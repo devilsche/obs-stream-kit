@@ -300,6 +300,18 @@ OCCASIONS = {
         "tier": "huge",
         "hint": "A lobby tougher than any you have played before",
     },
+    # Untergrenze 120: darunter faehrt jedes Auto, und der erste Ausflug
+    # ueberhaupt waere sonst schon ein Rekord. Gemessen erreichen Dacia
+    # und Mirado 147 bzw. 163 — der Bereich, in dem es interessant wird,
+    # liegt darueber.
+    "career_top_speed": {
+        "scope": "career", "metric": "top_speed", "kind": "record",
+        "min": 120, "unit": "km/h", "decimals": 1,
+        "label": "Top Speed", "widget": "big", "enabled": True,
+        "tier": "huge",
+        "hint": "Faster than you have ever driven before — at the wheel, "
+                "not in the passenger seat",
+    },
     "career_longest_kill": {
         "scope": "career", "metric": "longest_kill", "kind": "record",
         "min": 300, "unit": "metres",

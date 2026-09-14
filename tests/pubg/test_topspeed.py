@@ -149,3 +149,30 @@ def test_sedan_nennt_sein_basisfahrzeug():
     assert _fahrzeug_label("BP_Special_Sedan_02_C") == "Sedan · Mirado"
     # Ohne belegten Basistyp bleibt es beim reinen Namen.
     assert _fahrzeug_label("BP_Carrera_LGD_C") == "Porsche 911"
+
+
+def test_neuer_tempo_rekord_wird_gefeiert():
+    """Ein Rekord meldet sich nur, wenn er den alten wirklich schlaegt."""
+    from pubg.weapon_milestones import detect, default_config
+    cfg = default_config()
+    vorher = {"career": {"top_speed": 143.0}, "weapons": {}}
+    nachher = {"career": {"top_speed": 157.2}, "weapons": {},
+               "extra": {"top_speed": {"vehicleName": "Sedan · Mirado",
+                                        "mapName": "Neon_Main"}}}
+    ids = [m["occasion"] for m in detect(vorher, nachher, cfg)]
+    assert "career_top_speed" in ids
+
+
+def test_langsamer_als_der_rekord_meldet_nichts():
+    from pubg.weapon_milestones import detect, default_config
+    cfg = default_config()
+    vorher = {"career": {"top_speed": 157.2}, "weapons": {}}
+    nachher = {"career": {"top_speed": 150.0}, "weapons": {}}
+    ids = [m["occasion"] for m in detect(vorher, nachher, cfg)]
+    assert "career_top_speed" not in ids
+
+
+def test_gemuetliches_tempo_ist_kein_rekord():
+    """Ohne Untergrenze waere die erste Fahrt ueberhaupt ein Rekord."""
+    from pubg.weapon_milestones import OCCASIONS
+    assert OCCASIONS["career_top_speed"]["min"] >= 100

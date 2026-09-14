@@ -1036,6 +1036,25 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
                                        bekannt=vorher)
     career["hardest_lobby"] = wert
     extra = {}
+    # Tempo-Rekord: steht schon fertig in der Telemetrie, nur selbst
+    # gefahren zaehlt. Begleitzahlen dazu, damit die Feier sagen kann,
+    # womit und wo.
+    try:
+        from pubg.aggregations import compute_top_speed
+        tempo = compute_top_speed(conn, tenant_id, account_id)
+        if tempo.get("overall"):
+            o = tempo["overall"]
+            career["top_speed"] = o["kmh"]
+            extra["top_speed"] = {
+                "vehicleName": o.get("vehicleName"),
+                "mapName": o.get("mapName"),
+                "matchId": o.get("matchId"),
+                "playedAt": o.get("playedAt"),
+            }
+    except Exception:
+        # Ein fehlender Tempo-Wert darf die uebrigen Meilensteine nicht
+        # aufhalten — die Spalten gibt es erst seit dem Nachtrag.
+        pass
     if rekord_match:
         begleit = lobby_begleitzahlen(conn, tenant_id, rekord_match,
                                       account_id)

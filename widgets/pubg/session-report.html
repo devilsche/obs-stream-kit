@@ -1057,6 +1057,55 @@
     }
     .ve-match-head:first-child { margin-top: 2px; }
     .ve-veh { color: var(--pubg-text); }
+    .ts-box {
+      border: 1px solid var(--pubg-border, #2a2a32);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+    }
+    .ts-row {
+      display: grid;
+      grid-template-columns: auto 110px 1fr;
+      gap: 10px;
+      align-items: baseline;
+      padding: 4px 0;
+    }
+    .ts-kmh {
+      font-size: 1.5em;
+      font-weight: 700;
+      color: var(--pubg-gold, #f2b705);
+      font-variant-numeric: tabular-nums;
+    }
+    .ts-unit { font-size: 0.5em; margin-left: 3px; color: var(--pubg-muted); }
+    .ts-what { color: var(--pubg-muted); text-transform: uppercase;
+               font-size: 0.78em; letter-spacing: 0.05em; }
+    .ts-where { color: var(--pubg-text); }
+    .ts-note { color: var(--pubg-gold, #f2b705); font-size: 0.9em;
+               padding: 4px 0 2px; }
+    .ts-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--pubg-border, #2a2a32);
+    }
+    .ts-h {
+      margin: 0 0 4px;
+      font-size: 0.78em;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--pubg-muted);
+      font-weight: 700;
+    }
+    .ts-sub {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.92em;
+      padding: 2px 0;
+    }
+    .ts-sub b { font-variant-numeric: tabular-nums; }
     .ve-dealt { color: var(--pubg-good, #3cb44b); }
     .ve-taken { color: var(--pubg-warn, #e6194b); }
     .ve-wpn {
@@ -4561,13 +4610,17 @@
       const vehicleUrl = (FROM || TO)
         ? _SB + `api/pubg/vehicle-stats${fromTo}`
         : _SB + `api/pubg/vehicle-stats?range=session`;
-      const [trend, achievements, matches, hotDrop, payday, vehicle] = await Promise.all([
+      const [trend, achievements, matches, hotDrop, payday, vehicle, speed] =
+        await Promise.all([
         PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/trend-deltas${fromTo}`, EXTRAS_TIMEOUT_MS).catch(() => null),
         PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session-achievements${fromTo}`, EXTRAS_TIMEOUT_MS).catch(() => []),
         PubgUI.fetchJson(matchesUrl, EXTRAS_TIMEOUT_MS).catch(() => []),
         PubgUI.fetchJson(hotDropUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
         PubgUI.fetchJson(paydayUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
         PubgUI.fetchJson(vehicleUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
+        // Ohne Zeitraum: ein Bestwert gilt fuer immer, nicht fuer die
+        // gewaehlte Phase.
+        PubgUI.fetchJson(_SB + "api/pubg/top-speed", EXTRAS_TIMEOUT_MS).catch(() => null),
       ]);
 
       // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen.
@@ -4980,6 +5033,38 @@
           </div>`;
         }).join("");
       }
+      // --- Top Speed ------------------------------------------------
+      // Ein Rekord gilt fuer immer, nicht fuer eine Session — deshalb
+      // steht er hier ohne Zeitraum. Der Lobby-Bestwert daneben, nicht
+      // dazwischen: das ist nicht meine Leistung.
+      let speedHtml = "";
+      if (speed && speed.overall) {
+        const o = speed.overall;
+        const a2 = speed.allPlayers;
+        const istMeiner = a2 && Math.abs(a2.kmh - o.kmh) < 0.05;
+        const zeile = (v, was) => `<div class="ts-row">
+            <span class="ts-kmh">${v.kmh.toFixed(1)}<span class="ts-unit">km/h</span></span>
+            <span class="ts-what">${was}</span>
+            <span class="ts-where">${v.vehicleName} · ${PubgUI.fmtMap(v.mapName)}</span>
+          </div>`;
+        const proFz = (speed.perVehicle || []).slice(0, 6).map(v =>
+          `<div class="ts-sub"><span>${v.vehicleName}</span>
+             <b>${v.kmh.toFixed(1)}</b></div>`).join("");
+        const proMap = (speed.perMap || []).map(v =>
+          `<div class="ts-sub"><span>${PubgUI.fmtMap(v.mapName)}</span>
+             <b>${v.kmh.toFixed(1)}</b></div>`).join("");
+        speedHtml = `<h3 class="extras-h">Top Speed</h3>
+          <div class="ts-box">
+            ${zeile(o, "my record")}
+            ${a2 && !istMeiner ? zeile(a2, "best in lobby") : ""}
+            ${istMeiner ? `<div class="ts-note">Nobody in any of your
+               lobbies has ever driven faster.</div>` : ""}
+            <div class="ts-cols">
+              <div><h4 class="ts-h">By vehicle</h4>${proFz}</div>
+              <div><h4 class="ts-h">By map</h4>${proMap}</div>
+            </div>
+          </div>`;
+      }
       if (vehicle && Array.isArray(vehicle.members) && vehicle.members.length) {
         const parts = [];
         for (const m of vehicle.members) {
@@ -5019,7 +5104,8 @@
         }
       }
 
-      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml + specialHtml + vehicleHtml;
+      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml
+                            + specialHtml + speedHtml + vehicleHtml;
       // Skeleton-Reserve-Hoehe entfernen, sobald echter Content drin ist —
       // sonst klebt 450px Leerraum unten an wenn der Content kuerzer ist.
       placeholder.classList.add("extras-placeholder--filled");
