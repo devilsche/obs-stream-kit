@@ -4922,7 +4922,9 @@
         return events.map(ev => {
           const mapName = ev.mapName || "";
           const poi = poiOfV(mapName, ev.x, ev.y);
-          const veh = fmtVeh(ev.vehicle);
+          // Der Name kommt aus der Fahrzeugtabelle des Backends; die
+          // Muster hier sind nur noch Notnagel fuer alte Antworten.
+          const veh = ev.vehicleName || fmtVeh(ev.vehicle);
           const opp = ev.opponent ? `<b>${ev.opponent}</b>` : "an opponent";
           const matchT = fmtMatchTime(ev.tsMs);
           const absT = fmtAbsClock(ev.playedAt, ev.tsMs);

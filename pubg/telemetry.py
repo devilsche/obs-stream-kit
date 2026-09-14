@@ -36,7 +36,24 @@ def _normalize(event):
             "damage_reason": None,
             "seat_index": None,
             "attachments": None,
+            "velocity": None,
+            "vehicle_id": None,
             "payload_json": None}
+    # PUBG haengt den Fahrzeug-Zustand an fast jedes Event des Spielers,
+    # der gerade drin sitzt — auch an Position. Damit haben wir Tempo und
+    # Fahrzeug ohne einen einzigen zusaetzlichen Event-Typ. `weapon`
+    # bleibt der Waffe vorbehalten, sonst waere die Position eines
+    # Autofahrers ploetzlich ein Waffen-Ereignis.
+    _veh = event.get("vehicle") or {}
+    if _veh.get("vehicleId"):
+        base["vehicle_id"] = _veh.get("vehicleId")
+        if _veh.get("velocity") is not None:
+            base["velocity"] = _veh.get("velocity")
+        # Der Sitzplatz steht auch im vehicle-Block — erst damit laesst
+        # sich "ich bin gefahren" von "ich sass daneben" trennen, denn
+        # der Beifahrer hat dieselbe Geschwindigkeit.
+        if base["seat_index"] is None and _veh.get("seatIndex") is not None:
+            base["seat_index"] = _veh.get("seatIndex")
     # Helper: extracts z + health for character-events (for landing-pin
     # heuristic; ground-events have z<800 and health>0).
     def _z_health(ev, key):
@@ -302,6 +319,22 @@ def _normalize(event):
 # Events die wir immer behalten (auch ohne Squad-Beteiligung) — wichtig für
 # Fight-Cluster-Detection: enemy-vs-enemy Kills/Knocks zeigen welche anderen
 # Teams im selben Fight involviert sind.
+#: Was sich am Boden bewegt. Die Transportmaschine und die Gleiter
+#: haengen an den Positionen jedes Spielers, solange er drin sitzt — als
+#: Geschwindigkeits-Rekord waere das Flugzeug mit 1000+ km/h jedes Mal
+#: der Sieger und die Zahl waertlos.
+_KEINE_LANDFAHRZEUGE = ("Aircraft", "Motorglider", "Parachute", "Plane",
+                        "MortarPawn", "Glider")
+
+
+def ist_landfahrzeug(vehicle_id) -> bool:
+    """Faehrt das Ding, oder fliegt es?"""
+    s = str(vehicle_id or "")
+    if not s:
+        return False
+    return not any(n in s for n in _KEINE_LANDFAHRZEUGE)
+
+
 def extract_map_name(events) -> str | None:
     """Sucht in den Raw-Events den Map-Namen.
 

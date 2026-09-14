@@ -253,6 +253,8 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     damage_reason   TEXT,
     seat_index      INTEGER,
     attachments     TEXT,
+    velocity        DOUBLE PRECISION,
+    vehicle_id      TEXT,
     payload_json    TEXT
 );
 -- Additive: damage_reason + seat_index + attachments kamen nach Schema-
@@ -262,9 +264,17 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
 -- seat_index = Sitzposition fuer VehicleEnter/VehicleLeave (0 = Fahrer).
 -- attachments = JSON-Array der Killer-Weapon-Attachments (additionalInfo
 -- aus killerDamageInfo). Alte Rows NULL — via hidrive_refill nachfuellbar.
+-- velocity + vehicle_id: PUBG haengt an fast jedes Event den Zustand des
+-- Fahrzeugs, in dem der Spieler gerade sitzt — auch an LogPlayerPosition,
+-- das wir ohnehin importieren. Die Geschwindigkeit stand damit in jedem
+-- Blob und wurde bisher weggeworfen. vehicle_id gehoert dazu, sonst weiss
+-- man bei einer Position nicht, WOMIT gefahren wurde (`weapon` ist dort
+-- leer und bleibt der Waffe vorbehalten).
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS damage_reason TEXT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS seat_index INTEGER;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS attachments TEXT;
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS velocity DOUBLE PRECISION;
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS vehicle_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_tel_match
     ON telemetry_events(match_id);
 CREATE INDEX IF NOT EXISTS idx_tel_match_type
@@ -937,6 +947,8 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
         e.get("damage_reason"),
         e.get("seat_index"),
         e.get("attachments"),
+        e.get("velocity"),
+        e.get("vehicle_id"),
         e.get("payload_json", "{}"),
     ) for e in events]
     with conn.cursor() as cur:
@@ -946,7 +958,7 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
             "(match_id, event_type, timestamp_ms, actor_account, "
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
-            "seat_index, attachments, payload_json) "
+            "seat_index, attachments, velocity, vehicle_id, payload_json) "
             "VALUES %s",
             rows,
         )
@@ -1011,6 +1023,8 @@ def append_telemetry_events(conn, match_id: str, events: list) -> int:
         e.get("damage_reason"),
         e.get("seat_index"),
         e.get("attachments"),
+        e.get("velocity"),
+        e.get("vehicle_id"),
         e.get("payload_json", "{}"),
     ) for e in events]
     with conn.cursor() as cur:
@@ -1020,7 +1034,7 @@ def append_telemetry_events(conn, match_id: str, events: list) -> int:
             "(match_id, event_type, timestamp_ms, actor_account, "
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
-            "seat_index, attachments, payload_json) "
+            "seat_index, attachments, velocity, vehicle_id, payload_json) "
             "VALUES %s",
             rows,
         )

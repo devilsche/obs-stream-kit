@@ -433,6 +433,27 @@ _MULTIFIGHT_WINDOW_MS = 90_000
 # Vehicle-Pattern → Klartext-Name. Mehrere Skins/Varianten desselben
 # Modells werden zusammengefasst (Mirado_A_02 / Mirado_A_03_Esports / ...
 # alle → 'Mirado').
+def _fahrzeug_label(vid):
+    """Anzeigename eines Fahrzeugs, sonst die gekuerzte Id.
+
+    Sitzt der Skin auf einem bekannten Basisfahrzeug, steht das dahinter
+    ("Sedan · Dacia") — denn gefahren wird der Basistyp, und derselbe
+    Sedan gibt es auf zwei davon, die sich deutlich unterschiedlich
+    fahren.
+    """
+    s = str(vid or "")
+    name = None
+    for needle, label in _VEHICLE_PATTERNS:
+        if needle in s:
+            name = label
+            break
+    if name is None:
+        name = (s.replace("BP_", "").replace("_C", "")
+                 .replace("_", " ").strip()) or "?"
+    basis = VEHICLE_BASE.get(s)
+    return f"{name} · {basis}" if basis else name
+
+
 def _ist_fahrzeug_waffe(wid):
     """Steht in `weapon` ein Fahrzeug statt einer Waffe?
 
@@ -472,7 +493,53 @@ _VEHICLE_PATTERNS = [
     ("Lava_Mtb",      "Mountain Bike"),
     ("Scooter",       "Scooter"),
     ("EmergencyPickup", "Emergency Pickup"),
+    # --- Lizenz- und Sonder-Fahrzeuge -------------------------------
+    # Bis hierher stand fuer 55 der 109 Ids nur die rohe Id in der
+    # Anzeige. Die Reihenfolge zaehlt: der erste Treffer gewinnt, also
+    # muss Spezielles vor Allgemeinem stehen.
+    ("Special_Sedan", "Sedan"),
+    ("Cayenne",       "Porsche Cayenne"),
+    ("Carrera",       "Porsche 911"),
+    ("Panamera",      "Porsche Panamera"),
+    ("Urus",          "Lamborghini Urus"),
+    ("Countach",      "Lamborghini Countach"),
+    ("Chiron",        "Bugatti Chiron"),
+    ("Vantage",       "Aston Martin Vantage"),
+    ("DBX",           "Aston Martin DBX"),
+    ("McLarenGT",     "McLaren GT"),
+    ("PanigaleV4S",   "Ducati Panigale"),
+    ("RoadGlideST",   "Harley Road Glide"),
+    ("ElSolitario",   "El Solitario"),
+    ("FbrBike",       "FBR Bike"),
+    ("Classic_",      "Classic Car"),
+    ("M_Rony",        "Rony"),
+    ("TukTukTuk",     "Tukshai"),
+    ("Food_Truck",    "Food Truck"),
+    ("Porter",        "Porter"),
+    ("Dirtbike",      "Dirt Bike"),
+    ("Bicycle",       "Bicycle"),
+    ("ATV",           "ATV"),
+    ("AquaRail",      "Aquarail"),
+    ("Rubber_boat",   "Rubber Boat"),
+    ("PG117",         "PG-117"),
+    # Fliegt, faehrt nicht — steht hier nur, damit die Anzeige nicht die
+    # rohe Id zeigt. Fuer Geschwindigkeits-Rekorde ist es ausgeschlossen.
+    ("Motorglider",             "Motor Glider"),
+    ("DummyTransportAircraft",  "Transport Plane"),
+    ("TransportAircraft",       "Transport Plane"),
+    ("RedeployAircraft",        "Redeploy Plane"),
+    ("MortarPawn",              "Mortar"),
 ]
+
+#: Welcher Skin auf welchem Basisfahrzeug sitzt. Nur was gemessen ist:
+#: das Fahrverhalten haengt am Basistyp, nicht am Blech. Belegt ueber
+#: die `velocity`-Werte aus 40 archivierten Matches — Sedan 01 kommt in
+#: 1225 Messungen nie ueber 145 km/h (Dacia-Korridor), Sedan 02 erreicht
+#: 157 (das schafft nur der Mirado).
+VEHICLE_BASE = {
+    "BP_Special_Sedan_01_C": "Dacia",
+    "BP_Special_Sedan_02_C": "Mirado",
+}
 
 # Environment / Misc — Brand/Bombe/Care-Package-Drop etc.
 _ENVIR_NAMES = {
@@ -3522,6 +3589,9 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             "x":         e.get("vx"),
             "y":         e.get("vy"),
             "vehicle":   vehicle_class,
+            # Name aus der Tabelle des Backends — das Frontend hat eine
+            # eigene Kopie der Muster, die damit nur noch Notnagel ist.
+            "vehicleName": _fahrzeug_label(vehicle_class),
             # Womit wurde geschossen. Beim Ueberfahren steht in `weapon`
             # das Fahrzeug — das zeigt die Zeile ohnehin schon, also
             # bleibt der Name hier leer statt ihn doppelt zu nennen.
@@ -3655,6 +3725,95 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         -(s["evictionsDealt"] + s["evictionsTaken"]),
     ))
     return out
+
+
+#: cm/s -> km/h. PUBG liefert die Geschwindigkeit in Zentimetern je
+#: Sekunde, wie alle Laengen in der Telemetrie.
+_CMS_ZU_KMH = 0.036
+
+
+def compute_top_speed(conn, tenant_id: int, my_account_id,
+                      limit_vehicles: int = 12):
+    """Hoechstgeschwindigkeit: insgesamt, je Fahrzeug, je Karte.
+
+    Quelle ist das `velocity`-Feld, das PUBG an jedes Event des Spielers
+    haengt, der gerade im Fahrzeug sitzt — auch an die Positionen, die
+    ohnehin importiert werden.
+
+    Nur **selbst gefahren** (Sitz 0): der Beifahrer ist genauso schnell
+    unterwegs, gelenkt hat er aber nicht. Und nur, was am Boden faehrt —
+    die Transportmaschine haengt an den Positionen jedes Spielers,
+    solange er drin sitzt, und waere mit 1000+ km/h jedes Mal der
+    Rekordhalter.
+
+    `allPlayers` steht bewusst daneben statt mit drin: das ist der
+    Bestwert der ganzen Lobby, nicht meiner.
+    """
+    from pubg.telemetry import _KEINE_LANDFAHRZEUGE
+
+    eigene = ([my_account_id] if isinstance(my_account_id, str)
+              else [a for a in (my_account_id or []) if a])
+    if not eigene:
+        return {"overall": None, "perVehicle": [], "perMap": [],
+                "allPlayers": None}
+
+    # Flugzeuge und Gleiter raus, direkt in der Abfrage.
+    nicht_land = " ".join(
+        f"AND e.vehicle_id NOT LIKE '%{n}%'" for n in _KEINE_LANDFAHRZEUGE)
+    basis = f"""
+        FROM telemetry_events e
+        JOIN matches m ON m.match_id = e.match_id AND m.tenant_id = ?
+        WHERE e.velocity IS NOT NULL AND e.vehicle_id IS NOT NULL
+          AND e.seat_index = 0
+          {nicht_land}
+    """
+
+    def _zeile(r):
+        if not r or r["v"] is None:
+            return None
+        return {"kmh": round((r["v"] or 0) * _CMS_ZU_KMH, 1),
+                "vehicleId": r["vehicle_id"],
+                "vehicleName": _fahrzeug_label(r["vehicle_id"]),
+                "mapName": r["map_name"],
+                "matchId": r["match_id"],
+                "playedAt": r["played_at"]}
+
+    marks = ",".join("?" * len(eigene))
+    meine = conn.execute(f"""
+        SELECT e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
+               m.played_at
+        {basis} AND e.actor_account IN ({marks})
+        ORDER BY e.velocity DESC LIMIT 1
+    """, [tenant_id] + eigene).fetchone()
+
+    alle = conn.execute(f"""
+        SELECT e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
+               m.played_at
+        {basis}
+        ORDER BY e.velocity DESC LIMIT 1
+    """, (tenant_id,)).fetchone()
+
+    je_fahrzeug = conn.execute(f"""
+        SELECT DISTINCT ON (e.vehicle_id)
+               e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
+               m.played_at
+        {basis} AND e.actor_account IN ({marks})
+        ORDER BY e.vehicle_id, e.velocity DESC
+    """, [tenant_id] + eigene).fetchall()
+
+    je_karte = conn.execute(f"""
+        SELECT DISTINCT ON (m.map_name)
+               e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
+               m.played_at
+        {basis} AND e.actor_account IN ({marks})
+        ORDER BY m.map_name, e.velocity DESC
+    """, [tenant_id] + eigene).fetchall()
+
+    fz = sorted((_zeile(r) for r in je_fahrzeug),
+                key=lambda x: -x["kmh"])[:limit_vehicles]
+    km = sorted((_zeile(r) for r in je_karte), key=lambda x: -x["kmh"])
+    return {"overall": _zeile(meine), "perVehicle": fz, "perMap": km,
+            "allPlayers": _zeile(alle)}
 
 
 def compute_lobby_avg_kd(conn, tenant_id: int, my_account_id, range_key="session"):

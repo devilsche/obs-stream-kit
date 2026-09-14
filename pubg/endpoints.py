@@ -272,6 +272,8 @@ class EndpointRegistry:
             return self._trend_deltas(qs)
         if route == ("GET", "/api/pubg/session-matches"):
             return self._session_matches(qs)
+        if route == ("GET", "/api/pubg/top-speed"):
+            return self._top_speed(qs)
         if route == ("GET", "/api/pubg/vehicle-stats"):
             return self._vehicle_stats(qs)
         if route == ("GET", "/api/pubg/weapon-stats"):
@@ -1217,6 +1219,19 @@ class EndpointRegistry:
             "weapons": rows, "count": len(rows),
             "playerName": actor_name,
         })
+
+    def _top_speed(self, qs):
+        """Hoechstgeschwindigkeit — meine und die der Lobby, getrennt.
+
+        Kein `range`: ein Rekord gilt fuer immer, nicht fuer eine
+        Session.
+        """
+        from pubg.aggregations import compute_top_speed
+        conn = self.get_conn()
+        return _ok(self.cache.get_or_compute(
+            "top-speed",
+            lambda: compute_top_speed(conn, self.tenant_id,
+                                      self.my_account_id)))
 
     def _vehicle_stats(self, qs):
         conn = self.get_conn()
