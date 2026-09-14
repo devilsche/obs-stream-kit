@@ -849,6 +849,25 @@ def _ist_drop_waffe(item_id):
     return str(item_id or "") in DROP_WEAPONS
 
 
+def _items_gezaehlt(labels):
+    """Wiederholungen zu "3x ..." zusammenziehen, Reihenfolge behalten.
+
+    Ein Paket enthaelt oft dreimal dieselbe Munition — als drei
+    gleiche Eintraege untereinander liest sich das wie ein Fehler.
+    """
+    reihenfolge = []
+    anzahl = {}
+    for l in labels:
+        if not l:
+            continue
+        if l not in anzahl:
+            reihenfolge.append(l)
+            anzahl[l] = 0
+        anzahl[l] += 1
+    return [(f"{anzahl[l]}x {l}" if anzahl[l] > 1 else l)
+            for l in reihenfolge]
+
+
 def _item_label(item_id):
     """Lesbarer Name eines Abwurf-Items, sonst die gekuerzte Id.
 
@@ -2478,6 +2497,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 return False
 
             recent_other_damage = None
+            letzter_echter_schaden = None
             for d in dmg_by_target.get(target, []):
                 d_ts = d["timestamp_ms"]
                 if d_ts >= ts:
@@ -2493,6 +2513,13 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         and _is_vehicle_weapon(d["weapon"])):
                     continue
                 recent_other_damage = d  # latest non-self damage wins
+                if (d["damage"] or 0) > 0:
+                    # Nur ein Treffer, der wirklich Schaden macht, kann
+                    # den Tod verursacht haben. PUBG bucht Treffer auf
+                    # einen bereits Liegenden mit 0 — die bleiben oben
+                    # fuer die Finisher-Suche erhalten, taugen aber nicht
+                    # als Beleg, dass hier jemand nachgelegt hat.
+                    letzter_echter_schaden = d
 
             # Selbst zugefuegter Schaden kurz vor dem Tod (Panzerfaust in
             # die eigene Wand, Granate zu kurz geworfen, ...). PUBG liefert
@@ -2511,7 +2538,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 recent_self_damage = d  # latest self damage wins
             # Bleed-Out: wenn vorher ein Knock UND in den letzten 2s
             # KEIN non-self damage → ausgeblutet.
-            bled_out = bool(knock_ev) and recent_other_damage is None
+            # Ausgeblutet heisst: nach dem Knock kam nichts mehr, was
+            # wehtut. Ein wirkungsloser Nachschuss aendert daran nichts —
+            # solange der mitzaehlte, sah jeder Squad-Wipe wie ein
+            # normaler Kill aus.
+            bled_out = bool(knock_ev) and letzter_echter_schaden is None
             # damage_reason kann es explizit override'n (selten direkt
             # gesetzt von PUBG, aber wenn vorhanden vertrauen).
             if dmg_reason and "BleedOut" in dmg_reason:
@@ -3229,7 +3260,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
         except Exception:
             continue
         if isinstance(items, list):
-            inhalt_am_ort[o] = [_item_label(i) for i in items if i]
+            inhalt_am_ort[o] = _items_gezaehlt(
+                [_item_label(i) for i in items if i])
 
     for r in drop_rows:
         acc = r["actor_account"]
@@ -3271,6 +3303,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             erste = gefiltert[vorher]
             if ev.get("takenItem"):
                 erste.setdefault("takenItems", []).append(ev["takenItem"])
+    for ev in gefiltert:
+        if ev.get("type") == "airdrop_looted":
+            ev["takenItems"] = _items_gezaehlt(ev.get("takenItems") or [])
     events_out = gefiltert
 
     events_out.sort(key=lambda x: x["tsMs"] or 0)

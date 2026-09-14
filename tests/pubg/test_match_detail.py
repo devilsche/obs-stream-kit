@@ -489,6 +489,36 @@ def test_timelog_zeigt_den_ganzen_drop_inhalt():
     assert ev["takenItem"] == "Level 3 Helmet"
 
 
+def test_gleiche_items_werden_zusammengefasst():
+    """Dreimal dieselbe Munition ist "3x", nicht dreimal derselbe Eintrag."""
+    conn = _setup()
+    mid = _basic_match(conn, "md3")
+    evs = []
+    for acc in ("account.A", "account.B"):
+        e = _ev("Position", 5000, actor=acc)
+        e["actor_z"] = 160000.0
+        evs.append(e)
+        evs.append(_ev("Landing", 60000, actor=acc))
+    land = _ev("CarePackageLand", 120000, weapon="Carapackage_RedBox_C")
+    land["actor_x"], land["actor_y"] = 5000.0, 5000.0
+    land["attachments"] = json.dumps([
+        "Item_Weapon_Groza_C", "Item_Ammo_762mm_C", "Item_Ammo_762mm_C",
+        "Item_Ammo_762mm_C", "Item_Head_G_01_Lv3_C"])
+    evs.append(land)
+    for i in range(2):
+        pick = _ev("CarePackagePickup", 130000 + i, actor="account.A",
+                   weapon="Item_Ammo_762mm_C")
+        pick["actor_x"], pick["actor_y"] = 5000.0, 5000.0
+        pick["attachments"] = "Carapackage_RedBox_C"
+        evs.append(pick)
+    insert_telemetry_events(conn, mid, evs)
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    ev = next(e for e in d["events"] if e["type"] == "airdrop_looted")
+    assert ev["dropContents"] == ["Groza", "3x 7.62mm Ammo",
+                                  "Level 3 Helmet"]
+    assert ev["takenItems"] == ["2x 7.62mm Ammo"]
+
+
 def test_regulaerer_drop_ist_nicht_angefordert():
     conn = _setup()
     mid = _drop_match(conn, "md2", mit_flare=False)
@@ -503,3 +533,49 @@ def test_flare_taucht_als_eigene_zeile_auf():
     d = compute_match_detail(conn, T, "account.A", mid) or {}
     ev = next(e for e in d["events"] if e["type"] == "flare_fired")
     assert ev["actorName"] == "PEX_LuCKoR"
+
+
+def test_wirkungsloser_treffer_verdeckt_den_squad_wipe_nicht():
+    """Ein Treffer mit damage=0 hat niemanden getoetet.
+
+    PUBG zaehlt Treffer auf einen bereits liegenden Spieler mit 0
+    Schaden. Solange die als "da kam noch was" galten, sah jeder
+    Squad-Wipe wie ein normaler Kill aus — dabei starb der Geknockte,
+    weil sein letzter Mate fiel, nicht durch diesen Streifschuss.
+    """
+    conn = _setup()
+    mid = _basic_match(conn, "mw3")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.E", target="account.A",
+            weapon="WeapP90_C", damage=30.0),
+        # Nachschuss auf den Liegenden — ohne jede Wirkung, und dicht
+        # genug am Tod, dass die Finisher-Suche ihn ueberhaupt sieht.
+        _ev("TakeDamage", 704800, actor="account.E", target="account.A",
+            weapon="WeapP90_C", damage=0.0),
+        _ev("Kill", 705000, actor="account.E", target="account.B",
+            weapon="WeapP90_C", reason="Damage_Gun"),
+        _ev("Kill", 705100, actor="account.E", target="account.A",
+            weapon="WeapP90_C", reason="Damage_Gun"),
+    ])
+    ev = _typ_of(conn, mid, "PEX_LuCKoR")
+    assert ev["type"] == "kill_squad_wiped"
+
+
+def test_echter_nachschuss_bleibt_ein_kill():
+    """Die Gegenprobe: wer wirklich trifft, hat auch erledigt."""
+    conn = _setup()
+    mid = _basic_match(conn, "mw4")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.E", target="account.A",
+            weapon="WeapP90_C", damage=30.0),
+        _ev("TakeDamage", 705050, actor="account.E", target="account.A",
+            weapon="WeapP90_C", damage=25.0),
+        _ev("Kill", 705000, actor="account.E", target="account.B",
+            weapon="WeapP90_C", reason="Damage_Gun"),
+        _ev("Kill", 705100, actor="account.E", target="account.A",
+            weapon="WeapP90_C", reason="Damage_Gun"),
+    ])
+    ev = _typ_of(conn, mid, "PEX_LuCKoR")
+    assert ev["type"] == "kill"

@@ -683,10 +683,16 @@ DROP_ITEM_LABELS = {
     # jedem Inhalt und sagt nichts ueber die Beute.
     "Item_Weapon_PackageFlare_C": "Package Flare",
     "Item_Weapon_CoverStructDropHandFlare_C": "Hand Flare",
+    # Large/Medium ist nur die Waffenklasse, nicht der Item-Name — im
+    # Spiel heisst beides gleich.
     "Item_Attach_Weapon_Magazine_ExtendedQuickDraw_Large_C":
-        "Ext. QuickDraw Mag (Large)",
+        "Extended Quickdraw Magazine",
     "Item_Attach_Weapon_Magazine_ExtendedQuickDraw_Medium_C":
-        "Ext. QuickDraw Mag",
+        "Extended Quickdraw Magazine",
+    "Item_Attach_Weapon_Magazine_Extended_Large_C": "Extended Magazine",
+    "Item_Attach_Weapon_Magazine_Extended_Medium_C": "Extended Magazine",
+    "Item_Attach_Weapon_Magazine_QuickDraw_Large_C": "Quickdraw Magazine",
+    "Item_Attach_Weapon_Magazine_QuickDraw_Medium_C": "Quickdraw Magazine",
 }
 
 
