@@ -3793,6 +3793,9 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
         ORDER BY e.velocity DESC LIMIT 1
     """, (tenant_id,)).fetchone()
 
+    # Alle Fahrten, die schnellste zuerst — nach Anzeigename gruppiert
+    # wird unten. Dacia hat vier Spawn-Varianten, die untereinander wie
+    # vier verschiedene Autos aussaehen.
     je_fahrzeug = conn.execute(f"""
         SELECT DISTINCT ON (e.vehicle_id)
                e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
@@ -3809,7 +3812,13 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
         ORDER BY m.map_name, e.velocity DESC
     """, [tenant_id] + eigene).fetchall()
 
-    fz = sorted((_zeile(r) for r in je_fahrzeug),
+    bester_je_name = {}
+    for r in je_fahrzeug:
+        z = _zeile(r)
+        vorher = bester_je_name.get(z["vehicleName"])
+        if vorher is None or z["kmh"] > vorher["kmh"]:
+            bester_je_name[z["vehicleName"]] = z
+    fz = sorted(bester_je_name.values(),
                 key=lambda x: -x["kmh"])[:limit_vehicles]
     km = sorted((_zeile(r) for r in je_karte), key=lambda x: -x["kmh"])
     return {"overall": _zeile(meine), "perVehicle": fz, "perMap": km,

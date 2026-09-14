@@ -176,3 +176,32 @@ def test_gemuetliches_tempo_ist_kein_rekord():
     """Ohne Untergrenze waere die erste Fahrt ueberhaupt ein Rekord."""
     from pubg.weapon_milestones import OCCASIONS
     assert OCCASIONS["career_top_speed"]["min"] >= 100
+
+
+def test_das_rettungsfahrzeug_zaehlt_nicht():
+    """Der Emergency Pickup traegt einen durch die Luft, gefahren wird er
+    nicht — mit 260 km/h waere er sonst ewig der Rekordhalter."""
+    _match("ts7")
+    db_pg.insert_telemetry_events(CONN.raw, "ts7", [
+        _fahrt("ts7", 1000, 259.0, "BP_EmergencyPickupVehicle_C"),
+        _fahrt("ts7", 2000, 131.0, "Dacia_A_01_v2_C"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    assert round(d["overall"]["kmh"]) == 131
+
+
+def test_spawnvarianten_desselben_autos_sind_eine_zeile():
+    """Drei Dacias untereinander sind keine drei Fahrzeuge."""
+    _match("ts8")
+    db_pg.insert_telemetry_events(CONN.raw, "ts8", [
+        _fahrt("ts8", 1000, 120.0, "Dacia_A_01_v2_C"),
+        _fahrt("ts8", 2000, 141.0, "Dacia_A_03_v2_Esports_C"),
+        _fahrt("ts8", 3000, 133.0, "Dacia_A_02_v2_C"),
+        _fahrt("ts8", 4000, 99.0, "Uaz_B_01_C"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    namen = [v["vehicleName"] for v in d["perVehicle"]]
+    assert namen == ["Dacia", "UAZ"]
+    assert round(d["perVehicle"][0]["kmh"]) == 141

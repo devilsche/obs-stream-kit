@@ -324,7 +324,11 @@ def _normalize(event):
 #: Geschwindigkeits-Rekord waere das Flugzeug mit 1000+ km/h jedes Mal
 #: der Sieger und die Zahl waertlos.
 _KEINE_LANDFAHRZEUGE = ("Aircraft", "Motorglider", "Parachute", "Plane",
-                        "MortarPawn", "Glider")
+                        "MortarPawn", "Glider",
+                        # Das Rettungsfahrzeug traegt einen durch die
+                        # Luft; gefahren wird es nicht. Gemessen 260 km/h
+                        # — damit waere es ewig der Rekordhalter.
+                        "EmergencyPickup")
 
 
 def ist_landfahrzeug(vehicle_id) -> bool:
