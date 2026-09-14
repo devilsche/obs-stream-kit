@@ -925,6 +925,59 @@ def get_seasons_for_player(conn, tenant_id: int, account_id: str):
 # ── Telemetry ───────────────────────────────────────────────────────────────
 
 
+#: Alle inhaltlichen Spalten. Zwei Zeilen, die hierin uebereinstimmen,
+#: beschreiben dasselbe Ereignis — `id` ist nur die Einfuege-Reihenfolge.
+_TEL_FELDER = (
+    "match_id", "event_type", "timestamp_ms", "actor_account",
+    "target_account", "actor_x", "actor_y", "actor_z", "actor_health",
+    "victim_x", "victim_y", "weapon", "distance", "damage",
+    "damage_reason", "seat_index", "attachments", "velocity", "vehicle_id",
+)
+
+
+def dedupe_telemetry(conn, match_id: str = None, limit: int = 0) -> int:
+    """Doppelt importierte Ereignisse entfernen, das erste behalten.
+
+    Verglichen wird ueber ALLE inhaltlichen Spalten. Eine Schrot-Salve
+    trifft mehrfach in derselben Millisekunde, unterscheidet sich aber
+    im Schaden — solche Zeilen bleiben deshalb erhalten. Gibt die Zahl
+    der geloeschten Zeilen zurueck.
+    """
+    felder = ", ".join(_TEL_FELDER)
+    wo = "WHERE match_id = %s" if match_id else ""
+    grenze = f"LIMIT {int(limit)}" if limit else ""
+    sql = f"""
+        DELETE FROM telemetry_events WHERE id IN (
+          SELECT id FROM (
+            SELECT id, row_number() OVER (
+                     PARTITION BY {felder} ORDER BY id) AS rn
+            FROM telemetry_events {wo}
+          ) x WHERE rn > 1 {grenze}
+        )
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql, (match_id,) if match_id else ())
+        return cur.rowcount
+
+
+def _ohne_dubletten(rows):
+    """Zeilen, die in JEDEM Feld gleich sind, nur einmal behalten.
+
+    Ein Spieler kann nicht zweimal in derselben Millisekunde von
+    derselben Waffe aus derselben Entfernung erledigt werden. Schrot
+    trifft dagegen mehrfach im selben Moment — solche Zeilen
+    unterscheiden sich im Schaden und bleiben deshalb erhalten.
+    """
+    gesehen = set()
+    aus = []
+    for r in rows:
+        if r in gesehen:
+            continue
+        gesehen.add(r)
+        aus.append(r)
+    return aus
+
+
 def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     """Insert telemetry events for a match. Telemetry is GLOBAL (no
     tenant_id) — wenn ein anderer Tenant das Match schon gefetched hat,
@@ -932,6 +985,13 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
     if not events:
         return
     with conn.cursor() as cur:
+        # Telemetrie ist global: spielen zwei Tenants zusammen, holen
+        # beide Poller dasselbe Match. Die Pruefung unten lief bisher
+        # ohne Sperre — beide sahen "noch leer", beide schrieben, und
+        # jedes Ereignis stand zweimal in der DB. Der Lock haelt bis zum
+        # Ende der Transaktion und serialisiert genau diesen Fall.
+        cur.execute("SELECT pg_advisory_xact_lock(hashtext(%s))",
+                    (f"telemetry:{match_id}",))
         cur.execute(
             "SELECT 1 FROM telemetry_events WHERE match_id = %s LIMIT 1",
             (match_id,))
@@ -951,6 +1011,7 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
         e.get("vehicle_id"),
         e.get("payload_json", "{}"),
     ) for e in events]
+    rows = _ohne_dubletten(rows)
     with conn.cursor() as cur:
         execute_values(
             cur,

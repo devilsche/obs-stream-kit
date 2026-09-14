@@ -1331,6 +1331,58 @@ def _drop_events_nachtragen(conn, match_id, client, url, squad_ids):
     return append_telemetry_events(raw_conn, match_id, neu)
 
 
+def dedupe_telemetry_cli(root: str, args=None) -> int:
+    """Doppelt importierte Telemetrie-Ereignisse entfernen.
+
+    Telemetrie ist global: spielen zwei Tenants zusammen, holten beide
+    Poller dasselbe Match, und die Pruefung "hat es schon Events?" lief
+    ohne Sperre — beide sahen leer, beide schrieben. Der Import ist
+    seit der Sperre dagegen sicher; dieser Lauf raeumt den Altbestand.
+
+    Verglichen wird ueber ALLE inhaltlichen Spalten, `id` also
+    ausgenommen. Eine Schrot-Salve trifft mehrfach in derselben
+    Millisekunde, unterscheidet sich aber im Schaden und bleibt
+    erhalten.
+
+    Nutzung:
+        python -m pubg.cli dedupe-telemetry [--dry-run] [--match ID]
+    """
+    from core.db import connect
+    from pubg.db_pg import dedupe_telemetry, _TEL_FELDER
+
+    args = args or []
+    mid = None
+    if "--match" in args:
+        i = args.index("--match")
+        mid = args[i + 1] if i + 1 < len(args) else None
+    trocken = "--dry-run" in args
+
+    raw = connect()
+    felder = ", ".join(_TEL_FELDER)
+    wo = "WHERE match_id = %s" if mid else ""
+    with raw.cursor() as cur:
+        cur.execute(f"""
+            SELECT count(*) AS n, count(DISTINCT match_id) AS matches
+            FROM (
+              SELECT match_id, row_number() OVER (
+                       PARTITION BY {felder} ORDER BY id) AS rn
+              FROM telemetry_events {wo}
+            ) x WHERE rn > 1
+        """, (mid,) if mid else ())
+        r = cur.fetchone()
+    print(f"=== dedupe-telemetry ===\n{r['n']} ueberzaehlige Zeilen "
+          f"in {r['matches']} Matches")
+    if trocken:
+        print("(dry-run — nichts geloescht)")
+        return 0
+    if not r["n"]:
+        return 0
+    weg = dedupe_telemetry(raw, match_id=mid)
+    raw.commit()
+    print(f"geloescht: {weg}")
+    return 0
+
+
 def _tempo_nachtragen(conn, match_id, client, url):
     """Fahrzeug-Zustand eines Matches in die vorhandenen Zeilen schreiben.
 
@@ -2238,6 +2290,8 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-refill-pg":
         mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
         sys.exit(hidrive_refill_pg(root, only_match=mid))
+    elif len(sys.argv) > 1 and sys.argv[1] == "dedupe-telemetry":
+        sys.exit(dedupe_telemetry_cli(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "speed-backfill":
         sys.exit(speed_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "drop-backfill":
@@ -2256,6 +2310,6 @@ if __name__ == "__main__":
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
               "clan-queue-prune | lobby-kd-backfill | drop-backfill | "
-              "speed-backfill | "
+              "speed-backfill | dedupe-telemetry | "
               "lobby-kd-reset-unknown | "
               "purge-before YYYY-MM-DD")
