@@ -157,7 +157,13 @@
     // Phase 2: Single-Closest-Fallback. Nur 1 POI (vermeidet Multi-POI-
     // Richtungs-Konflikt, wenn z.B. 2 Orte im NO und 2 im SW sind).
     // Richtung relativ zu DIESEM einen POI.
-    const NEAR_CM = 50000;  // 500m
+    // 250 m. Vorher 500 — aber in PUBG ist das eine eigene Kampfzone:
+    // "Near Pochinki (480m)" behauptet eine Naehe, die es nicht gibt.
+    // Seit es das Kartenfeld mit Kilometern als Rueckfall gibt, verliert
+    // der Grenzfall dadurch nichts, sondern bekommt die genauere Angabe.
+    // Gemessen an 30.000 Ereignissen: 62% liegen ohnehin direkt in einem
+    // Gebiet, mit 250 m kommen 15 Punkte dazu (77% mit Namen).
+    const NEAR_CM = 25000;
     let nearest = null;
     let nearestD = Infinity;
     for (const r of regions) {
