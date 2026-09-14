@@ -3760,11 +3760,17 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
     # Flugzeuge und Gleiter raus, direkt in der Abfrage.
     nicht_land = " ".join(
         f"AND e.vehicle_id NOT LIKE '%{n}%'" for n in _KEINE_LANDFAHRZEUGE)
+    # Nur Battle Royale — Deathmatch und Heist sind ein anderes Spiel.
+    # Die Schiessanlage laeuft als "solo" und faellt damit nicht unter
+    # den Modus-Filter; als Karte im Rekord ist sie trotzdem sinnlos.
+    br_where, br_params = _br_filter("m")
     basis = f"""
         FROM telemetry_events e
         JOIN matches m ON m.match_id = e.match_id AND m.tenant_id = ?
         WHERE e.velocity IS NOT NULL AND e.vehicle_id IS NOT NULL
           AND e.seat_index = 0
+          AND {br_where}
+          AND m.map_name NOT IN ('Range_Main', 'Heaven_Main')
           {nicht_land}
     """
 
@@ -3784,14 +3790,14 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
                m.played_at
         {basis} AND e.actor_account IN ({marks})
         ORDER BY e.velocity DESC LIMIT 1
-    """, [tenant_id] + eigene).fetchone()
+    """, [tenant_id] + br_params + eigene).fetchone()
 
     alle = conn.execute(f"""
         SELECT e.velocity AS v, e.vehicle_id, m.map_name, m.match_id,
                m.played_at
         {basis}
         ORDER BY e.velocity DESC LIMIT 1
-    """, (tenant_id,)).fetchone()
+    """, [tenant_id] + br_params).fetchone()
 
     # Alle Fahrten, die schnellste zuerst — nach Anzeigename gruppiert
     # wird unten. Dacia hat vier Spawn-Varianten, die untereinander wie
@@ -3802,7 +3808,7 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
                m.played_at
         {basis} AND e.actor_account IN ({marks})
         ORDER BY e.vehicle_id, e.velocity DESC
-    """, [tenant_id] + eigene).fetchall()
+    """, [tenant_id] + br_params + eigene).fetchall()
 
     je_karte = conn.execute(f"""
         SELECT DISTINCT ON (m.map_name)
@@ -3810,7 +3816,7 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
                m.played_at
         {basis} AND e.actor_account IN ({marks})
         ORDER BY m.map_name, e.velocity DESC
-    """, [tenant_id] + eigene).fetchall()
+    """, [tenant_id] + br_params + eigene).fetchall()
 
     bester_je_name = {}
     for r in je_fahrzeug:

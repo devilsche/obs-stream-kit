@@ -205,3 +205,39 @@ def test_spawnvarianten_desselben_autos_sind_eine_zeile():
     namen = [v["vehicleName"] for v in d["perVehicle"]]
     assert namen == ["Dacia", "UAZ"]
     assert round(d["perVehicle"][0]["kmh"]) == 141
+
+
+def test_die_schiessanlage_zaehlt_nicht():
+    """Range_Main laeuft als "solo" und faellt damit nicht unter den
+    BR-Filter — als Karte im Rekord ist sie trotzdem sinnlos."""
+    _match("ts9", "Range_Main")
+    db_pg.insert_telemetry_events(CONN.raw, "ts9", [
+        _fahrt("ts9", 1000, 140.0, "Dacia_A_01_v2_C"),
+    ])
+    _match("ts10", "Baltic_Main")
+    db_pg.insert_telemetry_events(CONN.raw, "ts10", [
+        _fahrt("ts10", 1000, 118.0, "Dacia_A_01_v2_C"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    assert round(d["overall"]["kmh"]) == 118
+    assert [m["mapName"] for m in d["perMap"]] == ["Baltic_Main"]
+
+
+def test_event_modi_zaehlen_nicht():
+    """Deathmatch und Heist sind kein Battle Royale."""
+    db_pg.insert_match(CONN.raw, T, "ts11", "Baltic_Main", "tdm", False,
+                       600, "2026-09-14T18:00:00Z", None)
+    db_pg.insert_participants(CONN.raw, T, "ts11", [{
+        "account_id": ICH, "name": "PEX_LuCKoR", "team_id": 1, "place": 1,
+        "kills": 0, "headshot_kills": 0, "assists": 0, "dbnos": 0,
+        "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+        "time_survived": 600, "walk_distance": 0.0, "ride_distance": 0.0,
+        "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0,
+        "boosts": 0, "team_kills": 0}])
+    db_pg.insert_telemetry_events(CONN.raw, "ts11", [
+        _fahrt("ts11", 1000, 160.0, "BP_Mirado_A_01_C"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    assert d["overall"] is None
