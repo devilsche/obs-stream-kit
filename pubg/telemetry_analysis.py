@@ -643,16 +643,50 @@ PACKAGE_LABELS = {
 #: gemessen der haeufigste Inhalt ueberhaupt, und der Grund, warum
 #: Leute hinlaufen.
 DROP_GEAR_LABELS = {
-    "Item_Head_G_01_Lv3_C": "Helmet Lv3",
-    "Item_Armor_C_01_Lv3_C": "Vest Lv3",
-    "Item_Armor_D_01_Lv3_C": "Vest Lv3",
-    "Item_Back_BlueBlocker_Lv3": "Backpack Lv3",
-    "Item_Back_C_01_Lv3_C": "Backpack Lv3",
-    "Item_Attach_Weapon_Upper_CQBSS_C": "8x",
-    "Item_Attach_Weapon_Upper_PM2_01_C": "15x",
+    "Item_Head_G_01_Lv3_C": "Level 3 Helmet",
+    "Item_Armor_C_01_Lv3_C": "Level 3 Vest",
+    "Item_Armor_D_01_Lv3_C": "Level 3 Vest",
+    "Item_Back_BlueBlocker_Lv3": "Level 3 Backpack",
+    "Item_Back_C_01_Lv3_C": "Level 3 Backpack",
+    "Item_Attach_Weapon_Upper_CQBSS_C": "8x Scope",
+    "Item_Attach_Weapon_Upper_PM2_01_C": "15x Scope",
     "Item_Weapon_TraumaBag_C": "Trauma Bag",
-    "Item_Boost_AdrenalineSyringe_C": "Adrenaline",
-    "Item_Ghillie_01_C": "Ghillie",
+    "Item_Boost_AdrenalineSyringe_C": "Adrenaline Syringe",
+    "Item_Ghillie_01_C": "Ghillie Suit",
+    "Item_Ghillie_02_C": "Ghillie Suit",
+}
+
+#: Der Rest eines Pakets: Munition, Heilung, Kleinkram. Bewusst NICHT in
+#: DROP_GEAR_LABELS, denn das steuert ueber `_highlight()` mit, was als
+#: erwaehnenswert gilt — Munition gehoert dort nicht hinein. Hier geht es
+#: nur darum, wie das Stueck heisst, wenn der Paketinhalt aufgezaehlt
+#: wird.
+DROP_ITEM_LABELS = {
+    "Item_Ammo_762mm_C": "7.62mm Ammo",
+    "Item_Ammo_556mm_C": "5.56mm Ammo",
+    "Item_Ammo_57mm_C": "5.7mm Ammo",
+    "Item_Ammo_9mm_C": "9mm Ammo",
+    "Item_Ammo_45ACP_C": ".45 ACP Ammo",
+    "Item_Ammo_300Magnum_C": ".300 Magnum Ammo",
+    "Item_Ammo_12Guage_C": "12 Gauge Ammo",
+    "Item_Boost_PainKiller_C": "Painkiller",
+    "Item_Boost_EnergyDrink_C": "Energy Drink",
+    "Item_Heal_MedKit_C": "Med Kit",
+    "Item_Heal_FirstAid_C": "First Aid Kit",
+    "Item_Heal_Bandage_C": "Bandage",
+    "Item_BulletproofShield_C": "Riot Shield",
+    "Item_Weapon_IntegratedRepair_C": "Repair Kit",
+    "Item_Weapon_SmokeBomb_C": "Smoke Grenade",
+    "Item_Weapon_C4_C": "C4",
+    "Item_EmergencyPickup_C": "Emergency Pickup",
+    # Die Rauchmarkierung, die am Paket selbst haengt — steht in fast
+    # jedem Inhalt und sagt nichts ueber die Beute.
+    "Item_Weapon_PackageFlare_C": "Package Flare",
+    "Item_Weapon_CoverStructDropHandFlare_C": "Hand Flare",
+    "Item_Attach_Weapon_Magazine_ExtendedQuickDraw_Large_C":
+        "Ext. QuickDraw Mag (Large)",
+    "Item_Attach_Weapon_Magazine_ExtendedQuickDraw_Medium_C":
+        "Ext. QuickDraw Mag",
 }
 
 

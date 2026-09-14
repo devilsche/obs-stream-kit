@@ -859,12 +859,21 @@ def _item_label(item_id):
     s = str(item_id or "")
     if s in DROP_WEAPONS:
         return DROP_WEAPONS[s]
-    from pubg.telemetry_analysis import DROP_GEAR_LABELS, DROP_WEAPON_LABELS
-    treffer = DROP_WEAPON_LABELS.get(s) or DROP_GEAR_LABELS.get(s)
+    from pubg.telemetry_analysis import (DROP_GEAR_LABELS, DROP_ITEM_LABELS,
+                                          DROP_WEAPON_LABELS)
+    treffer = (DROP_WEAPON_LABELS.get(s) or DROP_GEAR_LABELS.get(s)
+               or DROP_ITEM_LABELS.get(s))
     if treffer:
         return treffer
-    return (s.replace("Item_Weapon_", "").replace("Item_", "")
-             .replace("_C", "").replace("_", " ")) or "?"
+    # Fallback: die Id lesbar machen. Die Wortart-Praefixe sagen nichts
+    # ueber das Stueck ("Boost PainKiller" statt "Painkiller").
+    roh = s
+    for pre in ("Item_Weapon_", "Item_Boost_", "Item_Heal_", "Item_Ammo_",
+                "Item_Attach_Weapon_", "Item_Attach_", "Item_"):
+        if roh.startswith(pre):
+            roh = roh[len(pre):]
+            break
+    return roh.replace("_C", "").replace("_", " ").strip() or "?"
 
 
 def _bestes_item(attachments_json):

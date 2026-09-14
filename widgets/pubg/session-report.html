@@ -1057,6 +1057,8 @@
     }
     .ve-match-head:first-child { margin-top: 2px; }
     .ve-veh { color: var(--pubg-text); }
+    .ve-dealt { color: var(--pubg-good, #3cb44b); }
+    .ve-taken { color: var(--pubg-warn, #e6194b); }
     .ve-wpn {
       color: var(--pubg-text);
       white-space: nowrap;
@@ -4996,7 +4998,7 @@
             if (nDriveby) parts2.push(`gunned <b>${nDriveby}</b> down while driving`);
             if (nRanOver) parts2.push(`ran <b>${nRanOver}</b> over`);
             const summary = parts2.join(", ") || `<b>${dealt}</b> vehicle kills`;
-            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${summary}</summary>${evRows(evDealt, "dealt")}</details>`);
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm ve-dealt" aria-hidden="true">thumb_up</span> ${summary}</summary>${evRows(evDealt, "dealt")}</details>`);
           }
           if (taken > 0) {
             const evTaken  = m.eventsTaken || [];
@@ -5005,7 +5007,7 @@
             const t2 = [];
             if (nShotOut) t2.push(`got shot out <b>${nShotOut}</b> ${nShotOut === 1 ? "time" : "times"}`);
             if (nOver)    t2.push(`got run over <b>${nOver}</b> ${nOver === 1 ? "time" : "times"}`);
-            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> ${t2.join(", ")}</summary>${evRows(evTaken, "taken")}</details>`);
+            blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm ve-taken" aria-hidden="true">thumb_down</span> ${t2.join(", ")}</summary>${evRows(evTaken, "taken")}</details>`);
           }
           parts.push(`<div class="ve-member"><div class="ve-name">${who}</div>${blocks.join("")}</div>`);
         }

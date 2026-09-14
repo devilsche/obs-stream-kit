@@ -486,7 +486,7 @@ def test_timelog_zeigt_den_ganzen_drop_inhalt():
     assert ev["dropCalled"] is True          # per Flare angefordert
     # Die Groza lag drin, obwohl ich sie nicht genommen habe.
     assert "Groza" in " ".join(ev["dropContents"])
-    assert ev["takenItem"] == "Helmet Lv3"
+    assert ev["takenItem"] == "Level 3 Helmet"
 
 
 def test_regulaerer_drop_ist_nicht_angefordert():

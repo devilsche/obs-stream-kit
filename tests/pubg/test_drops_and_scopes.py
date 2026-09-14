@@ -360,7 +360,7 @@ def test_ausruestung_zaehlt_auch_als_highlight():
     d = airdrops([_land("t0", 0.0, 0.0, [
         "Item_Ammo_556mm_C", "Item_Head_G_01_Lv3_C",
         "Item_Attach_Weapon_Upper_CQBSS_C"])])
-    assert set(d[0]["highlights"]) == {"Helmet Lv3", "8x"}
+    assert set(d[0]["highlights"]) == {"Level 3 Helmet", "8x Scope"}
 
 
 def test_munition_ist_kein_highlight():
@@ -442,4 +442,7 @@ def test_ausruestung_im_airdrop_ist_englisch():
     werte = set(DROP_GEAR_LABELS.values())
     for d in ("Helm Lv3", "Weste Lv3", "Rucksack Lv3", "Adrenalin"):
         assert d not in werte, d
-    assert "Helmet Lv3" in werte and "Vest Lv3" in werte
+    assert "Level 3 Helmet" in werte and "Level 3 Vest" in werte
+    # Ausgeschrieben, nicht "Lv3" — die Abkuerzung las sich wie
+    # ein Teil des Item-Namens.
+    assert not any("Lv3" in w for w in werte), werte
