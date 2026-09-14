@@ -433,6 +433,10 @@ _MULTIFIGHT_WINDOW_MS = 90_000
 # Vehicle-Pattern → Klartext-Name. Mehrere Skins/Varianten desselben
 # Modells werden zusammengefasst (Mirado_A_02 / Mirado_A_03_Esports / ...
 # alle → 'Mirado').
+#: Faellt der letzte Mate in diesem Fenster um den eigenen Tod herum,
+#: ist es ein Squad-Wipe und kein Ausbluten.
+_WIPE_TOLERANZ_MS = 1000
+
 _VEHICLE_PATTERNS = [
     ("Mirado",        "Mirado"),
     ("PickupTruck",   "Pickup Truck"),
@@ -2281,6 +2285,29 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
     # LogPlayerRevive keine victim_x/y mitgeschickt hat — alte Daten).
     knock_pos_by_target = {}
 
+    # Todeszeitpunkt je Spieler. Braucht es, um Ausbluten von einem
+    # Squad-Wipe zu trennen: in beiden Faellen kommt nach dem Knock kein
+    # Schaden mehr, aber nur beim Ausbluten lebt noch ein Mate.
+    death_ts_by_acc = {}
+    for _de in all_events_rows:
+        if _de["event_type"] == "Kill" and _de["target_account"]:
+            death_ts_by_acc.setdefault(_de["target_account"],
+                                       _de["timestamp_ms"])
+
+    def _squad_am_ende(acc, ts_tod):
+        """Lebt zum Todeszeitpunkt noch ein Teamkollege?"""
+        team = team_by_acc.get(acc)
+        if team is None:
+            return False
+        for other, other_team in team_by_acc.items():
+            if other == acc or other_team != team:
+                continue
+            tod = death_ts_by_acc.get(other)
+            # Wer gleichzeitig faellt (Toleranz), zaehlt nicht als lebend.
+            if tod is None or tod > ts_tod + _WIPE_TOLERANZ_MS:
+                return False
+        return True
+
     events_out = []
     for e in all_events_rows:
         et     = e["event_type"]
@@ -2469,9 +2496,22 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 env_type = "kill_fall"
             elif "Drown" in dmg_reason or "Apnea" in dmg_reason:
                 env_type = "kill_drown"
-            elif dmg_reason in ("Damage_VehicleHit",
-                                 "Damage_VehicleCrashHit"):
+            elif dmg_reason == "Damage_VehicleCrashHit":
                 env_type = "kill_self_eject"
+            elif dmg_reason == "Damage_VehicleHit" and actor and actor != target:
+                # Ueberfahren — hinter dem Fahrzeug sitzt ein Fahrer, und
+                # der gehoert in die Zeile. Frueher lief das als
+                # Umgebungstod ("died after jumping"): der Fahrer ging
+                # verloren und der Satz behauptete das Gegenteil dessen,
+                # was passiert ist. In den Daten hat JEDER dieser Kills
+                # einen fremden Akteur — ein Absprung ist es nie.
+                run_over_label = None
+                for needle, label in _VEHICLE_PATTERNS:
+                    if needle in wid:
+                        run_over_label = label
+                        break
+                row["type"] = "kill_run_over"
+                row["vehicleLabel"] = run_over_label
             # Fallback auf Waffen-ID (alte Daten ohne damage_reason)
             elif "RagdollPhysics" in wid or "Damage_HelpMeGroundFall" in wid:
                 env_type = "kill_self_eject"
@@ -2490,7 +2530,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                 env_type = "kill_redzone"
             elif "Drown" in wid or "Apnea" in wid:
                 env_type = "kill_drown"
-            if env_type:
+            if row.get("type") == "kill_run_over":
+                pass          # oben schon gesetzt
+            elif env_type:
                 row["type"] = env_type
             elif not actor:
                 # Kein Akteur: entweder der Spieler hat sich selbst
@@ -2558,6 +2600,14 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                         row["knockerDistanceM"]  = (
                             round((knock_ev["distance"] or 0) / 100.0, 1)
                             if knock_ev["distance"] else None)
+            if bled_out and row.get("type") == "kill_bleedout" \
+                    and _squad_am_ende(target, ts):
+                # Nicht ausgeblutet: der letzte stehende Mate ist
+                # gefallen, damit stirbt der Geknockte sofort mit.
+                # "bled out and died" behauptete hier eine Wartezeit,
+                # die es nie gab.
+                row["type"] = "kill_squad_wiped"
+                bled_out = False
             if bled_out:
                 row["bledOut"] = True
                 # Knocker-Info auch bei bleedout setzen (PUBG attribuiert

@@ -2452,6 +2452,7 @@
       ["lobby",   "Lobby",   ["join"]],
       ["knocks",  "Knocks",  ["knock"]],
       ["kills",   "Kills",   ["kill", "kill_finish", "kill_steal", "kill_bleedout",
+                              "kill_squad_wiped", "kill_run_over",
                               "kill_self_eject", "kill_fall", "kill_bluezone",
                               "kill_redzone", "kill_drown", "kill_self"]],
       ["revives", "Revives", ["revive", "revive_inferred", "redeploy",
@@ -2788,6 +2789,10 @@
             return `${T} was killed by <b>${ev.weaponName}</b>`;
           }
           return `${A} killed ${T}${meta}${_multiFight}`;
+        case "kill_squad_wiped":
+          // Kein Ausbluten: der letzte stehende Mate ist gefallen, damit
+          // stirbt der Geknockte im selben Moment mit.
+          return `${T} died when the last squadmate went down`;
         case "kill_bleedout":
           // Wer geknockt hat war (laut PUBG) der gleiche Actor — Knocker-
           // Info redundant. Just: "X bled out and died".
@@ -2844,6 +2849,10 @@
         }
         case "chip_upload":
           return `${A} uploaded a BlueChip at the Comeback Tower`;
+        case "kill_run_over": {
+          const veh = ev.vehicleLabel ? ` with the <b>${ev.vehicleLabel}</b>` : "";
+          return `${A} ran over ${T}${veh}`;
+        }
         case "kill_self_eject": {
           const veh = ev.victimVehicleLabel
             ? ` from <b>${ev.victimVehicleLabel}</b>` : "";

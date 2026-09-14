@@ -283,3 +283,81 @@ def test_path_timestamps_inside_lives():
     gp_ts = [pt[2] for pt in life["groundPath"]]
     assert pr_ts == sorted(pr_ts)
     assert gp_ts == sorted(gp_ts)
+
+
+def _ev(et, ts, actor=None, target=None, weapon=None, damage=None,
+        reason=None, vx=1000.0, vy=1000.0):
+    """Telemetrie-Zeile mit allen Pflichtfeldern."""
+    return {"event_type": et, "timestamp_ms": ts, "actor_account": actor,
+            "target_account": target, "actor_x": 900.0, "actor_y": 900.0,
+            "actor_z": 100.0, "actor_health": 100.0, "victim_x": vx,
+            "victim_y": vy, "weapon": weapon, "distance": 500.0,
+            "damage": damage, "damage_reason": reason, "payload_json": None}
+
+
+def _typ_of(conn, mid, ziel):
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    treffer = [e for e in (d.get("events") or [])
+               if e.get("targetName") == ziel]
+    assert treffer, f"kein Event fuer {ziel} in der Timeline"
+    return treffer[-1]
+
+
+def test_ueberfahren_ist_kein_absprung():
+    """`Damage_VehicleHit` heisst ueberfahren — nicht "rausgesprungen".
+
+    Der Fahrer steht als Akteur im Event; als Umgebungstod gewertet ging
+    er verloren und die Zeile behauptete "died after jumping".
+    """
+    conn = _setup()
+    mid = _basic_match(conn, "mv1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("TakeDamage", 700000, actor="account.E", target="account.A",
+            weapon="Uaz_B_01_esports_C", damage=15.3),
+        _ev("Kill", 700002, actor="account.E", target="account.A",
+            weapon="Uaz_B_01_esports_C", reason="Damage_VehicleHit"),
+    ])
+    ev = _typ_of(conn, mid, "PEX_LuCKoR")
+    assert ev["type"] == "kill_run_over"
+    # Der Fahrer muss erhalten bleiben — das ist ein Spieler-Kill.
+    assert ev["actorAccount"] == "account.E"
+    assert ev["vehicleLabel"] == "UAZ"
+
+
+def test_geknockt_und_squad_faellt_ist_kein_ausbluten():
+    """Stirbt der letzte stehende Mate, stirbt der Geknockte sofort mit.
+
+    Das ist kein Ausbluten — es sah nur so aus, weil in beiden Faellen
+    kein weiterer Schaden mehr kommt.
+    """
+    conn = _setup()
+    mid = _basic_match(conn, "mw1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.E", target="account.A",
+            weapon="WeapHK416_C", damage=30.0),
+        # Der letzte lebende Mate faellt — und damit sofort auch ich.
+        _ev("Kill", 705000, actor="account.E", target="account.B",
+            weapon="WeapHK416_C", reason="Damage_Gun"),
+        _ev("Kill", 705100, actor="account.E", target="account.A"),
+    ])
+    ev = _typ_of(conn, mid, "PEX_LuCKoR")
+    assert ev["type"] == "kill_squad_wiped"
+
+
+def test_ausbluten_bleibt_ausbluten_solange_wer_lebt():
+    """Die Gegenprobe: lebt noch ein Mate, ist es echtes Ausbluten."""
+    conn = _setup()
+    mid = _basic_match(conn, "mw2")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.E", target="account.A",
+            weapon="WeapHK416_C", damage=30.0),
+        # Mate1 stirbt erst viel spaeter — ich blute vorher aus.
+        _ev("Kill", 705100, actor="account.E", target="account.A"),
+        _ev("Kill", 900000, actor="account.E", target="account.B",
+            weapon="WeapHK416_C", reason="Damage_Gun"),
+    ])
+    ev = _typ_of(conn, mid, "PEX_LuCKoR")
+    assert ev["type"] == "kill_bleedout"
