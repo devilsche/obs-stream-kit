@@ -1045,12 +1045,21 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
         if tempo.get("overall"):
             o = tempo["overall"]
             career["top_speed"] = o["kmh"]
+            # Womit und wo — das gehoert zum Moment. Match-Id und
+            # Zeitstempel braucht die Feier nicht, die sagen niemandem
+            # etwas, der gerade zuschaut.
             extra["top_speed"] = {
                 "vehicleName": o.get("vehicleName"),
                 "mapName": o.get("mapName"),
-                "matchId": o.get("matchId"),
-                "playedAt": o.get("playedAt"),
             }
+            # Der Lobby-Bestwert klein daneben: er ordnet die eigene
+            # Zahl ein. Steht dort der eigene Name, ist das die
+            # eigentliche Nachricht.
+            lo = tempo.get("lobby")
+            if lo:
+                extra["top_speed"]["lobbyKmh"] = lo["kmh"]
+                extra["top_speed"]["lobbyDriver"] = (
+                    "you" if lo.get("isMe") else lo.get("driverName"))
     except Exception:
         # Ein fehlender Tempo-Wert darf die uebrigen Meilensteine nicht
         # aufhalten — die Spalten gibt es erst seit dem Nachtrag.

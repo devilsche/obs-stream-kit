@@ -95,6 +95,19 @@
       ["lowAvg", "bottom 5"],
       ["squadKd", "your squad"],
       ["max", "toughest"]
+    ],
+    // Beim Tempo-Rekord zaehlt, WOMIT und WO. Ohne diese Zeilen fiel
+    // die Feier auf den Notbehelf unten zurueck und zeigte fremde
+    // Karriere-Zahlen wie Runden und Matches — die sagen zu einer
+    // gefahrenen Geschwindigkeit nichts.
+    career_top_speed: [
+      ["vehicleName", "vehicle"],
+      ["mapName", "map"],
+      ["lobbyKmh", "best in lobby"]
+    ],
+    career_speed_150: [
+      ["vehicleName", "vehicle"],
+      ["mapName", "map"]
     ]
   };
 
@@ -109,12 +122,25 @@
     plan.forEach(function (pair) {
       if (out.length >= EXTRA_MAX) return;
       var v = e[pair[0]];
-      if (v == null) return;
+      if (v == null || v === "") return;
       // Beim haertesten Gegner steht der Name darunter, sonst die
       // Bezeichnung der Kennzahl.
       var label = pair[1];
       if (pair[0] === "max" && e.topName) label = esc(e.topName);
-      out.push([Number(v).toFixed(2), label]);
+      // Nicht jede Begleitangabe ist eine Zahl: beim Tempo-Rekord
+      // stehen Fahrzeug und Karte im Klartext, und `toFixed` machte
+      // daraus NaN.
+      if (pair[0] === "mapName") {
+        out.push([(window.PubgUI && window.PubgUI.fmtMap)
+                    ? window.PubgUI.fmtMap(String(v)) : String(v), label]);
+      } else if (typeof v === "string") {
+        out.push([v, label]);
+      } else if (pair[0] === "lobbyKmh") {
+        // Wer den Bestwert haelt, gehoert unter die Zahl.
+        out.push([Number(v).toFixed(1), e.lobbyDriver || label]);
+      } else {
+        out.push([Number(v).toFixed(2), label]);
+      }
     });
     return out.length ? out : null;
   }
