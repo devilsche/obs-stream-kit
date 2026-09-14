@@ -436,10 +436,15 @@ _MULTIFIGHT_WINDOW_MS = 90_000
 def _fahrzeug_label(vid):
     """Anzeigename eines Fahrzeugs, sonst die gekuerzte Id.
 
-    Sitzt der Skin auf einem bekannten Basisfahrzeug, steht das dahinter
-    ("Sedan · Dacia") — denn gefahren wird der Basistyp, und derselbe
-    Sedan gibt es auf zwei davon, die sich deutlich unterschiedlich
-    fahren.
+    Sitzt der Skin auf einem bekannten Basisfahrzeug, steht das in
+    Klammern dahinter ("Sedan (Dacia)") — denn gefahren wird der
+    Basistyp, und denselben Sedan gibt es auf zweien, die sich deutlich
+    unterschiedlich fahren.
+
+    Nur wo der Basistyp **belegt** ist. Die Lizenz-Fahrzeuge stehen
+    bewusst einzeln: ihre Geschwindigkeitsprofile liegen im
+    Ueberlappungsbereich mehrerer Basisautos, da waere jede Klammer
+    geraten.
     """
     s = str(vid or "")
     name = None
@@ -451,7 +456,7 @@ def _fahrzeug_label(vid):
         name = (s.replace("BP_", "").replace("_C", "")
                  .replace("_", " ").strip()) or "?"
     basis = VEHICLE_BASE.get(s)
-    return f"{name} · {basis}" if basis else name
+    return f"{name} ({basis})" if basis else name
 
 
 def _ist_fahrzeug_waffe(wid):

@@ -146,8 +146,8 @@ def test_sedan_nennt_sein_basisfahrzeug():
     """Denselben Sedan gibt es auf zwei Basisfahrzeugen — und die fahren
     sich deutlich unterschiedlich."""
     from pubg.aggregations import _fahrzeug_label
-    assert _fahrzeug_label("BP_Special_Sedan_01_C") == "Sedan · Dacia"
-    assert _fahrzeug_label("BP_Special_Sedan_02_C") == "Sedan · Mirado"
+    assert _fahrzeug_label("BP_Special_Sedan_01_C") == "Sedan (Dacia)"
+    assert _fahrzeug_label("BP_Special_Sedan_02_C") == "Sedan (Mirado)"
     # Ohne belegten Basistyp bleibt es beim reinen Namen.
     assert _fahrzeug_label("BP_Carrera_LGD_C") == "Porsche 911"
 
