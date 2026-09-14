@@ -4992,9 +4992,9 @@
             // jede Art wird genau einmal vergeben.
             const nRanOver = evDealt.filter(e => (e.kind||"").startsWith("run_over")).length;
             const parts2 = [];
-            if (nEject)   parts2.push(`<b>${nEject}</b> shot out of a vehicle`);
-            if (nDriveby) parts2.push(`<b>${nDriveby}</b> gunned down while driving`);
-            if (nRanOver) parts2.push(`<b>${nRanOver}</b> run over`);
+            if (nEject)   parts2.push(`shot <b>${nEject}</b> out of a vehicle`);
+            if (nDriveby) parts2.push(`gunned <b>${nDriveby}</b> down while driving`);
+            if (nRanOver) parts2.push(`ran <b>${nRanOver}</b> over`);
             const summary = parts2.join(", ") || `<b>${dealt}</b> vehicle kills`;
             blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${summary}</summary>${evRows(evDealt, "dealt")}</details>`);
           }
@@ -5003,8 +5003,8 @@
             const nOver    = evTaken.filter(e => (e.kind||"").startsWith("run_over")).length;
             const nShotOut = taken - nOver;
             const t2 = [];
-            if (nShotOut) t2.push(`was shot out <b>${nShotOut}</b> ${nShotOut === 1 ? "time" : "times"}`);
-            if (nOver)    t2.push(`run over <b>${nOver}</b> ${nOver === 1 ? "time" : "times"}`);
+            if (nShotOut) t2.push(`got shot out <b>${nShotOut}</b> ${nShotOut === 1 ? "time" : "times"}`);
+            if (nOver)    t2.push(`got run over <b>${nOver}</b> ${nOver === 1 ? "time" : "times"}`);
             blocks.push(`<details class="ve"><summary><span class="material-symbols-outlined icon-sm" aria-hidden="true">skull</span> ${t2.join(", ")}</summary>${evRows(evTaken, "taken")}</details>`);
           }
           parts.push(`<div class="ve-member"><div class="ve-name">${who}</div>${blocks.join("")}</div>`);
