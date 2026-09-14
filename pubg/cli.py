@@ -1331,6 +1331,116 @@ def _drop_events_nachtragen(conn, match_id, client, url, squad_ids):
     return append_telemetry_events(raw_conn, match_id, neu)
 
 
+def _tempo_nachtragen(conn, match_id, client, url):
+    """Fahrzeug-Zustand eines Matches in die vorhandenen Zeilen schreiben.
+
+    Die Roh-Telemetrie haengt an jedes Event des Spielers, der im Auto
+    sitzt, Tempo, Fahrzeug und Sitzplatz. Importiert wurden die Events
+    laengst — nur diese Felder fehlten. Gibt die Zahl der aktualisierten
+    Zeilen zurueck.
+    """
+    from pubg.telemetry import _normalize
+    from pubg.db_pg import update_velocity
+
+    werte = []
+    for e in client.get_telemetry(url):
+        norm = _normalize(e)
+        if not norm or norm.get("velocity") is None:
+            continue
+        werte.append((norm["timestamp_ms"], norm.get("actor_account"),
+                      norm["event_type"], norm["velocity"],
+                      norm.get("vehicle_id"), norm.get("seat_index")))
+    raw_conn = getattr(conn, "raw", conn)
+    return update_velocity(raw_conn, match_id, werte)
+
+
+def speed_backfill(root: str, args=None) -> int:
+    """Tempo-Werte fuer schon importierte Matches nachtragen.
+
+    Ohne das bleiben die Geschwindigkeits-Rekorde leer, bis genug neue
+    Matches durchgelaufen sind — dabei stand der Wert in jedem Blob, den
+    wir je geholt haben.
+
+    Zwei Quellen, in dieser Reihenfolge: das eigene Telemetrie-Archiv
+    (haelt alles, was je archiviert wurde) und sonst das PUBG-CDN, das
+    nur 14 Tage zurueckreicht.
+
+    Nutzung:
+        python -m pubg.cli speed-backfill [--matches 50] [--pace 0.3]
+                                          [--tenant 1] [--dry-run]
+    """
+    import time
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from pubg.db_pg import matches_missing_velocity
+    from pubg.api_client import PubgClient
+    from pubg.archive_config import archive_cfg_for_tenant
+    from pubg import hidrive_telemetry
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+
+    n_max = int(_opt("--matches", "0"))
+    pace = float(_opt("--pace", "0.3"))
+    tenant_id = int(_opt("--tenant", "1"))
+    trocken = "--dry-run" in args
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    offen = matches_missing_velocity(raw, limit=n_max)
+    print(f"=== speed-backfill ===\n{len(offen)} Matches ohne Tempo-Werte")
+    if trocken or not offen:
+        for r in offen[:10]:
+            print(f"   {r['played_at']}  {r['match_id']}")
+        if trocken and len(offen) > 10:
+            print(f"   ... und {len(offen) - 10} weitere")
+        return 0
+
+    cfg = archive_cfg_for_tenant(conn, tenant_id)
+    archiviert = set()
+    if cfg:
+        try:
+            archiviert = set(hidrive_telemetry.list_archived(cfg=cfg))
+            print(f"Archiv: {len(archiviert)} Matches verfuegbar")
+        except Exception as e:
+            print(f"Archiv nicht erreichbar ({e}) — nur CDN")
+
+    class _AusArchiv:
+        """Gibt sich als Client aus, liest aber aus dem Archiv."""
+        def __init__(self, mid):
+            self.mid = mid
+        def get_telemetry(self, _url):
+            roh = hidrive_telemetry.download_raw(self.mid, cfg=cfg)
+            if roh is None:
+                raise RuntimeError("nicht im Archiv")
+            return roh
+
+    cdn = PubgClient(api_key="", platform="steam")
+    ok = fehler = zeilen = 0
+    for i, r in enumerate(offen, 1):
+        mid = r["match_id"]
+        quelle = "Archiv" if mid in archiviert else "CDN"
+        client = _AusArchiv(mid) if mid in archiviert else cdn
+        try:
+            n = _tempo_nachtragen(conn, mid, client, r["telemetry_url"])
+            zeilen += n
+            ok += 1
+            if i % 25 == 0 or n:
+                print(f"[{i}/{len(offen)}] {mid[:8]} {r['played_at'][:10]} "
+                      f"{quelle:6s} +{n}", flush=True)
+        except Exception as e:
+            fehler += 1
+            print(f"[{i}/{len(offen)}] {mid[:8]} {quelle} FEHLER: {e}")
+        if pace:
+            time.sleep(pace)
+    print(f"\nfertig: {ok} Matches ({zeilen} Zeilen), {fehler} Fehler")
+    return 0
+
+
 def drop_backfill(root: str, args=None) -> int:
     """Airdrop-Zeilen fuer Matches nachtragen, die vor ihrer Einfuehrung liefen.
 
@@ -2128,6 +2238,8 @@ if __name__ == "__main__":
     elif len(sys.argv) > 1 and sys.argv[1] == "hidrive-refill-pg":
         mid = sys.argv[3] if len(sys.argv) > 3 and sys.argv[2] == "--match" else None
         sys.exit(hidrive_refill_pg(root, only_match=mid))
+    elif len(sys.argv) > 1 and sys.argv[1] == "speed-backfill":
+        sys.exit(speed_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "drop-backfill":
         sys.exit(drop_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
@@ -2144,5 +2256,6 @@ if __name__ == "__main__":
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
               "clan-queue-prune | lobby-kd-backfill | drop-backfill | "
+              "speed-backfill | "
               "lobby-kd-reset-unknown | "
               "purge-before YYYY-MM-DD")

@@ -1003,6 +1003,63 @@ def matches_missing_drop_events(conn, cutoff_iso: str, limit: int = 0):
     return rows[:limit] if limit else rows
 
 
+def matches_missing_velocity(conn, limit: int = 0):
+    """Matches mit Telemetrie, aber ohne einen einzigen Tempo-Wert.
+
+    `velocity` und `vehicle_id` kamen spaeter dazu; alle frueher
+    importierten Zeilen haben die Spalten leer. Anders als beim
+    Airdrop-Nachtrag fehlen hier keine Events, sondern Spalten.
+    """
+    sql = """
+        SELECT DISTINCT ON (m.match_id) m.match_id, m.telemetry_url,
+               m.played_at
+        FROM matches m
+        WHERE m.telemetry_url IS NOT NULL AND m.telemetry_url <> ''
+          AND EXISTS (SELECT 1 FROM telemetry_events t
+                      WHERE t.match_id = m.match_id)
+          AND NOT EXISTS (SELECT 1 FROM telemetry_events t
+                          WHERE t.match_id = m.match_id
+                            AND t.velocity IS NOT NULL)
+        ORDER BY m.match_id, m.played_at DESC
+    """
+    with conn.cursor() as cur:
+        cur.execute(sql)
+        rows = cur.fetchall()
+    rows = sorted(rows, key=lambda r: r["played_at"] or "", reverse=True)
+    return rows[:limit] if limit else rows
+
+
+def update_velocity(conn, match_id: str, werte: list) -> int:
+    """Tempo/Fahrzeug/Sitz in vorhandene Zeilen schreiben.
+
+    `werte` ist eine Liste (timestamp_ms, actor_account, event_type,
+    velocity, vehicle_id, seat_index). Angefasst wird nur, was es schon
+    gibt — die Roh-Telemetrie hat weit mehr Events als wir importieren.
+    """
+    if not werte:
+        return 0
+    with conn.cursor() as cur:
+        cur.execute("CREATE TEMP TABLE IF NOT EXISTS _tempo ("
+                    "ts BIGINT, acc TEXT, et TEXT, vel DOUBLE PRECISION, "
+                    "vid TEXT, seat INTEGER) ON COMMIT DROP")
+        cur.execute("TRUNCATE _tempo")
+        execute_values(cur, "INSERT INTO _tempo VALUES %s", werte)
+        cur.execute("""
+            UPDATE telemetry_events e
+               SET velocity = t.vel, vehicle_id = t.vid,
+                   seat_index = COALESCE(e.seat_index, t.seat)
+              FROM _tempo t
+             WHERE e.match_id = %s
+               AND e.timestamp_ms = t.ts
+               AND e.event_type = t.et
+               AND e.actor_account IS NOT DISTINCT FROM t.acc
+               AND e.velocity IS NULL
+        """, (match_id,))
+        n = cur.rowcount
+    conn.commit()
+    return n
+
+
 def append_telemetry_events(conn, match_id: str, events: list) -> int:
     """Events an ein Match anhaengen, das schon welche hat.
 
