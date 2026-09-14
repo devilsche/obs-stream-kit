@@ -94,12 +94,49 @@
     return dirs[Math.round(deg / 45) % 8];
   }
 
+  // Feldbreite: jede Karte bekommt 8x8 Felder, egal wie gross sie ist.
+  // Auf den 8-km-Karten ist das genau das Kilometer-Raster der
+  // Ingame-Minimap, also die Sprache, die im Spiel ohnehin gesprochen
+  // wird ("F4"). Auf den kleinen Karten wird das Feld entsprechend
+  // kleiner statt die Angabe unbrauchbar grob.
+  const GRID_N = 8;
+
+  POI.mapKmOf = function (mapName) {
+    const alias = (mapName === "Erangel_Main") ? "Baltic_Main" : mapName;
+    const blob = DATA[alias] || DATA[mapName];
+    return (blob && blob.mapKm)
+        || MAP_SIZE_KM_FALLBACK[alias]
+        || MAP_SIZE_KM_FALLBACK[mapName]
+        || null;
+  };
+
+  // Kartenfeld als Rueckfall, wenn weit und breit kein benannter Ort
+  // liegt. Auf Rondo trifft das jedes vierte Ereignis — "<unknown>"
+  // sagt dort nichts, ein Feld immerhin, wo ungefaehr.
+  POI.gridCell = function (mapName, xCm, yCm) {
+    if (xCm == null || yCm == null) return null;
+    const km = POI.mapKmOf(mapName);
+    if (!km) return null;
+    const zelle = km * 100000 / GRID_N;
+    const sx = Math.floor(xCm / zelle);
+    const sy = Math.floor(yCm / zelle);
+    // Ausserhalb der Karte: lieber nichts sagen als etwas Falsches.
+    if (sx < 0 || sy < 0 || sx >= GRID_N || sy >= GRID_N) return null;
+    // Feld fuer den groben Ueberblick, Kilometer fuer die genaue Stelle
+    // — ein Feld ist auf den grossen Karten einen Kilometer breit.
+    const kx = (xCm / 100000).toFixed(2);
+    const ky = (yCm / 100000).toFixed(2);
+    return String.fromCharCode(65 + sx) + (sy + 1)
+         + " (" + kx + " / " + ky + " km)";
+  };
+
   POI.fromCoords = function (mapName, xCm, yCm) {
     if (!mapName || xCm == null || yCm == null) return null;
     // Aliase fuer doppelte Map-IDs (Erangel)
     const alias = (mapName === "Erangel_Main") ? "Baltic_Main" : mapName;
     const blob = DATA[alias] || DATA[mapName];
-    if (!blob) return null;
+    // Ohne Regionen bleibt immer noch das Kartenfeld.
+    if (!blob) return POI.gridCell(mapName, xCm, yCm);
     // Regionen sind in Welt-cm gespeichert (gleiche Coords-Domain wie
     // die Pin-Telemetry-Coords). Cal im Editor ist nur Visualisierungs-
     // Hilfe — die persistierten Region-Points sind bereits in Welt-cm,
@@ -128,7 +165,8 @@
       const d = distToPoly(xCm, yCm, r.points);
       if (d < nearestD) { nearestD = d; nearest = r; }
     }
-    if (!nearest || nearestD > NEAR_CM) return null;
+    if (!nearest || nearestD > NEAR_CM)
+      return POI.gridCell(mapName, xCm, yCm);
     const distM = Math.max(1, Math.round(nearestD / 100));
     const [cx, cy] = polyCentroid(nearest.points);
     const dir = compassDir(xCm - cx, yCm - cy);
