@@ -4905,10 +4905,13 @@
             driveby_knock: "drive-by (knock)",
             driveby_kill:  "drive-by (kill)",
             knock_died: "knocked → died",
+            // Richtungsneutral wie alle anderen Arten hier — ob ich
+            // ueberfahren habe oder wurde, steht schon daneben ("→ X"
+            // gegenueber "by X").
             run_over: "run over (kill)",
-            run_over_dealt: "ran over (kill)",
+            run_over_dealt: "run over (kill)",
             run_over_knock: "run over (knock)",
-            run_over_knock_dealt: "ran over (knock)",
+            run_over_knock_dealt: "run over (knock)",
             kill: "kill",
           };
           const kindLbl = KIND_LABELS[ev.kind] || ev.kind || "kill";
