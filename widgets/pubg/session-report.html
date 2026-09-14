@@ -4905,8 +4905,10 @@
             driveby_knock: "drive-by (knock)",
             driveby_kill:  "drive-by (kill)",
             knock_died: "knocked → died",
-            run_over: "run over",
-            run_over_dealt: "ran over",
+            run_over: "run over (kill)",
+            run_over_dealt: "ran over (kill)",
+            run_over_knock: "run over (knock)",
+            run_over_knock_dealt: "ran over (knock)",
             kill: "kill",
           };
           const kindLbl = KIND_LABELS[ev.kind] || ev.kind || "kill";
@@ -4947,7 +4949,9 @@
             const evDealt = m.eventsDealt || [];
             const nEject   = evDealt.filter(e => (e.kind||"").startsWith("eject")).length;
             const nDriveby = evDealt.filter(e => (e.kind||"").startsWith("driveby")).length;
-            const nRanOver = evDealt.filter(e => e.kind === "run_over_dealt").length;
+            // eject/driveby und run_over schliessen sich gegenseitig aus —
+            // jede Art wird genau einmal vergeben.
+            const nRanOver = evDealt.filter(e => (e.kind||"").startsWith("run_over")).length;
             const parts2 = [];
             if (nEject)   parts2.push(`<b>${nEject}</b> shot out of a vehicle`);
             if (nDriveby) parts2.push(`<b>${nDriveby}</b> gunned down while driving`);
@@ -4957,7 +4961,7 @@
           }
           if (taken > 0) {
             const evTaken  = m.eventsTaken || [];
-            const nOver    = evTaken.filter(e => e.kind === "run_over").length;
+            const nOver    = evTaken.filter(e => (e.kind||"").startsWith("run_over")).length;
             const nShotOut = taken - nOver;
             const t2 = [];
             if (nShotOut) t2.push(`was shot out <b>${nShotOut}</b> ${nShotOut === 1 ? "time" : "times"}`);

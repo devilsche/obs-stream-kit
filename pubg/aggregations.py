@@ -433,6 +433,18 @@ _MULTIFIGHT_WINDOW_MS = 90_000
 # Vehicle-Pattern → Klartext-Name. Mehrere Skins/Varianten desselben
 # Modells werden zusammengefasst (Mirado_A_02 / Mirado_A_03_Esports / ...
 # alle → 'Mirado').
+def _ist_fahrzeug_waffe(wid):
+    """Steht in `weapon` ein Fahrzeug statt einer Waffe?
+
+    Noetig, weil Knock-Events NIE ein `damage_reason` tragen (in der
+    gesamten DB kein einziges). Ob jemand umgefahren oder aus dem Auto
+    heraus erschossen wurde, steht dort nur in der Waffe.
+    """
+    if not wid:
+        return False
+    return any(needle in wid for needle, _ in _VEHICLE_PATTERNS)
+
+
 #: Faellt der letzte Mate in diesem Fenster um den eigenen Tod herum,
 #: ist es ein Squad-Wipe und kein Ausbluten.
 _WIPE_TOLERANZ_MS = 1000
@@ -3449,7 +3461,10 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
                     _ensure(actor)["evictionsDealt"] += 1
                     _add_event(actor, "eventsDealt", kind, mid, e, target, veh)
                 elif t == "Knock":
-                    kind = "eject_knock" if target_veh else "driveby_knock"
+                    kind = ("run_over_knock_dealt"
+                            if _ist_fahrzeug_waffe(e.get("weapon"))
+                            else "eject_knock" if target_veh
+                            else "driveby_knock")
                     _ensure(actor)["evictionsDealt"] += 1
                     _add_event(actor, "eventsDealt", kind, mid, e, target, veh)
 
@@ -3464,6 +3479,12 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
                         and e.get("reason") == "Damage_VehicleHit"):
                     _ensure(target)["evictionsTaken"] += 1
                     _add_event(target, "eventsTaken", "run_over",
+                                mid, e, actor, e.get("weapon"))
+                elif (t == "Knock" and veh is None
+                        and _ist_fahrzeug_waffe(e.get("weapon"))):
+                    # Meist bleibt es beim Knock — das Auto toetet selten.
+                    _ensure(target)["evictionsTaken"] += 1
+                    _add_event(target, "eventsTaken", "run_over_knock",
                                 mid, e, actor, e.get("weapon"))
                 elif t == "Kill" and veh is not None:
                     _ensure(target)["evictionsTaken"] += 1

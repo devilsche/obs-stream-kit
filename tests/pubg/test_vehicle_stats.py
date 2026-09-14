@@ -100,3 +100,43 @@ def test_driveby_bleibt_driveby():
     ])
     res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
     assert _mich(res)["eventsDealt"][0]["kind"] == "driveby_kill"
+
+
+def test_ueberfahren_knock_ist_kein_driveby():
+    """Knocks tragen NIE einen damage_reason — dort zaehlt die Waffe.
+
+    Alle 222.592 Knock-Events in der DB haben ein leeres
+    `damage_reason`; steht dort ein Fahrzeug als Waffe, wurde jemand
+    umgefahren. Ohne diese Zweitpruefung lief das als "drive-by
+    (knock)" — also als Schuss aus dem fahrenden Auto.
+    """
+    _match("v4", [
+        _ev("VehicleEnter", 100000, actor=ICH, weapon="BP_PicoBus_C", seat=0),
+        _ev("Knock", 150000, actor=ICH, target=GEGNER, weapon="BP_PicoBus_C"),
+    ])
+    res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
+    ich = _mich(res)
+    assert ich["evictionsDealt"] == 1
+    assert ich["eventsDealt"][0]["kind"] == "run_over_knock_dealt"
+
+
+def test_ueberfahren_werden_zaehlt_auch_wenn_es_nur_knockt():
+    """Meist knockt das Auto nur — auch das gehoert in die Vehicle Action."""
+    _match("v5", [
+        _ev("VehicleEnter", 100000, actor=GEGNER, weapon="Uaz_B_01_C", seat=0),
+        _ev("Knock", 150000, actor=GEGNER, target=ICH, weapon="Uaz_B_01_C"),
+    ])
+    res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
+    ich = _mich(res)
+    assert ich["evictionsTaken"] == 1
+    assert ich["eventsTaken"][0]["kind"] == "run_over_knock"
+
+
+def test_driveby_knock_bleibt_driveby():
+    """Gegenprobe: mit der Waffe aus dem Auto geknockt bleibt drive-by."""
+    _match("v6", [
+        _ev("VehicleEnter", 100000, actor=ICH, weapon="BP_PicoBus_C", seat=0),
+        _ev("Knock", 150000, actor=ICH, target=GEGNER, weapon="WeapHK416_C"),
+    ])
+    res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
+    assert _mich(res)["eventsDealt"][0]["kind"] == "driveby_knock"
