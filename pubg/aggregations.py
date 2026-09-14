@@ -3384,6 +3384,11 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
             "x":         e.get("vx"),
             "y":         e.get("vy"),
             "vehicle":   vehicle_class,
+            # Womit wurde geschossen. Beim Ueberfahren steht in `weapon`
+            # das Fahrzeug — das zeigt die Zeile ohnehin schon, also
+            # bleibt der Name hier leer statt ihn doppelt zu nennen.
+            "weaponName": (None if _ist_fahrzeug_waffe(e.get("weapon"))
+                            else weapon_name_en(e.get("weapon"))),
             "opponent":  _opp_name(opponent_acc),
         })
 

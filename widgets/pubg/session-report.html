@@ -1030,7 +1030,7 @@
     details.ve > summary::-webkit-details-marker { display: none; }
     .ve-row {
       display: grid;
-      grid-template-columns: 110px 130px 1fr auto auto;
+      grid-template-columns: 110px 130px 1fr auto auto auto;
       gap: 8px;
       padding: 3px 6px 3px 22px;
       font-size: 0.92em;
@@ -1057,6 +1057,11 @@
     }
     .ve-match-head:first-child { margin-top: 2px; }
     .ve-veh { color: var(--pubg-text); }
+    .ve-wpn {
+      color: var(--pubg-text);
+      white-space: nowrap;
+      font-weight: 600;
+    }
     .ve-poi { color: var(--pubg-gold); }
     .ve-act b { color: var(--pubg-text); }
     .ve-kind {
@@ -4899,20 +4904,22 @@
           const matchT = fmtMatchTime(ev.tsMs);
           const absT = fmtAbsClock(ev.playedAt, ev.tsMs);
           const where = poi ? `<span class="ve-poi">${poi}</span>` : "";
+          // Jede Art kommt nur in EINER Richtung vor: eject_*,
+          // driveby_* und *_dealt sind immer "ich", kill/knock_died und
+          // run_over(_knock) immer "mir". Darum steht die Richtung im
+          // Wort selbst, statt dass man sie aus dem Pfeil daneben
+          // erschliessen muss.
           const KIND_LABELS = {
-            eject_knock: "shot out (knock)",
-            eject_kill:  "shot out (kill)",
+            eject_knock: "shot someone out (knock)",
+            eject_kill:  "shot someone out (kill)",
             driveby_knock: "drive-by (knock)",
             driveby_kill:  "drive-by (kill)",
-            knock_died: "knocked → died",
-            // Richtungsneutral wie alle anderen Arten hier — ob ich
-            // ueberfahren habe oder wurde, steht schon daneben ("→ X"
-            // gegenueber "by X").
-            run_over: "run over (kill)",
-            run_over_dealt: "run over (kill)",
-            run_over_knock: "run over (knock)",
-            run_over_knock_dealt: "run over (knock)",
-            kill: "kill",
+            run_over_knock_dealt: "ran someone over (knock)",
+            run_over_dealt: "ran someone over (kill)",
+            knock_died: "got shot out, then died",
+            kill: "got shot out (kill)",
+            run_over_knock: "got run over (knock)",
+            run_over: "got run over (kill)",
           };
           const kindLbl = KIND_LABELS[ev.kind] || ev.kind || "kill";
           const verb = role === "dealt"
@@ -4931,11 +4938,19 @@
           const tCell = absT
             ? `<span class="ve-t" title="${matchT} ins Match"><b>${absT}</b> <span class="ve-tsub">+${matchT}</span></span>`
             : `<span class="ve-t">${matchT}</span>`;
+          // Womit geschossen wurde. Beim Ueberfahren liefert das
+          // Backend bewusst nichts — da waere es nur das Auto nochmal.
+          // Ohne Icon: Material Symbols hat bewusst keine Waffen, und ein
+          // zweites Symbol neben dem Auto macht die Zeile nur unruhig.
+          const wpn = ev.weaponName
+            ? `<span class="ve-wpn">${ev.weaponName}</span>`
+            : `<span class="ve-wpn"></span>`;
           return header + `<div class="ve-row">
             ${tCell}
             <span class="ve-veh"><span class="material-symbols-outlined icon-sm" aria-hidden="true">directions_car</span> ${veh}</span>
             <span class="ve-act">${verb}</span>
             ${where}
+            ${wpn}
             <span class="ve-kind">${kindLbl}</span>
           </div>`;
         }).join("");

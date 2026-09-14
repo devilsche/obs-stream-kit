@@ -140,3 +140,25 @@ def test_driveby_knock_bleibt_driveby():
     ])
     res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
     assert _mich(res)["eventsDealt"][0]["kind"] == "driveby_knock"
+
+
+def test_aus_dem_auto_geschossen_zeigt_die_waffe():
+    """Ohne Waffe steht da nur "shot out" — womit, bleibt offen."""
+    _match("v7", [
+        _ev("VehicleEnter", 100000, actor=ICH, weapon="Uaz_B_01_C", seat=0),
+        _ev("Kill", 150000, actor=GEGNER, target=ICH, weapon="WeapKar98k_C"),
+    ])
+    res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
+    treffer = _mich(res)["eventsTaken"][0]
+    assert treffer["kind"] == "kill"
+    assert treffer["weaponName"] == "Kar98k"
+
+
+def test_ueberfahren_braucht_keinen_waffennamen():
+    """Beim Ueberfahren ist die "Waffe" das Auto — das steht schon da."""
+    _match("v8", [
+        _ev("VehicleEnter", 100000, actor=GEGNER, weapon="Uaz_B_01_C", seat=0),
+        _ev("Knock", 150000, actor=GEGNER, target=ICH, weapon="Uaz_B_01_C"),
+    ])
+    res = compute_vehicle_stats(CONN, T, ICH, range_key="all")
+    assert _mich(res)["eventsTaken"][0]["weaponName"] is None
