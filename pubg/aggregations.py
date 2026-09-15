@@ -965,6 +965,10 @@ def _item_label(item_id):
     if m:
         art = {"Head": "Helmet", "Armor": "Vest", "Back": "Backpack"}
         return f"Level {m.group(2)} {art[m.group(1)]}"
+    # Tarnanzug gibt es in mehreren Ausfuehrungen, im Spiel heisst jede
+    # gleich.
+    if _re.search(r"Item_Ghillie", s):
+        return "Ghillie Suit"
     # Fallback: die Id lesbar machen. Die Wortart-Praefixe sagen nichts
     # ueber das Stueck ("Boost PainKiller" statt "Painkiller").
     roh = s
@@ -973,7 +977,10 @@ def _item_label(item_id):
         if roh.startswith(pre):
             roh = roh[len(pre):]
             break
-    return roh.replace("_C", "").replace("_", " ").strip() or "?"
+    # NUR das Suffix wegnehmen: `.replace("_C", "")` traf jedes
+    # Vorkommen und machte aus `AR_Composite_C` ein "ARomposite".
+    roh = _re.sub(r"_C$", "", roh)
+    return roh.replace("_", " ").strip() or "?"
 
 
 def _bestes_item(attachments_json):

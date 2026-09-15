@@ -473,3 +473,36 @@ def test_unbekanntes_item_zeigt_keine_id_reste():
     from pubg.aggregations import _item_label
     name = _item_label("Item_Boost_Irgendwas_C")
     assert "_" not in name and not name.startswith("Item")
+
+
+def test_item_namen_verlieren_kein_C_mitten_im_wort():
+    """`.replace("_C", "")` traf jedes Vorkommen, nicht nur das Suffix.
+
+    Aus `Stock_AR_Composite_C` wurde dadurch "Stock ARomposite", aus
+    `SniperRifle_CheekPad_C` ein "SniperRifleheekPad".
+    """
+    from pubg.aggregations import _item_label
+    for iid in ("Item_Attach_Weapon_Stock_AR_Composite_C",
+                "Item_Attach_Weapon_Stock_SniperRifle_CheekPad_C"):
+        name = _item_label(iid)
+        assert "omposite" not in name or "Composite" in name, name
+        assert "heekPad" not in name, name
+        assert not name.endswith("_C") and "_" not in name, name
+
+
+def test_haeufige_aufsaetze_haben_klarnamen():
+    from pubg.aggregations import _item_label
+    faelle = {
+        "Item_Attach_Weapon_Magazine_ExtendedQuickDraw_SniperRifle_C":
+            "Extended Quickdraw Magazine",
+        "Item_Attach_Weapon_Upper_DualOptic_4x1x_C": "4x-1x Dual Optic",
+        "Item_Attach_Weapon_Muzzle_Suppressor_SniperRifle_C": "Suppressor",
+        "Item_Attach_Weapon_Stock_AR_Composite_C": "Composite Stock",
+        "Item_Ghillie_04_C": "Ghillie Suit",
+        "Item_Weapon_FlashBang_C": "Flashbang",
+        "Item_Weapon_Grenade_C": "Frag Grenade",
+        "Item_Weapon_BluezoneGrenade_C": "Blue Zone Grenade",
+        "Item_Weapon_JerryCan_C": "Jerry Can",
+    }
+    for iid, erwartet in faelle.items():
+        assert _item_label(iid) == erwartet, (iid, _item_label(iid))
