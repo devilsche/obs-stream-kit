@@ -137,7 +137,10 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             out.append(d)
             continue
         if et == "LogPlayerUseFlareGun":
-            ch = e.get("character") or {}
+            # PUBG nennt den Schuetzen hier `attacker`, nicht
+            # `character` — ein Schuss ist fuer die Telemetrie ein
+            # Angriff. Beides annehmen: der DB-Weg baut `character`.
+            ch = e.get("attacker") or e.get("character") or {}
             x, y = _loc(ch)
             nx, ny = normalize_coords(x, y, mapKm)
             if nx is None:

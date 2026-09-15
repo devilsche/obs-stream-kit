@@ -19,10 +19,14 @@ def _land(ts_iso, x, y, items=None, pid="Carapackage_RedBox_C"):
                             "items": [{"itemId": i} for i in (items or [])]}}
 
 
-def _flare(ts_iso, x, y, acc="account.A"):
+def _flare(ts_iso, x, y, acc="account.A", feld="attacker"):
+    """So, wie PUBG es wirklich liefert: der Schuetze steht unter
+    `attacker`, nicht unter `character` — ein Schuss ist fuer die
+    Telemetrie ein Angriff. Der DB-Weg baut dagegen `character`, also
+    muss beides gelesen werden."""
     return {"_T": "LogPlayerUseFlareGun", "_D": ts_iso,
-            "character": {"accountId": acc, "name": "PEX_LuCKoR",
-                          "location": {"x": x, "y": y, "z": 100}}}
+            feld: {"accountId": acc, "name": "PEX_LuCKoR",
+                   "location": {"x": x, "y": y, "z": 100}}}
 
 
 def _drops(evs):
@@ -72,6 +76,14 @@ def test_viel_spaeteres_paket_gehoert_nicht_zur_flare():
               ["Item_Weapon_AWM_C"]),
     ], MAPKM)
     assert _drops(evs)[0]["called"] is False
+
+
+def test_flare_aus_dem_db_weg_heisst_character():
+    """Der DB-Weg baut `character`; beide Formen muessen ankommen."""
+    evs, _ = extract_events([
+        _flare("2026-09-14T10:05:00.0Z", 400000, 300000, feld="character"),
+    ], MAPKM)
+    assert len([e for e in evs if e["type"] == "flare"]) == 1
 
 
 def test_flare_ist_ein_eigenes_ereignis():
