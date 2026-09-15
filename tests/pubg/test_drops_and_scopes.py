@@ -446,3 +446,30 @@ def test_ausruestung_im_airdrop_ist_englisch():
     # Ausgeschrieben, nicht "Lv3" — die Abkuerzung las sich wie
     # ein Teil des Item-Namens.
     assert not any("Lv3" in w for w in werte), werte
+
+
+def test_schutzausruestung_jeder_stufe_hat_einen_namen():
+    """Die Tabelle kannte nur die Level-3-Varianten.
+
+    Es gibt aber mehrere Modelle je Stufe (Head_F, Head_G, Armor_C,
+    Armor_D …), und die Level-2-Teile fielen komplett durch — angezeigt
+    wurde dann "Head F 01 Lv2".
+    """
+    from pubg.aggregations import _item_label
+    faelle = {
+        "Item_Head_G_01_Lv3_C": "Level 3 Helmet",
+        "Item_Head_F_01_Lv2_C": "Level 2 Helmet",
+        "Item_Head_E_01_Lv1_C": "Level 1 Helmet",
+        "Item_Armor_C_01_Lv3_C": "Level 3 Vest",
+        "Item_Armor_D_01_Lv2_C": "Level 2 Vest",
+        "Item_Back_C_01_Lv3_C": "Level 3 Backpack",
+        "Item_Back_BlueBlocker_Lv3": "Level 3 Backpack",
+    }
+    for iid, erwartet in faelle.items():
+        assert _item_label(iid) == erwartet, iid
+
+
+def test_unbekanntes_item_zeigt_keine_id_reste():
+    from pubg.aggregations import _item_label
+    name = _item_label("Item_Boost_Irgendwas_C")
+    assert "_" not in name and not name.startswith("Item")

@@ -11,7 +11,7 @@ const RS = {
   speed: 1,
   lastFrameWall: 0,
   toggles: { kills: true, knocks: true, streaks: true, zones: true, names: true,
-             grid: false },
+             drops: true, grid: false },
   view: { zoom: 1, panX: 0, panY: 0, tZoom: 1, tPanX: 0, tPanY: 0 },
   // Empty defaults damit Hover/Render-Helpers vor dem ersten Load nicht crashen
   _tracks: {}, _groundTracks: {}, _deaths: {}, _relands: {},
@@ -637,6 +637,26 @@ function posAt(acc, ms) {
   return _interpTrack(RS._groundTracks[acc], ms, RS._deaths[acc]);
 }
 
+//: Wie lange ein Kill-Kreuz voll sichtbar bleibt — in ECHTZEIT, nicht
+//: in Ingame-Zeit. Bei 4x waeren das 16 s Ingame, bei 16x eine Minute:
+//: genau der Zusammenhang, den man beim Zuschauen als "gleich lang"
+//: empfindet. Danach verblasst das Kreuz auf REST_ALPHA und bleibt als
+//: blasse Spur stehen, statt die Karte zuzupflastern.
+const MARK_FULL_REAL_MS = 4000;
+const MARK_FADE_REAL_MS = 3000;
+const MARK_REST_ALPHA = 0.2;
+
+//: Sichtbarkeit eines Markers zum Cursor-Zeitpunkt: 1 solange frisch,
+//: dann linear auf MARK_REST_ALPHA.
+function markerAlpha(alterMs) {
+  const speed = RS.speed || 1;
+  const voll = MARK_FULL_REAL_MS * speed;
+  const fade = MARK_FADE_REAL_MS * speed;
+  if (alterMs <= voll) return 1;
+  const p = Math.min(1, (alterMs - voll) / fade);
+  return 1 - p * (1 - MARK_REST_ALPHA);
+}
+
 function markersUpTo(ms) {
   if (!RS.replay || !RS.replay.events) return [];
   const out = [];
@@ -646,6 +666,20 @@ function markersUpTo(ms) {
     if (e.type === "knock" && RS.toggles.knocks) out.push(e);
   }
   return out;
+}
+
+//: Pakete bis zum Cursor. Ein Drop bleibt liegen, verblasst also nicht
+//: — anders als ein Kill ist er ein Ort, kein Moment.
+function dropsUpTo(ms) {
+  if (!RS.replay || !RS.replay.events) return [];
+  return RS.replay.events.filter(
+    e => e.type === "drop" && e.ts <= ms);
+}
+
+function flaresUpTo(ms) {
+  if (!RS.replay || !RS.replay.events) return [];
+  return RS.replay.events.filter(
+    e => e.type === "flare" && e.ts <= ms);
 }
 
 // Bullets die zum Cursor-Zeitpunkt in der Luft sind.
@@ -1017,6 +1051,41 @@ function renderFrame() {
     ctx.globalAlpha = 1;
   }
 
+  // 2b) Airdrops und Leuchtpistolen. Vor den Kill-Markern, damit ein
+  // Kreuz ueber dem Paket nicht verschwindet — das Paket ist Kulisse,
+  // der Kill das Ereignis.
+  if (RS.toggles.drops !== false) {
+    for (const f of flaresUpTo(ms)) {
+      const [fx, fy] = projToCanvas(f.x, f.y);
+      ctx.globalAlpha = 0.55;
+      ctx.strokeStyle = "#f2b705";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(fx, fy - 7); ctx.lineTo(fx, fy + 7);
+      ctx.moveTo(fx - 7, fy); ctx.lineTo(fx + 7, fy);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    for (const d of dropsUpTo(ms)) {
+      const [dx, dy] = projToCanvas(d.x, d.y);
+      // Angefordert = Gold, regulaer = Weiss. Der Unterschied ist das
+      // Interessante: dort wollte jemand hin.
+      const gold = !!d.called;
+      ctx.fillStyle = gold ? "rgba(242,183,5,0.85)" : "rgba(255,255,255,0.7)";
+      ctx.strokeStyle = gold ? "#f2b705" : "#cfd3dc";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.rect(dx - 5, dy - 5, 10, 10);
+      ctx.fill(); ctx.stroke();
+      // Fallschirm-Andeutung nach oben
+      ctx.globalAlpha = 0.5;
+      ctx.beginPath();
+      ctx.arc(dx, dy - 7, 5, Math.PI, 0);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+
   // 3) Kill/Knock-Marker (X) — nach den Pins, damit sie nicht verdeckt werden
   const heroTeamId = RS.replay.heroTeamId ?? null;
   const heroColor2 = RS._teamColor[heroTeamId] || "#fff";
@@ -1025,11 +1094,14 @@ function renderFrame() {
     const victimTeam = RS._accTeam[e.targetId];
     const isHeroVictim = heroTeamId !== null && victimTeam === heroTeamId;
     const sz = e.type === "kill" ? 6 : 5;
+    // Frische Kreuze stehen voll da, aeltere verblassen — sonst ist die
+    // Karte nach zehn Minuten ein Kreuzfeld.
+    const fade = markerAlpha(ms - e.ts);
     if (isHeroVictim) {
       const r = e.type === "kill" ? 14 : 10;
       ctx.strokeStyle = e.type === "kill" ? "#ff3a3a" : heroColor2;
       ctx.lineWidth = e.type === "kill" ? 2.5 : 1.5;
-      ctx.globalAlpha = 0.9;
+      ctx.globalAlpha = 0.9 * fade;
       if (e.type === "knock") ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.arc(emx, emy, r, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
@@ -1038,7 +1110,7 @@ function renderFrame() {
     ctx.strokeStyle = isHeroVictim
       ? (e.type === "kill" ? "#ff3a3a" : heroColor2)
       : teamColorOf(e.actorId);
-    ctx.globalAlpha = e.type === "kill" ? 1 : 0.85;
+    ctx.globalAlpha = (e.type === "kill" ? 1 : 0.85) * fade;
     ctx.lineWidth = isHeroVictim ? 2.5 : 2;
     ctx.beginPath();
     ctx.moveTo(emx - sz, emy - sz); ctx.lineTo(emx + sz, emy + sz);
@@ -1052,7 +1124,8 @@ function renderFrame() {
 }
 
 // Toggle-Checkboxen verdrahten
-["Kills", "Knocks", "Streaks", "Zones", "Names", "Killfeed", "Grid"].forEach(k => {
+["Kills", "Knocks", "Streaks", "Zones", "Names", "Drops", "Killfeed",
+ "Grid"].forEach(k => {
   const cb = document.getElementById("tgl" + k);
   if (!cb) return;
   cb.addEventListener("change", () => {
@@ -1268,6 +1341,26 @@ function hitTest(mx, my) {
       const poi = poiAt(p.x, p.y);
       const loc = poi ? ` · ${poi}` : "";
       return `Team ${tid} · ${RS._accName[acc]} · ${k} Kills · ${kn} Knocks${loc}`;
+    }
+  }
+  // 1b) Pakete: was drin lag, auch wenn niemand drangegangen ist.
+  if (RS.toggles.drops !== false) {
+    for (const d of dropsUpTo(ms)) {
+      const [dx, dy] = projToCanvas(d.x, d.y);
+      if (Math.hypot(dx - mx, dy - my) <= 9) {
+        const wer = d.called
+          ? ` · called in by ${RS._accName[d.calledBy] || "someone"}`
+          : "";
+        const inhalt = (d.items && d.items.length)
+          ? d.items.join(", ") : "contents unknown";
+        return `Airdrop${wer} · ${inhalt}`;
+      }
+    }
+    for (const f of flaresUpTo(ms)) {
+      const [fx, fy] = projToCanvas(f.x, f.y);
+      if (Math.hypot(fx - mx, fy - my) <= 9) {
+        return `Flare fired by ${RS._accName[f.actorId] || "someone"}`;
+      }
     }
   }
   // 2) Kill/Knock-Marker (8px)

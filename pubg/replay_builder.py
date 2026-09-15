@@ -51,6 +51,46 @@ def _weapon_label(weapon_id):
     return _wl(weapon_id)
 
 
+#: Ein Paket, das innerhalb dieser Zeit nach einer Leuchtpistole in
+#: deren Naehe landet, gilt als angefordert. PUBG sagt das nicht dazu —
+#: der Pakettyp `Carapackage_FlareGun_C` steht nur in den Pickups, nicht
+#: im Land-Event. Gemessen liegen Zuendung und Landung 40-100 s
+#: auseinander, das Paket faellt dicht am Zuendort.
+FLARE_DROP_WINDOW_MS = 150_000
+FLARE_DROP_RADIUS_CM = 30_000        # 300 m
+
+
+def _paket_items(pkg):
+    """Inhalt eines Pakets als Klartext-Liste, Wiederholungen gezaehlt."""
+    from pubg.aggregations import _item_label, _items_gezaehlt
+    roh = []
+    for it in (pkg.get("items") or []):
+        iid = it.get("itemId") if isinstance(it, dict) else it
+        if iid:
+            roh.append(_item_label(iid))
+    return _items_gezaehlt(roh)
+
+
+def _flares_zuordnen(drops, flares):
+    """Angeforderte Pakete markieren — ueber Ort und Zeit.
+
+    Ohne diese Zuordnung sehen alle Pakete gleich aus, dabei ist das
+    selbst gerufene das interessante: man weiss, wer es geholt hat und
+    dass jemand dort hinwollte.
+    """
+    for d in drops:
+        for f in flares:
+            dt = d["_ts_roh"] - f["_ts_roh"]
+            if not (0 <= dt <= FLARE_DROP_WINDOW_MS):
+                continue
+            dx = d["_x_roh"] - f["_x_roh"]
+            dy = d["_y_roh"] - f["_y_roh"]
+            if (dx * dx + dy * dy) ** 0.5 <= FLARE_DROP_RADIUS_CM:
+                d["called"] = True
+                d["calledBy"] = f["actorId"]
+                break
+
+
 def extract_events(raw_events, mapKm, position_interval_ms=1000):
     """Raw PUBG-Events → flache, sortierte Replay-Event-Liste fuer ALLE
     Spieler. Position-Events werden pro Spieler auf position_interval_ms
@@ -72,6 +112,7 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                    ein Spieler als Repraesentant, ts normalisiert noch NICHT.
     """
     out = []
+    _drops, _flares = [], []
     last_pos_ts = {}  # actorId → letzter behaltener Position-ts
     # Flugroute: ALLE Spieler zusammengeführt, 1-s-Buckets → lückenlose Route
     _flight_by_ts = {}  # ts_bucket (ms, 1s-Raster) → [nx, ny]
@@ -79,6 +120,33 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
         et = e.get("_T", "")
         ts = _ts_ms(e.get("_D"))
         if ts is None:
+            continue
+        if et == "LogCarePackageLand":
+            pkg = e.get("itemPackage") or {}
+            x, y = _loc(pkg)
+            nx, ny = normalize_coords(x, y, mapKm)
+            if nx is None:
+                continue
+            d = {"type": "drop", "ts": ts, "x": nx, "y": ny,
+                 "items": _paket_items(pkg),
+                 "packageId": pkg.get("itemPackageId"),
+                 "called": False, "calledBy": None,
+                 # Rohwerte nur zum Zuordnen; fliegen unten wieder raus.
+                 "_ts_roh": ts, "_x_roh": x, "_y_roh": y}
+            _drops.append(d)
+            out.append(d)
+            continue
+        if et == "LogPlayerUseFlareGun":
+            ch = e.get("character") or {}
+            x, y = _loc(ch)
+            nx, ny = normalize_coords(x, y, mapKm)
+            if nx is None:
+                continue
+            f = {"type": "flare", "ts": ts, "actorId": ch.get("accountId"),
+                 "x": nx, "y": ny,
+                 "_ts_roh": ts, "_x_roh": x, "_y_roh": y}
+            _flares.append(f)
+            out.append(f)
             continue
         if et == "LogParachuteLanding":
             ch = e.get("character") or {}
@@ -185,6 +253,13 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                 "nextX": zx, "nextY": zy,
                 "nextR": (nr / span) if nr else None,
             })
+    # Angeforderte Pakete markieren, dann die Rohwerte wieder entfernen —
+    # sie dienen nur der Zuordnung und haben in der Antwort nichts
+    # verloren.
+    _flares_zuordnen(_drops, _flares)
+    for d in _drops + _flares:
+        for k in ("_ts_roh", "_x_roh", "_y_roh"):
+            d.pop(k, None)
     out.sort(key=lambda e: e["ts"])
     flight_pts = [[nx, ny, ts] for ts, (nx, ny) in sorted(_flight_by_ts.items())]
     return out, flight_pts
@@ -367,6 +442,10 @@ _DB_EVENT_MAP = {
     "TakeDamage":   ("LogPlayerTakeDamage", "attacker",  "victim"),
     "VehicleEnter": ("LogVehicleRide",      "character", None),
     "VehicleLeave": ("LogVehicleLeave",     "character", None),
+    # Pakete und Leuchtpistolen: das Land-Event traegt keinen Akteur,
+    # der Paketinhalt steht in `attachments`.
+    "CarePackageLand": ("LogCarePackageLand", "itemPackage", None),
+    "FlareGun":        ("LogPlayerUseFlareGun", "character", None),
 }
 
 
@@ -419,6 +498,22 @@ def db_rows_to_raw_events(rows):
             e["damageCauserName"] = g("weapon")
             e["distance"] = g("distance")
             e["damage"] = g("damage")
+        elif raw_t == "LogCarePackageLand":
+            # In der DB liegt die Position im actor_x/y-Feld und der
+            # Inhalt als JSON in attachments.
+            import json as _json_pkg
+            try:
+                items = _json_pkg.loads(g("attachments") or "[]")
+            except (TypeError, ValueError):
+                items = []
+            e["itemPackage"] = {
+                "itemPackageId": g("weapon"),
+                "location": {"x": g("actor_x"), "y": g("actor_y"), "z": 0},
+                "items": [{"itemId": i} for i in items if i],
+            }
+            # Oben wurde pauschal ein `character` gesetzt; ein
+            # gelandetes Paket hat aber keinen Akteur.
+            e.pop("character", None)
         elif raw_t in ("LogVehicleRide", "LogVehicleLeave"):
             # vehicleId liegt in der DB in der weapon-Spalte (siehe
             # pubg/telemetry.py::_normalize) — ohne ihn kann die

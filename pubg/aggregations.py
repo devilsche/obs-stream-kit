@@ -956,6 +956,15 @@ def _item_label(item_id):
                or DROP_ITEM_LABELS.get(s))
     if treffer:
         return treffer
+    # Schutzausruestung ueber das Muster, nicht ueber Festwerte: es gibt
+    # mehrere Modelle je Stufe (Head_F, Head_G, Armor_C, Armor_D …), und
+    # eine Liste davon ist nie vollstaendig — die Level-2-Teile fielen
+    # so durch und standen als "Head F 01 Lv2" da.
+    import re as _re
+    m = _re.search(r"Item_(Head|Armor|Back)_.*?Lv(\d+)", s)
+    if m:
+        art = {"Head": "Helmet", "Armor": "Vest", "Back": "Backpack"}
+        return f"Level {m.group(2)} {art[m.group(1)]}"
     # Fallback: die Id lesbar machen. Die Wortart-Praefixe sagen nichts
     # ueber das Stueck ("Boost PainKiller" statt "Painkiller").
     roh = s
