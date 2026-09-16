@@ -641,10 +641,12 @@ function posAt(acc, ms) {
 //: in Ingame-Zeit. Bei 4x waeren das 16 s Ingame, bei 16x eine Minute:
 //: genau der Zusammenhang, den man beim Zuschauen als "gleich lang"
 //: empfindet. Danach verblasst das Kreuz auf REST_ALPHA und bleibt als
-//: blasse Spur stehen, statt die Karte zuzupflastern.
+//: blasse Spur stehen, statt die Karte zuzupflastern. 5%: bei ueber
+//: neunzig Kills im Match sind auch schwache Kreuze in der Summe noch
+//: ein Kreuzfeld.
 const MARK_FULL_REAL_MS = 4000;
 const MARK_FADE_REAL_MS = 3000;
-const MARK_REST_ALPHA = 0.2;
+const MARK_REST_ALPHA = 0.05;
 
 //: Sichtbarkeit eines Markers zum Cursor-Zeitpunkt: 1 solange frisch,
 //: dann linear auf MARK_REST_ALPHA.

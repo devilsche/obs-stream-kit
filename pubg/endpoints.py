@@ -1062,11 +1062,19 @@ class EndpointRegistry:
         # Raw-Telemetrie von HiDrive — Single Source of Truth
         here = os.path.dirname(os.path.abspath(__file__))
         secrets = os.path.join(os.path.dirname(here), ".secrets")
-        # Archiv dieses Tenants (eigener SFTP-Zugang, sonst der geteilte fuer
-        # Admin-Tenants) — nicht blind der Bucket des Betreibers.
-        from pubg.archive_config import archive_cfg_for_tenant
-        arch_cfg = archive_cfg_for_tenant(conn.raw, self.tenant_id, secrets)
-        raw = hidrive_telemetry.download_raw(match_id, secrets, cfg=arch_cfg)
+        # Archive, aus denen dieser Tenant lesen darf: das eigene, und
+        # die der Mitspieler aus DIESEM Match. Die Telemetrie gehoert dem
+        # Match, nicht dem Konto — wer in derselben Lobby sass, hat
+        # dasselbe Spiel gespielt. Ohne das haengt es am Zufall, wer
+        # zuerst gepollt hat, ob ein Replay ueberhaupt Daten findet.
+        from pubg.archive_config import lesbare_archive_fuer_match
+        raw = None
+        for arch_cfg in lesbare_archive_fuer_match(
+                conn.raw, self.tenant_id, match_id, secrets):
+            raw = hidrive_telemetry.download_raw(match_id, secrets,
+                                                 cfg=arch_cfg)
+            if raw:
+                break
         replay_source = "hidrive"
         # Fallback 1: HiDrive hat das Blob nicht (nie archiviert / HiDrive nicht
         # konfiguriert) → direkt vom PUBG-Telemetrie-CDN laden. Die telemetry_url

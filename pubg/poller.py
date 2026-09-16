@@ -753,6 +753,38 @@ def _squad_account_ids_for_match(conn, tenant_id: int, match_id):
     return {r["account_id"] for r in rows}
 
 
+def _archiv_nachholen(conn, tenant_id, client, match_id, url, cfg=None):
+    """Blob ins eigene Archiv legen, auch wenn ein anderer schneller war.
+
+    Das CDN haelt die Rohdaten nur 14 Tage; danach ist das Archiv die
+    einzige Quelle. Ein Match, das ein anderer Tenant geholt hat, fiel
+    ohne diesen Nachzug dauerhaft heraus.
+
+    Kostet einen CDN-Download ohne API-Key, faellt also nicht unter das
+    Rate-Limit des Match-Pollings. Wer schon archiviert hat, laedt
+    nichts.
+    """
+    from pubg import hidrive_telemetry
+    raw_conn = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    if cfg is None:
+        try:
+            from pubg.archive_config import archive_cfg_for_tenant
+            cfg = archive_cfg_for_tenant(raw_conn, tenant_id)
+        except Exception:
+            cfg = None
+    if not cfg or not url:
+        return
+    try:
+        if hidrive_telemetry.exists(match_id, cfg=cfg):
+            return
+        roh = client.get_telemetry(url)
+        if roh:
+            hidrive_telemetry.upload_raw(match_id, roh, cfg=cfg)
+    except Exception:
+        # Ein fehlendes Archiv-Blob darf das Polling nicht aufhalten.
+        pass
+
+
 def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
     """Laedt + persistiert Telemetry-Events fuer ein Match. Idempotent.
 
@@ -769,6 +801,13 @@ def _process_one_telemetry(conn, tenant_id: int, client, my_account_id, row):
             row["match_id"]):
         mark_telemetry_fetched(conn, tenant_id, row["match_id"])
         mark_telemetry_schema(conn, tenant_id, row["match_id"])
+        # …aber das eigene Archiv braucht den Blob trotzdem. Bisher
+        # endete die Funktion hier, und da nur ein Tenant archiviert,
+        # brach dessen Abdeckung von 100% auf 40% ein, sobald mehr
+        # Tenants mitspielten: wer zuerst kam, holte die Telemetrie, und
+        # das Archiv ging leer aus.
+        _archiv_nachholen(conn, tenant_id, client, row["match_id"],
+                          row["telemetry_url"])
         return
     try:
         raw = client.get_telemetry(row["telemetry_url"])

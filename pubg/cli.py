@@ -1462,14 +1462,20 @@ def speed_backfill(root: str, args=None) -> int:
             print(f"Archiv nicht erreichbar ({e}) — nur CDN")
 
     class _AusArchiv:
-        """Gibt sich als Client aus, liest aber aus dem Archiv."""
+        """Gibt sich als Client aus, liest aber aus dem Archiv.
+
+        Probiert alle Archive, aus denen dieser Tenant lesen darf — das
+        eigene und die der Mitspieler aus dem jeweiligen Match.
+        """
         def __init__(self, mid):
             self.mid = mid
         def get_telemetry(self, _url):
-            roh = hidrive_telemetry.download_raw(self.mid, cfg=cfg)
-            if roh is None:
-                raise RuntimeError("nicht im Archiv")
-            return roh
+            from pubg.archive_config import lesbare_archive_fuer_match
+            for c in lesbare_archive_fuer_match(raw, tenant_id, self.mid):
+                roh = hidrive_telemetry.download_raw(self.mid, cfg=c)
+                if roh:
+                    return roh
+            raise RuntimeError("in keinem erreichbaren Archiv")
 
     cdn = PubgClient(api_key="", platform="steam")
     ok = fehler = zeilen = 0

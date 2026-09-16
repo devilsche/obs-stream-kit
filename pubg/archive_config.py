@@ -79,6 +79,59 @@ def archive_cfg_for_tenant(conn, tenant_id: int, secrets_path: str = ".secrets")
     return None
 
 
+def lesbare_archive_fuer_match(conn, tenant_id: int, match_id: str,
+                               secrets_path: str = ".secrets") -> list:
+    """Alle Archive, aus denen dieser Tenant das Match lesen darf.
+
+    Die Telemetrie gehoert dem MATCH, nicht dem Konto: wer in derselben
+    Lobby sass, hat dasselbe Spiel gespielt. Darum darf er den Blob auch
+    aus dem Archiv eines Mitspielers holen — sonst haette jeder Tenant
+    eine andere Sicht auf dieselbe Runde, je nachdem wer zufaellig
+    zuerst gepollt hat.
+
+    Das eigene Archiv steht vorn. Fremde kommen nur dazu, wenn BEIDE
+    Tenants im Match waren; wer nicht dabei war, bekommt nichts.
+    """
+    raw = getattr(conn, "raw", conn)
+    aus = []
+    eigenes = archive_cfg_for_tenant(raw, tenant_id, secrets_path)
+    # War ich dabei? Der Poller legt ein Match nur an, wenn ein eigener
+    # Account darin gespielt hat — `matches.tenant_id` ist damit der
+    # verlaessliche Nachweis. `match_team_mapping` waere zu streng: die
+    # Tabelle ist nicht fuer jedes Match gefuellt.
+    with raw.cursor() as cur:
+        cur.execute(
+            "SELECT 1 FROM matches WHERE tenant_id = %s AND match_id = %s "
+            "LIMIT 1", (tenant_id, match_id))
+        dabei = cur.fetchone() is not None
+    if not dabei:
+        return []
+    if eigenes:
+        aus.append(eigenes)
+    else:
+        # Dabei gewesen, aber kein eigener Zugang hinterlegt: `None`
+        # heisst "nimm die Standard-Konfiguration aus .secrets". Das ist
+        # etwas anderes als die leere Liste, die "nicht dabei" bedeutet.
+        aus.append(None)
+    # Mitspieler-Tenants: wer dasselbe Match in seinem Bestand hat.
+    with raw.cursor() as cur:
+        cur.execute(
+            "SELECT DISTINCT tenant_id FROM matches "
+            "WHERE match_id = %s AND tenant_id <> %s",
+            (match_id, tenant_id))
+        andere = [r["tenant_id"] for r in cur.fetchall()]
+    for tid in andere:
+        cfg = archive_cfg_for_tenant(raw, tid, secrets_path)
+        if cfg and cfg not in aus:
+            aus.append(cfg)
+    return aus
+
+
+def darf_archiv_lesen(conn, tenant_id: int, match_id: str) -> bool:
+    """Kurzform: war dieser Tenant in dem Match?"""
+    return bool(lesbare_archive_fuer_match(conn, tenant_id, match_id))
+
+
 def has_own_archive(conn, tenant_id: int) -> bool:
     """Hat der Tenant einen EIGENEN Zugang hinterlegt (nicht den geteilten)?"""
     from core import credentials as core_creds
