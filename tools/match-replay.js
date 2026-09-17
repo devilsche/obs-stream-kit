@@ -691,7 +691,9 @@ function zeichneKiste(ctx, x, y, gold, ms) {
   const rand   = gold ? "#f2b705" : "#e8ebf2";
   const fuell  = gold ? "rgba(242,183,5,0.9)" : "rgba(226,232,242,0.9)";
   const gurt   = gold ? "rgba(90,60,0,0.85)" : "rgba(40,44,54,0.8)";
-  const w = 18, h = 14;
+  // 16,5 statt 18: knapp 8% kleiner, damit die Kiste neben Pins und
+  // Kreuzen nicht dominiert.
+  const w = 16.5, h = 13;
   // Rauchsaeule: drei Schwaden, nach oben breiter und blasser.
   for (let i = 0; i < 3; i++) {
     ctx.globalAlpha = 0.3 - i * 0.08;
@@ -1187,7 +1189,7 @@ function renderFrame() {
       // Kiste an den Leinen — dasselbe Bild wie am Boden, damit man
       // schon im Anflug sieht, was da kommt.
       if (KISTE_BILD._fertig) {
-        const bw = 13;
+        const bw = 12;   // proportional zur gelandeten Kiste
         const bh = bw * (KISTE_BILD.naturalHeight / KISTE_BILD.naturalWidth);
         ctx.drawImage(KISTE_BILD, dx - bw / 2, ky, bw, bh);
       } else {
