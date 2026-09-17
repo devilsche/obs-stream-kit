@@ -205,3 +205,34 @@ def test_brdm_kommt_auch_aus_einer_flare():
         _land("2026-09-14T10:06:00.0Z", 400000, 300000, pid="BP_BRDM_C"),
     ], MAPKM)
     assert _drops(evs)[0]["called"] is True
+
+
+def test_alle_zeitstempel_werden_auf_den_matchstart_bezogen():
+    """`build_replay` rechnet Zeiten auf 0 = Match-Start um.
+
+    Meine Zusatzfelder blieben dabei absolut (Unix-Millisekunden). Das
+    Frontend vergleicht sie gegen den Abspiel-Cursor, der bei 0 beginnt
+    — damit lag jedes Paket rund 1,8 Billionen Millisekunden in der
+    Zukunft und wurde nie gezeichnet.
+    """
+    from pubg.replay_builder import build_replay
+    roh = [
+        {"_T": "LogParachuteLanding", "_D": "2026-09-14T10:00:00.0Z",
+         "character": {"accountId": "account.A", "name": "Ich",
+                       "location": {"x": 100000, "y": 100000, "z": 100}}},
+        _spawn("2026-09-14T10:04:10.0Z", 400000, 300000,
+               items=["Item_Weapon_AWM_C"]),
+        _land("2026-09-14T10:05:00.0Z", 400000, 300000,
+              ["Item_Weapon_AWM_C"]),
+        _flare("2026-09-14T10:03:00.0Z", 400000, 300000),
+    ]
+    r = build_replay(roh, "m1", "Baltic_Main", MAPKM,
+                     {"account.A": 1}, {"account.A": "Ich"})
+    d = [e for e in r["events"] if e["type"] == "drop"][0]
+    f = [e for e in r["events"] if e["type"] == "flare"][0]
+    # Alles relativ zum ersten Ereignis, also im Bereich der Spieldauer.
+    assert d["ts"] == d["landTs"]
+    assert 0 <= d["spawnTs"] < d["landTs"] <= r["durationMs"]
+    assert 0 <= f["ts"] <= r["durationMs"]
+    # 50 s Fallzeit bleiben 50 s.
+    assert d["landTs"] - d["spawnTs"] == 50_000

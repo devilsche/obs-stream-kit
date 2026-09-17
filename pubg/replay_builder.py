@@ -485,6 +485,14 @@ def build_replay(raw_events, match_id, map_name, mapKm,
     if events:
         for e in events:
             e["ts"] = e["ts"] - t0_abs
+            # Jede weitere Zeitangabe muss denselben Bezug bekommen.
+            # Bleibt eine absolut, vergleicht das Frontend Unix-Zeit
+            # gegen einen Cursor, der bei 0 beginnt — das Ereignis liegt
+            # dann rund 1,8 Billionen Millisekunden in der Zukunft und
+            # wird nie gezeichnet.
+            for feld in ("landTs", "spawnTs"):
+                if e.get(feld) is not None:
+                    e[feld] = e[feld] - t0_abs
         duration = events[-1]["ts"]
     else:
         duration = 0
