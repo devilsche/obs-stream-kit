@@ -127,7 +127,29 @@ def _spawns_zuordnen(drops, spawns, out, mapKm):
 #: waere nicht nur unnoetig, sondern falsch: landen ein gerufenes und
 #: ein regulaeres Paket nebeneinander, kaeme beides als "gerufen"
 #: heraus.
-FLARE_PACKAGE_MARKER = ("FlareGun", "BRDM")
+FLARE_PACKAGE_MARKER = ("FlareGun",)
+
+#: Pakettypen, die wirklich am Fallschirm vom Himmel kommen. Gemessen an
+#: der Zeit zwischen Spawn und Landung: RedBox, SmallPackage, DihorOtok
+#: und FlareGun fallen 53-75 s. Alles andere gehoert nicht auf die Karte
+#: als Versorgungskiste:
+#:   BP_BRDM_C        — ein Fahrzeug aus der Leuchtpistole, kein Paket,
+#:                      und ohne Spawn-Ereignis
+#:   *NoParachute*    — erscheint am Boden (5,7 s), faellt also nicht
+#:   *Bluechip*       — Paket am Comeback-Turm, kein Abwurf
+#:   Carepackage_Container_C — Event-Behaelter, 3,2 s
+AIRDROP_PACKAGES = ("Carapackage_RedBox_C", "Carapackage_SmallPackage_C",
+                    "Carapackage_SmallPackage_DihorOtok_C",
+                    "Carapackage_FlareGun_C")
+
+
+def _ist_airdrop(package_id):
+    s = str(package_id or "")
+    if not s:
+        return False
+    if "NoParachute" in s or "Bluechip" in s or "BRDM" in s:
+        return False
+    return s in AIRDROP_PACKAGES
 
 
 def _ist_flare_paket(package_id):
@@ -189,6 +211,8 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             continue
         if et == "LogCarePackageSpawn":
             pkg = e.get("itemPackage") or {}
+            if not _ist_airdrop(pkg.get("itemPackageId")):
+                continue
             x, y = _loc(pkg)
             if x is None:
                 continue
@@ -198,6 +222,8 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
             continue
         if et == "LogCarePackageLand":
             pkg = e.get("itemPackage") or {}
+            if not _ist_airdrop(pkg.get("itemPackageId")):
+                continue
             x, y = _loc(pkg)
             nx, ny = normalize_coords(x, y, mapKm)
             if nx is None:

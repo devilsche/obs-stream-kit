@@ -200,11 +200,13 @@ def test_regulaeres_paket_bleibt_regulaer_auch_neben_einer_flare():
     assert gerufen["calledBy"] == "account.A"
 
 
-def test_brdm_kommt_auch_aus_einer_flare():
+def test_brdm_ist_kein_paket():
+    """Die Leuchtpistole kann auch ein BRDM rufen — das ist ein Fahrzeug
+    und gehoert nicht als Versorgungskiste auf die Karte."""
     evs, _ = extract_events([
         _land("2026-09-14T10:06:00.0Z", 400000, 300000, pid="BP_BRDM_C"),
     ], MAPKM)
-    assert _drops(evs)[0]["called"] is True
+    assert _drops(evs) == []
 
 
 def test_alle_zeitstempel_werden_auf_den_matchstart_bezogen():
@@ -236,3 +238,34 @@ def test_alle_zeitstempel_werden_auf_den_matchstart_bezogen():
     assert 0 <= f["ts"] <= r["durationMs"]
     # 50 s Fallzeit bleiben 50 s.
     assert d["landTs"] - d["spawnTs"] == 50_000
+
+
+def test_nur_echte_airdrops_gelten_als_drop():
+    """Ein Airdrop kommt am Fallschirm vom Himmel — sonst ist es keiner.
+
+    Gemessen fallen RedBox, SmallPackage, DihorOtok und FlareGun 53-75 s
+    lang. Das BRDM aus der Leuchtpistole ist ein Fahrzeug und hat gar
+    keinen Spawn, die Bluechip- und NoParachute-Pakete erscheinen am
+    Boden. Als Versorgungskiste auf der Karte waren die alle irrefuehrend.
+    """
+    evs, _ = extract_events([
+        _land("2026-09-14T10:05:00.0Z", 400000, 300000, pid="BP_BRDM_C"),
+        _land("2026-09-14T10:06:00.0Z", 410000, 310000,
+              pid="Carepackage_SmallPackage_NoParachute_Bluechip_C"),
+        _land("2026-09-14T10:07:00.0Z", 420000, 320000,
+              pid="Carapackage_SmallPackage_NoParachute_C"),
+        _land("2026-09-14T10:08:00.0Z", 430000, 330000,
+              ["Item_Weapon_AWM_C"], pid="Carapackage_RedBox_C"),
+    ], MAPKM)
+    d = _drops(evs)
+    assert [x["packageId"] for x in d] == ["Carapackage_RedBox_C"]
+
+
+def test_der_flare_airdrop_bleibt_ein_drop():
+    """Nur das BRDM fliegt raus, nicht die gerufene Kiste."""
+    evs, _ = extract_events([
+        _land("2026-09-14T10:08:00.0Z", 430000, 330000,
+              ["Item_Weapon_AWM_C"], pid="Carapackage_FlareGun_C"),
+    ], MAPKM)
+    d = _drops(evs)
+    assert len(d) == 1 and d[0]["called"] is True

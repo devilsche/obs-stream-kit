@@ -733,16 +733,9 @@ function zeichneKiste(ctx, x, y, gold, ms) {
     ctx.moveTo(x, y - h / 2); ctx.lineTo(x, y + h / 2);
     ctx.stroke();
   }
-  // Blinklicht auf der Kiste — im Spiel das Merkmal, das sie auch im
-  // Dunkeln findbar macht. Pulst mit der Abspielzeit, nicht mit der
-  // Wanduhr: beim Anhalten steht auch das Licht.
-  const puls = 0.45 + 0.55 * Math.abs(Math.sin((ms || 0) / 420));
-  ctx.globalAlpha = puls;
-  ctx.fillStyle = "#ffffff";
-  ctx.beginPath();
-  ctx.arc(x, y - h / 2 - 1.5, 1.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  // Kein Blinklicht: im Spiel hilft es, die Kiste im Gelaende zu
+  // finden — auf einer Uebersichtskarte flackert es nur ueber dem
+  // Symbol und sieht nach Stoerung aus.
 }
 
 //: Pakete, die schon LIEGEN. Ein Drop bleibt liegen, verblasst also
@@ -1191,11 +1184,19 @@ function renderFrame() {
         ctx.lineTo(dx, ky);
         ctx.stroke();
       }
-      // Kiste an den Leinen
-      ctx.fillStyle = gold ? "rgba(242,183,5,0.9)" : "rgba(226,232,242,0.9)";
-      ctx.beginPath();
-      ctx.rect(dx - 4, ky, 8, 6);
-      ctx.fill(); ctx.stroke();
+      // Kiste an den Leinen — dasselbe Bild wie am Boden, damit man
+      // schon im Anflug sieht, was da kommt.
+      if (KISTE_BILD._fertig) {
+        const bw = 13;
+        const bh = bw * (KISTE_BILD.naturalHeight / KISTE_BILD.naturalWidth);
+        ctx.drawImage(KISTE_BILD, dx - bw / 2, ky, bw, bh);
+      } else {
+        ctx.fillStyle = gold
+          ? "rgba(242,183,5,0.9)" : "rgba(226,232,242,0.9)";
+        ctx.beginPath();
+        ctx.rect(dx - 4, ky, 8, 6);
+        ctx.fill(); ctx.stroke();
+      }
       ctx.globalAlpha = 1;
     }
     for (const d of dropsUpTo(ms)) {
