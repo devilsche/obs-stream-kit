@@ -115,21 +115,37 @@ def _spawns_zuordnen(drops, spawns, out, mapKm):
              "landTs": s["ts"] + DROP_FALL_MS, "spawnTs": s["ts"],
              "spawnEstimated": False, "x": nx, "y": ny,
              "items": s["items"], "packageId": s["pid"],
-             "called": False, "calledBy": None,
+             "called": _ist_flare_paket(s["pid"]), "calledBy": None,
              "_ts_roh": s["ts"] + DROP_FALL_MS,
              "_x_roh": s["x_roh"], "_y_roh": s["y_roh"]}
         drops.append(d)
         out.append(d)
 
 
-def _flares_zuordnen(drops, flares):
-    """Angeforderte Pakete markieren — ueber Ort und Zeit.
+#: Pakettypen, die aus einer Leuchtpistole kommen. Das steht im Event
+#: selbst — in Spawn UND Landung. Eine Schaetzung ueber Ort und Zeit
+#: waere nicht nur unnoetig, sondern falsch: landen ein gerufenes und
+#: ein regulaeres Paket nebeneinander, kaeme beides als "gerufen"
+#: heraus.
+FLARE_PACKAGE_MARKER = ("FlareGun", "BRDM")
 
-    Ohne diese Zuordnung sehen alle Pakete gleich aus, dabei ist das
-    selbst gerufene das interessante: man weiss, wer es geholt hat und
-    dass jemand dort hinwollte.
+
+def _ist_flare_paket(package_id):
+    s = str(package_id or "")
+    return any(m in s for m in FLARE_PACKAGE_MARKER)
+
+
+def _flares_zuordnen(drops, flares):
+    """Dem gerufenen Paket den Schuetzen zuordnen — ueber Ort und Zeit.
+
+    OB ein Paket gerufen wurde, sagt der Pakettyp (siehe
+    `_ist_flare_paket`). Offen bleibt nur, WER die Leuchtpistole
+    abgefeuert hat; das steht im Paket nicht und laesst sich einzig aus
+    Naehe und Zeitpunkt erschliessen.
     """
     for d in drops:
+        if not d.get("called"):
+            continue
         for f in flares:
             dt = d["_ts_roh"] - f["_ts_roh"]
             if not (0 <= dt <= FLARE_DROP_WINDOW_MS):
@@ -137,7 +153,6 @@ def _flares_zuordnen(drops, flares):
             dx = d["_x_roh"] - f["_x_roh"]
             dy = d["_y_roh"] - f["_y_roh"]
             if (dx * dx + dy * dy) ** 0.5 <= FLARE_DROP_RADIUS_CM:
-                d["called"] = True
                 d["calledBy"] = f["actorId"]
                 break
 
@@ -192,7 +207,8 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                  "x": nx, "y": ny,
                  "items": _paket_items(pkg),
                  "packageId": pkg.get("itemPackageId"),
-                 "called": False, "calledBy": None,
+                 "called": _ist_flare_paket(pkg.get("itemPackageId")),
+                 "calledBy": None,
                  # Rohwerte nur zum Zuordnen; fliegen unten wieder raus.
                  "_ts_roh": ts, "_x_roh": x, "_y_roh": y}
             _drops.append(d)

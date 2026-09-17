@@ -162,3 +162,46 @@ def test_spawn_ohne_landung_zaehlt_als_paket():
     d = _drops(evs)
     assert len(d) == 1
     assert d[0]["items"] == ["AWM"]
+
+
+def test_pakettyp_entscheidet_ob_angefordert():
+    """Der Pakettyp sagt es selbst — keine Schaetzung noetig.
+
+    `Carapackage_FlareGun_C` steht in Spawn UND Landung (951 bzw. 382
+    Ereignisse in der DB). Meine erste Fassung hat das ueber Ort und
+    Zeit erraten, obwohl die Antwort im Event stand.
+    """
+    evs, _ = extract_events([
+        _land("2026-09-14T10:06:00.0Z", 700000, 700000,
+              ["Item_Weapon_AWM_C"], pid="Carapackage_FlareGun_C"),
+    ], MAPKM)
+    d = _drops(evs)[0]
+    assert d["called"] is True
+    # Ohne Leuchtpistole in Reichweite bleibt offen, WER sie gefeuert hat.
+    assert d["calledBy"] is None
+
+
+def test_regulaeres_paket_bleibt_regulaer_auch_neben_einer_flare():
+    """Der Kern des Problems: zwei Pakete landen nebeneinander, eines
+    gerufen, eines nicht. Ueber die Position waere beides "gerufen"."""
+    evs, _ = extract_events([
+        _flare("2026-09-14T10:05:00.0Z", 400000, 300000),
+        _land("2026-09-14T10:06:00.0Z", 400500, 300500,
+              ["Item_Weapon_AWM_C"], pid="Carapackage_FlareGun_C"),
+        _land("2026-09-14T10:06:10.0Z", 401000, 301000,
+              ["Item_Weapon_Groza_C"], pid="Carapackage_RedBox_C"),
+    ], MAPKM)
+    d = _drops(evs)
+    nach_typ = {x["packageId"]: x["called"] for x in d}
+    assert nach_typ["Carapackage_FlareGun_C"] is True
+    assert nach_typ["Carapackage_RedBox_C"] is False
+    # Beim gerufenen steht auch der Schuetze dran.
+    gerufen = [x for x in d if x["called"]][0]
+    assert gerufen["calledBy"] == "account.A"
+
+
+def test_brdm_kommt_auch_aus_einer_flare():
+    evs, _ = extract_events([
+        _land("2026-09-14T10:06:00.0Z", 400000, 300000, pid="BP_BRDM_C"),
+    ], MAPKM)
+    assert _drops(evs)[0]["called"] is True
