@@ -670,12 +670,28 @@ function markersUpTo(ms) {
   return out;
 }
 
-//: Pakete bis zum Cursor. Ein Drop bleibt liegen, verblasst also nicht
-//: — anders als ein Kill ist er ein Ort, kein Moment.
+//: Pakete, die schon LIEGEN. Ein Drop bleibt liegen, verblasst also
+//: nicht — anders als ein Kill ist er ein Ort, kein Moment.
 function dropsUpTo(ms) {
   if (!RS.replay || !RS.replay.events) return [];
   return RS.replay.events.filter(
-    e => e.type === "drop" && e.ts <= ms);
+    e => e.type === "drop" && (e.landTs ?? e.ts) <= ms);
+}
+
+//: Pakete, die gerade FALLEN: gespawnt, aber noch nicht unten. Das
+//: Paket faellt senkrecht — es wandert nicht ueber die Karte, sondern
+//: kommt an Ort und Stelle herunter. `p` ist der Fortschritt 0..1.
+function dropsInAnflug(ms) {
+  if (!RS.replay || !RS.replay.events) return [];
+  const out = [];
+  for (const e of RS.replay.events) {
+    if (e.type !== "drop") continue;
+    const land = e.landTs ?? e.ts;
+    const spawn = e.spawnTs ?? (land - 50000);
+    if (ms < spawn || ms >= land) continue;
+    out.push({ e, p: (ms - spawn) / Math.max(1, land - spawn) });
+  }
+  return out;
 }
 
 function flaresUpTo(ms) {
@@ -1068,6 +1084,28 @@ function renderFrame() {
       ctx.stroke();
       ctx.globalAlpha = 1;
     }
+    // Erst der Anflug: das Paket kommt senkrecht herunter. Ein Ring
+    // zieht sich auf den Landepunkt zusammen, damit man sieht, WO
+    // gleich etwas ankommt — und ab wann es sich lohnt, hinzufahren.
+    for (const { e: d, p } of dropsInAnflug(ms)) {
+      const [dx, dy] = projToCanvas(d.x, d.y);
+      const gold = !!d.called;
+      const r = 26 * (1 - p) + 7;
+      ctx.globalAlpha = 0.25 + 0.45 * p;
+      ctx.strokeStyle = gold ? "#f2b705" : "#cfd3dc";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      // Fallschirm ueber dem Punkt, sinkt mit.
+      const h = 16 * (1 - p);
+      ctx.beginPath();
+      ctx.arc(dx, dy - h - 4, 5, Math.PI, 0);
+      ctx.moveTo(dx - 5, dy - h - 4); ctx.lineTo(dx, dy - h + 2);
+      ctx.moveTo(dx + 5, dy - h - 4); ctx.lineTo(dx, dy - h + 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     for (const d of dropsUpTo(ms)) {
       const [dx, dy] = projToCanvas(d.x, d.y);
       // Angefordert = Gold, regulaer = Weiss. Der Unterschied ist das
@@ -1079,12 +1117,6 @@ function renderFrame() {
       ctx.beginPath();
       ctx.rect(dx - 5, dy - 5, 10, 10);
       ctx.fill(); ctx.stroke();
-      // Fallschirm-Andeutung nach oben
-      ctx.globalAlpha = 0.5;
-      ctx.beginPath();
-      ctx.arc(dx, dy - 7, 5, Math.PI, 0);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
     }
   }
 
@@ -1356,6 +1388,15 @@ function hitTest(mx, my) {
         const inhalt = (d.items && d.items.length)
           ? d.items.join(", ") : "contents unknown";
         return `Airdrop${wer} · ${inhalt}`;
+      }
+    }
+    for (const { e: d, p } of dropsInAnflug(ms)) {
+      const [dx, dy] = projToCanvas(d.x, d.y);
+      if (Math.hypot(dx - mx, dy - my) <= 12) {
+        const sek = Math.round(((d.landTs ?? d.ts) - ms) / 1000);
+        const inhalt = (d.items && d.items.length)
+          ? d.items.join(", ") : "contents unknown";
+        return `Airdrop incoming · lands in ${sek}s · ${inhalt}`;
       }
     }
     for (const f of flaresUpTo(ms)) {

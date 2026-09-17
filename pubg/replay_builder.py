@@ -59,6 +59,13 @@ def _weapon_label(weapon_id):
 FLARE_DROP_WINDOW_MS = 150_000
 FLARE_DROP_RADIUS_CM = 30_000        # 300 m
 
+#: Ueblicher Fall vom Spawn bis zum Boden. Gemessen an echten Paketen:
+#: Spawn auf 300 m, Landung rund 50 s spaeter an derselben Stelle — das
+#: Paket faellt senkrecht, x und y sind identisch. Fuer Matches ohne
+#: Spawn-Event wird diese Zeit angenommen, damit das Paket nicht aus dem
+#: Nichts erscheint.
+DROP_FALL_MS = 50_000
+
 
 def _paket_items(pkg):
     """Inhalt eines Pakets als Klartext-Liste, Wiederholungen gezaehlt."""
@@ -69,6 +76,50 @@ def _paket_items(pkg):
         if iid:
             roh.append(_item_label(iid))
     return _items_gezaehlt(roh)
+
+
+def _spawns_zuordnen(drops, spawns, out, mapKm):
+    """Spawn und Landung zu EINEM Paket zusammenfuehren.
+
+    Das Paket faellt senkrecht — Spawn und Landung teilen x und y, nur
+    die Hoehe aendert sich. Der Spawn liefert damit den echten Beginn
+    des Anflugs statt der Schaetzung; ein Spawn ohne Landung wird zum
+    eigenen Paket, sonst fehlte es auf der Karte ganz.
+    """
+    offen = list(spawns)
+    for d in drops:
+        passend = None
+        for s in offen:
+            if s["ts"] > d["_ts_roh"]:
+                continue
+            dx = d["_x_roh"] - s["x_roh"]
+            dy = d["_y_roh"] - s["y_roh"]
+            # Senkrechter Fall: derselbe Punkt. Die kleine Toleranz
+            # faengt Rundung ab.
+            if (dx * dx + dy * dy) ** 0.5 > 1000:
+                continue
+            if passend is None or s["ts"] > passend["ts"]:
+                passend = s
+        if passend is not None:
+            d["spawnTs"] = passend["ts"]
+            d["spawnEstimated"] = False
+            if not d["items"] and passend["items"]:
+                d["items"] = passend["items"]
+            offen.remove(passend)
+    # Spawns ohne Landung: das Paket lag trotzdem im Match.
+    for s in offen:
+        nx, ny = normalize_coords(s["x_roh"], s["y_roh"], mapKm)
+        if nx is None:
+            continue
+        d = {"type": "drop", "ts": s["ts"] + DROP_FALL_MS,
+             "landTs": s["ts"] + DROP_FALL_MS, "spawnTs": s["ts"],
+             "spawnEstimated": False, "x": nx, "y": ny,
+             "items": s["items"], "packageId": s["pid"],
+             "called": False, "calledBy": None,
+             "_ts_roh": s["ts"] + DROP_FALL_MS,
+             "_x_roh": s["x_roh"], "_y_roh": s["y_roh"]}
+        drops.append(d)
+        out.append(d)
 
 
 def _flares_zuordnen(drops, flares):
@@ -112,7 +163,7 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
                    ein Spieler als Repraesentant, ts normalisiert noch NICHT.
     """
     out = []
-    _drops, _flares = [], []
+    _drops, _flares, _spawns = [], [], []
     last_pos_ts = {}  # actorId → letzter behaltener Position-ts
     # Flugroute: ALLE Spieler zusammengeführt, 1-s-Buckets → lückenlose Route
     _flight_by_ts = {}  # ts_bucket (ms, 1s-Raster) → [nx, ny]
@@ -121,13 +172,24 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
         ts = _ts_ms(e.get("_D"))
         if ts is None:
             continue
+        if et == "LogCarePackageSpawn":
+            pkg = e.get("itemPackage") or {}
+            x, y = _loc(pkg)
+            if x is None:
+                continue
+            _spawns.append({"ts": ts, "x_roh": x, "y_roh": y,
+                            "pid": pkg.get("itemPackageId"),
+                            "items": _paket_items(pkg)})
+            continue
         if et == "LogCarePackageLand":
             pkg = e.get("itemPackage") or {}
             x, y = _loc(pkg)
             nx, ny = normalize_coords(x, y, mapKm)
             if nx is None:
                 continue
-            d = {"type": "drop", "ts": ts, "x": nx, "y": ny,
+            d = {"type": "drop", "ts": ts, "landTs": ts,
+                 "spawnTs": ts - DROP_FALL_MS, "spawnEstimated": True,
+                 "x": nx, "y": ny,
                  "items": _paket_items(pkg),
                  "packageId": pkg.get("itemPackageId"),
                  "called": False, "calledBy": None,
@@ -259,6 +321,7 @@ def extract_events(raw_events, mapKm, position_interval_ms=1000):
     # Angeforderte Pakete markieren, dann die Rohwerte wieder entfernen —
     # sie dienen nur der Zuordnung und haben in der Antwort nichts
     # verloren.
+    _spawns_zuordnen(_drops, _spawns, out, mapKm)
     _flares_zuordnen(_drops, _flares)
     for d in _drops + _flares:
         for k in ("_ts_roh", "_x_roh", "_y_roh"):
@@ -448,6 +511,7 @@ _DB_EVENT_MAP = {
     # Pakete und Leuchtpistolen: das Land-Event traegt keinen Akteur,
     # der Paketinhalt steht in `attachments`.
     "CarePackageLand": ("LogCarePackageLand", "itemPackage", None),
+    "CarePackageSpawn": ("LogCarePackageSpawn", "itemPackage", None),
     "FlareGun":        ("LogPlayerUseFlareGun", "character", None),
 }
 
@@ -501,7 +565,7 @@ def db_rows_to_raw_events(rows):
             e["damageCauserName"] = g("weapon")
             e["distance"] = g("distance")
             e["damage"] = g("damage")
-        elif raw_t == "LogCarePackageLand":
+        elif raw_t in ("LogCarePackageLand", "LogCarePackageSpawn"):
             # In der DB liegt die Position im actor_x/y-Feld und der
             # Inhalt als JSON in attachments.
             import json as _json_pkg

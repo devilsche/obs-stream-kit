@@ -44,11 +44,19 @@ def test_auswahl_findet_nur_luecken(_bind=None):
     from pubg.db_pg import matches_missing_drop_events
     _match("bf1", "2026-09-20T10:00:00Z")
     _alte_events("bf1")
-    # Dieses Match hat die Events schon — darf nicht nochmal geholt werden.
+    # Nur eine Leuchtpistole ist noch kein Drop-Bestand: Landepunkt und
+    # Inhalt fehlen, also bleibt das Match eine Luecke. Nachweis ist
+    # allein `CarePackageLand` — `CarePackageSpawn` wurde schon immer
+    # gespeichert und waere als Marker wertlos.
     _match("bf2", "2026-09-20T11:00:00Z")
     db_pg.insert_telemetry_events(CONN.raw, "bf2", [{
         "event_type": "FlareGun", "timestamp_ms": 900,
         "actor_account": ME, "payload_json": "{}"}])
+    # Dieses hat den Landepunkt — und ist damit versorgt.
+    _match("bf2b", "2026-09-20T11:30:00Z")
+    db_pg.insert_telemetry_events(CONN.raw, "bf2b", [{
+        "event_type": "CarePackageLand", "timestamp_ms": 900,
+        "actor_account": None, "payload_json": "{}"}])
     # Ohne Telemetrie ist nichts nachzutragen — das holt der Poller.
     _match("bf3", "2026-09-20T12:00:00Z")
     # Zu alt: das CDN liefert nichts mehr.
@@ -57,7 +65,11 @@ def test_auswahl_findet_nur_luecken(_bind=None):
     CONN.raw.commit()
     treffer = matches_missing_drop_events(
         CONN.raw, cutoff_iso="2026-09-14T00:00:00Z")
-    assert [r["match_id"] for r in treffer] == ["bf1"]
+    ids = [r["match_id"] for r in treffer]
+    assert "bf1" in ids and "bf2" in ids      # beide ohne Landepunkt
+    assert "bf2b" not in ids                  # hat einen
+    assert "bf3" not in ids                   # gar keine Telemetrie
+    assert "bf4" not in ids                   # zu alt fuers CDN
 
 
 def test_nachtrag_loescht_die_vorhandenen_events_nicht():

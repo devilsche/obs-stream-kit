@@ -1322,7 +1322,7 @@ def _drop_events_nachtragen(conn, match_id, client, url, squad_ids):
         if not norm:
             continue
         et = norm.get("event_type")
-        if et in ("CarePackageLand", "FlareGun"):
+        if et in ("CarePackageLand", "CarePackageSpawn", "FlareGun"):
             neu.append(norm)
         elif et == "CarePackagePickup":
             if norm.get("actor_account") in squad_ids:
@@ -1564,10 +1564,30 @@ def drop_backfill(root: str, args=None) -> int:
                       AND p.tenant_id = mtm.tenant_id AND p.is_self = 1
         WHERE mtm.match_id = ?
     """
-    client = PubgClient(api_key="", platform="steam")
+    cdn = PubgClient(api_key="", platform="steam")
+
+    class _AusArchiv:
+        """Liest den Blob aus einem Archiv, auf das dieser Tenant darf.
+
+        Das CDN haelt nur 14 Tage; die Archive reichen weiter zurueck,
+        und seit sie unter Mitspielern geteilt werden, deckt das die
+        meisten aelteren Matches ab.
+        """
+        def __init__(self, mid):
+            self.mid = mid
+        def get_telemetry(self, url):
+            from pubg.archive_config import lesbare_archive_fuer_match
+            from pubg import hidrive_telemetry
+            for c in lesbare_archive_fuer_match(raw, 1, self.mid):
+                roh = hidrive_telemetry.download_raw(self.mid, cfg=c)
+                if roh:
+                    return roh
+            return cdn.get_telemetry(url)
+
     ok = fehler = zeilen = 0
     for i, r in enumerate(offen, 1):
         mid = r["match_id"]
+        client = _AusArchiv(mid)
         squad = {row["account_id"] for row in
                  conn.execute(squad_sql, (mid,)).fetchall()}
         try:

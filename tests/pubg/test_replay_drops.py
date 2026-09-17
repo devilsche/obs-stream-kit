@@ -111,3 +111,54 @@ def test_drops_kommen_auch_aus_der_datenbank():
     d = _drops(evs)
     assert len(d) == 1
     assert d[0]["items"] == ["Groza"]
+
+
+def _spawn(ts_iso, x, y, z=30000, items=None, pid="Carapackage_RedBox_C"):
+    return {"_T": "LogCarePackageSpawn", "_D": ts_iso,
+            "itemPackage": {"itemPackageId": pid,
+                            "location": {"x": x, "y": y, "z": z},
+                            "items": [{"itemId": i} for i in (items or [])]}}
+
+
+def test_anflug_und_landung_gehoeren_zusammen():
+    """Das Paket faellt senkrecht: Spawn und Landung teilen x/y.
+
+    Nur die Hoehe aendert sich (300 m auf 37 m) ueber rund 50 s. Fuer
+    das Replay heisst das: ab dem Spawn faellt es sichtbar, ab der
+    Landung liegt es.
+    """
+    evs, _ = extract_events([
+        _spawn("2026-09-14T10:05:00.0Z", 400000, 300000,
+               items=["Item_Weapon_Groza_C"]),
+        _land("2026-09-14T10:05:50.0Z", 400000, 300000,
+              ["Item_Weapon_Groza_C"]),
+    ], MAPKM)
+    d = _drops(evs)
+    assert len(d) == 1, "Spawn und Landung sind EIN Paket, nicht zwei"
+    assert d[0]["ts"] == d[0]["landTs"], "ts ist der Landezeitpunkt"
+    assert d[0]["spawnTs"] < d[0]["landTs"]
+    # 50 Sekunden Fallzeit — daran haengt die Anflug-Darstellung.
+    assert d[0]["landTs"] - d[0]["spawnTs"] == 50_000
+
+
+def test_paket_ohne_spawn_hat_trotzdem_eine_anflugzeit():
+    """Aeltere Matches haben nur den Landepunkt — dann wird die uebliche
+    Fallzeit angenommen, statt das Paket aus dem Nichts erscheinen zu
+    lassen."""
+    evs, _ = extract_events([
+        _land("2026-09-14T10:05:50.0Z", 400000, 300000, ["Item_Weapon_AWM_C"]),
+    ], MAPKM)
+    d = _drops(evs)[0]
+    assert d["spawnTs"] < d["landTs"]
+    assert d["spawnEstimated"] is True
+
+
+def test_spawn_ohne_landung_zaehlt_als_paket():
+    """Sonst fehlt das Paket ganz, obwohl es im Match lag."""
+    evs, _ = extract_events([
+        _spawn("2026-09-14T10:05:00.0Z", 400000, 300000,
+               items=["Item_Weapon_AWM_C"]),
+    ], MAPKM)
+    d = _drops(evs)
+    assert len(d) == 1
+    assert d[0]["items"] == ["AWM"]

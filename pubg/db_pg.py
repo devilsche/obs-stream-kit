@@ -1031,6 +1031,11 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
 #: dieser Zeilen.
 DROP_EVENT_TYPES = ("CarePackageLand", "CarePackagePickup", "FlareGun")
 
+#: Fuer die Luecken-Suche zaehlt allein das Land-Event: `CarePackageSpawn`
+#: wurde schon immer gespeichert und waere als Nachweis wertlos — ein
+#: Match haette damit "Drop-Daten", obwohl Landepunkt und Inhalt fehlen.
+DROP_GAP_MARKER = "CarePackageLand"
+
 
 def matches_missing_drop_events(conn, cutoff_iso: str, limit: int = 0):
     """Matches mit Telemetrie, aber ohne Airdrop-Zeilen.
@@ -1042,21 +1047,19 @@ def matches_missing_drop_events(conn, cutoff_iso: str, limit: int = 0):
     Ohne `telemetry_url` ist nichts zu holen; solche Matches hat der
     Poller ohnehin nie verarbeitet.
     """
-    marks = ",".join(["%s"] * len(DROP_EVENT_TYPES))
-    sql = f"""
+    sql = """
         SELECT DISTINCT ON (m.match_id) m.match_id, m.telemetry_url,
                m.played_at
         FROM matches m
         WHERE m.played_at >= %s
-          AND m.telemetry_url IS NOT NULL AND m.telemetry_url <> ''
           AND EXISTS (SELECT 1 FROM telemetry_events t
                       WHERE t.match_id = m.match_id)
           AND NOT EXISTS (SELECT 1 FROM telemetry_events t
                           WHERE t.match_id = m.match_id
-                            AND t.event_type IN ({marks}))
+                            AND t.event_type = %s)
         ORDER BY m.match_id, m.played_at DESC
     """
-    params = [cutoff_iso, *DROP_EVENT_TYPES]
+    params = [cutoff_iso, DROP_GAP_MARKER]
     with conn.cursor() as cur:
         cur.execute(sql, params)
         rows = cur.fetchall()
