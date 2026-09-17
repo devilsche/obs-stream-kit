@@ -254,6 +254,12 @@ def test_nur_echte_airdrops_gelten_als_drop():
               pid="Carepackage_SmallPackage_NoParachute_Bluechip_C"),
         _land("2026-09-14T10:07:00.0Z", 420000, 320000,
               pid="Carapackage_SmallPackage_NoParachute_C"),
+        # Kartenspezifische Massenpakete: auf Taego 49 je Match, auf
+        # Vikendi 36. Kein Abwurf, sondern Bodenloot.
+        _land("2026-09-14T10:07:30.0Z", 425000, 325000,
+              pid="Carapackage_SmallPackage_C"),
+        _land("2026-09-14T10:07:40.0Z", 426000, 326000,
+              pid="Carapackage_SmallPackage_DihorOtok_C"),
         _land("2026-09-14T10:08:00.0Z", 430000, 330000,
               ["Item_Weapon_AWM_C"], pid="Carapackage_RedBox_C"),
     ], MAPKM)

@@ -138,9 +138,12 @@ FLARE_PACKAGE_MARKER = ("FlareGun",)
 #:   *NoParachute*    — erscheint am Boden (5,7 s), faellt also nicht
 #:   *Bluechip*       — Paket am Comeback-Turm, kein Abwurf
 #:   Carepackage_Container_C — Event-Behaelter, 3,2 s
-AIRDROP_PACKAGES = ("Carapackage_RedBox_C", "Carapackage_SmallPackage_C",
-                    "Carapackage_SmallPackage_DihorOtok_C",
-                    "Carapackage_FlareGun_C")
+#: Gemessen an der Zahl je Match: `RedBox` liegt auf JEDER Karte bei
+#: 4,8-6,5 und ist damit der klassische Abwurf. Die SmallPackage-Varianten
+#: sind kartenspezifische Massenpakete und keine Airdrops — auf Taego
+#: 49 Stueck je Match, auf Vikendi 36. Als Kiste auf der Karte waeren das
+#: Dutzende Marker, die niemanden interessieren.
+AIRDROP_PACKAGES = ("Carapackage_RedBox_C", "Carapackage_FlareGun_C")
 
 
 def _ist_airdrop(package_id):
@@ -148,6 +151,8 @@ def _ist_airdrop(package_id):
     if not s:
         return False
     if "NoParachute" in s or "Bluechip" in s or "BRDM" in s:
+        return False
+    if "SmallPackage" in s:
         return False
     return s in AIRDROP_PACKAGES
 
