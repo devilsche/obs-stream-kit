@@ -670,6 +670,16 @@ function markersUpTo(ms) {
   return out;
 }
 
+//: Das Kisten-Bild. Einmal geladen, dann je Frame nur gezeichnet.
+//: `fertig` erst, wenn das Bild wirklich da ist — sonst zeichnet
+//: Canvas nichts und die Kiste fehlt lautlos.
+const KISTE_BILD = (() => {
+  const im = new Image();
+  im.src = (window.__SERVE_BASE__ || "/") + "tools-static/img-airdrop.png";
+  im.addEventListener("load", () => { im._fertig = true; renderFrame(); });
+  return im;
+})();
+
 //: Versorgungskiste wie im Spiel: Kiste mit Gurtkreuz, weissem
 //: Blinklicht und ROTEM Rauchsignal. Das Rauchsignal zuendet erst am
 //: Boden und heisst "bereit zum Oeffnen" — deshalb hat nur die
@@ -681,7 +691,7 @@ function zeichneKiste(ctx, x, y, gold, ms) {
   const rand   = gold ? "#f2b705" : "#e8ebf2";
   const fuell  = gold ? "rgba(242,183,5,0.9)" : "rgba(226,232,242,0.9)";
   const gurt   = gold ? "rgba(90,60,0,0.85)" : "rgba(40,44,54,0.8)";
-  const w = 13, h = 10;
+  const w = 18, h = 14;
   // Rauchsaeule: drei Schwaden, nach oben breiter und blasser.
   for (let i = 0; i < 3; i++) {
     ctx.globalAlpha = 0.3 - i * 0.08;
@@ -692,20 +702,37 @@ function zeichneKiste(ctx, x, y, gold, ms) {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  // Kiste
-  ctx.fillStyle = fuell;
-  ctx.strokeStyle = rand;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.rect(x - w / 2, y - h / 2, w, h);
-  ctx.fill(); ctx.stroke();
-  // Gurte: laengs und quer, wie an einer Versorgungskiste
-  ctx.strokeStyle = gurt;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y);
-  ctx.moveTo(x, y - h / 2); ctx.lineTo(x, y + h / 2);
-  ctx.stroke();
+  // Die Kiste selbst als Bild — ein gezeichnetes Rechteck war von den
+  // uebrigen Markern nicht zu unterscheiden. Faellt das Bild aus,
+  // bleibt die gezeichnete Variante als Rueckfall.
+  if (KISTE_BILD._fertig) {
+    const bh = w * (KISTE_BILD.naturalHeight / KISTE_BILD.naturalWidth);
+    ctx.drawImage(KISTE_BILD, x - w / 2, y - bh / 2, w, bh);
+    if (gold) {
+      // Gerufenes Paket: goldener Ring statt Umfaerbung, damit das Bild
+      // erkennbar bleibt.
+      ctx.strokeStyle = "#f2b705";
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 0.9;
+      ctx.beginPath();
+      ctx.arc(x, y, w * 0.72, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    ctx.fillStyle = fuell;
+    ctx.strokeStyle = rand;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.rect(x - w / 2, y - h / 2, w, h);
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = gurt;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y);
+    ctx.moveTo(x, y - h / 2); ctx.lineTo(x, y + h / 2);
+    ctx.stroke();
+  }
   // Blinklicht auf der Kiste — im Spiel das Merkmal, das sie auch im
   // Dunkeln findbar macht. Pulst mit der Abspielzeit, nicht mit der
   // Wanduhr: beim Anhalten steht auch das Licht.
