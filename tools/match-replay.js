@@ -670,6 +670,54 @@ function markersUpTo(ms) {
   return out;
 }
 
+//: Versorgungskiste wie im Spiel: Kiste mit Gurtkreuz, weissem
+//: Blinklicht und ROTEM Rauchsignal. Das Rauchsignal zuendet erst am
+//: Boden und heisst "bereit zum Oeffnen" — deshalb hat nur die
+//: gelandete Kiste eines, nicht die fallende. Rot ist dabei nicht
+//: Geschmack, sondern die Farbe im Spiel; gerufene Pakete rauchen gelb.
+//: Quelle: pubg.wiki.gg/wiki/Air_Drops
+function zeichneKiste(ctx, x, y, gold, ms) {
+  const rauch  = gold ? "#f2b705" : "#e6194b";
+  const rand   = gold ? "#f2b705" : "#e8ebf2";
+  const fuell  = gold ? "rgba(242,183,5,0.9)" : "rgba(226,232,242,0.9)";
+  const gurt   = gold ? "rgba(90,60,0,0.85)" : "rgba(40,44,54,0.8)";
+  const w = 13, h = 10;
+  // Rauchsaeule: drei Schwaden, nach oben breiter und blasser.
+  for (let i = 0; i < 3; i++) {
+    ctx.globalAlpha = 0.3 - i * 0.08;
+    ctx.fillStyle = rauch;
+    ctx.beginPath();
+    ctx.arc(x + (i % 2 ? 1.5 : -1.5), y - h / 2 - 5 - i * 5,
+            3 + i * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Kiste
+  ctx.fillStyle = fuell;
+  ctx.strokeStyle = rand;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.rect(x - w / 2, y - h / 2, w, h);
+  ctx.fill(); ctx.stroke();
+  // Gurte: laengs und quer, wie an einer Versorgungskiste
+  ctx.strokeStyle = gurt;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y);
+  ctx.moveTo(x, y - h / 2); ctx.lineTo(x, y + h / 2);
+  ctx.stroke();
+  // Blinklicht auf der Kiste — im Spiel das Merkmal, das sie auch im
+  // Dunkeln findbar macht. Pulst mit der Abspielzeit, nicht mit der
+  // Wanduhr: beim Anhalten steht auch das Licht.
+  const puls = 0.45 + 0.55 * Math.abs(Math.sin((ms || 0) / 420));
+  ctx.globalAlpha = puls;
+  ctx.fillStyle = "#ffffff";
+  ctx.beginPath();
+  ctx.arc(x, y - h / 2 - 1.5, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
 //: Pakete, die schon LIEGEN. Ein Drop bleibt liegen, verblasst also
 //: nicht — anders als ein Kill ist er ein Ort, kein Moment.
 function dropsUpTo(ms) {
@@ -1097,13 +1145,30 @@ function renderFrame() {
       ctx.setLineDash([5, 4]);
       ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
-      // Fallschirm ueber dem Punkt, sinkt mit.
-      const h = 16 * (1 - p);
+      // Fallschirm mit Kiste darunter, sinkt auf den Landepunkt zu.
+      const h = 22 * (1 - p);
+      const ky = dy - h;
+      ctx.globalAlpha = 0.45 + 0.5 * p;
+      ctx.lineWidth = 1.5;
+      // Ein Schirm am regulaeren Paket, DREI am gerufenen — so haengt
+      // es im Spiel, weil die Flare-Kiste schwerer ist.
+      const schirme = gold ? [-7, 0, 7] : [0];
+      for (const off of schirme) {
+        ctx.beginPath();
+        ctx.arc(dx + off, ky - 6, gold ? 5 : 7, Math.PI, 0);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(dx + off - (gold ? 5 : 7), ky - 6);
+        ctx.lineTo(dx, ky);
+        ctx.moveTo(dx + off + (gold ? 5 : 7), ky - 6);
+        ctx.lineTo(dx, ky);
+        ctx.stroke();
+      }
+      // Kiste an den Leinen
+      ctx.fillStyle = gold ? "rgba(242,183,5,0.9)" : "rgba(226,232,242,0.9)";
       ctx.beginPath();
-      ctx.arc(dx, dy - h - 4, 5, Math.PI, 0);
-      ctx.moveTo(dx - 5, dy - h - 4); ctx.lineTo(dx, dy - h + 2);
-      ctx.moveTo(dx + 5, dy - h - 4); ctx.lineTo(dx, dy - h + 2);
-      ctx.stroke();
+      ctx.rect(dx - 4, ky, 8, 6);
+      ctx.fill(); ctx.stroke();
       ctx.globalAlpha = 1;
     }
     for (const d of dropsUpTo(ms)) {
@@ -1111,12 +1176,7 @@ function renderFrame() {
       // Angefordert = Gold, regulaer = Weiss. Der Unterschied ist das
       // Interessante: dort wollte jemand hin.
       const gold = !!d.called;
-      ctx.fillStyle = gold ? "rgba(242,183,5,0.85)" : "rgba(255,255,255,0.7)";
-      ctx.strokeStyle = gold ? "#f2b705" : "#cfd3dc";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.rect(dx - 5, dy - 5, 10, 10);
-      ctx.fill(); ctx.stroke();
+      zeichneKiste(ctx, dx, dy, gold, ms);
     }
   }
 
