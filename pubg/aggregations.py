@@ -433,6 +433,45 @@ _MULTIFIGHT_WINDOW_MS = 90_000
 # Vehicle-Pattern → Klartext-Name. Mehrere Skins/Varianten desselben
 # Modells werden zusammengefasst (Mirado_A_02 / Mirado_A_03_Esports / ...
 # alle → 'Mirado').
+#: Wer im selben Auto sitzt, ist am selben Ort. Zwei Wagen desselben
+#: Typs trennt nur die Position — mehr als 150 m auseinander ist kein
+#: Beifahrer mehr. Grosszuegig genug, dass versetzte Zeitstempel (die
+#: Positionen der Mitfahrer kommen nicht gleichzeitig) nicht stoeren.
+_SELBES_AUTO_CM = 15000
+#: Positionen, die weiter als das auseinanderliegen, sind nicht
+#: vergleichbar — dazwischen faehrt ein Auto zu weit.
+_ZEIT_TOLERANZ_MS = 6000
+
+
+def _selbes_fahrzeug(acc_a, acc_b, start, ende, pos_by_acc):
+    """Sassen die beiden im selben Wagen? Ueber die Positionen gepruft.
+
+    Ohne verwertbare Positionen bleibt es bei der bisherigen Annahme:
+    gleiche Fahrzeug-Id plus ueberlappende Zeit heisst dasselbe Auto.
+    """
+    pa = [p for p in (pos_by_acc.get(acc_a) or [])
+          if start <= p["timestamp_ms"] <= ende and p["actor_x"] is not None]
+    pb = [p for p in (pos_by_acc.get(acc_b) or [])
+          if start <= p["timestamp_ms"] <= ende and p["actor_x"] is not None]
+    if not pa or not pb:
+        return True
+    weit = gesamt = 0
+    for p in pa:
+        q = min(pb, key=lambda x: abs(x["timestamp_ms"] - p["timestamp_ms"]))
+        if abs(q["timestamp_ms"] - p["timestamp_ms"]) > _ZEIT_TOLERANZ_MS:
+            continue
+        dx = p["actor_x"] - q["actor_x"]
+        dy = p["actor_y"] - q["actor_y"]
+        gesamt += 1
+        if (dx * dx + dy * dy) ** 0.5 > _SELBES_AUTO_CM:
+            weit += 1
+    if not gesamt:
+        return True
+    # Ein einzelner Ausreisser (Aussteigen, Umsetzen) soll die Fahrt
+    # nicht zerreissen; die Mehrheit entscheidet.
+    return weit < gesamt / 2.0
+
+
 def _fahrzeug_label(vid):
     """Anzeigename eines Fahrzeugs, sonst die gekuerzte Id.
 
@@ -2027,10 +2066,21 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     if vid2 != vid:
                         continue
                     e2x = e2 if e2 != float("inf") else (ep_end + 1)
-                    if s2 < ep_end and e2x > ep_start:
-                        riders.add(b_other)
-                        ep_start = min(ep_start, s2)
-                        ep_end   = max(ep_end, e2x)
+                    if not (s2 < ep_end and e2x > ep_start):
+                        continue
+                    # Gleiche Fahrzeug-Id heisst NICHT dasselbe Auto.
+                    # PUBG vergibt keine Instanz-Nummer (`vehicleUniqueId`
+                    # ist durchgehend leer), und ein Squad faehrt oft in
+                    # zwei gleichen Dacias. Ohne diese Pruefung bekam der
+                    # eine Wagen den Pfad des anderen — auf der Karte
+                    # Striche quer durchs Bild.
+                    if not _selbes_fahrzeug(
+                            a_outer, b_other, max(ep_start, s2),
+                            min(ep_end, e2x), pos_by_acc_unify):
+                        continue
+                    riders.add(b_other)
+                    ep_start = min(ep_start, s2)
+                    ep_end   = max(ep_end, e2x)
             if len(riders) < 2:
                 continue
             key = (vid, frozenset(riders), ep_start, ep_end)

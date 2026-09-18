@@ -579,3 +579,93 @@ def test_echter_nachschuss_bleibt_ein_kill():
     ])
     ev = _typ_of(conn, mid, "PEX_LuCKoR")
     assert ev["type"] == "kill"
+
+
+def _zwei_autos_match(conn, mid="mz1"):
+    """Vier Mates, ZWEI gleiche Dacias, entgegengesetzte Richtungen.
+
+    A+B fahren nach Osten, C+D nach Westen. Beide Autos haben dieselbe
+    Fahrzeug-Id — die Telemetrie kennt keine Instanz-Nummer, das Feld
+    `vehicleUniqueId` ist durchgehend leer.
+    """
+    insert_match(conn, mid, "Baltic_Main", "squad-fpp", False, 1800,
+                 "2026-09-18T18:00:00Z", None)
+    parts, mapping = [], []
+    for acc, name in (("account.A", "PEX_LuCKoR"), ("account.B", "Mate1"),
+                      ("account.C", "Mate2"), ("account.D", "Mate3")):
+        parts.append({
+            "account_id": acc, "name": name, "team_id": 1, "place": 3,
+            "kills": 0, "headshot_kills": 0, "assists": 0, "dbnos": 0,
+            "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+            "time_survived": 900, "walk_distance": 0.0,
+            "ride_distance": 0.0, "swim_distance": 0.0,
+            "weapons_acquired": 0, "heals": 0, "boosts": 0,
+            "team_kills": 0})
+        mapping.append({"account_id": acc, "team_id": 1})
+    insert_participants(conn, mid, parts)
+    insert_team_mapping(conn, mid, mapping)
+
+    evs = []
+    for acc in ("account.A", "account.B", "account.C", "account.D"):
+        e = _ev("Position", 5000, actor=acc)
+        e["actor_z"] = 160000.0
+        evs.append(e)
+        evs.append(_ev("Landing", 60000, actor=acc))
+    # Beide Autos: gleiche Klasse, gleicher Zeitraum.
+    for acc, seat in (("account.A", 0), ("account.B", 1),
+                      ("account.C", 0), ("account.D", 1)):
+        e = _ev("VehicleEnter", 100000, actor=acc, weapon="Dacia_A_01_v2_C")
+        e["seat_index"] = seat
+        e["actor_x"] = 10000.0 if acc in ("account.A", "account.B") else 90000.0
+        e["actor_y"] = 50000.0
+        evs.append(e)
+    # Auto 1 faehrt nach Osten, Auto 2 nach Westen — weit auseinander.
+    for i in range(6):
+        ts = 110000 + i * 10000
+        for acc, start, richtung in (("account.A", 10000.0, +1),
+                                     ("account.B", 10000.0, +1),
+                                     ("account.C", 90000.0, -1),
+                                     ("account.D", 90000.0, -1)):
+            e = _ev("Position", ts + (0 if acc in ("account.A", "account.C")
+                                      else 1000), actor=acc)
+            e["actor_x"] = start + richtung * (i + 1) * 5000.0
+            e["actor_y"] = 50000.0
+            evs.append(e)
+    for acc in ("account.A", "account.B", "account.C", "account.D"):
+        e = _ev("VehicleLeave", 180000, actor=acc, weapon="Dacia_A_01_v2_C")
+        e["actor_x"] = (40000.0 if acc in ("account.A", "account.B")
+                        else 60000.0)
+        e["actor_y"] = 50000.0
+        evs.append(e)
+    insert_telemetry_events(conn, mid, evs)
+    return mid
+
+
+def test_zwei_gleiche_autos_vermischen_die_pfade_nicht():
+    """Der gemeldete Fehler: Wer im zweiten Dacia sitzt, bekam den Pfad
+    des ersten — die Karte zeigte Striche quer durchs Bild.
+
+    Zusammengefuehrt wird ueber die Fahrzeug-Id, und die ist bei zwei
+    gleichen Autos identisch. Erst die Position trennt sie.
+    """
+    conn = _setup()
+    upsert_player(conn, "account.C", "Mate2", "steam", False)
+    upsert_player(conn, "account.D", "Mate3", "steam", False)
+    mid = _zwei_autos_match(conn)
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    pfade = {m["name"]: [p for p in (m["lives"][0]["groundPath"] or [])
+                         if 100000 <= p[2] <= 180000]
+             for m in d["members"] if m["lives"]}
+    # Auto 1 faehrt nach Osten: alle x-Werte steigen ueber 10000.
+    for name in ("PEX_LuCKoR", "Mate1"):
+        xs = [p[0] for p in pfade[name]]
+        assert xs, name
+        assert max(xs) > 20000, (name, max(xs))
+        assert min(xs) >= 9000, (name, min(xs))
+    # Auto 2 faehrt nach Westen: die x-Werte fallen unter 90000, und
+    # niemand aus Auto 2 darf im Osten auftauchen.
+    for name in ("Mate2", "Mate3"):
+        xs = [p[0] for p in pfade[name]]
+        assert xs, name
+        assert min(xs) < 80000, (name, min(xs))
+        assert min(xs) > 50000, (name, min(xs))
