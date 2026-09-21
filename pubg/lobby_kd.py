@@ -870,6 +870,50 @@ def squad_names_per_match(conn, match_ids):
     return {r["account_id"]: r["name"] for r in rows}
 
 
+def _bester_stand(squad_seen, account_id):
+    """Hoechste K/D eines Spielers ueber seine Staende — nur zum Sortieren.
+
+    Die Liste bleibt nach Spielerstaerke geordnet; seine zweite Zeile
+    rutscht dadurch neben die erste statt ans andere Ende.
+    """
+    werte = [v["kd"] for k, v in squad_seen.items()
+             if v.get("accountId") == account_id and v.get("kd") is not None]
+    return max(werte) if werte else None
+
+
+def feste_kd_je_match(raw_conn, match_ids) -> dict:
+    """Eingefrorene Staende, im Format von `kd_resolved`.
+
+    `match_player_kd` haelt fest, wie stark jemand IN ein Match ging.
+    Wo ein Eintrag steht, hat er Vorrang vor der Live-Aufloesung — sonst
+    zeigt ein Match von vor drei Wochen die K/D von heute, und beim
+    Season-Wechsel springt es rueckwirkend (gemessen: 1,66 wurde zu
+    2,33 fuer alle Matches der Vorsaison).
+
+    Bewusst ohne `lifetimeRounds`: das waere der heutige Karriere-Stand
+    neben einer Rundenzahl von damals.
+    """
+    try:
+        from pubg.db_pg import get_match_player_kd
+        roh = get_match_player_kd(raw_conn, list(match_ids or [])) or {}
+    except Exception:
+        return {}
+    out = {}
+    for mid, accs in roh.items():
+        d = {}
+        for a, v in (accs or {}).items():
+            if v.get("kd") is None:
+                continue
+            d[a] = {"kd": v["kd"], "basis": v.get("mode"),
+                    "rounds": v.get("rounds"), "source": v.get("source"),
+                    "seasonId": v.get("seasonId"), "lifetimeRounds": None,
+                    "isRankedValue": False, "rankedFallback": False,
+                    "frozen": True}
+        if d:
+            out[mid] = d
+    return out
+
+
 def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                          mode: str = "squad-fpp", my_account_id=None,
                          extra_key: str = None) -> dict:
@@ -970,13 +1014,18 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         extra_by_acc = {a: (v or {}).get("kd") if v else None
                         for a, v in extra_snaps.items()}
 
+    feste = feste_kd_je_match(raw, list(per_match.keys()))
     out = []
     for mid, entry in per_match.items():
         squad = squad_by_match.get(mid, set())
+        fest = feste.get(mid) or {}
         if by_mode is not None:
             m_hint = entry.get("mode")
             kd_by_acc = {}
             for a in set(entry["accounts"]) | set(squad):
+                if a in fest:
+                    kd_by_acc[a] = fest[a]["kd"]
+                    continue
                 kd_by_acc[a] = kd_resolved(
                     m_hint,
                     current_season=cur_season_by_mode.get(a),
@@ -984,6 +1033,11 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                     lifetime=lifetime_by_mode.get(a),
                     current_season_id=cur_season_id,
                     is_ranked=bool(entry.get("isRanked")))["kd"]
+        # Auch der eigene Wert gehoert zum Match, nicht zu heute.
+        m_my_kd = ((fest.get(my_account_id) or {}).get("kd")
+                   if my_account_id else None)
+        if m_my_kd is None:
+            m_my_kd = my_kd
         # Lobby heisst hier: alle ausser uns. Der eigene Squad steckte sonst
         # in beiden Seiten des Vergleichs.
         avg = lobby_average(entry["accounts"], kd_by_acc, exclude=squad)
@@ -1026,7 +1080,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
             "squadPlayers": squad_avg["total"],
             "squadKdMates": mates_avg["avgKd"],
             "squadMatesKnown": mates_avg["known"],
-            "myKd": my_kd,
+            "myKd": m_my_kd,
             "lobbyKdExtra": (extra_avg or {}).get("avgKd"),
             "extraCoverage": (extra_avg or {}).get("coverage"),
             "diff": (squad_avg["avgKd"] - avg["avgKd"])
@@ -1195,6 +1249,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
     names.update({a: n for a, n in squad_names.items() if n})
 
+    feste = feste_kd_je_match(raw, list(per_match.keys()))
     out, strongest, weakest = [], {}, {}
     squad_seen = {}
     for mid, e in per_match.items():
@@ -1203,13 +1258,14 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                  if a not in squad and not is_bot(a)]
         # Gemessen wird am Modus, in dem man sich begegnet ist — mit Rueckfall
         # auf dieselbe Perspektive und erst zuletzt auf alles.
-        kd_by_acc = {a: kd_resolved(
+        fest = feste.get(mid) or {}
+        kd_by_acc = {a: (fest.get(a) or kd_resolved(
                             e.get("mode"),
                             current_season=cur_season_by_mode.get(a),
                             last_seasons=older_by_acc.get(a),
                             lifetime=by_mode.get(a),
                             current_season_id=_cur_sid,
-                            is_ranked=bool(e.get("isRanked")))
+                            is_ranked=bool(e.get("isRanked"))))
                      for a in set(lobby) | set(squad)}
         players = [(names.get(a) or a[:12], (kd_by_acc.get(a) or {}).get("kd"),
                     kd_by_acc.get(a) or {}) for a in lobby]
@@ -1232,7 +1288,15 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                           "isMe": a == my_account_id,
                           # Bilanz in genau diesen Matches (Squad Record).
                           **_record_fields(record_by_acc.get(a))})
-            agg = squad_seen.setdefault(a, {"name": names.get(a) or a[:12],
+            # Schluessel ist nicht der Account, sondern der STAND: geht
+            # ein Zeitraum ueber eine Season-Grenze, hatte derselbe
+            # Spieler zwei verschiedene K/Ds. Eine Zeile daraus zu machen
+            # hiesse, eine davon zu unterschlagen — also bekommt er zwei,
+            # jede mit der Zahl der Matches, in denen sie galt.
+            _stand = (a, info.get("source"), info.get("seasonId"),
+                      None if info.get("kd") is None
+                      else round(info["kd"], 4))
+            agg = squad_seen.setdefault(_stand, {"name": names.get(a) or a[:12],
                                             "kd": info.get("kd"),
                                             "basis": info.get("basis"),
                                             "rounds": info.get("rounds"),
@@ -1244,8 +1308,20 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "isMe": a == my_account_id,
                                             **_record_fields(
                                                 record_by_acc.get(a)),
+                                            "accountId": a,
+                                            "frozen": bool(info.get("frozen")),
+                                            "from": e.get("playedAt"),
+                                            "to": e.get("playedAt"),
                                             "matches": 0})
             agg["matches"] += 1
+            # Zeitraum, in dem dieser Stand galt — damit die zweite Zeile
+            # im Modal einzuordnen ist.
+            _pa = e.get("playedAt")
+            if _pa:
+                if not agg.get("from") or _pa < agg["from"]:
+                    agg["from"] = _pa
+                if not agg.get("to") or _pa > agg["to"]:
+                    agg["to"] = _pa
         # Zwei Schnitte, weil das Modal aus zwei Kontexten kommt:
         #   squadAvg      mit mir   -> aufgerufen aus der Match Row
         #   squadAvgMates ohne mich -> aufgerufen aus dem Phasen-Header
@@ -1322,8 +1398,15 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         # Ueber die Phase: jeder, der mitgespielt hat, mit seiner Karriere-K/D
         # und der Zahl der Runden — wer nur zwei Matches dabei war, faellt so
         # auf, statt den Eindruck zu praegen.
+        # Nach Spieler zusammenhaengend, innerhalb dessen der juengste
+        # Stand zuerst: sonst stehen die beiden Zeilen eines Spielers an
+        # zwei Enden der Liste.
         "squad": sorted(squad_seen.values(),
-                        key=lambda p: (-(p["kd"] or -1), -p["matches"])),
+                        key=lambda p: (-(_bester_stand(squad_seen,
+                                                       p["accountId"]) or -1),
+                                       p.get("accountId") or "",
+                                       p.get("to") or "",
+                                       -p["matches"]), reverse=False),
         "squadAvg": _avg("squadAvg"),
         "squadAvgMates": _avg("squadAvgMates"),
         # Squad Record ueber den ganzen Zeitraum: Kills und Tode des Teams

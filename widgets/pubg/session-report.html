@@ -477,6 +477,13 @@
       white-space: nowrap;
       color: var(--theme-accent-2-text, var(--theme-text-dim, #8a7d99));
     }
+    /* Zeitspanne eines K/D-Standes. Kein Rahmen wie bei den Marken
+       daneben: das hier ist eine Einordnung, keine Warnung. */
+    .lobby-list .where--span {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      opacity: 0.85;
+    }
     .lobby-list .where--me {
       border: 1px solid currentColor;
       border-radius: 3px;
@@ -3804,6 +3811,19 @@
       return m ? m[1] : (id || "").replace(/^.*\./, "");
     }
 
+    // Zeitraum, in dem ein K/D-Stand galt. Nur ein Tag: ein Datum.
+    function zeitspanne(von, bis) {
+      const kurz = (s) => {
+        if (!s) return "";
+        const d = new Date(s);
+        return isNaN(d) ? "" : d.toLocaleDateString("en-GB",
+          { day: "numeric", month: "short" });
+      };
+      const a = kurz(von), b = kurz(bis);
+      if (!a && !b) return "";
+      return (!b || a === b) ? a : `${a} – ${b}`;
+    }
+
     function basisHtml(p) {
       if (!p || !p.basis) return "";
       const label = BASIS_LABEL[p.basis] || p.basis;
@@ -3856,8 +3876,15 @@
           selection.</p>`;
       }
       const kdStr = (v) => v == null ? "—" : v.toFixed(2);
-      const rows = [...mates].sort((a, b) =>
-        (b.recKd ?? -1) - (a.recKd ?? -1));
+      // Ein Spieler kann in der Squad-Liste zwei Zeilen haben, wenn sein
+      // K/D-Stand im Zeitraum wechselte. Kills und Tode zaehlen aber pro
+      // Person, nicht pro Stand — hier also entdoppeln.
+      const gesehen = new Set();
+      const rows = [...mates].filter(m => {
+        const k = m.accountId || m.name;
+        if (gesehen.has(k)) return false;
+        gesehen.add(k); return true;
+      }).sort((a, b) => (b.recKd ?? -1) - (a.recKd ?? -1));
       return `
         <div class="lobby-kpis">
           <div class="lobby-kpi"><b>${hotKd(src.recordKdMates)}</b><span>Mates Record</span></div>
@@ -3892,7 +3919,19 @@
         return `<p class="lobby-modal__empty">No squad data for this
           selection.</p>`;
       }
-      const known = mates.filter(m => m.kd != null).length;
+      // Personen zaehlen, nicht Zeilen: wer ueber eine Season-Grenze
+      // hinweg zwei Staende hat, steht zweimal in der Liste, ist aber
+      // ein Mitspieler.
+      const personen = new Set(mates.map(m => m.accountId || m.name));
+      const known = new Set(mates.filter(m => m.kd != null)
+                                 .map(m => m.accountId || m.name)).size;
+      // Wessen Stand im Zeitraum wechselte — nur dort lohnt die Zeitspanne
+      // an der Zeile, sonst ist sie Rauschen.
+      const zeilen = {};
+      mates.forEach(m => {
+        const k = m.accountId || m.name;
+        zeilen[k] = (zeilen[k] || 0) + 1;
+      });
       // Der angezeigte Schnitt muss zu der Zahl passen, auf die geklickt
       // wurde: aus der Match Row kommt der Wert MIT mir, aus dem
       // Phasen-Header der ohne mich. Nur im Phasen-Fall wird der eigene
@@ -3903,10 +3942,10 @@
         <div class="lobby-kpis">
           <div class="lobby-kpi"><b>${hotKd(avg)}</b><span>${
             isPhase ? "Ø Mates K/D" : "Ø Squad K/D"}</span></div>
-          <div class="lobby-kpi"><b>${mates.length}</b><span>${
+          <div class="lobby-kpi"><b>${personen.size}</b><span>${
             isPhase ? "teammates" : "in the squad"}</span></div>
-          ${known < mates.length
-            ? `<div class="lobby-kpi"><b>${mates.length - known}</b><span>no value</span></div>`
+          ${known < personen.size
+            ? `<div class="lobby-kpi"><b>${personen.size - known}</b><span>no value</span></div>`
             : ""}
         </div>
         <div class="lobby-side">
@@ -3919,9 +3958,15 @@
             // Schnitt ein — ohne Kennzeichnung sieht das wie ein Rechenfehler
             // aus (Liste mit drei Namen, Mittel aus zwei).
             const isMe = dimMe && !!m.isMe;
+            // Zwei Staende desselben Spielers brauchen ein
+            // Unterscheidungsmerkmal, sonst liest sich die Liste wie ein
+            // doppelter Eintrag.
+            const mehrfach = (zeilen[m.accountId || m.name] || 1) > 1;
+            const spanne = mehrfach ? zeitspanne(m.from, m.to) : "";
             return `
             <li${isMe ? ' class="is-me"' : ''}><span class="li-name">${PubgUI.esc(m.name)}${isMe
-                  ? ` <span class="where where--me">not counted</span>` : ""}${isPhase && m.matches
+                  ? ` <span class="where where--me">not counted</span>` : ""}${spanne
+                  ? ` <span class="where where--span">${PubgUI.esc(spanne)}</span>` : ""}${isPhase && m.matches
                   ? ` <span class="where">${m.matches} ${
                       m.matches === 1 ? "match" : "matches"}</span>` : ""
                 }</span>
@@ -3938,7 +3983,10 @@
           that is what &bdquo;Squad Record&ldquo; in the phase header shows.${isPhase
             ? " Anyone who only joined for a round or two barely moves the"
               + " average but still shows up here."
-            : ""}</p>`;
+            : ""} Values are frozen at the time of each match, so a player
+          whose K/D changed within the period — a new season passing the
+          20-round mark, for instance — is listed once per value, with the
+          dates each one applied to.</p>`;
     }
 
     function lobbyBodyHtml(d, isPhase) {
