@@ -1499,6 +1499,66 @@ def speed_backfill(root: str, args=None) -> int:
     return 0
 
 
+def kd_backfill(root: str, args=None) -> int:
+    """K/D-Stand alter Matches aus der Match-Historie nachtragen.
+
+    Bis zur Einfuehrung von `match_player_kd` zeigte jeder Report den
+    heutigen Stand, auch fuer Matches von vor Wochen. Das faellt
+    besonders bei Season-Wechseln auf: PEX_LuCKoR stand bis zur 20.
+    Runde der Season bei 1,66 (Rueckfall auf die Vorsaison) und sprang
+    dann auf 2,33 — rueckwirkend auch fuer Matches vom 10.09.
+
+    Rechnet ohne API-Zugriff, rein aus der vorhandenen Historie.
+
+    Nutzung:
+        python -m pubg.cli kd-backfill [--tenant 1 | --all]
+                                       [--limit N] [--dry-run]
+    """
+    from core.db import connect
+    from core.db_compat import SqliteCompatConn
+    from pubg import kd_rekonstruktion as KR
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    limit = int(_opt("--limit", "0")) or None
+    trocken = "--dry-run" in args
+    alle = "--all" in args
+
+    raw = connect()
+    conn = SqliteCompatConn(raw)
+    if alle:
+        tenants = [r["tenant_id"] for r in conn.execute(
+            "SELECT DISTINCT tenant_id FROM matches ORDER BY tenant_id"
+        ).fetchall()]
+    else:
+        tenants = [int(_opt("--tenant", "1"))]
+
+    gesamt = 0
+    for tid in tenants:
+        offen = KR.offene_matches(conn, tid, limit)
+        print(f"Tenant {tid}: {len(offen)} Matches ohne Stand")
+        if trocken:
+            for mid in offen[:5]:
+                e = KR.kd_vor_match(conn, tid, mid)
+                print("   ", mid[:8], [(x["account_id"][-6:],
+                                        x["kd"], x["source"]) for x in e])
+            continue
+
+        def _melde(i, n, mid, k, _tid=tid):
+            if i % 25 == 0 or i == n:
+                print(f"  [{i}/{n}] {mid[:8]} {k} Spieler", flush=True)
+
+        n = KR.backfill(conn, tid, limit, fortschritt=_melde)
+        print(f"Tenant {tid}: {n} Matches nachgetragen")
+        gesamt += n
+    print(f"fertig: {gesamt} Matches")
+    return 0
+
+
 def drop_backfill(root: str, args=None) -> int:
     """Airdrop-Zeilen fuer Matches nachtragen, die vor ihrer Einfuehrung liefen.
 
@@ -2320,6 +2380,8 @@ if __name__ == "__main__":
         sys.exit(dedupe_telemetry_cli(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "speed-backfill":
         sys.exit(speed_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "kd-backfill":
+        sys.exit(kd_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "drop-backfill":
         sys.exit(drop_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
@@ -2336,6 +2398,7 @@ if __name__ == "__main__":
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
               "clan-queue-prune | lobby-kd-backfill | drop-backfill | "
+              "kd-backfill | "
               "speed-backfill | dedupe-telemetry | "
               "lobby-kd-reset-unknown | "
               "purge-before YYYY-MM-DD")
