@@ -3508,8 +3508,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     continue
                 player_kds[acc] = {
                     "kd": round(v["kd"], 2), "rounds": v.get("rounds"),
-                    "lifetimeRounds": (player_kds.get(acc) or {}).get(
-                        "lifetimeRounds"),
+                    # Kein lifetimeRounds: das waere der heutige Stand
+                    # neben einer Rundenzahl von damals — der Tooltip
+                    # zeigte dann zwei Zeitpunkte in einem Bruch.
                     "source": v.get("source"), "seasonId": v.get("seasonId"),
                     "mode": v.get("mode"), "frozen": True}
     except Exception as _kd_err:
