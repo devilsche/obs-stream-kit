@@ -848,10 +848,10 @@ def kd_stand_einfrieren(conn, tenant_id, client, match_id):
     eine Luecke.
     """
     from pubg.db_pg import (save_match_player_kd, save_match_lobby_kd,
-                            get_lifetime_by_mode, get_season_split_by_mode,
                             _now_iso)
-    from pubg.lobby_kd import (kd_resolved, lobby_kd_for_matches,
-                               LIFETIME_KEY, _newest_season_id)
+    from pubg.lobby_kd import (lobby_kd_for_matches, LIFETIME_KEY,
+                               _newest_season_id)
+    from pubg.kd_rekonstruktion import kd_vor_match
     raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
     jetzt = _now_iso()
     mode = "squad-fpp"
@@ -861,39 +861,22 @@ def kd_stand_einfrieren(conn, tenant_id, client, match_id):
     if r and r["game_mode"]:
         mode = r["game_mode"]
 
-    mates = [x["account_id"] for x in conn.execute("""
-        SELECT DISTINCT m2.account_id
-        FROM match_team_mapping m1
-        JOIN match_team_mapping m2 ON m2.match_id = m1.match_id
-                                   AND m2.team_id = m1.team_id
-                                   AND m2.tenant_id = m1.tenant_id
-        JOIN players p ON p.account_id = m1.account_id
-                       AND p.tenant_id = m1.tenant_id AND p.is_self = 1
-        WHERE m1.match_id = ? AND m1.tenant_id = ?
-    """, (match_id, tenant_id)).fetchall()]
+    from pubg.kd_rekonstruktion import eigene_squad_accounts
+    mates = eigene_squad_accounts(conn, tenant_id, match_id)
     if mates:
         try:
             sid = _current_season_id(client, conn, tenant_id) \
                 or _newest_season_id(raw)
             _squad_snapshots_auffrischen(conn, tenant_id, client, match_id,
                                          sid, mode)
-            cur_s, older = get_season_split_by_mode(raw, mates,
-                                                    current_season_id=sid)
-            lifetime = get_lifetime_by_mode(conn, mates)
-            eintraege = []
-            for acc in mates:
-                res = kd_resolved(mode, current_season=cur_s.get(acc),
-                                  last_seasons=older.get(acc),
-                                  lifetime=lifetime.get(acc),
-                                  current_season_id=sid)
-                if res.get("kd") is None:
-                    continue
-                eintraege.append({
-                    "account_id": acc, "mode": res.get("basis") or mode,
-                    "kd": round(res["kd"], 4), "rounds": res.get("rounds"),
-                    "source": res.get("source"),
-                    "season_id": res.get("seasonId")})
-            save_match_player_kd(raw, match_id, eintraege, jetzt)
+            # Gerechnet wird ueber dieselbe Rekonstruktion wie beim
+            # Backfill: gefragt ist, wie stark jemand IN die Runde ging,
+            # nicht wie er nach ihr dasteht. Der frisch geholte Snapshot
+            # enthaelt das Match bereits und wird darum zurueckgedreht —
+            # sonst stuende live ein anderer Wert als nachtraeglich.
+            save_match_player_kd(raw, match_id,
+                                 kd_vor_match(conn, tenant_id, match_id),
+                                 jetzt)
         except Exception as e:
             print(f"[kd-einfrieren] Squad {match_id[:8]}: {e}")
 

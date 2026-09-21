@@ -221,3 +221,32 @@ def test_einfrieren_schreibt_squad_und_lobby():
     lo = get_match_lobby_kd(CONN.raw, ["mk9"]).get("mk9") or {}
     assert lo.get("lobbyKd") == 1.44
     assert lo.get("players") == 90
+
+
+def test_live_und_backfill_liefern_denselben_wert():
+    """Sonst haengt der Stand davon ab, wann er geschrieben wurde."""
+    from unittest.mock import MagicMock, patch
+    from pubg.poller import kd_stand_einfrieren
+    from pubg.kd_rekonstruktion import kd_vor_match
+    from pubg.db_pg import get_match_player_kd
+    _match("mk10", played_at="2026-09-20T18:00:00Z")
+    db_pg.insert_participants(CONN.raw, T, "mk10", [
+        {"account_id": ICH, "team_id": 1, "kills": 4, "place": 3,
+         "name": "PEX_LuCKoR"}])
+    db_pg.upsert_season_snapshots(
+        CONN.raw, "lifetime", "squad-fpp",
+        {ICH: {"kills": 900, "rounds": 400, "wins": 30},
+         MATE: {"kills": 200, "rounds": 150, "wins": 8}},
+        "2026-09-21T00:00:00Z")
+    CONN.raw.commit()
+    erwartet = {e["account_id"]: e["kd"]
+                for e in kd_vor_match(CONN, T, "mk10")}
+    assert erwartet, "die Rekonstruktion muss etwas liefern"
+    with patch("pubg.lobby_kd.lobby_kd_for_matches",
+               return_value={"matches": []}):
+        kd_stand_einfrieren(CONN, T, MagicMock(), "mk10")
+    CONN.raw.commit()
+    gespeichert = {a: v["kd"] for a, v
+                   in (get_match_player_kd(CONN.raw, ["mk10"])
+                       .get("mk10") or {}).items()}
+    assert gespeichert == erwartet
