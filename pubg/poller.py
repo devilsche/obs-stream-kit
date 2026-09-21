@@ -906,7 +906,7 @@ def kd_stand_einfrieren(conn, tenant_id, client, match_id):
             save_match_lobby_kd(raw, match_id, {
                 "lobbyKd": m.get("lobbyKd"), "top5": m.get("lobbyTop5"),
                 "median": m.get("lobbyMedian"),
-                "players": m.get("players"),
+                "players": m.get("lobbyPlayers") or m.get("players"),
                 "coverage": m.get("coverage")}, jetzt)
     except Exception as e:
         print(f"[kd-einfrieren] Lobby {match_id[:8]}: {e}")
