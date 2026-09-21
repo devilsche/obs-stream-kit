@@ -3824,6 +3824,17 @@
       return (!b || a === b) ? a : `${a} – ${b}`;
     }
 
+    // Season-Werte wandern mit jedem Match. Steht eine Zeile fuer
+    // mehrere Matches, ist die gezeigte Zahl das Mittel — die Spanne
+    // sagt, wie weit er sich darin bewegt hat. Unter 0,05 Unterschied
+    // waere das Rauschen, das bleibt weg.
+    function spanneKd(p) {
+      if (!p || p.kdMin == null || p.kdMax == null) return "";
+      if (p.kdMax - p.kdMin < 0.05) return "";
+      return ` <span class="where where--span">${p.kdMin.toFixed(2)} – ${
+        p.kdMax.toFixed(2)}</span>`;
+    }
+
     function basisHtml(p) {
       if (!p || !p.basis) return "";
       const label = BASIS_LABEL[p.basis] || p.basis;
@@ -3970,7 +3981,7 @@
                   ? ` <span class="where">${m.matches} ${
                       m.matches === 1 ? "match" : "matches"}</span>` : ""
                 }</span>
-                <span class="li-basis">${basisHtml(m)}</span>
+                <span class="li-basis">${basisHtml(m)}${spanneKd(m)}</span>
                 <span class="kd">${m.kd == null ? "N/A" : hotKd(m.kd)}</span></li>`;
             }).join("")}</ul>
         </div>

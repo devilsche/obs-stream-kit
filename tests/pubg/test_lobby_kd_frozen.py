@@ -107,6 +107,7 @@ def test_ein_spieler_steht_zweimal_wenn_der_stand_wechselte():
     assert len(meine) == 2, "alter und neuer Stand"
     assert sorted(x["kd"] for x in meine) == [1.66, 2.33]
     assert all(x["matches"] == 1 for x in meine)
+    assert all("_kds" not in x for x in meine), "Hilfsfeld bleibt drin"
     # Jede Zeile sagt, fuer welchen Zeitraum sie gilt.
     alt = [x for x in meine if x["kd"] == 1.66][0]
     assert alt["from"].startswith("2026-09-10")
@@ -127,3 +128,25 @@ def test_gleicher_stand_bleibt_eine_zeile():
     d = lobby_detail(CONN, T, ["m1", "m2"], my_account_id=ICH)
     meine = [x for x in d["totals"]["squad"] if x["isMe"]]
     assert len(meine) == 1 and meine[0]["matches"] == 2
+
+
+def test_season_wert_wandert_und_bleibt_trotzdem_eine_zeile():
+    """Innerhalb einer Season bewegt sich der Wert mit jedem Match — das
+    darf keine Zeile je Runde geben."""
+    from pubg.lobby_kd import lobby_detail
+    _heutige_snapshots()
+    for i, kd in enumerate((2.37, 2.35, 2.33, 2.23)):
+        mid = "s%d" % i
+        _match(mid, "2026-09-20T1%d:00:00Z" % i)
+        db_pg.save_match_player_kd(CONN.raw, mid, [
+            {"account_id": ICH, "mode": "squad-fpp", "kd": kd,
+             "rounds": 20 + i, "source": "season", "season_id": "div.43"}],
+            "2026-09-21T00:00:00Z")
+    CONN.raw.commit()
+    d = lobby_detail(CONN, T, ["s0", "s1", "s2", "s3"], my_account_id=ICH)
+    meine = [x for x in d["totals"]["squad"] if x["isMe"]]
+    assert len(meine) == 1, "eine Season, eine Zeile"
+    z = meine[0]
+    assert z["matches"] == 4
+    assert round(z["kd"], 3) == round((2.37 + 2.35 + 2.33 + 2.23) / 4, 3)
+    assert z["kdMin"] == 2.23 and z["kdMax"] == 2.37

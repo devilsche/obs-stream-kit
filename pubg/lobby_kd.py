@@ -1288,14 +1288,17 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                           "isMe": a == my_account_id,
                           # Bilanz in genau diesen Matches (Squad Record).
                           **_record_fields(record_by_acc.get(a))})
-            # Schluessel ist nicht der Account, sondern der STAND: geht
-            # ein Zeitraum ueber eine Season-Grenze, hatte derselbe
-            # Spieler zwei verschiedene K/Ds. Eine Zeile daraus zu machen
-            # hiesse, eine davon zu unterschlagen — also bekommt er zwei,
-            # jede mit der Zahl der Matches, in denen sie galt.
-            _stand = (a, info.get("source"), info.get("seasonId"),
-                      None if info.get("kd") is None
-                      else round(info["kd"], 4))
+            # Schluessel ist nicht der Account allein, sondern die
+            # QUELLE seines Wertes: geht ein Zeitraum ueber eine
+            # Season-Grenze, galten fuer denselben Spieler zwei
+            # verschiedene K/Ds — eine davon zu unterschlagen waere eine
+            # Falschauskunft, also bekommt er zwei Zeilen.
+            #
+            # Bewusst nicht auf den exakten Wert geschluesselt: der
+            # Season-K/D bewegt sich mit jedem Match, das gaebe eine
+            # Zeile je Runde. Innerhalb einer Season also eine Zeile,
+            # mit Spanne und Mittel ueber die Matches.
+            _stand = (a, info.get("source"), info.get("seasonId"))
             agg = squad_seen.setdefault(_stand, {"name": names.get(a) or a[:12],
                                             "kd": info.get("kd"),
                                             "basis": info.get("basis"),
@@ -1314,6 +1317,16 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
                                             "to": e.get("playedAt"),
                                             "matches": 0})
             agg["matches"] += 1
+            # Mittel und Spanne ueber die Matches dieser Quelle: der Wert
+            # in der Zeile soll fuer den ganzen Abschnitt stehen, nicht
+            # fuer das erste Match daraus.
+            if info.get("kd") is not None:
+                agg.setdefault("_kds", []).append(info["kd"])
+                _k = agg["_kds"]
+                agg["kd"] = sum(_k) / len(_k)
+                agg["kdMin"] = min(_k)
+                agg["kdMax"] = max(_k)
+                agg["rounds"] = info.get("rounds")
             # Zeitraum, in dem dieser Stand galt — damit die zweite Zeile
             # im Modal einzuordnen ist.
             _pa = e.get("playedAt")
@@ -1401,7 +1414,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         # Nach Spieler zusammenhaengend, innerhalb dessen der juengste
         # Stand zuerst: sonst stehen die beiden Zeilen eines Spielers an
         # zwei Enden der Liste.
-        "squad": sorted(squad_seen.values(),
+        "squad": sorted([{k: v for k, v in s.items() if k != "_kds"}
+                         for s in squad_seen.values()],
                         key=lambda p: (-(_bester_stand(squad_seen,
                                                        p["accountId"]) or -1),
                                        p.get("accountId") or "",
