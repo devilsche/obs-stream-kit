@@ -3497,6 +3497,21 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                      "mode": res["basis"]}
                     if res["kd"] is not None else None
                 )
+            # Wo ein Stand vom Match-Zeitpunkt vorliegt, gewinnt der.
+            # Sonst zeigte ein Match von vor drei Wochen die heutigen
+            # Werte — also andere Zahlen als in der Aufzeichnung.
+            from pubg.db_pg import get_match_player_kd
+            fest = (get_match_player_kd(_raw, [match_id]) or {}).get(
+                match_id) or {}
+            for acc, v in fest.items():
+                if v.get("kd") is None:
+                    continue
+                player_kds[acc] = {
+                    "kd": round(v["kd"], 2), "rounds": v.get("rounds"),
+                    "lifetimeRounds": (player_kds.get(acc) or {}).get(
+                        "lifetimeRounds"),
+                    "source": v.get("source"), "seasonId": v.get("seasonId"),
+                    "mode": v.get("mode"), "frozen": True}
     except Exception as _kd_err:
         import traceback as _tb
         print(f"[match-detail] playerKds-Fehler: {_kd_err}")

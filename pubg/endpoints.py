@@ -3335,6 +3335,16 @@ class EndpointRegistry:
         except Exception:
             return
         by_id = {m["matchId"]: m for m in lobby.get("matches") or []}
+        # Eingefrorene Staende haben Vorrang: der Report soll zeigen, wie
+        # stark die Lobby DAMALS war, nicht wie stark dieselben Leute
+        # heute sind.
+        try:
+            from pubg.db_pg import get_match_lobby_kd, get_match_player_kd
+            _raw = getattr(conn, "raw", conn)
+            fest_lobby = get_match_lobby_kd(_raw, match_ids) or {}
+            fest_spieler = get_match_player_kd(_raw, match_ids) or {}
+        except Exception:
+            fest_lobby, fest_spieler = {}, {}
         for m in matches:
             info = by_id.get(m.get("matchId"))
             if not info:
@@ -3347,6 +3357,25 @@ class EndpointRegistry:
             m["lobbyCoverage"] = info["coverage"]
             m["lobbyKnown"] = info["known"]
             m["lobbyPlayers"] = info["lobbyPlayers"]
+            fl = fest_lobby.get(m.get("matchId"))
+            if fl and fl.get("lobbyKd") is not None:
+                m["lobbyKd"] = fl["lobbyKd"]
+                if fl.get("top5") is not None:
+                    m["lobbyTop5"] = fl["top5"]
+                if fl.get("coverage") is not None:
+                    m["lobbyCoverage"] = fl["coverage"]
+                if fl.get("players"):
+                    m["lobbyPlayers"] = fl["players"]
+                m["lobbyFrozen"] = True
+            fs = fest_spieler.get(m.get("matchId")) or {}
+            werte = [v["kd"] for v in fs.values() if v.get("kd") is not None]
+            if werte:
+                m["squadKd"] = sum(werte) / len(werte)
+                ohne = [v["kd"] for a, v in fs.items()
+                        if a != self.my_account_id and v.get("kd") is not None]
+                if ohne:
+                    m["_squadKdMates"] = sum(ohne) / len(ohne)
+                m["squadKdFrozen"] = True
         if data.get("totals") is not None:
             data["totals"]["lobbyKd"] = lobby.get("avgKd")
             data["totals"]["lobbySquadKd"] = lobby.get("avgSquadKd")

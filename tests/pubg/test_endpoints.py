@@ -404,6 +404,51 @@ def test_session_report_carries_the_lobby_strength():
     assert data["phases"][0]["stats"]["lobbySquadKd"] == 2.0
 
 
+def test_session_report_bevorzugt_eingefrorene_kd():
+    """Der Report zeigt den Stand von DAMALS, nicht den von heute."""
+    from pubg import db_pg
+    conn = _setup()
+    upsert_player(conn, "account.MATE", "MateA", "steam", False)
+    _insert_match(conn, "sr9", "2026-05-20T18:00:00Z", "Baltic_Main",
+                  "squad-fpp")
+    _insert_participant(conn, "sr9", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_team_mapping(conn, "sr9", "account.A", 1)
+    _insert_team_mapping(conn, "sr9", "account.MATE", 1)
+    snaps = {"account.A": {"kills": 100, "losses": 50, "rounds": 50,
+                           "wins": 0, "damage": 1.0, "kd": 2.0},
+             "account.MATE": {"kills": 100, "losses": 50, "rounds": 50,
+                              "wins": 0, "damage": 1.0, "kd": 2.0}}
+    for i in range(1, 25):
+        acc = f"account.F{i}"
+        _insert_team_mapping(conn, "sr9", acc, 7 + i // 4)
+        snaps[acc] = {"kills": 40, "losses": 40, "rounds": 40, "wins": 0,
+                      "damage": 1.0, "kd": 1.0}
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", snaps,
+                                  "2026-05-20T00:00:00Z")
+    db_pg.save_match_lobby_kd(conn.raw, "sr9", {
+        "lobbyKd": 3.5, "top5": 6.0, "median": 3.0, "players": 95,
+        "coverage": 88.0}, "2026-05-20T18:30:00Z")
+    db_pg.save_match_player_kd(conn.raw, "sr9", [
+        {"account_id": "account.A", "mode": "squad-fpp", "kd": 4.0,
+         "rounds": 50, "source": "lifetime", "season_id": "lifetime"},
+        {"account_id": "account.MATE", "mode": "squad-fpp", "kd": 5.0,
+         "rounds": 50, "source": "lifetime", "season_id": "lifetime"}],
+        "2026-05-20T18:30:00Z")
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    data = json.loads(body)
+    matches = [m for ph in data.get("phases", [])
+               for m in ph.get("matches", [])]
+    m = next(m for m in matches if m["matchId"] == "sr9")
+    assert m["lobbyKd"] == 3.5 and m["lobbyFrozen"] is True
+    assert m["lobbyTop5"] == 6.0
+    assert m["squadKd"] == 4.5          # (4,0 + 5,0) / 2, nicht 2,0
+    assert data["phases"][0]["stats"]["lobbySquadKd"] == 5.0  # ohne mich
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

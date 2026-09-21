@@ -256,6 +256,11 @@ def run_single_tick_multi(conn, tenant_id: int, client,
             stats["new_matches"] += 1
         except Exception as e:
             stats["errors"].append(f"match {mid}: {e}")
+            continue
+        try:
+            kd_stand_einfrieren(conn, tenant_id, client, mid)
+        except Exception as e:
+            stats["errors"].append(f"kd-freeze {mid}: {e}")
     stats["skipped"] = max(0, len(new_ids) - max_matches_per_tick)
     try:
         from pubg.clan_enrichment import process_queue
@@ -424,6 +429,8 @@ def _current_season_id(client, conn=None, tenant_id: int = 1):
             sid = client.extract_current_season_id(client.get_seasons())
         except Exception:
             sid = None
+    if not isinstance(sid, str):
+        sid = None
     if not sid:
         if stored:
             _SEASON_CACHE.update({"id": stored, "at": now})
@@ -751,6 +758,158 @@ def _squad_account_ids_for_match(conn, tenant_id: int, match_id):
         (match_id, tenant_id)
     ).fetchall()
     return {r["account_id"] for r in rows}
+
+
+#: Wie alt der K/D-Stand des eigenen Squads hoechstens sein darf, bevor
+#: er nach einem Match neu geholt wird. Vier Accounts passen in einen
+#: einzigen API-Call — das kostet praktisch nichts.
+SQUAD_KD_MAX_ALTER_MIN = 30
+
+#: Fremde dagegen nur, wenn ihr Stand wirklich alt ist. Eine volle Lobby
+#: sind ~95 Spieler, also zehn Calls bei 10 Anfragen je Minute.
+FREMD_KD_MAX_ALTER_TAGE = 14
+
+
+def squad_accounts_zum_auffrischen(conn, tenant_id, match_id, season_id,
+                                   mode, max_alter_min=None):
+    """Eigene Squad-Mitglieder, deren K/D-Stand zu alt ist.
+
+    Gegner bleiben aussen vor: die laufen ueber die normale Rotation mit
+    ihrem eigenen, weit groesszuegigeren Alterslimit.
+    """
+    from pubg.db_pg import snapshot_alter_tage
+    grenze = (max_alter_min if max_alter_min is not None
+              else SQUAD_KD_MAX_ALTER_MIN)
+    raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    mates = [r["account_id"] for r in conn.execute("""
+        SELECT DISTINCT m2.account_id
+        FROM match_team_mapping m1
+        JOIN match_team_mapping m2 ON m2.match_id = m1.match_id
+                                   AND m2.team_id = m1.team_id
+                                   AND m2.tenant_id = m1.tenant_id
+        JOIN players p ON p.account_id = m1.account_id
+                       AND p.tenant_id = m1.tenant_id AND p.is_self = 1
+        WHERE m1.match_id = ? AND m1.tenant_id = ?
+    """, (match_id, tenant_id)).fetchall()]
+    if not mates:
+        return []
+    alter = snapshot_alter_tage(raw, mates, season_id, mode)
+    grenze_tage = grenze / (60.0 * 24.0)
+    # Wer gar keinen Stand hat, taucht in `alter` nicht auf und muss
+    # geholt werden.
+    return [a for a in mates
+            if alter.get(a) is None or alter[a] > grenze_tage]
+
+
+def _squad_snapshots_auffrischen(conn, tenant_id, client, match_id,
+                                 season_id, mode):
+    """Veraltete Squad-Staende vor dem Einfrieren nachladen.
+
+    Das eigene Squad sind drei bis vier Leute, also hoechstens ein
+    Season-Batch plus vier Lifetime-Calls je Match — das passt neben das
+    Polling. Fremde bleiben bei der langsamen Rotation.
+    """
+    if client is None:
+        return
+    from pubg import db_pg, lobby_kd
+    raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    accs = squad_accounts_zum_auffrischen(conn, tenant_id, match_id,
+                                          season_id, mode)
+    if not accs:
+        return
+    jetzt = _iso_utc_now()
+    if season_id:
+        store = {}
+        lobby_kd.fetch_missing(client, accs, season_id, mode, store,
+                               max_batches=1)
+        if store:
+            db_pg.upsert_season_snapshots(raw, season_id, mode, store, jetzt)
+    alt_lt = db_pg.snapshot_alter_tage(raw, accs, lobby_kd.LIFETIME_KEY, mode)
+    grenze = SQUAD_KD_MAX_ALTER_MIN / (60.0 * 24.0)
+    fehlt = [a for a in accs
+             if alt_lt.get(a) is None or alt_lt[a] > grenze]
+    if fehlt:
+        store = {}
+        lobby_kd.fetch_lifetime(client, fehlt, store, max_calls=len(fehlt))
+        if store:
+            db_pg.upsert_lifetime_snapshots(raw, store, jetzt)
+
+
+def kd_stand_einfrieren(conn, tenant_id, client, match_id):
+    """Den K/D-Stand eines frisch verarbeiteten Matches festhalten.
+
+    Zwei Dinge: die Squad-Mitglieder einzeln, weil man rueckblickend
+    wissen will, wie stark man damals war — und die Lobby als Aggregat,
+    weil der Report ohnehin nur das anzeigt und ~115 Einzelzeilen je
+    Match nichts brächten.
+
+    Faellt der Abruf aus, bleibt der Eintrag leer und der Report nutzt
+    weiter den aktuellen Stand. Besser eine leichte Verschiebung als
+    eine Luecke.
+    """
+    from pubg.db_pg import (save_match_player_kd, save_match_lobby_kd,
+                            get_lifetime_by_mode, get_season_split_by_mode,
+                            _now_iso)
+    from pubg.lobby_kd import (kd_resolved, lobby_kd_for_matches,
+                               LIFETIME_KEY, _newest_season_id)
+    raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
+    jetzt = _now_iso()
+    mode = "squad-fpp"
+    r = conn.execute("SELECT game_mode FROM matches WHERE match_id = ? "
+                     "AND tenant_id = ? LIMIT 1",
+                     (match_id, tenant_id)).fetchone()
+    if r and r["game_mode"]:
+        mode = r["game_mode"]
+
+    mates = [x["account_id"] for x in conn.execute("""
+        SELECT DISTINCT m2.account_id
+        FROM match_team_mapping m1
+        JOIN match_team_mapping m2 ON m2.match_id = m1.match_id
+                                   AND m2.team_id = m1.team_id
+                                   AND m2.tenant_id = m1.tenant_id
+        JOIN players p ON p.account_id = m1.account_id
+                       AND p.tenant_id = m1.tenant_id AND p.is_self = 1
+        WHERE m1.match_id = ? AND m1.tenant_id = ?
+    """, (match_id, tenant_id)).fetchall()]
+    if mates:
+        try:
+            sid = _current_season_id(client, conn, tenant_id) \
+                or _newest_season_id(raw)
+            _squad_snapshots_auffrischen(conn, tenant_id, client, match_id,
+                                         sid, mode)
+            cur_s, older = get_season_split_by_mode(raw, mates,
+                                                    current_season_id=sid)
+            lifetime = get_lifetime_by_mode(conn, mates)
+            eintraege = []
+            for acc in mates:
+                res = kd_resolved(mode, current_season=cur_s.get(acc),
+                                  last_seasons=older.get(acc),
+                                  lifetime=lifetime.get(acc),
+                                  current_season_id=sid)
+                if res.get("kd") is None:
+                    continue
+                eintraege.append({
+                    "account_id": acc, "mode": res.get("basis") or mode,
+                    "kd": round(res["kd"], 4), "rounds": res.get("rounds"),
+                    "source": res.get("source"),
+                    "season_id": res.get("seasonId")})
+            save_match_player_kd(raw, match_id, eintraege, jetzt)
+        except Exception as e:
+            print(f"[kd-einfrieren] Squad {match_id[:8]}: {e}")
+
+    try:
+        d = lobby_kd_for_matches(conn, tenant_id, [match_id], LIFETIME_KEY,
+                                 mode)
+        for m in (d.get("matches") or []):
+            if m.get("matchId") != match_id or m.get("lobbyKd") is None:
+                continue
+            save_match_lobby_kd(raw, match_id, {
+                "lobbyKd": m.get("lobbyKd"), "top5": m.get("lobbyTop5"),
+                "median": m.get("lobbyMedian"),
+                "players": m.get("players"),
+                "coverage": m.get("coverage")}, jetzt)
+    except Exception as e:
+        print(f"[kd-einfrieren] Lobby {match_id[:8]}: {e}")
 
 
 def _archiv_nachholen(conn, tenant_id, client, match_id, url, cfg=None):

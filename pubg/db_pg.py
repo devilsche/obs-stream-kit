@@ -215,6 +215,32 @@ CREATE INDEX IF NOT EXISTS idx_mws_tenant_match
 -- einem Tenant, und zwei Tenants in derselben Lobby sollen sie nicht doppelt
 -- abrufen. `kd IS NULL` heisst: die API kennt den Spieler in diesem Modus
 -- nicht (Negativ-Eintrag, damit der Sammler ihn nicht erneut anfragt).
+-- K/D-Stand zum Zeitpunkt eines Matches. player_season_snapshot haelt
+-- nur den letzten Stand (PK ohne Zeit) und wird ueberschrieben; hier
+-- friert der Wert ein, damit ein altes Match nicht die heutige K/D
+-- zeigt. Nur fuer die eigenen Squad-Mitglieder — fuer die Lobby steht
+-- das Aggregat in match_lobby_kd, das spart ~115 Zeilen je Match.
+CREATE TABLE IF NOT EXISTS match_player_kd (
+    match_id    TEXT NOT NULL,
+    account_id  TEXT NOT NULL,
+    mode        TEXT,
+    kd          DOUBLE PRECISION,
+    rounds      INTEGER,
+    source      TEXT,
+    season_id   TEXT,
+    fetched_at  TEXT NOT NULL,
+    PRIMARY KEY (match_id, account_id)
+);
+CREATE TABLE IF NOT EXISTS match_lobby_kd (
+    match_id    TEXT PRIMARY KEY,
+    lobby_kd    DOUBLE PRECISION,
+    top5        DOUBLE PRECISION,
+    median      DOUBLE PRECISION,
+    players     INTEGER,
+    coverage    DOUBLE PRECISION,
+    fetched_at  TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS player_season_snapshot (
     account_id  TEXT NOT NULL,
     season_id   TEXT NOT NULL,
@@ -1229,6 +1255,110 @@ def mark_telemetry_schema(conn, tenant_id: int, match_id: str,
             (v, tenant_id, match_id),
         )
     conn.commit()
+
+
+# ── K/D-Stand zum Match ─────────────────────────────────────────────────────
+
+def save_match_player_kd(conn, match_id: str, eintraege: list,
+                         fetched_at: str) -> int:
+    """K/D der Squad-Mitglieder festhalten, wie sie BEIM Match war.
+
+    `player_season_snapshot` kennt nur den letzten Stand und wird bei
+    jedem Abruf ueberschrieben — ein Match von vor drei Wochen zeigte
+    damit die heutige K/D. Hier friert der Wert ein.
+
+    Ein vorhandener Eintrag bleibt stehen: Was beim Match galt, aendert
+    sich nicht mehr.
+    """
+    if not eintraege:
+        return 0
+    rows = [(match_id, e["account_id"], e.get("mode"), e.get("kd"),
+             e.get("rounds"), e.get("source"), e.get("season_id"),
+             fetched_at) for e in eintraege]
+    with conn.cursor() as cur:
+        execute_values(
+            cur,
+            "INSERT INTO match_player_kd (match_id, account_id, mode, kd,"
+            " rounds, source, season_id, fetched_at) VALUES %s "
+            "ON CONFLICT (match_id, account_id) DO NOTHING",
+            rows)
+        n = cur.rowcount
+    conn.commit()
+    return n
+
+
+def get_match_player_kd(conn, match_ids: list) -> dict:
+    """{match_id: {account_id: {kd, rounds, source, mode}}}"""
+    if not match_ids:
+        return {}
+    marks = ",".join(["%s"] * len(match_ids))
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT match_id, account_id, mode, kd, rounds, source, "
+            f"season_id FROM match_player_kd WHERE match_id IN ({marks})",
+            list(match_ids))
+        rows = cur.fetchall()
+    aus = {}
+    for r in rows:
+        aus.setdefault(r["match_id"], {})[r["account_id"]] = {
+            "kd": r["kd"], "rounds": r["rounds"], "source": r["source"],
+            "mode": r["mode"], "seasonId": r["season_id"]}
+    return aus
+
+
+def save_match_lobby_kd(conn, match_id: str, werte: dict,
+                        fetched_at: str) -> int:
+    """Lobby-Kennzahlen eines Matches festhalten.
+
+    Statt aller ~115 Gegner einzeln nur das Aggregat: Das ist, was der
+    Report zeigt, und spart eine Viertelmillion Zeilen.
+    """
+    if not werte:
+        return 0
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO match_lobby_kd (match_id, lobby_kd, top5, median,"
+            " players, coverage, fetched_at) VALUES (%s,%s,%s,%s,%s,%s,%s) "
+            "ON CONFLICT (match_id) DO NOTHING",
+            (match_id, werte.get("lobbyKd"), werte.get("top5"),
+             werte.get("median"), werte.get("players"),
+             werte.get("coverage"), fetched_at))
+        n = cur.rowcount
+    conn.commit()
+    return n
+
+
+def get_match_lobby_kd(conn, match_ids: list) -> dict:
+    if not match_ids:
+        return {}
+    marks = ",".join(["%s"] * len(match_ids))
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT match_id, lobby_kd, top5, median, players, coverage "
+            f"FROM match_lobby_kd WHERE match_id IN ({marks})",
+            list(match_ids))
+        rows = cur.fetchall()
+    return {r["match_id"]: {"lobbyKd": r["lobby_kd"], "top5": r["top5"],
+                            "median": r["median"], "players": r["players"],
+                            "coverage": r["coverage"]} for r in rows}
+
+
+def snapshot_alter_tage(conn, account_ids: list, season_id: str,
+                        mode: str) -> dict:
+    """{account_id: Alter des Snapshots in Tagen} — fuer die Frage, wen
+    man ueberhaupt neu holen muss."""
+    if not account_ids:
+        return {}
+    marks = ",".join(["%s"] * len(account_ids))
+    with conn.cursor() as cur:
+        cur.execute(
+            f"SELECT account_id, EXTRACT(EPOCH FROM "
+            f"(now() - fetched_at::timestamptz)) / 86400.0 AS tage "
+            f"FROM player_season_snapshot "
+            f"WHERE season_id = %s AND mode = %s "
+            f"AND account_id IN ({marks})",
+            [season_id, mode] + list(account_ids))
+        return {r["account_id"]: float(r["tage"] or 0) for r in cur.fetchall()}
 
 
 # ── player_season_snapshot ──────────────────────────────────────────────────
