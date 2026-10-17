@@ -1205,11 +1205,15 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
 
     accounts.update(squad_names)
 
-    # Squad-Bilanz je Mitspieler: Kills und echte Tode in genau diesen
-    # Matches. Der Karriere-K/D daneben sagt, wie gut jemand ueblicherweise
-    # ist — das hier sagt, was in diesem Zeitraum passiert ist. Ein Tod
-    # zaehlt, wenn time_survived vor dem Match-Ende liegt (5 s Toleranz);
-    # fehlt die Angabe, gilt "tot, wenn nicht gewonnen".
+    # Squad-Bilanz je Mitspieler: Kills und Tode in genau diesen Matches.
+    # Der Karriere-K/D daneben sagt, wie gut jemand ueblicherweise ist —
+    # das hier sagt, was in diesem Zeitraum passiert ist.
+    #
+    # Ein Tod ist ein nicht gewonnenes Match, dieselbe Formel wie der
+    # Report-Header (Kills / (Matches - Wins)). Mein Name steht an beiden
+    # Stellen, also muss dort dieselbe Zahl stehen. Vorher zaehlte hier
+    # time_survived < Match-Ende - 5 s: wer als letztes Team stirbt,
+    # beendet das Match selbst und galt als ueberlebt (27/8 statt 27/9).
     rec_rows = conn.execute(
         f"""
         WITH my_teams AS (
@@ -1218,10 +1222,8 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
         )
         SELECT mtm.account_id,
                SUM(COALESCE(mtm.kills, 0))            AS kills,
-               SUM(CASE WHEN mtm.time_survived IS NULL
-                          THEN (CASE WHEN mtm.place = 1 THEN 0 ELSE 1 END)
-                        WHEN mtm.time_survived < m.duration_secs - 5
-                          THEN 1 ELSE 0 END)          AS deaths,
+               SUM(CASE WHEN mtm.place = 1 THEN 0 ELSE 1 END)
+                                                      AS deaths,
                COUNT(*)                               AS matches
         FROM match_team_mapping mtm
         JOIN my_teams mt ON mt.match_id = mtm.match_id

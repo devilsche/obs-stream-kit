@@ -4045,11 +4045,6 @@ def compute_squad_kd(conn, tenant_id: int, my_account_id, range_key="session"):
         SELECT m.match_id, m.played_at, m.duration_secs,
                SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
                COUNT(*)                     AS team_size,
-               SUM(CASE WHEN mtm.time_survived IS NOT NULL
-                          AND mtm.time_survived < m.duration_secs - 5
-                        THEN 1 ELSE 0 END)  AS sq_deaths_real,
-               SUM(CASE WHEN mtm.time_survived IS NULL THEN 1 ELSE 0 END)
-                                            AS sq_no_surv,
                MAX(CASE WHEN mtm.place=1 THEN 1 ELSE 0 END) AS sq_won
         FROM matches m
         JOIN my_teams mt ON mt.match_id = m.match_id
@@ -4069,12 +4064,10 @@ def compute_squad_kd(conn, tenant_id: int, my_account_id, range_key="session"):
         kills = r["sq_kills"] or 0
         team_size = r["team_size"] or 0
         won = r["sq_won"] or 0
-        # Death pro Mate via time_survived. Fallback (Schema 3): alle
-        # team_size tot wenn Match verloren.
-        if r["sq_no_surv"]:
-            deaths = 0 if won else team_size
-        else:
-            deaths = r["sq_deaths_real"] or 0
+        # Death pro Mate = Match nicht gewonnen, wie Kills / (Matches - Wins)
+        # beim eigenen K/D. time_survived taugt nicht: wer als letztes Team
+        # stirbt, beendet das Match selbst und laege in der Toleranz.
+        deaths = 0 if won else team_size
         per_match.append({
             "matchId": r["match_id"],
             "playedAt": r["played_at"],
@@ -7034,11 +7027,10 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     def _squad_lobby_for(match_ids):
         """Squad-K/D + Lobby-K/D für eine Match-ID-Liste.
         Squad = my_team_id pro Match. Squad-K/D = SUM(team_kills) /
-        SUM(team_deaths). Death pro Mate = time_survived < duration-5
-        (Toleranz für Rundungs-Unschärfe). Wenn time_survived fehlt
-        (Schema 3): Fallback team_size_if_lost.
-        Beispiel Duo, beide tot, 9 kills: 9/2 = 4.5. Win mit 1 toten
-        Mate: kills/1 statt kills/0."""
+        SUM(team_deaths). Death pro Mate = Match nicht gewonnen, wie
+        beim eigenen K/D (Kills / (Matches - Wins)).
+        Beispiel Duo, verloren, 9 kills: 9/2 = 4.5. Ein Win zaehlt
+        keinen Tod, auch wenn ein Mate unterwegs gestorben ist."""
         out = {"squadKills": 0, "squadKd": 0, "squadKillsPerMatch": 0,
                "squadMatchesWithMapping": 0,
                "lobbyKd": 0, "lobbyMatchesWithMapping": 0,
@@ -7063,11 +7055,6 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             SELECT mtm.match_id, m.duration_secs,
                    SUM(COALESCE(mtm.kills, 0)) AS sq_kills,
                    COUNT(*)                     AS team_size,
-                   SUM(CASE WHEN mtm.time_survived IS NOT NULL
-                              AND mtm.time_survived < m.duration_secs - 5
-                            THEN 1 ELSE 0 END)  AS sq_deaths_real,
-                   SUM(CASE WHEN mtm.time_survived IS NULL THEN 1 ELSE 0 END)
-                                                AS sq_no_surv,
                    MAX(CASE WHEN mtm.place=1 THEN 1 ELSE 0 END) AS sq_won
             FROM match_team_mapping mtm
             JOIN my_teams mt ON mt.match_id = mtm.match_id
@@ -7085,11 +7072,9 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         sq_deaths = 0
         for r in sq_rows:
             sq_kills += r["sq_kills"] or 0
-            if r["sq_no_surv"]:
-                # Fallback (Schema 3): alle tot wenn nicht gewonnen
-                sq_deaths += 0 if r["sq_won"] else (r["team_size"] or 0)
-            else:
-                sq_deaths += r["sq_deaths_real"] or 0
+            # Tod = nicht gewonnen, dieselbe Zaehlung wie das Record-Modal
+            # (lobby_kd.lobby_detail) und der eigene K/D im Header.
+            sq_deaths += 0 if r["sq_won"] else (r["team_size"] or 0)
         sq_n = len(sq_rows)
         out["squadKills"] = sq_kills
         out["squadMatchesWithMapping"] = sq_n
@@ -7269,12 +7254,10 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             ms_["eventMatches"] += 1
         else:
             ms_["brMatches"] += 1
-            # Death = nicht gewonnen UND time_survived < duration_secs (Toleranz 5s)
+            # Death = nicht gewonnen, wie der K/D daneben. Ein Tod kurz vor
+            # Match-Ende ist trotzdem ein Tod — er beendet das Match ja.
             if (x["place"] or 99) != 1:
-                dur = x.get("duration_secs") or 0
-                surv = x.get("time_survived") or 0
-                if dur and surv < dur - 5:
-                    ms_["deaths"] += 1
+                ms_["deaths"] += 1
         if (x["place"] or 99) == 1:
             ms_["wins"] += 1
         ms_["kills"] += x.get("effective_kills", x["kills"] or 0)
