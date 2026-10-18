@@ -14,11 +14,15 @@ Die eigene Match-Historie ist vollstaendig, also laesst sich der
 Season-Stand exakt aufsummieren: fuer PEX_LuCKoR ergeben die Matches
 seit Season-Beginn 26 Runden, 56 Kills, 2 Siege — genau das, was die
 API liefert. Fuer Mitspieler ist sie nur so vollstaendig, wie sie mit
-uns gespielt haben; deren Wert ist eine Untergrenze und entsprechend
-gekennzeichnet. Fuer Lobby-Fremde geht es gar nicht, aber deren
-Lobby-Wert beruht auf Lifetime und bewegt sich kaum.
+uns gespielt haben — als Season-Stand taugt sie dort NICHT: die
+20-Runden-Schwelle fragt nach den Season-Runden des Spielers, nicht nach
+den Runden mit uns. Fuer Mitspieler gilt deshalb der API-Snapshot, um die
+spaeter bekannten Matches zurueckgedreht (`_snapshot_vor`). Fuer
+Lobby-Fremde geht es gar nicht, aber deren Lobby-Wert beruht auf Lifetime
+und bewegt sich kaum.
 """
 from core.db_compat import SqliteCompatConn
+from pubg.lobby_kd import ranked_mode
 
 
 def _raw(conn):
@@ -76,10 +80,11 @@ def _summiere(conn, tenant_id, account_ids, von, bis):
     if not ids:
         return {}
     sql = ["""
-        SELECT s.account_id, s.game_mode, count(*) AS n,
+        SELECT s.account_id, s.game_mode, s.is_ranked, count(*) AS n,
                sum(s.kills) AS kills,
                sum(CASE WHEN s.place = 1 THEN 1 ELSE 0 END) AS wins
         FROM (SELECT DISTINCT p.account_id, m.match_id, m.game_mode,
+                     COALESCE(m.is_ranked, 0) AS is_ranked,
                      p.kills, p.place
               FROM participants p
               JOIN matches m ON m.match_id = p.match_id
@@ -93,17 +98,26 @@ def _summiere(conn, tenant_id, account_ids, von, bis):
     if bis:
         sql.append(" AND m.played_at < %s")
         params.append(bis)
-    sql.append(") s GROUP BY s.account_id, s.game_mode")
+    sql.append(") s GROUP BY s.account_id, s.game_mode, s.is_ranked")
     with _raw(conn).cursor() as cur:
         cur.execute("".join(sql), params)
         rows = cur.fetchall()
     out = {}
     for r in rows:
-        st = out.setdefault(r["account_id"], {}) \
-                .setdefault(r["game_mode"], _leer())
+        # Ranked steht in `matches` als squad-fpp + is_ranked, in den
+        # Snapshots als squad-fpp-ranked. Ohne die Trennung zog die
+        # Rueckrechnung Ranked-Runden vom Normal-Stand ab.
+        mode = r["game_mode"]
+        if r["is_ranked"] and mode:
+            mode = ranked_mode(mode)
+        st = out.setdefault(r["account_id"], {}).setdefault(mode, _leer())
+        n, wins = int(r["n"] or 0), int(r["wins"] or 0)
         st["kills"] += int(r["kills"] or 0)
-        st["rounds"] += int(r["n"] or 0)
-        st["wins"] += int(r["wins"] or 0)
+        st["rounds"] += n
+        st["wins"] += wins
+        # Ein Tod je nicht gewonnener Runde — mehr weiss die Historie
+        # nicht. Gebraucht fuer Ranked, das ueber Tode rechnet.
+        st["losses"] += n - wins
     return out
 
 
@@ -117,14 +131,20 @@ def season_stand_vor(conn, tenant_id: int, account_ids, season_start,
     return _summiere(conn, tenant_id, account_ids, season_start, bis)
 
 
-def lifetime_stand_vor(conn, tenant_id: int, account_ids,
-                       bis: str) -> dict:
-    """Lifetime-Snapshot um die spaeter gespielten Matches zurueckdrehen.
+def _snapshot_vor(conn, tenant_id: int, account_ids, season_id: str,
+                  bis: str, ende: str = None) -> dict:
+    """Snapshot einer Season (oder 'lifetime') auf den Stand vor `bis`.
 
-    Der gespeicherte Stand ist von heute. Alles, was nach `bis` gespielt
-    wurde, gehoert da wieder raus. Fuer die eigenen Accounts ist das
-    exakt; fuer Mitspieler fehlen die Matches ohne uns, dann faellt die
-    Korrektur zu klein aus — immer noch naeher dran als gar keine.
+    Der gespeicherte Stand ist der vom Abruf (`fetched_at`). Abgezogen
+    wird, was zwischen `bis` und dem Abruf gespielt wurde — und bei einer
+    Season nur bis zu ihrem Ende (`ende`), denn spaetere Matches gehoeren
+    in die naechste. Was nach dem Abruf kam, steckt im Snapshot nicht
+    drin und bleibt unangetastet.
+
+    Fuer die eigenen Accounts ist das exakt. Fuer Mitspieler fehlen die
+    Matches ohne uns, dann faellt die Korrektur zu klein aus und der Stand
+    eher etwas zu hoch — aber die Groessenordnung stimmt, waehrend die
+    Summe "Matches mit uns" sie um ein Vielfaches unterschaetzt.
     """
     ids = [a for a in (account_ids or []) if a]
     if not ids:
@@ -133,31 +153,39 @@ def lifetime_stand_vor(conn, tenant_id: int, account_ids,
         cur.execute("""
             SELECT account_id, mode, kills, losses, rounds, wins, fetched_at
             FROM player_season_snapshot
-            WHERE season_id = 'lifetime' AND account_id = ANY(%s)
+            WHERE season_id = %s AND account_id = ANY(%s)
               AND kills IS NOT NULL
-        """, (ids,))
+        """, (season_id, ids))
         rows = cur.fetchall()
     if not rows:
         return {}
-    out, stand = {}, {}
+    out, abruf = {}, {}
     for r in rows:
         out.setdefault(r["account_id"], {})[r["mode"]] = {
             "kills": r["kills"] or 0, "losses": r["losses"] or 0,
             "rounds": r["rounds"] or 0, "wins": r["wins"] or 0}
-        stand[r["account_id"]] = r["fetched_at"]
-    # Nur Matches zwischen dem Stichtag und dem Snapshot abziehen. Ist der
-    # Snapshot aelter als das Match, gibt es nichts zu korrigieren — dann
-    # ist er ohnehin der Stand von damals oder davor.
-    for acc, spaeter in _summiere(conn, tenant_id, ids, bis, None).items():
-        bis_snapshot = stand.get(acc)
-        for mode, st in spaeter.items():
-            ziel = (out.get(acc) or {}).get(mode)
-            if not ziel or not bis_snapshot:
+        abruf.setdefault(r["account_id"], {})[r["mode"]] = r["fetched_at"]
+    for acc, je_modus in abruf.items():
+        # Je Abrufzeitpunkt einmal summieren — meist ist es nur einer.
+        for zeitpunkt in set(je_modus.values()):
+            obergrenze = min(x for x in (zeitpunkt, ende) if x)
+            if not obergrenze or obergrenze <= bis:
                 continue
-            ziel["kills"] = max(0, ziel["kills"] - st["kills"])
-            ziel["rounds"] = max(0, ziel["rounds"] - st["rounds"])
-            ziel["wins"] = max(0, ziel["wins"] - st["wins"])
+            spaeter = _summiere(conn, tenant_id, [acc], bis,
+                                obergrenze).get(acc) or {}
+            for mode, st in spaeter.items():
+                if je_modus.get(mode) != zeitpunkt:
+                    continue
+                ziel = out[acc][mode]
+                for k in ("kills", "rounds", "wins", "losses"):
+                    ziel[k] = max(0, ziel[k] - st[k])
     return out
+
+
+def lifetime_stand_vor(conn, tenant_id: int, account_ids,
+                       bis: str) -> dict:
+    """Lifetime-Snapshot um die spaeter gespielten Matches zurueckdrehen."""
+    return _snapshot_vor(conn, tenant_id, account_ids, "lifetime", bis)
 
 
 def _aeltere_seasons(conn, account_ids, bis_season):
@@ -208,10 +236,27 @@ def kd_vor_match(conn, tenant_id: int, match_id: str) -> list:
     if not mates:
         return []
 
-    sid = season_fuer(season_grenzen(conn), played_at)
-    grenzen = dict(season_grenzen(conn))
-    aktuell = season_stand_vor(conn, tenant_id, mates,
+    liste = season_grenzen(conn)
+    sid = season_fuer(liste, played_at)
+    grenzen = dict(liste)
+    # Ende der Season = Beginn der naechst neueren (Liste ist absteigend).
+    ende = None
+    for i, (x, _von) in enumerate(liste):
+        if x == sid and i > 0:
+            ende = liste[i - 1][1]
+    # Eigene Accounts: die Historie ist vollstaendig, die Summe exakt.
+    # Mitspieler: der API-Stand, zurueckgedreht. Die gemeinsamen Matches
+    # allein sind kein Season-Stand — mit ihnen fiel ein Mitspieler mit
+    # 100 Season-Runden unter die 20-Runden-Schwelle, weil nur 17 davon
+    # mit uns waren.
+    eigene = set(eigene_accounts(conn, tenant_id, mates))
+    aktuell = season_stand_vor(conn, tenant_id, [a for a in mates
+                                                 if a in eigene],
                                grenzen.get(sid), played_at)
+    if sid:
+        aktuell.update(_snapshot_vor(conn, tenant_id,
+                                     [a for a in mates if a not in eigene],
+                                     sid, played_at, ende))
     aelter = _aeltere_seasons(conn, mates, sid)
     lifetime = lifetime_stand_vor(conn, tenant_id, mates, played_at)
 
@@ -229,6 +274,18 @@ def kd_vor_match(conn, tenant_id: int, match_id: str) -> list:
                     "source": res.get("source"),
                     "season_id": res.get("seasonId")})
     return out
+
+
+def eigene_accounts(conn, tenant_id: int, account_ids) -> list:
+    """Welche dieser Accounts gehoeren dem Tenant selbst (is_self)."""
+    ids = [a for a in (account_ids or []) if a]
+    if not ids:
+        return []
+    with _raw(conn).cursor() as cur:
+        cur.execute("SELECT DISTINCT account_id FROM players "
+                    "WHERE tenant_id = %s AND is_self = 1 "
+                    "AND account_id = ANY(%s)", (tenant_id, ids))
+        return [r["account_id"] for r in cur.fetchall()]
 
 
 def eigene_squad_accounts(conn, tenant_id: int, match_id: str) -> list:
@@ -276,6 +333,34 @@ def backfill(conn, tenant_id: int, limit: int = None,
         if not eintraege:
             continue
         save_match_player_kd(_raw(conn), mid, eintraege, jetzt)
+        n += 1
+        if fortschritt:
+            fortschritt(i, len(mids), mid, len(eintraege))
+    return n
+
+
+def neu_berechnen(conn, tenant_id: int, ab: str, fortschritt=None) -> int:
+    """Eingefrorene Staende ab `ab` neu rechnen und ueberschreiben.
+
+    Fuer den Fall, dass die Rechnung selbst falsch war — so geschehen bei
+    Mitspielern, deren Season-Stand aus den gemeinsamen Matches statt aus
+    der API kam. Returns Anzahl neu geschriebener Matches.
+    """
+    from pubg.db_pg import save_match_player_kd, _now_iso
+
+    jetzt = _now_iso()
+    mids = [r["match_id"] for r in conn.execute("""
+        SELECT DISTINCT m.match_id, m.played_at FROM matches m
+        WHERE m.tenant_id = ? AND m.played_at >= ?
+        ORDER BY m.played_at
+    """, (tenant_id, ab)).fetchall()]
+    n = 0
+    for i, mid in enumerate(mids, 1):
+        eintraege = kd_vor_match(conn, tenant_id, mid)
+        if not eintraege:
+            continue
+        save_match_player_kd(_raw(conn), mid, eintraege, jetzt,
+                             ersetzen=True)
         n += 1
         if fortschritt:
             fortschritt(i, len(mids), mid, len(eintraege))

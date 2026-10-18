@@ -1260,7 +1260,7 @@ def mark_telemetry_schema(conn, tenant_id: int, match_id: str,
 # ── K/D-Stand zum Match ─────────────────────────────────────────────────────
 
 def save_match_player_kd(conn, match_id: str, eintraege: list,
-                         fetched_at: str) -> int:
+                         fetched_at: str, ersetzen: bool = False) -> int:
     """K/D der Squad-Mitglieder festhalten, wie sie BEIM Match war.
 
     `player_season_snapshot` kennt nur den letzten Stand und wird bei
@@ -1268,7 +1268,8 @@ def save_match_player_kd(conn, match_id: str, eintraege: list,
     damit die heutige K/D. Hier friert der Wert ein.
 
     Ein vorhandener Eintrag bleibt stehen: Was beim Match galt, aendert
-    sich nicht mehr.
+    sich nicht mehr. Ausnahme `ersetzen=True` — fuer die Neuberechnung,
+    wenn der eingefrorene Wert nachweislich falsch gerechnet war.
     """
     if not eintraege:
         return 0
@@ -1280,7 +1281,12 @@ def save_match_player_kd(conn, match_id: str, eintraege: list,
             cur,
             "INSERT INTO match_player_kd (match_id, account_id, mode, kd,"
             " rounds, source, season_id, fetched_at) VALUES %s "
-            "ON CONFLICT (match_id, account_id) DO NOTHING",
+            "ON CONFLICT (match_id, account_id) DO "
+            + ("UPDATE SET mode = EXCLUDED.mode, kd = EXCLUDED.kd, "
+               "rounds = EXCLUDED.rounds, source = EXCLUDED.source, "
+               "season_id = EXCLUDED.season_id, "
+               "fetched_at = EXCLUDED.fetched_at" if ersetzen
+               else "NOTHING"),
             rows)
         n = cur.rowcount
     conn.commit()

@@ -1513,6 +1513,11 @@ def kd_backfill(root: str, args=None) -> int:
     Nutzung:
         python -m pubg.cli kd-backfill [--tenant 1 | --all]
                                        [--limit N] [--dry-run]
+                                       [--neu-ab 2026-09-21]
+
+    `--neu-ab` rechnet auch schon eingefrorene Matches ab diesem Datum
+    neu und ueberschreibt sie — nur fuer den Fall, dass die Rechnung
+    selbst falsch war.
     """
     from core.db import connect
     from core.db_compat import SqliteCompatConn
@@ -1537,8 +1542,17 @@ def kd_backfill(root: str, args=None) -> int:
     else:
         tenants = [int(_opt("--tenant", "1"))]
 
+    neu_ab = _opt("--neu-ab")
     gesamt = 0
     for tid in tenants:
+        if neu_ab and not trocken:
+            def _melde_neu(i, n, mid, k):
+                if i % 50 == 0 or i == n:
+                    print(f"  [{i}/{n}] {mid[:8]} {k} Spieler", flush=True)
+            n = KR.neu_berechnen(conn, tid, neu_ab, fortschritt=_melde_neu)
+            print(f"Tenant {tid}: {n} Matches ab {neu_ab} neu berechnet")
+            gesamt += n
+            continue
         offen = KR.offene_matches(conn, tid, limit)
         print(f"Tenant {tid}: {len(offen)} Matches ohne Stand")
         if trocken:
