@@ -150,3 +150,27 @@ def test_season_wert_wandert_und_bleibt_trotzdem_eine_zeile():
     assert z["matches"] == 4
     assert round(z["kd"], 3) == round((2.37 + 2.35 + 2.33 + 2.23) / 4, 3)
     assert z["kdMin"] == 2.23 and z["kdMax"] == 2.37
+
+
+def test_squad_kd_nimmt_standardmaessig_den_stand_nach_dem_match():
+    from pubg.lobby_kd import lobby_kd_for_matches, LIFETIME_KEY
+    _match("f1", "2026-09-10T17:00:00Z")
+    _heutige_snapshots()
+    db_pg.save_match_player_kd(CONN.raw, "f1", [
+        {"account_id": ICH, "mode": "squad-fpp", "kd": 1.66, "rounds": 390,
+         "source": "season", "season_id": "div.42",
+         "nach": {"kd": 1.70, "rounds": 391, "mode": "squad-fpp",
+                  "source": "season", "season_id": "div.42"}},
+        {"account_id": MATE, "mode": "squad-fpp", "kd": 1.20, "rounds": 300,
+         "source": "season", "season_id": "div.42",
+         "nach": {"kd": 1.30, "rounds": 301, "mode": "squad-fpp",
+                  "source": "season", "season_id": "div.42"}}],
+        "2026-09-21T00:00:00Z")
+    CONN.raw.commit()
+    nach = lobby_kd_for_matches(CONN, T, ["f1"], LIFETIME_KEY,
+                                my_account_id=ICH)["matches"][0]
+    vor = lobby_kd_for_matches(CONN, T, ["f1"], LIFETIME_KEY,
+                               my_account_id=ICH,
+                               kd_stand="vor")["matches"][0]
+    assert round(nach["squadKd"], 2) == 1.50
+    assert round(vor["squadKd"], 2) == 1.43

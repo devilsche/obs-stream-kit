@@ -1838,6 +1838,16 @@
               aria-label="Next session">&#9654;</button>
       <span class="pick-count" id="sessCount"></span>
     </div>
+    <div class="pick-row">
+      <span class="pick-label" id="lblKdStand">Squad K/D</span>
+      <span class="switch" role="group" aria-labelledby="lblKdStand"
+            aria-describedby="kdStandHint" id="kdStandSwitch">
+        <button type="button" data-kd="after" aria-pressed="true">After match</button>
+        <button type="button" data-kd="before" aria-pressed="false">Before match</button>
+      </span>
+      <span class="pick-count" id="kdStandHint">K/D values frozen per
+        match &mdash; with or without that match counted</span>
+    </div>
     <div class="pick-custom" id="customRow" hidden>
       <label for="dateFrom">From</label>
       <input type="date" id="dateFrom">
@@ -1896,6 +1906,16 @@
     const MD_SPEEDS = [1, 2, 4, 8, 16];
     const MD_DEFAULT_SPEED = 4;
 
+    // Welcher eingefrorene K/D-Stand gilt: "after" rechnet das Match mit
+    // ein (Standard), "before" zeigt, wie stark jemand in die Runde ging.
+    // Ohne "after" sah man die Wirkung einer Runde erst in der naechsten.
+    const KD_STAND_KEY = "pubg-report-kd-stand";
+    let KD_STAND = "after";
+    try {
+      if (localStorage.getItem(KD_STAND_KEY) === "before") KD_STAND = "before";
+    } catch (e) { /* Speicher gesperrt — dann gilt der Standard */ }
+    const kdStandParam = () => (KD_STAND === "before" ? "kd=before" : "");
+
     // Cache fuer match-detail responses
     const _mdCache = new Map();
     async function mdLoad(matchId) {
@@ -1910,7 +1930,8 @@
       let d = null;
       try {
         d = await PubgUI.fetchJson(
-          (window.__SERVE_BASE__||"/") + `api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`,
+          (window.__SERVE_BASE__||"/") + `api/pubg/match-detail?matchId=${encodeURIComponent(matchId)}`
+            + (kdStandParam() ? "&" + kdStandParam() : ""),
           60000);
       } catch (e) { console.warn("mdLoad failed", matchId, e); }
       // Wenn die Anfrage fehlschlug, NICHT cachen — sonst friert ein
@@ -3994,7 +4015,10 @@
           that is what &bdquo;Squad Record&ldquo; in the phase header shows.${isPhase
             ? " Anyone who only joined for a round or two barely moves the"
               + " average but still shows up here."
-            : ""} Values are frozen at the time of each match, so a player
+            : ""} Values are frozen per match, ${KD_STAND === "before"
+            ? "as they stood right before it"
+            : "as they stood right after it, that match included"} &mdash;
+          switch this under &bdquo;Squad K/D&ldquo; at the top. A player
           whose K/D changed within the period — a new season passing the
           20-round mark, for instance — is listed once per value, with the
           dates each one applied to.</p>`;
@@ -4055,6 +4079,7 @@
             Object.entries({from: matchIds.range.from,
                             to: matchIds.range.to}).filter(([, v]) => v)))
         : new URLSearchParams({matches: (matchIds || []).join(",")});
+      if (KD_STAND === "before") params.set("kd", "before");
       const key = params.toString();
       try {
         let d = _lobbyCache.get(key);
@@ -5238,15 +5263,20 @@
       mdPanelOpen(mid);
     });
 
-    const reportUrl = (window.__SERVE_BASE__||"/") + "api/pubg/session-report" +
-      ((FROM || TO) ? "?" + new URLSearchParams({
-        ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {})
-      }).toString() : "");
+    const reportUrlFor = () => {
+      const q = new URLSearchParams({
+        ...(FROM ? {from: FROM} : {}), ...(TO ? {to: TO} : {}),
+        ...(KD_STAND === "before" ? {kd: "before"} : {})
+      }).toString();
+      return (window.__SERVE_BASE__||"/") + "api/pubg/session-report"
+        + (q ? "?" + q : "");
+    };
+    let reportUrl = reportUrlFor();
     // 45 s statt der 10 s Standard: der Report ueber den ganzen Bestand
     // rechnet serverseitig rund 7 s (1070 Matches) und wurde vorher
     // abgeschnitten — die Seite blieb dann stumm am Platzhalter stehen.
     let _reportShown = false;
-    PubgUI.poll(reportUrl, 60000, (d) => {
+    const startReportPoll = () => PubgUI.poll(reportUrl, 60000, (d) => {
       _reportShown = true;
       render(d);
     }, (err) => {
@@ -5272,6 +5302,30 @@
             + PubgUI.esc(String(e && e.message || e)) + `</div>`; });
       });
     }, 45000);
+    let stopReportPoll = startReportPoll();
+
+    // Squad-K/D-Stand umschalten. Der Report-Fingerprint kennt die
+    // K/D-Werte nicht, er muss deshalb zurueckgesetzt werden — sonst
+    // verwirft render() die neue Antwort als unveraendert. Modal- und
+    // Match-Detail-Cache halten den alten Stand und gehen mit.
+    const kdSwitch = document.getElementById("kdStandSwitch");
+    const syncKdSwitch = () => kdSwitch.querySelectorAll("button[data-kd]")
+      .forEach(b => b.setAttribute("aria-pressed",
+                                   String(b.dataset.kd === KD_STAND)));
+    syncKdSwitch();
+    kdSwitch.addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-kd]");
+      if (!b || b.dataset.kd === KD_STAND) return;
+      KD_STAND = b.dataset.kd;
+      try { localStorage.setItem(KD_STAND_KEY, KD_STAND); } catch (err) { /* egal */ }
+      syncKdSwitch();
+      _mdCache.clear();
+      _lobbyCache.clear();
+      _lastReportFp = null;
+      stopReportPoll();
+      reportUrl = reportUrlFor();
+      stopReportPoll = startReportPoll();
+    });
 
     // Findet Marker unter Maus-Position. Returns {acc, lifeIdx, kind, target}
     // oder null. kind = 'landing' | 'death' | 'kill' | 'revive'

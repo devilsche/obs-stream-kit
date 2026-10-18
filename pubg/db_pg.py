@@ -231,6 +231,14 @@ CREATE TABLE IF NOT EXISTS match_player_kd (
     fetched_at  TEXT NOT NULL,
     PRIMARY KEY (match_id, account_id)
 );
+-- Der Stand NACH dem Match, das Match selbst eingerechnet. Der Report
+-- zeigt ihn standardmaessig — sonst sieht man die Wirkung einer Runde
+-- erst in der naechsten. Leer bei Eintraegen von vor der Einfuehrung.
+ALTER TABLE match_player_kd ADD COLUMN IF NOT EXISTS kd_nach DOUBLE PRECISION;
+ALTER TABLE match_player_kd ADD COLUMN IF NOT EXISTS rounds_nach INTEGER;
+ALTER TABLE match_player_kd ADD COLUMN IF NOT EXISTS mode_nach TEXT;
+ALTER TABLE match_player_kd ADD COLUMN IF NOT EXISTS source_nach TEXT;
+ALTER TABLE match_player_kd ADD COLUMN IF NOT EXISTS season_id_nach TEXT;
 CREATE TABLE IF NOT EXISTS match_lobby_kd (
     match_id    TEXT PRIMARY KEY,
     lobby_kd    DOUBLE PRECISION,
@@ -1270,45 +1278,72 @@ def save_match_player_kd(conn, match_id: str, eintraege: list,
     Ein vorhandener Eintrag bleibt stehen: Was beim Match galt, aendert
     sich nicht mehr. Ausnahme `ersetzen=True` — fuer die Neuberechnung,
     wenn der eingefrorene Wert nachweislich falsch gerechnet war.
+
+    Der Stand nach dem Match steht optional unter `e["nach"]` (dieselben
+    Schluessel).
     """
     if not eintraege:
         return 0
-    rows = [(match_id, e["account_id"], e.get("mode"), e.get("kd"),
-             e.get("rounds"), e.get("source"), e.get("season_id"),
-             fetched_at) for e in eintraege]
+    rows = []
+    for e in eintraege:
+        n = e.get("nach") or {}
+        rows.append((match_id, e["account_id"], e.get("mode"), e.get("kd"),
+                     e.get("rounds"), e.get("source"), e.get("season_id"),
+                     fetched_at, n.get("kd"), n.get("rounds"),
+                     n.get("mode"), n.get("source"), n.get("season_id")))
+    spalten = ("mode", "kd", "rounds", "source", "season_id", "fetched_at",
+               "kd_nach", "rounds_nach", "mode_nach", "source_nach",
+               "season_id_nach")
     with conn.cursor() as cur:
         execute_values(
             cur,
             "INSERT INTO match_player_kd (match_id, account_id, mode, kd,"
-            " rounds, source, season_id, fetched_at) VALUES %s "
+            " rounds, source, season_id, fetched_at, kd_nach, rounds_nach,"
+            " mode_nach, source_nach, season_id_nach) VALUES %s "
             "ON CONFLICT (match_id, account_id) DO "
-            + ("UPDATE SET mode = EXCLUDED.mode, kd = EXCLUDED.kd, "
-               "rounds = EXCLUDED.rounds, source = EXCLUDED.source, "
-               "season_id = EXCLUDED.season_id, "
-               "fetched_at = EXCLUDED.fetched_at" if ersetzen
-               else "NOTHING"),
+            + ("UPDATE SET " + ", ".join(f"{c} = EXCLUDED.{c}"
+                                         for c in spalten)
+               if ersetzen else "NOTHING"),
             rows)
         n = cur.rowcount
     conn.commit()
     return n
 
 
-def get_match_player_kd(conn, match_ids: list) -> dict:
-    """{match_id: {account_id: {kd, rounds, source, mode}}}"""
+#: Welcher eingefrorene Stand gilt: "nach" (das Match eingerechnet, der
+#: Standard im Report) oder "vor" (wie stark jemand in die Runde ging).
+KD_STAENDE = ("nach", "vor")
+
+
+def get_match_player_kd(conn, match_ids: list, stand: str = "nach") -> dict:
+    """{match_id: {account_id: {kd, rounds, source, mode, seasonId, stand}}}
+
+    `stand="nach"` liefert den Stand nach dem Match und faellt je Eintrag
+    auf "vor" zurueck, wo keiner gespeichert ist (Eintraege von vor der
+    Einfuehrung). `stand` am Ergebnis sagt, welcher es wurde.
+    """
     if not match_ids:
         return {}
     marks = ",".join(["%s"] * len(match_ids))
     with conn.cursor() as cur:
         cur.execute(
             f"SELECT match_id, account_id, mode, kd, rounds, source, "
-            f"season_id FROM match_player_kd WHERE match_id IN ({marks})",
+            f"season_id, kd_nach, rounds_nach, mode_nach, source_nach, "
+            f"season_id_nach FROM match_player_kd "
+            f"WHERE match_id IN ({marks})",
             list(match_ids))
         rows = cur.fetchall()
     aus = {}
     for r in rows:
-        aus.setdefault(r["match_id"], {})[r["account_id"]] = {
-            "kd": r["kd"], "rounds": r["rounds"], "source": r["source"],
-            "mode": r["mode"], "seasonId": r["season_id"]}
+        if stand == "nach" and r["kd_nach"] is not None:
+            v = {"kd": r["kd_nach"], "rounds": r["rounds_nach"],
+                 "source": r["source_nach"], "mode": r["mode_nach"],
+                 "seasonId": r["season_id_nach"], "stand": "nach"}
+        else:
+            v = {"kd": r["kd"], "rounds": r["rounds"], "source": r["source"],
+                 "mode": r["mode"], "seasonId": r["season_id"],
+                 "stand": "vor"}
+        aus.setdefault(r["match_id"], {})[r["account_id"]] = v
     return aus
 
 

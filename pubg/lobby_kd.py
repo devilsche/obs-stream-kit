@@ -881,7 +881,7 @@ def _bester_stand(squad_seen, account_id):
     return max(werte) if werte else None
 
 
-def feste_kd_je_match(raw_conn, match_ids) -> dict:
+def feste_kd_je_match(raw_conn, match_ids, stand: str = "nach") -> dict:
     """Eingefrorene Staende, im Format von `kd_resolved`.
 
     `match_player_kd` haelt fest, wie stark jemand IN ein Match ging.
@@ -892,10 +892,13 @@ def feste_kd_je_match(raw_conn, match_ids) -> dict:
 
     Bewusst ohne `lifetimeRounds`: das waere der heutige Karriere-Stand
     neben einer Rundenzahl von damals.
+
+    `stand`: "nach" (Match eingerechnet, Standard) oder "vor".
     """
     try:
         from pubg.db_pg import get_match_player_kd
-        roh = get_match_player_kd(raw_conn, list(match_ids or [])) or {}
+        roh = get_match_player_kd(raw_conn, list(match_ids or []),
+                                  stand=stand) or {}
     except Exception:
         return {}
     out = {}
@@ -908,7 +911,7 @@ def feste_kd_je_match(raw_conn, match_ids) -> dict:
                     "rounds": v.get("rounds"), "source": v.get("source"),
                     "seasonId": v.get("seasonId"), "lifetimeRounds": None,
                     "isRankedValue": False, "rankedFallback": False,
-                    "frozen": True}
+                    "frozen": True, "stand": v.get("stand")}
         if d:
             out[mid] = d
     return out
@@ -916,7 +919,8 @@ def feste_kd_je_match(raw_conn, match_ids) -> dict:
 
 def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                          mode: str = "squad-fpp", my_account_id=None,
-                         extra_key: str = None) -> dict:
+                         extra_key: str = None,
+                         kd_stand: str = "nach") -> dict:
     """Je Match: Lobby-Schnitt, eigener Season-K/D, Abdeckung — plus ein
     Gesamtschnitt ueber die Matches, die genug Abdeckung haben.
 
@@ -1014,7 +1018,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         extra_by_acc = {a: (v or {}).get("kd") if v else None
                         for a, v in extra_snaps.items()}
 
-    feste = feste_kd_je_match(raw, list(per_match.keys()))
+    feste = feste_kd_je_match(raw, list(per_match.keys()), kd_stand)
     out = []
     for mid, entry in per_match.items():
         squad = squad_by_match.get(mid, set())
@@ -1148,7 +1152,8 @@ def _record_totals(record_by_acc, my_account_id):
 
 
 def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
-                 my_account_id=None, top_n: int = 5) -> dict:
+                 my_account_id=None, top_n: int = 5,
+                 kd_stand: str = "nach") -> dict:
     """Aufschluesselung der Lobby je Match plus ein Gesamtbild ueber alle.
 
     Fuer die Detailansicht hinter der Lobby-K/D-Zahl: wer war die Spitze, wie
@@ -1251,7 +1256,7 @@ def lobby_detail(conn, tenant_id: int, match_ids, season_id: str = LIFETIME_KEY,
     names = db_pg.get_player_names(raw, tenant_id, list(accounts))
     names.update({a: n for a, n in squad_names.items() if n})
 
-    feste = feste_kd_je_match(raw, list(per_match.keys()))
+    feste = feste_kd_je_match(raw, list(per_match.keys()), kd_stand)
     out, strongest, weakest = [], {}, {}
     squad_seen = {}
     for mid, e in per_match.items():

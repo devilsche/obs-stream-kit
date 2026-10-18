@@ -216,12 +216,29 @@ def _aeltere_seasons(conn, account_ids, bis_season):
             for acc, d in tmp.items()}
 
 
-def kd_vor_match(conn, tenant_id: int, match_id: str) -> list:
+def _direkt_danach(played_at: str) -> str:
+    """Stichtag, ab dem das Match selbst mitzaehlt.
+
+    Alle Summen fragen `played_at < bis`. Eine Sekunde spaeter liegt das
+    Match davor, das naechste (mindestens Minuten spaeter) noch nicht.
+    """
+    from datetime import datetime, timedelta, timezone
+    t = datetime.fromisoformat(played_at.replace("Z", "+00:00"))
+    t = (t + timedelta(seconds=1)).astimezone(timezone.utc)
+    return t.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def kd_vor_match(conn, tenant_id: int, match_id: str,
+                 nach: bool = False) -> list:
     """Eintraege fuer `save_match_player_kd` — Stand vor dem Match.
 
     Gerechnet wird mit derselben Quellen-Kette wie im Livebetrieb
     (`kd_resolved`), nur mit zurueckgedrehten Zahlen. Damit greift auch
     die 20-Runden-Schwelle wieder so, wie sie damals griff.
+
+    `nach=True` rechnet das Match selbst mit ein — der Stand, mit dem
+    man aus der Runde herausgeht. Springt ein Spieler genau mit diesem
+    Match auf 20 Season-Runden, steht hier schon die neue Season.
     """
     from pubg.lobby_kd import kd_resolved
 
@@ -231,13 +248,19 @@ def kd_vor_match(conn, tenant_id: int, match_id: str) -> list:
     if not r:
         return []
     played_at = r["played_at"]
+    if not played_at:
+        return []
+    season_zeit = played_at
+    if nach:
+        played_at = _direkt_danach(played_at)
     mode = r["game_mode"] or "squad-fpp"
     mates = eigene_squad_accounts(conn, tenant_id, match_id)
     if not mates:
         return []
 
     liste = season_grenzen(conn)
-    sid = season_fuer(liste, played_at)
+    # Die Season haengt am Match, nicht am verschobenen Stichtag.
+    sid = season_fuer(liste, season_zeit)
     grenzen = dict(liste)
     # Ende der Season = Beginn der naechst neueren (Liste ist absteigend).
     ende = None
@@ -274,6 +297,19 @@ def kd_vor_match(conn, tenant_id: int, match_id: str) -> list:
                     "source": res.get("source"),
                     "season_id": res.get("seasonId")})
     return out
+
+
+def kd_eintraege(conn, tenant_id: int, match_id: str) -> list:
+    """Stand vor UND nach dem Match, fertig fuer `save_match_player_kd`."""
+    vor = kd_vor_match(conn, tenant_id, match_id)
+    nach = {e["account_id"]: e
+            for e in kd_vor_match(conn, tenant_id, match_id, nach=True)}
+    for e in vor:
+        n = nach.get(e["account_id"])
+        if n:
+            e["nach"] = {k: n.get(k) for k in
+                         ("kd", "rounds", "mode", "source", "season_id")}
+    return vor
 
 
 def eigene_accounts(conn, tenant_id: int, account_ids) -> list:
@@ -329,7 +365,7 @@ def backfill(conn, tenant_id: int, limit: int = None,
     n = 0
     mids = offene_matches(conn, tenant_id, limit)
     for i, mid in enumerate(mids, 1):
-        eintraege = kd_vor_match(conn, tenant_id, mid)
+        eintraege = kd_eintraege(conn, tenant_id, mid)
         if not eintraege:
             continue
         save_match_player_kd(_raw(conn), mid, eintraege, jetzt)
@@ -356,7 +392,7 @@ def neu_berechnen(conn, tenant_id: int, ab: str, fortschritt=None) -> int:
     """, (tenant_id, ab)).fetchall()]
     n = 0
     for i, mid in enumerate(mids, 1):
-        eintraege = kd_vor_match(conn, tenant_id, mid)
+        eintraege = kd_eintraege(conn, tenant_id, mid)
         if not eintraege:
             continue
         save_match_player_kd(_raw(conn), mid, eintraege, jetzt,

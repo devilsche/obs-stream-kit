@@ -38,6 +38,12 @@ def _err(code, msg):
     return json.dumps({"error": msg}).encode("utf-8"), code, "application/json"
 
 
+def _kd_stand(qs) -> str:
+    """Welcher eingefrorene K/D-Stand gilt: `?kd=before` oder der Standard
+    "nach dem Match". Der Report schaltet das per Umschalter."""
+    return "vor" if (qs.get("kd") or "").lower() == "before" else "nach"
+
+
 RANGE_KEYS = ("session", "day", "week", "all")
 
 
@@ -997,9 +1003,12 @@ class EndpointRegistry:
         match_id = (qs.get("matchId") or "").strip()
         if not match_id:
             return _err(400, "matchId required")
+        stand = _kd_stand(qs)
         data = self.cache.get_or_compute(
-            f"match-detail:{match_id}",
-            lambda: compute_match_detail(conn, self.tenant_id, self.my_account_id, match_id))
+            f"match-detail:{match_id}:{stand}",
+            lambda: compute_match_detail(conn, self.tenant_id,
+                                         self.my_account_id, match_id,
+                                         kd_stand=stand))
         if not data:
             return _err(404, "match not found")
         return _ok(data)
@@ -3302,17 +3311,19 @@ class EndpointRegistry:
         conn = self.get_conn()
         rf = qs.get("from")
         rt = qs.get("to")
-        key = f"session-report:{rf or 'auto'}:{rt or 'now'}"
+        stand = _kd_stand(qs)
+        key = f"session-report:{rf or 'auto'}:{rt or 'now'}:{stand}"
 
         def _build():
             data = compute_session_report(conn, self.tenant_id,
                                           self.my_account_id, rf, rt)
-            self._add_lobby_strength(conn, data)
+            self._add_lobby_strength(conn, data, stand)
+            data["kdStand"] = stand
             return data
 
         return _ok(self.cache.get_or_compute(key, _build))
 
-    def _add_lobby_strength(self, conn, data) -> None:
+    def _add_lobby_strength(self, conn, data, stand: str = "nach") -> None:
         """Lobby-Staerke an die Match-Zeilen und die Session-Totals haengen.
 
         Gehoert in den Report, weil man dort die Session durchgeht: "war die
@@ -3331,7 +3342,8 @@ class EndpointRegistry:
         try:
             lobby = lobby_kd_for_matches(conn, self.tenant_id, match_ids,
                                           LIFETIME_KEY,
-                                          my_account_id=self.my_account_id)
+                                          my_account_id=self.my_account_id,
+                                          kd_stand=stand)
         except Exception:
             return
         by_id = {m["matchId"]: m for m in lobby.get("matches") or []}
@@ -3342,7 +3354,8 @@ class EndpointRegistry:
             from pubg.db_pg import get_match_lobby_kd, get_match_player_kd
             _raw = getattr(conn, "raw", conn)
             fest_lobby = get_match_lobby_kd(_raw, match_ids) or {}
-            fest_spieler = get_match_player_kd(_raw, match_ids) or {}
+            fest_spieler = get_match_player_kd(_raw, match_ids,
+                                               stand=stand) or {}
         except Exception:
             fest_lobby, fest_spieler = {}, {}
         for m in matches:
@@ -3573,11 +3586,13 @@ class EndpointRegistry:
             self.client, conn, self.tenant_id)
 
         data = self.cache.get_or_compute(
-            f"lobby-kd:{range_key}:{mode}:{limit}:{season_id or '-'}",
+            f"lobby-kd:{range_key}:{mode}:{limit}:{season_id or '-'}"
+            f":{_kd_stand(qs)}",
             lambda: lobby_kd_for_matches(conn, self.tenant_id, match_ids,
                                           LIFETIME_KEY, mode,
                                           my_account_id=self.my_account_id,
-                                          extra_key=season_id))
+                                          extra_key=season_id,
+                                          kd_stand=_kd_stand(qs)))
         return _ok({**data, "range": range_key, "seasonId": season_id,
                     "basis": "lifetime"})
 
@@ -3632,18 +3647,21 @@ class EndpointRegistry:
             top_n = max(1, min(int(qs.get("top", "5")), 20))
         except ValueError:
             top_n = 5
-        key = (f"lobby-detail:{top_n}:range:{rf or ''}:{rt or ''}" if by_range
-               else f"lobby-detail:{top_n}:" + ",".join(sorted(ids)))
+        stand = _kd_stand(qs)
+        key = (f"lobby-detail:{top_n}:{stand}:range:{rf or ''}:{rt or ''}"
+               if by_range
+               else f"lobby-detail:{top_n}:{stand}:" + ",".join(sorted(ids)))
         data = self.cache.get_or_compute(
             key, lambda: lobby_detail(conn, self.tenant_id, ids,
                                       my_account_id=self.my_account_id,
-                                      top_n=top_n))
+                                      top_n=top_n, kd_stand=stand))
         # Gekuerzt wird nur ausgewiesen, nicht verschwiegen: sonst steht
         # neben dem Report ein anderer Wert ohne erkennbaren Grund.
         return _ok({**data,
                     "matchesRequested": len(wanted),
                     "matchesUsed": len(ids),
-                    "byRange": by_range})
+                    "byRange": by_range,
+                    "kdStand": stand})
 
     def _lobby_kd_refresh(self, qs):
         """Fehlende und veraltete Season-Snapshots nachladen — auf Knopfdruck.

@@ -866,9 +866,20 @@ Zeitraum und Session stehen in **einer Leiste**, mit demselben `switch`-Element
 wie in `shot-quality` und `landing-spots`:
 
 ```
-Range    [Current][Today][7 days][30 days][All][Custom…]
-Session  ◀  Sat 06 Sep 21:14 · 19 matches · 3 W  ▾  ▶     89 sessions
+Range     [Current][Today][7 days][30 days][All][Custom…]
+Session   ◀  Sat 06 Sep 21:14 · 19 matches · 3 W  ▾  ▶     89 sessions
+Squad K/D [After match][Before match]
 ```
+
+**Squad K/D** wählt, welcher eingefrorene K/D-Stand je Match gilt: *After
+match* (Standard) rechnet das Match selbst mit ein, *Before match* zeigt, wie
+stark jemand in die Runde ging. Gilt für Match-Zeile, Team-Kacheln, Lobby-Modal
+und Match-Detail; die Wahl merkt sich der Browser. Die API nimmt dafür
+`?kd=before` an `session-report`, `lobby-detail`, `lobby-kd` und
+`match-detail` — ohne Parameter gilt *after*. Gespeichert werden beide Stände
+in `match_player_kd` (`kd` / `kd_nach`); alte Einträge ohne Nach-Stand fallen
+auf den Vor-Stand zurück. Nachfüllen: `python -m pubg.cli kd-backfill --all
+--neu-ab 2026-01-01`.
 
 Vorher waren es zwei Tabs — *Sessions* mit Monats-Akkordeons und *Custom
 Range* mit fünf Presets. Zwei Wege zum selben Ziel, und „Yesterday" stand als

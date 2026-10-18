@@ -344,3 +344,63 @@ def test_neu_berechnen_ueberschreibt_den_falschen_stand():
     assert neu_berechnen(CONN, T, "2026-09-11T00:00:00Z") == 15
     eintrag = get_match_player_kd(CONN.raw, ["g10"])["g10"][MATE]
     assert eintrag["seasonId"] == "div.43"
+
+
+# --- Stand nach dem Match: das Match selbst zaehlt mit ---
+
+def test_nach_dem_match_zaehlt_das_match_mit():
+    from pubg.kd_rekonstruktion import kd_vor_match
+    _seasons_fuer_mate({"kills": 420, "rounds": 100, "wins": 24})
+    _mate_matches(15)
+    vor = {x["account_id"]: x for x in kd_vor_match(CONN, T, "g10")}[MATE]
+    nach = {x["account_id"]: x
+            for x in kd_vor_match(CONN, T, "g10", nach=True)}[MATE]
+    assert nach["rounds"] == vor["rounds"] + 1
+
+
+def test_zwanzigste_runde_schaltet_nach_dem_match_auf_die_season():
+    """Mit dem Match, das die 20. Season-Runde ist, gilt danach schon die
+    neue Season — davor noch die alte."""
+    from pubg.kd_rekonstruktion import kd_vor_match
+    db_pg.upsert_season_snapshots(
+        CONN.raw, "div.42", "squad-fpp",
+        {ICH: {"kills": 595, "rounds": 390, "wins": 32}},
+        "2026-08-01T00:00:00Z")
+    db_pg.upsert_season_snapshots(
+        CONN.raw, "div.43", "squad-fpp",
+        {ICH: {"kills": 56, "rounds": 26, "wins": 2}},
+        "2026-09-10T02:40:00Z")
+    CONN.raw.commit()
+    for i in range(19):
+        _match(f"v{i}", f"2026-09-10T1{i//10}:{i%10:02d}:00Z", kills=2,
+               mates=())
+    _match("m20", "2026-09-11T20:00:00Z", kills=3, mates=())
+    vor = {x["account_id"]: x for x in kd_vor_match(CONN, T, "m20")}[ICH]
+    nach = {x["account_id"]: x
+            for x in kd_vor_match(CONN, T, "m20", nach=True)}[ICH]
+    assert vor["season_id"] == "div.42"
+    assert nach["season_id"] == "div.43" and nach["rounds"] == 20
+
+
+def test_gespeichert_wird_beides_und_nach_ist_der_standard():
+    from pubg.kd_rekonstruktion import kd_eintraege
+    from pubg.db_pg import save_match_player_kd, get_match_player_kd
+    _seasons_fuer_mate({"kills": 420, "rounds": 100, "wins": 24})
+    _mate_matches(15)
+    save_match_player_kd(CONN.raw, "g10", kd_eintraege(CONN, T, "g10"),
+                         "2026-09-30T00:00:00Z")
+    nach = get_match_player_kd(CONN.raw, ["g10"])["g10"][MATE]
+    vor = get_match_player_kd(CONN.raw, ["g10"], stand="vor")["g10"][MATE]
+    assert nach["stand"] == "nach" and vor["stand"] == "vor"
+    assert nach["rounds"] == vor["rounds"] + 1
+
+
+def test_alter_eintrag_ohne_nach_stand_faellt_auf_vor_zurueck():
+    from pubg.db_pg import save_match_player_kd, get_match_player_kd
+    _mate_matches(1)
+    save_match_player_kd(CONN.raw, "g0", [
+        {"account_id": MATE, "mode": "squad-fpp", "kd": 2.0, "rounds": 50,
+         "source": "season", "season_id": "div.43"}],
+        "2026-09-30T00:00:00Z")
+    v = get_match_player_kd(CONN.raw, ["g0"])["g0"][MATE]
+    assert v["kd"] == 2.0 and v["stand"] == "vor"

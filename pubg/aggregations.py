@@ -1524,7 +1524,8 @@ def compute_session_matches(conn, tenant_id: int, my_account_id, range_key="sess
     } for r in rows]
 
 
-def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
+def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
+                         kd_stand: str = "nach"):
     """v2: liefert pro Member ein lives[]-Array. Jedes Leben hat
     planeRoute, landing, groundPath, death (oder None), kills.
     Comeback-Detection ueber Telemetry-Split an Kill-target=member.
@@ -3501,8 +3502,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
             # Sonst zeigte ein Match von vor drei Wochen die heutigen
             # Werte — also andere Zahlen als in der Aufzeichnung.
             from pubg.db_pg import get_match_player_kd
-            fest = (get_match_player_kd(_raw, [match_id]) or {}).get(
-                match_id) or {}
+            fest = (get_match_player_kd(_raw, [match_id], stand=kd_stand)
+                    or {}).get(match_id) or {}
             for acc, v in fest.items():
                 if v.get("kd") is None:
                     continue
@@ -3512,7 +3513,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id):
                     # neben einer Rundenzahl von damals — der Tooltip
                     # zeigte dann zwei Zeitpunkte in einem Bruch.
                     "source": v.get("source"), "seasonId": v.get("seasonId"),
-                    "mode": v.get("mode"), "frozen": True}
+                    "mode": v.get("mode"), "frozen": True,
+                    "stand": v.get("stand")}
     except Exception as _kd_err:
         import traceback as _tb
         print(f"[match-detail] playerKds-Fehler: {_kd_err}")

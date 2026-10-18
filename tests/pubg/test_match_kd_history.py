@@ -247,6 +247,13 @@ def test_live_und_backfill_liefern_denselben_wert():
         kd_stand_einfrieren(CONN, T, MagicMock(), "mk10")
     CONN.raw.commit()
     gespeichert = {a: v["kd"] for a, v
-                   in (get_match_player_kd(CONN.raw, ["mk10"])
+                   in (get_match_player_kd(CONN.raw, ["mk10"], stand="vor")
                        .get("mk10") or {}).items()}
     assert gespeichert == erwartet
+    # Der Stand nach dem Match genauso.
+    erwartet_nach = {e["account_id"]: e["kd"]
+                     for e in kd_vor_match(CONN, T, "mk10", nach=True)}
+    gespeichert_nach = {a: v["kd"] for a, v
+                        in (get_match_player_kd(CONN.raw, ["mk10"])
+                            .get("mk10") or {}).items()}
+    assert gespeichert_nach == erwartet_nach

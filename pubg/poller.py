@@ -851,7 +851,7 @@ def kd_stand_einfrieren(conn, tenant_id, client, match_id):
                             _now_iso)
     from pubg.lobby_kd import (lobby_kd_for_matches, LIFETIME_KEY,
                                _newest_season_id)
-    from pubg.kd_rekonstruktion import kd_vor_match
+    from pubg.kd_rekonstruktion import kd_eintraege
     raw = conn.raw if isinstance(conn, SqliteCompatConn) else conn
     jetzt = _now_iso()
     mode = "squad-fpp"
@@ -875,7 +875,7 @@ def kd_stand_einfrieren(conn, tenant_id, client, match_id):
             # enthaelt das Match bereits und wird darum zurueckgedreht —
             # sonst stuende live ein anderer Wert als nachtraeglich.
             save_match_player_kd(raw, match_id,
-                                 kd_vor_match(conn, tenant_id, match_id),
+                                 kd_eintraege(conn, tenant_id, match_id),
                                  jetzt)
         except Exception as e:
             print(f"[kd-einfrieren] Squad {match_id[:8]}: {e}")
