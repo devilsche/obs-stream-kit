@@ -195,7 +195,14 @@ def resolve_tracked_accounts(conn, tenant_id: int, client) -> list:
     resolved = []
     for chunk in [tracked[i:i + PLAYER_FILTER_MAX]
                   for i in range(0, len(tracked), PLAYER_FILTER_MAX)]:
-        payload = client.get_player(",".join(t["name"] for t in chunk))
+        try:
+            payload = client.get_player(",".join(t["name"] for t in chunk))
+        except Exception as e:
+            # 404 = keiner der Namen existiert (mehr), z.B. nach einer
+            # Umbenennung. Dann bleibt der Rueckfall ueber die ID.
+            if getattr(e, "status", None) != 404:
+                raise
+            payload = None
         by_name = {}
         for entry in (payload or {}).get("data", []):
             nm = (entry.get("attributes") or {}).get("name")

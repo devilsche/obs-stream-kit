@@ -30,6 +30,10 @@ class _StubClient:
 
     def get_player(self, name):
         self.player_calls.append(name)
+        if not self._players_payload.get("data"):
+            # Wie die echte API: kein Name gefunden -> HTTP 404.
+            from pubg.api_client import ApiError
+            raise ApiError("HTTP 404: Not Found", status=404)
         return self._players_payload
 
     def get_players_by_ids(self, ids):
