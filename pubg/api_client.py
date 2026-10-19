@@ -187,6 +187,13 @@ class PubgClient:
                f"?filter[playerNames]={name}")
         return self._get_json(url, rate_limited=True, metric_endpoint="player")
 
+    def get_players_by_ids(self, account_ids) -> dict:
+        """Bis zu 10 Spieler ueber die account_id — der Weg, wenn sich
+        jemand umbenannt hat und der Name nur noch 404 liefert."""
+        url = (f"{PUBG_BASE}/shards/{self.platform}/players"
+               f"?filter[playerIds]={','.join(account_ids)}")
+        return self._get_json(url, rate_limited=True, metric_endpoint="player")
+
     def get_match(self, match_id: str) -> dict:
         url = f"{PUBG_BASE}/shards/{self.platform}/matches/{match_id}"
         return self._get_json(url, rate_limited=False, metric_endpoint="match")

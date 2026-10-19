@@ -506,6 +506,26 @@ def test_solo_spieler_sind_keine_bot_teams():
     assert m["totalTeamsInLobby"] == 5
 
 
+def test_report_zeigt_den_namen_von_damals():
+    """Nach einer Umbenennung bleibt im alten Match der alte Name stehen."""
+    conn = _setup()
+    _insert_match(conn, "nm1", "2026-05-20T18:00:00Z", "Baltic_Main",
+                  "squad-fpp")
+    _insert_participant(conn, "nm1", "account.A", "AlterName", team_id=1)
+    _insert_participant(conn, "nm1", "account.M", "MateAlt", team_id=1)
+    _insert_team_mapping(conn, "nm1", "account.A", 1)
+    _insert_team_mapping(conn, "nm1", "account.M", 1)
+    upsert_player(conn, "account.M", "MateNeu", "steam", False)
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    assert "AlterName" in body.decode() if isinstance(body, bytes) else body
+    assert "MateAlt" in (body.decode() if isinstance(body, bytes) else body)
+    assert "MateNeu" not in (body.decode() if isinstance(body, bytes) else body)
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

@@ -661,6 +661,22 @@ def set_tracked_account_id(conn, tenant_id: int, name: str,
     conn.commit()
 
 
+def rename_tracked_player(conn, tenant_id: int, alt: str, neu: str,
+                          account_id: str) -> None:
+    """Umbenennung in PUBG nachziehen: verfolgter Name, Zugangsdaten und
+    der Spielername — der ist universell, also ueber alle Tenants."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE tracked_players SET name = %s "
+            "WHERE tenant_id = %s AND name = %s", (neu, tenant_id, alt))
+        cur.execute(
+            "UPDATE tenant_credentials SET pubg_name = %s "
+            "WHERE tenant_id = %s AND pubg_name = %s", (neu, tenant_id, alt))
+        cur.execute("UPDATE players SET name = %s WHERE account_id = %s",
+                    (neu, account_id))
+    conn.commit()
+
+
 def backfill_tracked_players(conn, tenant_id: int, name: str,
                              platform: str = None,
                              account_id: str = None) -> bool:

@@ -22,6 +22,7 @@ from pubg.db_pg import (upsert_player, insert_match, insert_participants,
                         get_matches_needing_match_schema_update,
                         get_setting, set_setting,
                         list_tracked_players, set_tracked_account_id,
+                        rename_tracked_player,
                         CURRENT_MATCH_SCHEMA)
 from pubg.match_parser import (parse_match_response, parse_lifetime_response,
                                 aggregate_lifetime_modes,
@@ -204,8 +205,35 @@ def resolve_tracked_accounts(conn, tenant_id: int, client) -> list:
                     or {}).get("data") or []
             by_name[nm.lower()] = (entry.get("id"),
                                    [r["id"] for r in rels])
+        # Umbenannt? Der alte Name liefert nur noch 404 — mit bekannter
+        # account_id fragen wir ueber die ID nach und ziehen den Namen nach.
+        # Sonst stuende der Poller still, bis jemand den Namen aendert.
+        by_id = {}
+        verwaist = [t["account_id"] for t in chunk if t["account_id"]
+                    and (t["name"] or "").lower() not in by_name]
+        if verwaist and hasattr(client, "get_players_by_ids"):
+            try:
+                payload = client.get_players_by_ids(verwaist)
+            except Exception as e:
+                print(f"[poller] tenant {tenant_id} playerIds: {e}")
+                payload = None
+            for entry in (payload or {}).get("data", []):
+                rels = ((entry.get("relationships") or {}).get("matches")
+                        or {}).get("data") or []
+                by_id[entry.get("id")] = (
+                    (entry.get("attributes") or {}).get("name"),
+                    [r["id"] for r in rels])
         for t in chunk:
             hit = by_name.get((t["name"] or "").lower())
+            if not hit and t["account_id"] in by_id:
+                neu, match_ids = by_id[t["account_id"]]
+                if neu and neu != t["name"]:
+                    print(f"[poller] tenant {tenant_id}: {t['name']} heisst "
+                          f"jetzt {neu}")
+                    rename_tracked_player(conn, tenant_id, t["name"], neu,
+                                          t["account_id"])
+                    t = dict(t, name=neu)
+                hit = (t["account_id"], match_ids)
             if not hit:
                 continue  # Name unbekannt (Tippfehler/geloescht) — Rest laeuft weiter
             account_id, match_ids = hit

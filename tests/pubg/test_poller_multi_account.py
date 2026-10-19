@@ -25,10 +25,16 @@ class _StubClient:
         self.player_calls = []
         self.match_calls = []
         self._players_payload = players_payload or {"data": []}
+        self.id_calls = []
+        self._id_payload = {"data": []}
 
     def get_player(self, name):
         self.player_calls.append(name)
         return self._players_payload
+
+    def get_players_by_ids(self, ids):
+        self.id_calls.append(ids)
+        return self._id_payload
 
     def get_match(self, match_id):
         self.match_calls.append(match_id)
@@ -81,6 +87,29 @@ def test_unknown_account_is_reported_not_crashing(pg):
     client = _StubClient(_players_payload([("Echt", "account.echt", [])]))
     resolved = poller.resolve_tracked_accounts(conn, t1, client)
     assert [r["name"] for r in resolved] == ["Echt"]
+
+
+def test_umbenannter_account_wird_ueber_die_id_gefunden(pg):
+    """Nach einer Umbenennung kennt die API den alten Namen nicht mehr
+    (404). Ohne Rueckfall auf die account_id stand der Poller still."""
+    conn, t1, _ = pg
+    db_pg.add_tracked_player(conn, t1, "AltName", platform="steam",
+                             account_id="account.alt", is_primary=True)
+    db_pg.upsert_player(conn, t1, "account.alt", "AltName", "steam", 1)
+    conn.commit()
+    client = _StubClient({"data": []})
+    client._id_payload = _players_payload([("NeuName", "account.alt", ["m1"])])
+    resolved = poller.resolve_tracked_accounts(conn, t1, client)
+    assert client.id_calls == [["account.alt"]]
+    assert [(r["name"], r["account_id"], r["match_ids"]) for r in resolved] \
+        == [("NeuName", "account.alt", ["m1"])]
+    assert resolved[0]["is_primary"] is True
+    t = db_pg.list_tracked_players(conn, t1)
+    assert [(x["name"], x["is_primary"]) for x in t] == [("NeuName", True)]
+    with conn.cursor() as cur:
+        cur.execute("SELECT name FROM players WHERE account_id = %s",
+                    ("account.alt",))
+        assert [r["name"] for r in cur.fetchall()] == ["NeuName"]
 
 
 def test_new_matches_collected_across_accounts(pg):

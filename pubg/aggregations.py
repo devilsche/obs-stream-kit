@@ -2374,13 +2374,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             return _name_cache[acc]
         nrow = conn.execute("""
             SELECT COALESCE(
-                (SELECT name FROM players
-                  WHERE account_id = ? AND name IS NOT NULL LIMIT 1),
+                -- Der Name von damals: nach einer Umbenennung soll ein
+                -- altes Match den alten Namen zeigen.
                 (SELECT name FROM participants
                   WHERE match_id = ? AND account_id = ?
-                    AND name IS NOT NULL LIMIT 1)
+                    AND name IS NOT NULL LIMIT 1),
+                (SELECT name FROM players
+                  WHERE account_id = ? AND name IS NOT NULL
+                  ORDER BY last_polled_at DESC NULLS LAST, first_seen_at DESC
+                  LIMIT 1)
             ) AS n
-        """, (acc, match_id, acc)).fetchone()
+        """, (match_id, acc, acc)).fetchone()
         n = nrow["n"] if nrow else None
         _name_cache[acc] = n
         return n
@@ -6780,7 +6784,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                m.duration_secs, m.is_ranked,
                pa.kills, pa.headshot_kills, pa.assists, pa.dbnos,
                pa.damage_dealt, pa.place, pa.time_survived,
-               pa.longest_kill
+               pa.longest_kill, pa.name AS match_name
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ? {end_filter}
@@ -7444,6 +7448,15 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "SELECT account_id, name FROM players WHERE tenant_id=? AND account_id IN ({})".format(
                 ",".join("?"*len(sq_accs_from_db))),
             [tenant_id] + list(sq_accs_from_db)).fetchall()} if sq_accs_from_db else {}
+        # Der Name von damals hat Vorrang — nach einer Umbenennung zeigt
+        # ein altes Match den alten Namen.
+        if sq_accs_from_db:
+            for r in conn.execute(
+                    "SELECT account_id, name FROM participants WHERE tenant_id=? "
+                    "AND match_id=? AND name IS NOT NULL AND account_id IN ({})".format(
+                        ",".join("?"*len(sq_accs_from_db))),
+                    [tenant_id, m["match_id"]] + list(sq_accs_from_db)).fetchall():
+                acc_name[r["account_id"]] = r["name"]
         # Knock-Empfang + Wiederbelebungen pro Squadmember aus Telemetrie
         ph = ",".join("?"*len(sq_accs_from_db)) if sq_accs_from_db else "''"
         sq_list = list(sq_accs_from_db)
@@ -7504,7 +7517,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
         my_special = spec.get(my_account_id, {})
         my_entry = {
-            "name": my_name,
+            "name": m.get("match_name") or my_name,
             "kills": m.get("effective_kills", m["kills"]),
             "headshot_kills": m["headshot_kills"],
             "assists": m["assists"],
