@@ -3371,6 +3371,14 @@ class EndpointRegistry:
             m["lobbyKnown"] = info["known"]
             m["lobbyPlayers"] = info["lobbyPlayers"]
             fl = fest_lobby.get(m.get("matchId"))
+            # Eingefroren wird direkt nach dem Match — da kennt man oft
+            # erst wenige Gegner. Ein duenner Stand von damals verliert
+            # gegen den heute vollstaendigeren, sonst bleibt das Match fuer
+            # immer "in Sammlung".
+            fl_cov = (fl or {}).get("coverage")
+            live_cov = info.get("coverage") or 0
+            if fl and fl_cov is not None and fl_cov < min(live_cov, 75):
+                fl = None
             if fl and fl.get("lobbyKd") is not None:
                 m["lobbyKd"] = fl["lobbyKd"]
                 if fl.get("top5") is not None:

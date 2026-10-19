@@ -2356,7 +2356,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
         if not acc or acc in sq_set:
             return None
         tid = team_by_acc.get(acc)
-        if tid is None:
+        # Solo: PUBG gibt jedem Spieler ein eigenes "Team" ab 100000 —
+        # eine Teamnummer sagt dort nichts.
+        if tid is None or tid >= 100000:
             return None
         return f"Team #{tid}"
 

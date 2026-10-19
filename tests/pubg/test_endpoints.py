@@ -449,6 +449,41 @@ def test_session_report_bevorzugt_eingefrorene_kd():
     assert data["phases"][0]["stats"]["lobbySquadKd"] == 5.0  # ohne mich
 
 
+def test_session_report_nimmt_duenn_eingefrorene_lobby_nicht():
+    """Direkt nach dem Match kennt man oft erst wenige Gegner. Ein so
+    eingefrorener Wert (14 %) darf die heute volle Abdeckung nicht
+    verdraengen — sonst dreht der Spinner fuer immer."""
+    from pubg import db_pg
+    conn = _setup()
+    _insert_match(conn, "sr8", "2026-05-20T18:00:00Z", "Baltic_Main",
+                  "squad-fpp")
+    _insert_participant(conn, "sr8", "account.A", "PEX_LuCKoR", team_id=1)
+    _insert_team_mapping(conn, "sr8", "account.A", 1)
+    snaps = {"account.A": {"kills": 100, "losses": 50, "rounds": 50,
+                           "wins": 0, "damage": 1.0, "kd": 2.0}}
+    for i in range(1, 25):
+        acc = f"account.F{i}"
+        _insert_team_mapping(conn, "sr8", acc, 7 + i // 4)
+        snaps[acc] = {"kills": 40, "losses": 40, "rounds": 40, "wins": 0,
+                      "damage": 1.0, "kd": 1.0}
+    db_pg.upsert_season_snapshots(conn.raw, "lifetime", "squad-fpp", snaps,
+                                  "2026-05-20T00:00:00Z")
+    db_pg.save_match_lobby_kd(conn.raw, "sr8", {
+        "lobbyKd": 3.5, "top5": 6.0, "median": 3.0, "players": 24,
+        "coverage": 14.0}, "2026-05-20T18:30:00Z")
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    data = json.loads(body)
+    m = next(m for ph in data["phases"] for m in ph["matches"]
+             if m["matchId"] == "sr8")
+    assert m["lobbyKd"] == 1.0 and not m.get("lobbyFrozen")
+    assert m["lobbyCoverage"] == 100.0
+    assert data["phases"][0]["stats"]["lobbyKd"] == 1.0
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

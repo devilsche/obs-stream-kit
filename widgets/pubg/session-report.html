@@ -2777,7 +2777,10 @@
                       && snap.lifetimeRounds !== snap.rounds)
           ? `${snap.rounds}/${snap.lifetimeRounds} rounds`
           : `${snap && snap.rounds} rounds`;
-        const tip = (snap && snap.kd != null)
+        // Bots haben keine Statistik — da wird nichts mehr geladen.
+        const tip = acc.startsWith("ai.")
+          ? "Bot · no K/D"
+          : (snap && snap.kd != null)
           ? `K/D ${snap.kd.toFixed(2)} · ${_rds} (${MODE[snap.mode] || snap.mode || "Allzeit"}${_src ? ", " + _src : ""})`
           : snap === null
             ? "K/D N/A · no API data"
@@ -4230,7 +4233,7 @@
               ? "Squad K/D not known yet"
               : "Average K/D of my squad for the mode of this match, myself included"
           }">${
-            (m.squadKd == null || (m.lobbyCoverage || 0) < MIN_LOBBY_COVERAGE)
+            m.squadKd == null
               ? (m.lobbyPlayers
                   ? `<span class="lobby-pending" role="img" aria-label="Squad strength is still being collected"></span>`
                   : '<span class="dim">—</span>')
