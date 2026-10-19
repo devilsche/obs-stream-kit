@@ -1,6 +1,7 @@
 // tools/match-replay.js
 const isBotAcc = (acc) => typeof acc === "string" && acc.startsWith("ai.");
-const isBotTeam = (tid) => Number(tid) >= 200;
+// Bots 200..99999; ab 100000 sind es Solo-Spieler, jeder sein eigenes Team.
+const isBotTeam = (tid) => Number(tid) >= 200 && Number(tid) < 100000;
 const botSuffix = (acc) => isBotAcc(acc) ? " ·BOT" : "";
 
 const RS = {

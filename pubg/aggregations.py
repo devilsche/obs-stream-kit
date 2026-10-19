@@ -7481,10 +7481,12 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 f"AND target_account LIKE 'ai.%' GROUP BY actor_account",
                     [m["match_id"]] + sq_list).fetchall():
                 bot_kills[r["actor_account"]] = r["c"]
-        # Bot-Teams (team_id >= 200) und Gesamt-Teams in dieser Lobby
+        # Bot-Teams (team_id 200..99999) und Gesamt-Teams in dieser Lobby.
+        # Solo-Spieler bekommen eigene "Teams" ab 100000 — das sind Menschen.
         bot_teams_in_lobby = (conn.execute(
             "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "
-            "WHERE tenant_id = ? AND match_id = ? AND team_id>=200",
+            "WHERE tenant_id = ? AND match_id = ? "
+            "AND team_id >= 200 AND team_id < 100000",
             (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
         total_teams_in_lobby = (conn.execute(
             "SELECT COUNT(DISTINCT team_id) AS c FROM match_team_mapping "

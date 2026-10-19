@@ -484,6 +484,28 @@ def test_session_report_nimmt_duenn_eingefrorene_lobby_nicht():
     assert data["phases"][0]["stats"]["lobbyKd"] == 1.0
 
 
+def test_solo_spieler_sind_keine_bot_teams():
+    """Solo: PUBG gibt jedem Menschen ein eigenes Team ab 100000. Die
+    zaehlen nicht als Bot-Teams, sonst stuende 100/100 bei 98 Bots."""
+    conn = _setup()
+    _insert_match(conn, "solo1", "2026-05-20T18:00:00Z", "Baltic_Main",
+                  "solo-fpp")
+    _insert_participant(conn, "solo1", "account.A", "PEX_LuCKoR", team_id=100001)
+    _insert_team_mapping(conn, "solo1", "account.A", 100001)
+    _insert_team_mapping(conn, "solo1", "account.X", 100000)
+    for i in range(3):
+        _insert_team_mapping(conn, "solo1", f"ai.{200 + i}", 200 + i)
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    m = next(m for ph in json.loads(body)["phases"] for m in ph["matches"]
+             if m["matchId"] == "solo1")
+    assert m["botTeamsInLobby"] == 3
+    assert m["totalTeamsInLobby"] == 5
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

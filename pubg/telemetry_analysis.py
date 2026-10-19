@@ -329,8 +329,9 @@ def analyse(events) -> dict:
             if q.get("accountId"):
                 acc_of.setdefault(q["name"], q["accountId"])
             # Zwei Signale, die sich decken (siehe aggregations.py):
-            # ai.-accountId und team_id >= 200.
-            if _is_bot(q) or (q.get("teamId") or 0) >= 200:
+            # ai.-accountId und team_id 200..99999 (ab 100000 sind es
+            # Solo-Spieler, jeder sein eigenes Team).
+            if _is_bot(q) or 200 <= (q.get("teamId") or 0) < 100000:
                 bot_of[q["name"]] = True
 
     # Gefechts-Fenster brauchen die Team-Zuordnung — deshalb erst hier.
