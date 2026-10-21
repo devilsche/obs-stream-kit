@@ -1711,6 +1711,7 @@
     }
     .md-tl-row--lobby .md-tl-t { color: var(--pubg-muted); }
     .md-tl-t   { color: var(--pubg-text); }
+    .md-tl-chicken { color: var(--pubg-gold); font-weight: 700; }
     .md-tl-poi {
       color: var(--pubg-gold); font-size: 0.9em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2932,6 +2933,8 @@
             : `${A} used the revive antenna`;
         case "comeback":
           return `${A} dropped back in via Comeback Heli`;
+        case "chicken":
+          return `<span class="md-tl-chicken"><span class="material-symbols-outlined icon-sm" aria-hidden="true">emoji_events</span> Winner Winner Chicken Dinner</span>`;
         case "flare_fired":
           return `${A} called in an airdrop`;
         case "airdrop_looted": {
@@ -3023,6 +3026,8 @@
                        || ev.type === "kill_steal";
       if (ev.type === "join") {
         poi = "Lobby";
+      } else if (ev.type === "chicken") {
+        poi = "";
       } else if (isShooterEv && ev.actorX != null) {
         poi = mdTlPoi(ctx, ev.actorX, ev.actorY);
         // Victim-POI fuer Satz-Zusatz (nur bei langen Schuessen)
@@ -3041,7 +3046,8 @@
       }
       const sentence = mdTlSentence(ev, ctx);
       const myAccount = ctx.myAccount;
-      const involvesMe = ev.actorAccount === myAccount
+      const involvesMe = ev.type === "chicken"
+                      || ev.actorAccount === myAccount
                       || ev.targetAccount === myAccount
                       || ev.knockerAccount === myAccount;
       const isLobby = (displayMs != null && displayMs < 0);
@@ -3060,7 +3066,9 @@
       // Hinweis "had knocked N squad mate(s)" anhaengen kann.
       const squadKnockedBy = new Map();
       for (const ev of (events || [])) {
-        const _hitsSquad = ev.type === "knock" || ev.type.startsWith("kill");
+        // Knock oder direkter Kill. Ausbluten/Nachschuss/Wipe folgen auf
+        // einen Knock — derselbe Mate, nicht ein zweiter.
+        const _hitsSquad = ev.type === "knock" || ev.type === "kill";
         if (_hitsSquad && !ev.actorIsSquad && ev.targetIsSquad && ev.actorAccount) {
           squadKnockedBy.set(ev.actorAccount, (squadKnockedBy.get(ev.actorAccount) || 0) + 1);
         }

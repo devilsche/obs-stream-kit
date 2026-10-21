@@ -2485,11 +2485,40 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
     # Todeszeitpunkt je Spieler. Braucht es, um Ausbluten von einem
     # Squad-Wipe zu trennen: in beiden Faellen kommt nach dem Knock kein
     # Schaden mehr, aber nur beim Ausbluten lebt noch ein Mate.
-    death_ts_by_acc = {}
+    # ALLE Tode je Spieler, nicht nur der erste: mit Bluechip/Comeback
+    # stirbt man mehrmals. Nur den ersten zu kennen hiess, ein
+    # zurueckgeholter Mate galt fuer den Rest des Matches als tot.
+    deaths_by_acc = {}
+    # Lebenszeichen nach einem Tod: Landung (Redeploy-Flug) oder Einstieg
+    # ins Redeploy-Flugzeug.
+    respawns_by_acc = {}
     for _de in all_events_rows:
         if _de["event_type"] == "Kill" and _de["target_account"]:
-            death_ts_by_acc.setdefault(_de["target_account"],
-                                       _de["timestamp_ms"])
+            deaths_by_acc.setdefault(_de["target_account"], []).append(
+                _de["timestamp_ms"])
+    if deaths_by_acc:
+        for _re in conn.execute("""
+                SELECT actor_account, timestamp_ms FROM telemetry_events
+                WHERE match_id = ? AND actor_account IS NOT NULL
+                  AND timestamp_ms IS NOT NULL
+                  AND (event_type IN ('Landing', 'Redeploy')
+                       OR (event_type = 'VehicleEnter'
+                           AND weapon LIKE '%Redeploy%'))
+                """, (match_id,)).fetchall():
+            if _re["actor_account"] in deaths_by_acc:
+                respawns_by_acc.setdefault(_re["actor_account"], []).append(
+                    _re["timestamp_ms"])
+
+    def _lebt(acc, ts):
+        """Steht `acc` zum Zeitpunkt `ts` (noch oder wieder)?"""
+        tode = deaths_by_acc.get(acc) or []
+        vorher = [t for t in tode if t <= ts + _WIPE_TOLERANZ_MS]
+        if not vorher:
+            return True
+        letzter = max(vorher)
+        # Nach dem letzten Tod zurueckgekommen?
+        return any(letzter < r <= ts
+                   for r in respawns_by_acc.get(acc) or [])
 
     def _squad_am_ende(acc, ts_tod):
         """Lebt zum Todeszeitpunkt noch ein Teamkollege?"""
@@ -2499,9 +2528,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
         for other, other_team in team_by_acc.items():
             if other == acc or other_team != team:
                 continue
-            tod = death_ts_by_acc.get(other)
             # Wer gleichzeitig faellt (Toleranz), zaehlt nicht als lebend.
-            if tod is None or tod > ts_tod + _WIPE_TOLERANZ_MS:
+            if _lebt(other, ts_tod):
                 return False
         return True
 
@@ -2552,6 +2580,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
         # Knock-State pflegen AUCH wenn nicht in scope (Lobby-Knocks
         # koennen spaeter relevant werden bei stole-the-knock).
         revive_fallback_pos = None
+        knock_vor_kill = None
         if et == "Knock":
             last_knock_by_target[target] = e
             knock_pos_by_target[target] = (e["victim_x"], e["victim_y"])
@@ -2568,8 +2597,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             currently_knocked_by_squad.discard(target)
         elif et == "Kill":
             currently_knocked_by_squad.discard(target)
-            # Enemy killt Squad-Mitglied → zaehlt wie ein Knock
-            if actor and actor not in sq_set and target and target in sq_set:
+            # Der Knock gehoert zu DIESEM Tod. Danach ist er erledigt — auch
+            # wenn der Kill ausserhalb unseres Blickfelds liegt. Sonst haengt
+            # ein Knock von vor einem Redeploy am naechsten Tod und macht
+            # aus einem direkten Kill ein "stole the knock".
+            knock_vor_kill = last_knock_by_target.pop(target, None)
+            # Enemy killt Squad-Mitglied → zaehlt wie ein Knock. Hatte er
+            # ihn schon selbst geknockt, ist es derselbe Mate (Ausbluten,
+            # Nachschuss) — nicht ein zweiter.
+            if (actor and actor not in sq_set and target and target in sq_set
+                    and not (knock_vor_kill
+                             and knock_vor_kill["actor_account"] == actor)):
                 knocked_our_squad[actor] = knocked_our_squad.get(actor, 0) + 1
 
         # Direkter Kontakt Squad ↔ Gegner: haelt das Multi-Fight-Fenster offen.
@@ -2627,7 +2665,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
         elif et == "Redeploy":
             row["type"] = "redeploy"
         elif et == "Kill":
-            knock_ev = last_knock_by_target.get(target)
+            knock_ev = knock_vor_kill
             dmg_reason = (e["damage_reason"] or "") if "damage_reason" in e.keys() else ""
             wid = weapon or ""
             # TakeDamage-basierte Bleed-/Finisher-Erkennung:
@@ -2692,6 +2730,15 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             # gesetzt von PUBG, aber wenn vorhanden vertrauen).
             if dmg_reason and "BleedOut" in dmg_reason:
                 bled_out = True
+            # Treffer auf Liegende bucht PUBG mit 0 Schaden. Kam so einer
+            # kurz vor dem Tod und steht sein Squad noch, wurde er erledigt
+            # — ausgeblutet waere er erst viel spaeter. Faellt dagegen
+            # gerade der letzte Mate, bleibt es der Squad-Wipe.
+            if (bled_out and recent_other_damage is not None
+                    and "BleedOut" not in (dmg_reason or "")
+                    and not _squad_am_ende(target, ts)):
+                bled_out = False
+                letzter_echter_schaden = recent_other_damage
             # Env-Death-Detection: damage_reason zuerst, dann Waffen-ID.
             # WICHTIG: Damage_BlueZoneGrenade ist eine GRANATE die der
             # Spieler wirft — NICHT die Zone. Damit Bluezone-Detection nur
@@ -2781,6 +2828,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                         _dy = (rod["actor_y"] - rod["victim_y"]) / 100.0
                         row["distanceM"] = round(
                             (_dx*_dx + _dy*_dy) ** 0.5, 1)
+                # Eigener Nachschuss mit einer anderen Waffe (Knock mit der
+                # M416, erledigt mit der M24): PUBG nennt im Kill die
+                # Knock-Waffe, erledigt hat der Nachschuss.
+                elif (knock_ev and not bled_out
+                        and recent_other_damage
+                        and recent_other_damage["actor_account"] == actor
+                        and recent_other_damage["weapon"]
+                        and recent_other_damage["weapon"] != weapon):
+                    row["weapon"] = recent_other_damage["weapon"]
+                    row["weaponName"] = weapon_name_en(
+                        recent_other_damage["weapon"])
                 # Subtype-Detection
                 if knock_ev is None:
                     row["type"] = "kill"
@@ -3454,6 +3512,18 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
     events_out = gefiltert
 
     events_out.sort(key=lambda x: x["tsMs"] or 0)
+
+    # Der Sieg als letzte Zeile. PUBG schickt dafuer kein eigenes Event —
+    # das Match endet mit dem letzten Kill, die Platzierung steht in den
+    # Teilnehmern.
+    if any(m.get("place") == 1 for m in out_members):
+        _ende = max((ev["tsMs"] for ev in events_out
+                     if ev.get("tsMs") is not None), default=None)
+        if _ende is not None:
+            _sieg = _row_skeleton("Win", None, None, None, None, None)
+            _sieg["tsMs"] = _ende
+            _sieg["type"] = "chicken"
+            events_out.append(_sieg)
 
     # Alle Accounts aus Events sammeln und deren Lifetime-K/D anhängen.
     # Liefert playerKds = {accountId: {kd, rounds, mode} | null}.

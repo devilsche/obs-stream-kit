@@ -669,3 +669,117 @@ def test_zwei_gleiche_autos_vermischen_die_pfade_nicht():
         assert xs, name
         assert min(xs) < 80000, (name, min(xs))
         assert min(xs) > 50000, (name, min(xs))
+
+
+def _gegner_match(conn, mid, place=5):
+    """Mein Duo (A, B) gegen das Duo X+Y (Team 6) und Einzelgaenger Z."""
+    _basic_match(conn, mid)
+    if place != 5:
+        with conn.raw.cursor() as cur:
+            cur.execute("UPDATE participants SET place = %s "
+                        "WHERE match_id = %s", (place, mid))
+        conn.raw.commit()
+    insert_team_mapping(conn, mid, [
+        {"account_id": "account.X", "team_id": 6},
+        {"account_id": "account.Y", "team_id": 6},
+        {"account_id": "account.Z", "team_id": 9}])
+    return mid
+
+
+def _event_fuer(conn, mid, ziel):
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    treffer = [e for e in (d.get("events") or [])
+               if e.get("targetAccount") == ziel]
+    assert treffer, f"kein Event fuer {ziel} in der Timeline"
+    return treffer[-1]
+
+
+def test_redeployter_mate_lebt_wieder():
+    """Y stirbt frueh und kommt per Bluechip zurueck. Danach ist er am
+    Leben — wer seinen Mate X erledigt, wiped nicht den Squad."""
+    conn = _setup()
+    mid = _gegner_match(conn, "rd1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Kill", 100000, actor="account.Z", target="account.Y",
+            weapon="WeapM24_C", reason="Damage_Gun"),
+        _ev("Landing", 300000, actor="account.Y"),
+        _ev("Knock", 700000, actor="account.A", target="account.X",
+            weapon="WeapHK416_C"),
+        # Nachschuss auf den Liegenden — PUBG bucht ihn mit 0 Schaden.
+        _ev("TakeDamage", 705000, actor="account.A", target="account.X",
+            weapon="WeapM24_C", damage=0.0),
+        _ev("Kill", 705100, actor="account.A", target="account.X",
+            weapon="WeapHK416_C", reason="Damage_Gun"),
+        _ev("Kill", 900000, actor="account.A", target="account.Y",
+            weapon="WeapM24_C", reason="Damage_Gun"),
+    ])
+    ev = _event_fuer(conn, mid, "account.X")
+    assert ev["type"] == "kill", "erledigt, weder ausgeblutet noch Wipe"
+    assert ev["weaponName"] == "M24", "der Nachschuss hat erledigt"
+
+
+def test_alter_knock_ist_mit_dem_tod_erledigt():
+    """Ein Knock vor einem frueheren Tod gilt nach dem Redeploy nicht mehr
+    — sonst wird aus einem direkten Kill ein "stole the knock"."""
+    conn = _setup()
+    mid = _gegner_match(conn, "rd2")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 90000, actor="account.Z", target="account.Y",
+            weapon="WeapM24_C"),
+        _ev("Kill", 100000, actor="account.Z", target="account.Y",
+            weapon="WeapM24_C", reason="Damage_Gun"),
+        _ev("Landing", 300000, actor="account.Y"),
+        _ev("TakeDamage", 899000, actor="account.A", target="account.Y",
+            weapon="WeapM24_C", damage=90.0),
+        _ev("Kill", 900000, actor="account.A", target="account.Y",
+            weapon="WeapM24_C", reason="Damage_Gun"),
+    ])
+    ev = _event_fuer(conn, mid, "account.Y")
+    assert ev["type"] == "kill"
+    assert "knockerAccount" not in ev
+
+
+def test_knock_und_ausbluten_ist_ein_mate():
+    """Gegner knockt meinen Mate, der blutet aus: ein Mate, nicht zwei."""
+    conn = _setup()
+    mid = _gegner_match(conn, "rd3")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.X", target="account.B",
+            weapon="WeapACE32_C"),
+        _ev("Kill", 760000, actor="account.X", target="account.B",
+            weapon="WeapACE32_C", reason="Damage_Gun"),
+        _ev("TakeDamage", 769000, actor="account.Z", target="account.X",
+            weapon="WeapMk47Mutant_C", damage=90.0),
+        _ev("Kill", 770000, actor="account.Z", target="account.X",
+            weapon="WeapMk47Mutant_C", reason="Damage_Gun"),
+    ])
+    ev = _event_fuer(conn, mid, "account.X")
+    assert ev["squadKnocksCount"] == 1
+
+
+def test_sieg_steht_am_ende_der_timeline():
+    conn = _setup()
+    mid = _gegner_match(conn, "rd4", place=1)
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("TakeDamage", 899000, actor="account.A", target="account.Y",
+            weapon="WeapM24_C", damage=90.0),
+        _ev("Kill", 900000, actor="account.A", target="account.Y",
+            weapon="WeapM24_C", reason="Damage_Gun"),
+    ])
+    d = compute_match_detail(conn, T, "account.A", mid)
+    assert d["events"][-1]["type"] == "chicken"
+    assert d["events"][-1]["tsMs"] >= d["events"][-2]["tsMs"]
+
+
+def test_ohne_sieg_kein_chicken():
+    conn = _setup()
+    mid = _gegner_match(conn, "rd5")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+    ])
+    d = compute_match_detail(conn, T, "account.A", mid)
+    assert all(e["type"] != "chicken" for e in d["events"])
