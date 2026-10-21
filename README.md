@@ -881,6 +881,20 @@ in `match_player_kd` (`kd` / `kd_nach`); alte Einträge ohne Nach-Stand fallen
 auf den Vor-Stand zurück. Nachfüllen: `python -m pubg.cli kd-backfill --all
 --neu-ab 2026-01-01`.
 
+**Phasen** trennt der Report, wenn der Stamm-Squad wechselt, zwischen Battle
+Royale und Event, zwischen Ranked und Normal — und zwischen Solo, Duo und
+Squad, auch mit demselben Mate.
+
+**Timelog im Match-Detail:** „killed" heißt direkter Kill ohne Knock,
+„finished" erledigt einen Knock (eigenen oder vom Mate), „stole the knock"
+holt sich den Knock eines anderen Teams — auch wenn dabei weder Täter noch
+Opfer zum Squad gehören. Redeploys (Bluechip, Comeback) zählen: ein
+zurückgeholter Mate lebt wieder. Bei Platz 1 schließt „Winner Winner Chicken
+Dinner" ab. Airdrops nennen, wer das Paket vorher schon geplündert hat und
+was er mitnahm; dafür speichert das Einlesen seit 2026-10-21 alle Griffe ins
+Paket. Für ältere Matches: `python -m pubg.cli airdrop-backfill` (aus dem
+Archiv, sonst vom CDN; wiederholbar).
+
 Vorher waren es zwei Tabs — *Sessions* mit Monats-Akkordeons und *Custom
 Range* mit fünf Presets. Zwei Wege zum selben Ziel, und „Yesterday" stand als
 Knopf **und** als Session in der Liste. Der Sprung zur Session davor, die
