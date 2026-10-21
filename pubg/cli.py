@@ -1799,7 +1799,11 @@ def airdrop_backfill(root: str, args=None) -> int:
         mid = r["match_id"]
         roh, quelle = None, None
         try:
+            # Tenants ohne eigenes Archiv liefern hier None — ueberspringen,
+            # sonst bricht das Match ab, bevor das CDN drankommt.
             for c in lesbare_archive_fuer_match(raw, r["tenant_id"], mid):
+                if not c:
+                    continue
                 roh = _aus_archiv(c, mid)
                 if roh:
                     quelle = "archiv"
