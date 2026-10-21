@@ -526,6 +526,28 @@ def test_report_zeigt_den_namen_von_damals():
     assert "MateNeu" not in (body.decode() if isinstance(body, bytes) else body)
 
 
+def test_wechsel_von_squad_auf_duo_ist_eine_neue_phase():
+    """Gleicher Mate, anderer Modus: Squad und Duo sind nicht vergleichbar,
+    also zwei Phasen."""
+    conn = _setup()
+    for mid, ts, mode in (("ph1", "2026-05-20T18:00:00Z", "squad-fpp"),
+                          ("ph2", "2026-05-20T18:30:00Z", "squad-fpp"),
+                          ("ph3", "2026-05-20T19:00:00Z", "duo-fpp"),
+                          ("ph4", "2026-05-20T19:30:00Z", "duo-fpp")):
+        _insert_match(conn, mid, ts, "Baltic_Main", mode)
+        _insert_participant(conn, mid, "account.A", "PEX_LuCKoR", team_id=1)
+        _insert_participant(conn, mid, "account.M", "Mate", team_id=1)
+        _insert_team_mapping(conn, mid, "account.A", 1)
+        _insert_team_mapping(conn, mid, "account.M", 1)
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch("GET", "/api/pubg/session-report", b"", {})
+    assert code == 200
+    phasen = json.loads(body)["phases"]
+    assert sorted(len(ph["matches"]) for ph in phasen) == [2, 2]
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

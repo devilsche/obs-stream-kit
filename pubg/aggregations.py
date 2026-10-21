@@ -50,6 +50,15 @@ def is_br_mode(game_mode):
     return game_mode in BATTLE_ROYALE_MODES
 
 
+def team_groesse(game_mode):
+    """solo / duo / squad aus dem Modus, None fuer alles andere."""
+    m = (game_mode or "").lower()
+    for teil in ("solo", "duo", "squad"):
+        if m.startswith(teil):
+            return teil
+    return None
+
+
 def _parse_iso(s):
     if not s:
         return None
@@ -6989,14 +6998,20 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         # Ranked und Unranked sind zwar beide BR, aber nicht vergleichbar —
         # andere Lobby-Staerke, anderer Einsatz. Zusammengerechnet sagt der
         # Schnitt ueber keine der beiden etwas.
+        #
+        # Solo, Duo und Squad ebenso: andere Teamgroesse, andere Lobby,
+        # andere Zahlen — auch wenn derselbe Mate dabei bleibt.
         m_is_event = not is_br_mode(m.get("game_mode"))
         m_is_ranked = bool(m.get("is_ranked"))
+        m_groesse = team_groesse(m.get("game_mode"))
         if cur_phase is not None and (
                 cur_phase.get("isEvent") != m_is_event
-                or cur_phase.get("isRanked") != m_is_ranked):
+                or cur_phase.get("isRanked") != m_is_ranked
+                or cur_phase.get("teamGroesse") != m_groesse):
             cur_phase = {"core": set(cur_set), "allMembers": set(cur_set),
                           "matches": [], "isEvent": m_is_event,
-                          "isRanked": m_is_ranked}
+                          "isRanked": m_is_ranked,
+                          "teamGroesse": m_groesse}
             phases.append(cur_phase)
             cur_phase["matches"].append(m)
             continue
@@ -7004,7 +7019,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             cur_phase = {"core": set(cur_set),
                           "allMembers": set(cur_set),
                           "matches": [], "isEvent": m_is_event,
-                          "isRanked": m_is_ranked}
+                          "isRanked": m_is_ranked,
+                          "teamGroesse": m_groesse}
             phases.append(cur_phase)
         else:
             new_core = cur_phase["core"] & cur_set
@@ -7013,7 +7029,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 cur_phase = {"core": set(cur_set),
                               "allMembers": set(cur_set),
                               "matches": [], "isEvent": m_is_event,
-                              "isRanked": m_is_ranked}
+                              "isRanked": m_is_ranked,
+                          "teamGroesse": m_groesse}
                 phases.append(cur_phase)
             elif not cur_set:
                 # Solo-Match — bricht Phase nur wenn vorher Squad da war
@@ -7021,7 +7038,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                     cur_phase = {"core": set(),
                                   "allMembers": set(),
                                   "matches": [], "isEvent": m_is_event,
-                                  "isRanked": m_is_ranked}
+                                  "isRanked": m_is_ranked,
+                          "teamGroesse": m_groesse}
                     phases.append(cur_phase)
             else:
                 cur_phase["core"] = new_core
