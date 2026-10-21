@@ -2849,7 +2849,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                     if k_actor == actor:
                         # Self-Finish (oder Bleed-Out — PUBG attribuiert
                         # Bleed-Outs dem Knocker)
-                        row["type"] = "kill_bleedout" if bled_out else "kill"
+                        # Selbst geknockt und selbst erledigt: "finished",
+                        # wie wenn ein Mate nachlegt. "killed" bleibt dem
+                        # direkten Kill ohne Knock.
+                        row["type"] = ("kill_bleedout" if bled_out
+                                       else "kill_finish")
                     else:
                         k_team = team_by_acc.get(k_actor)
                         a_team = team_by_acc.get(actor)

@@ -578,7 +578,7 @@ def test_echter_nachschuss_bleibt_ein_kill():
             weapon="WeapP90_C", reason="Damage_Gun"),
     ])
     ev = _typ_of(conn, mid, "PEX_LuCKoR")
-    assert ev["type"] == "kill"
+    assert ev["type"] == "kill_finish"
 
 
 def _zwei_autos_match(conn, mid="mz1"):
@@ -715,7 +715,7 @@ def test_redeployter_mate_lebt_wieder():
             weapon="WeapM24_C", reason="Damage_Gun"),
     ])
     ev = _event_fuer(conn, mid, "account.X")
-    assert ev["type"] == "kill", "erledigt, weder ausgeblutet noch Wipe"
+    assert ev["type"] == "kill_finish", "erledigt, weder ausgeblutet noch Wipe"
     assert ev["weaponName"] == "M24", "der Nachschuss hat erledigt"
 
 
@@ -800,5 +800,5 @@ def test_nachschuss_im_selben_moment_wie_der_kill():
             weapon="WeapHK416_C", reason="Damage_Gun"),
     ])
     ev = _event_fuer(conn, mid, "account.X")
-    assert ev["type"] == "kill"
+    assert ev["type"] == "kill_finish"
     assert ev["weaponName"] == "M24"
