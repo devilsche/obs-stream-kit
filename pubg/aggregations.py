@@ -2590,6 +2590,11 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
         # koennen spaeter relevant werden bei stole-the-knock).
         revive_fallback_pos = None
         knock_vor_kill = None
+        # VOR dem Aufraeumen merken: der Kill auf einen von uns Geknockten
+        # gehoert in die Timeline, auch wenn ein drittes Team ihn erledigt.
+        # Erst danach geprueft, war er schon aus der Liste — der geklaute
+        # Knock verschwand spurlos.
+        von_uns_geknockt = target in currently_knocked_by_squad
         if et == "Knock":
             last_knock_by_target[target] = e
             knock_pos_by_target[target] = (e["victim_x"], e["victim_y"])
@@ -2643,7 +2648,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
 
         in_scope = (
             (actor in sq_set) or (target in sq_set)
-            or (target in currently_knocked_by_squad)
+            or von_uns_geknockt
             or third_party
         )
 

@@ -802,3 +802,23 @@ def test_nachschuss_im_selben_moment_wie_der_kill():
     ev = _event_fuer(conn, mid, "account.X")
     assert ev["type"] == "kill_finish"
     assert ev["weaponName"] == "M24"
+
+
+def test_fremdes_team_klaut_meinen_knock():
+    """Ich knocke X, ein drittes Team (Z) erledigt ihn. Die Zeile muss
+    erscheinen, obwohl weder Taeter noch Opfer zu meinem Squad gehoeren."""
+    conn = _setup()
+    mid = _gegner_match(conn, "st1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 246000, actor="account.A", target="account.X",
+            weapon="WeapBerylM762_C"),
+        _ev("TakeDamage", 252000, actor="account.Z", target="account.X",
+            weapon="WeapFNFal_C", damage=40.0),
+        _ev("Kill", 252700, actor="account.Z", target="account.X",
+            weapon="WeapFNFal_C", reason="Damage_Gun"),
+    ])
+    ev = _event_fuer(conn, mid, "account.X")
+    assert ev["type"] == "kill_steal"
+    assert ev["actorAccount"] == "account.Z"
+    assert ev["knockerAccount"] == "account.A"
