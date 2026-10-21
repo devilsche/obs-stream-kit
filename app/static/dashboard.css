@@ -1021,6 +1021,21 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 /* Ruhiger dunkler Grund (kein Schachbrett, nicht "weiss") — das Widget bringt
    per dock=1 seinen eigenen Hintergrund mit und sitzt mittig darauf. */
 .dn-modal__body{height:min(82vh,820px);background:var(--bg-deeper);display:block}
+/* Vorschau: iframe rendert auf der vollen Flaeche (--pv-fw/--pv-fh), das
+   Modal zeigt nur den Ausschnitt mit Inhalt (--pv-cw/--pv-ch), skaliert
+   mit --pv-s. Alle Masse setzt das Skript nach dem Messen. */
+.dn-modal:has(.dn-modal__body--fit){max-height:none;max-width:none;overflow:hidden}
+.dn-modal__body--fit{position:relative;overflow:hidden;padding:0;
+  width:calc(var(--pv-cw,400) * var(--pv-s,1) * 1px);
+  height:calc(var(--pv-ch,300) * var(--pv-s,1) * 1px);
+  background-color:#3a3a3a;
+  background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%);
+  background-size:20px 20px}
+.dn-modal__body.dn-modal__body--fit iframe{position:absolute;left:0;top:0;
+  width:calc(var(--pv-fw,1920) * 1px);height:calc(var(--pv-fh,1080) * 1px);
+  transform:scale(var(--pv-s,1));transform-origin:0 0;background:transparent}
+.dn-modal__scale{margin-left:auto;color:var(--text-dim);font-size:13px;
+  font-variant-numeric:tabular-nums}
 .dn-modal__body--checker{
   background-color:#3a3a3a !important;
   background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%) !important;

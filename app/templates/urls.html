@@ -125,6 +125,7 @@ G1R_STEAM_NAME=</code></pre>
 <dialog class="dn-modal" id="previewModal" aria-label="Widget-Vorschau">
   <div class="dn-modal__head">
     <h2 id="previewModalTitle">Vorschau</h2>
+    <span class="dn-modal__scale" id="previewModalScale" aria-live="polite"></span>
     <button type="button" class="dn-modal__close" id="previewClose" aria-label="Close preview"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
   </div>
   <div class="dn-modal__body"><iframe id="previewFrame" title="Widget-Vorschau" loading="lazy"></iframe></div>
@@ -715,34 +716,69 @@ G1R_STEAM_NAME=</code></pre>
       const modal = document.getElementById("previewModal");
       const frame = document.getElementById("previewFrame");
       const body = modal.querySelector(".dn-modal__body");
+      const massEl = document.getElementById("previewModalScale");
       document.getElementById("previewModalTitle").textContent =
         "Vorschau · " + document.getElementById("urlDName").textContent;
-      const u = buildUrl(base, scope);
       const dim = meta._dynW
         ? [meta._dynW, meta._dynH]
         : String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
-      const isOverlay = meta && meta.kind === "overlay";
-      // Scale down large sources; never add dock=1 — checkerboard handles transparency
-      body.classList.remove("dn-modal__body--checker");
-      if (dim[0] && dim[1]) {
-        body.classList.add("dn-modal__body--overlay");
-        body.style.setProperty("--ov-w", dim[0]);
-        body.style.setProperty("--ov-h", dim[1]);
-      } else if (meta._dynW) {
-        body.classList.add("dn-modal__body--overlay");
-        body.style.setProperty("--ov-w", meta._dynW);
-        body.style.setProperty("--ov-h", meta._dynH);
-      } else {
-        body.classList.remove("dn-modal__body--overlay");
-        body.classList.add("dn-modal__body--checker");
+      const pw = meta.previewW || 0, ph = meta.previewH || 0;
+      // Vollbild-Szenen (Meilensteine, Szenen, Alerts) zeigen immer die
+      // ganze Flaeche — genau das, was OBS zeigt, nur kleiner.
+      const vollbild = (dim[0] >= 1280 && dim[1] >= 720) ? [dim[0], dim[1]]
+                     : (pw >= 1280 && ph >= 720) ? [pw, ph] : null;
+      // Gerendert wird immer auf einer echten Flaeche; kleine Widgets
+      // legen sich darauf frei aus, gezeigt wird nur der Ausschnitt mit
+      // Inhalt. Vorher bestimmte die Modal-Groesse das Layout mit — und
+      // ein zu klein geschaetztes Mass schnitt ab.
+      const flaeche = vollbild || [1920, 1080];
+      let ausschnitt = vollbild || [pw || 400, ph || 300];
+
+      function anwenden() {
+        const head = modal.querySelector(".dn-modal__head");
+        const headH = head ? head.offsetHeight : 52;
+        const maxW = window.innerWidth * 0.92;
+        const maxH = window.innerHeight * 0.9 - headH;
+        const [cw, ch] = ausschnitt;
+        // Bis 2x vergroessern (schmale Leisten bleiben lesbar), sonst
+        // so weit verkleinern, dass alles ins Modal passt.
+        const s = Math.max(0.05, Math.min(2, maxW / cw, maxH / ch));
+        body.style.setProperty("--pv-fw", flaeche[0]);
+        body.style.setProperty("--pv-fh", flaeche[1]);
+        body.style.setProperty("--pv-cw", cw);
+        body.style.setProperty("--pv-ch", ch);
+        body.style.setProperty("--pv-s", s.toFixed(4));
+        if (massEl) massEl.textContent = `${cw}×${ch} · ${Math.round(s * 100)} %`;
       }
-      frame.src = u;
-      // Inject checkerboard directly into the iframe body (same-origin).
+
+      // Wie weit reicht der sichtbare Inhalt? Vereinigung aller sichtbaren
+      // Elemente, mit demselben Rand rechts/unten wie links/oben.
+      function inhaltsMass() {
+        try {
+          const doc = frame.contentDocument;
+          if (!doc || !doc.body) return null;
+          const win = doc.defaultView;
+          let l = Infinity, t = Infinity, r = 0, b = 0, n = 0;
+          for (const el of doc.body.querySelectorAll("*")) {
+            if (++n > 4000) break;
+            const rc = el.getBoundingClientRect();
+            if (rc.width < 1 || rc.height < 1) continue;
+            const cs = win.getComputedStyle(el);
+            if (cs.display === "none" || cs.visibility === "hidden") continue;
+            l = Math.min(l, rc.left); t = Math.min(t, rc.top);
+            r = Math.max(r, rc.right); b = Math.max(b, rc.bottom);
+          }
+          if (!isFinite(l)) return null;
+          const w = Math.ceil(r + Math.max(0, l));
+          const h = Math.ceil(b + Math.max(0, t));
+          return [Math.min(Math.max(w, 40), flaeche[0]),
+                  Math.min(Math.max(h, 20), flaeche[1])];
+        } catch (_) { return null; }
+      }
+
       function injectChecker(doc) {
         try {
-          if (!doc || !doc.head) return;
-          if (doc.getElementById("preview-checker")) return;
-          // Nur injizieren wenn body und html wirklich transparent sind (kein Gradient)
+          if (!doc || !doc.head || doc.getElementById("preview-checker")) return;
           const bs = getComputedStyle(doc.body);
           const hs = getComputedStyle(doc.documentElement);
           const hasBodyBg = (bs.backgroundColor !== 'rgba(0, 0, 0, 0)') || (bs.backgroundImage && bs.backgroundImage !== 'none');
@@ -753,59 +789,39 @@ G1R_STEAM_NAME=</code></pre>
           st.textContent = `html,body{
             background-color:#3a3a3a !important;
             background-image:repeating-conic-gradient(#2a2a2a 0% 25%,#3a3a3a 0% 50%) !important;
-            background-size:20px 20px !important;}`;
+            background-size:20px 20px !important;}
+            html,body{overflow:hidden !important;}`;
           doc.head.appendChild(st);
         } catch(_) {}
       }
-      function sizeFrame() {
-        try {
-          const doc = frame.contentDocument;
-          if (!doc || !doc.body) return;
-          try {
-            if (!doc.getElementById('preview-noscroll')) {
-              const ns = doc.createElement('style');
-              ns.id = 'preview-noscroll';
-              ns.textContent = 'html,body{overflow:hidden!important;}';
-              doc.head.appendChild(ns);
-            }
-          } catch(_) {}
 
-          // preview_size aus Katalog > size-Feld > DOM-Messung
-          const pw = meta.previewW || 0;
-          const ph = meta.previewH || 0;
-          const cw = pw || (dim[0] && dim[1] ? dim[0]
-            : Math.max(doc.body.scrollWidth || doc.documentElement.scrollWidth, 40));
-          const ch = ph || (dim[0] && dim[1] ? dim[1]
-            : Math.max(doc.body.scrollHeight || doc.documentElement.scrollHeight, 20));
-
-          const ww = window.innerWidth;
-          const wh = window.innerHeight;
-          const maxW = ww * 0.9;
-          const maxH = wh * 0.9;
-
-          // Modal-Header-Höhe einberechnen
-          const headerEl = modal.querySelector(".dn-modal__head");
-          const headerH = headerEl ? headerEl.offsetHeight : 52;
-          const availH = wh - headerH;
-          // Nie hochskalieren — nur runter wenn zu groß; Modal passt sich Inhalt an
-          const scale = Math.min(1, maxW / cw, (availH * 0.9) / ch);
-          const mwVw = (scale * cw / ww * 100).toFixed(2);
-          const mhVh = (scale * ch / availH * 100).toFixed(2);
-
-          body.classList.remove("dn-modal__body--overlay","dn-modal__body--checker");
-          body.style.cssText = `;width:${mwVw}vw;height:${mhVh}vh;` +
-            `display:flex;align-items:center;justify-content:center;overflow:hidden;` +
-            `background:#1a1a1a;`;
-          frame.style.cssText = `width:${cw}px;height:${ch}px;flex-shrink:0;border:0;` +
-            `transform-origin:center center;transform:scale(${scale.toFixed(4)});`;
-        } catch(_) {}
+      // Widgets holen ihre Daten erst nach dem Laden und wachsen dann noch
+      // — darum ein paar Sekunden nachmessen, bis sich nichts mehr tut.
+      clearInterval(modal._pvTimer);
+      function nachmessen() {
+        if (vollbild) return;
+        let runden = 0;
+        modal._pvTimer = setInterval(() => {
+          const m = inhaltsMass();
+          if (m && (Math.abs(m[0] - ausschnitt[0]) > 2
+                    || Math.abs(m[1] - ausschnitt[1]) > 2)) {
+            ausschnitt = m;
+            anwenden();
+          }
+          if (++runden >= 12 || !modal.open) clearInterval(modal._pvTimer);
+        }, 400);
       }
-      function afterLoad() {
+
+      body.classList.remove("dn-modal__body--overlay", "dn-modal__body--checker");
+      body.classList.add("dn-modal__body--fit");
+      anwenden();
+      frame.onload = () => {
         injectChecker(frame.contentDocument);
-        setTimeout(sizeFrame, 200);
-      }
-      frame.onload = afterLoad;
-      setTimeout(() => { injectChecker(frame.contentDocument); sizeFrame(); }, 600);
+        const m = inhaltsMass();
+        if (m && !vollbild) { ausschnitt = m; anwenden(); }
+        nachmessen();
+      };
+      frame.src = buildUrl(base, scope);
       modal.showModal();
     });
   }
