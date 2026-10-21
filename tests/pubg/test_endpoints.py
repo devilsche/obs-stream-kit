@@ -548,6 +548,29 @@ def test_wechsel_von_squad_auf_duo_ist_eine_neue_phase():
     assert sorted(len(ph["matches"]) for ph in phasen) == [2, 2]
 
 
+def test_lange_pause_beginnt_eine_neue_phase():
+    """Gleicher Mate, gleicher Modus, aber 8 Stunden dazwischen: das sind
+    zwei Sessions und damit zwei Phasen."""
+    conn = _setup()
+    for mid, ts in (("pp1", "2026-05-20T18:00:00Z"),
+                    ("pp2", "2026-05-20T18:40:00Z"),
+                    ("pp3", "2026-05-21T03:00:00Z")):
+        _insert_match(conn, mid, ts, "Baltic_Main", "squad-fpp")
+        _insert_participant(conn, mid, "account.A", "PEX_LuCKoR", team_id=1)
+        _insert_participant(conn, mid, "account.M", "Mate", team_id=1)
+        _insert_team_mapping(conn, mid, "account.A", 1)
+        _insert_team_mapping(conn, mid, "account.M", 1)
+    set_setting(conn, "sessionStartedAt", "1970-01-01T00:00:00Z")
+    conn.commit()
+    reg = _registry(conn)
+    body, code, _ = reg.dispatch(
+        "GET", "/api/pubg/session-report?from=2026-05-20T00:00:00Z"
+        "&to=2026-05-22T00:00:00Z", b"", {})
+    assert code == 200
+    phasen = json.loads(body)["phases"]
+    assert sorted(len(ph["matches"]) for ph in phasen) == [1, 2]
+
+
 def test_lobby_kd_rejects_a_bad_range():
     conn = _setup()
     reg = _registry(conn)

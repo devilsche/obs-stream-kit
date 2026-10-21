@@ -7113,8 +7113,20 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     # Random-Filler die nur in einzelnen Matches mitliefen werden separat geführt.
     phases = []
     cur_phase = None
+    # Dieselbe Pause, die eine neue Session beginnt, trennt auch Phasen —
+    # sonst klebt im Monatsbericht der Squad vom Dienstag am selben Squad
+    # vom Freitag.
+    pause_secs = _session_gap_hours(conn, tenant_id) * 3600
+    vorher_ende = None
     for m in enriched:
         cur_set = m["squadSet"]
+        _start = _parse_iso(m.get("played_at"))
+        lange_pause = bool(_start and vorher_ende
+                           and (_start - vorher_ende).total_seconds()
+                           > pause_secs)
+        if _start:
+            vorher_ende = _start + datetime.timedelta(
+                seconds=m.get("duration_secs") or 0)
         # Zwei Dinge brechen eine Phase unabhaengig von der Besetzung:
         #
         # Event-Modi (TDM, Heist) haben kein Placement, keine Survival-Zeit
@@ -7132,7 +7144,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         m_is_ranked = bool(m.get("is_ranked"))
         m_groesse = team_groesse(m.get("game_mode"))
         if cur_phase is not None and (
-                cur_phase.get("isEvent") != m_is_event
+                lange_pause
+                or cur_phase.get("isEvent") != m_is_event
                 or cur_phase.get("isRanked") != m_is_ranked
                 or cur_phase.get("teamGroesse") != m_groesse):
             cur_phase = {"core": set(cur_set), "allMembers": set(cur_set),
