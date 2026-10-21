@@ -878,3 +878,35 @@ def test_airdrop_vom_eigenen_mate_ist_nicht_fremd():
     meins = [e for e in d["events"] if e["type"] == "airdrop_looted"
              and e["actorAccount"] == "account.A"][0]
     assert meins.get("lootedBefore") in (None, [])
+
+
+def test_tod_durch_zonen_ticks_ist_blue_zone():
+    """PUBG schickt den Zonen-Tod ohne Taeter und ohne Ursache. Erkennbar
+    ist er nur an den Ticks davor — und wer vorher geschossen hat, gehoert
+    dazu."""
+    conn = _setup()
+    mid = _gegner_match(conn, "bz1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("TakeDamage", 1741500, actor="account.X", target="account.B",
+            weapon="WeapAK47_C", damage=23.8),
+        _ev("TakeDamage", 1742400, target="account.B",
+            weapon="TslGameModeBase_BattleRoyaleBP_C", damage=11.0),
+        _ev("TakeDamage", 1743400, target="account.B",
+            weapon="TslGameModeBase_BattleRoyaleBP_C", damage=4.2),
+        _ev("Kill", 1743400, target="account.B"),
+    ])
+    ev = _event_fuer(conn, mid, "account.B")
+    assert ev["type"] == "kill_bluezone"
+    assert ev["lastHitByAccount"] == "account.X"
+    assert ev["lastHitWeaponName"] == "AKM"
+
+
+def test_tod_ohne_alles_bleibt_died():
+    conn = _setup()
+    mid = _gegner_match(conn, "bz2")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Kill", 900000, target="account.B"),
+    ])
+    assert _event_fuer(conn, mid, "account.B")["type"] == "kill_self"

@@ -2336,6 +2336,34 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             continue
         dmg_by_target.setdefault(tgt, []).append(d)
 
+    #: Quelle des Zonen-Schadens in TakeDamage (ohne Akteur).
+    _ZONEN_QUELLE = "TslGameModeBase"
+
+    def _zonen_tick_vor(victim_acc, kill_ts, fenster_ms=2000):
+        """Kam unmittelbar vor dem Tod Zonen-Schaden?"""
+        for d in reversed(dmg_by_target.get(victim_acc, [])):
+            if d["timestamp_ms"] > kill_ts:
+                continue
+            if kill_ts - d["timestamp_ms"] > fenster_ms:
+                return False
+            if (not d["actor_account"]
+                    and _ZONEN_QUELLE in (d["weapon"] or "")
+                    and (d["damage"] or 0) > 0):
+                return True
+        return False
+
+    def _letzter_spielertreffer(victim_acc, kill_ts, fenster_ms=30000):
+        """Der letzte Treffer eines anderen Spielers kurz vor dem Tod."""
+        for d in reversed(dmg_by_target.get(victim_acc, [])):
+            if d["timestamp_ms"] > kill_ts:
+                continue
+            if kill_ts - d["timestamp_ms"] > fenster_ms:
+                return None
+            a = d["actor_account"]
+            if a and a != victim_acc and (d["damage"] or 0) > 0:
+                return d
+        return None
+
     def _is_bleed_out(victim_acc, kill_ts):
         """Heuristik: hat das Opfer geblutet bis zum Tod, ohne signifikanten
         Finisher-Schaden in der letzten Sekunde davor? Bleed-Ticks sind
@@ -2785,6 +2813,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                 env_type = "kill_fall"
             elif "Drown" in dmg_reason or "Apnea" in dmg_reason:
                 env_type = "kill_drown"
+            elif (not actor and not dmg_reason and not knock_ev
+                  and _zonen_tick_vor(target, ts)):
+                # Zonen-Tod: PUBG schickt ihn ohne Taeter und ohne Ursache.
+                # Erkennbar nur an den Ticks unmittelbar davor. Liegend
+                # (knock_ev) waere derselbe Tick das Ausbluten.
+                env_type = "kill_bluezone"
             elif dmg_reason == "Damage_VehicleCrashHit":
                 env_type = "kill_self_eject"
             elif dmg_reason == "Damage_VehicleHit" and actor and actor != target:
@@ -2823,6 +2857,19 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                 pass          # oben schon gesetzt
             elif env_type:
                 row["type"] = env_type
+                # Wer ihn vorher angeschossen hat: die Zone gab oft nur
+                # den Rest.
+                _treffer = _letzter_spielertreffer(target, ts)
+                if _treffer:
+                    _ta = _treffer["actor_account"]
+                    row["lastHitByAccount"] = _ta
+                    row["lastHitByName"] = _name_of(_ta)
+                    row["lastHitByTeamId"] = team_by_acc.get(_ta)
+                    row["lastHitByTeamLabel"] = _team_label_for(_ta)
+                    row["lastHitByIsSquad"] = _ta in sq_set
+                    row["lastHitWeaponName"] = (
+                        weapon_name_en(_treffer["weapon"])
+                        if _treffer["weapon"] else None)
             elif not actor:
                 # Kein Akteur: entweder der Spieler hat sich selbst
                 # erledigt (Self-Damage kurz vorher) oder es bleibt beim

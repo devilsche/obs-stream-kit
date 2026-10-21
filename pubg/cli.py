@@ -1764,13 +1764,43 @@ def airdrop_backfill(root: str, args=None) -> int:
     if trocken:
         return 0
 
+    # EINE Verbindung je Archiv fuer den ganzen Lauf. Je Match neu
+    # einzuloggen sperrt HiDrive nach ein paar hundert Logins — der erste
+    # Lauf am 21.10. bekam ab Match 279 nur noch leere Fehler.
+    import gzip, io, json as _json
+    verbindungen = {}
+
+    def _aus_archiv(c, mid):
+        schluessel = (c.get("host"), c.get("user"), c.get("path"))
+        for versuch in range(2):
+            if schluessel not in verbindungen:
+                verbindungen[schluessel] = hidrive_telemetry._sftp_connect(c)
+            sftp, _tr = verbindungen[schluessel]
+            pfad = hidrive_telemetry._remote_path(c.get("path", ""), mid)
+            try:
+                buf = io.BytesIO()
+                sftp.getfo(pfad, buf)
+                return _json.loads(gzip.decompress(buf.getvalue()))
+            except FileNotFoundError:
+                return None
+            except Exception:
+                # Verbindung tot: einmal neu aufbauen, dann aufgeben.
+                try:
+                    sftp.close(); _tr.close()
+                except Exception:
+                    pass
+                del verbindungen[schluessel]
+                if versuch:
+                    raise
+        return None
+
     ok = ohne = fehler = zeilen = 0
     for i, r in enumerate(offen, 1):
         mid = r["match_id"]
         roh, quelle = None, None
         try:
             for c in lesbare_archive_fuer_match(raw, r["tenant_id"], mid):
-                roh = hidrive_telemetry.download_raw(mid, cfg=c)
+                roh = _aus_archiv(c, mid)
                 if roh:
                     quelle = "archiv"
                     break
@@ -1795,6 +1825,11 @@ def airdrop_backfill(root: str, args=None) -> int:
             time.sleep(pace)
     print(f"\nfertig: {ok} Matches ({zeilen} Zeilen), {ohne} ohne Rohdaten, "
           f"{fehler} Fehler")
+    for sftp, tr in verbindungen.values():
+        try:
+            sftp.close(); tr.close()
+        except Exception:
+            pass
     raw.close()
     return 0
 

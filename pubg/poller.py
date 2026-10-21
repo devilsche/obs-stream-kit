@@ -1341,6 +1341,35 @@ def refresh_milestones(conn, tenant_id: int, client, account_id: str = None,
             "keys": [m["key"] for m in found][:10]}
 
 
+#: Merker "Meilensteine pruefen". Neue Matches ODER neue Telemetrie
+#: setzen ihn, erst ein erfolgreicher Check loescht ihn.
+MILESTONES_PENDING_KEY = "pubg.milestones_pending"
+
+
+def milestones_tick(conn, tenant_id: int, client, account_id,
+                    neu: bool) -> dict:
+    """Meilenstein-Check, bis er einmal durchgelaufen ist.
+
+    Frueher lief er nur im Tick mit neuen Matches. Scheiterte er dort —
+    zwei API-Calls, Rate-Limit — kam er erst mit dem naechsten Match
+    wieder; der Tempo-Rekord vom 21.10. blieb so ungefeiert. Auch die
+    Telemetrie zaehlt als Anlass: Tempo und Hot Drop stehen erst darin.
+    """
+    if neu:
+        set_setting(conn, tenant_id, MILESTONES_PENDING_KEY, "1")
+    if get_setting(conn, tenant_id, MILESTONES_PENDING_KEY, "0") != "1":
+        return {}
+    try:
+        ms = refresh_milestones(conn, tenant_id, client, account_id) or {}
+    except Exception as e:
+        return {"error": str(e)}
+    # Zu frisch oder Fehler: offen lassen, der naechste Tick versucht es.
+    if ms.get("error") or str(ms.get("skipped", "")).startswith("frisch"):
+        return ms
+    set_setting(conn, tenant_id, MILESTONES_PENDING_KEY, "0")
+    return ms
+
+
 #: Schluessel, unter dem die Anlass-Konfiguration in den Tenant-Settings
 #: liegt. Kein File unter data/, damit jeder Tenant seine eigene hat.
 MILESTONE_CONFIG_KEY = "pubg_milestone_config"
@@ -1502,15 +1531,11 @@ def poll_tenant(conn, tenant_id: int, client_factory,
     # zusaetzlichen API-Calls an der Zahl der Matches statt an der Zahl
     # der Ticks. Fehler bleiben lokal: eine ausgefallene Feier darf den
     # Tick nicht abbrechen.
-    ms_stats = {}
-    if m_stats["new_matches"] > 0:
-        try:
-            ms_stats = refresh_milestones(conn, tenant_id, client,
-                                          my_account_id)
-            if ms_stats.get("error"):
-                detect_errors.append(f"milestones: {ms_stats['error']}")
-        except Exception as e:
-            detect_errors.append(f"milestones: {e}")
+    ms_stats = milestones_tick(
+        conn, tenant_id, client, my_account_id,
+        neu=(m_stats["new_matches"] > 0 or t_stats["processed"] > 0))
+    if ms_stats.get("error"):
+        detect_errors.append(f"milestones: {ms_stats['error']}")
 
     all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
                   + b_stats["errors"] + t_stats["errors"] + detect_errors)

@@ -2865,6 +2865,15 @@
       return parts.length ? " " + parts.join(" ") : "";
     }
 
+    // Wer das Opfer kurz vor einem Umgebungstod angeschossen hat — die
+    // Zone gibt oft nur den Rest.
+    function mdTlLastHit(ev, cba, kds) {
+      if (!ev.lastHitByName) return "";
+      const wer = mdTlNameSpan(ev, "lastHitBy", cba, kds);
+      const mit = ev.lastHitWeaponName ? ` with <b>${ev.lastHitWeaponName}</b>` : "";
+      return ` <span class="md-dim">after being shot by</span> ${wer}${mit}`;
+    }
+
     function mdTlSentence(ev, ctx) {
       const cba = ctx.colorByAcc;
       const kds = ctx.playerKds;
@@ -3004,9 +3013,9 @@
         case "kill_fall":
           return `${T} fell to their death`;
         case "kill_bluezone":
-          return `${T} died in the Blue Zone`;
+          return `${T} died in the Blue Zone${mdTlLastHit(ev, cba, kds)}`;
         case "kill_redzone":
-          return `${T} died in the Red Zone`;
+          return `${T} died in the Red Zone${mdTlLastHit(ev, cba, kds)}`;
         case "kill_drown":
           return `${T} drowned`;
         case "kill_self_inflicted": {
