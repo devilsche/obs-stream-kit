@@ -624,6 +624,10 @@ DROP_WEAPON_LABELS = {
     "Item_Weapon_DesertEagle_C": "Deagle",
     "Item_Weapon_Railgun_C": "Railgun",
     "Item_Weapon_ItemGhillieSuit_C": "Ghillie",
+    "Item_Weapon_L6_C": "Lynx AMR",
+    "Item_Weapon_FAMASG2_C": "FAMAS",
+    "Item_Weapon_DP12_C": "DBS",
+    "Item_Weapon_P90_C": "P90",
 }
 
 #: Pakettypen in lesbar. Der BlueChip-Abwurf wird durch einen
@@ -716,6 +720,15 @@ DROP_ITEM_LABELS = {
     "Item_Weapon_JerryCan_C": "Jerry Can",
     "Item_Weapon_Molotov_C": "Molotov",
     "Item_Weapon_StickyBomb_C": "Sticky Bomb",
+    "Item_Weapon_StickyGrenade_C": "Sticky Bomb",
+    "Item_Weapon_PanzerFaust100M_C": "Panzerfaust",
+    "Item_JerryCan_C": "Jerry Can",
+    "Item_SpareTire_C": "Spare Tire",
+    "Item_Attach_Weapon_Stock_AR_HeavyStock_C": "Heavy Stock",
+    "Item_Attach_Weapon_Muzzle_AR_MuzzleBrake_C": "Muzzle Brake",
+    "Item_Attach_Weapon_Muzzle_Compensator_Large_C": "Compensator",
+    "Item_Weapon_PackageFlare_nonDest_C": "Package Flare",
+    "Item_Weapon_PackageFlare_summerland_C": "Package Flare",
     "Item_Weapon_DecoyGrenade_C": "Decoy Grenade",
     "Item_Attach_Weapon_Magazine_Extended_Large_C": "Extended Magazine",
     "Item_Attach_Weapon_Magazine_Extended_Medium_C": "Extended Magazine",

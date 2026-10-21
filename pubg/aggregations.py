@@ -559,6 +559,8 @@ _VEHICLE_PATTERNS = [
     ("Chiron",        "Bugatti Chiron"),
     ("Vantage",       "Aston Vantage"),
     ("DBX",           "Aston DBX"),
+    ("FlyingSpur",    "Bentley Flying Spur"),
+    ("ContinentalGTC", "Bentley Continental GTC"),
     ("McLarenGT",     "McLaren GT"),
     ("PanigaleV4S",   "Ducati Panigale"),
     ("RoadGlideST",   "Harley Road Glide"),
@@ -962,6 +964,10 @@ DROP_WEAPONS = {
     "Item_Weapon_DesertEagle_C": "Deagle",
     "Item_Weapon_Railgun_C": "Railgun",
     "Item_Weapon_ItemGhillieSuit_C": "Ghillie",
+    "Item_Weapon_L6_C": "Lynx AMR",
+    "Item_Weapon_FAMASG2_C": "FAMAS",
+    "Item_Weapon_DP12_C": "DBS",
+    "Item_Weapon_P90_C": "P90",
 }
 
 
@@ -1017,6 +1023,12 @@ def _item_label(item_id):
     # gleich.
     if _re.search(r"Item_Ghillie", s):
         return "Ghillie Suit"
+    # Waffen, die nicht eigens gelistet sind: ueber das Waffen-Mapping
+    # (Item_Weapon_X_C -> WeapX_C), sonst stuende dort die interne Id
+    # ("L6" statt "Lynx AMR").
+    m = _re.match(r"Item_Weapon_(.+)_C$", s)
+    if m and _weapon_label(f"Weap{m.group(1)}_C")[0] != "Unknown":
+        return weapon_name_en(f"Weap{m.group(1)}_C")
     # Fallback: die Id lesbar machen. Die Wortart-Praefixe sagen nichts
     # ueber das Stueck ("Boost PainKiller" statt "Painkiller").
     roh = s
