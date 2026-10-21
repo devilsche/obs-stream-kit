@@ -822,3 +822,59 @@ def test_fremdes_team_klaut_meinen_knock():
     assert ev["type"] == "kill_steal"
     assert ev["actorAccount"] == "account.Z"
     assert ev["knockerAccount"] == "account.A"
+
+
+def _paket(ts, x, y, items):
+    e = _ev("CarePackageLand", ts, weapon="Carapackage_RedBox_C")
+    e["actor_x"], e["actor_y"] = x, y
+    e["attachments"] = json.dumps(items)
+    return e
+
+
+def _griff(ts, acc, item, x, y):
+    e = _ev("CarePackagePickup", ts, actor=acc, weapon=item)
+    e["actor_x"], e["actor_y"] = x, y
+    e["attachments"] = "Carapackage_RedBox_C"
+    return e
+
+
+def test_airdrop_schon_von_fremden_gepluendert():
+    """Wer vor uns am selben Paket war, steht dabei — mit seinen Teilen."""
+    conn = _setup()
+    mid = _gegner_match(conn, "ad1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _paket(400000, 50000.0, 50000.0,
+               ["Item_Weapon_MG3_C", "Item_Ammo_762mm_C",
+                "Item_Attach_Weapon_Stock_AR_HeavyStock_C"]),
+        # Z (fremdes Team) nimmt MG3 + Munition, steht leicht versetzt.
+        _griff(500000, "account.Z", "Item_Weapon_MG3_C", 50150.0, 49900.0),
+        _griff(501000, "account.Z", "Item_Ammo_762mm_C", 50150.0, 49900.0),
+        # Ein anderes Paket weit weg — gehoert nicht dazu.
+        _paket(410000, 300000.0, 300000.0, ["Item_Weapon_AWM_C"]),
+        _griff(505000, "account.X", "Item_Weapon_AWM_C", 300000.0, 300000.0),
+        # Ich komme spaeter und nehme den Rest.
+        _griff(900000, "account.A", "Item_Attach_Weapon_Stock_AR_HeavyStock_C",
+               49950.0, 50050.0),
+    ])
+    d = compute_match_detail(conn, T, "account.A", mid)
+    ev = next(e for e in d["events"] if e["type"] == "airdrop_looted")
+    vorher = ev["lootedBefore"]
+    assert [v["accountId"] for v in vorher] == ["account.Z"]
+    assert vorher[0]["items"] == ["MG3", "7.62mm Ammo"]
+    assert vorher[0]["agoMs"] == 900000 - 501000
+
+
+def test_airdrop_vom_eigenen_mate_ist_nicht_fremd():
+    conn = _setup()
+    mid = _gegner_match(conn, "ad2")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _paket(400000, 50000.0, 50000.0, ["Item_Weapon_MG3_C"]),
+        _griff(500000, "account.B", "Item_Weapon_MG3_C", 50000.0, 50000.0),
+        _griff(900000, "account.A", "Item_Ammo_762mm_C", 50000.0, 50000.0),
+    ])
+    d = compute_match_detail(conn, T, "account.A", mid)
+    meins = [e for e in d["events"] if e["type"] == "airdrop_looted"
+             and e["actorAccount"] == "account.A"][0]
+    assert meins.get("lootedBefore") in (None, [])

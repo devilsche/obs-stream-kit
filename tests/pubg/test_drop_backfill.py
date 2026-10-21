@@ -122,8 +122,9 @@ def test_nur_die_fehlenden_typen_kommen_dazu():
     assert kills["n"] == 1
 
 
-def test_fremde_pickups_bleiben_draussen():
-    """Der Inhalt fremder Pakete geht uns nichts an — und flutet die DB."""
+def test_fremde_pickups_kommen_mit():
+    """Seit 2026-10-21 auch fremde Griffe: nur so sieht man, dass ein
+    Paket schon gepluendert war, als man hinkam."""
     from pubg.cli import _drop_events_nachtragen
     _match("bf7", "2026-09-20T10:00:00Z")
     _alte_events("bf7")
@@ -143,4 +144,4 @@ def test_fremde_pickups_bleiben_draussen():
     ]
     n = _drop_events_nachtragen(CONN, "bf7", client, "https://cdn/x.json",
                                 {ME})
-    assert n == 1
+    assert n == 2

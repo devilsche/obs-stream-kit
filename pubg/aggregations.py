@@ -523,6 +523,11 @@ def _ist_fahrzeug_waffe(wid):
 #: ist es ein Squad-Wipe und kein Ausbluten.
 _WIPE_TOLERANZ_MS = 1000
 
+#: Wie weit ein Griff ins Paket von dessen Landepunkt entfernt sein darf
+#: (cm). Man steht direkt an der Kiste; Pakete liegen viel weiter
+#: auseinander.
+_PAKET_RADIUS_CM = 2000
+
 _VEHICLE_PATTERNS = [
     ("Mirado",        "Mirado"),
     ("PickupTruck",   "Pickup Truck"),
@@ -3498,6 +3503,38 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             inhalt_am_ort[o] = _items_gezaehlt(
                 [_item_label(i) for i in items if i])
 
+    # Griffe einem Paket zuordnen: das naechstgelegene, das schon gelandet
+    # war. Das Ortsraster oben trennt Pakete, taugt aber nicht, um einen
+    # Griff zuzuordnen — wer an der anderen Seite der Kiste steht, faellt
+    # sonst in die Nachbarzelle.
+    pakete = [(r["timestamp_ms"], r["actor_x"], r["actor_y"])
+              for r in drop_rows
+              if r["event_type"] == "CarePackageLand"
+              and r["actor_x"] is not None and r["actor_y"] is not None]
+
+    def _paket_von(x, y, ts):
+        if x is None or y is None:
+            return None
+        bestes, abstand = None, _PAKET_RADIUS_CM
+        for i, (lts, px, py) in enumerate(pakete):
+            if lts is not None and ts is not None and lts > ts:
+                continue
+            d = ((px - x) ** 2 + (py - y) ** 2) ** 0.5
+            if d <= abstand:
+                bestes, abstand = i, d
+        return bestes
+
+    # Fremde Griffe je Paket: wer vor uns da war und was er mitnahm.
+    fremde_griffe = {}
+    for r in drop_rows:
+        acc = r["actor_account"]
+        if (r["event_type"] != "CarePackagePickup" or not acc
+                or acc in sq_set):
+            continue
+        p = _paket_von(r["actor_x"], r["actor_y"], r["timestamp_ms"])
+        if p is not None:
+            fremde_griffe.setdefault(p, []).append(r)
+
     for r in drop_rows:
         acc = r["actor_account"]
         if not acc or acc not in sq_set:
@@ -3517,6 +3554,8 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             dr["takenItem"] = _item_label(r["weapon"]) if r["weapon"] else None
             dr["dropContents"] = inhalt_am_ort.get(
                 _ort(r["actor_x"], r["actor_y"])) or []
+            dr["_paket"] = _paket_von(r["actor_x"], r["actor_y"], ts_d)
+            dr["_rohTs"] = ts_d
             events_out.append(dr)
 
     # Mehrere Items aus DEMSELBEN Paket sind eine Zeile, keine vier:
@@ -3539,8 +3578,32 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             if ev.get("takenItem"):
                 erste.setdefault("takenItems", []).append(ev["takenItem"])
     for ev in gefiltert:
-        if ev.get("type") == "airdrop_looted":
-            ev["takenItems"] = _items_gezaehlt(ev.get("takenItems") or [])
+        if ev.get("type") != "airdrop_looted":
+            continue
+        ev["takenItems"] = _items_gezaehlt(ev.get("takenItems") or [])
+        # Schon gepluendert? Fremde, die VOR unserem ersten Griff am selben
+        # Paket waren — je Spieler mit seinen Teilen.
+        paket, mein_ts = ev.pop("_paket", None), ev.pop("_rohTs", None)
+        vorher = {}
+        for g in fremde_griffe.get(paket, []) if paket is not None else []:
+            if mein_ts is None or g["timestamp_ms"] >= mein_ts:
+                continue
+            v = vorher.setdefault(g["actor_account"], {
+                "accountId": g["actor_account"],
+                "name": _name_of(g["actor_account"]),
+                "teamLabel": _team_label_for(g["actor_account"]),
+                "teamId": team_by_acc.get(g["actor_account"]),
+                "items": [], "_letzter": g["timestamp_ms"]})
+            if g["weapon"]:
+                v["items"].append(_item_label(g["weapon"]))
+            v["_letzter"] = max(v["_letzter"], g["timestamp_ms"])
+        if vorher:
+            ev["lootedBefore"] = [
+                {**{k: v[k] for k in ("accountId", "name", "teamLabel",
+                                      "teamId")},
+                 "items": _items_gezaehlt(v["items"]),
+                 "agoMs": mein_ts - v["_letzter"]}
+                for v in vorher.values()]
     events_out = gefiltert
 
     events_out.sort(key=lambda x: x["tsMs"] or 0)

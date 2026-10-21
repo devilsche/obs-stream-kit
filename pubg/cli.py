@@ -1306,11 +1306,11 @@ def _drop_events_nachtragen(conn, match_id, client, url, squad_ids):
     alles andere haengt schon in der DB und waere doppelt. Gibt die Zahl
     der eingefuegten Zeilen zurueck.
 
-    Fremde Pickups bleiben draussen: in einer 100er-Lobby raeumt fast
-    jeder irgendein Paket aus, und was andere mitnehmen, wertet nichts
-    aus. Die systemweiten Ereignisse (Paket faellt, Leuchtpistole) kommen
-    dagegen vollstaendig rein — die Landung nennt erst den Punkt, an dem
-    das Paket liegt, und ohne den gibt es keinen Inhalt zum Anzeigen.
+    Seit 2026-10-21 auch fremde Griffe ins Paket: nur damit laesst sich
+    sagen, dass ein Paket schon gepluendert war, als man hinkam. Die
+    systemweiten Ereignisse (Paket faellt, Leuchtpistole) kommen ohnehin
+    vollstaendig rein — die Landung nennt erst den Punkt, an dem das
+    Paket liegt, und ohne den gibt es keinen Inhalt zum Anzeigen.
     """
     from pubg.telemetry import _normalize
     from pubg.db_pg import append_telemetry_events
@@ -1322,11 +1322,9 @@ def _drop_events_nachtragen(conn, match_id, client, url, squad_ids):
         if not norm:
             continue
         et = norm.get("event_type")
-        if et in ("CarePackageLand", "CarePackageSpawn", "FlareGun"):
+        if et in ("CarePackageLand", "CarePackageSpawn", "FlareGun",
+                  "CarePackagePickup"):
             neu.append(norm)
-        elif et == "CarePackagePickup":
-            if norm.get("actor_account") in squad_ids:
-                neu.append(norm)
     raw_conn = getattr(conn, "raw", conn)
     return append_telemetry_events(raw_conn, match_id, neu)
 
@@ -1679,6 +1677,125 @@ def drop_backfill(root: str, args=None) -> int:
             time.sleep(pace)
     print(f"\nfertig: {ok} Matches nachgetragen ({zeilen} Zeilen), "
           f"{fehler} Fehler")
+    return 0
+
+
+def airdrop_griffe_nachtragen(raw_conn, match_id, roh) -> int:
+    """Paket-Griffe eines Matches aus der Roh-Telemetrie neu ablegen.
+
+    Bis 2026-10-21 kamen nur die Griffe des eigenen Squads in die DB.
+    Hier werden ALLE ersetzt — die eigenen sind in den Rohdaten ja auch
+    drin. Loeschen statt Abgleichen haelt den Lauf wiederholbar: zweimal
+    laufen lassen ergibt dasselbe. Fehlen dem Match die Abwurf-Ereignisse
+    ganz (vor dem 11.09.), kommen Landung und Leuchtpistole mit.
+    """
+    from pubg.telemetry import _normalize
+    from pubg.db_pg import append_telemetry_events
+
+    with raw_conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM telemetry_events WHERE match_id = %s "
+                    "AND event_type = 'CarePackageLand' LIMIT 1",
+                    (match_id,))
+        hat_landungen = cur.fetchone() is not None
+    typen = {"CarePackagePickup"}
+    if not hat_landungen:
+        typen |= {"CarePackageLand", "CarePackageSpawn", "FlareGun"}
+    neu = []
+    for e in roh or []:
+        norm = _normalize(e)
+        if norm and norm.get("event_type") in typen:
+            neu.append(norm)
+    with raw_conn.cursor() as cur:
+        cur.execute("DELETE FROM telemetry_events WHERE match_id = %s "
+                    "AND event_type = ANY(%s)", (match_id, list(typen)))
+    raw_conn.commit()
+    n = append_telemetry_events(raw_conn, match_id, neu)
+    raw_conn.commit()
+    return n
+
+
+def airdrop_backfill(root: str, args=None) -> int:
+    """Fremde Griffe ins Paket fuer alte Matches nachtragen.
+
+    Quelle je Match: jedes Archiv, das der Tenant lesen darf (eigenes und
+    das von Mitspielern im selben Match), sonst das PUBG-CDN, solange es
+    die Rohdaten noch vorhaelt (14 Tage). Matches ohne beides bleiben, wie
+    sie sind. Neueste zuerst; wiederholbar.
+
+    Nutzung:
+        python -m pubg.cli airdrop-backfill [--matches N] [--pace 0.2]
+                                            [--dry-run]
+    """
+    import time
+    from core.db import connect
+    from pubg.api_client import PubgClient
+    from pubg.archive_config import lesbare_archive_fuer_match
+    from pubg import hidrive_telemetry
+
+    args = args or []
+    def _opt(name, default=None):
+        if name in args:
+            i = args.index(name)
+            return args[i + 1] if i + 1 < len(args) else default
+        return default
+    n_max = int(_opt("--matches", "0"))
+    pace = float(_opt("--pace", "0.2"))
+    trocken = "--dry-run" in args
+
+    raw = connect()
+    cdn = PubgClient(api_key="", platform="steam")
+    cdn_ab = (datetime.datetime.now(datetime.timezone.utc)
+              - datetime.timedelta(days=13)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    with raw.cursor() as cur:
+        # Je Match ein Tenant (der erste) und die juengste URL — die
+        # Telemetrie ist global.
+        cur.execute("""
+            SELECT DISTINCT ON (match_id) match_id, tenant_id, played_at,
+                   telemetry_url
+            FROM matches
+            WHERE match_id IN (SELECT DISTINCT match_id FROM telemetry_events)
+            ORDER BY match_id, tenant_id
+        """)
+        offen = sorted(cur.fetchall(), key=lambda r: r["played_at"] or "",
+                       reverse=True)
+    if n_max:
+        offen = offen[:n_max]
+    print(f"=== airdrop-backfill: {len(offen)} Matches ===")
+    if trocken:
+        return 0
+
+    ok = ohne = fehler = zeilen = 0
+    for i, r in enumerate(offen, 1):
+        mid = r["match_id"]
+        roh, quelle = None, None
+        try:
+            for c in lesbare_archive_fuer_match(raw, r["tenant_id"], mid):
+                roh = hidrive_telemetry.download_raw(mid, cfg=c)
+                if roh:
+                    quelle = "archiv"
+                    break
+            if not roh and r["telemetry_url"] and (r["played_at"] or "") >= cdn_ab:
+                roh = cdn.get_telemetry(r["telemetry_url"])
+                quelle = "cdn"
+            if not roh:
+                ohne += 1
+                print(f"[{i}/{len(offen)}] {mid[:8]} {r['played_at'][:10]}  "
+                      f"keine Rohdaten")
+                continue
+            n = airdrop_griffe_nachtragen(raw, mid, roh)
+            zeilen += n
+            ok += 1
+            print(f"[{i}/{len(offen)}] {mid[:8]} {r['played_at'][:10]}  "
+                  f"{quelle}  {n} Zeilen")
+        except Exception as e:
+            raw.rollback()
+            fehler += 1
+            print(f"[{i}/{len(offen)}] {mid[:8]} FEHLER: {e}")
+        if pace:
+            time.sleep(pace)
+    print(f"\nfertig: {ok} Matches ({zeilen} Zeilen), {ohne} ohne Rohdaten, "
+          f"{fehler} Fehler")
+    raw.close()
     return 0
 
 
@@ -2398,6 +2515,8 @@ if __name__ == "__main__":
         sys.exit(kd_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "drop-backfill":
         sys.exit(drop_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "airdrop-backfill":
+        sys.exit(airdrop_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
         sys.exit(refresh_maps(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-assets":
@@ -2412,6 +2531,7 @@ if __name__ == "__main__":
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
               "clan-queue-prune | lobby-kd-backfill | drop-backfill | "
+              "airdrop-backfill | "
               "kd-backfill | "
               "speed-backfill | dedupe-telemetry | "
               "lobby-kd-reset-unknown | "

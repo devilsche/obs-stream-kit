@@ -444,9 +444,16 @@ def filter_squad_events(events, squad_account_ids):
                 "ItemPickup", "ItemPickupBox", "ItemDrop", "ItemUse"):
             yield norm
             continue
+        # Griffe ins Paket: die ganze Lobby. Nur so laesst sich sagen,
+        # dass ein Paket schon gepluendert war, als man hinkam — und von
+        # wem. Ein paar Dutzend Zeilen je Match; alle Auswertungen
+        # filtern beim Lesen selbst auf den Squad.
+        if norm["event_type"] == "CarePackagePickup":
+            yield norm
+            continue
         # PAYDAY-relevante Events: nur Squad behalten, alle Phasen
         if norm["event_type"] in ("ItemPickup", "ObjectInteraction",
-                                    "ObjectDestroy", "CarePackagePickup"):
+                                    "ObjectDestroy"):
             if norm["actor_account"] in squad_account_ids:
                 yield norm
             continue

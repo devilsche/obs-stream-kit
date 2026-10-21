@@ -1712,6 +1712,7 @@
     .md-tl-row--lobby .md-tl-t { color: var(--pubg-muted); }
     .md-tl-t   { color: var(--pubg-text); }
     .md-tl-chicken { color: var(--pubg-gold); font-weight: 700; }
+    .md-tl-looted { color: var(--pubg-muted); font-style: italic; }
     .md-tl-poi {
       color: var(--pubg-gold); font-size: 0.9em;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -2947,7 +2948,21 @@
           const inhalt = drin.length
             ? ` <span class="md-dim">(${drin.join(", ")})</span>` : "";
           const art = ev.dropCalled ? "their own airdrop" : "an airdrop";
-          return `${A} looted ${art}${nahm}${inhalt}`;
+          // Schon gepluendert: wer vorher dran war und was er mitnahm.
+          const vorher = (ev.lootedBefore || []).map(v => {
+            const wer = mdTlNameSpan({ xAccount: v.accountId, xName: v.name,
+                                       xTeamLabel: v.teamLabel,
+                                       xTeamId: v.teamId }, "x", cba, kds);
+            const was = (v.items || []).length
+              ? ` <span class="md-dim">(${v.items.join(", ")})</span>` : "";
+            const min = Math.round((v.agoMs || 0) / 60000);
+            const wann = min >= 1 ? ` ${min} min earlier` : " just before";
+            return `${wer}${was}${wann}`;
+          });
+          const gepluendert = vorher.length
+            ? ` — <span class="md-tl-looted">already looted by</span> ${vorher.join(", ")}`
+            : "";
+          return `${A} looted ${art}${nahm}${inhalt}${gepluendert}`;
         }
         case "chip_pickup": {
           const n = ev.chipCount || 1;
