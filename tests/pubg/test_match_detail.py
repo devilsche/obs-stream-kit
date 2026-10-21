@@ -783,3 +783,22 @@ def test_ohne_sieg_kein_chicken():
     ])
     d = compute_match_detail(conn, T, "account.A", mid)
     assert all(e["type"] != "chicken" for e in d["events"])
+
+
+def test_nachschuss_im_selben_moment_wie_der_kill():
+    """PUBG stempelt den letzten Treffer und den Kill oft auf dieselbe
+    Millisekunde — der Treffer gehoert trotzdem zum Kill."""
+    conn = _setup()
+    mid = _gegner_match(conn, "rd6")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.A", target="account.X",
+            weapon="WeapHK416_C"),
+        _ev("TakeDamage", 707000, actor="account.A", target="account.X",
+            weapon="WeapM24_C", damage=0.0),
+        _ev("Kill", 707000, actor="account.A", target="account.X",
+            weapon="WeapHK416_C", reason="Damage_Gun"),
+    ])
+    ev = _event_fuer(conn, mid, "account.X")
+    assert ev["type"] == "kill"
+    assert ev["weaponName"] == "M24"

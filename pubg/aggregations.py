@@ -2683,7 +2683,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             letzter_echter_schaden = None
             for d in dmg_by_target.get(target, []):
                 d_ts = d["timestamp_ms"]
-                if d_ts >= ts:
+                # Gleiche Millisekunde zaehlt mit: PUBG stempelt den
+                # letzten Treffer oft exakt auf den Kill.
+                if d_ts > ts:
                     break
                 if (ts - d_ts) > 2000:
                     continue
