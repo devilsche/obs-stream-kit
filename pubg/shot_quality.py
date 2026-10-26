@@ -29,7 +29,7 @@ sind direkt testbar, das DB-Holen sitzt darunter.
 """
 import statistics
 
-from pubg.aggregations import KEINE_BR_KARTEN, _br_filter, _karten_filter, _weapon_label, weapon_display
+from pubg.aggregations import KEINE_BR_KARTEN, _br_filter, _weapon_label, weapon_display
 from pubg.poi_match import point_in_poly, poly_area
 
 #: Grenzen der Rundenphasen in Sekunden Ueberlebenszeit. Die frueh/mitte-
@@ -556,7 +556,7 @@ def _weapon_rows(conn, tenant_id, account_id, cutoff, to_iso=None):
         JOIN matches m ON m.match_id = w.match_id
         WHERE m.tenant_id = ? AND w.account_id = ?
           AND NOT COALESCE(w.is_thrown, false)
-          AND m.played_at >= ? AND {br_where} AND {_karten_filter("m")}
+          AND m.played_at >= ? AND {br_where}
     """
     params = [tenant_id, account_id, cutoff, *br_params]
     if to_iso:

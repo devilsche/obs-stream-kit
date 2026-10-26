@@ -3900,7 +3900,7 @@ class EndpointRegistry:
             # Heavy-Hitter-Diagnose
             dmg = r["damage_dealt"] or 0
             mode = r["game_mode"] or ""
-            is_br = is_br_mode(mode)
+            is_br = is_br_mode(mode, r["map_name"])
             heavy_eligible = is_br and dmg >= 500
             heavy_emitted = any(a["id"] == "damage_500" for a in achievements)
             out.append({

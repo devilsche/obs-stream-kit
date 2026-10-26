@@ -805,3 +805,11 @@ def test_top_scorer_without_lobby_mapping_is_absent():
     insert_participants(conn, "ts7", [_sc_part("account.A", "PEX_LuCKoR", 1)])
     assert compute_top_scorers_by_match(conn, T, ["ts7"]) == {}
     assert compute_top_scorer(conn, T, ["ts7"]) is None
+
+
+def test_camp_jackal_ist_kein_br_match():
+    """Camp Jackal laeuft als "solo" — zaehlt trotzdem nicht in K/D & Co."""
+    from pubg.aggregations import is_br_mode
+    assert is_br_mode("solo", "Baltic_Main")
+    assert not is_br_mode("solo", "Range_Main")
+    assert not is_br_mode("heistroyale", "SafeHouse_Main")

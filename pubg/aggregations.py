@@ -43,7 +43,9 @@ def _br_filter(alias="m"):
     """SQL-Fragment + Params um auf BR-Matches zu filtern.
     Beispiel: where, params = _br_filter('m')
               cursor.execute(f'... WHERE x AND {where}', [other_params, *params])"""
-    return (f"{alias}.game_mode IN ({_BR_PLACEHOLDERS})",
+    # Klammern, weil Aufrufer auch `NOT {br_where}` schreiben.
+    return (f"({alias}.game_mode IN ({_BR_PLACEHOLDERS})"
+            f" AND {_karten_filter(alias)})",
             list(BATTLE_ROYALE_MODES))
 
 # Trainings- und Eventkarten: zaehlen in Karten-Uebersichten nicht mit.
@@ -57,8 +59,11 @@ def _karten_filter(alias="m"):
     return f"{alias}.map_name NOT IN ({namen})"
 
 
-def is_br_mode(game_mode):
-    return game_mode in BATTLE_ROYALE_MODES
+def is_br_mode(game_mode, map_name=None):
+    """BR-Modus auf einer echten BR-Karte — Camp Jackal laeuft als "solo",
+    ist aber Training und zaehlt als Event."""
+    return (game_mode in BATTLE_ROYALE_MODES
+            and map_name not in KEINE_BR_KARTEN)
 
 
 def team_groesse(game_mode):
@@ -1473,7 +1478,7 @@ def compute_best_worst_map(conn, tenant_id: int, my_account_id, range_key="all",
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
-          AND {br_where} AND {_karten_filter("m")}
+          AND {br_where}
         GROUP BY m.map_name
         HAVING COUNT(*) >= ?
     """, (tenant_id, my_account_id, cutoff, *br_params, min_matches)).fetchall()
@@ -1504,7 +1509,7 @@ def compute_map_distribution(conn, tenant_id: int, my_account_id, range_key="ses
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
-          AND {br_where} AND {_karten_filter("m")}
+          AND {br_where}
         GROUP BY m.map_name
         ORDER BY cnt DESC
     """, (tenant_id, my_account_id, cutoff, *br_params)).fetchall()
@@ -1553,7 +1558,7 @@ def compute_session_matches(conn, tenant_id: int, my_account_id, range_key="sess
         "matchId":     r["match_id"],
         "map":         r["map_name"],
         "mode":        r["game_mode"],
-        "isEvent":     not is_br_mode(r["game_mode"]),
+        "isEvent":     not is_br_mode(r["game_mode"], r["map_name"]),
         "playedAt":    r["played_at"],
         "durationSec": r["duration_secs"],
         "kills":       r["kills"] or 0,
@@ -4879,7 +4884,7 @@ def compute_map_performance(conn, tenant_id: int, my_account_id, range_key="all"
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
-          AND {br_where} AND {_karten_filter("m")}
+          AND {br_where}
         GROUP BY m.map_name
         ORDER BY matches DESC
     """, (tenant_id, my_account_id, cutoff, *br_params)).fetchall()
@@ -6957,7 +6962,7 @@ def compute_sessions_index(conn, tenant_id: int, my_account_id, gap_hours=4):
         n = len(ms)
         # game_mode steht hier in den row-Daten als Spalte
         wins = sum(1 for x in ms
-                   if (x["place"] or 99) == 1 and is_br_mode(x["game_mode"]))
+                   if (x["place"] or 99) == 1 and is_br_mode(x["game_mode"], x.get("map_name")))
         first_end = _parse_iso(ms[0]["played_at"])
         first_start = first_end - datetime.timedelta(
             seconds=ms[0]["duration_secs"] or 0)
@@ -7082,7 +7087,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     # und die Match-Liste benutzen die effective_*-Werte; Top-Totals + K/D
     # bleiben unverpestet (Events zaehlen dort 0).
     event_match_ids = [x["match_id"] for x in enriched
-                        if not is_br_mode(x.get("game_mode"))]
+                        if not is_br_mode(x.get("game_mode"), x.get("map_name"))]
     kills_by_match = {}
     dmg_by_match = {}
     if event_match_ids:
@@ -7115,7 +7120,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 f"AND match_id IN ({_phd}) GROUP BY match_id",
                 [my_account_id, *event_match_ids]).fetchall()}
     for x in enriched:
-        if not is_br_mode(x.get("game_mode")):
+        if not is_br_mode(x.get("game_mode"), x.get("map_name")):
             x["effective_kills"]  = kills_by_match.get(x["match_id"], 0)
             x["effective_damage"] = dmg_by_match.get(x["match_id"], 0.0)
             x["effective_deaths"] = ev_deaths_by_match.get(x["match_id"], 0)
@@ -7157,7 +7162,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         #
         # Solo, Duo und Squad ebenso: andere Teamgroesse, andere Lobby,
         # andere Zahlen — auch wenn derselbe Mate dabei bleibt.
-        m_is_event = not is_br_mode(m.get("game_mode"))
+        m_is_event = not is_br_mode(m.get("game_mode"), m.get("map_name"))
         m_is_ranked = bool(m.get("is_ranked"))
         m_groesse = team_groesse(m.get("game_mode"))
         if cur_phase is not None and (
@@ -7361,8 +7366,8 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
         ms = ph["matches"]
         # Aggregate-Stats nur ueber BR-Matches. Events bleiben in der
         # Match-Liste (Anzeige), zaehlen aber nicht fuer K/D, Wins etc.
-        br_ms = [x for x in ms if is_br_mode(x.get("game_mode"))]
-        ev_ms = [x for x in ms if not is_br_mode(x.get("game_mode"))]
+        br_ms = [x for x in ms if is_br_mode(x.get("game_mode"), x.get("map_name"))]
+        ev_ms = [x for x in ms if not is_br_mode(x.get("game_mode"), x.get("map_name"))]
         n = len(br_ms)
         wins = sum(1 for x in br_ms if (x["place"] or 99) == 1)
         # Member-Counts: wie oft war jeder dabei in dieser Phase (auch
@@ -7421,7 +7426,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     # Total-Aggregate — NUR Battle-Royale. TDM/Event-Matches dürfen in der
     # Match-Liste auftauchen, verfälschen aber NICHT die BR-K/D (TDM hat echte
     # kills in participants, die sonst die kills/(matches-wins)-Formel sprengen).
-    br_ms = [x for x in enriched if is_br_mode(x.get("game_mode"))]
+    br_ms = [x for x in enriched if is_br_mode(x.get("game_mode"), x.get("map_name"))]
     n = len(br_ms)
     wins = sum(1 for x in br_ms if (x["place"] or 99) == 1)
     total_kills = sum(x["kills"] or 0 for x in br_ms)
@@ -7460,7 +7465,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     # Event-Block fuer die Session: alle Nicht-BR-Matches zusammen. Kills
     # und Schaden aus der Telemetrie (effective_*), Tode aus den Kill-Events
     # auf mich — Event-Modi haben kein Placement und kein time_survived.
-    ev_all = [x for x in enriched if not is_br_mode(x.get("game_mode"))]
+    ev_all = [x for x in enriched if not is_br_mode(x.get("game_mode"), x.get("map_name"))]
     if ev_all:
         _ek = sum(x.get("effective_kills") or 0 for x in ev_all)
         _ed = sum(x.get("effective_deaths") or 0 for x in ev_all)
@@ -7500,7 +7505,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
     map_stats = {}
     for x in enriched:
         mn = x["map_name"]
-        is_event = not is_br_mode(x.get("game_mode"))
+        is_event = not is_br_mode(x.get("game_mode"), x.get("map_name"))
         if mn not in map_stats:
             map_stats[mn] = {"map": mn, "matches": 0, "wins": 0,
                               "kills": 0, "damage": 0.0,
@@ -7811,7 +7816,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             # matchType == "competitive" aus der API. Rueckwirkend nicht zu
             # rekonstruieren: die Match-Payloads sind nach ~14 Tagen weg.
             "isRanked": bool(m["is_ranked"]),
-            "isEvent": not is_br_mode(m["game_mode"]),
+            "isEvent": not is_br_mode(m["game_mode"], m["map_name"]),
             "matchEnd": m["played_at"],
             "durationSec": m["duration_secs"],
             "place": m["place"],
