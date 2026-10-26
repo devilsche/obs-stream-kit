@@ -46,6 +46,17 @@ def _br_filter(alias="m"):
     return (f"{alias}.game_mode IN ({_BR_PLACEHOLDERS})",
             list(BATTLE_ROYALE_MODES))
 
+# Trainings- und Eventkarten: zaehlen in Karten-Uebersichten nicht mit.
+# Camp Jackal laeuft als "solo" und rutscht sonst durch den Modus-Filter.
+KEINE_BR_KARTEN = ("Range_Main", "SafeHouse_Main")
+
+
+def _karten_filter(alias="m"):
+    """SQL-Fragment ohne Params: blendet Trainings-/Eventkarten aus."""
+    namen = ", ".join(f"'{k}'" for k in KEINE_BR_KARTEN)
+    return f"{alias}.map_name NOT IN ({namen})"
+
+
 def is_br_mode(game_mode):
     return game_mode in BATTLE_ROYALE_MODES
 
@@ -1331,6 +1342,8 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
         deaths = max(n - wins, 1)
         map_dist = {}
         for r in shared:
+            if r["map_name"] in KEINE_BR_KARTEN:
+                continue
             map_dist[r["map_name"]] = map_dist.get(r["map_name"], 0) + 1
         history = {
             "matches": n,
@@ -1449,7 +1462,8 @@ def compute_best_worst_map(conn, tenant_id: int, my_account_id, range_key="all",
     """Liefert Best- und Worst-Map basierend auf K/D mit Mindest-Match-Schwelle."""
     cutoff = (_range_filter(conn, tenant_id, range_key)
               if range_key != "all" else "1970-01-01T00:00:00Z")
-    rows = conn.execute("""
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT m.map_name,
                COUNT(*) AS n,
                SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
@@ -1459,9 +1473,10 @@ def compute_best_worst_map(conn, tenant_id: int, my_account_id, range_key="all",
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
+          AND {br_where} AND {_karten_filter("m")}
         GROUP BY m.map_name
         HAVING COUNT(*) >= ?
-    """, (tenant_id, my_account_id, cutoff, min_matches)).fetchall()
+    """, (tenant_id, my_account_id, cutoff, *br_params, min_matches)).fetchall()
     if not rows:
         return {"best": None, "worst": None}
 
@@ -1480,7 +1495,8 @@ def compute_best_worst_map(conn, tenant_id: int, my_account_id, range_key="all",
 
 def compute_map_distribution(conn, tenant_id: int, my_account_id, range_key="session"):
     cutoff = _range_filter(conn, tenant_id, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
-    rows = conn.execute("""
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT m.map_name,
                COUNT(*) AS cnt,
                SUM(CASE WHEN pa.place=1 THEN 1 ELSE 0 END) AS wins,
@@ -1488,9 +1504,10 @@ def compute_map_distribution(conn, tenant_id: int, my_account_id, range_key="ses
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
+          AND {br_where} AND {_karten_filter("m")}
         GROUP BY m.map_name
         ORDER BY cnt DESC
-    """, (tenant_id, my_account_id, cutoff)).fetchall()
+    """, (tenant_id, my_account_id, cutoff, *br_params)).fetchall()
     return [{"map": r["map_name"], "count": r["cnt"],
              "wins": r["wins"], "avgPlace": r["avg_place"]} for r in rows]
 
@@ -4862,7 +4879,7 @@ def compute_map_performance(conn, tenant_id: int, my_account_id, range_key="all"
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
         WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
-          AND {br_where}
+          AND {br_where} AND {_karten_filter("m")}
         GROUP BY m.map_name
         ORDER BY matches DESC
     """, (tenant_id, my_account_id, cutoff, *br_params)).fetchall()

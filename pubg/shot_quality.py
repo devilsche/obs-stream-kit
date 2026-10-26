@@ -29,7 +29,7 @@ sind direkt testbar, das DB-Holen sitzt darunter.
 """
 import statistics
 
-from pubg.aggregations import _br_filter, _weapon_label, weapon_display
+from pubg.aggregations import KEINE_BR_KARTEN, _br_filter, _karten_filter, _weapon_label, weapon_display
 from pubg.poi_match import point_in_poly, poly_area
 
 #: Grenzen der Rundenphasen in Sekunden Ueberlebenszeit. Die frueh/mitte-
@@ -298,6 +298,8 @@ def deaths_by_map(deaths, matches_per_map):
 
     out = []
     for map_name in set(grouped) | set(matches_per_map):
+        if map_name in KEINE_BR_KARTEN:
+            continue
         rows = grouped.get(map_name, [])
         n = matches_per_map.get(map_name)
         surv = [r["timeSurvived"] for r in rows if r.get("timeSurvived")]
@@ -554,7 +556,7 @@ def _weapon_rows(conn, tenant_id, account_id, cutoff, to_iso=None):
         JOIN matches m ON m.match_id = w.match_id
         WHERE m.tenant_id = ? AND w.account_id = ?
           AND NOT COALESCE(w.is_thrown, false)
-          AND m.played_at >= ? AND {br_where}
+          AND m.played_at >= ? AND {br_where} AND {_karten_filter("m")}
     """
     params = [tenant_id, account_id, cutoff, *br_params]
     if to_iso:

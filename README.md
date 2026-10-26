@@ -449,7 +449,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `mates.html` | Squad-Mates der Range | `layout=carousel\|stack\|fold\|mosaic`, `range=session\|week` |
 | `top-mates.html` | Top-5-Liste | `sortBy=avgPlace\|kd\|winRate\|mostPlayed`, `limit`, `minMatches` |
 | `post-match-card.html` | 10s-Pop-up nach Match-Ende | `durationMs` |
-| `map-distribution.html` | Map-Häufigkeits-Bars | `range=session\|day\|week\|all` |
+| `map-distribution.html` | Map-Häufigkeits-Bars | `range=session\|day\|week\|all` — nur BR-Karten, ohne Camp Jackal und Safe House |
 | `first-fight.html` | Survival-% mit Sparkline | `range` |
 | `session-summary.html` | Vollformat Stream-Ending | `hideMaps=1`, `hideMates=1` |
 | `session-report.html` | After-Session-Report mit Phasen, Match-Liste und Match-Detail | `from`, `to` (ISO, sonst laufende Session) |

@@ -223,6 +223,29 @@ def test_map_distribution_counts_by_range():
     assert miramar["wins"] == 1
 
 
+def test_map_distribution_ohne_trainings_und_eventkarten():
+    """Camp Jackal laeuft als "solo", Safe House als Heist — beides sind
+    keine echten BR-Karten und gehoeren nicht in die Verteilung."""
+    conn = _setup()
+    set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
+    _add_match(conn, "br1", "2026-05-04T10:00:00Z", 2, 200.0, 5)
+    teilnahme = {
+        "account_id": "account.A", "name": "PEX_LuCKoR", "team_id": 1,
+        "place": 1, "kills": 0, "headshot_kills": 0, "assists": 0,
+        "dbnos": 0, "revives": 0, "damage_dealt": 0.0, "longest_kill": 0.0,
+        "time_survived": 600, "walk_distance": 0.0, "ride_distance": 0.0,
+        "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+        "team_kills": 0,
+    }
+    for mid, karte, modus in (("jk1", "Range_Main", "solo"),
+                              ("sh1", "SafeHouse_Main", "heistroyale")):
+        insert_match(conn, mid, karte, modus, False, 600,
+                     "2026-05-04T12:00:00Z", None)
+        insert_participants(conn, mid, [teilnahme])
+    out = compute_map_distribution(conn, T, "account.A", range_key="session")
+    assert [x["map"] for x in out] == ["Erangel_Main"]
+
+
 def test_first_fight_rate_aggregates():
     """First-Fight-Win-Rate: Squad gewinnt wenn am Fight-Ende mind. 1 Member
     noch lebt (kein Squad-Member als Kill-Victim im Fight-Cluster)."""
