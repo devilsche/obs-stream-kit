@@ -71,3 +71,71 @@ def test_das_flugzeug_ist_kein_fahrzeug():
     assert ist_landfahrzeug("TransportAircraft_Chimera_C") is False
     assert ist_landfahrzeug("BP_Motorglider_C") is False
     assert ist_landfahrzeug(None) is False
+
+
+# ── 26.10.: finishDamageInfo, dBNOId, maxSpeed, fellowPassengers ─────────
+
+def _kill_v2(**extra):
+    e = {"_T": "LogPlayerKillV2", "_D": "2026-10-24T18:00:00.0Z",
+         "killer": {"accountId": "account.K"},
+         "victim": {"accountId": "account.V"},
+         "killerDamageInfo": {"damageTypeCategory": "Damage_Gun",
+                              "damageCauserName": "WeapM24_C",
+                              "additionalInfo": ["Item_Attach_Weapon_Upper_CQBSS_C"]},
+         "finishDamageInfo": {"damageTypeCategory": "Damage_DBNO",
+                              "damageCauserName": "WeapHK416_C",
+                              "additionalInfo": ["Item_Attach_Weapon_Upper_Holosight_C"]},
+         "dBNOId": 4711}
+    e.update(extra)
+    return e
+
+
+def test_kill_ursache_kommt_vom_finish():
+    """Das Feld heisst finishDamageInfo — vorher kam die Ursache vom Knock."""
+    r = _normalize(_kill_v2())
+    assert r["damage_reason"] == "Damage_DBNO"
+    assert r["dbno_id"] == 4711
+
+
+def test_aufsaetze_gehoeren_zur_killer_waffe():
+    """weapon ist die M24 — die Visiere der nachlegenden HK416 passen nicht."""
+    r = _normalize(_kill_v2())
+    assert r["weapon"] == "WeapM24_C"
+    assert "CQBSS" in r["attachments"]
+
+
+def test_knock_und_revive_tragen_die_dbno_id():
+    knock = _normalize({"_T": "LogPlayerMakeGroggy",
+                        "_D": "2026-10-24T18:00:00.0Z",
+                        "attacker": {"accountId": "account.K"},
+                        "victim": {"accountId": "account.V"},
+                        "dBNOId": 4711})
+    rev = _normalize({"_T": "LogPlayerRevive", "_D": "2026-10-24T18:00:05.0Z",
+                      "reviver": {"accountId": "account.M"},
+                      "victim": {"accountId": "account.V"}, "dBNOId": 4711})
+    assert knock["dbno_id"] == rev["dbno_id"] == 4711
+
+
+def test_aussteigen_traegt_spitzentempo_und_mitfahrer():
+    r = _normalize({"_T": "LogVehicleLeave", "_D": "2026-10-24T18:00:00.0Z",
+                    "character": {"accountId": "account.A"},
+                    "vehicle": {"vehicleId": "Dacia_A_03_v2_C",
+                                "velocity": 900.0, "seatIndex": 0},
+                    "seatIndex": 0, "rideDistance": 800.0,
+                    "maxSpeed": 137.3,
+                    "fellowPassengers": [{"accountId": "account.B"}]})
+    assert r["max_speed"] == 137.3
+    assert r["fellow_passengers"] == '["account.B"]'
+
+
+def test_einsteigen_allein_und_alte_telemetrie():
+    allein = _normalize({"_T": "LogVehicleRide", "_D": "2026-10-24T18:00:00.0Z",
+                         "character": {"accountId": "account.A"},
+                         "vehicle": {"vehicleId": "Dacia_A_03_v2_C"},
+                         "seatIndex": 0, "fellowPassengers": []})
+    alt = _normalize({"_T": "LogVehicleRide", "_D": "2026-10-24T18:00:00.0Z",
+                      "character": {"accountId": "account.A"},
+                      "vehicle": {"vehicleId": "Dacia_A_03_v2_C"},
+                      "seatIndex": 0})
+    assert allein["fellow_passengers"] == "[]"
+    assert alt["fellow_passengers"] is None

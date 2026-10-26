@@ -910,3 +910,127 @@ def test_tod_ohne_alles_bleibt_died():
         _ev("Kill", 900000, target="account.B"),
     ])
     assert _event_fuer(conn, mid, "account.B")["type"] == "kill_self"
+
+
+# ── dBNOId verbindet Knock und Kill (seit 26.10.) ────────────────────────
+
+def _mit_id(ev, dbno):
+    ev["dbno_id"] = dbno
+    return ev
+
+
+def test_kill_ohne_knock_laut_id_ist_direkter_kill():
+    """Ein haengengebliebener Knock (Revive fehlt in den Daten) macht aus
+    dem direkten Kill sonst ein "stole the knock". Die Id -1 sagt: ohne."""
+    conn = _setup()
+    mid = _gegner_match(conn, "db1")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _mit_id(_ev("Knock", 90000, actor="account.Z", target="account.Y",
+                    weapon="WeapM24_C"), 11),
+        # Revive fehlt — kommt vor, wenn der Mate per Kit aufsteht.
+        _ev("TakeDamage", 899000, actor="account.A", target="account.Y",
+            weapon="WeapM24_C", damage=90.0),
+        _mit_id(_ev("Kill", 900000, actor="account.A", target="account.Y",
+                    weapon="WeapM24_C", reason="Damage_Gun"), -1),
+    ])
+    ev = _event_fuer(conn, mid, "account.Y")
+    assert ev["type"] == "kill"
+    assert "knockerAccount" not in ev
+
+
+def test_kill_gehoert_zum_knock_mit_derselben_id():
+    """Zwei Knocks auf Y, der Tod gehoert laut Id zum ersten (Z)."""
+    conn = _setup()
+    mid = _gegner_match(conn, "db2")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _mit_id(_ev("Knock", 700000, actor="account.A", target="account.Y",
+                    weapon="WeapM24_C"), 21),
+        _mit_id(_ev("Knock", 701000, actor="account.Z", target="account.Y",
+                    weapon="WeapAK47_C"), 22),
+        _ev("TakeDamage", 704900, actor="account.Z", target="account.Y",
+            weapon="WeapAK47_C", damage=0.0),
+        _mit_id(_ev("Kill", 705000, actor="account.Z", target="account.Y",
+                    weapon="WeapAK47_C", reason="Damage_Gun"), 21),
+    ])
+    ev = _event_fuer(conn, mid, "account.Y")
+    assert ev["type"] == "kill_steal"
+    assert ev["knockerAccount"] == "account.A"
+
+
+def test_damage_dbno_ist_ausbluten_trotz_nachschuss():
+    """finishDamageInfo sagt Damage_DBNO: am Boden gestorben, niemand hat
+    erledigt — auch wenn kurz davor ein 0-Schaden-Treffer kam."""
+    conn = _setup()
+    mid = _basic_match(conn, "db3")
+    insert_telemetry_events(conn, mid, [
+        _ev("Landing", 60000, actor="account.A"),
+        _ev("Knock", 700000, actor="account.E", target="account.A",
+            weapon="WeapHK416_C", damage=30.0),
+        _ev("TakeDamage", 704900, actor="account.E", target="account.A",
+            weapon="WeapHK416_C", damage=0.0),
+        _ev("Kill", 705000, actor="account.E", target="account.A",
+            weapon="WeapHK416_C", reason="Damage_DBNO"),
+        _ev("Kill", 900000, actor="account.E", target="account.B",
+            weapon="WeapHK416_C", reason="Damage_Gun"),
+    ])
+    ev = _typ_of(conn, mid, "PEX_LuCKoR")
+    assert ev["type"] == "kill_bleedout"
+
+
+def _mitfahrer(ev, accs):
+    ev["fellow_passengers"] = json.dumps(sorted(accs))
+    return ev
+
+
+def test_mitfahrer_laut_pubg():
+    """Beim Einsteigen steht drin, wer schon sitzt, beim Aussteigen, wer
+    noch sitzt. Ohne diese Daten: None, dann entscheiden die Positionen."""
+    from pubg.aggregations import _gemeinsam_laut_pubg
+    m = {"account.A": [(100000, set()), (180000, {"account.B"})],
+         "account.B": [(101000, {"account.A"}), (180500, set())],
+         "account.C": [(100000, set()), (180000, set())]}
+    assert _gemeinsam_laut_pubg("account.A", "account.B", 100000, 180000, m)
+    assert _gemeinsam_laut_pubg("account.A", "account.C",
+                                100000, 180000, m) is False
+    assert _gemeinsam_laut_pubg("account.X", "account.Y",
+                                100000, 180000, m) is None
+
+
+def test_mitfahrer_laut_pubg_schlagen_die_positionen():
+    """Zwei gleiche Dacias Seite an Seite: die Positionen sagen "dasselbe
+    Auto", fellowPassengers sagt nein — dann bleiben die Pfade getrennt."""
+    conn = _setup()
+    upsert_player(conn, "account.C", "Mate2", "steam", False)
+    upsert_player(conn, "account.D", "Mate3", "steam", False)
+    mid = _zwei_autos_match(conn, "fp1")
+    # Auto 2 faehrt 50 m neben Auto 1 her — fuer die Positionen dasselbe.
+    with conn.raw.cursor() as cur:
+        cur.execute("UPDATE telemetry_events SET actor_x = actor_x - 75000, "
+                    "actor_y = actor_y + 5000 "
+                    "WHERE match_id = %s AND event_type = 'Position' "
+                    "AND actor_account IN ('account.C', 'account.D') "
+                    "AND timestamp_ms BETWEEN 110000 AND 170000", (mid,))
+        cur.execute("UPDATE telemetry_events SET actor_x = 10000 + "
+                    "(timestamp_ms - 100000) / 10000.0 * 5000 "
+                    "WHERE match_id = %s AND event_type = 'Position' "
+                    "AND actor_account IN ('account.C', 'account.D') "
+                    "AND timestamp_ms BETWEEN 110000 AND 170000", (mid,))
+        cur.execute("UPDATE telemetry_events SET fellow_passengers = CASE "
+                    "actor_account WHEN 'account.B' THEN '[\"account.A\"]' "
+                    "WHEN 'account.D' THEN '[\"account.C\"]' ELSE '[]' END "
+                    "WHERE match_id = %s AND event_type = 'VehicleEnter'",
+                    (mid,))
+        cur.execute("UPDATE telemetry_events SET fellow_passengers = '[]' "
+                    "WHERE match_id = %s AND event_type = 'VehicleLeave'",
+                    (mid,))
+    conn.raw.commit()
+    d = compute_match_detail(conn, T, "account.A", mid) or {}
+    pfade = {m["name"]: [p for p in (m["lives"][0]["groundPath"] or [])
+                         if 100000 <= p[2] <= 180000]
+             for m in d["members"] if m["lives"]}
+    # Ohne fellowPassengers waeren alle vier eine Episode und B bekaeme
+    # die Punkte von Auto 2 (y = 55000) beigemischt.
+    assert all(p[1] == 50000.0 for p in pfade["Mate1"]), pfade["Mate1"]
+    assert all(p[1] == 55000.0 for p in pfade["Mate3"]), pfade["Mate3"]

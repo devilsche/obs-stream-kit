@@ -1726,6 +1726,48 @@ def airdrop_backfill(root: str, args=None) -> int:
         python -m pubg.cli airdrop-backfill [--matches N] [--pace 0.2]
                                             [--dry-run]
     """
+    return _rohdaten_lauf("airdrop-backfill", args,
+                          lambda raw, mid, roh: airdrop_griffe_nachtragen(
+                              raw, mid, roh))
+
+
+def telemetrie_felder_nachtragen(raw_conn, match_id: str, roh: list) -> int:
+    """dbno_id, Finish-Ursache, Spitzentempo und Mitfahrer in vorhandene
+    Zeilen schreiben. Kein Einfuegen, kein Loeschen; wiederholbar."""
+    from pubg.telemetry import _normalize
+    from pubg.db_pg import update_telemetrie_felder
+    werte = []
+    for e in roh:
+        if e.get("_T") not in ("LogPlayerKillV2", "LogPlayerMakeGroggy",
+                               "LogPlayerRevive", "LogVehicleRide",
+                               "LogVehicleLeave"):
+            continue
+        n = _normalize(e)
+        if not n or n.get("timestamp_ms") is None:
+            continue
+        werte.append((n["timestamp_ms"], n["event_type"],
+                      n.get("actor_account"), n.get("target_account"),
+                      n.get("dbno_id"), n.get("max_speed"),
+                      n.get("fellow_passengers"),
+                      n.get("damage_reason") if n["event_type"] == "Kill"
+                      else None))
+    return update_telemetrie_felder(raw_conn, match_id, werte)
+
+
+def felder_backfill(root: str, args=None) -> int:
+    """Knock-Id, Finish-Ursache, Spitzentempo und Mitfahrer fuer alte
+    Matches nachtragen — Quellen wie beim airdrop-backfill.
+
+    Nutzung:
+        python -m pubg.cli felder-backfill [--matches N] [--pace 0.2]
+                                           [--dry-run]
+    """
+    return _rohdaten_lauf("felder-backfill", args, telemetrie_felder_nachtragen)
+
+
+def _rohdaten_lauf(titel, args, verarbeite) -> int:
+    """Alle Matches mit Telemetrie, neueste zuerst, je Match die Rohdaten
+    aus Archiv oder CDN holen und `verarbeite(raw, match_id, roh)` geben."""
     import time
     from core.db import connect
     from pubg.api_client import PubgClient
@@ -1760,7 +1802,7 @@ def airdrop_backfill(root: str, args=None) -> int:
                        reverse=True)
     if n_max:
         offen = offen[:n_max]
-    print(f"=== airdrop-backfill: {len(offen)} Matches ===")
+    print(f"=== {titel}: {len(offen)} Matches ===")
     if trocken:
         return 0
 
@@ -1816,7 +1858,7 @@ def airdrop_backfill(root: str, args=None) -> int:
                 print(f"[{i}/{len(offen)}] {mid[:8]} {r['played_at'][:10]}  "
                       f"keine Rohdaten")
                 continue
-            n = airdrop_griffe_nachtragen(raw, mid, roh)
+            n = verarbeite(raw, mid, roh)
             zeilen += n
             ok += 1
             print(f"[{i}/{len(offen)}] {mid[:8]} {r['played_at'][:10]}  "
@@ -2556,6 +2598,8 @@ if __name__ == "__main__":
         sys.exit(drop_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "airdrop-backfill":
         sys.exit(airdrop_backfill(root, sys.argv[2:]))
+    elif len(sys.argv) > 1 and sys.argv[1] == "felder-backfill":
+        sys.exit(felder_backfill(root, sys.argv[2:]))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-maps":
         sys.exit(refresh_maps(root))
     elif len(sys.argv) > 1 and sys.argv[1] == "refresh-assets":
@@ -2570,7 +2614,7 @@ if __name__ == "__main__":
               "list-milestones [pattern] | "
               "weapon-stats-backfill | assists-backfill | "
               "clan-queue-prune | lobby-kd-backfill | drop-backfill | "
-              "airdrop-backfill | "
+              "airdrop-backfill | felder-backfill | "
               "kd-backfill | "
               "speed-backfill | dedupe-telemetry | "
               "lobby-kd-reset-unknown | "

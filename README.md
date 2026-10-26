@@ -895,6 +895,14 @@ was er mitnahm; dafür speichert das Einlesen seit 2026-10-21 alle Griffe ins
 Paket. Für ältere Matches: `python -m pubg.cli airdrop-backfill` (aus dem
 Archiv, sonst vom CDN; wiederholbar).
 
+Seit 2026-10-26 speichert das Einlesen außerdem die Knock-Id (`dBNOId`), die
+den Tod eindeutig seinem Knock zuordnet, die Todesursache vom Finish statt
+vom Knock (`Damage_DBNO` = ausgeblutet), das Spitzentempo jeder Fahrt
+(`maxSpeed`) und die Mitfahrer beim Ein- und Aussteigen (`fellowPassengers`).
+Damit trennt die Karte zwei gleiche Autos ohne Positions-Schätzung, und der
+Tempo-Rekord nennt, wer mitfuhr. Für ältere Matches:
+`python -m pubg.cli felder-backfill` (gleiche Quellen, wiederholbar).
+
 Vorher waren es zwei Tabs — *Sessions* mit Monats-Akkordeons und *Custom
 Range* mit fünf Presets. Zwei Wege zum selben Ziel, und „Yesterday" stand als
 Knopf **und** als Session in der Liste. Der Sprung zur Session davor, die

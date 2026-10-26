@@ -289,6 +289,9 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     attachments     TEXT,
     velocity        DOUBLE PRECISION,
     vehicle_id      TEXT,
+    dbno_id         BIGINT,
+    max_speed       DOUBLE PRECISION,
+    fellow_passengers TEXT,
     payload_json    TEXT
 );
 -- Additive: damage_reason + seat_index + attachments kamen nach Schema-
@@ -309,6 +312,12 @@ ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS seat_index INTEGER;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS attachments TEXT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS velocity DOUBLE PRECISION;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS vehicle_id TEXT;
+-- dbno_id: verbindet Knock, Revive und Kill (Kill -1 = ohne Knock).
+-- max_speed: km/h der ganzen Fahrt, nur auf VehicleLeave.
+-- fellow_passengers: JSON-Liste der Mitfahrer bei Ein-/Ausstieg.
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS dbno_id BIGINT;
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS max_speed DOUBLE PRECISION;
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS fellow_passengers TEXT;
 CREATE INDEX IF NOT EXISTS idx_tel_match
     ON telemetry_events(match_id);
 CREATE INDEX IF NOT EXISTS idx_tel_match_type
@@ -982,6 +991,7 @@ _TEL_FELDER = (
     "target_account", "actor_x", "actor_y", "actor_z", "actor_health",
     "victim_x", "victim_y", "weapon", "distance", "damage",
     "damage_reason", "seat_index", "attachments", "velocity", "vehicle_id",
+    "dbno_id", "max_speed", "fellow_passengers",
 )
 
 
@@ -1059,6 +1069,9 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
         e.get("attachments"),
         e.get("velocity"),
         e.get("vehicle_id"),
+        e.get("dbno_id"),
+        e.get("max_speed"),
+        e.get("fellow_passengers"),
         e.get("payload_json", "{}"),
     ) for e in events]
     rows = _ohne_dubletten(rows)
@@ -1069,7 +1082,8 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
             "(match_id, event_type, timestamp_ms, actor_account, "
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
-            "seat_index, attachments, velocity, vehicle_id, payload_json) "
+            "seat_index, attachments, velocity, vehicle_id, dbno_id, "
+            "max_speed, fellow_passengers, payload_json) "
             "VALUES %s",
             rows,
         )
@@ -1174,6 +1188,42 @@ def update_velocity(conn, match_id: str, werte: list) -> int:
     return n
 
 
+def update_telemetrie_felder(conn, match_id: str, werte: list) -> int:
+    """Die Felder vom 26.10. in vorhandene Zeilen schreiben.
+
+    `werte`: (timestamp_ms, event_type, actor, target, dbno_id, max_speed,
+    fellow_passengers, damage_reason). damage_reason nur fuer Kills —
+    vorher kam sie vom Knock statt vom Finish. Zugeordnet ueber Zeit, Typ
+    und beide Accounts.
+    """
+    if not werte:
+        return 0
+    with conn.cursor() as cur:
+        cur.execute("CREATE TEMP TABLE IF NOT EXISTS _felder ("
+                    "ts BIGINT, et TEXT, acc TEXT, tgt TEXT, dbno BIGINT, "
+                    "maxs DOUBLE PRECISION, fp TEXT, grund TEXT) "
+                    "ON COMMIT DROP")
+        cur.execute("TRUNCATE _felder")
+        execute_values(cur, "INSERT INTO _felder VALUES %s", werte)
+        cur.execute("""
+            UPDATE telemetry_events e
+               SET dbno_id = COALESCE(f.dbno, e.dbno_id),
+                   max_speed = COALESCE(f.maxs, e.max_speed),
+                   fellow_passengers = COALESCE(f.fp, e.fellow_passengers),
+                   damage_reason = COALESCE(NULLIF(f.grund, ''),
+                                            e.damage_reason)
+              FROM _felder f
+             WHERE e.match_id = %s
+               AND e.timestamp_ms = f.ts
+               AND e.event_type = f.et
+               AND e.actor_account IS NOT DISTINCT FROM f.acc
+               AND e.target_account IS NOT DISTINCT FROM f.tgt
+        """, (match_id,))
+        n = cur.rowcount
+    conn.commit()
+    return n
+
+
 def append_telemetry_events(conn, match_id: str, events: list) -> int:
     """Events an ein Match anhaengen, das schon welche hat.
 
@@ -1196,6 +1246,9 @@ def append_telemetry_events(conn, match_id: str, events: list) -> int:
         e.get("attachments"),
         e.get("velocity"),
         e.get("vehicle_id"),
+        e.get("dbno_id"),
+        e.get("max_speed"),
+        e.get("fellow_passengers"),
         e.get("payload_json", "{}"),
     ) for e in events]
     with conn.cursor() as cur:
@@ -1205,7 +1258,8 @@ def append_telemetry_events(conn, match_id: str, events: list) -> int:
             "(match_id, event_type, timestamp_ms, actor_account, "
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
-            "seat_index, attachments, velocity, vehicle_id, payload_json) "
+            "seat_index, attachments, velocity, vehicle_id, dbno_id, "
+            "max_speed, fellow_passengers, payload_json) "
             "VALUES %s",
             rows,
         )

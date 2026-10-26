@@ -21,6 +21,20 @@ def _loc(p, key):
     return loc.get("x"), loc.get("y")
 
 
+def _mitfahrer(event):
+    """Wer sitzt beim Ein-/Aussteigen schon bzw. noch mit drin?
+
+    JSON-Liste der accountIds, "[]" fuer allein. None, wenn das Feld
+    fehlt (Telemetrie vor API v14.1) — dann bleibt nur der Abgleich ueber
+    die Positionen.
+    """
+    fp = event.get("fellowPassengers")
+    if fp is None:
+        return None
+    return json.dumps(sorted(p.get("accountId") for p in fp
+                             if isinstance(p, dict) and p.get("accountId")))
+
+
 def _normalize(event):
     """Convert one PUBG telemetry event to flat row schema, or None to skip.
     Deckt alle für unsere Stats relevanten Event-Typen ab."""
@@ -38,6 +52,9 @@ def _normalize(event):
             "attachments": None,
             "velocity": None,
             "vehicle_id": None,
+            "dbno_id": None,
+            "max_speed": None,
+            "fellow_passengers": None,
             "payload_json": None}
     # PUBG haengt den Fahrzeug-Zustand an fast jedes Event des Spielers,
     # der gerade drin sitzt — auch an Position. Damit haben wir Tempo und
@@ -87,7 +104,12 @@ def _normalize(event):
         base["actor_account"] = (event.get("killer") or {}).get("accountId")
         base["target_account"] = (event.get("victim") or {}).get("accountId")
         info = event.get("killerDamageInfo") or {}
-        finisher_info = event.get("finisherDamageInfo") or {}
+        # Das Feld heisst `finishDamageInfo` — `finisherDamageInfo` stand
+        # hier bis 2026-10-26 und gibt es nicht, damit kam die Ursache
+        # immer vom Knock. Der alte Name bleibt als Rueckfall.
+        finisher_info = (event.get("finishDamageInfo")
+                         or event.get("finisherDamageInfo") or {})
+        base["dbno_id"] = event.get("dBNOId")
         base["weapon"] = info.get("damageCauserName") or event.get("damageCauserName")
         base["distance"] = info.get("distance") or event.get("distance")
         base["actor_x"], base["actor_y"] = _loc(event, "killer")
@@ -102,11 +124,10 @@ def _normalize(event):
             or event.get("damageTypeCategory"))
         # Killer-Weapon-Attachments aus killerDamageInfo.additionalInfo
         # (Liste der Item-Class-Names, z.B. 'Item_Attach_Weapon_Upper_Scope3x_C').
-        # finisherDamageInfo (wenn vorhanden) hat die Attachments des
-        # FINISHER-Schusses — bevorzugen.
-        attach_list = (finisher_info.get("additionalInfo")
-                        or info.get("additionalInfo")
-                        or [])
+        # Bewusst NICHT vom Finish: `weapon` ist die Waffe des Killers, und
+        # die Aufsaetze muessen zu ihr gehoeren — sonst haette die M24 die
+        # Visiere der M4, mit der nur nachgelegt wurde.
+        attach_list = info.get("additionalInfo") or []
         if attach_list:
             import json as _json
             base["attachments"] = _json.dumps(attach_list)
@@ -123,10 +144,14 @@ def _normalize(event):
         base["distance"] = event.get("distance")
         base["actor_x"], base["actor_y"] = _loc(event, "attacker")
         base["victim_x"], base["victim_y"] = _loc(event, "victim")
+        # Knock, Revive und Kill tragen dieselbe Id — damit gehoert ein Tod
+        # eindeutig zu einem Knock, ohne Zeitfenster.
+        base["dbno_id"] = event.get("dBNOId")
     elif et == "LogPlayerRevive":
         base["event_type"] = "Revive"
         base["actor_account"] = (event.get("reviver") or {}).get("accountId")
         base["target_account"] = (event.get("victim") or {}).get("accountId")
+        base["dbno_id"] = event.get("dBNOId")
     elif et == "LogPlayerTakeDamage":
         base["event_type"] = "TakeDamage"
         base["actor_account"] = (event.get("attacker") or {}).get("accountId")
@@ -148,6 +173,7 @@ def _normalize(event):
         # seatIndex: 0 = Fahrer, 1+ = Beifahrer. Sitzwechsel zeigen sich als
         # VehicleLeave (alte seatIndex) + VehicleRide (neue seatIndex).
         base["seat_index"] = event.get("seatIndex")
+        base["fellow_passengers"] = _mitfahrer(event)
     elif et == "LogVehicleLeave":
         base["event_type"] = "VehicleLeave"
         base["actor_account"] = (event.get("character") or {}).get("accountId")
@@ -160,6 +186,10 @@ def _normalize(event):
         # ueberschrieb auch Positions NACH dem Aussteigen.
         base["weapon"] = (event.get("vehicle") or {}).get("vehicleId")
         base["seat_index"] = event.get("seatIndex")
+        base["fellow_passengers"] = _mitfahrer(event)
+        # Spitzentempo der Fahrt in km/h — genauer als die Abtastung alle
+        # 10 s. Fahrer und Beifahrer bekommen denselben Wert.
+        base["max_speed"] = event.get("maxSpeed")
     elif et in ("LogPlayerRedeploy", "LogPlayerRedeployStart"):
         # Comeback-Antenne (Wiederhol-Antenne) — Squadmate aktiviert die
         # Redeploy-Mechanik fuer einen Toten Mate.

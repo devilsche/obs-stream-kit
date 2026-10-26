@@ -145,3 +145,44 @@ def test_fremde_pickups_kommen_mit():
     n = _drop_events_nachtragen(CONN, "bf7", client, "https://cdn/x.json",
                                 {ME})
     assert n == 2
+
+
+def test_felder_nachtrag_fuellt_vorhandene_zeilen():
+    """dbno_id, Finish-Ursache, Spitzentempo und Mitfahrer — nur Updates."""
+    from pubg.cli import telemetrie_felder_nachtragen
+    _match("bf8", "2026-09-20T10:00:00Z")
+    db_pg.insert_telemetry_events(CONN.raw, "bf8", [
+        {"event_type": "Kill", "timestamp_ms": 1000,
+         "actor_account": ME, "target_account": "account.E",
+         "weapon": "WeapHK416_C", "damage_reason": "Damage_Gun",
+         "payload_json": "{}"},
+        {"event_type": "VehicleLeave", "timestamp_ms": 2000,
+         "actor_account": ME, "weapon": "Dacia_A_01_v2_C",
+         "payload_json": "{}"}])
+    CONN.raw.commit()
+    roh = [
+        {"_T": "LogPlayerKillV2", "_D": "1970-01-01T00:00:01.0Z",
+         "killer": {"accountId": ME}, "victim": {"accountId": "account.E"},
+         "killerDamageInfo": {"damageTypeCategory": "Damage_Gun",
+                              "damageCauserName": "WeapHK416_C"},
+         "finishDamageInfo": {"damageTypeCategory": "Damage_DBNO"},
+         "dBNOId": 77},
+        {"_T": "LogVehicleLeave", "_D": "1970-01-01T00:00:02.0Z",
+         "character": {"accountId": ME},
+         "vehicle": {"vehicleId": "Dacia_A_01_v2_C"}, "seatIndex": 0,
+         "maxSpeed": 133.0, "fellowPassengers": [{"accountId": "account.B"}]},
+        # Gibt es in der DB nicht — wird nicht eingefuegt.
+        {"_T": "LogPlayerRevive", "_D": "1970-01-01T00:00:03.0Z",
+         "reviver": {"accountId": ME}, "victim": {"accountId": "account.B"},
+         "dBNOId": 78},
+    ]
+    assert telemetrie_felder_nachtragen(CONN.raw, "bf8", roh) == 2
+    zeilen = {r["event_type"]: r for r in CONN.execute(
+        "SELECT event_type, dbno_id, damage_reason, max_speed, "
+        "fellow_passengers FROM telemetry_events WHERE match_id = ?",
+        ("bf8",)).fetchall()}
+    assert len(zeilen) == 2
+    assert zeilen["Kill"]["dbno_id"] == 77
+    assert zeilen["Kill"]["damage_reason"] == "Damage_DBNO"
+    assert zeilen["VehicleLeave"]["max_speed"] == 133.0
+    assert zeilen["VehicleLeave"]["fellow_passengers"] == '["account.B"]'

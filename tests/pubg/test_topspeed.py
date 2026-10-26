@@ -289,3 +289,42 @@ def test_zeitraum_grenzt_den_report_ein():
     assert round(alles["overall"]["kmh"]) == 160
     eng = compute_top_speed(CONN, T, ICH, from_iso="2026-09-01T00:00:00Z")
     assert round(eng["overall"]["kmh"]) == 121
+
+
+def test_spitzentempo_vom_aussteigen_schlaegt_die_abtastung():
+    """maxSpeed sieht die ganze Fahrt, die Abtastung nur alle 10 s."""
+    _match("ts9")
+    raus = _fahrt("ts9", 2000, 80.0, "Dacia_A_01_v2_C")
+    raus["event_type"] = "VehicleLeave"
+    raus["max_speed"] = 151.5
+    db_pg.insert_telemetry_events(CONN.raw, "ts9", [
+        _fahrt("ts9", 1000, 120.0, "Dacia_A_01_v2_C"), raus])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    assert d["overall"]["kmh"] == 151.5
+
+
+def test_bestwert_nennt_die_mitfahrer():
+    _match("ts10")
+    db_pg.upsert_player(CONN.raw, T, "account.B", "Mate1", "steam", False)
+    rein = _fahrt("ts10", 1000, 20.0, "Dacia_A_01_v2_C")
+    rein.update(event_type="VehicleEnter", fellow_passengers="[]")
+    zu = _fahrt("ts10", 1500, 20.0, "Dacia_A_01_v2_C", acc="account.B", sitz=1)
+    zu.update(event_type="VehicleEnter", fellow_passengers='["account.A"]')
+    raus = _fahrt("ts10", 9000, 30.0, "Dacia_A_01_v2_C")
+    raus.update(event_type="VehicleLeave", fellow_passengers="[]",
+                max_speed=140.0)
+    db_pg.insert_telemetry_events(CONN.raw, "ts10", [
+        rein, zu, _fahrt("ts10", 5000, 120.0, "Dacia_A_01_v2_C"), raus])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    assert d["overall"]["kmh"] == 140.0
+    assert d["overall"]["passengerNames"] == ["Mate1"]
+
+
+def test_ohne_mitfahrer_daten_bleibt_es_offen():
+    _match("ts11")
+    db_pg.insert_telemetry_events(CONN.raw, "ts11", [
+        _fahrt("ts11", 1000, 120.0, "Dacia_A_01_v2_C")])
+    CONN.raw.commit()
+    assert compute_top_speed(CONN, T, ICH)["overall"]["passengerNames"] is None

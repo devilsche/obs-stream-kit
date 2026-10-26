@@ -1,5 +1,6 @@
 import datetime
 import math
+import json
 from pubg.db_pg import get_setting
 
 
@@ -466,6 +467,24 @@ _SELBES_AUTO_CM = 15000
 #: Positionen, die weiter als das auseinanderliegen, sind nicht
 #: vergleichbar — dazwischen faehrt ein Auto zu weit.
 _ZEIT_TOLERANZ_MS = 6000
+
+
+def _gemeinsam_laut_pubg(acc_a, acc_b, start, ende, mitfahrer_by_acc):
+    """Sassen die beiden laut `fellowPassengers` im selben Wagen?
+
+    True/False, wenn einer der beiden im Zeitraum ein- oder ausgestiegen
+    ist und PUBG die Mitfahrer dazu geliefert hat; None ohne diese Daten.
+    Beim Einsteigen stehen die drin, die schon sitzen, beim Aussteigen
+    die, die noch sitzen — einer der beiden sieht den anderen also immer.
+    """
+    rand = 1000
+    a = [m for ts, m in mitfahrer_by_acc.get(acc_a, [])
+         if start - rand <= ts <= ende + rand]
+    b = [m for ts, m in mitfahrer_by_acc.get(acc_b, [])
+         if start - rand <= ts <= ende + rand]
+    if not a and not b:
+        return None
+    return (any(acc_b in m for m in a) or any(acc_a in m for m in b))
 
 
 def _selbes_fahrzeug(acc_a, acc_b, start, ende, pos_by_acc):
@@ -2094,6 +2113,27 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
     for r in ride_seat_rows:
         rides_by_acc.setdefault(r["actor_account"], []).append(r)
 
+    # Mitfahrer laut PUBG (`fellowPassengers`, seit API v14.1): wer beim
+    # Ein- oder Aussteigen schon bzw. noch drinsitzt. Wo das fehlt, bleibt
+    # nur der Abgleich ueber die Positionen.
+    mitfahrer_rows = conn.execute(f"""
+        SELECT actor_account, timestamp_ms, fellow_passengers
+        FROM telemetry_events
+        WHERE match_id = ?
+          AND event_type IN ('VehicleEnter', 'VehicleLeave')
+          AND actor_account IN ({_ph_sq})
+          AND fellow_passengers IS NOT NULL
+          AND timestamp_ms IS NOT NULL
+    """, (match_id, *squad_accs)).fetchall()
+    mitfahrer_by_acc = {}
+    for r in mitfahrer_rows:
+        try:
+            namen = set(json.loads(r["fellow_passengers"]) or [])
+        except (TypeError, ValueError):
+            continue
+        mitfahrer_by_acc.setdefault(r["actor_account"], []).append(
+            (r["timestamp_ms"], namen))
+
     # Shared-Vehicle-Episoden finden (≥2 Squad-Members, selber vid,
     # ueberlappendes Intervall)
     shared_episodes = []
@@ -2123,7 +2163,12 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                     # zwei gleichen Dacias. Ohne diese Pruefung bekam der
                     # eine Wagen den Pfad des anderen — auf der Karte
                     # Striche quer durchs Bild.
-                    if not _selbes_fahrzeug(
+                    belegt = _gemeinsam_laut_pubg(
+                        a_outer, b_other, max(ep_start, s2),
+                        min(ep_end, e2x), mitfahrer_by_acc)
+                    if belegt is False:
+                        continue
+                    if belegt is None and not _selbes_fahrzeug(
                             a_outer, b_other, max(ep_start, s2),
                             min(ep_end, e2x), pos_by_acc_unify):
                         continue
@@ -2262,7 +2307,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
     all_events_rows = conn.execute("""
         SELECT event_type, timestamp_ms, actor_account, target_account,
                victim_x, victim_y, actor_x, actor_y,
-               weapon, distance, damage_reason, attachments
+               weapon, distance, damage_reason, attachments, dbno_id
         FROM telemetry_events
         WHERE match_id = ?
           AND event_type IN ('Kill', 'Knock', 'Revive', 'Redeploy', 'Login')
@@ -2514,6 +2559,15 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
     # (kill / kill_finish / kill_steal). Revive loescht den Knock aus dem
     # State, da das Opfer dann wieder oben war.
     last_knock_by_target = {}  # target_account → Knock-Event-Row
+    # dBNOId → Knock-Event-Row. Seit dem 26.10. gespeichert; wo sie fehlt,
+    # bleibt es bei "letzter Knock auf dieses Ziel".
+    knock_by_dbno = {}
+
+    def _dbno(row):
+        try:
+            return row["dbno_id"]
+        except (KeyError, IndexError):
+            return None
 
     def _row_skeleton(et_row, ts_row, actor_row, target_row,
                        vx, vy, weapon_row=None, dist_cm=None,
@@ -2662,8 +2716,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
         # Erst danach geprueft, war er schon aus der Liste — der geklaute
         # Knock verschwand spurlos.
         von_uns_geknockt = target in currently_knocked_by_squad
+        dbno = _dbno(e)
+        if et == "Kill" and dbno is not None:
+            # Die Id entscheidet: -1 heisst ohne Knock gestorben, sonst
+            # gehoert der Tod genau zu diesem Knock.
+            k = knock_by_dbno.get(dbno) if dbno != -1 else None
+            von_uns_geknockt = bool(k and k["actor_account"] in sq_set
+                                    and target not in sq_set)
         if et == "Knock":
             last_knock_by_target[target] = e
+            if dbno is not None and dbno != -1:
+                knock_by_dbno[dbno] = e
             knock_pos_by_target[target] = (e["victim_x"], e["victim_y"])
             if actor in sq_set and target and target not in sq_set:
                 currently_knocked_by_squad.add(target)
@@ -2683,6 +2746,9 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             # ein Knock von vor einem Redeploy am naechsten Tod und macht
             # aus einem direkten Kill ein "stole the knock".
             knock_vor_kill = last_knock_by_target.pop(target, None)
+            if dbno is not None:
+                knock_vor_kill = (None if dbno == -1
+                                  else knock_by_dbno.get(dbno) or knock_vor_kill)
             # Enemy killt Squad-Mitglied → zaehlt wie ein Knock. Hatte er
             # ihn schon selbst geknockt, ist es derselbe Mate (Ausbluten,
             # Nachschuss) — nicht ein zweiter.
@@ -2813,12 +2879,17 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             # gesetzt von PUBG, aber wenn vorhanden vertrauen).
             if dmg_reason and "BleedOut" in dmg_reason:
                 bled_out = True
+            # Aus finishDamageInfo: am Boden gestorben, ohne dass noch
+            # jemand geschossen hat — ausgeblutet oder Squad-Wipe.
+            if dmg_reason == "Damage_DBNO" and knock_ev:
+                bled_out = True
             # Treffer auf Liegende bucht PUBG mit 0 Schaden. Kam so einer
             # kurz vor dem Tod und steht sein Squad noch, wurde er erledigt
             # — ausgeblutet waere er erst viel spaeter. Faellt dagegen
             # gerade der letzte Mate, bleibt es der Squad-Wipe.
             if (bled_out and recent_other_damage is not None
                     and "BleedOut" not in (dmg_reason or "")
+                    and dmg_reason != "Damage_DBNO"
                     and not _squad_am_ende(target, ts)):
                 bled_out = False
                 letzter_echter_schaden = recent_other_damage
@@ -4060,6 +4131,11 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
 #: Sekunde, wie alle Laengen in der Telemetrie.
 _CMS_ZU_KMH = 0.036
 
+#: Tempo einer Zeile in cm/s. `max_speed` (km/h, nur am Aussteigen) ist die
+#: Spitze der ganzen Fahrt, `velocity` nur der Wert im Abtast-Moment —
+#: GREATEST ignoriert NULL, alte Zeilen ohne max_speed bleiben also gleich.
+_TEMPO = f"GREATEST(e.velocity, e.max_speed / {_CMS_ZU_KMH})"
+
 
 def compute_top_speed(conn, tenant_id: int, my_account_id,
                       from_iso=None, to_iso=None, limit_vehicles: int = 12):
@@ -4067,7 +4143,8 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
 
     Quelle ist das `velocity`-Feld, das PUBG an jedes Event des Spielers
     haengt, der gerade im Fahrzeug sitzt — auch an die Positionen, die
-    ohnehin importiert werden.
+    ohnehin importiert werden. Wo vorhanden, gewinnt `maxSpeed` vom
+    Aussteigen: die Abtastung alle 10 s verpasst die Spitzen.
 
     Nur **selbst gefahren** (Sitz 0): der Beifahrer ist genauso schnell
     unterwegs, gelenkt hat er aber nicht. Und nur, was am Boden faehrt —
@@ -4105,7 +4182,8 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
     basis = f"""
         FROM telemetry_events e
         JOIN matches m ON m.match_id = e.match_id AND m.tenant_id = ?
-        WHERE e.velocity IS NOT NULL AND e.vehicle_id IS NOT NULL
+        WHERE (e.velocity IS NOT NULL OR e.max_speed IS NOT NULL)
+          AND e.vehicle_id IS NOT NULL
           AND e.seat_index = 0
           AND {br_where}
           AND m.map_name NOT IN ('Range_Main', 'Heaven_Main')
@@ -4140,22 +4218,64 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
                 "driverName": _name(acc),
                 "isMe": acc in set(eigene)}
 
-    felder = ("e.velocity AS v, e.vehicle_id, e.actor_account, "
-              "m.map_name, m.match_id, m.played_at")
+    felder = (f"{_TEMPO} AS v, e.vehicle_id, e.actor_account, "
+              "e.timestamp_ms, m.map_name, m.match_id, m.played_at")
+
+    def _mitfahrer(r):
+        """Wer sass bei dieser Fahrt mit drin? Aus fellowPassengers am Ein-
+        und Aussteigen des Fahrers und der anderen. None ohne diese Daten."""
+        acc, ts = r["actor_account"], r["timestamp_ms"]
+        rein = conn.execute(
+            "SELECT timestamp_ms, fellow_passengers FROM telemetry_events "
+            "WHERE match_id = ? AND actor_account = ? "
+            "AND event_type = 'VehicleEnter' AND timestamp_ms <= ? "
+            "ORDER BY timestamp_ms DESC LIMIT 1",
+            (r["match_id"], acc, ts)).fetchone()
+        raus = conn.execute(
+            "SELECT timestamp_ms, fellow_passengers FROM telemetry_events "
+            "WHERE match_id = ? AND actor_account = ? "
+            "AND event_type = 'VehicleLeave' AND timestamp_ms >= ? "
+            "ORDER BY timestamp_ms ASC LIMIT 1",
+            (r["match_id"], acc, ts)).fetchone()
+        if not rein or not raus:
+            return None
+        if rein["fellow_passengers"] is None and raus["fellow_passengers"] is None:
+            return None
+        dabei = set()
+        for x in (rein, raus):
+            dabei |= set(json.loads(x["fellow_passengers"] or "[]"))
+        # Wer unterwegs zu- oder ausgestiegen ist, sieht den Fahrer.
+        for x in conn.execute(
+                "SELECT actor_account, fellow_passengers FROM telemetry_events "
+                "WHERE match_id = ? AND event_type IN "
+                "('VehicleEnter', 'VehicleLeave') "
+                "AND timestamp_ms BETWEEN ? AND ? AND actor_account <> ? "
+                "AND fellow_passengers LIKE ?",
+                (r["match_id"], rein["timestamp_ms"], raus["timestamp_ms"],
+                 acc, f'%"{acc}"%')).fetchall():
+            dabei.add(x["actor_account"])
+        dabei.discard(acc)
+        return sorted(_name(a) for a in dabei)
+
+    def _mit_mitfahrern(z, r):
+        if z:
+            z["passengerNames"] = _mitfahrer(r)
+        return z
 
     def _bester(nur_eigene):
         f = eigen_filter if nur_eigene else ""
         pr = grund + (eigene if nur_eigene else [])
-        return _zeile(conn.execute(
-            f"SELECT {felder} {basis}{f} ORDER BY e.velocity DESC LIMIT 1",
-            pr).fetchone())
+        r = conn.execute(
+            f"SELECT {felder} {basis}{f} ORDER BY {_TEMPO} DESC LIMIT 1",
+            pr).fetchone()
+        return _mit_mitfahrern(_zeile(r), r)
 
     def _je(spalte, nur_eigene):
         f = eigen_filter if nur_eigene else ""
         pr = grund + (eigene if nur_eigene else [])
         rows = conn.execute(
             f"SELECT DISTINCT ON ({spalte}) {felder} {basis}{f} "
-            f"ORDER BY {spalte}, e.velocity DESC", pr).fetchall()
+            f"ORDER BY {spalte}, {_TEMPO} DESC", pr).fetchall()
         # Nach Anzeigename zusammenfassen: Dacia hat vier Spawn-
         # Varianten, die untereinander wie vier Autos aussaehen.
         best = {}
