@@ -1542,11 +1542,13 @@ Zwei **unabhängige** Signale, gedacht für sekündliches Streamer.bot-Polling
 - **`active`** — läuft PUBG laut Steam? (`gameid == 578080`)
   `true` / `false` / `null` (wenn Steam nicht abfragbar ist). Unabhängig vom
   letzten Match.
-- **`matchRecent`** — ist das letzte Match jünger als `thresholdMin` (Default
-  30)? Wird **immer** aus der DB berechnet, auch wenn PUBG geschlossen ist.
+- **`matchRecent`** — ist das letzte Match vor weniger als `thresholdMin`
+  (Default 30) Minuten **zu Ende** gegangen (Start + Dauer)? Wird **immer**
+  aus der DB berechnet, auch wenn PUBG geschlossen ist.
 
 Weitere Felder: `pubgOpen` (Alias für `active`, rückwärtskompatibel),
-`lastMatchAt`, `lastMatchAgeMin`, `thresholdMin`, `steamChecked`.
+`lastMatchAt` (Matchstart), `lastMatchEndAt` (Matchende),
+`lastMatchAgeMin` (Minuten seit Matchende), `thresholdMin`, `steamChecked`.
 
 | Parameter | Beschreibung |
 |-----------|-------------|

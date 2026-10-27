@@ -439,12 +439,16 @@ class EndpointRegistry:
                 steam_checked = False
 
         # ── matchRecent immer aus der DB berechnen ──
+        # played_at ist der Matchstart — gezaehlt wird ab Matchende
+        # (Start + Dauer), sonst faellt ein 25-min-Match fast sofort raus.
         match_recent = False
         last_iso = None
+        end_iso = None
         age_min = None
         conn = self.get_conn()
         row = conn.execute(
-            "SELECT MAX(played_at) AS last FROM matches WHERE tenant_id = ?",
+            "SELECT played_at AS last, duration_secs FROM matches "
+            "WHERE tenant_id = ? ORDER BY played_at DESC LIMIT 1",
             (self.tenant_id,)
         ).fetchone()
         last_iso = row["last"] if row else None
@@ -452,8 +456,11 @@ class EndpointRegistry:
             try:
                 last_dt = datetime.datetime.fromisoformat(
                     last_iso.replace("Z", "+00:00"))
+                end_dt = last_dt + datetime.timedelta(
+                    seconds=row["duration_secs"] or 0)
+                end_iso = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
                 now = datetime.datetime.now(datetime.timezone.utc)
-                age_min = round((now - last_dt).total_seconds() / 60.0, 1)
+                age_min = round((now - end_dt).total_seconds() / 60.0, 1)
                 match_recent = age_min < threshold_min
             except Exception:
                 pass
@@ -463,6 +470,7 @@ class EndpointRegistry:
             "pubgOpen": active,   # Alias (rueckwaertskompatibel) — identisch zu active
             "matchRecent": match_recent,
             "lastMatchAt": last_iso,
+            "lastMatchEndAt": end_iso,
             "lastMatchAgeMin": age_min,
             "thresholdMin": threshold_min,
             "steamChecked": steam_checked,

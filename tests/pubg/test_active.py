@@ -21,8 +21,8 @@ def _setup(tmp_db_path):
     return conn
 
 
-def _add_match(conn, match_id, minutes_ago):
-    insert_match(conn, match_id, "Erangel", "squad", 0, 1800,
+def _add_match(conn, match_id, minutes_ago, duration_secs=1800):
+    insert_match(conn, match_id, "Erangel", "squad", 0, duration_secs,
                  _iso(minutes_ago), None)
     conn.commit()
 
@@ -134,7 +134,18 @@ def test_fake_pubg_open_override(tmp_db_path):
 
 def test_threshold_override(tmp_db_path):
     conn = _setup(tmp_db_path)
-    _add_match(conn, "m1", 20)  # 20 min alt
+    _add_match(conn, "m1", 20, duration_secs=0)  # vor 20 min zu Ende
     reg = _registry(conn, steam_summary_fn=lambda: {"gameid": str(PUBG)})
     assert _call(reg, "thresholdMin=30")["matchRecent"] is True
     assert _call(reg, "thresholdMin=10")["matchRecent"] is False
+
+
+def test_match_recent_counts_from_match_end(tmp_db_path):
+    # played_at ist der Matchstart. Start vor 50 min + 30 min Dauer
+    # -> erst seit 20 min vorbei, also noch "recent" bei Schwelle 30.
+    conn = _setup(tmp_db_path)
+    _add_match(conn, "m1", 50, duration_secs=1800)
+    out = _call(_registry(conn, steam_summary_fn=None))
+    assert out["matchRecent"] is True
+    assert 19 <= out["lastMatchAgeMin"] <= 21
+    assert out["lastMatchEndAt"] is not None
