@@ -4723,7 +4723,11 @@
     // Trend, Achievements und Streaks fetchen + in den Report einhängen.
     // Streaks werden client-seitig aus session-matches berechnet (matches
     // sind absteigend sortiert: neueste zuerst).
+    // Laufnummer: wechselt der Zeitraum, waehrend Abrufe noch laufen,
+    // duerfen deren spaete Antworten nicht in die neuen Plaetze schreiben.
+    let _extrasRun = 0;
     async function renderExtras() {
+      const run = ++_extrasRun;
       // Range an alle Extras durchreichen — sonst zeigen Trend/Achievements/
       // Streaks immer die aktuelle Session unabhängig von gewählter Phase.
       const fromTo = (FROM || TO)
@@ -4752,27 +4756,32 @@
       const vehicleUrl = (FROM || TO)
         ? _SB + `api/pubg/vehicle-stats${fromTo}`
         : _SB + `api/pubg/vehicle-stats?range=session`;
-      const [trend, achievements, matches, hotDrop, payday, vehicle, speed] =
-        await Promise.all([
-        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/trend-deltas${fromTo}`, EXTRAS_TIMEOUT_MS).catch(() => null),
-        PubgUI.fetchJson((window.__SERVE_BASE__||"/") + `api/pubg/session-achievements${fromTo}`, EXTRAS_TIMEOUT_MS).catch(() => []),
-        PubgUI.fetchJson(matchesUrl, EXTRAS_TIMEOUT_MS).catch(() => []),
-        PubgUI.fetchJson(hotDropUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
-        PubgUI.fetchJson(paydayUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
-        PubgUI.fetchJson(vehicleUrl, EXTRAS_TIMEOUT_MS).catch(() => null),
-        // MIT Zeitraum: im Report zaehlt die gewaehlte Session. Der
-        // Bestwert ueberhaupt gehoert zum Meilenstein, nicht hierher.
-        PubgUI.fetchJson((FROM || TO)
+      // Jede Sektion zeichnet, sobald IHRE Daten da sind. Frueher wartete
+      // ein Promise.all auf alle sieben — Trend und Streaks (je < 0,1 s)
+      // hingen bei "All time" hinter vehicle-stats (12 s) und
+      // session-achievements (6 s), und alles erschien auf einmal.
+      const fx = (url, leer) =>
+        PubgUI.fetchJson(url, EXTRAS_TIMEOUT_MS).catch(() => leer);
+      const pTrend    = fx(_SB + `api/pubg/trend-deltas${fromTo}`, null);
+      const pAchs     = fx(_SB + `api/pubg/session-achievements${fromTo}`, []);
+      const pMatches  = fx(matchesUrl, []);
+      const pHotDrop  = fx(hotDropUrl, null);
+      const pPayday   = fx(paydayUrl, null);
+      const pVehicle  = fx(vehicleUrl, null);
+      // MIT Zeitraum: im Report zaehlt die gewaehlte Session. Der
+      // Bestwert ueberhaupt gehoert zum Meilenstein, nicht hierher.
+      const pSpeed    = fx((FROM || TO)
           ? _SB + `api/pubg/top-speed${fromTo}`
-          : _SB + "api/pubg/top-speed?range=session",
-          EXTRAS_TIMEOUT_MS).catch(() => null),
-      ]);
+          : _SB + "api/pubg/top-speed?range=session", null);
 
-      // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen.
+      // POI-Lookup-Tabelle muss da sein bevor wir Tooltips bauen —
+      // schnell und lokal, darf vorweg.
       if (PubgUI.POI && PubgUI.POI.ready) {
         try { await PubgUI.POI.ready; } catch (e) {}
       }
 
+      // Laeuft nebenher; die Mini-Map rendert ohnehin erst beim Aufklappen.
+      (async () => {
       // Landings + POI-Cal pre-fetchen fuer Mini-Map. Lazy-rendert wenn
       // User Match expandiert.
       try {
@@ -4794,10 +4803,12 @@
         window._landingsByMatch = new Map();
         window._poiData = {};
       }
+      })();
 
       // Flammen-Badge in jeder Match-Zeile rendern: Hot-Drop → local_fire_department
       // (greyscale wenn nicht ueberlebt). Tooltip = POI-Name (Map ist
       // schon in der Zeile selbst sichtbar).
+      const sHotDrop = pHotDrop.then((hotDrop) => {
       if (hotDrop && Array.isArray(hotDrop.perMatch)) {
         const hdMap = new Map();
         for (const pm of hotDrop.perMatch) {
@@ -4824,13 +4835,26 @@
           slot.setAttribute("title", tooltip);
         });
       }
+      });
 
       const placeholder = document.querySelector(".extras-placeholder");
       if (!placeholder) return;
+      // Feste Plaetze in fester Reihenfolge — wer zuerst fertig ist,
+      // erscheint zuerst, ohne dass die Reihenfolge springt.
+      const SLOTS = ["trend", "streaks", "achievements", "special",
+                     "speed", "vehicle"];
+      placeholder.innerHTML = SLOTS
+        .map(k => `<div data-extras-slot="${k}"></div>`).join("");
+      const fill = (k, html) => {
+        if (run !== _extrasRun) return;
+        const el = placeholder.querySelector(`[data-extras-slot="${k}"]`);
+        if (el) el.innerHTML = html || "";
+      };
 
       const arrow = (v) => v > 0.001 ? "↑" : (v < -0.001 ? "↓" : "·");
       const cls = (v) => v > 0.001 ? "delta-pos" : (v < -0.001 ? "delta-neg" : "delta-zero");
 
+      const sTrend = pTrend.then((trend) => {
       let trendHtml = "";
       if (trend && trend.deltas && trend.current) {
         const d = trend.deltas;
@@ -4859,9 +4883,12 @@
             </div>
           </div>`;
       }
+      fill("trend", trendHtml);
+      });
 
       // Streaks aus session-matches berechnen — current = vom neuesten
       // Match rückwärts; best = längster Run im Range (chronologisch)
+      const sStreaks = pMatches.then((matches) => {
       const computeCurrent = (test) => {
         let n = 0;
         for (const m of (matches || [])) {
@@ -4902,6 +4929,8 @@
           ${streakItem("Kills ≥ 1", kd1Cur, kd1Best)}
           ${streakItem("Kills ≥ 2", kd2Cur, kd2Best)}
         </div>`;
+      fill("streaks", streaksHtml);
+      });
 
       // Seltene Achievements, die zusaetzlich eine eigene Karte bekommen.
       // Kriterium: Seltenheit plus Erzaehlwert. Match-Anteile gemessen am
@@ -4953,6 +4982,7 @@
         "iron_sights_100", "iron_sights_200",
       ]);
 
+      const sAchs = pAchs.then((achievements) => {
       let achievementsHtml = "";
       let specialHtml = "";
       if (achievements && achievements.length) {
@@ -5016,10 +5046,14 @@
             </div>`;
         }
       }
+      fill("achievements", achievementsHtml);
+      fill("special", specialHtml);
+      });
 
       // PAYDAY/Event-Stats werden jetzt INLINE im jeweiligen Match-Detail-
       // Panel angezeigt (nicht mehr als separate Sektion). Wir fuellen die
       // .event-detail-Placeholder mit Loot/Windows/Doors etc.
+      const sPayday = pPayday.then((payday) => {
       if (payday && payday.matches && payday.matches.length) {
         const labels = payday.labels || {};
         const lootBadges = (loot) => Object.entries(loot || {})
@@ -5070,6 +5104,7 @@
         document.querySelectorAll(".event-detail .event-detail-empty")
           .forEach(el => { el.textContent = "— keine Event-Telemetry —"; });
       }
+      });
 
       // Vehicle-Eviction-Sektion: pro Squad-Member aufklappbar mit
       // Detail-Events (Match-Zeit, POI, Fahrzeug, Gegner).
@@ -5195,6 +5230,7 @@
       // Ein Rekord gilt fuer immer, nicht fuer eine Session — deshalb
       // steht er hier ohne Zeitraum. Der Lobby-Bestwert daneben, nicht
       // dazwischen: das ist nicht meine Leistung.
+      const sSpeed = pSpeed.then((speed) => {
       let speedHtml = "";
       if (speed && speed.overall) {
         const o = speed.overall;
@@ -5240,6 +5276,9 @@
             </div>
           </div>`;
       }
+      fill("speed", speedHtml);
+      });
+      const sVehicle = pVehicle.then((vehicle) => {
       if (vehicle && Array.isArray(vehicle.members) && vehicle.members.length) {
         const parts = [];
         for (const m of vehicle.members) {
@@ -5279,8 +5318,12 @@
         }
       }
 
-      placeholder.innerHTML = trendHtml + streaksHtml + achievementsHtml
-                            + specialHtml + speedHtml + vehicleHtml;
+      fill("vehicle", vehicleHtml);
+      });
+
+      await Promise.allSettled([sHotDrop, sTrend, sStreaks, sAchs, sPayday,
+                                sSpeed, sVehicle]);
+      if (run !== _extrasRun) return;
       // Skeleton-Reserve-Hoehe entfernen, sobald echter Content drin ist —
       // sonst klebt 450px Leerraum unten an wenn der Content kuerzer ist.
       placeholder.classList.add("extras-placeholder--filled");
