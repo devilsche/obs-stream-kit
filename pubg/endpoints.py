@@ -2784,7 +2784,7 @@ class EndpointRegistry:
                                       self.my_account_id) or {}
         weapons = snap.get("weapons") or {}
         career = snap.get("career") or {}
-        vehicles = snap.get("vehicles") or {}
+        vehicles = snap.get("vehicle_groups") or {}
 
         rows = []
         for oid, occ in OCCASIONS.items():
@@ -2850,7 +2850,7 @@ class EndpointRegistry:
                                       self.my_account_id) or {}
         weapons = snap.get("weapons") or {}
         career = snap.get("career") or {}
-        vehicles = snap.get("vehicles") or {}
+        vehicles = snap.get("vehicle_groups") or {}
 
         subject = spec.get("subject") or ""
         stand = 0.0
@@ -2861,10 +2861,10 @@ class EndpointRegistry:
             if not subject:
                 # Die Waffe (bzw. das Fahrzeug) mit dem hoechsten Stand in
                 # dieser Kennzahl — dort faellt die naechste Marke wirklich
-                # als naechste. Ohne Stand: M416 bzw. Dacia.
+                # als naechste. Ohne Stand: M416 bzw. die Sedan-Gruppe.
                 best = sorted(((float(v.get(metric) or 0), n)
                                for n, v in pool.items()), reverse=True)
-                fallback = "Dacia" if occ["scope"] == "vehicle" else "M416"
+                fallback = "Sedan" if occ["scope"] == "vehicle" else "M416"
                 subject = best[0][1] if best and best[0][0] > 0 else fallback
             stand = float((pool.get(subject) or {}).get(metric) or 0)
 

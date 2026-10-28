@@ -1233,27 +1233,29 @@ def lobby_begleitzahlen(conn, tenant_id: int, match_id: str, account_id: str):
 
 
 def _vehicle_records(tempo):
-    """Eigener Bestwert je Fahrzeug fuer den Meilenstein-Stand, dazu Karte
-    und Lobby-Bestwert desselben Fahrzeugs als Begleitinfo.
+    """Eigener Bestwert je Fahrzeug-Gruppe fuer den Meilenstein-Stand,
+    dazu das konkrete Fahrzeug, die Karte und der Lobby-Bestwert derselben
+    Gruppe als Begleitinfo.
 
-    Returns (vehicles, extra): {"Mirado": {"top_speed": 163.4}} und
-    {"Mirado": {"mapName": …, "lobbyKmh": …, "lobbyDriver": …}}.
+    Returns (groups, extra): {"Coupe RB": {"top_speed": 154.2}} und
+    {"Coupe RB": {"vehicleName": "Porsche 911", "mapName": …,
+                  "lobbyKmh": …, "lobbyDriver": …}}.
     """
-    lobby = {z["vehicleName"]: z for z in (tempo.get("lobbyPerVehicle") or [])
-             if z and z.get("vehicleName")}
-    vehicles, extra = {}, {}
-    for z in tempo.get("perVehicle") or []:
-        name = z and z.get("vehicleName")
+    lobby = {z["group"]: z for z in (tempo.get("lobbyPerGroup") or [])
+             if z and z.get("group")}
+    groups, extra = {}, {}
+    for z in tempo.get("perGroup") or []:
+        name = z and z.get("group")
         if not name:
             continue
-        vehicles[name] = {"top_speed": z["kmh"]}
-        info = {"mapName": z.get("mapName")}
+        groups[name] = {"top_speed": z["kmh"]}
+        info = {"vehicleName": z.get("vehicleName"), "mapName": z.get("mapName")}
         lo = lobby.get(name)
         if lo:
             info["lobbyKmh"] = lo["kmh"]
             info["lobbyDriver"] = "you" if lo.get("isMe") else lo.get("driverName")
         extra[name] = info
-    return vehicles, extra
+    return groups, extra
 
 
 def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
@@ -1286,7 +1288,7 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
         # sonst fiele ein Rekord im 13. Fahrzeug unter den Tisch.
         tempo = compute_top_speed(conn, tenant_id, account_id,
                                   limit_vehicles=1000)
-        vehicles, extra["vehicles"] = _vehicle_records(tempo)
+        vehicles, extra["vehicle_groups"] = _vehicle_records(tempo)
         if tempo.get("overall"):
             o = tempo["overall"]
             career["top_speed"] = o["kmh"]
@@ -1318,7 +1320,11 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
     # Nur mit echten Werten: ein leerer Schluessel waere spaeter ein
     # "Vorstand", gegen den jedes Fahrzeug als neuer Rekord gaelte.
     if vehicles:
-        state["vehicles"] = vehicles
+        # Eigener Schluessel je Gruppe (seit 2026-10-28). Unter "vehicles"
+        # standen kurz Einzelfahrzeuge — mit gleichem Schluessel haette die
+        # Gruppe "Motorbike" (inkl. Panigale) den alten Motorrad-Wert als
+        # Rekord geschlagen, ohne dass jemand schneller gefahren waere.
+        state["vehicle_groups"] = vehicles
     return state
 
 

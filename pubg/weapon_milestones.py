@@ -326,8 +326,10 @@ OCCASIONS = {
         "tier": "huge",
         "hint": "Crossed 150 km/h at the wheel",
     },
-    # Eigener Rekord je Fahrzeug. Gezaehlt wird nur der eigene Wert am
-    # Steuer; der Lobby-Bestwert desselben Fahrzeugs steht bloss als Info
+    # Eigener Rekord je Fahrzeug-Gruppe (Basis + Skins, siehe
+    # aggregations.FAHRZEUG_GRUPPEN — ein Skin faehrt wie seine Basis).
+    # Die Feier nennt das konkrete Fahrzeug. Gezaehlt wird nur der eigene
+    # Wert am Steuer; der Lobby-Bestwert desselben Fahrzeugs steht bloss als Info
     # dabei. Seit maxSpeed (2026-10-26) kennt die Lobby-Wertung die echten
     # Spitzen aller Fahrer, darunter Motorrad-Spruenge mit 180+ — gegen die
     # waere ein Gesamt-Rekord im Auto aussichtslos.
@@ -337,7 +339,8 @@ OCCASIONS = {
         "min": 100, "unit": "km/h", "decimals": 1,
         "label": "Vehicle Top Speed", "widget": "big", "enabled": True,
         "tier": "big",
-        "hint": "New personal top speed in this vehicle — at the wheel",
+        "hint": "New personal top speed in this vehicle class (base vehicle "
+                "plus its skins) — at the wheel",
     },
     "career_longest_kill": {
         "scope": "career", "metric": "longest_kill", "kind": "record",
@@ -622,11 +625,11 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
     Ausgangsstand an, sonst waere die halbe Karriere auf einmal faellig.
     """
     if not prev or not (prev.get("weapons") or prev.get("career")
-                        or prev.get("vehicles")):
+                        or prev.get("vehicle_groups")):
         return []
-    # Fahrzeuge kamen spaeter dazu: ein alter Stand ohne den Schluessel
-    # ist eine Bestandsaufnahme, kein Rekord fuer jedes Fahrzeug.
-    has_vehicles = "vehicles" in prev
+    # Fahrzeug-Gruppen kamen spaeter dazu: ein alter Stand ohne den
+    # Schluessel ist eine Bestandsaufnahme, kein Rekord fuer jede Gruppe.
+    has_vehicles = "vehicle_groups" in prev
     cfg = cfg or default_config()
     # Begleitzahlen des aktuellen Stands, je Metrik.
     extras = (cur.get("extra") or {}) if isinstance(cur, dict) else {}
@@ -656,7 +659,7 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
         else:
             if occ["scope"] == "vehicle" and not has_vehicles:
                 continue
-            bucket = "vehicles" if occ["scope"] == "vehicle" else "weapons"
+            bucket = "vehicle_groups" if occ["scope"] == "vehicle" else "weapons"
             pw, cw = prev.get(bucket) or {}, cur.get(bucket) or {}
             pairs = [(name, (pw.get(name) or {}).get(metric) or 0,
                       (vals.get(metric) or 0))
@@ -675,7 +678,7 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
                 floor = c.get("min", occ.get("min")) or 0
                 if v > p and v >= floor and p > 0:
                     # Fahrzeuge tragen ihre Begleitinfo je Fahrzeug.
-                    ex = ((extras.get("vehicles") or {}).get(subject)
+                    ex = ((extras.get("vehicle_groups") or {}).get(subject)
                           if occ["scope"] == "vehicle"
                           else extras.get(metric))
                     found.append(_emit(oid, {**occ, **c}, subject, v, p, ex))

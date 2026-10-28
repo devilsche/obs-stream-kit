@@ -1136,6 +1136,30 @@
     }
     .ts-lead { color: var(--pubg-gold, #f2b705); }
     .ts-me { color: var(--pubg-gold, #f2b705); }
+    /* Fahrzeug-Gruppe (Basis + Skins): Zeile mit dem besten Wert, darunter
+       aufklappbar jede Variante. Ein Skin faehrt wie seine Basis, die
+       Varianten zeigen nur, womit es war. */
+    .ts-group > summary {
+      list-style: none;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .ts-group > summary::-webkit-details-marker { display: none; }
+    .ts-group > summary:hover { background: var(--pubg-row-hover, rgba(255,255,255,.04)); }
+    .ts-group > summary:focus-visible {
+      outline: 2px solid var(--pubg-gold, #f2b705);
+      outline-offset: 2px;
+    }
+    .ts-group > summary .ts-sub > span:first-child::before {
+      content: "\25B8\00A0";
+      color: var(--pubg-muted);
+    }
+    .ts-group[open] > summary .ts-sub > span:first-child::before {
+      content: "\25BE\00A0";
+    }
+    .ts-var { color: var(--pubg-muted); }
+    .ts-var > span:first-child { padding-left: 1.2em; }
+    .ts-var > span:first-child::before { content: "\21B3\00A0"; }
     .ve-dealt { color: var(--pubg-good, #3cb44b); }
     .ve-taken { color: var(--pubg-warn, #e6194b); }
     .ve-wpn {
@@ -5249,7 +5273,7 @@
           ? `<b class="ts-me">${v.driverName}</b>` : v.driverName;
         const spalte = (meine, lobby, titel, schluessel) => {
           const lobbyBy = new Map((lobby || []).map(v => [v[schluessel], v]));
-          return (meine || []).slice(0, 6).map(v => {
+          return (meine || []).map(v => {
             const l = lobbyBy.get(v[schluessel]);
             const best = (l && l.kmh > v.kmh)
               ? `<span class="ts-best">${l.kmh.toFixed(1)} ${wer(l)}</span>`
@@ -5260,6 +5284,31 @@
                       <b>${v.kmh.toFixed(1)}</b>${best}</div>`;
           }).join("");
         };
+        // Je Fahrzeug-Gruppe (Basis + Skins) der beste Wert, darunter
+        // aufklappbar jede Variante — man sieht, womit es war. Lobby-Wert
+        // je Gruppe bzw. je Variante daneben.
+        const bestZelle = (mein, l) => (l && l.kmh > mein.kmh)
+          ? `<span class="ts-best">${l.kmh.toFixed(1)} ${wer(l)}</span>`
+          : `<span class="ts-best ts-lead">you lead</span>`;
+        const gruppen = (meine, lobby) => {
+          const lobbyBy = new Map((lobby || []).map(g => [g.group, g]));
+          return (meine || []).map(g => {
+            const lg = lobbyBy.get(g.group);
+            const zeile = `<div class="ts-sub"><span>${g.group}</span>
+                <b>${g.kmh.toFixed(1)}</b>${bestZelle(g, lg)}</div>`;
+            const vars = g.variants || [];
+            // Nur aufklappen, wo es etwas zu sehen gibt: mehrere
+            // Varianten oder eine, die anders heisst als die Gruppe.
+            if (vars.length < 2 && (!vars[0] || vars[0].vehicleName === g.group))
+              return zeile;
+            const lobbyVar = new Map(((lg && lg.variants) || [])
+              .map(v => [v.vehicleName, v]));
+            const unter = vars.map(v => `<div class="ts-sub ts-var">
+                <span>${v.vehicleName}</span><b>${v.kmh.toFixed(1)}</b>
+                ${bestZelle(v, lobbyVar.get(v.vehicleName))}</div>`).join("");
+            return `<details class="ts-group"><summary>${zeile}</summary>${unter}</details>`;
+          }).join("");
+        };
         speedHtml = `<h3 class="extras-h">Top Speed</h3>
           <div class="ts-box">
             ${zeile(o, "my best")}
@@ -5268,8 +5317,10 @@
                that is your own name up there.</div>` : ""}
             <div class="ts-cols">
               <div><h4 class="ts-h">By vehicle · mine / lobby</h4>
-                ${spalte(speed.perVehicle, speed.lobbyPerVehicle,
-                         "vehicle", "vehicleName")}</div>
+                ${speed.perGroup
+                  ? gruppen(speed.perGroup, speed.lobbyPerGroup)
+                  : spalte(speed.perVehicle, speed.lobbyPerVehicle,
+                           "vehicle", "vehicleName")}</div>
               <div><h4 class="ts-h">By map · mine / lobby</h4>
                 ${spalte(speed.perMap, speed.lobbyPerMap,
                          "map", "mapName")}</div>

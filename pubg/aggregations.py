@@ -532,15 +532,8 @@ def _selbes_fahrzeug(acc_a, acc_b, start, ende, pos_by_acc):
 def _fahrzeug_label(vid):
     """Anzeigename eines Fahrzeugs, sonst die gekuerzte Id.
 
-    Sitzt der Skin auf einem bekannten Basisfahrzeug, steht das in
-    Klammern dahinter ("Sedan (Dacia)") — denn gefahren wird der
-    Basistyp, und denselben Sedan gibt es auf zweien, die sich deutlich
-    unterschiedlich fahren.
-
-    Nur wo der Basistyp **belegt** ist. Die Lizenz-Fahrzeuge stehen
-    bewusst einzeln: ihre Geschwindigkeitsprofile liegen im
-    Ueberlappungsbereich mehrerer Basisautos, da waere jede Klammer
-    geraten.
+    Welches Basisfahrzeug ein Skin hat, steht nicht hier, sondern in
+    `fahrzeug_gruppe` — die Id verraet es nicht (siehe dort).
     """
     s = str(vid or "")
     name = None
@@ -551,8 +544,44 @@ def _fahrzeug_label(vid):
     if name is None:
         name = (s.replace("BP_", "").replace("_C", "")
                  .replace("_", " ").strip()) or "?"
-    basis = VEHICLE_BASE.get(s)
-    return f"{name} ({basis})" if basis else name
+    nummer = SKIN_NUMMER.get(s)
+    return f"{name} {nummer}" if nummer else name
+
+
+#: Fahrzeug-Gruppen: Basisfahrzeuge und die Skins, die aus ihnen entstehen.
+#: Ein Skin aendert laut PUBG nur das Aussehen — HP, Tempo, Gewicht, Tank
+#: und Fahrverhalten bleiben die des Basisfahrzeugs (pubg.com/news/6546).
+#: Ein Porsche 911 faehrt also genau wie ein Coupe RB; Tempo-Rekorde
+#: zaehlen deshalb je Gruppe.
+#:
+#: Belegt (2026-10-28) ueber die Umwandlung in den Daten: wo ein Skin zum
+#: ersten Mal bestiegen wird, ist kurz davor an derselben Stelle jemand
+#: aus dem Basisfahrzeug gestiegen — Porsche 911 101x aus dem Coupe RB,
+#: Cayenne aus dem SUV der jeweiligen Karte (UAZ auf Erangel/Taego, Niva =
+#: "Zima" auf Vikendi, Pickup auf Miramar/Deston, Blanc auf Rondo). Fuer
+#: Aston Martin offiziell bestaetigt: DBX707 -> Zima, Pickup, UAZ;
+#: Vantage -> Coupe RB.
+#:
+#: Die Reihenfolge zaehlt (erster Treffer gewinnt), nicht gelistete
+#: Fahrzeuge bilden eine eigene Gruppe unter ihrem Namen.
+FAHRZEUG_GRUPPEN = [
+    ("Coupe RB", ("CoupeRB", "Carrera", "Vantage", "Chiron", "Countach",
+                  "McLarenGT", "ContinentalGTC")),
+    ("Sedan", ("Dacia", "Mirado", "Special_Sedan", "Panamera", "FlyingSpur")),
+    ("SUV", ("Uaz", "Niva", "Blanc", "PickupTruck", "Cayenne", "DBX", "Urus",
+             "Classic_")),
+    ("Motorbike", ("Motorbike", "PanigaleV4S", "RoadGlideST", "ElSolitario",
+                   "FbrBike")),
+]
+
+
+def fahrzeug_gruppe(vid):
+    """Gruppe eines Fahrzeugs (Basis + Skins), sonst sein eigener Name."""
+    s = str(vid or "")
+    for gruppe, needles in FAHRZEUG_GRUPPEN:
+        if any(n in s for n in needles):
+            return gruppe
+    return _fahrzeug_label(s)
 
 
 def _ist_fahrzeug_waffe(wid):
@@ -639,14 +668,15 @@ _VEHICLE_PATTERNS = [
     ("MortarPawn",              "Mortar"),
 ]
 
-#: Welcher Skin auf welchem Basisfahrzeug sitzt. Nur was gemessen ist:
-#: das Fahrverhalten haengt am Basistyp, nicht am Blech. Belegt ueber
-#: die `velocity`-Werte aus 40 archivierten Matches — Sedan 01 kommt in
-#: 1225 Messungen nie ueber 145 km/h (Dacia-Korridor), Sedan 02 erreicht
-#: 157 (das schafft nur der Mirado).
-VEHICLE_BASE = {
-    "BP_Special_Sedan_01_C": "Dacia",
-    "BP_Special_Sedan_02_C": "Mirado",
+#: Zwei Sedan-Modelle mit gleichem Namen auseinanderhalten. Frueher stand
+#: hier "Sedan 01 = Dacia, Sedan 02 = Mirado" (aus dem Tempo geschlossen).
+#: Die Umwandlungen in den Daten zeigen: beide entstehen ueberwiegend aus
+#: dem Dacia (Sedan 02: 42x Dacia, 10x Mirado) — Sedan 02 sass nur oefter
+#: auf einem Mirado und wirkte deshalb schneller. Die Basis steht nicht in
+#: der Id; die Gruppe "Sedan" deckt beide ab.
+SKIN_NUMMER = {
+    "BP_Special_Sedan_01_C": "01",
+    "BP_Special_Sedan_02_C": "02",
 }
 
 # Environment / Misc — Brand/Bombe/Care-Package-Drop etc.
@@ -4305,9 +4335,30 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
         aus = sorted(best.values(), key=lambda x: -x["kmh"])
         return aus[:limit_vehicles] if spalte == "e.vehicle_id" else aus
 
+    def _gruppen(rows):
+        """Je Fahrzeug-Gruppe der beste Wert aller Varianten, darunter jede
+        Variante (Basis und Skins) mit ihrem eigenen Bestwert — damit man
+        sieht, was es war. Ohne Begrenzung: der Report zeigt alle."""
+        gruppen = {}
+        for r in rows:
+            z = _zeile(r)
+            if not z:
+                continue
+            varianten = gruppen.setdefault(fahrzeug_gruppe(r["vehicle_id"]), {})
+            alt = varianten.get(z["vehicleName"])
+            if not alt or z["kmh"] > alt["kmh"]:
+                varianten[z["vehicleName"]] = z
+        aus = []
+        for gruppe, varianten in gruppen.items():
+            vs = sorted(varianten.values(), key=lambda x: -x["kmh"])
+            aus.append({**vs[0], "group": gruppe, "variants": vs})
+        return sorted(aus, key=lambda x: -x["kmh"])
+
     eigen_fzg = _zeilen("e.vehicle_id", True)
     lobby_fzg = _zeilen("e.vehicle_id", False)
     return {"overall": _bester(eigen_fzg),
+            "perGroup": _gruppen(eigen_fzg),
+            "lobbyPerGroup": _gruppen(lobby_fzg),
             "perVehicle": _je("e.vehicle_id", eigen_fzg),
             "perMap": _je("m.map_name", _zeilen("m.map_name", True)),
             "lobby": _bester(lobby_fzg),

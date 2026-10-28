@@ -142,12 +142,14 @@ def test_jedes_gesehene_fahrzeug_hat_einen_namen():
         assert "_" not in name and not name.startswith("BP"), (vid, name)
 
 
-def test_sedan_nennt_sein_basisfahrzeug():
-    """Denselben Sedan gibt es auf zwei Basisfahrzeugen — und die fahren
-    sich deutlich unterschiedlich."""
-    from pubg.aggregations import _fahrzeug_label
-    assert _fahrzeug_label("BP_Special_Sedan_01_C") == "Sedan (Dacia)"
-    assert _fahrzeug_label("BP_Special_Sedan_02_C") == "Sedan (Mirado)"
+def test_sedan_modelle_heissen_nach_nummer():
+    """Die Basis steht nicht in der Id: beide Sedans entstehen ueberwiegend
+    aus dem Dacia. "Sedan (Mirado)" war aus dem Tempo geschlossen und
+    falsch — die Gruppe "Sedan" deckt beide ab."""
+    from pubg.aggregations import _fahrzeug_label, fahrzeug_gruppe
+    assert _fahrzeug_label("BP_Special_Sedan_01_C") == "Sedan 01"
+    assert _fahrzeug_label("BP_Special_Sedan_02_C") == "Sedan 02"
+    assert fahrzeug_gruppe("BP_Special_Sedan_02_C") == "Sedan"
     # Ohne belegten Basistyp bleibt es beim reinen Namen.
     assert _fahrzeug_label("BP_Carrera_LGD_C") == "Porsche 911"
 
@@ -350,38 +352,38 @@ def test_gesamt_rekord_ist_standardmaessig_aus():
 
 def test_rekord_je_fahrzeug_feiert_nur_das_fahrzeug():
     vorher = {"career": {}, "weapons": {},
-              "vehicles": {"Mirado": {"top_speed": 163.4},
-                           "Dacia": {"top_speed": 154.0}}}
+              "vehicle_groups": {"Sedan": {"top_speed": 163.4},
+                                 "Coupe RB": {"top_speed": 153.9}}}
     nachher = {"career": {}, "weapons": {},
-               "vehicles": {"Mirado": {"top_speed": 163.4},
-                            "Dacia": {"top_speed": 156.1}},
-               "extra": {"vehicles": {"Dacia": {"mapName": "Baltic_Main",
-                                                "lobbyKmh": 171.2,
-                                                "lobbyDriver": "Someone"}}}}
+               "vehicle_groups": {"Sedan": {"top_speed": 163.4},
+                                  "Coupe RB": {"top_speed": 156.1}},
+               "extra": {"vehicle_groups": {"Coupe RB": {
+                   "vehicleName": "Porsche 911", "mapName": "Baltic_Main",
+                   "lobbyKmh": 171.2, "lobbyDriver": "Someone"}}}}
     got = [m for m in _detect(vorher, nachher)
            if m["occasion"] == "vehicle_top_speed"]
-    assert [m["subject"] for m in got] == ["Dacia"]
-    assert got[0]["value"] == 156.1 and got[0]["prev_value"] == 154.0
-    assert got[0]["extra"]["mapName"] == "Baltic_Main"
-    assert got[0]["display"] == "Dacia"
+    assert [m["subject"] for m in got] == ["Coupe RB"]
+    assert got[0]["value"] == 156.1 and got[0]["prev_value"] == 153.9
+    assert got[0]["extra"]["vehicleName"] == "Porsche 911"
+    assert got[0]["display"] == "Coupe RB"
 
 
 def test_fremder_lobby_rekord_feiert_nichts():
     """Nur der eigene Wert zaehlt; die Lobby steht bloss als Info dabei."""
     vorher = {"career": {}, "weapons": {},
-              "vehicles": {"Motorbike": {"top_speed": 159.3}}}
+              "vehicle_groups": {"Motorbike": {"top_speed": 159.3}}}
     nachher = {"career": {}, "weapons": {},
-               "vehicles": {"Motorbike": {"top_speed": 159.3}},
-               "extra": {"vehicles": {"Motorbike": {"lobbyKmh": 184.8}}}}
+               "vehicle_groups": {"Motorbike": {"top_speed": 159.3}},
+               "extra": {"vehicle_groups": {"Motorbike": {"lobbyKmh": 184.8}}}}
     assert not [m for m in _detect(vorher, nachher)
                 if m["occasion"] == "vehicle_top_speed"]
 
 
 def test_neues_fahrzeug_ist_bestandsaufnahme_kein_rekord():
     vorher = {"career": {}, "weapons": {},
-              "vehicles": {"Mirado": {"top_speed": 163.4}}}
+              "vehicle_groups": {"Mirado": {"top_speed": 163.4}}}
     nachher = {"career": {}, "weapons": {},
-               "vehicles": {"Mirado": {"top_speed": 163.4},
+               "vehicle_groups": {"Mirado": {"top_speed": 163.4},
                             "Buggy": {"top_speed": 121.0}}}
     assert not [m for m in _detect(vorher, nachher)
                 if m["occasion"] == "vehicle_top_speed"]
@@ -392,31 +394,82 @@ def test_erster_stand_mit_fahrzeugen_feiert_nichts():
     kein Rekord fuer jedes Fahrzeug auf einmal."""
     vorher = {"career": {"top_speed": 163.4}, "weapons": {"M416": {"kills": 1}}}
     nachher = {"career": {"top_speed": 163.4}, "weapons": {"M416": {"kills": 1}},
-               "vehicles": {"Mirado": {"top_speed": 163.4}}}
+               "vehicle_groups": {"Mirado": {"top_speed": 163.4}}}
     assert not [m for m in _detect(vorher, nachher)
                 if m["occasion"] == "vehicle_top_speed"]
 
 
 def test_unter_der_untergrenze_kein_rekord():
     vorher = {"career": {}, "weapons": {},
-              "vehicles": {"Bicycle": {"top_speed": 30.0}}}
+              "vehicle_groups": {"Bicycle": {"top_speed": 30.0}}}
     nachher = {"career": {}, "weapons": {},
-               "vehicles": {"Bicycle": {"top_speed": 41.0}}}
+               "vehicle_groups": {"Bicycle": {"top_speed": 41.0}}}
     assert not [m for m in _detect(vorher, nachher)
                 if m["occasion"] == "vehicle_top_speed"]
 
 
-def test_stand_traegt_fahrzeuge_mit_lobby_info():
-    """collect: je Fahrzeug der eigene Bestwert, dazu Karte und
-    Lobby-Bestwert desselben Fahrzeugs als Begleitinfo."""
+def test_stand_traegt_gruppen_mit_fahrzeug_und_lobby_info():
+    """collect: je Gruppe der eigene Bestwert, dazu das konkrete Fahrzeug,
+    die Karte und der Lobby-Bestwert derselben Gruppe als Begleitinfo."""
     from pubg.poller import _vehicle_records
     tempo = {
-        "perVehicle": [{"vehicleName": "Mirado", "kmh": 163.4,
-                        "mapName": "Baltic_Main", "isMe": True}],
-        "lobbyPerVehicle": [{"vehicleName": "Mirado", "kmh": 171.0,
-                             "driverName": "X", "isMe": False}],
+        "perGroup": [{"group": "Coupe RB", "vehicleName": "Porsche 911",
+                      "kmh": 154.2, "mapName": "Baltic_Main", "isMe": True}],
+        "lobbyPerGroup": [{"group": "Coupe RB", "kmh": 179.0,
+                           "driverName": "X", "isMe": False}],
     }
-    vehicles, extra = _vehicle_records(tempo)
-    assert vehicles == {"Mirado": {"top_speed": 163.4}}
-    assert extra["Mirado"] == {"mapName": "Baltic_Main", "lobbyKmh": 171.0,
-                               "lobbyDriver": "X"}
+    groups, extra = _vehicle_records(tempo)
+    assert groups == {"Coupe RB": {"top_speed": 154.2}}
+    assert extra["Coupe RB"] == {"vehicleName": "Porsche 911",
+                                 "mapName": "Baltic_Main",
+                                 "lobbyKmh": 179.0, "lobbyDriver": "X"}
+
+
+def test_alter_stand_mit_einzelfahrzeugen_feiert_keine_gruppe():
+    """Kurz stand der Stand unter "vehicles" je Einzelfahrzeug. Die Gruppe
+    "Motorbike" (inkl. Panigale) darf den alten Motorrad-Wert nicht als
+    Rekord schlagen — niemand ist schneller gefahren."""
+    vorher = {"career": {}, "weapons": {"M416": {"kills": 1}},
+              "vehicles": {"Motorbike": {"top_speed": 159.3}}}
+    nachher = {"career": {}, "weapons": {"M416": {"kills": 1}},
+               "vehicle_groups": {"Motorbike": {"top_speed": 163.7}}}
+    assert not [m for m in _detect(vorher, nachher)
+                if m["occasion"] == "vehicle_top_speed"]
+
+
+@pytest.mark.parametrize("vid,gruppe", [
+    ("BP_CoupeRB_C", "Coupe RB"), ("BP_Carrera_LGD_C", "Coupe RB"),
+    ("BP_Vantage_EP_C", "Coupe RB"), ("BP_McLarenGT_St_white_C", "Coupe RB"),
+    ("BP_Dacia_A_03_v2_Esports_C", "Sedan"), ("BP_Mirado_Open_05_C", "Sedan"),
+    ("BP_Panamera_ULT_C", "Sedan"), ("BP_FlyingSpur_LGD_C", "Sedan"),
+    ("BP_Uaz_B_01_C", "SUV"), ("BP_Niva_07_C", "SUV"), ("BP_Blanc_C", "SUV"),
+    ("BP_PickupTruck_A_esports_C", "SUV"), ("BP_Cayenne_EP_C", "SUV"),
+    ("BP_DBX_LGD_C", "SUV"), ("BP_Urus_EP_C", "SUV"), ("BP_Classic_02_C", "SUV"),
+    ("BP_Motorbike_04_Desert_C", "Motorbike"),
+    ("BP_PanigaleV4S_LGD04_C", "Motorbike"),
+    ("BP_RoadGlideST_ULT_C", "Motorbike"), ("BP_Special_FbrBike_C", "Motorbike"),
+    ("BP_M_Rony_A_01_C", "Rony"), ("BP_Buggy_A_01_C", "Buggy"),
+])
+def test_fahrzeug_gruppen(vid, gruppe):
+    from pubg.aggregations import fahrzeug_gruppe
+    assert fahrzeug_gruppe(vid) == gruppe
+
+
+def test_bestwert_je_gruppe_mit_allen_varianten():
+    _match("g1", "Baltic_Main")
+    db_pg.insert_telemetry_events(CONN.raw, "g1", [
+        _fahrt("g1", 1000, 150.0, "BP_CoupeRB_C"),
+        _fahrt("g1", 2000, 152.1, "BP_Carrera_LGD_C"),
+        _fahrt("g1", 3000, 148.0, "BP_Countach_ULT_C"),
+        _fahrt("g1", 4000, 145.0, "Dacia_A_01_v2_C"),
+    ])
+    CONN.raw.commit()
+    d = compute_top_speed(CONN, T, ICH)
+    by = {g["group"]: g for g in d["perGroup"]}
+    assert set(by) == {"Coupe RB", "Sedan"}
+    coupe = by["Coupe RB"]
+    assert round(coupe["kmh"], 1) == 152.1
+    assert coupe["vehicleName"] == "Porsche 911"
+    assert [v["vehicleName"] for v in coupe["variants"]] == [
+        "Porsche 911", "Coupe RB", "Lambo Countach"]
+

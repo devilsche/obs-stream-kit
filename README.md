@@ -726,10 +726,32 @@ ohne sich Anlässe wegzunehmen; welcher Anlass wohin geht (`big`, `bar` oder
 | `seasons/lifetime` (API) | kontoweite Summen über **alle** Modi, plus Strecke, Zeit, Heilung und die Karriere-Rekorde | ganze Karriere |
 | `match_weapon_stats` (DB) | Match-Schadensrekord je Waffe und Wurfzahlen je Wurfgerät | ab Beginn der Aufzeichnung |
 
-**Tempo-Rekord je Fahrzeug** (`vehicle_top_speed`, seit 2026-10-28): gefeiert
-wird, wenn du **deinen eigenen** Bestwert in einem Fahrzeug schlägst (am
-Steuer, ab 100 km/h). Die Feier nennt die Karte und — nur als Info — den
-Lobby-Bestwert desselben Fahrzeugs. Der frühere Gesamt-Rekord
+**Tempo-Rekord je Fahrzeug-Gruppe** (`vehicle_top_speed`, seit 2026-10-28):
+gefeiert wird, wenn du **deinen eigenen** Bestwert in einer Gruppe schlägst (am
+Steuer, ab 100 km/h). Die Feier nennt das konkrete Fahrzeug („Coupe RB ·
+Porsche 911"), die Karte und — nur als Info — den Lobby-Bestwert der Gruppe.
+
+Gruppen = Basisfahrzeug plus die Skins, die daraus entstehen
+(`aggregations.FAHRZEUG_GRUPPEN`). Ein Skin ändert laut PUBG nur das Aussehen,
+HP, Tempo und Fahrverhalten bleiben die der Basis (pubg.com/news/6546):
+
+| Gruppe | Basis | Skins |
+|---|---|---|
+| Coupe RB | Coupe RB | Porsche 911, Aston Vantage, Bugatti Chiron, Lambo Countach, McLaren GT, Bentley Continental GTC |
+| Sedan | Dacia, Mirado | Sedan 01/02, Porsche Panamera, Bentley Flying Spur |
+| SUV | UAZ (Erangel, Taego), Niva/Zima (Vikendi), Pickup (Miramar, Deston), Blanc (Rondo) | Porsche Cayenne, Aston DBX, Lambo Urus, Classic Car |
+| Motorbike | Motorrad | Ducati Panigale, Harley Road Glide, FBR Bike, El Solitario |
+
+Alles andere (Rony, Buggy, Pony Coupe, …) ist eine eigene Gruppe. Belegt über
+die Umwandlung in den Daten: wo ein Skin zum ersten Mal bestiegen wird, ist kurz
+davor an derselben Stelle jemand aus dem Basisfahrzeug gestiegen. Die
+Telemetrie selbst nennt die Basis nirgends — weder ein Feld noch ein Event.
+Die frühere Zuordnung „Sedan 01 = Dacia, Sedan 02 = Mirado" war aus dem Tempo
+geschlossen und falsch; beide entstehen überwiegend aus dem Dacia.
+
+Im Report zeigt die Tempo-Box je Gruppe den besten Wert, darunter aufklappbar
+jede Variante mit eigenem Wert und dem Lobby-Wert — alle Gruppen, nicht nur
+die ersten sechs. Der frühere Gesamt-Rekord
 (`career_top_speed`) ist standardmäßig aus, sonst feierte ein neuer Bestwert
 zweimal; im Tool lässt er sich wieder einschalten.
 
