@@ -33,6 +33,16 @@ def test_alle_stufenreihen():
 
 def test_fremde_ids_und_reihenfolge_bleiben():
     items = [_a("flare_gun"), _a("beast_chicken"), _a("skeet_shooter"),
-             _a("ultra_chicken"), _a("chicken_streak")]
+             _a("ultra_chicken"), _a("chicken_streak")]   # streak: keine Stufe
     assert [a["id"] for a in keep_highest_tier(items)] == [
         "flare_gun", "skeet_shooter", "ultra_chicken", "chicken_streak"]
+
+
+def test_dinner_served_ist_die_grundstufe():
+    got = keep_highest_tier([_a("chicken"), _a("beast_chicken")])
+    assert [a["id"] for a in got] == ["beast_chicken"]
+
+
+def test_dinner_served_allein_bleibt():
+    got = keep_highest_tier([_a("chicken", "m1"), _a("god_mode_chicken", "m2")])
+    assert [a["id"] for a in got] == ["chicken", "god_mode_chicken"]

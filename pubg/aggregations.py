@@ -5129,7 +5129,10 @@ LONGEST_KILL_TIERS = [
 #: Chicken" und darunter nochmal "Ultra Chicken" fuer dieselben 15 Kills
 #: waere doppelt.
 TIER_FAMILIES = [
-    ["beast_chicken", "ultra_chicken", "god_mode_chicken"],
+    # "chicken" (Dinner Served) ist die Grundstufe: ein God Mode Chicken
+    # ist immer auch ein Sieg. Gezaehlt wird der Sieg trotzdem — Siege,
+    # Streaks und Quoten kommen aus place == 1, nicht aus dieser Liste.
+    ["chicken", "beast_chicken", "ultra_chicken", "god_mode_chicken"],
     [aid for _, aid, _ in reversed(KILL_TIERS)],
     [aid for _, aid, _ in reversed(DAMAGE_TIERS)],
     [aid for _, aid, _ in reversed(LONGEST_KILL_TIERS)],
