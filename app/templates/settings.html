@@ -7,7 +7,7 @@
   <h1 class="dn-title">Settings</h1>
 
   {% if saved %}
-  <div class="dn-saved"><span class="material-symbols-outlined icon-sm" aria-hidden="true">check_circle</span> Gespeichert</div>
+  <div class="dn-saved"><span class="material-symbols-outlined icon-sm" aria-hidden="true">check_circle</span> Saved</div>
   {% endif %}
 
   <section class="dn-simple" aria-labelledby="acc-head">
@@ -148,11 +148,11 @@
     </div>
 
     <div class="dn-actions">
-      <button class="dn-btn" type="submit">Speichern</button>
+      <button class="dn-btn" type="submit">Save</button>
       <button class="dn-btn ghost" type="reset">Eingaben verwerfen</button>
     </div>
 
-    <div class="dn-pro">[ Pro / Advanced ] — externe DB pro Tenant. <b>admin-only, later.</b></div>
+    <div class="dn-pro">[ Pro / Advanced ] — external database per tenant. <b>admin-only, later.</b></div>
   </form>
 
   <div class="dn-simple">
@@ -174,19 +174,19 @@
     {% endif %}
     <p class="archive-state" role="status">
       {% if archive.host %}
-        Aktiv: <b>{{ archive.user }}@{{ archive.host }}:{{ archive.port }}</b>
-        unter <code>{{ archive.path }}</code>
+        Active: <b>{{ archive.user }}@{{ archive.host }}:{{ archive.port }}</b>
+        in <code>{{ archive.path }}</code>
       {% else %}
-        Kein eigenes Archiv hinterlegt.
+        No own archive configured.
       {% endif %}
     </p>
     <form method="post" action="/app/settings/archive" id="archiveForm">
       <div class="dn-fgrid">
         <div class="dn-field">
-          <label for="archive_host">SFTP-Host</label>
+          <label for="archive_host">SFTP host</label>
           <input id="archive_host" name="archive_host" type="text"
                  autocomplete="off" value="{{ archive.host or '' }}">
-          <div class="dn-note">z.B. <code>sftp.hidrive.strato.com</code></div>
+          <div class="dn-note">e.g. <code>sftp.hidrive.strato.com</code></div>
         </div>
         <div class="dn-field">
           <label for="archive_port">Port</label>
@@ -194,12 +194,12 @@
                  max="65535" value="{{ archive.port or 22 }}">
         </div>
         <div class="dn-field">
-          <label for="archive_user">Benutzer</label>
+          <label for="archive_user">User</label>
           <input id="archive_user" name="archive_user" type="text"
                  autocomplete="off" value="{{ archive.user or '' }}">
         </div>
         <div class="dn-field">
-          <label for="archive_password">Passwort</label>
+          <label for="archive_password">Password</label>
           <input id="archive_password" name="archive_password" type="password"
                  autocomplete="new-password"
                  aria-describedby="archive_password_note">
@@ -208,18 +208,18 @@
           </div>
         </div>
         <div class="dn-field">
-          <label for="archive_path">Verzeichnis</label>
+          <label for="archive_path">Directory</label>
           <input id="archive_path" name="archive_path" type="text"
                  value="{{ archive.path or '/pubg/telemetry' }}">
           <div class="dn-note">Created if missing. One match takes about 1–3 MB.</div>
         </div>
       </div>
       <div class="dn-actions">
-        <button class="dn-btn" type="submit">Archiv speichern</button>
-        <button class="dn-btn ghost" type="button" id="archiveTest">Verbindung testen</button>
+        <button class="dn-btn" type="submit">Save archive</button>
+        <button class="dn-btn ghost" type="button" id="archiveTest">Test connection</button>
         {% if archive.host %}
         <button class="dn-btn danger" type="submit" name="action" value="delete"
-                formnovalidate>Zugang entfernen</button>
+                formnovalidate>Remove access</button>
         {% endif %}
       </div>
       <p class="archive-result" id="archiveResult" role="status" aria-live="polite"></p>
@@ -285,7 +285,7 @@
     if (!btn || !out || !form) return;
     btn.addEventListener("click", async () => {
       out.className = "archive-result";
-      out.textContent = "Teste Verbindung …";
+      out.textContent = "Testing connection …";
       btn.disabled = true;
       try {
         const res = await fetch("/app/settings/archive/test",
@@ -293,9 +293,9 @@
         const d = await res.json();
         out.classList.add(d.ok ? "ok" : "err");
         out.textContent = d.ok
-          ? `Verbindung steht — ${d.path} ist beschreibbar, `
-            + `${d.files} Match${d.files === 1 ? "" : "es"} liegen dort.`
-          : `Fehlgeschlagen: ${d.error || "unbekannter Fehler"}`;
+          ? `Connected — ${d.path} is writable, `
+            + `${d.files} match${d.files === 1 ? "" : "es"} stored there.`
+          : `Failed: ${d.error || "unknown error"}`;
       } catch (e) {
         out.classList.add("err");
         out.textContent = "Test not possible: " + (e.message || e);

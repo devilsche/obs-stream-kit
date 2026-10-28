@@ -47,19 +47,19 @@
 
       {# ── Ein Grid — alle Karten mit data-tab ── #}
       <div class="url-grid" id="urlGrid">
-        {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG-API-Key fehlt — unter <a href="/app/settings">Settings</a> so the PUBG widgets show data. The URLs work either way but stay empty/offline.</div>{% endif %}
-        {% if not steam_ready %}<div class="url-credhint" data-tab="steam" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> Steam-Key + ID fehlen — unter <a href="/app/settings">Settings</a> so the Steam widgets show data.</div>{% endif %}
+        {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG API key missing — add it under <a href="/app/settings">Settings</a> so the PUBG widgets show data. The URLs work either way but stay empty/offline.</div>{% endif %}
+        {% if not steam_ready %}<div class="url-credhint" data-tab="steam" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> Steam key + ID missing — add them under <a href="/app/settings">Settings</a> so the Steam widgets show data.</div>{% endif %}
         {# ── Gothic 1: Setup-Block (.env zum Kopieren für das Prod-Forwarding) ── #}
         <div class="url-g1r-setup" data-tab="g1r" hidden>
           <div class="url-g1r-setup__head">
             <span class="material-symbols-outlined" aria-hidden="true">terminal</span>
-            <b>Gothic-Live-Daten — Setup</b>
+            <b>Gothic live data — setup</b>
           </div>
-          <p class="url-g1r-setup__txt">Datei <code>.env</code> into the folder <code>g1r-local/</code> legen (neben <code>server.py</code>) and paste this — <code>server.py</code> liest sie beim Start automatisch. Danach <code>server.py</code> neu starten; im Log muss <code>Prod-Forwarding aktiv</code> erscheinen.</p>
+          <p class="url-g1r-setup__txt">Create a file <code>.env</code> in the folder <code>g1r-local/</code> (next to <code>server.py</code>) and paste this — <code>server.py</code> reads it automatically on start. Then restart <code>server.py</code>; the log must show <code>Prod-Forwarding aktiv</code>.</p>
           <pre class="url-g1r-setup__env" id="g1rEnv"><code>G1R_INGEST_URL={{ base_url }}/s/{{ token }}/api/g1r/ingest
 G1R_STEAM_NAME=</code></pre>
           <div class="url-g1r-setup__foot">
-            <button type="button" class="url-act" id="g1rEnvCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> .env kopieren</button>
+            <button type="button" class="url-act" id="g1rEnvCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Copy .env</button>
             <span class="url-copied" id="g1rEnvStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
@@ -122,13 +122,13 @@ G1R_STEAM_NAME=</code></pre>
 </div>
 
 {# Preview-Modal — echtes Widget im iframe (dock=1 → eigener dunkler Grund) #}
-<dialog class="dn-modal" id="previewModal" aria-label="Widget-Vorschau">
+<dialog class="dn-modal" id="previewModal" aria-label="Widget preview">
   <div class="dn-modal__head">
-    <h2 id="previewModalTitle">Vorschau</h2>
+    <h2 id="previewModalTitle">Preview</h2>
     <span class="dn-modal__scale" id="previewModalScale" aria-live="polite"></span>
     <button type="button" class="dn-modal__close" id="previewClose" aria-label="Close preview"><span class="material-symbols-outlined" aria-hidden="true">close</span></button>
   </div>
-  <div class="dn-modal__body"><iframe id="previewFrame" title="Widget-Vorschau" loading="lazy"></iframe></div>
+  <div class="dn-modal__body"><iframe id="previewFrame" title="Widget preview" loading="lazy"></iframe></div>
 </dialog>
 
 <script>
@@ -328,7 +328,7 @@ G1R_STEAM_NAME=</code></pre>
                            placeholder="${escapeAttr(sw.placeholder || "")}">` +
           (isImg ? `<label class="sw-upload-btn" title="Upload image + save as WebP">
             <span class="material-symbols-outlined" aria-hidden="true">upload</span>
-            <input type="file" class="sw-upload-file" accept="image/*" aria-label="Bild hochladen">
+            <input type="file" class="sw-upload-file" accept="image/*" aria-label="Upload image">
           </label>
           <span class="sw-upload-status" aria-live="polite"></span>` : "");
       } else {
@@ -379,7 +379,7 @@ G1R_STEAM_NAME=</code></pre>
     document.getElementById("urlDCat").textContent = card.dataset.cat;
     document.getElementById("urlDName").textContent = card.dataset.label;
     const tabBtn = document.getElementById("urltab-" + currentTab);
-    document.getElementById("urlBackTo").textContent = tabBtn ? tabBtn.dataset.label : "Übersicht";
+    document.getElementById("urlBackTo").textContent = tabBtn ? tabBtn.dataset.label : "Overview";
 
     const label = escapeHtml(card.dataset.label);
     const desc = card.dataset.desc ? `<p class="url-dbox__desc">${escapeHtml(card.dataset.desc)}</p>` : "";
@@ -388,13 +388,13 @@ G1R_STEAM_NAME=</code></pre>
 
     let tag, body;
     if (switches.length) {
-      tag = "konfigurieren";
+      tag = "configure";
       body = `<div class="url-switches" id="urlSwitches">${renderSwitches(switches)}</div>`;
       // Font-Preview wird in wireDetail per DOM nach dem font-Switch injiziert
     } else if (params.length) {
-      tag = "Parameter";
+      tag = "Parameters";
       body = `<div class="url-param url-param--info">
-          <p>This source reads its values straight from the URL — typically from <b>Streamer.bot</b> beim Triggern gesetzt (z.&nbsp;B. <code>?${escapeHtml(params[0])}=…</code>):</p>
+          <p>This source reads its values straight from the URL — typically set by <b>Streamer.bot</b> when triggering (e.g. <code>?${escapeHtml(params[0])}=…</code>):</p>
           <ul class="url-paramlist">${params.map(p => `<li><code>${escapeHtml(p)}</code></li>`).join("")}</ul>
         </div>`;
     } else {
@@ -403,7 +403,7 @@ G1R_STEAM_NAME=</code></pre>
     }
     const chromeHtml = hasChromePreview ? `
       <div class="url-dbox url-chrome-preview">
-        <div class="url-chrome-label">// Vorschau</div>
+        <div class="url-chrome-label">// Preview</div>
         <div class="url-chrome-wrap" id="cpWrap">
           <div class="url-chrome-glow"   id="cpGlow"   aria-hidden="true">PREVIEW</div>
           <div class="url-chrome-shadow" id="cpShadow" aria-hidden="true">PREVIEW</div>
@@ -435,10 +435,10 @@ G1R_STEAM_NAME=</code></pre>
       <div class="url-detail-col">${configCol}</div>
       <div class="url-detail-col">
         <div class="url-dbox url-urlbox">
-          <div class="url-urlbox__cap">${hasParamHints ? "// OBS-URL — {Platzhalter} ersetzt Streamer.bot beim Triggern" : "// OBS-URL (live)"}</div>
+          <div class="url-urlbox__cap">${hasParamHints ? "// OBS URL — Streamer.bot replaces the {placeholders} when triggering" : "// OBS-URL (live)"}</div>
           <div class="url-livefield" id="urlText">${escapeHtml(shownUrl)}</div>
           <div class="url-dactions">
-            <button type="button" class="url-act" id="btnCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren</button>
+            <button type="button" class="url-act" id="btnCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Copy</button>
             <button type="button" class="url-act ghost" id="btnPreview"><span class="material-symbols-outlined" aria-hidden="true">visibility</span> Preview</button>
             ${switches.length ? `<button type="button" class="url-act ghost" id="btnReset" title="Reset saved settings"><span class="material-symbols-outlined" aria-hidden="true">restart_alt</span></button>` : ""}
             <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
@@ -828,11 +828,11 @@ G1R_STEAM_NAME=</code></pre>
     document.getElementById("btnCopy").addEventListener("click", async () => {
       const url = (meta && meta.shownUrl) || buildUrl(base, scope);
       const done = () => {
-        status.textContent = "URL kopiert.";
+        status.textContent = "URL copied.";
         const btn = document.getElementById("btnCopy");
-        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span> Kopiert';
+        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span> Copied';
         setTimeout(() => {
-          btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Kopieren';
+          btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span> Copy';
           status.textContent = "";
         }, 1500);
       };
@@ -844,7 +844,7 @@ G1R_STEAM_NAME=</code></pre>
         ta.value = url; ta.className = "url-copy-helper";
         document.body.appendChild(ta); ta.select();
         try { document.execCommand("copy"); done(); }
-        catch (_) { status.textContent = "Kopieren fehlgeschlagen — URL bitte manuell markieren."; }
+        catch (_) { status.textContent = "Copy failed — please select the URL manually."; }
         document.body.removeChild(ta);
       }
     });
@@ -855,7 +855,7 @@ G1R_STEAM_NAME=</code></pre>
       const body = modal.querySelector(".dn-modal__body");
       const massEl = document.getElementById("previewModalScale");
       document.getElementById("previewModalTitle").textContent =
-        "Vorschau · " + document.getElementById("urlDName").textContent;
+        "Preview · " + document.getElementById("urlDName").textContent;
       const dim = meta._dynW
         ? [meta._dynW, meta._dynH]
         : String((meta && meta.size) || "").split(/[×x]/).map(n => parseInt(n.trim(), 10));
@@ -1014,7 +1014,7 @@ G1R_STEAM_NAME=</code></pre>
     g1rCopyBtn.addEventListener("click", async () => {
       const txt = (document.getElementById("g1rEnv")?.textContent || "").trim();
       const st = document.getElementById("g1rEnvStatus");
-      const done = () => { if (st) { st.textContent = "Kopiert!"; setTimeout(() => { st.textContent = ""; }, 2000); } };
+      const done = () => { if (st) { st.textContent = "Copied!"; setTimeout(() => { st.textContent = ""; }, 2000); } };
       try { await navigator.clipboard.writeText(txt); done(); }
       catch (_) {
         const ta = document.createElement("textarea");
