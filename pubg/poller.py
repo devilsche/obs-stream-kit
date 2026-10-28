@@ -1232,6 +1232,30 @@ def lobby_begleitzahlen(conn, tenant_id: int, match_id: str, account_id: str):
     }
 
 
+def _vehicle_records(tempo):
+    """Eigener Bestwert je Fahrzeug fuer den Meilenstein-Stand, dazu Karte
+    und Lobby-Bestwert desselben Fahrzeugs als Begleitinfo.
+
+    Returns (vehicles, extra): {"Mirado": {"top_speed": 163.4}} und
+    {"Mirado": {"mapName": …, "lobbyKmh": …, "lobbyDriver": …}}.
+    """
+    lobby = {z["vehicleName"]: z for z in (tempo.get("lobbyPerVehicle") or [])
+             if z and z.get("vehicleName")}
+    vehicles, extra = {}, {}
+    for z in tempo.get("perVehicle") or []:
+        name = z and z.get("vehicleName")
+        if not name:
+            continue
+        vehicles[name] = {"top_speed": z["kmh"]}
+        info = {"mapName": z.get("mapName")}
+        lo = lobby.get(name)
+        if lo:
+            info["lobbyKmh"] = lo["kmh"]
+            info["lobbyDriver"] = "you" if lo.get("isMe") else lo.get("driverName")
+        extra[name] = info
+    return vehicles, extra
+
+
 def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
                             vorher: float = 0.0) -> dict:
     """Aktueller Stand aus allen Quellen, wie `detect` ihn erwartet.
@@ -1252,12 +1276,17 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
                                        bekannt=vorher)
     career["hardest_lobby"] = wert
     extra = {}
+    vehicles = None
     # Tempo-Rekord: steht schon fertig in der Telemetrie, nur selbst
     # gefahren zaehlt. Begleitzahlen dazu, damit die Feier sagen kann,
     # womit und wo.
     try:
         from pubg.aggregations import compute_top_speed
-        tempo = compute_top_speed(conn, tenant_id, account_id)
+        # Alle Fahrzeuge, nicht nur die ersten zwoelf der Report-Anzeige:
+        # sonst fiele ein Rekord im 13. Fahrzeug unter den Tisch.
+        tempo = compute_top_speed(conn, tenant_id, account_id,
+                                  limit_vehicles=1000)
+        vehicles, extra["vehicles"] = _vehicle_records(tempo)
         if tempo.get("overall"):
             o = tempo["overall"]
             career["top_speed"] = o["kmh"]
@@ -1285,7 +1314,12 @@ def collect_milestone_state(conn, tenant_id: int, client, account_id: str,
                                       account_id)
         if begleit:
             extra["hardest_lobby"] = begleit
-    return {"weapons": weapons, "career": career, "extra": extra}
+    state = {"weapons": weapons, "career": career, "extra": extra}
+    # Nur mit echten Werten: ein leerer Schluessel waere spaeter ein
+    # "Vorstand", gegen den jedes Fahrzeug als neuer Rekord gaelte.
+    if vehicles:
+        state["vehicles"] = vehicles
+    return state
 
 
 def refresh_milestones(conn, tenant_id: int, client, account_id: str = None,

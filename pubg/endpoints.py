@@ -2779,6 +2779,7 @@ class EndpointRegistry:
                                       self.my_account_id) or {}
         weapons = snap.get("weapons") or {}
         career = snap.get("career") or {}
+        vehicles = snap.get("vehicles") or {}
 
         rows = []
         for oid, occ in OCCASIONS.items():
@@ -2787,8 +2788,9 @@ class EndpointRegistry:
             if occ["scope"] == "career":
                 subjects = [("", career.get(metric) or 0)]
             else:
+                pool = vehicles if occ["scope"] == "vehicle" else weapons
                 subjects = sorted(
-                    ((n, (v.get(metric) or 0)) for n, v in weapons.items()
+                    ((n, (v.get(metric) or 0)) for n, v in pool.items()
                      if (v.get(metric) or 0) > 0),
                     key=lambda kv: -kv[1])[:8]
             for subject, value in subjects:
@@ -2843,20 +2845,23 @@ class EndpointRegistry:
                                       self.my_account_id) or {}
         weapons = snap.get("weapons") or {}
         career = snap.get("career") or {}
+        vehicles = snap.get("vehicles") or {}
 
         subject = spec.get("subject") or ""
         stand = 0.0
         if occ["scope"] == "career":
             stand = float(career.get(metric) or 0)
         else:
+            pool = vehicles if occ["scope"] == "vehicle" else weapons
             if not subject:
-                # Die Waffe mit dem hoechsten Stand in dieser Kennzahl —
-                # bei ihr faellt die naechste Marke wirklich als
-                # naechste, und ohne Stand bleibt es bei der M416.
+                # Die Waffe (bzw. das Fahrzeug) mit dem hoechsten Stand in
+                # dieser Kennzahl — dort faellt die naechste Marke wirklich
+                # als naechste. Ohne Stand: M416 bzw. Dacia.
                 best = sorted(((float(v.get(metric) or 0), n)
-                               for n, v in weapons.items()), reverse=True)
-                subject = best[0][1] if best and best[0][0] > 0 else "M416"
-            stand = float((weapons.get(subject) or {}).get(metric) or 0)
+                               for n, v in pool.items()), reverse=True)
+                fallback = "Dacia" if occ["scope"] == "vehicle" else "M416"
+                subject = best[0][1] if best and best[0][0] > 0 else fallback
+            stand = float((pool.get(subject) or {}).get(metric) or 0)
 
         try:
             value = float(spec.get("value"))

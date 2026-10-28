@@ -304,10 +304,13 @@ OCCASIONS = {
     # ueberhaupt waere sonst schon ein Rekord. Gemessen erreichen Dacia
     # und Mirado 147 bzw. 163 — der Bereich, in dem es interessant wird,
     # liegt darueber.
+    # Seit 2026-10-28 standardmaessig aus: der Rekord je Fahrzeug
+    # (vehicle_top_speed) ersetzt ihn. Beide an hiesse, ein neuer
+    # Bestwert feiert zweimal. Im Tool laesst er sich wieder einschalten.
     "career_top_speed": {
         "scope": "career", "metric": "top_speed", "kind": "record",
         "min": 120, "unit": "km/h", "decimals": 1,
-        "label": "Top Speed", "widget": "big", "enabled": True,
+        "label": "Top Speed", "widget": "big", "enabled": False,
         "tier": "huge",
         "hint": "Faster than you have ever driven before — at the wheel, "
                 "not in the passenger seat",
@@ -322,6 +325,19 @@ OCCASIONS = {
         "label": "Speed Demon", "widget": "big", "enabled": True,
         "tier": "huge",
         "hint": "Crossed 150 km/h at the wheel",
+    },
+    # Eigener Rekord je Fahrzeug. Gezaehlt wird nur der eigene Wert am
+    # Steuer; der Lobby-Bestwert desselben Fahrzeugs steht bloss als Info
+    # dabei. Seit maxSpeed (2026-10-26) kennt die Lobby-Wertung die echten
+    # Spitzen aller Fahrer, darunter Motorrad-Spruenge mit 180+ — gegen die
+    # waere ein Gesamt-Rekord im Auto aussichtslos.
+    # Untergrenze 100: darunter liegen Fahrrad, Boote, Traktor & Co.
+    "vehicle_top_speed": {
+        "scope": "vehicle", "metric": "top_speed", "kind": "record",
+        "min": 100, "unit": "km/h", "decimals": 1,
+        "label": "Vehicle Top Speed", "widget": "big", "enabled": True,
+        "tier": "big",
+        "hint": "New personal top speed in this vehicle — at the wheel",
     },
     "career_longest_kill": {
         "scope": "career", "metric": "longest_kill", "kind": "record",
@@ -605,8 +621,12 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
     Ein leeres `prev` liefert bewusst nichts: der erste Lauf legt den
     Ausgangsstand an, sonst waere die halbe Karriere auf einmal faellig.
     """
-    if not prev or not (prev.get("weapons") or prev.get("career")):
+    if not prev or not (prev.get("weapons") or prev.get("career")
+                        or prev.get("vehicles")):
         return []
+    # Fahrzeuge kamen spaeter dazu: ein alter Stand ohne den Schluessel
+    # ist eine Bestandsaufnahme, kein Rekord fuer jedes Fahrzeug.
+    has_vehicles = "vehicles" in prev
     cfg = cfg or default_config()
     # Begleitzahlen des aktuellen Stands, je Metrik.
     extras = (cur.get("extra") or {}) if isinstance(cur, dict) else {}
@@ -634,7 +654,10 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
                 continue
             pairs = [("", pc.get(metric) or 0, cc.get(metric) or 0)]
         else:
-            pw, cw = prev.get("weapons") or {}, cur.get("weapons") or {}
+            if occ["scope"] == "vehicle" and not has_vehicles:
+                continue
+            bucket = "vehicles" if occ["scope"] == "vehicle" else "weapons"
+            pw, cw = prev.get(bucket) or {}, cur.get(bucket) or {}
             pairs = [(name, (pw.get(name) or {}).get(metric) or 0,
                       (vals.get(metric) or 0))
                      for name, vals in sorted(cw.items())
@@ -651,8 +674,11 @@ def detect(prev: dict, cur: dict, cfg=None) -> list:
             elif kind == "record":
                 floor = c.get("min", occ.get("min")) or 0
                 if v > p and v >= floor and p > 0:
-                    found.append(_emit(oid, {**occ, **c}, subject, v, p,
-                                       extras.get(metric)))
+                    # Fahrzeuge tragen ihre Begleitinfo je Fahrzeug.
+                    ex = ((extras.get("vehicles") or {}).get(subject)
+                          if occ["scope"] == "vehicle"
+                          else extras.get(metric))
+                    found.append(_emit(oid, {**occ, **c}, subject, v, p, ex))
             elif kind == "at":
                 target = c.get("at", occ.get("at")) or 0
                 if p < target <= v:

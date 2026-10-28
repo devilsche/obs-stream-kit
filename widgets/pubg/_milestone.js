@@ -44,7 +44,7 @@
     weapon_best_damage: 1, weapon_best_kills: 1, weapon_longest: 1,
     career_longest_kill: 1, career_most_kills: 1,
     career_hardest_lobby: 1,
-    career_top_speed: 1
+    career_top_speed: 1, vehicle_top_speed: 1
   };
 
   var NUM = function (n) {
@@ -53,7 +53,9 @@
 
   //: Kennzahlen, bei denen die Nachkommastelle die Aussage traegt. Eine
   //: Lobby-K/D von 2,46 auf "2" gerundet waere keine Nachricht mehr.
-  var DECIMALS = { "lobby K/D": 2 };
+  //: Tempo mit einer Stelle: Fahrzeug-Rekorde trennen oft nur Zehntel,
+  //: gerundet stuende da "159 -> 159".
+  var DECIMALS = { "lobby K/D": 2, "km/h": 1 };
 
   var NUMD = function (n, dec) {
     return Number(n).toLocaleString("en-US", {

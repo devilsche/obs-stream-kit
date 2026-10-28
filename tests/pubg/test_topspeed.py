@@ -153,9 +153,12 @@ def test_sedan_nennt_sein_basisfahrzeug():
 
 
 def test_neuer_tempo_rekord_wird_gefeiert():
-    """Ein Rekord meldet sich nur, wenn er den alten wirklich schlaegt."""
+    """Ein Rekord meldet sich nur, wenn er den alten wirklich schlaegt.
+    Der Gesamt-Rekord ist seit dem Rekord je Fahrzeug standardmaessig aus;
+    eingeschaltet arbeitet er wie bisher."""
     from pubg.weapon_milestones import detect, default_config
     cfg = default_config()
+    cfg["career_top_speed"] = {**cfg.get("career_top_speed", {}), "enabled": True}
     vorher = {"career": {"top_speed": 143.0}, "weapons": {}}
     nachher = {"career": {"top_speed": 157.2}, "weapons": {},
                "extra": {"top_speed": {"vehicleName": "Sedan · Mirado",
@@ -328,3 +331,92 @@ def test_ohne_mitfahrer_daten_bleibt_es_offen():
         _fahrt("ts11", 1000, 120.0, "Dacia_A_01_v2_C")])
     CONN.raw.commit()
     assert compute_top_speed(CONN, T, ICH)["overall"]["passengerNames"] is None
+
+
+
+# ── Rekord je Fahrzeug ────────────────────────────────────────────────────
+
+def _detect(vorher, nachher):
+    from pubg.weapon_milestones import detect, default_config
+    return detect(vorher, nachher, default_config())
+
+
+def test_gesamt_rekord_ist_standardmaessig_aus():
+    """Der Rekord je Fahrzeug ersetzt ihn — sonst feierte ein neuer
+    Bestwert zweimal."""
+    from pubg.weapon_milestones import default_config
+    assert default_config()["career_top_speed"]["enabled"] is False
+
+
+def test_rekord_je_fahrzeug_feiert_nur_das_fahrzeug():
+    vorher = {"career": {}, "weapons": {},
+              "vehicles": {"Mirado": {"top_speed": 163.4},
+                           "Dacia": {"top_speed": 154.0}}}
+    nachher = {"career": {}, "weapons": {},
+               "vehicles": {"Mirado": {"top_speed": 163.4},
+                            "Dacia": {"top_speed": 156.1}},
+               "extra": {"vehicles": {"Dacia": {"mapName": "Baltic_Main",
+                                                "lobbyKmh": 171.2,
+                                                "lobbyDriver": "Someone"}}}}
+    got = [m for m in _detect(vorher, nachher)
+           if m["occasion"] == "vehicle_top_speed"]
+    assert [m["subject"] for m in got] == ["Dacia"]
+    assert got[0]["value"] == 156.1 and got[0]["prev_value"] == 154.0
+    assert got[0]["extra"]["mapName"] == "Baltic_Main"
+    assert got[0]["display"] == "Dacia"
+
+
+def test_fremder_lobby_rekord_feiert_nichts():
+    """Nur der eigene Wert zaehlt; die Lobby steht bloss als Info dabei."""
+    vorher = {"career": {}, "weapons": {},
+              "vehicles": {"Motorbike": {"top_speed": 159.3}}}
+    nachher = {"career": {}, "weapons": {},
+               "vehicles": {"Motorbike": {"top_speed": 159.3}},
+               "extra": {"vehicles": {"Motorbike": {"lobbyKmh": 184.8}}}}
+    assert not [m for m in _detect(vorher, nachher)
+                if m["occasion"] == "vehicle_top_speed"]
+
+
+def test_neues_fahrzeug_ist_bestandsaufnahme_kein_rekord():
+    vorher = {"career": {}, "weapons": {},
+              "vehicles": {"Mirado": {"top_speed": 163.4}}}
+    nachher = {"career": {}, "weapons": {},
+               "vehicles": {"Mirado": {"top_speed": 163.4},
+                            "Buggy": {"top_speed": 121.0}}}
+    assert not [m for m in _detect(vorher, nachher)
+                if m["occasion"] == "vehicle_top_speed"]
+
+
+def test_erster_stand_mit_fahrzeugen_feiert_nichts():
+    """Nach dem Deploy hat der alte Stand noch keine Fahrzeuge — das ist
+    kein Rekord fuer jedes Fahrzeug auf einmal."""
+    vorher = {"career": {"top_speed": 163.4}, "weapons": {"M416": {"kills": 1}}}
+    nachher = {"career": {"top_speed": 163.4}, "weapons": {"M416": {"kills": 1}},
+               "vehicles": {"Mirado": {"top_speed": 163.4}}}
+    assert not [m for m in _detect(vorher, nachher)
+                if m["occasion"] == "vehicle_top_speed"]
+
+
+def test_unter_der_untergrenze_kein_rekord():
+    vorher = {"career": {}, "weapons": {},
+              "vehicles": {"Bicycle": {"top_speed": 30.0}}}
+    nachher = {"career": {}, "weapons": {},
+               "vehicles": {"Bicycle": {"top_speed": 41.0}}}
+    assert not [m for m in _detect(vorher, nachher)
+                if m["occasion"] == "vehicle_top_speed"]
+
+
+def test_stand_traegt_fahrzeuge_mit_lobby_info():
+    """collect: je Fahrzeug der eigene Bestwert, dazu Karte und
+    Lobby-Bestwert desselben Fahrzeugs als Begleitinfo."""
+    from pubg.poller import _vehicle_records
+    tempo = {
+        "perVehicle": [{"vehicleName": "Mirado", "kmh": 163.4,
+                        "mapName": "Baltic_Main", "isMe": True}],
+        "lobbyPerVehicle": [{"vehicleName": "Mirado", "kmh": 171.0,
+                             "driverName": "X", "isMe": False}],
+    }
+    vehicles, extra = _vehicle_records(tempo)
+    assert vehicles == {"Mirado": {"top_speed": 163.4}}
+    assert extra["Mirado"] == {"mapName": "Baltic_Main", "lobbyKmh": 171.0,
+                               "lobbyDriver": "X"}

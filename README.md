@@ -726,6 +726,21 @@ ohne sich Anlässe wegzunehmen; welcher Anlass wohin geht (`big`, `bar` oder
 | `seasons/lifetime` (API) | kontoweite Summen über **alle** Modi, plus Strecke, Zeit, Heilung und die Karriere-Rekorde | ganze Karriere |
 | `match_weapon_stats` (DB) | Match-Schadensrekord je Waffe und Wurfzahlen je Wurfgerät | ab Beginn der Aufzeichnung |
 
+**Tempo-Rekord je Fahrzeug** (`vehicle_top_speed`, seit 2026-10-28): gefeiert
+wird, wenn du **deinen eigenen** Bestwert in einem Fahrzeug schlägst (am
+Steuer, ab 100 km/h). Die Feier nennt die Karte und — nur als Info — den
+Lobby-Bestwert desselben Fahrzeugs. Der frühere Gesamt-Rekord
+(`career_top_speed`) ist standardmäßig aus, sonst feierte ein neuer Bestwert
+zweimal; im Tool lässt er sich wieder einschalten.
+
+Warum: seit `maxSpeed` (2026-10-26) kennt die Lobby-Wertung die echte Spitze
+**jedes** Fahrers. Vorher stand das Tempo nur als Stichprobe an Events —
+eigene Fahrten hatten im Schnitt 5,8 davon, fremde 2,1, deren Spitzen fehlten
+also fast immer. Jetzt stehen dort 180+-Werte, fast alle Motorräder und
+vermutlich mit Sprung oder bergab. Eigene Werte haben sich nicht verändert
+(Stichprobe 163,7 gegen `maxSpeed` 163,4): wer lange auf Höchsttempo fährt,
+wird von der Stichprobe gut getroffen.
+
 Zwei Eigenheiten der API, die im Code festgehalten sind:
 
 * Die **ingame sichtbare Zahl ist `OfficialStatsTotal` + `CompetitiveStatsTotal`**
