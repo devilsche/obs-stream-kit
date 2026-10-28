@@ -5236,6 +5236,179 @@ def _career_win_number(conn, tenant_id: int, my_account_id, match_id, played_at)
     return local_at + offset
 
 
+
+# ── Luft-Kills und Kimme-und-Korn ───────────────────────────────────────────
+#
+# Die Telemetrie kennt keinen "in der Luft"-Zustand. Aber: wird jemand am
+# Fallschirm getroffen, beendet das Spiel den Flug und schreibt dafuer ein
+# LogParachuteLanding 0-20 ms vor dem Knock. Massgeblich ist nur die ERSTE
+# Landung nach dem Verlassen eines Flugzeugs — dieselbe Landung feuert
+# spaeter auch bei Knocks am Boden (bis zu sechs je Spieler und Match).
+# Gemessen ueber alle Daten (2026-10-28): 148 Treffer 0-20 ms nach der
+# ersten Landung, 685 bis 3 s danach, 561.196 spaeter.
+
+#: Fahrzeuge, nach deren Verlassen man am Fallschirm haengt.
+AIR_DROP_VEHICLES = ("DummyTransportAircraft_C", "TransportAircraft_Chimera_C",
+                     "IBRTransportAircraft_C", "BP_EmergencyPickupVehicle_C")
+AIR_DROP_PREFIXES = ("RedeployAircraft",)
+SKEET_WINDOW_MS = 20
+WELCOME_WINDOW_MS = 3000
+IRON_SIGHT_TIERS_CM = ((20000, "iron_sights_200"), (10000, "iron_sights_100"))
+#: Waffen mit fest eingebautem Visier — ohne Aufsatz trotzdem nicht "ohne".
+INTEGRATED_SCOPE_WEAPONS = {"WeapVSS_C"}
+#: Hoehe ueber Grund erst ab dieser Differenz anzeigen; Dach oder Strasse
+#: machen schnell 10 m aus, die Schaetzung ist grob.
+SKEET_SHOW_HEIGHT_CM = 500
+
+
+def _is_air_drop_vehicle(vehicle):
+    v = vehicle or ""
+    return v in AIR_DROP_VEHICLES or v.startswith(AIR_DROP_PREFIXES)
+
+
+def _intervals(rows, match):
+    """(enter, leave)-Intervalle der Fahrzeuge, fuer die match(vehicle) gilt."""
+    out, start = [], None
+    for r in rows:
+        if not match(r["weapon"]):
+            continue
+        if r["event_type"] == "VehicleEnter":
+            start = r["timestamp_ms"]
+        elif r["event_type"] == "VehicleLeave" and start is not None:
+            out.append((start, r["timestamp_ms"]))
+            start = None
+    if start is not None:
+        out.append((start, 10**15))
+    return out
+
+
+def _ground_height_cm(conn, mid, victim, x, y):
+    """Median der Landehoehen anderer Spieler im Umkreis von 150 m —
+    grobe Schaetzung fuer den Boden. None bei weniger als drei Werten."""
+    if x is None or y is None:
+        return None
+    rows = conn.execute("""
+        SELECT actor_z FROM telemetry_events
+        WHERE match_id = ? AND event_type = 'Landing'
+          AND actor_account <> ? AND actor_z IS NOT NULL
+          AND ABS(actor_x - ?) < 15000 AND ABS(actor_y - ?) < 15000
+    """, (mid, victim, x, y)).fetchall()
+    zs = sorted(r["actor_z"] for r in rows)
+    if len(zs) < 3:
+        return None
+    return zs[len(zs) // 2]
+
+
+def _air_and_sight_achievements(conn, mid, played, my_account_id):
+    """Skeet Shooter, Welcome Committee, Glider Down, Iron Sights fuer
+    ein Match. Je Opfer zaehlt ein Anlass nur einmal (Knock + spaeterer
+    Kill desselben Spielers = ein Fund)."""
+    hits = conn.execute("""
+        SELECT event_type, timestamp_ms, target_account, distance, weapon,
+               attachments, damage_reason
+        FROM telemetry_events
+        WHERE match_id = ? AND actor_account = ?
+          AND event_type IN ('Kill', 'Knock')
+          AND target_account IS NOT NULL AND target_account <> ?
+        ORDER BY timestamp_ms ASC
+    """, (mid, my_account_id, my_account_id)).fetchall()
+    if not hits:
+        return []
+    victims = sorted({h["target_account"] for h in hits})
+    ph = ",".join(["?"] * len(victims))
+    veh_rows = conn.execute(f"""
+        SELECT actor_account, event_type, timestamp_ms, weapon
+        FROM telemetry_events
+        WHERE match_id = ? AND event_type IN ('VehicleEnter', 'VehicleLeave')
+          AND actor_account IN ({ph})
+        ORDER BY timestamp_ms ASC
+    """, [mid] + victims).fetchall()
+    land_rows = conn.execute(f"""
+        SELECT actor_account, timestamp_ms, actor_x, actor_y, actor_z
+        FROM telemetry_events
+        WHERE match_id = ? AND event_type = 'Landing'
+          AND actor_account IN ({ph})
+        ORDER BY timestamp_ms ASC
+    """, [mid] + victims).fetchall()
+    veh_by, land_by = {}, {}
+    for r in veh_rows:
+        veh_by.setdefault(r["actor_account"], []).append(r)
+    for r in land_rows:
+        land_by.setdefault(r["actor_account"], []).append(r)
+
+    found = {}       # aid -> Liste (distance_cm, weapon, extra)
+    counted = set()  # (aid, victim)
+
+    def _add(aid, victim, hit, extra=""):
+        if (aid, victim) in counted:
+            return
+        counted.add((aid, victim))
+        found.setdefault(aid, []).append((hit["distance"] or 0, hit["weapon"], extra))
+
+    for h in hits:
+        v, ts = h["target_account"], h["timestamp_ms"]
+        if ts is None:
+            continue
+        vrows = veh_by.get(v, [])
+        gliders = _intervals(vrows, lambda w: (w or "").startswith("BP_Motorglider"))
+        pickups = _intervals(vrows, lambda w: w == "BP_EmergencyPickupVehicle_C")
+        if _in_veh_interval(ts, gliders):
+            _add("glider_down", v, h)
+        elif not _in_veh_interval(ts, pickups):   # dort gilt Sky Snipe
+            drops = [r["timestamp_ms"] for r in vrows
+                     if r["event_type"] == "VehicleLeave"
+                     and _is_air_drop_vehicle(r["weapon"])
+                     and r["timestamp_ms"] <= ts]
+            if drops:
+                last_drop = max(drops)
+                first_land = next((l for l in land_by.get(v, [])
+                                   if l["timestamp_ms"] >= last_drop), None)
+                dt = (ts - first_land["timestamp_ms"]) if first_land else None
+                if first_land is None or dt < 0 or dt <= SKEET_WINDOW_MS:
+                    extra = ""
+                    if first_land and first_land["actor_z"] is not None:
+                        ground = _ground_height_cm(conn, mid, v,
+                                                   first_land["actor_x"],
+                                                   first_land["actor_y"])
+                        if ground is not None:
+                            up = first_land["actor_z"] - ground
+                            if up >= SKEET_SHOW_HEIGHT_CM:
+                                extra = f"{round(up / 100)} m up"
+                    _add("skeet_shooter", v, h, extra)
+                elif dt <= WELCOME_WINDOW_MS:
+                    _add("welcome_committee", v, h)
+        # Kimme und Korn: nur Kills tragen die Aufsaetze der Killerwaffe.
+        if (h["event_type"] == "Kill" and h["damage_reason"] == "Damage_Gun"
+                and (h["distance"] or 0) >= IRON_SIGHT_TIERS_CM[-1][0]
+                and h["weapon"] not in INTEGRATED_SCOPE_WEAPONS
+                and "Upper_" not in (h["attachments"] or "")):
+            tier = next(aid for cm, aid in IRON_SIGHT_TIERS_CM
+                        if h["distance"] >= cm)
+            _add(tier, v, h)
+
+    titles = {"skeet_shooter": "Skeet Shooter", "glider_down": "Glider Down",
+              "welcome_committee": "Welcome Committee",
+              "iron_sights_100": "Iron Sights", "iron_sights_200": "Iron Sights"}
+    # Iron Sights: nur die hoechste Stufe des Matches melden.
+    if "iron_sights_200" in found:
+        found.pop("iron_sights_100", None)
+    out = []
+    for aid, items in found.items():
+        dist, weapon, extra = max(items, key=lambda i: i[0])
+        parts = [titles[aid]]
+        if len(items) > 1:
+            parts.append(f"{len(items)}×")
+        parts.append(weapon_name_en(weapon))
+        parts.append(f"{round(dist / 100)} m")
+        if extra:
+            parts.append(extra)
+        out.append({"id": aid, "label": " · ".join(parts),
+                    # Bilder stehen noch aus (PUBG_ICON_URLS = None); kein
+                    # Emoji als Ersatz.
+                    "icon": "", "matchId": mid, "playedAt": played})
+    return out
+
+
 def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=None, to_iso=None):
     """Detected Achievements der aktuellen oder einer historischen Session.
     from_iso/to_iso optional — sonst aktuelle Session.
@@ -6014,6 +6187,16 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
               f"bei match={mid}: {exc!r}", flush=True)
         traceback.print_exc()
 
+    # Luft-Kills + Kimme und Korn: eigener Block je Match, damit ein Fehler
+    # hier weder die Milestones oben noch die anderen Matches mitnimmt.
+    for m in matches:
+        try:
+            out.extend(_air_and_sight_achievements(
+                conn, m["matchId"], m["playedAt"], my_account_id))
+        except Exception as exc:
+            print(f"[session-achievements] Luft/Iron-Sights abgebrochen "
+                  f"bei match={m['matchId']}: {exc!r}", flush=True)
+
     out.sort(key=lambda a: a.get("playedAt") or "")
     return out
 
@@ -6045,6 +6228,11 @@ PUBG_RARE_ACHIEVEMENTS = {
     "longest_kill_400",              # ≥400m
     "chicken_streak",                # ≥2 Chickens in Folge
     "em_pickup_kill",                # Kill waehrend Gegner am EP-Ballon haengt
+    "skeet_shooter",                 # Gegner am Fallschirm getroffen
+    "glider_down",                   # Gegner im Motorgleiter getroffen
+    "welcome_committee",             # Treffer bis 3 s nach der Landung
+    "iron_sights_100",               # Kill ab 100 m ohne Visier
+    "iron_sights_200",               # Kill ab 200 m ohne Visier
     "redzone_vehicle_death",         # Im Fahrzeug von der Red Zone erwischt
     "redzone_death",                 # Von der Red Zone zu Fuss erschlagen
     "flare_gun",                     # Leuchtpistole abgefeuert

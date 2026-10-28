@@ -1531,6 +1531,11 @@ class EndpointRegistry:
             "ghost_operative":         "Heist with 0 kills, 0 damage, 10+ loot",
             "window_smasher":          "Smashed 30+ windows in a heist",
             "em_pickup_kill":          "Shot an enemy hanging from an Emergency Pickup balloon",
+            "skeet_shooter":           "Hit an enemy still hanging from the parachute",
+            "glider_down":             "Hit an enemy flying a motor glider",
+            "welcome_committee":       "Hit an enemy within 3 seconds of their landing",
+            "iron_sights_100":         "Kill at 100 m or more without a sight",
+            "iron_sights_200":         "Kill at 200 m or more without a sight",
             "redzone_death":           "Killed outright by a red zone bomb — rare, it usually only knocks you down",
             "redzone_knock":           "Knocked down by a red zone bomb",
             "redzone_vehicle_death":   "Caught by a red zone bomb while in a vehicle — you see it too late to get out",
@@ -1592,6 +1597,11 @@ class EndpointRegistry:
             "ghost_operative":         "Heist mit 0 Kills, 0 DMG, 10+ Loot",
             "window_smasher":          "30+ Fenster im Heist eingeschlagen",
             "em_pickup_kill":          "Gegner abgeschossen während er am Emergency-Pickup-Ballon hing",
+            "skeet_shooter":           "Gegner noch am Fallschirm getroffen",
+            "glider_down":             "Gegner im Motorgleiter getroffen",
+            "welcome_committee":       "Gegner bis 3 Sekunden nach seiner Landung getroffen",
+            "iron_sights_100":         "Kill ab 100 m ohne Visier",
+            "iron_sights_200":         "Kill ab 200 m ohne Visier",
             "redzone_death":           "Von einer Bombe der Roten Zone direkt erschlagen — selten, sie streckt meist nur nieder",
             "redzone_knock":           "Von einer Bombe der Roten Zone niedergestreckt",
             "redzone_vehicle_death":   "Im Fahrzeug von der Roten Zone erwischt — im Fahren sieht man es zu spaet",
@@ -1799,6 +1809,11 @@ class EndpointRegistry:
         "first_hot_drop_survived": 51,  # legacy
         # Sonder-Milestones (locker am Ende)
         "em_pickup_kill":          20,  # Sky Snipe — Highlight, frueh anzeigen
+        "skeet_shooter":           19,  # Luft-Kills — Highlights, frueh anzeigen
+        "glider_down":             19,
+        "iron_sights_200":         23,
+        "iron_sights_100":         24,
+        "welcome_committee":       26,
         "flare_gun":               21,
         "airdrop_looted":          22,
         "redzone_vehicle_death":   58,
@@ -1865,6 +1880,11 @@ class EndpointRegistry:
         "window_smasher":          "Window Smasher",
         # Sonder-Milestones
         "em_pickup_kill":          "Sky Snipe",
+        "skeet_shooter":           "Skeet Shooter",
+        "glider_down":             "Glider Down",
+        "welcome_committee":       "Welcome Committee",
+        "iron_sights_100":         "Iron Sights",
+        "iron_sights_200":         "Iron Sights",
         "redzone_death":           "Red Zone Victim",
         "redzone_knock":            "Red Zone Shockwave",
         "redzone_vehicle_death":    "Bombed While Driving",
@@ -1891,6 +1911,12 @@ class EndpointRegistry:
     PUBG_ICON_URLS = {
         # Sky Snipe
         "em_pickup_kill":          "/widgets-static/pubg/icons/sky_snipe.png",
+        # Luft-Kills + Iron Sights: Bilder stehen noch aus.
+        "skeet_shooter":           None,
+        "glider_down":             None,
+        "welcome_committee":       None,
+        "iron_sights_100":         None,
+        "iron_sights_200":         None,
         # BR Opener
         "first_chicken":           "/widgets-static/pubg/icons/first_chicken.png",
         "chicken":                 "/widgets-static/pubg/icons/first_chicken.png",
