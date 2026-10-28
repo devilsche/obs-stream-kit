@@ -181,6 +181,18 @@ def compute_session_stats(conn, tenant_id: int, my_account_id: str,
     dbnos = sum(r["dbnos"] or 0 for r in rows)
     survived_sec = sum(r["time_survived"] or 0 for r in rows)
 
+    # Geheilte HP: Heal-Events speichern healAmount in der Spalte damage.
+    # Gleicher Zeitraum + BR-Filter wie oben; Matches ohne Telemetrie
+    # tragen einfach 0 bei.
+    healed_row = conn.execute(f"""
+        SELECT COALESCE(SUM(e.damage), 0) AS hp
+        FROM telemetry_events e
+        JOIN matches m ON m.match_id = e.match_id AND m.tenant_id = ?
+        WHERE e.actor_account = ? AND e.event_type = 'Heal'
+          AND m.played_at >= ? AND {br_where}
+    """, (tenant_id, my_account_id, started, *br_params)).fetchone()
+    hp_healed = float(healed_row["hp"] or 0) if healed_row else 0.0
+
     map_breakdown = {}
     for r in rows:
         m = r["map_name"]
@@ -199,6 +211,7 @@ def compute_session_stats(conn, tenant_id: int, my_account_id: str,
         "longestKill": longest,
         "totalBoosts": boosts,
         "totalHeals": heals,
+        "hpHealed": round(hp_healed, 1),
         "totalRevives": revives,
         "totalWeaponsAcquired": weapons,
         "totalAssists": assists,

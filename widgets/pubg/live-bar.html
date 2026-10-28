@@ -59,6 +59,9 @@
       longest: ["Longest", (s) => s.longestKill || 0,      (n) => Math.round(n) + " m", true],
       assists: ["Assists", (s) => s.totalAssists || 0,     fmt,  true],
       knocks:  ["Knocks",  (s) => s.totalDbnos || 0,       fmt,  true],
+      heals:   ["Heals",   (s) => s.totalHeals || 0,       fmt,  true],
+      boosts:  ["Boosts",  (s) => s.totalBoosts || 0,      fmt,  true],
+      healed:  ["HP healed", (s) => s.hpHealed || 0,       fmt,  true],
     };
     const DEFAULT_STATS = "kills,dmg,wins,matches";
 
@@ -69,6 +72,7 @@
           ["matches", "Matches"], ["kd", "K/D"], ["kpm", "K/M"],
           ["hs", "HS"], ["top10", "Top 10"], ["best", "Best"],
           ["longest", "Longest"], ["assists", "Assists"], ["knocks", "Knocks"],
+          ["heals", "Heals"], ["boosts", "Boosts"], ["healed", "HP healed"],
         ],
         tooltip: "Which values the bar shows, in URL order " +
                  "(e.g. ?stats=kills,kd,dmg,wins). None selected = " +

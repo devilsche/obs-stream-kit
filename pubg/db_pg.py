@@ -318,12 +318,13 @@ ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS vehicle_id TEXT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS dbno_id BIGINT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS max_speed DOUBLE PRECISION;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS fellow_passengers TEXT;
-CREATE INDEX IF NOT EXISTS idx_tel_match
-    ON telemetry_events(match_id);
+-- Kein Einzel-Index auf match_id bzw. actor_account: beide sind der Anfang
+-- eines der kombinierten Indizes und wuerden nur doppelt Platz kosten
+-- (auf prod ~170 MB, 2026-10-28).
 CREATE INDEX IF NOT EXISTS idx_tel_match_type
     ON telemetry_events(match_id, event_type);
-CREATE INDEX IF NOT EXISTS idx_tel_actor
-    ON telemetry_events(actor_account);
+CREATE INDEX IF NOT EXISTS idx_tel_actor_match_type
+    ON telemetry_events(actor_account, match_id, event_type);
 CREATE INDEX IF NOT EXISTS idx_tel_type
     ON telemetry_events(event_type);
 

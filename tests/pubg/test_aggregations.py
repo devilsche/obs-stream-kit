@@ -813,3 +813,31 @@ def test_camp_jackal_ist_kein_br_match():
     assert is_br_mode("solo", "Baltic_Main")
     assert not is_br_mode("solo", "Range_Main")
     assert not is_br_mode("heistroyale", "SafeHouse_Main")
+
+
+def test_session_stats_sums_hp_healed_from_heal_events():
+    """Geheilte HP = Summe healAmount (Heal-Events, Spalte damage) — nur
+    eigene Heals, nur Matches der Session, keine anderen Event-Typen."""
+    conn = _setup()
+    set_setting(conn, "sessionStartedAt", "2026-05-04T18:00:00Z")
+    _add_match(conn, "old", "2026-05-04T17:00:00Z", 1, 100.0, 5)
+    _add_match(conn, "s1", "2026-05-04T18:30:00Z", 1, 100.0, 5)
+    _add_match(conn, "s2", "2026-05-04T19:00:00Z", 1, 100.0, 5)
+    insert_telemetry_events(conn, "old", [
+        {"event_type": "Heal", "actor_account": "account.A", "damage": 75.0}])
+    insert_telemetry_events(conn, "s1", [
+        {"event_type": "Heal", "actor_account": "account.A", "damage": 75.0},
+        {"event_type": "Heal", "actor_account": "account.A", "damage": 10.5},
+        {"event_type": "Heal", "actor_account": "account.M0", "damage": 75.0},
+        {"event_type": "TakeDamage", "actor_account": "account.A", "damage": 40.0}])
+    insert_telemetry_events(conn, "s2", [
+        {"event_type": "Heal", "actor_account": "account.A", "damage": 14.5}])
+    s = compute_session_stats(conn, T, "account.A")
+    assert s["hpHealed"] == 100.0
+
+
+def test_session_stats_hp_healed_zero_without_telemetry():
+    conn = _setup()
+    set_setting(conn, "sessionStartedAt", "2026-05-04T18:00:00Z")
+    _add_match(conn, "s1", "2026-05-04T18:30:00Z", 1, 100.0, 5)
+    assert compute_session_stats(conn, T, "account.A")["hpHealed"] == 0
