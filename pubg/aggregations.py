@@ -4275,20 +4275,24 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
             z["passengerNames"] = _mitfahrer(r)
         return z
 
-    def _bester(nur_eigene):
-        f = eigen_filter if nur_eigene else ""
-        pr = grund + (eigene if nur_eigene else [])
-        r = conn.execute(
-            f"SELECT {felder} {basis}{f} ORDER BY {_TEMPO} DESC LIMIT 1",
-            pr).fetchone()
+    def _bester(rows):
+        """Der schnellste Wert ueberhaupt = der hoechste der Bestwerte je
+        Fahrzeug. Frueher eine eigene Abfrage mit ORDER BY … LIMIT 1 — mit
+        Zeitfilter waehlte Postgres dafuer einen Plan, der fuer "All time"
+        ueber 120 s brauchte; der Report brach nach 60 s ab und liess die
+        Tempo-Sektion still weg."""
+        r = max((x for x in rows if x["v"] is not None),
+                key=lambda x: x["v"], default=None)
         return _mit_mitfahrern(_zeile(r), r)
 
-    def _je(spalte, nur_eigene):
+    def _zeilen(spalte, nur_eigene):
         f = eigen_filter if nur_eigene else ""
         pr = grund + (eigene if nur_eigene else [])
-        rows = conn.execute(
+        return conn.execute(
             f"SELECT DISTINCT ON ({spalte}) {felder} {basis}{f} "
             f"ORDER BY {spalte}, {_TEMPO} DESC", pr).fetchall()
+
+    def _je(spalte, rows):
         # Nach Anzeigename zusammenfassen: Dacia hat vier Spawn-
         # Varianten, die untereinander wie vier Autos aussaehen.
         best = {}
@@ -4301,12 +4305,14 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
         aus = sorted(best.values(), key=lambda x: -x["kmh"])
         return aus[:limit_vehicles] if spalte == "e.vehicle_id" else aus
 
-    return {"overall": _bester(True),
-            "perVehicle": _je("e.vehicle_id", True),
-            "perMap": _je("m.map_name", True),
-            "lobby": _bester(False),
-            "lobbyPerVehicle": _je("e.vehicle_id", False),
-            "lobbyPerMap": _je("m.map_name", False)}
+    eigen_fzg = _zeilen("e.vehicle_id", True)
+    lobby_fzg = _zeilen("e.vehicle_id", False)
+    return {"overall": _bester(eigen_fzg),
+            "perVehicle": _je("e.vehicle_id", eigen_fzg),
+            "perMap": _je("m.map_name", _zeilen("m.map_name", True)),
+            "lobby": _bester(lobby_fzg),
+            "lobbyPerVehicle": _je("e.vehicle_id", lobby_fzg),
+            "lobbyPerMap": _je("m.map_name", _zeilen("m.map_name", False))}
 
 
 def compute_lobby_avg_kd(conn, tenant_id: int, my_account_id, range_key="session"):
