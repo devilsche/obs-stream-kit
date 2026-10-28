@@ -1064,102 +1064,88 @@
     }
     .ve-match-head:first-child { margin-top: 2px; }
     .ve-veh { color: var(--pubg-text); }
+    /* Top Speed als "Fahrspuren": je Fahrzeug-Klasse ein Balken auf
+       gemeinsamer Skala (SVG, Werte im Attribut), gold = mein Bestwert,
+       heller Strich = Lobby-Bestwert. Volle Breite, damit Rekordhalter-
+       Namen nicht abgeschnitten werden. */
     .ts-box {
+      --ts-rail: color-mix(in srgb, var(--pubg-text) 9%, transparent);
+      --ts-tick: var(--pubg-text);
+      --ts-name-w: 150px;
+      --ts-val-w: 230px;
       border: 1px solid var(--pubg-border, #2a2a32);
-      border-radius: 6px;
-      padding: 10px 12px;
-      margin-bottom: 10px;
+      border-radius: 10px;
+      padding: 18px 20px 14px;
     }
-    .ts-row {
+    .ts-hero {
       display: grid;
-      grid-template-columns: auto 110px 1fr;
-      gap: 10px;
-      align-items: baseline;
-      padding: 4px 0;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid var(--pubg-border, #2a2a32);
     }
-    .ts-kmh {
-      font-size: 1.5em;
-      font-weight: 700;
+    .ts-hero b {
+      font-size: 2.2em;
+      line-height: 1;
       color: var(--pubg-gold, #f2b705);
       font-variant-numeric: tabular-nums;
     }
-    .ts-unit { font-size: 0.5em; margin-left: 3px; color: var(--pubg-muted); }
-    .ts-what { color: var(--pubg-muted); text-transform: uppercase;
-               font-size: 0.78em; letter-spacing: 0.05em; }
-    .ts-where { color: var(--pubg-text); }
-    .ts-note { color: var(--pubg-gold, #f2b705); font-size: 0.9em;
-               padding: 4px 0 2px; }
-    .ts-cols {
+    .ts-hero-lobby b { color: var(--pubg-text); }
+    .ts-hero small, .ts-val small { margin-left: 4px; color: var(--pubg-muted); }
+    .ts-hero span { display: block; margin-top: 6px; }
+    .ts-h { margin: 18px 0 4px; font-size: 1em; font-weight: 700; }
+    .ts-scale {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 14px;
-      margin-top: 8px;
-      padding-top: 8px;
-      border-top: 1px solid var(--pubg-border, #2a2a32);
-    }
-    .ts-h {
-      margin: 0 0 4px;
-      font-size: 0.78em;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      grid-template-columns: repeat(4, 1fr) auto;
+      margin: 16px calc(var(--ts-val-w) + 42px) -8px calc(var(--ts-name-w) + 24px);
+      font-size: 0.72em;
       color: var(--pubg-muted);
-      font-weight: 700;
     }
-    /* Feste Spalten statt space-between: die rechte Spalte ist mal
-       "you lead" und mal "150.0 Hat3", und mit Flex wanderte die
-       km/h-Zahl in der Mitte dadurch von Zeile zu Zeile. */
-    .ts-sub {
+    .ts-scale span:last-child { transform: translateX(-50%); }
+    .ts-list { display: flex; flex-direction: column; }
+    .ts-lane {
       display: grid;
-      grid-template-columns: 1fr 4.2em 7.5em;
-      gap: 8px;
-      align-items: baseline;
-      font-size: 0.92em;
-      padding: 2px 0;
+      grid-template-columns: var(--ts-name-w) 1fr var(--ts-val-w) 24px;
+      align-items: center;
+      gap: 0 18px;
+      min-height: 46px;
+      padding: 4px 6px;
+      border-radius: 6px;
     }
-    .ts-sub > span:first-child {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .ts-sub b {
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-    }
-    .ts-best {
-      color: var(--pubg-muted);
-      font-size: 0.85em;
-      font-variant-numeric: tabular-nums;
-      text-align: right;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .ts-lead { color: var(--pubg-gold, #f2b705); }
-    .ts-me { color: var(--pubg-gold, #f2b705); }
-    /* Fahrzeug-Gruppe (Basis + Skins): Zeile mit dem besten Wert, darunter
-       aufklappbar jede Variante. Ein Skin faehrt wie seine Basis, die
-       Varianten zeigen nur, womit es war. */
-    .ts-group > summary {
-      list-style: none;
-      cursor: pointer;
-      border-radius: 3px;
-    }
+    .ts-name { display: flex; flex-direction: column; font-weight: 500; }
+    .ts-count { font-size: 0.78em; font-weight: 400; color: var(--pubg-muted); }
+    .ts-track { width: 100%; height: 12px; }
+    .ts-track--thin { height: 8px; }
+    .ts-rail { fill: var(--ts-rail); }
+    .ts-mine { fill: var(--pubg-gold, #f2b705); }
+    .ts-tick { stroke: var(--ts-tick); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+    .ts-val { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 2px; }
+    .ts-val b { font-size: 1.15em; font-variant-numeric: tabular-nums; }
+    .ts-lobby, .ts-lead { flex-basis: 100%; font-size: 0.8em; color: var(--pubg-muted); }
+    .ts-lead { display: flex; align-items: center; gap: 4px; color: var(--pubg-gold, #f2b705); }
+    .ts-lead .material-symbols-outlined { font-size: 15px; }
+    .ts-group > summary { list-style: none; cursor: pointer; }
     .ts-group > summary::-webkit-details-marker { display: none; }
-    .ts-group > summary:hover { background: var(--pubg-row-hover, rgba(255,255,255,.04)); }
-    .ts-group > summary:focus-visible {
-      outline: 2px solid var(--pubg-gold, #f2b705);
-      outline-offset: 2px;
+    .ts-group > summary:hover { background: color-mix(in srgb, var(--pubg-text) 4%, transparent); }
+    .ts-group > summary:focus-visible { outline: 2px solid var(--pubg-gold, #f2b705); outline-offset: 2px; }
+    .ts-chev { color: var(--pubg-muted); transition: transform 0.2s; }
+    .ts-group[open] .ts-chev { transform: rotate(180deg); color: var(--pubg-gold, #f2b705); }
+    @media (prefers-reduced-motion: reduce) { .ts-chev { transition: none; } }
+    .ts-vars { margin: 2px 0 8px 14px; padding-left: 12px; border-left: 2px solid var(--pubg-border, #2a2a32); }
+    .ts-lane--var { min-height: 36px; grid-template-columns: calc(var(--ts-name-w) - 26px) 1fr var(--ts-val-w) 24px; }
+    .ts-lane--var .ts-name { font-weight: 400; color: var(--pubg-muted); }
+    .ts-lane--var .ts-val b { font-size: 1em; font-weight: 500; }
+    .ts-list--maps { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+    .ts-lane--map { grid-template-columns: 80px 1fr 150px; }
+    .ts-legend { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 0.8em; color: var(--pubg-muted); }
+    .ts-key { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-left: 10px; }
+    .ts-key--mine { background: var(--pubg-gold, #f2b705); margin-left: 0; }
+    .ts-key--lobby { width: 2px; height: 12px; background: var(--ts-tick); }
+    @media (max-width: 760px) {
+      .ts-box { --ts-name-w: 96px; --ts-val-w: 150px; padding: 14px 12px; }
+      .ts-hero, .ts-list--maps { grid-template-columns: 1fr; }
+      .ts-scale { display: none; }
     }
-    .ts-group > summary .ts-sub > span:first-child::before {
-      content: "\25B8\00A0";
-      color: var(--pubg-muted);
-    }
-    .ts-group[open] > summary .ts-sub > span:first-child::before {
-      content: "\25BE\00A0";
-    }
-    .ts-var { color: var(--pubg-muted); }
-    .ts-var > span:first-child { padding-left: 1.2em; }
-    .ts-var > span:first-child::before { content: "\21B3\00A0"; }
     .ve-dealt { color: var(--pubg-good, #3cb44b); }
     .ve-taken { color: var(--pubg-warn, #e6194b); }
     .ve-wpn {
@@ -5257,75 +5243,78 @@
       const sSpeed = pSpeed.then((speed) => {
       let speedHtml = "";
       if (speed && speed.overall) {
+        // Jede Fahrzeug-Klasse (Basis + Skins) als "Fahrspur": ein Balken
+        // auf gemeinsamer Skala 0-200 km/h, gold = mein Bestwert, heller
+        // Strich = Lobby-Bestwert. So sieht man den Abstand, ohne Zahlen zu
+        // vergleichen. Die Zahlen stehen zusaetzlich als Text daneben.
+        // Balken als SVG mit Werten im Attribut — keine Inline-Styles.
+        const SKALA = 200;
+        const esc = PubgUI.esc;
         const o = speed.overall;
         const lo = speed.lobby;
-        // Die Lobby-Wertung zaehlt mich mit — fuehre ich, steht dort
-        // mein eigener Name, und genau das ist die Nachricht.
-        const fuehreIch = lo && lo.isMe;
-        const zeile = (v, was) => `<div class="ts-row">
-            <span class="ts-kmh">${v.kmh.toFixed(1)}<span class="ts-unit">km/h</span></span>
-            <span class="ts-what">${was}</span>
-            <span class="ts-where">${v.vehicleName} · ${PubgUI.fmtMap(v.mapName)}</span>
-          </div>`;
-        // Je Fahrzeug und Karte beides: mein Bestwert und der der
-        // Lobby. Steht dort mein Name, war ich der Schnellste.
-        const wer = v => v.isMe
-          ? `<b class="ts-me">${v.driverName}</b>` : v.driverName;
-        const spalte = (meine, lobby, titel, schluessel) => {
-          const lobbyBy = new Map((lobby || []).map(v => [v[schluessel], v]));
-          return (meine || []).map(v => {
-            const l = lobbyBy.get(v[schluessel]);
-            const best = (l && l.kmh > v.kmh)
-              ? `<span class="ts-best">${l.kmh.toFixed(1)} ${wer(l)}</span>`
-              : `<span class="ts-best ts-lead">you lead</span>`;
-            const name = schluessel === "mapName"
-              ? PubgUI.fmtMap(v.mapName) : v.vehicleName;
-            return `<div class="ts-sub"><span>${name}</span>
-                      <b>${v.kmh.toFixed(1)}</b>${best}</div>`;
-          }).join("");
+        const km = v => Math.min(SKALA, Math.max(0, Number(v) || 0)).toFixed(1);
+        const balken = (mein, lobbyKmh, duenn) => `<svg class="ts-track${duenn ? " ts-track--thin" : ""}"
+            viewBox="0 0 ${SKALA} 10" preserveAspectRatio="none" aria-hidden="true">
+            <rect class="ts-rail" x="0" y="3" width="${SKALA}" height="4"/>
+            <rect class="ts-mine" x="0" y="3" width="${km(mein)}" height="4"/>
+            ${lobbyKmh ? `<line class="ts-tick" x1="${km(lobbyKmh)}" x2="${km(lobbyKmh)}" y1="0" y2="10"/>` : ""}
+          </svg>`;
+        // Fuehre ich (Lobby-Wert <= meiner, ich zaehle in der Lobby mit),
+        // ist das die Nachricht; sonst wer den Bestwert haelt — ungekuerzt.
+        const lobbyZeile = (mein, l) => {
+          if (!l) return "";
+          if (l.kmh <= mein.kmh || l.isMe) return `<span class="ts-lead">
+              <span class="material-symbols-outlined" aria-hidden="true">trophy</span>Fastest in your lobbies</span>`;
+          return `<span class="ts-lobby">Lobby best ${l.kmh.toFixed(1)} by ${esc(l.driverName || "unknown")}</span>`;
         };
-        // Je Fahrzeug-Gruppe (Basis + Skins) der beste Wert, darunter
-        // aufklappbar jede Variante — man sieht, womit es war. Lobby-Wert
-        // je Gruppe bzw. je Variante daneben.
-        const bestZelle = (mein, l) => (l && l.kmh > mein.kmh)
-          ? `<span class="ts-best">${l.kmh.toFixed(1)} ${wer(l)}</span>`
-          : `<span class="ts-best ts-lead">you lead</span>`;
-        const gruppen = (meine, lobby) => {
-          const lobbyBy = new Map((lobby || []).map(g => [g.group, g]));
-          return (meine || []).map(g => {
-            const lg = lobbyBy.get(g.group);
-            const zeile = `<div class="ts-sub"><span>${g.group}</span>
-                <b>${g.kmh.toFixed(1)}</b>${bestZelle(g, lg)}</div>`;
-            const vars = g.variants || [];
-            // Nur aufklappen, wo es etwas zu sehen gibt: mehrere
-            // Varianten oder eine, die anders heisst als die Gruppe.
-            if (vars.length < 2 && (!vars[0] || vars[0].vehicleName === g.group))
-              return zeile;
-            const lobbyVar = new Map(((lg && lg.variants) || [])
-              .map(v => [v.vehicleName, v]));
-            const unter = vars.map(v => `<div class="ts-sub ts-var">
-                <span>${v.vehicleName}</span><b>${v.kmh.toFixed(1)}</b>
-                ${bestZelle(v, lobbyVar.get(v.vehicleName))}</div>`).join("");
-            return `<details class="ts-group"><summary>${zeile}</summary>${unter}</details>`;
-          }).join("");
-        };
+        const wert = (mein, l, einheit) => `<span class="ts-val"><b>${mein.kmh.toFixed(1)}</b>${
+            einheit ? "<small>km/h</small>" : ""}${lobbyZeile(mein, l)}</span>`;
+        const spur = (name, mein, l, extra) => `<span class="ts-name">${esc(name)}${extra || ""}</span>
+            ${balken(mein.kmh, l && l.kmh, false)}${wert(mein, l, true)}`;
+
+        const lobbyGr = new Map((speed.lobbyPerGroup || []).map(g => [g.group, g]));
+        const klassen = (speed.perGroup || []).map(g => {
+          const lg = lobbyGr.get(g.group);
+          const vars = g.variants || [];
+          // Aufklappen nur, wo es etwas zu sehen gibt.
+          if (vars.length < 2 && (!vars[0] || vars[0].vehicleName === g.group)) {
+            return `<div class="ts-lane">${spur(g.group, g, lg)}<span class="ts-chev-spacer"></span></div>`;
+          }
+          const lv = new Map(((lg && lg.variants) || []).map(v => [v.vehicleName, v]));
+          const unter = vars.map(v => `<div class="ts-lane ts-lane--var">
+              <span class="ts-name">${esc(v.vehicleName)}</span>
+              ${balken(v.kmh, (lv.get(v.vehicleName) || {}).kmh, true)}
+              ${wert(v, lv.get(v.vehicleName), false)}</div>`).join("");
+          return `<details class="ts-group"><summary class="ts-lane">
+              ${spur(g.group, g, lg, `<span class="ts-count">${vars.length} variants</span>`)}
+              <span class="material-symbols-outlined ts-chev" aria-hidden="true">expand_more</span>
+            </summary><div class="ts-vars">${unter}</div></details>`;
+        }).join("");
+
+        const lobbyKarte = new Map((speed.lobbyPerMap || []).map(m => [m.mapName, m]));
+        const karten = (speed.perMap || []).map(m => `<div class="ts-lane ts-lane--map">
+            <span class="ts-name">${esc(PubgUI.fmtMap(m.mapName))}</span>
+            ${balken(m.kmh, (lobbyKarte.get(m.mapName) || {}).kmh, true)}
+            ${wert(m, lobbyKarte.get(m.mapName), false)}</div>`).join("");
+
+        const satz = (v, wer) => `${wer}, ${esc(v.vehicleName)} on ${esc(PubgUI.fmtMap(v.mapName))}`;
         speedHtml = `<h3 class="extras-h">Top Speed</h3>
-          <div class="ts-box">
-            ${zeile(o, "my best")}
-            ${lo && !fuehreIch ? zeile(lo, "best in lobby") : ""}
-            ${fuehreIch ? `<div class="ts-note">Fastest in the lobby —
-               that is your own name up there.</div>` : ""}
-            <div class="ts-cols">
-              <div><h4 class="ts-h">By vehicle · mine / lobby</h4>
-                ${speed.perGroup
-                  ? gruppen(speed.perGroup, speed.lobbyPerGroup)
-                  : spalte(speed.perVehicle, speed.lobbyPerVehicle,
-                           "vehicle", "vehicleName")}</div>
-              <div><h4 class="ts-h">By map · mine / lobby</h4>
-                ${spalte(speed.perMap, speed.lobbyPerMap,
-                         "map", "mapName")}</div>
+          <section class="ts-box" aria-label="Top speed by vehicle class and map">
+            <div class="ts-hero">
+              <div><b>${o.kmh.toFixed(1)}</b><small>km/h</small>
+                <span>${satz(o, "Your best")}</span></div>
+              ${lo ? `<div class="ts-hero-lobby"><b>${lo.kmh.toFixed(1)}</b><small>km/h</small>
+                <span>${lo.isMe ? "Lobby best is yours"
+                  : `Lobby best, ${esc(lo.driverName || "unknown")} with a ${esc(lo.vehicleName)} on ${esc(PubgUI.fmtMap(lo.mapName))}`}</span></div>` : ""}
             </div>
-          </div>`;
+            <div class="ts-scale" aria-hidden="true"><span>0</span><span>50</span><span>100</span><span>150</span><span>200 km/h</span></div>
+            <h4 class="ts-h">By vehicle class</h4>
+            <div class="ts-list">${klassen}</div>
+            <h4 class="ts-h">By map</h4>
+            <div class="ts-list ts-list--maps">${karten}</div>
+            <p class="ts-legend"><span class="ts-key ts-key--mine"></span>Your best
+              <span class="ts-key ts-key--lobby"></span>Best in your lobbies</p>
+          </section>`;
       }
       fill("speed", speedHtml);
       });
