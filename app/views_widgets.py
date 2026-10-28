@@ -74,9 +74,11 @@ def widget_file(token, filepath):
             "__THEME__": theme,
         }
         html = inject_theme(html, theme)
-        # Admin-Fremdsicht (?asTenant=...) sichtbar machen — wie bei den Tools
+        # Admin-Fremdsicht (?asTenant=...) sichtbar machen — als schwebendes
+        # Abzeichen, das den Widget-Inhalt nicht verschiebt
         html = inject_impersonation_banner(
-            html, getattr(g, "tenant_impersonating", None), request.full_path)
+            html, getattr(g, "tenant_impersonating", None), request.full_path,
+            badge=True)
         # no-cache: die HTML wird pro Request mit Token + Theme injiziert und darf
         # nicht veraltet im Browser/OBS haengenbleiben (sonst altes/kein data-theme).
         return (inject_window_vars(html, variables), 200,

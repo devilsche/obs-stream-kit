@@ -62,7 +62,7 @@ _IMPERSONATION_CSS = """
    overflow-x: clip fangt den Scrollbalken ab, den 100vw sonst erzeugt (clip
    und nicht hidden: hidden wuerde den body zum Scroll-Container machen und
    das sticky-Verhalten brechen). */
-body:has(> .obs-impersonation) {
+body:has(> .obs-impersonation:not(.obs-impersonation--badge)) {
   padding-top: 0;
   overflow-x: clip;
 }
@@ -110,6 +110,31 @@ body:has(> .obs-impersonation) {
   outline: 3px solid #f2b705;
   outline-offset: 2px;
 }
+/* Widgets: kleines schwebendes Abzeichen statt Leiste — Widgets haben feste
+   Groessen bzw. sind an einer Kante verankert, eine Leiste wuerde den Inhalt
+   verschieben. Verdeckt hoechstens eine Ecke; Widgets sind kaum bedienbar. */
+.obs-impersonation--badge {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  width: auto;
+  max-width: calc(100vw - 16px);
+  margin: 0;
+  flex-wrap: nowrap;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 2px solid #f2b705;
+  border-radius: 4px;
+  font-size: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .45);
+}
+.obs-impersonation--badge .obs-impersonation__icon {
+  width: 16px;
+  height: 16px;
+}
+.obs-impersonation--badge .obs-impersonation__exit {
+  padding: 2px 6px;
+}
 </style>"""
 
 # Auge als Inline-SVG statt Material-Symbols-Ligatur: die Icon-Font ist in
@@ -136,7 +161,8 @@ def _drop_query_param(url: str, param: str) -> str:
                        urlencode(kept), parts.fragment))
 
 
-def inject_impersonation_banner(html: str, tenant_info, current_url: str) -> str:
+def inject_impersonation_banner(html: str, tenant_info, current_url: str,
+                                badge: bool = False) -> str:
     """Sichtbarer Hinweis, dass die Seite die Daten eines FREMDEN Tenants
     zeigt (Admin-Impersonation via ?asTenant=...).
 
@@ -147,6 +173,10 @@ def inject_impersonation_banner(html: str, tenant_info, current_url: str) -> str
     Sitzt direkt nach <body> und ist `sticky`, nicht `fixed`: so schiebt es
     den Inhalt nach unten statt fokussierte Elemente zu verdecken
     (WCAG 2.4.12).
+
+    `badge=True` (Widgets): kleines `fixed`-Abzeichen oben rechts statt der
+    Leiste — schiebt nichts weg; Widgets haben feste Groessen und kaum
+    fokussierbare Elemente.
 
     `tenant_info` ist g.tenant_impersonating (oder None → unveraendert).
     """
@@ -160,16 +190,28 @@ def inject_impersonation_banner(html: str, tenant_info, current_url: str) -> str
     # Nur den asTenant-Parameter abstreifen: range/matchId & Co. sollen beim
     # Wechsel in die eigene Sicht stehen bleiben.
     exit_url = escape(_drop_query_param(current_url, "asTenant"))
-    banner = (
-        f'{_IMPERSONATION_CSS}\n'
-        f'<div class="obs-impersonation" role="status">'
-        f'{_IMPERSONATION_ICON}'
-        f'<span>Viewing as <b class="obs-impersonation__who">{name}</b> '
-        f'(Tenant&nbsp;#{tid})</span>'
-        f'<a class="obs-impersonation__exit" href="{exit_url}">'
-        f'Back to my own view</a>'
-        f'</div>'
-    )
+    if badge:
+        banner = (
+            f'{_IMPERSONATION_CSS}\n'
+            f'<div class="obs-impersonation obs-impersonation--badge" role="status">'
+            f'{_IMPERSONATION_ICON}'
+            f'<span>Viewing as <b class="obs-impersonation__who">{name}</b> '
+            f'#{tid}</span>'
+            f'<a class="obs-impersonation__exit" href="{exit_url}" '
+            f'aria-label="Back to my own view">Exit</a>'
+            f'</div>'
+        )
+    else:
+        banner = (
+            f'{_IMPERSONATION_CSS}\n'
+            f'<div class="obs-impersonation" role="status">'
+            f'{_IMPERSONATION_ICON}'
+            f'<span>Viewing as <b class="obs-impersonation__who">{name}</b> '
+            f'(Tenant&nbsp;#{tid})</span>'
+            f'<a class="obs-impersonation__exit" href="{exit_url}">'
+            f'Back to my own view</a>'
+            f'</div>'
+        )
     m = _BODY_TAG_RE.search(html)
     if m:
         return html[:m.end()] + "\n" + banner + html[m.end():]

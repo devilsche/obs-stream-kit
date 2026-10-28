@@ -107,6 +107,7 @@ def test_widget_html_shows_banner_in_foreign_view(pg_conn_test_setup, tmp_path):
     assert "obs-impersonation" in body
     assert f"#{other}" in body
     assert "Back to my own view" in body
+    assert "obs-impersonation--badge" in body   # schwebt, schiebt nichts weg
 
     # Eigene Sicht: kein Banner
     credentials.set_pubg(conn, tid, name="Ich", api_key="k")

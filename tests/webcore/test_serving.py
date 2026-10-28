@@ -114,9 +114,22 @@ def test_banner_survives_a_page_with_body_padding():
     out = inject_impersonation_banner(
         "<html><head></head><body></body></html>",
         {"id": 2, "slug": "h3", "display_name": "H3"}, "/app/")
-    assert "body:has(> .obs-impersonation)" in out
+    assert "body:has(> .obs-impersonation:not(.obs-impersonation--badge))" in out
     assert "padding-top: 0" in out
     # 100vw braucht clip statt hidden: hidden macht den body zum
     # Scroll-Container und bricht damit position: sticky.
     assert "overflow-x: clip" in out
     assert "width: 100vw" in out
+
+
+def test_badge_variant_floats_and_does_not_push_content():
+    """Widgets: schwebendes Abzeichen — fixed, und die Leisten-Regel, die
+    das body-padding anfasst, greift fuer das Abzeichen nicht."""
+    out = inject_impersonation_banner(
+        "<html><head></head><body></body></html>",
+        {"id": 3, "slug": "h3", "display_name": "H3"}, "/s/t/widgets/x.html?asTenant=3",
+        badge=True)
+    assert 'class="obs-impersonation obs-impersonation--badge"' in out
+    assert "position: fixed" in out
+    assert 'href="/s/t/widgets/x.html"' in out
+    assert 'aria-label="Back to my own view"' in out
