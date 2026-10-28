@@ -457,7 +457,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `session-report.html` | After-Session-Report mit Phasen, Match-Liste und Match-Detail | `from`, `to` (ISO, sonst laufende Session) |
 | `career-card.html` | Lifetime-Anzeige | `player`, `mode=all\|squad-fpp\|...` |
 | `performance-history.html` | K/D-Verlauf pro Session / Tag / Monat | `groupBy=session\|day\|month`, `metric`, `limit`, `player` |
-| `news-ticker.html` | Marquee-Bar mit rotierenden Snippets | `rotateMs` |
+| `news-ticker.html` | Marquee-Bar mit rotierenden Snippets (Session-Stats, Maps, Mates, Hot Drops, Achievements, Top Speed der Session + in dieser Session gebrochene Tempo-Rekorde je Fahrzeug-Gruppe) | `rotateMs`, `focus=session\|lifetime\|mix` |
 | `squad-compare.html` | Vergleich über die letzten **gemeinsamen** Squad-Matches | `players=A,B,C,D`, `matches` |
 | `chat-stats-popup.html` | Streamer.bot-driven Pop-up | `player`, `duration` (Sek) |
 | `milestone-celebrate.html` | Vollbild-Feier bei jedem 100. Career-Win | `n`, `wait`, `force`, `mute` |

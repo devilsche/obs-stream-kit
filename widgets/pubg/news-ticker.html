@@ -179,6 +179,29 @@
             out.push(`<span class="label">SESSION ACHIEVEMENTS</span> ${recent}`);
           }
         } catch (_) {}
+
+        // ── Top Speed (Session) + gebrochene Gruppen-Rekorde ──
+        // Rekord = der All-time-Bestwert der Gruppe stammt aus einem
+        // Match dieser Session (Vergleich über matchId, nicht über km/h).
+        try {
+          const ts = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/top-speed?range=session");
+          const groups = (ts && ts.perGroup) || [];
+          if (groups[0]) {
+            const g = groups[0];
+            const variant = g.vehicleName && g.vehicleName !== g.group ? ` (${g.vehicleName})` : "";
+            out.push(`<span class="label">SESSION TOP SPEED</span> <b>${g.kmh.toFixed(1)} km/h</b> · ${g.group}${variant} · ${PubgUI.fmtMap(g.mapName)}`);
+          }
+          if (groups.length) {
+            const all = await PubgUI.fetchJson((window.__SERVE_BASE__||"/") + "api/pubg/top-speed?range=all");
+            const sessionMatches = new Set(groups.flatMap(g => (g.variants || [g]).map(v => v.matchId)));
+            const records = ((all && all.perGroup) || []).filter(g => sessionMatches.has(g.matchId));
+            if (records.length) {
+              const txt = records.slice(0, 3).map(g => `${g.group} <b>${g.kmh.toFixed(1)} km/h</b>`).join(" · ");
+              const label = records.length > 1 ? "NEW SPEED RECORDS" : "NEW SPEED RECORD";
+              out.push(`<span class="label">${label}</span> ${txt}`);
+            }
+          }
+        } catch (_) {}
       }
 
       // ── LIFETIME / DB-LIFETIME ────────────────────────────
