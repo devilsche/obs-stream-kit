@@ -625,6 +625,43 @@ Umgebungstod gezählt verlor die Granate außerdem ihren Verursacher.
 Die drei Icons stehen noch aus; `None` in `PUBG_ICON_URLS` heißt „kein Bild",
 nicht „fehlt versehentlich".
 
+#### Luft-Kills und Kimme und Korn (Stand 2026-10-28)
+
+Fünf seltene Achievements, alle unter 1 % der Matches je Tenant und deshalb
+auch in der Sektion „Special Achievements" des Session-Reports:
+
+| ID | Label | wann |
+|---|---|---|
+| `skeet_shooter` | Skeet Shooter | Opfer noch am Fallschirm getroffen (Knock oder Kill) |
+| `glider_down` | Glider Down | Opfer saß im Motorgleiter |
+| `welcome_committee` | Welcome Committee | Treffer bis 3 s nach der Landung des Opfers |
+| `iron_sights_100` | Iron Sights | Kill ab 100 m ohne Visier-Aufsatz |
+| `iron_sights_200` | Iron Sights | Kill ab 200 m ohne Visier-Aufsatz (ersetzt die 100er) |
+
+Das Label nennt Waffe und Distanz, bei Skeet Shooter auch die Höhe über
+Grund, wenn sie deutlich ist: „Skeet Shooter · Kar98k · 204 m · 22 m up".
+
+**Wie „in der Luft" erkannt wird.** Die Telemetrie hat keinen Luft-Zustand.
+Wird jemand am Fallschirm getroffen, beendet das Spiel den Flug und schreibt
+dafür ein `LogParachuteLanding` 0–20 ms vor dem Knock. Maßgeblich ist nur die
+**erste** Landung nach dem Verlassen von Flugzeug, Redeploy-Flugzeug oder
+Emergency Pickup: dasselbe Event feuert auch bei Knocks am Boden, bis zu
+sechsmal je Spieler und Match. Über alle Daten gemessen: 148 Treffer 0–20 ms
+nach der ersten Landung, 685 bis 3 s danach, 561.196 später. Die Höhe über
+Grund ist der Median der Landungen anderer Spieler im 150-m-Umkreis — grob,
+Dach oder Straße machen schnell 10 m aus, deshalb nur Anzeige, keine Bedingung.
+
+Im Emergency Pickup getroffen bleibt **Sky Snipe** (`em_pickup_kill`).
+
+**Iron Sights** nutzt die Aufsätze der Killerwaffe (`killerDamageInfo.
+additionalInfo`): kein `Upper_`-Teil = kein Rotpunkt, Holo oder Zielfernrohr.
+Ein echter No-Scope (aus der Hüfte) ist nicht erkennbar — ob anvisiert wurde,
+steht nicht in der Telemetrie. Ausgenommen: Waffen mit eingebautem Visier
+(VSS) und Knocks, die keine Aufsätze tragen.
+
+Je Opfer zählt ein Anlass nur einmal; die Erkennung läuft in einem eigenen
+`try`-Block je Match. Icons stehen noch aus (`None` in `PUBG_ICON_URLS`).
+
 #### Wurfgeräte: vier fehlende Mappings (Stand 2026-09-11)
 
 Vier Wurfgeräte tragen `Item_Weapon_`-Präfix statt `Proj` und fehlten

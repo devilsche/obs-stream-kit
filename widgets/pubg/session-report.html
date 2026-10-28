@@ -4917,6 +4917,17 @@
       //   longest_kill_800         —      —      —   nie erreicht
       //   longest_kill_1000        —      —      —   nie erreicht
       //
+      // Luft-Kills + Kimme und Korn, gemessen 2026-10-28 ueber alle Matches
+      // (T1 1499, T2 916, T3 1079, T5 442):
+      //                          T1     T2     T3     T5
+      //   skeet_shooter         0,40   0,11   0,28   0,45   am Fallschirm getroffen
+      //   glider_down           0,00   0,33   0,28   0,00   im Motorgleiter
+      //   welcome_committee     0,27   0,44   0,37   0,23   bis 3 s nach der Landung
+      //   iron_sights_100       0,00   0,11   0,56   0,23   ab 100 m ohne Visier
+      //   iron_sights_200       0,00   0,00   0,09   0,00   ab 200 m ohne Visier
+      // iron_sights_100 bleibt trotz Staffel drin: unter 1 %, und je Match
+      // wird nur die hoechste Stufe gemeldet — keine Doppelung.
+      //
       // longest_kill_400 bleibt draussen: ~1 % und Einstiegsstufe der
       // Staffel, wie kills_7. Die Tiers standen bis 2026-09-07 bei 0 %,
       // weil der API-Meter-Wert durch 100 geteilt wurde — deshalb waren
@@ -4938,6 +4949,8 @@
         "em_pickup_kill", "god_mode_chicken", "damage_2000", "kills_20",
         "ultra_chicken", "chicken_streak",
         "longest_kill_600", "longest_kill_800", "longest_kill_1000",
+        "skeet_shooter", "glider_down", "welcome_committee",
+        "iron_sights_100", "iron_sights_200",
       ]);
 
       let achievementsHtml = "";
