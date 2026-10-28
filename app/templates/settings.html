@@ -54,6 +54,14 @@
     </form>
   </section>
 
+  {% set KEY_ERRORS = {
+    "pubg_is_steam": "This looks like a Steam key (32 characters). Enter it under Steam Web API key below.",
+    "pubg_format":   "This is not a PUBG API key — PUBG keys are long and start with eyJ.",
+    "pubg_rejected": "PUBG rejected this key (invalid or revoked).",
+    "steam_is_pubg": "This looks like a PUBG key (starts with eyJ). Enter it under PUBG API key above.",
+    "steam_format":  "This is not a Steam Web API key — it has exactly 32 characters (0–9, A–F).",
+    "steam_rejected": "Steam rejected this key (invalid or revoked). Copy the current key from steamcommunity.com/dev/apikey.",
+  } %}
   <form method="POST" class="dn-simple">
     <p class="sec">// PUBG</p>
     <div class="dn-fgrid">
@@ -68,9 +76,15 @@
         </select>
       </div>
       <div class="dn-field">
-        <label for="pubg_api_key">API key</label>
-        <input id="pubg_api_key" name="pubg_api_key" type="password" autocomplete="new-password"
-               placeholder="{% if creds.pubg_api_key %}(saved — leave empty to keep){% else %}von developer.pubg.com{% endif %}">
+        <label for="pubg_api_key">PUBG API key</label>
+        <input id="pubg_api_key" name="pubg_api_key" type="password" autocomplete="off"
+               aria-describedby="pubg_api_key_hint{% if pubg_err %} pubg_api_key_err{% endif %}"
+               {% if pubg_err %}aria-invalid="true"{% endif %}
+               placeholder="{% if creds.pubg_api_key %}(saved — leave empty to keep){% else %}from developer.pubg.com{% endif %}">
+        <p class="dn-key-hint" id="pubg_api_key_hint">Long key starting with <code>eyJ</code>, from developer.pubg.com.</p>
+        {% if pubg_err %}
+        <p class="dn-key-err" id="pubg_api_key_err" role="alert"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> {{ KEY_ERRORS.get(pubg_err, "Key not accepted.") }} Nothing was saved.</p>
+        {% endif %}
       </div>
     </div>
 
@@ -82,9 +96,15 @@
                value="{{ creds.steam_id or '' }}" placeholder="76561198..." autocomplete="off">
       </div>
       <div class="dn-field">
-        <label for="steam_api_key">API key</label>
-        <input id="steam_api_key" name="steam_api_key" type="password" autocomplete="new-password"
-               placeholder="{% if creds.steam_api_key %}(saved — leave empty to keep){% else %}von steamcommunity.com/dev{% endif %}">
+        <label for="steam_api_key">Steam Web API key</label>
+        <input id="steam_api_key" name="steam_api_key" type="password" autocomplete="off"
+               aria-describedby="steam_api_key_hint{% if steam_err %} steam_api_key_err{% endif %}"
+               {% if steam_err %}aria-invalid="true"{% endif %}
+               placeholder="{% if creds.steam_api_key %}(saved — leave empty to keep){% else %}from steamcommunity.com/dev/apikey{% endif %}">
+        <p class="dn-key-hint" id="steam_api_key_hint">32 characters (0–9, A–F), from steamcommunity.com/dev/apikey.</p>
+        {% if steam_err %}
+        <p class="dn-key-err" id="steam_api_key_err" role="alert"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> {{ KEY_ERRORS.get(steam_err, "Key not accepted.") }} Nothing was saved.</p>
+        {% endif %}
       </div>
     </div>
 

@@ -2,6 +2,7 @@
 import json
 import os
 import re
+from urllib.parse import urlencode
 
 from flask import (
     Blueprint, render_template, g, jsonify, request, redirect, current_app,
@@ -162,9 +163,26 @@ def settings():
         if request.method == "POST":
             pubg_name = request.form.get("pubg_name") or None
             pubg_platform = request.form.get("pubg_platform") or None
-            pubg_api_key = request.form.get("pubg_api_key") or None
+            pubg_api_key = (request.form.get("pubg_api_key") or "").strip() or None
             steam_id = request.form.get("steam_id") or None
-            steam_api_key = request.form.get("steam_api_key") or None
+            steam_api_key = (request.form.get("steam_api_key") or "").strip() or None
+            # Keys vor dem Speichern pruefen — bei einem Fehler wird NICHTS
+            # gespeichert, sonst ueberschreibt ein vertauschter Key den
+            # gueltigen (Steam-Key im PUBG-Feld -> Poller 401).
+            from core import key_check
+            errs = {}
+            if pubg_api_key:
+                platform = pubg_platform or core_creds.get(
+                    conn, g.tenant_id).pubg_platform or "steam"
+                err = key_check.check("pubg", pubg_api_key, platform)
+                if err:
+                    errs["pubg_err"] = err
+            if steam_api_key:
+                err = key_check.check("steam", steam_api_key)
+                if err:
+                    errs["steam_err"] = err
+            if errs:
+                return redirect("/app/settings?" + urlencode(errs))
             if pubg_name or pubg_platform or pubg_api_key:
                 core_creds.set_pubg(
                     conn, g.tenant_id,
@@ -241,6 +259,8 @@ def settings():
                            saved=request.args.get("saved"),
                            archive=archive,
                            archive_msg=request.args.get("archive"),
+                           pubg_err=request.args.get("pubg_err"),
+                           steam_err=request.args.get("steam_err"),
                            api_token=api_token, base_url=base_url)
 
 

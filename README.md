@@ -395,10 +395,12 @@ wo beides gesetzt ist, gewinnt `from`/`to`.
 ### Setup
 
 1. **API-Key** unter [developer.pubg.com](https://developer.pubg.com) holen (kostenlos, 10 RPM Default).
-2. **`.secrets`** erweitern:
-   ```
-   PUBG-API-Key:  <dein-key>
-   ```
+2. Key unter **`/app/settings` → PUBG API key** eintragen. Er wird
+   verschlüsselt in der DB gespeichert (`tenant_credentials`); `.secrets`
+   wird dafür nur noch beim einmaligen Admin-Seed (`core/seed_admin.py`)
+   gelesen. Beim Speichern wird der Key geprüft — Format (`eyJ…`, JWT) und
+   ein Live-Aufruf; ein Steam-Key im PUBG-Feld oder ein abgelehnter Key wird
+   mit Hinweis abgewiesen, und es wird **nichts** gespeichert.
 3. **`config/pubg.json`** aus dem Template anlegen:
    ```bash
    cp config/pubg.example.json config/pubg.json
@@ -1567,18 +1569,17 @@ Default 10 RPM reicht für 1-2 Matches/Min steady-state. Bei häufigen
 
 Live-Now-Playing-Card, Achievement-Popup mit Rare-Highlight, Library-
 Ticker (alle / Co-op / Multiplayer) und Achievement-Feed. Optional —
-nur aktiv wenn `Steam API Key:` + `Steam-ID:` in `.secrets` stehen.
+nur aktiv wenn Steam-Key + SteamID64 unter `/app/settings` hinterlegt sind.
 
 ### Setup
 
 1. Steam-Key holen: <https://steamcommunity.com/dev/apikey>.
 2. SteamID64 ermitteln: <https://steamid.io/>.
-3. Beides in `.secrets`:
-   ```
-   Steam API Key: ABCDEF...
-   Steam-ID:      76561198XXXXXXXXX
-   ```
-4. Server neu starten — Poller läuft im Hintergrund.
+3. Beides unter **`/app/settings` → Steam** eintragen (Feld „Steam Web API
+   key"). Geprüft wird wie beim PUBG-Key: 32 Zeichen Hex + Live-Aufruf;
+   ein PUBG-Key im Steam-Feld oder ein von Steam abgelehnter Key wird
+   abgewiesen, nichts wird gespeichert.
+4. Der Poller holt sich die neuen Credentials beim nächsten Durchlauf.
 
 ### Polling-Layer
 
