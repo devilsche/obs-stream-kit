@@ -153,3 +153,24 @@ def test_pubg_status_only_shows_own_tenant(monkeypatch):
     assert list(s["perTenant"].keys()) == ["3"]
     assert s["errors"] == ["B: bang"]
     assert s["lastPollAt"] == "x"
+
+
+def test_key_without_account_is_named(pg_conn_test_setup):
+    """Tenant mit Key, aber ohne PUBG-Account: der Poller ueberspringt ihn —
+    die Uebersicht muss sagen, was fehlt, statt 'no pubg credentials'."""
+    conn, tid, _, _ = pg_conn_test_setup
+    credentials.set_pubg(conn, tid, platform="steam", api_key="eyJ" + "x" * 200)
+    status = {"pubg": {"perTenant": {str(tid): {
+                  "polling": "skip", "reason": "no-pubg-credentials"}}},
+              "steam": {}, "reachable": True}
+    row = so.merge_status(so.tenant_overview(conn), status)[0]
+    assert row["pubg_state"] == "skip"
+    assert row["pubg_detail"] == "key set, but no PUBG account added"
+
+
+def test_dashboard_names_missing_account(pg_conn_test_setup, fake_poller):
+    conn, tid, _, sid = pg_conn_test_setup
+    credentials.set_pubg(conn, tid, platform="steam", api_key="eyJ" + "x" * 200)
+    body = _client(conn, sid).get("/app/").get_data(as_text=True)
+    assert "PUBG account missing" in body
+    assert "API key + in-game name missing" not in body

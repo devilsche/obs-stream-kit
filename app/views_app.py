@@ -136,6 +136,7 @@ def dashboard():
             conn.close()
     cred_status = {
         "pubg_ready": bool(creds.pubg_name and creds.pubg_api_key),
+        "pubg_key_only": bool(creds.pubg_api_key and not creds.pubg_name),
         "steam_ready": bool(creds.steam_id and creds.steam_api_key),
         "any_missing": not (creds.pubg_name and creds.pubg_api_key
                             and creds.steam_id and creds.steam_api_key),

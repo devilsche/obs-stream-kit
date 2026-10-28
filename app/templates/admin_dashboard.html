@@ -43,9 +43,9 @@
             <td class="num">{{ t.matches }} · {{ t.matches_7d }}</td>
             <td>{{ t.last_match_ago }}</td>
             <td>
-              <span class="dn-key {% if t.pubg_key %}is-set{% endif %}">
+              <span class="dn-key {% if t.pubg_key and t.pubg_name %}is-set{% endif %}">
                 <span class="material-symbols-outlined icon-sm" aria-hidden="true">{% if t.pubg_key %}key{% else %}key_off{% endif %}</span>
-                PUBG {% if t.pubg_key %}set{% else %}missing{% endif %}</span>
+                PUBG {% if t.pubg_key and t.pubg_name %}set{% elif t.pubg_key %}key only, no account{% else %}missing{% endif %}</span>
               <span class="dn-key {% if t.steam_key %}is-set{% endif %}">
                 <span class="material-symbols-outlined icon-sm" aria-hidden="true">{% if t.steam_key %}key{% else %}key_off{% endif %}</span>
                 Steam {% if t.steam_key %}set{% else %}missing{% endif %}</span>

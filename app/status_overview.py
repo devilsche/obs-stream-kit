@@ -114,7 +114,12 @@ def merge_status(rows: list, status: dict) -> list:
             r["pubg_state"], r["pubg_detail"] = "unknown", ""
         elif p.get("polling") == "skip":
             r["pubg_state"] = "skip"
-            r["pubg_detail"] = (p.get("reason") or "").replace("-", " ")
+            # Haeufigster Fall: Key eingetragen, aber kein PUBG-Account
+            # angelegt — dann weiss der Poller nicht, wen er abfragen soll.
+            if r["pubg_key"] and not r.get("pubg_name"):
+                r["pubg_detail"] = "key set, but no PUBG account added"
+            else:
+                r["pubg_detail"] = (p.get("reason") or "").replace("-", " ")
         else:
             errs = p.get("errors") or []
             state = p.get("polling") or "unknown"
