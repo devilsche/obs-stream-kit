@@ -1067,6 +1067,33 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   font-family:var(--font-display);font-size:11.5px;text-transform:uppercase;letter-spacing:.02em}
 .url-switches .sw-btn.active{background:var(--brand-purple);color:var(--theme-on-primary,#fff);border-color:var(--theme-accent)}
 
+/* Multiselect sortierbar: aktive Pills vorn + nummeriert, per Drag,
+   Alt+Pfeil oder den Pfeil-Buttons verschiebbar (urls.html initMultiSort) */
+.sw-group[data-type="multiselect"] .sw-controls{counter-reset:swpos}
+.sw-multi-item{position:relative;display:inline-flex}
+.sw-multi.active{touch-action:none;cursor:grab}
+.sw-multi.active::before{counter-increment:swpos;content:counter(swpos);display:inline-grid;place-items:center;
+  min-width:16px;height:16px;margin-right:6px;border-radius:50%;background:var(--theme-on-primary,#fff);
+  color:var(--brand-purple);font-size:10px;font-weight:700;letter-spacing:0}
+.sw-move-bar{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+  gap:2px;padding-bottom:4px;z-index:5}
+.sw-multi-item:has(> .sw-multi.active):is(:hover,:focus-within) .sw-move-bar{display:flex}
+/* Touch: kein Hover — Pfeile fest neben der Pill statt schwebend */
+@media (hover:none){.sw-multi-item:has(> .sw-multi.active){gap:2px;align-items:center}
+  .sw-multi-item:has(> .sw-multi.active) .sw-move-bar{display:flex;position:static;transform:none;padding:0}}
+.sw-move{width:24px;height:24px;display:grid;place-items:center;padding:0;cursor:pointer;
+  border:1px solid var(--border);border-radius:4px;background:var(--bg-card);color:var(--text)}
+.sw-move .material-symbols-outlined{font-size:18px}
+.sw-move:hover:not(:disabled){border-color:var(--theme-accent)}
+.sw-move:disabled{opacity:.35;cursor:default}
+.sw-move:focus-visible{outline:2px solid var(--brand-gold);outline-offset:1px}
+.sw-group.is-sorting{user-select:none}
+.sw-group.is-sorting .sw-move-bar{display:none!important}
+.sw-multi-item.is-dragging .sw-multi{cursor:grabbing;outline:2px dashed var(--brand-gold);outline-offset:2px;
+  box-shadow:0 6px 16px rgba(0,0,0,.35)}
+.sw-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
+  clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
 /* ════════════════════════════════════════════════════════════════════════
    URLs-Seite — Mockup-Layout: Crumb + Titel + Sub-Tabs + Card-Grid + Detail.
    Token-basiert ueber die Dashboard-Aliase (--brand-*, --bg-*, --text*) +

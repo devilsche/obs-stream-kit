@@ -173,6 +173,128 @@ G1R_STEAM_NAME=</code></pre>
     return params.length ? base + "?" + params.join("&") : base;
   }
 
+  // ── Multiselect: Reihenfolge ──────────────────────────────
+  // Aktive Pills stehen vorn in gewaehlter Reihenfolge, inaktive dahinter in
+  // Options-Reihenfolge. Alle Leser (buildUrl, lsSave, Dirty-Check) nehmen
+  // .sw-btn.active in DOM-Reihenfolge — die Anordnung genuegt also.
+  function multiOrder(group) {
+    return Array.from(group.querySelectorAll(".sw-btn.active")).map(b => b.dataset.value);
+  }
+
+  function multiArrange(group, order) {
+    const ctrl = group.querySelector(".sw-controls");
+    const anchor = ctrl.querySelector(".sw-reset-btn");
+    const focused = document.activeElement;
+    const items = Array.from(ctrl.querySelectorAll(".sw-multi-item"));
+    const byVal = new Map(items.map(it => [it.querySelector(".sw-multi").dataset.value, it]));
+    const active = order.filter(v => byVal.has(v));
+    const rest = items.filter(it => !active.includes(it.querySelector(".sw-multi").dataset.value))
+      .sort((a, b) => a.dataset.idx - b.dataset.idx);
+    active.map(v => byVal.get(v)).concat(rest).forEach(it => {
+      const btn = it.querySelector(".sw-multi");
+      const on = active.includes(btn.dataset.value);
+      btn.classList.toggle("active", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      ctrl.insertBefore(it, anchor);
+    });
+    // Verschieben im DOM nimmt den Fokus weg — zurueckgeben
+    if (focused && group.contains(focused) && document.activeElement !== focused) {
+      focused.focus({preventScroll: true});
+    }
+    const act = ctrl.querySelectorAll(".sw-multi-item:has(> .sw-multi.active)");
+    act.forEach((it, i) => {
+      it.querySelector('.sw-move[data-dir="-1"]').disabled = (i === 0);
+      it.querySelector('.sw-move[data-dir="1"]').disabled = (i === act.length - 1);
+    });
+  }
+
+  // Drag & Drop (Pointer Events — Maus + Touch), Alt+Pfeiltasten und die
+  // Pfeil-Buttons. onChange(meldung) nach jeder Umsortierung.
+  function initMultiSort(group, onChange) {
+    const label = v => {
+      const b = group.querySelector(`.sw-multi[data-value="${CSS.escape(v)}"]`);
+      return b ? b.textContent.trim() : v;
+    };
+    function move(value, delta) {
+      const order = multiOrder(group);
+      const i = order.indexOf(value), j = i + delta;
+      if (i < 0 || j < 0 || j >= order.length) return;
+      order.splice(i, 1); order.splice(j, 0, value);
+      multiArrange(group, order);
+      onChange(`${label(value)}, position ${j + 1} of ${order.length}`);
+    }
+
+    group.querySelectorAll(".sw-move").forEach(mb => {
+      mb.addEventListener("click", () => {
+        const v = mb.closest(".sw-multi-item").querySelector(".sw-multi").dataset.value;
+        move(v, parseInt(mb.dataset.dir, 10));
+      });
+    });
+
+    group.addEventListener("keydown", e => {
+      const btn = e.target.closest(".sw-multi.active");
+      if (!btn || !e.altKey) return;
+      const d = {ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1}[e.key];
+      if (!d) return;
+      e.preventDefault();
+      move(btn.dataset.value, d);
+    });
+
+    let drag = null, suppressClick = false;
+    group.addEventListener("pointerdown", e => {
+      const btn = e.target.closest(".sw-multi.active");
+      if (!btn || e.button !== 0) return;
+      drag = {btn, item: btn.closest(".sw-multi-item"), x: e.clientX, y: e.clientY, moving: false};
+      // Nur waehrend des Ziehens am document — wireDetail laeuft je Karte neu
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", endDrag);
+      document.addEventListener("pointercancel", endDrag);
+    });
+    function onMove(e) {
+      if (!drag) return;
+      if (!drag.moving) {
+        if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return;
+        drag.moving = true;
+        drag.item.classList.add("is-dragging");
+        group.classList.add("is-sorting");
+      }
+      // Naechstes andere aktive Item; links/rechts von dessen Mitte entscheidet
+      let best = null, bestDist = Infinity;
+      group.querySelectorAll(".sw-multi-item:has(> .sw-multi.active)").forEach(it => {
+        if (it === drag.item) return;
+        const r = it.getBoundingClientRect();
+        const dist = Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2));
+        if (dist < bestDist) { bestDist = dist; best = {it, r}; }
+      });
+      if (!best) return;
+      const ctrl = drag.item.parentNode;
+      const after = e.clientX > best.r.left + best.r.width / 2;
+      const ref = after ? best.it.nextSibling : best.it;
+      if (ref !== drag.item && ref !== drag.item.nextSibling) ctrl.insertBefore(drag.item, ref);
+    }
+    function endDrag() {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", endDrag);
+      document.removeEventListener("pointercancel", endDrag);
+      if (!drag) return;
+      const d = drag; drag = null;
+      if (!d.moving) return;
+      d.item.classList.remove("is-dragging");
+      group.classList.remove("is-sorting");
+      suppressClick = true;                 // der folgende click ist das Loslassen
+      setTimeout(() => { suppressClick = false; }, 0);
+      const order = multiOrder(group);
+      multiArrange(group, order);
+      onChange(`${label(d.btn.dataset.value)}, position ${order.indexOf(d.btn.dataset.value) + 1} of ${order.length}`);
+    }
+    // Capture-Phase: laeuft vor dem Toggle-Handler am Button
+    group.addEventListener("click", e => {
+      if (suppressClick && e.target.closest(".sw-multi")) {
+        e.stopImmediatePropagation(); e.preventDefault(); suppressClick = false;
+      }
+    }, true);
+  }
+
   // ── Switch-Controls-HTML aus switches-Array ───────────────
   function renderSwitches(switches) {
     if (!switches || !switches.length) return "";
@@ -187,9 +309,17 @@ G1R_STEAM_NAME=</code></pre>
                    data-value="${escapeAttr(value)}" aria-pressed="${value == sw.default ? "true" : "false"}">${escapeHtml(vlabel)}</button>`
         ).join("");
       } else if (sw.type === "multiselect" && sw.options) {
-        controls = sw.options.map(([value, vlabel]) =>
-          `<button type="button" class="sw-btn sw-multi"
-                   data-value="${escapeAttr(value)}" aria-pressed="false">${escapeHtml(vlabel)}</button>`
+        // Je Option ein Item: Pill + Pfeile zum Verschieben (nur aktiv sichtbar).
+        // Die DOM-Reihenfolge der aktiven Pills IST die Reihenfolge im Parameter.
+        controls = sw.options.map(([value, vlabel], i) =>
+          `<span class="sw-multi-item" data-idx="${i}">
+             <button type="button" class="sw-btn sw-multi"
+                     data-value="${escapeAttr(value)}" aria-pressed="false">${escapeHtml(vlabel)}</button>
+             <span class="sw-move-bar">
+               <button type="button" class="sw-move" data-dir="-1" aria-label="Move ${escapeAttr(vlabel)} left"><span class="material-symbols-outlined" aria-hidden="true">chevron_left</span></button>
+               <button type="button" class="sw-move" data-dir="1" aria-label="Move ${escapeAttr(vlabel)} right"><span class="material-symbols-outlined" aria-hidden="true">chevron_right</span></button>
+             </span>
+           </span>`
         ).join("");
       } else if (sw.type === "text") {
         const isImg = sw.key === "img";
@@ -358,12 +488,7 @@ G1R_STEAM_NAME=</code></pre>
             b.setAttribute("aria-pressed", active ? "true" : "false");
           });
         } else if (group.dataset.type === "multiselect") {
-          const vals = v.split(",");
-          group.querySelectorAll(".sw-btn").forEach(b => {
-            const active = vals.includes(b.dataset.value);
-            b.classList.toggle("active", active);
-            b.setAttribute("aria-pressed", active ? "true" : "false");
-          });
+          multiArrange(group, v.split(",").filter(Boolean));
         } else {
           const inp = group.querySelector(".sw-input");
           if (inp) inp.value = v;
@@ -406,10 +531,7 @@ G1R_STEAM_NAME=</code></pre>
             b.setAttribute("aria-pressed", active ? "true" : "false");
           });
         } else if (group.dataset.type === "multiselect") {
-          group.querySelectorAll(".sw-btn").forEach(b => {
-            b.classList.remove("active");
-            b.setAttribute("aria-pressed", "false");
-          });
+          multiArrange(group, []);
         } else {
           const inp = group.querySelector(".sw-input");
           if (inp) inp.value = def || "";
@@ -568,14 +690,31 @@ G1R_STEAM_NAME=</code></pre>
     }
 
     if (switchesRoot) {
+      let live = document.getElementById("swSortLive");
+      if (!live) {
+        live = document.createElement("div");
+        live.id = "swSortLive";
+        live.className = "sw-sr-only";
+        live.setAttribute("aria-live", "polite");
+        document.body.appendChild(live);
+      }
+      switchesRoot.querySelectorAll('.sw-group[data-type="multiselect"]').forEach(group => {
+        multiArrange(group, multiOrder(group));
+        initMultiSort(group, msg => {
+          live.textContent = msg;
+          group.dispatchEvent(new Event("sw-change"));
+          refresh();
+        });
+      });
       switchesRoot.querySelectorAll(".sw-group").forEach(group => {
         const numInput = group.querySelector("input[type=number]");
         const isMulti = group.dataset.type === "multiselect";
         group.querySelectorAll(".sw-btn").forEach(btn => {
           btn.addEventListener("click", () => {
             if (isMulti) {
-              const pressed = btn.classList.toggle("active");
-              btn.setAttribute("aria-pressed", pressed ? "true" : "false");
+              const order = multiOrder(group).filter(v => v !== btn.dataset.value);
+              if (!btn.classList.contains("active")) order.push(btn.dataset.value);
+              multiArrange(group, order);
             } else {
               group.querySelectorAll(".sw-btn").forEach(b => {
                 b.classList.remove("active");
@@ -665,10 +804,7 @@ G1R_STEAM_NAME=</code></pre>
               if (active) setTimeout(() => b.dispatchEvent(new Event("click", {bubbles: true})), 0);
             });
           } else if (type === "multiselect") {
-            group.querySelectorAll(".sw-btn").forEach(b => {
-              b.classList.remove("active");
-              b.setAttribute("aria-pressed", "false");
-            });
+            multiArrange(group, []);
           } else {
             const inp = group.querySelector(".sw-input");
             if (inp) {
@@ -684,6 +820,7 @@ G1R_STEAM_NAME=</code></pre>
         // dirty-check bei jeder Änderung
         group.querySelectorAll(".sw-btn").forEach(b => b.addEventListener("click", checkDirty));
         group.querySelectorAll(".sw-input").forEach(i => i.addEventListener("input", checkDirty));
+        group.addEventListener("sw-change", checkDirty);
         checkDirty();
       });
     }
