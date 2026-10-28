@@ -177,7 +177,7 @@ WIDGET_META = [
     ("PUBG · Stats", "Career Card",          "Career stats: K/D, wins, top 10 — current season.",                    "pubg/career-card.html"),
 
 
-    ("PUBG · Stats", "Live Bar",             "Live stat bar for the gameplay overlay — kills, damage, place.", "pubg/live-bar.html"),
+    ("PUBG · Stats", "Live Bar",             "Live stat bar for the gameplay overlay — pick the values and their order (kills, K/D, damage, wins, top 10 …).", "pubg/live-bar.html"),
     ("PUBG · Stats", "Streak Counter",       "Live win-streak / top10-streak counter. Tied to the active session.",  "pubg/streak-counter.html"),
     ("PUBG · Stats", "First Fight Rate",     "How often you win the first fight.",                                   "pubg/first-fight.html"),
     ("PUBG · Stats", "Weapon Stats",         "Damage and kill distribution by weapon.",                              "pubg/weapon-stats.html"),
@@ -507,7 +507,7 @@ WIDGET_HINTS = {
     "latest-tip.html":      "Displays whoever is passed as ?name= and ?amount=. Set this URL as a browser source and let Streamer.bot update the URL with the donor name and amount on each event.",
     # Auto-hide
     "steam/now-playing.html":         "Only visible when a Steam game is running — hides automatically when nothing is being played.",
-    "pubg/live-bar.html":             "Only visible during an active session — hides automatically between matches.",
+    "pubg/live-bar.html":             "Only visible during an active session — hides automatically between matches. ?stats=kills,kd,dmg,wins sets values and order (default kills,dmg,wins,matches).",
     "pubg/post-match-card.html":      "Hides automatically when data becomes stale. OBS source toggle controls visibility after a match.",
     "pubg/news-ticker.html":          "Hides when no session is active (unless ?focus=lifetime). Rotates between session and lifetime snippets every 60 seconds.",
     "pubg/session-goal.html":         "Hides automatically 60 seconds after the goal is reached — use ?keepAfterDone=1 to keep it visible.",

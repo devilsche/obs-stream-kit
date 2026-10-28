@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <title>PUBG Live Bar</title>
@@ -33,34 +33,83 @@
   </style>
 </head>
 <body>
-  <div class="pubg-card pubg-bar live-bar pubg-fade-in" id="bar">
-    <span class="pubg-stat-value" id="kills">—</span> <span class="label">Kills</span></span>
-    <span class="sep">·</span>
-    <span class="pubg-stat-value" id="dmg">—</span> <span class="label">DMG</span></span>
-    <span class="sep">·</span>
-    <span class="pubg-stat-value" id="wins">—</span> <span class="label">Wins</span></span>
-    <span class="sep">·</span>
-    <span class="pubg-stat-value" id="matches">—</span> <span class="label" id="matches-label">Matches</span>
-  </div>
+  <div class="pubg-card pubg-bar live-bar pubg-fade-in" id="bar"></div>
   <script src="_pubg.js"></script>
   <script>
-    // Filter-Bar nur mit dem globalen 'Show always'-Toggle.
-    PubgUI.buildFilter([]);
-    const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", 30000), 10);
-
+    // ?stats=kills,kd,dmg,... — welche Werte in welcher Reihenfolge.
+    // Ohne Parameter die bisherigen vier (Kills · DMG · Wins · Matches).
     const fmt = (n) => {
       if (n == null) return "—";
       if (n >= 1000) return (n / 1000).toFixed(1) + "k";
       return String(Math.round(n));
     };
+    const fmt2 = (n) => (n == null ? "—" : n.toFixed(2));
+
+    // key → [Label, Wert aus /api/pubg/session, Formatter, animieren?]
+    const STATS = {
+      kills:   ["Kills",   (s) => s.kills || 0,            fmt,  true],
+      dmg:     ["DMG",     (s) => s.damage || 0,           fmt,  true],
+      wins:    ["Wins",    (s) => s.wins || 0,             fmt,  true],
+      matches: ["Matches", (s) => s.matches || 0,          fmt,  true],
+      kd:      ["K/D",     (s) => s.kd || 0,               fmt2, true],
+      kpm:     ["K/M",     (s) => s.kpm || 0,              fmt2, true],
+      hs:      ["HS",      (s) => s.headshotPct || 0,      (n) => Math.round(n) + "%", true],
+      top10:   ["Top 10",  (s) => s.top10s || 0,           fmt,  true],
+      best:    ["Best",    (s) => s.bestPlace,             (n) => (n == null ? "—" : "#" + n), false],
+      longest: ["Longest", (s) => s.longestKill || 0,      (n) => Math.round(n) + " m", true],
+      assists: ["Assists", (s) => s.totalAssists || 0,     fmt,  true],
+      knocks:  ["Knocks",  (s) => s.totalDbnos || 0,       fmt,  true],
+    };
+    const DEFAULT_STATS = "kills,dmg,wins,matches";
+
+    PubgUI.buildFilter([
+      { key: "stats", label: "Stats", type: "multiselect", default: "",
+        options: [
+          ["kills", "Kills"], ["dmg", "DMG"], ["wins", "Wins"],
+          ["matches", "Matches"], ["kd", "K/D"], ["kpm", "K/M"],
+          ["hs", "HS"], ["top10", "Top 10"], ["best", "Best"],
+          ["longest", "Longest"], ["assists", "Assists"], ["knocks", "Knocks"],
+        ],
+        tooltip: "Which values the bar shows, in URL order " +
+                 "(e.g. ?stats=kills,kd,dmg,wins). None selected = " +
+                 "Kills, DMG, Wins, Matches." },
+    ]);
+    const REFRESH_MS = parseInt(PubgUI.qs("refreshMs", 30000), 10);
+
+    const keys = (PubgUI.qs("stats", "") || DEFAULT_STATS)
+      .split(",").map((k) => k.trim()).filter((k) => STATS[k]);
+    if (!keys.length) keys.push(...DEFAULT_STATS.split(","));
+
+    const bar = document.getElementById("bar");
+    const cells = {};
+    keys.forEach((k, i) => {
+      if (i > 0) {
+        const sep = document.createElement("span");
+        sep.className = "sep";
+        sep.setAttribute("aria-hidden", "true");
+        sep.textContent = "·";
+        bar.appendChild(sep);
+      }
+      const value = document.createElement("span");
+      value.className = "pubg-stat-value";
+      value.textContent = "—";
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = STATS[k][0];
+      bar.append(value, " ", label);
+      cells[k] = { value, label };
+    });
 
     function renderSession(s) {
-      PubgUI.animateNumber(document.getElementById("kills"), s.kills || 0, {format: fmt});
-      PubgUI.animateNumber(document.getElementById("dmg"), s.damage || 0, {format: fmt});
-      PubgUI.animateNumber(document.getElementById("wins"), s.wins || 0, {format: fmt});
-      PubgUI.animateNumber(document.getElementById("matches"), s.matches || 0, {format: fmt});
-      document.getElementById("matches-label").textContent =
-        (s.matches === 1) ? "Match" : "Matches";
+      keys.forEach((k) => {
+        const [, get, format, animate] = STATS[k];
+        const v = get(s);
+        if (animate) PubgUI.animateNumber(cells[k].value, v, {format});
+        else cells[k].value.textContent = format(v);
+      });
+      if (cells.matches) {
+        cells.matches.label.textContent = (s.matches === 1) ? "Match" : "Matches";
+      }
     }
 
     PubgUI.hideIfStale();
