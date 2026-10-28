@@ -1459,6 +1459,11 @@ class EndpointRegistry:
                   repr(exc), flush=True)
             traceback.print_exc()
 
+        # Je Match nur die hoechste Stufe einer Reihe anzeigen (God Mode
+        # statt God Mode + Ultra + Beast). In der DB bleiben alle Stufen.
+        from pubg.aggregations import keep_highest_tier
+        items = keep_highest_tier(list(items))
+
         # Enrich: PNG-Icon-URL, lokalisierter Canonical + Label fuer den Report.
         # Original-icon (Emoji) bleibt als Fallback drin.
         lang = self._current_lang()

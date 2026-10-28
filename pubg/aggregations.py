@@ -5123,6 +5123,42 @@ LONGEST_KILL_TIERS = [
     (400,  "longest_kill_400",  "Long-Range Ranger"),
 ]
 
+#: Stufenreihen, aufsteigend. Gespeichert werden alle erreichten Stufen
+#: (die Popup-Logik braucht sie: nur die hoechste poppt, der Rest traegt
+#: suppressPopup). Angezeigt wird je Match nur die hoechste — "God Mode
+#: Chicken" und darunter nochmal "Ultra Chicken" fuer dieselben 15 Kills
+#: waere doppelt.
+TIER_FAMILIES = [
+    ["beast_chicken", "ultra_chicken", "god_mode_chicken"],
+    [aid for _, aid, _ in reversed(KILL_TIERS)],
+    [aid for _, aid, _ in reversed(DAMAGE_TIERS)],
+    [aid for _, aid, _ in reversed(LONGEST_KILL_TIERS)],
+    ["iron_sights_100", "iron_sights_200"],
+]
+_TIER_RANK = {aid: (fam_i, rank)
+              for fam_i, fam in enumerate(TIER_FAMILIES)
+              for rank, aid in enumerate(fam)}
+
+
+def keep_highest_tier(items):
+    """Je Match und Stufenreihe nur die hoechste Stufe; alles andere und
+    die Reihenfolge bleiben unveraendert."""
+    best = {}
+    for a in items:
+        r = _TIER_RANK.get(a.get("id"))
+        if r is None:
+            continue
+        key = (r[0], a.get("matchId"))
+        if key not in best or r[1] > best[key]:
+            best[key] = r[1]
+    out = []
+    for a in items:
+        r = _TIER_RANK.get(a.get("id"))
+        if r is not None and r[1] < best[(r[0], a.get("matchId"))]:
+            continue
+        out.append(a)
+    return out
+
 
 #: Ueber dieser Grenze kann kein Longest-Kill in Metern liegen — dann
 #: stehen Telemetrie-Einheiten in der Spalte (100 = 1 m).
