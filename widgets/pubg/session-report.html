@@ -997,6 +997,14 @@
     .extras-skel-trend { height: 140px; }
     .extras-skel-streak { height: 90px; }
     .extras-skel-ach { height: 180px; }
+    /* Skelette je Platz (renderExtras): Hoehe ungefaehr wie der fertige
+       Inhalt, damit nichts springt. */
+    [data-extras-slot] > .extras-skel-box { margin: 24px 0 8px; }
+    .extras-skel--trend { height: 120px; }
+    .extras-skel--streaks { height: 80px; }
+    .extras-skel--achievements { height: 48px; }
+    .extras-skel--speed { height: 260px; }
+    .extras-skel--vehicle { height: 120px; }
 
     .extras-h {
       margin: 24px 0 8px;
@@ -4853,8 +4861,14 @@
       // erscheint zuerst, ohne dass die Reihenfolge springt.
       const SLOTS = ["trend", "streaks", "achievements", "special",
                      "speed", "vehicle"];
-      placeholder.innerHTML = SLOTS
-        .map(k => `<div data-extras-slot="${k}"></div>`).join("");
+      // Jeder Platz zeigt sein eigenes Skelett, bis genau diese Sektion
+      // fertig ist — die Specials nicht, die sind meist leer und wuerden
+      // nur kurz aufblitzen.
+      placeholder.innerHTML = SLOTS.map(k => `<div data-extras-slot="${k}">${
+          k === "special" ? ""
+            : `<div class="extras-skel-box extras-skel--${k}" aria-hidden="true"></div>`
+        }</div>`).join("");
+      placeholder.setAttribute("aria-busy", "true");
       const fill = (k, html) => {
         if (run !== _extrasRun) return;
         const el = placeholder.querySelector(`[data-extras-slot="${k}"]`);
@@ -5364,6 +5378,7 @@
       await Promise.allSettled([sHotDrop, sTrend, sStreaks, sAchs, sPayday,
                                 sSpeed, sVehicle]);
       if (run !== _extrasRun) return;
+      placeholder.removeAttribute("aria-busy");
       // Skeleton-Reserve-Hoehe entfernen, sobald echter Content drin ist —
       // sonst klebt 450px Leerraum unten an wenn der Content kuerzer ist.
       placeholder.classList.add("extras-placeholder--filled");
