@@ -58,6 +58,17 @@ def register_middleware(app):
             finally:
                 if "_PG_CONN_FACTORY" not in current_app.config:
                     conn.close()
+            # Admin-Fremdsicht auch auf Token-URLs (?asTenant=...), damit
+            # Widgets wie Tools fremde Daten zeigen koennen. Greift NUR mit
+            # Admin-Login — OBS hat keinen Cookie, Nicht-Admins und
+            # unbekannte Tenants bleiben beim Tenant des Tokens.
+            if request.args.get("asTenant"):
+                sid = request.cookies.get(Config.OBSKIT_SID_COOKIE)
+                if sid:
+                    token_tenant = g.tenant_id
+                    _maybe_set_user_from_session(sid)
+                    if not g.tenant_impersonating:
+                        g.tenant_id = token_tenant
             return
 
         # 2. Public? Exakte Matches und prefix-Matches getrennt — sonst

@@ -477,9 +477,13 @@ Banner auch auf Seiten mit eigenem `body`-Padding randlos oben sitzt, läuft es
 
 Voraussetzung für die Fremdsicht: die Seite muss ihre API-Calls über
 `PubgUI.fetchJson` schicken — nur dort wird `asTenant` angehängt. Ein roher
-`fetch()` landet stumm im eigenen Tenant. OBS-Sources über
-`/s/<token>/` sind davon nicht betroffen — dort gibt es keine Impersonation und
-entsprechend kein Banner im Stream.
+`fetch()` landet stumm im eigenen Tenant.
+
+Widgets über ihre Token-URL (`/s/<token>/widgets/…?asTenant=3`) zeigen die
+Fremdsicht nur, wenn der Browser einen **Admin-Login** mitschickt — also im
+selben Browser, in dem man auf stream-overlay.com eingeloggt ist. Ohne Login
+(OBS-Browser-Source), mit Nicht-Admin-Login oder bei unbekanntem Tenant gilt
+weiter allein der Tenant des Tokens; im Stream erscheint deshalb nie ein Banner.
 
 #### Anlass „Hardest Lobby"
 

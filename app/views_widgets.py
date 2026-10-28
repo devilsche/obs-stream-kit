@@ -1,7 +1,8 @@
 """Widget-Routes: HTML mit Inject + statisches Asset-Serving unter /s/<token>/."""
 import os
 from flask import Blueprint, send_from_directory, current_app, g, request, abort
-from webcore.serving import inject_window_vars, inject_theme
+from webcore.serving import (inject_window_vars, inject_theme,
+                             inject_impersonation_banner)
 
 
 bp_widgets = Blueprint("widgets", __name__)
@@ -73,6 +74,9 @@ def widget_file(token, filepath):
             "__THEME__": theme,
         }
         html = inject_theme(html, theme)
+        # Admin-Fremdsicht (?asTenant=...) sichtbar machen — wie bei den Tools
+        html = inject_impersonation_banner(
+            html, getattr(g, "tenant_impersonating", None), request.full_path)
         # no-cache: die HTML wird pro Request mit Token + Theme injiziert und darf
         # nicht veraltet im Browser/OBS haengenbleiben (sonst altes/kein data-theme).
         return (inject_window_vars(html, variables), 200,

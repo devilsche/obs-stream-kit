@@ -167,7 +167,7 @@ def inject_impersonation_banner(html: str, tenant_info, current_url: str) -> str
         f'<span>Viewing as <b class="obs-impersonation__who">{name}</b> '
         f'(Tenant&nbsp;#{tid})</span>'
         f'<a class="obs-impersonation__exit" href="{exit_url}">'
-        f'Zur\u00fcck zur eigenen Sicht</a>'
+        f'Back to my own view</a>'
         f'</div>'
     )
     m = _BODY_TAG_RE.search(html)
