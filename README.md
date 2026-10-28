@@ -622,8 +622,7 @@ namentlich als `kill_redzone`, während die echte Bombardierung
 (`RedZoneBombingField_*`) im Waffen-Fallback gar nicht vorkam. Als
 Umgebungstod gezählt verlor die Granate außerdem ihren Verursacher.
 
-Die drei Icons stehen noch aus; `None` in `PUBG_ICON_URLS` heißt „kein Bild",
-nicht „fehlt versehentlich".
+Icons: `widgets/pubg/assets/achievements/redzone_*.png` (seit 2026-10-28).
 
 #### Luft-Kills und Kimme und Korn (Stand 2026-10-28)
 
@@ -660,7 +659,8 @@ steht nicht in der Telemetrie. Ausgenommen: Waffen mit eingebautem Visier
 (VSS) und Knocks, die keine Aufsätze tragen.
 
 Je Opfer zählt ein Anlass nur einmal; die Erkennung läuft in einem eigenen
-`try`-Block je Match. Icons stehen noch aus (`None` in `PUBG_ICON_URLS`).
+`try`-Block je Match. Icons: `widgets/pubg/assets/achievements/<id>.png`,
+im selben Medaillon-Stil wie die übrigen (Goldring, Lila/Orange, gemalt).
 
 #### Wurfgeräte: vier fehlende Mappings (Stand 2026-09-11)
 

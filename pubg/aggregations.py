@@ -5403,8 +5403,7 @@ def _air_and_sight_achievements(conn, mid, played, my_account_id):
         if extra:
             parts.append(extra)
         out.append({"id": aid, "label": " · ".join(parts),
-                    # Bilder stehen noch aus (PUBG_ICON_URLS = None); kein
-                    # Emoji als Ersatz.
+                    # Bild kommt ueber PUBG_ICON_URLS; kein Emoji.
                     "icon": "", "matchId": mid, "playedAt": played})
     return out
 

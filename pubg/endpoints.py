@@ -1911,12 +1911,12 @@ class EndpointRegistry:
     PUBG_ICON_URLS = {
         # Sky Snipe
         "em_pickup_kill":          "/widgets-static/pubg/icons/sky_snipe.png",
-        # Luft-Kills + Iron Sights: Bilder stehen noch aus.
-        "skeet_shooter":           None,
-        "glider_down":             None,
-        "welcome_committee":       None,
-        "iron_sights_100":         None,
-        "iron_sights_200":         None,
+        # Luft-Kills + Iron Sights
+        "skeet_shooter":           "/widgets-static/pubg/assets/achievements/skeet_shooter.png",
+        "glider_down":             "/widgets-static/pubg/assets/achievements/glider_down.png",
+        "welcome_committee":       "/widgets-static/pubg/assets/achievements/welcome_committee.png",
+        "iron_sights_100":         "/widgets-static/pubg/assets/achievements/iron_sights_100.png",
+        "iron_sights_200":         "/widgets-static/pubg/assets/achievements/iron_sights_200.png",
         # BR Opener
         "first_chicken":           "/widgets-static/pubg/icons/first_chicken.png",
         "chicken":                 "/widgets-static/pubg/icons/first_chicken.png",
@@ -1978,14 +1978,11 @@ class EndpointRegistry:
         "ghost_operative":         "/widgets-static/pubg/icons/ghost_operative.png",
         "window_smasher":          "/widgets-static/pubg/icons/window_smasher.png",
         # Sonder-Milestones: Redzone, Fahrzeug.
-        # Die drei Redzone-Bilder stehen noch aus; None heisst
-        # "kein Bild", nicht "fehlt versehentlich".
-        "redzone_death":           None,
-        "redzone_knock":           None,
-        "redzone_vehicle_death":   None,
-        # Bilder stehen noch aus, wie bei den Redzone-Anlaessen.
-        "flare_gun":               None,
-        "airdrop_looted":          None,
+        "redzone_death":           "/widgets-static/pubg/assets/achievements/redzone_death.png",
+        "redzone_knock":           "/widgets-static/pubg/assets/achievements/redzone_knock.png",
+        "redzone_vehicle_death":   "/widgets-static/pubg/assets/achievements/redzone_vehicle_death.png",
+        "flare_gun":               "/widgets-static/pubg/assets/achievements/flare_gun.png",
+        "airdrop_looted":          "/widgets-static/pubg/assets/achievements/airdrop_looted.png",
         "vehicle_kill":            "/widgets-static/pubg/assets/achievements/vehicle_kill.png",
         "vehicle_death":           "/widgets-static/pubg/assets/achievements/vehicle_death.png",
         "vehicle_gunkill":         "/widgets-static/pubg/assets/achievements/vehicle_gunkill.png",
