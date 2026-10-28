@@ -113,6 +113,13 @@ def dashboard():
         except Exception:
             widgets_count = 0
         overlays_count = len(OVERLAYS)
+        # Status-Kachel: echter Poller-Zustand + Datenstand des Tenants
+        from app import status_overview as so
+        try:
+            rows = so.tenant_overview(conn, g.tenant_id)
+            my_status = so.merge_status(rows, so.poller_status())[0] if rows else None
+        except Exception:
+            my_status = None
         # All-tenants-Kachel (admin-only): robuste Standard-Queries
         if g.user.get("is_admin"):
             try:
@@ -135,7 +142,7 @@ def dashboard():
     }
     return render_template("dashboard.html", user=g.user, cred_status=cred_status,
                            widgets_count=widgets_count, overlays_count=overlays_count,
-                           admin_stats=admin_stats)
+                           admin_stats=admin_stats, my_status=my_status)
 
 
 @bp_app.route("/app/pending")

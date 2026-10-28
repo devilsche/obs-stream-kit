@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Dashboard — OBS Stream Kit{% endblock %}
+{% from "_status_macros.html" import state %}
 {% block body %}
 {% include "_sidebar.html" %}
 <main id="main-content" class="dn dn-main" tabindex="-1">
@@ -32,9 +33,17 @@
     <article class="dn-ccard m dn-c4"><span class="corner" aria-hidden="true"></span>
       <h2>Status</h2>
       <div class="dn-pad">
-        <div class="dn-kv"><span class="lbl">PUBG-Poller</span><span class="v {% if not cred_status.pubg_ready %}x{% endif %}">{% if cred_status.pubg_ready %}running{% else %}idle{% endif %}</span></div>
-        <div class="dn-kv"><span class="lbl">Steam-Sync</span><span class="v {% if not cred_status.steam_ready %}x{% endif %}">{% if cred_status.steam_ready %}running{% else %}idle{% endif %}</span></div>
-        <div class="dn-kv"><span class="lbl">Konto</span><span class="v n">{{ user.display_name }}</span></div>
+        {% if my_status %}
+        <div class="dn-kv dn-kv--stack"><span class="lbl">PUBG poller</span><span class="v n">{{ state(my_status.pubg_state, my_status.pubg_detail) }}</span></div>
+        <div class="dn-kv dn-kv--stack"><span class="lbl">Steam sync</span><span class="v n">{{ state(my_status.steam_state, my_status.steam_detail) }}</span></div>
+        <div class="dn-kv"><span class="lbl">Last match</span><span class="v n">{{ my_status.last_match_ago }}</span></div>
+        <div class="dn-kv"><span class="lbl">Matches stored</span><span class="v n">{{ my_status.matches }} · {{ my_status.matches_7d }} this week</span></div>
+        {% if my_status.telemetry_pending %}
+        <div class="dn-kv"><span class="lbl">Telemetry pending</span><span class="v n">{{ my_status.telemetry_pending }}</span></div>
+        {% endif %}
+        {% else %}
+        <div class="dn-kv"><span class="lbl">Status</span><span class="v x">unavailable</span></div>
+        {% endif %}
       </div>
     </article>
 
@@ -69,6 +78,5 @@
 
   </div>
 
-  <p class="dn-legend">Cockpit · more live tiles (poller interval, matches today, source counters, tenant stats) to follow.</p>
 </main>
 {% endblock %}

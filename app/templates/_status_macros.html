@@ -1,0 +1,11 @@
+{# Poller-/Dienst-Zustand: Icon + Text (+ Detail). Genutzt von admin_dashboard
+   und dashboard. #}
+{% macro state(st, detail) -%}
+  {%- set icons = {"ok": "check_circle", "warn": "warning", "error": "error", "skip": "block", "unknown": "help"} -%}
+  {%- set labels = {"ok": "OK", "warn": "Degraded", "error": "Error", "skip": "Not set up", "unknown": "Unknown"} -%}
+  <span class="dn-state dn-state--{{ st }}">
+    <span class="material-symbols-outlined icon-sm" aria-hidden="true">{{ icons.get(st, "help") }}</span>
+    {{ labels.get(st, st) }}
+  </span>
+  {%- if detail %}<span class="dn-state__detail">{{ detail }}</span>{% endif -%}
+{%- endmacro %}

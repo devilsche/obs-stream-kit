@@ -11,7 +11,7 @@ aus; Browser-Daten-Calls landen via nginx hier. Auth/Session-DB ist geteilt
 (core/webcore), die Session-Validierung im Frontend liest dieselbe DB.
 """
 import os
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request, abort
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from webcore.config import Config, TestingConfig
@@ -40,5 +40,20 @@ def create_app(testing: bool = False) -> Flask:
     @app.route("/healthz")
     def healthz():
         return jsonify({"status": "ok"})
+
+    # Poller-Zustand aller Tenants fuer das Admin-Dashboard im Frontend-
+    # Prozess (dort laufen keine Poller). Nur lokal: nginx leitet /internal
+    # nicht hierher, und hinter nginx waere remote_addr die Client-IP.
+    @app.route("/internal/status")
+    def internal_status():
+        if request.remote_addr not in ("127.0.0.1", "::1"):
+            abort(404)
+        from app.views_api import _pubg_status_all
+        from app.poller_startup import _steam_poller
+        steam = (_steam_poller.status_all()
+                 if _steam_poller is not None and hasattr(_steam_poller, "status_all")
+                 else {})
+        return jsonify({"pubg": _pubg_status_all(),
+                        "steam": {str(k): v for k, v in steam.items()}})
 
     return app

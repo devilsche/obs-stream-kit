@@ -9,7 +9,8 @@ ohne Cross-Tenant-Lecks (Tenant 1's Keys: 't1:...', Tenant 2's: 't2:...').
 """
 
 
-def _pubg_status():
+def _pubg_status_all():
+    """Poller-Zustand ALLER Tenants — nur fuer /internal/status (Admin)."""
     try:
         from app.poller_startup import _pubg_poller
         if _pubg_poller and hasattr(_pubg_poller, "status"):
@@ -17,6 +18,24 @@ def _pubg_status():
         return {"running": _pubg_poller is not None and _pubg_poller.is_alive()}
     except Exception:
         return {"running": False}
+
+
+def _pubg_status_for(tenant_id):
+    """/api/pubg/status eines Tenants: nur sein eigener Eintrag. Vorher kam
+    ueber jede Token-URL der Zustand aller Tenants mit — inkl. Spielernamen
+    in den Fehlertexten."""
+    full = _pubg_status_all()
+    own = {k: v for k, v in (full.get("perTenant") or {}).items()
+           if str(k) == str(tenant_id)}
+    errors = []
+    for t in own.values():
+        errors.extend(t.get("errors") or [])
+    errors.extend(e for e in (full.get("errors") or [])
+                  if str(e).startswith(f"tenant {tenant_id}:"))
+    out = {k: v for k, v in full.items() if k not in ("perTenant", "errors")}
+    out["perTenant"] = {str(k): v for k, v in own.items()}
+    out["errors"] = errors
+    return out
 import time as _time
 
 from flask import Blueprint, g, jsonify, abort, request, current_app
@@ -139,7 +158,7 @@ def _build_pubg_registry(tenant_id):
         platform=creds.pubg_platform or "steam",
         cache=_TenantPrefixCache(_shared_pubg_cache(), tenant_id),
         client=client,
-        poller_status=_pubg_status,
+        poller_status=lambda: _pubg_status_for(tenant_id),
         tenant_id=tenant_id,
         steam_summary_fn=steam_summary_fn,
     )

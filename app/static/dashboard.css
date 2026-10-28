@@ -962,6 +962,24 @@ html[data-theme="aurora"] .dn-ccard,html[data-theme="aurora"] .dn-hero{backdrop-
 .dn-table tr:last-child td{border-bottom:none}
 .dn-table tr:hover td{background:color-mix(in srgb,var(--theme-primary) 5%,transparent)}
 .dn-table .dn-btn{padding:4px 10px;font-size:11px}
+/* Status-Tabelle (Admin) + Status-Kachel: Zustand immer Icon + Text,
+   Farbe nur zusaetzlich (WCAG 1.4.1) */
+.dn-table--status th[scope="row"]{font-weight:600;text-align:left;white-space:nowrap}
+.dn-table--status .num{font-variant-numeric:tabular-nums;white-space:nowrap}
+.dn-th-sub{display:block;font-family:var(--theme-font-mono);font-size:11px;font-weight:400;
+  color:var(--theme-text-dim);text-transform:none;letter-spacing:0}
+.dn-state{display:inline-flex;align-items:center;gap:4px;white-space:nowrap;font-weight:600}
+.dn-state--ok{color:var(--theme-ok)}
+.dn-state--warn{color:var(--theme-accent)}
+.dn-state--error{color:var(--theme-accent-2)}
+.dn-state--skip,.dn-state--unknown{color:var(--theme-text-dim)}
+.dn-state__detail{display:block;max-width:280px;font-family:var(--theme-font-mono);font-size:11px;
+  color:var(--theme-text);overflow-wrap:anywhere}
+.dn-key{display:flex;align-items:center;gap:4px;white-space:nowrap;color:var(--theme-text-dim)}
+.dn-key.is-set{color:var(--theme-text)}
+.dn-cgrid--spaced,.dn-simple--spaced{margin-top:20px}
+.dn-kv--stack{align-items:flex-start;gap:12px}
+.dn-kv--stack .v{text-align:right}
 /* Liste der verfolgten PUBG-Accounts (Settings) */
 .dn-acclist{list-style:none;margin:14px 0 18px;padding:0;
   border:1px solid var(--theme-border)}
