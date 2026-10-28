@@ -446,7 +446,7 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 
 | Datei | Zweck | URL-Parameter |
 |---|---|---|
-| `live-bar.html` | Slim-Counter Gameplay | `stats` (Werte + Reihenfolge, z.B. `kills,kd,dmg,wins,top10,matches`; Default `kills,dmg,wins,matches`; möglich: `kills dmg wins matches kd kpm hs top10 best longest assists knocks`), `refreshMs` |
+| `live-bar.html` | Slim-Counter Gameplay | `stats` (Werte + Reihenfolge, z.B. `kills,kd,dmg,wins,top10,matches`; Default `kills,dmg,wins,matches`; möglich: `kills dmg wins matches kd kpm hs top10 best longest assists knocks`; im Konfigurator `/app/urls` per Drag & Drop, Alt+Pfeiltasten oder Pfeil-Buttons sortierbar), `refreshMs` |
 | `flyout-full.html` | Großes Detail-Panel mit Filter-Slider und Reset-Button | — |
 | `mates.html` | Squad-Mates der Range | `layout=carousel\|stack\|fold\|mosaic`, `range=session\|week` |
 | `top-mates.html` | Top-5-Liste | `sortBy=avgPlace\|kd\|winRate\|mostPlayed`, `limit`, `minMatches` |
