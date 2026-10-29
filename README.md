@@ -1686,6 +1686,15 @@ Alle URLs unter `http://localhost:9000/widgets/steam/<datei>.html`.
 
 Demo + Größenempfehlungen: `http://localhost:9000/widgets/steam/index.html`
 
+**Achievement Browser** (`/app/tools/achievement-browser`, Steam + PUBG gemeinsam):
+Schalter **Show** mit `All`, `Latest drop` (nur was mit dem letzten Match bzw.
+dem letzten Steam-Freischalt-Schub kam; bleibt stehen, bis etwas Neueres
+kommt), `This session`, `Last 7 days`, `Latest 50`. **Dim older** nimmt in den
+anderen Ansichten alles außer dem neuesten Schub zurück und markiert diesen mit
+„Just in". Steam-Freischaltungen gelten als ein Schub, solange zwischen ihnen
+höchstens 10 Minuten liegen. Die Wahl merkt sich der Browser; per URL
+vorbelegbar mit `?show=all|drop|session|7d|latest`.
+
 ### API-Endpoints
 
 | Route | Liefert |

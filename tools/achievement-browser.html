@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <title>Achievement Browser — Click to Replay</title>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
   <link rel="stylesheet" href="/widgets-static/_theme.css">
   <link rel="stylesheet" href="/widgets-static/pubg/_pubg.css">
   <style>
@@ -215,7 +217,81 @@
       font-style: italic;
       text-align: center;
       padding: 32px;
+      grid-column: 1 / -1;
     }
+    .empty-action {
+      margin-top: 10px;
+      font-style: normal;
+    }
+    .intro-link { color: var(--theme-accent); }
+    .jump-btn {
+      min-height: 28px; padding: 0 12px;
+      background: var(--theme-primary); color: var(--theme-text);
+      border: 1px solid var(--theme-accent); border-radius: 4px;
+      font: inherit; cursor: pointer;
+    }
+    .jump-btn:focus-visible { outline: 2px solid var(--theme-accent); outline-offset: 2px; }
+    .grid-sentinel { grid-column: 1 / -1; height: 1px; }
+    #searchInput { width: 220px; }
+    #rarePctInput { width: 60px; }
+    .toolbar input[type="checkbox"] { vertical-align: middle; margin: 0 4px 0 0; }
+
+    /* Zeitraum-Umschalter: Radio-Gruppe im Schalter-Look. Die Radios
+       bleiben echte Formular-Elemente (Pfeiltasten, Screenreader),
+       sind nur visuell versteckt. */
+    .seg {
+      border: 0; margin: 0; padding: 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .seg legend {
+      float: left; padding: 0;
+      color: var(--theme-text-dim);
+      font-size: 0.78em; letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .seg-opts {
+      display: inline-flex;
+      border: 1px solid var(--theme-border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .toolbar .seg-opt {
+      position: relative;
+      display: inline-flex; align-items: center;
+      min-height: 28px; padding: 0 10px;
+      font-size: 0.85em; letter-spacing: 0; text-transform: none;
+      color: var(--theme-text);
+      background: var(--theme-surface);
+      cursor: pointer;
+    }
+    .seg-opt + .seg-opt { border-left: 1px solid var(--theme-border); }
+    .seg-opt input {
+      position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer;
+    }
+    .seg-opt:hover { background: color-mix(in srgb,var(--theme-primary) 25%,var(--theme-surface)); }
+    .seg-opt:has(input:checked) {
+      background: var(--theme-primary);
+      color: var(--theme-text);
+      font-weight: 600;
+    }
+    .seg-opt:has(input:focus-visible) {
+      outline: 2px solid var(--theme-accent);
+      outline-offset: -2px;
+    }
+
+    /* Latest drop: neue Kacheln markiert, ältere zurückgenommen. */
+    .tile.is-old .tile-icon { opacity: 0.35; filter: grayscale(1); }
+    .tile.is-old .tile-name { color: var(--theme-text-dim); }
+    .tile.is-old { border-color: color-mix(in srgb,var(--theme-border) 50%,transparent); }
+    .tile.in-drop { border-color: var(--theme-accent); }
+    .new-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      padding: 1px 6px 1px 3px;
+      border: 1px solid var(--theme-accent);
+      border-radius: 3px;
+      font-size: 0.75em; font-weight: 700;
+      color: var(--theme-accent-text);
+    }
+    .new-badge .material-symbols-outlined { font-size: 16px; vertical-align: 0; }
 
     /* Loading-State: alle Eingaben deaktiviert + Spinner ueber dem Grid.
        Greift wenn body.loading-Klasse gesetzt — z.B. waehrend dem
@@ -294,9 +370,9 @@
     All achievements stored in the DB. Filterable per game.
     <b>Click a tile</b> to mark the achievement as "unseen" — the
     <a id="lnkAchPopup" href="#"
-    target="_blank" style="color:var(--theme-accent)">achievement-popup widget</a>
+    target="_blank" class="intro-link">achievement-popup widget</a>
     or the <a id="lnkCombinedPopup" href="#"
-    target="_blank" style="color:var(--theme-accent)">combined-popup</a>
+    target="_blank" class="intro-link">combined-popup</a>
     will fire it on the next poll with sound + animation. Handy for testing
     or for stream recaps of individual highlights.
     <script>
@@ -321,7 +397,7 @@
     </div>
     <div class="grp">
       <label>Search:</label>
-      <input id="searchInput" type="text" placeholder="Name / description" style="width: 220px;">
+      <input id="searchInput" type="text" placeholder="Name / description">
     </div>
     <div class="grp">
       <label>Sort:</label>
@@ -334,11 +410,21 @@
     </div>
     <div class="grp">
       <label>Rare ≤ (%):</label>
-      <input id="rarePctInput" type="number" min="1" max="50" value="10" style="width: 60px;">
+      <input id="rarePctInput" type="number" min="1" max="50" value="10">
     </div>
+    <fieldset class="grp seg" id="showSeg">
+      <legend>Show:</legend>
+      <div class="seg-opts">
+        <label class="seg-opt" title="Everything in the database."><input type="radio" name="show" value="all">All</label>
+        <label class="seg-opt" title="Only what came in with your last match (PUBG) or last unlock burst (Steam). Stays until something newer arrives."><input type="radio" name="show" value="drop">Latest drop</label>
+        <label class="seg-opt" title="Matches since session start (PUBG) and unlocks since session start (Steam)."><input type="radio" name="show" value="session">This session</label>
+        <label class="seg-opt" title="Unlocked in the last 7 days."><input type="radio" name="show" value="7d">Last 7 days</label>
+        <label class="seg-opt" title="The 50 most recent, however old."><input type="radio" name="show" value="latest">Latest 50</label>
+      </div>
+    </fieldset>
     <div class="grp">
-      <label title="Only show achievements/milestones from the current session (PUBG: matches since session start; Steam: unlocked since session start).">
-        <input id="sessionOnly" type="checkbox" style="vertical-align:middle;margin-right:4px"> Session only
+      <label title="Dims everything except the latest drop, so new arrivals stand out.">
+        <input id="dimOld" type="checkbox" checked> Dim older
       </label>
     </div>
     <div class="grp">
@@ -385,8 +471,24 @@
     // Keys (appId:apiName) der Achievements die NEU dazukommen (via
     // Auto-Refresh) bekommen einen 4s-Flash. Set wird konsumiert.
     let freshKeys = new Set();
-    // Session-Filter: zeigt nur Achievements/Milestones aus der laufenden Session.
-    let sessionOnly = false;
+    // Zeitraum: all | drop | session | 7d | latest. Vorrang: ?show= aus der
+    // URL, dann die letzte Wahl im Browser, sonst all.
+    const SHOW_MODES = ["all", "drop", "session", "7d", "latest"];
+    const LATEST_N = 50;
+    const DROP_GAP_MS = 10 * 60 * 1000;   // Steam: Freischaltungen im 10-min-Abstand = ein Schub
+    let showMode = (() => {
+      const q = new URLSearchParams(location.search).get("show");
+      if (SHOW_MODES.includes(q)) return q;
+      try {
+        const v = localStorage.getItem("achBrowser.show");
+        if (SHOW_MODES.includes(v)) return v;
+      } catch (_) {}
+      return "all";
+    })();
+    let dimOld = (() => {
+      try { return localStorage.getItem("achBrowser.dimOld") !== "0"; } catch (_) { return true; }
+    })();
+    let dropKeys = new Set();   // Keys (appId:apiName) des neuesten Schubs
     let sessionCutoffMs = null;   // Unix-ms — wird beim ersten Load gesetzt
     // Landings pro Match — Map<matchId, {x,y,mapName,name}> meiner
     // eigenen Landing-Position. Wird lazy gefuellt + im Popover als POI
@@ -409,7 +511,40 @@
     const sortSel  = document.getElementById("sortSelect");
     const rareIn   = document.getElementById("rarePctInput");
     const langSel  = document.getElementById("langSelect");
-    const sessionChk = document.getElementById("sessionOnly");
+    const showSeg    = document.getElementById("showSeg");
+    const dimChk     = document.getElementById("dimOld");
+
+    // Zeitpunkt eines Eintrags in ms (PUBG: Match-Start, Steam: Freischaltung).
+    function tsOf(a) {
+      const isPubg = a.source === "pubg" || a.appId === -2;
+      if (isPubg && a.playedAt) return new Date(a.playedAt).getTime();
+      return a.unlockedAt ? a.unlockedAt * 1000 : 0;
+    }
+
+    // Neuester Schub: kommt der juengste Eintrag aus PUBG, alles aus
+    // demselben Match; bei Steam alle Freischaltungen, die in Abstaenden
+    // unter DROP_GAP_MS davor liegen. Gibt es nichts Neues, bleibt der
+    // letzte Schub stehen.
+    function computeDropKeys(list) {
+      const keyOf = a => a.appId + ":" + a.apiName;
+      const items = list.filter(a => !a.suppressed && tsOf(a) > 0)
+        .sort((x, y) => tsOf(y) - tsOf(x));
+      if (!items.length) return new Set();
+      const top = items[0];
+      const isPubg = top.source === "pubg" || top.appId === -2;
+      if (isPubg && top.matchId) {
+        return new Set(items.filter(a => a.matchId === top.matchId).map(keyOf));
+      }
+      const out = new Set();
+      let prev = tsOf(top);
+      for (const a of items) {
+        if (a.source === "pubg" || a.appId === -2) continue;
+        if (prev - tsOf(a) > DROP_GAP_MS) break;
+        out.add(keyOf(a));
+        prev = tsOf(a);
+      }
+      return out;
+    }
 
     function fmtDate(unixSec) {
       if (!unixSec) return "—";
@@ -464,6 +599,8 @@
       const desc = (a.description || "").replace(/</g, "&lt;");
       const key = a.appId + ":" + a.apiName;
       const isFresh = freshKeys.has(key);
+      const inDrop = dropKeys.has(key);
+      const isOld = dimOld && showMode !== "drop" && dropKeys.size > 0 && !inDrop;
 
       const resolvedIcon = a.iconUrl || "";
       const isPubgMilestone = a.source === "pubg" || a.appId === -2;
@@ -492,7 +629,10 @@
       const statSpan = statText ? `<span class="pct">${statText}</span>` : "";
       const dateHtml = `<span class="date">${fmtDate(a.unlockedAt)}</span>`;
       const badgeLabel = {legendary:"Legendary", mythic:"Mythic", rare:"Rare"}[tier];
-      const metaInner = dateHtml
+      const newBadge = inDrop && showMode !== "drop"
+        ? `<span class="new-badge"><span class="material-symbols-outlined" aria-hidden="true">new_releases</span>Just in</span>`
+        : "";
+      const metaInner = newBadge + dateHtml
         + statSpan
         + (badgeLabel ? `<span class="rare-badge ${tier}">${badgeLabel}</span>` : "");
 
@@ -545,7 +685,7 @@
       const povAttrs = ` data-pov-title="${povTitle.replace(/"/g,"&quot;")}" `
                      + `data-pov-body="${povLines.replace(/"/g,"&quot;")}"`;
       return `
-        <div class="tile${isRare ? " " + tier : ""}${isFresh ? " brand-new" : ""}"
+        <div class="tile${isRare ? " " + tier : ""}${isFresh ? " brand-new" : ""}${isOld ? " is-old" : ""}${inDrop && showMode !== "drop" ? " in-drop" : ""}"
              data-appid="${a.appId}" data-api="${a.apiName.replace(/"/g, "&quot;")}"
              data-source="${source}"${povAttrs}>
           ${iconHtml}
@@ -561,17 +701,17 @@
     function applyFilters() {
       RARE_PCT = parseFloat(rareIn.value) || 10;
       let view = all.slice();
-      // Session-Filter: nur Achievements/Milestones aus der laufenden Session.
-      // PUBG: playedAt (ISO-String) >= sessionCutoff; Steam: unlockedAt (Unix-s) >= cutoff.
-      if (sessionOnly && sessionCutoffMs) {
-        view = view.filter(a => {
-          if (a.suppressed) return false;
-          const isPubg = a.source === "pubg" || a.appId === -2;
-          const tsMs = isPubg
-            ? (a.playedAt ? new Date(a.playedAt).getTime() : (a.unlockedAt ? a.unlockedAt * 1000 : 0))
-            : (a.unlockedAt ? a.unlockedAt * 1000 : 0);
-          return tsMs >= sessionCutoffMs;
-        });
+      dropKeys = computeDropKeys(all);
+      if (showMode === "session") {
+        // PUBG: playedAt >= Session-Start; Steam: unlockedAt >= Session-Start.
+        view = sessionCutoffMs
+          ? view.filter(a => !a.suppressed && tsOf(a) >= sessionCutoffMs)
+          : [];
+      } else if (showMode === "drop") {
+        view = view.filter(a => dropKeys.has(a.appId + ":" + a.apiName));
+      } else if (showMode === "7d") {
+        const since = Date.now() - 7 * 24 * 3600 * 1000;
+        view = view.filter(a => tsOf(a) >= since);
       }
       if (filterGame) {
         view = view.filter(a => String(a.appId) === filterGame);
@@ -598,6 +738,13 @@
       });
       else if (sortMode === "name") view.sort((x, y) =>
         (x.displayName || x.apiName || "").localeCompare(y.displayName || y.apiName || ""));
+      // Latest N: die N neuesten (nach Spiel-/Suchfilter), dann in der
+      // gewaehlten Sortierung anzeigen.
+      if (showMode === "latest") {
+        const keep = new Set(view.slice().sort((x, y) => tsOf(y) - tsOf(x))
+          .slice(0, LATEST_N).map(a => a.appId + ":" + a.apiName));
+        view = view.filter(a => keep.has(a.appId + ":" + a.apiName));
+      }
 
       // Lazy rendering — erst PAGE_SIZE Tiles, Rest per IntersectionObserver
       const PAGE_SIZE = 60;
@@ -605,7 +752,17 @@
       _renderedCount = 0;
       gridEl.innerHTML = "";
       if (!view.length) {
-        gridEl.innerHTML = `<div class="empty" style="grid-column:1/-1">No achievements match these filters.</div>`;
+        const hint = {
+          drop:    "Nothing has come in yet.",
+          session: "Nothing in this session yet.",
+          "7d":    "Nothing unlocked in the last 7 days.",
+        }[showMode] || "No achievements match these filters.";
+        const jump = showMode !== "latest" && showMode !== "all"
+          ? `<div class="empty-action"><button type="button" class="jump-btn" id="jumpLatest">Show latest ${LATEST_N}</button></div>`
+          : "";
+        gridEl.innerHTML = `<div class="empty">${hint}${jump}</div>`;
+        const jb = document.getElementById("jumpLatest");
+        if (jb) jb.addEventListener("click", () => setShowMode("latest"));
       } else {
         _renderMore();
       }
@@ -631,7 +788,7 @@
       _renderedCount += batch.length;
       if (_renderedCount < _currentView.length) {
         _sentinel = document.createElement("div");
-        _sentinel.style.cssText = "grid-column:1/-1;height:1px";
+        _sentinel.className = "grid-sentinel";
         gridEl.appendChild(_sentinel);
         _observer.observe(_sentinel);
       }
@@ -767,8 +924,21 @@
       applyFilters();
     });
     rareIn.addEventListener("change", () => applyFilters());
-    sessionChk.addEventListener("change", (e) => {
-      sessionOnly = e.target.checked;
+    function setShowMode(mode) {
+      showMode = mode;
+      const r = showSeg.querySelector(`input[value="${mode}"]`);
+      if (r) r.checked = true;
+      try { localStorage.setItem("achBrowser.show", mode); } catch (_) {}
+      applyFilters();
+    }
+    showSeg.querySelector(`input[value="${showMode}"]`).checked = true;
+    showSeg.addEventListener("change", (e) => {
+      if (e.target.name === "show") setShowMode(e.target.value);
+    });
+    dimChk.checked = dimOld;
+    dimChk.addEventListener("change", (e) => {
+      dimOld = e.target.checked;
+      try { localStorage.setItem("achBrowser.dimOld", dimOld ? "1" : "0"); } catch (_) {}
       applyFilters();
     });
     langSel.addEventListener("change", async (e) => {
