@@ -62,6 +62,8 @@
       flex-shrink: 0;
     }
     .empty { padding: 20px; color: var(--pubg-muted); text-align: center; font-style: italic; }
+    .empty.api-error { color: var(--theme-danger-text, #e57b7b); }
+    .api-error small { opacity: 0.7; }
   </style>
 </head>
 <body>
@@ -170,11 +172,14 @@
       });
     }
 
+    // Netzwackler (Stream-Reconnect, Timeout): letzte Daten stehen lassen.
+    // Die Fehlerbox nur zeigen, solange noch nie etwas angekommen ist.
     function showError(e) {
       console.error(e);
+      if (_rowsCache.length) return;
       document.getElementById("content").innerHTML =
-        `<div class="empty" style="color:var(--theme-danger-text,#e57b7b)"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> API error: ${e.message || e}<br>` +
-        `<small style="opacity:0.7">Is /api/pubg/map-performance reachable? ` +
+        `<div class="empty api-error"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> API error: ${e.message || e}<br>` +
+        `<small>Is /api/pubg/map-performance reachable? ` +
         `Restart the server if you just pulled.</small></div>`;
     }
     PubgUI.poll((window.__SERVE_BASE__||"/") + `api/pubg/map-performance?range=${RANGE}`, 60000, render, showError);

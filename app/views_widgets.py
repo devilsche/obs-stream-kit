@@ -1,6 +1,7 @@
 """Widget-Routes: HTML mit Inject + statisches Asset-Serving unter /s/<token>/."""
 import os
-from flask import Blueprint, send_from_directory, current_app, g, request, abort
+from flask import (Blueprint, send_from_directory, current_app, g, request,
+                   abort, redirect)
 from webcore.serving import (inject_window_vars, inject_theme,
                              inject_impersonation_banner)
 
@@ -15,8 +16,18 @@ def _project_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+#: Umgezogene Sources — alte OBS-URLs leiten weiter statt 404.
+MOVED = {
+    "welcome.html": "alerts/welcome.html",
+}
+
+
 @bp_widgets.route("/s/<token>/widgets/<path:filepath>")
 def widget_file(token, filepath):
+    if filepath in MOVED:
+        qs = request.query_string.decode()
+        return redirect(f"/s/{token}/{MOVED[filepath]}" + (f"?{qs}" if qs else ""),
+                        code=301)
     root = _project_root()
     # TODO(Task 7): inline traversal+open below könnte webcore.serving.
     # serve_html_or_asset nutzen, sobald der Creds-Gate ausgelagert ist.

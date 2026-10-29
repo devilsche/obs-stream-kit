@@ -39,6 +39,15 @@ def test_widget_static_no_token_needed(pg_conn_test_setup, tmp_path):
     assert resp.data.startswith(b"\x89PNG")
 
 
+def test_umgezogenes_widget_leitet_mit_query_weiter(pg_conn_test_setup, tmp_path):
+    conn, tid, token, _ = pg_conn_test_setup
+    app = _make_app(conn, tmp_path)
+    resp = app.test_client().get(f"/s/{token}/widgets/welcome.html?name=x&v=1")
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith(
+        f"/s/{token}/alerts/welcome.html?name=x&v=1")
+
+
 def test_unknown_token_404(pg_conn_test_setup, tmp_path):
     conn, *_ = pg_conn_test_setup
     app = _make_app(conn, tmp_path)

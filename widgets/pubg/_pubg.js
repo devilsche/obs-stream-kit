@@ -332,7 +332,9 @@
       const ts = lm && lm.playedAt ? new Date(lm.playedAt).getTime() : 0;
       stale = !ts || (Date.now() - ts > limit);
     } catch (_) {
-      stale = true;
+      // Netzfehler sagt nichts ueber die Session — Zustand beibehalten,
+      // sonst verschwinden Widgets bei jedem Verbindungswackler.
+      return document.body ? document.body.classList.contains("pubg-stale-hidden") : true;
     }
     if (document.body) document.body.classList.toggle("pubg-stale-hidden", stale);
     return stale;

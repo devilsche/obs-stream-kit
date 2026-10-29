@@ -85,11 +85,47 @@
     }
   }
 
+  // Bricht die Audio-Ausgabe der Browser-Engine weg (z.B. nach einem
+  // Stream-Reconnect: AUDIO_RENDERER_ERROR), scheitert play() oder das
+  // Video bricht mitten drin ab. Videos laufen dann stumm weiter, damit
+  // wenigstens das Bild kommt. console.error landet im OBS-Log.
+  function playMuted(m, reason) {
+    if (m.muted) return null;
+    console.error('[stinger-ready] audio failed, continuing muted:', m.currentSrc || m.src, reason);
+    m.muted = true;
+    try { return m.play(); } catch (e) { return null; }
+  }
+
+  function watchAudioFailure(m) {
+    if (m.tagName !== 'VIDEO' || m._stingerWatched) return;
+    m._stingerWatched = true;
+    m.addEventListener('error', function () {
+      var err = m.error;
+      if (m.muted || !err) return;
+      var t = m.currentTime || 0;
+      console.error('[stinger-ready] media error, reloading muted:', m.currentSrc || m.src, err.code, err.message);
+      m.muted = true;
+      m.addEventListener('loadeddata', function () {
+        try { m.currentTime = t; } catch (e) {}
+        m.play().catch(function (e2) { console.error('[stinger-ready] muted replay failed:', e2); });
+      }, { once: true });
+      try { m.load(); } catch (e) {}
+    });
+  }
+
   function tryPlay(m) {
+    watchAudioFailure(m);
     var p;
-    try { p = m.play(); } catch (e) { console.warn('[stinger-ready] play() threw:', e); return null; }
+    try { p = m.play(); } catch (e) {
+      console.warn('[stinger-ready] play() threw:', e);
+      return m.tagName === 'VIDEO' ? playMuted(m, e) : null;
+    }
     if (!p || typeof p.catch !== 'function') return p || null;
-    p.catch(function (err) {
+    return p.catch(function (err) {
+      if (m.tagName === 'VIDEO' && !m.muted) {
+        var p2 = playMuted(m, err);
+        if (p2 && typeof p2.then === 'function') return p2;
+      }
       console.warn('[stinger-ready] autoplay blocked for', m.currentSrc || m.src, '— retrying on next click', err);
       var retry = function () {
         document.removeEventListener('click', retry);
@@ -99,7 +135,6 @@
       document.addEventListener('click', retry, { once: true });
       document.addEventListener('keydown', retry, { once: true });
     });
-    return p;
   }
 
   var ready = { fonts: false, media: false };
