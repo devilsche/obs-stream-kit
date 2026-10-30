@@ -929,6 +929,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     mehr ueber unsere Sammelquote als ueber die Lobby.
     """
     from pubg import db_pg
+    from pubg.identity import as_set, pick_me
 
     match_ids = [m for m in (match_ids or []) if m]
     if not match_ids:
@@ -1004,9 +1005,9 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
     if my_account_id:
         my_kd = kd_resolved(
             mode,
-            current_season=cur_season_by_mode.get(my_account_id),
-            last_seasons=older_seasons_by_acc.get(my_account_id),
-            lifetime=lifetime_by_mode.get(my_account_id),
+            current_season=pick_me(cur_season_by_mode, my_account_id),
+            last_seasons=pick_me(older_seasons_by_acc, my_account_id),
+            lifetime=pick_me(lifetime_by_mode, my_account_id),
             current_season_id=cur_season_id)["kd"]
 
     # Zweiter Satz Zahlen (z.B. Season neben Alltime) — dieselbe Rechnung,
@@ -1038,7 +1039,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
                     current_season_id=cur_season_id,
                     is_ranked=bool(entry.get("isRanked")))["kd"]
         # Auch der eigene Wert gehoert zum Match, nicht zu heute.
-        m_my_kd = ((fest.get(my_account_id) or {}).get("kd")
+        m_my_kd = ((pick_me(fest, my_account_id) or {}).get("kd")
                    if my_account_id else None)
         if m_my_kd is None:
             m_my_kd = my_kd
@@ -1053,7 +1054,7 @@ def lobby_kd_for_matches(conn, tenant_id: int, match_ids, season_id: str,
         # die Frage, wie stark die Mitspieler sind.
         squad_avg = lobby_average(sorted(squad), kd_by_acc)
         mates_avg = lobby_average(sorted(squad), kd_by_acc,
-                                   exclude={my_account_id} if my_account_id
+                                   exclude=as_set(my_account_id) if my_account_id
                                    else None)
         # Die Spitze der Lobby als eigener Wert: der Schnitt sagt nicht, ob
         # oben fuenf Haie sassen. Der Report markiert damit harte Runden.

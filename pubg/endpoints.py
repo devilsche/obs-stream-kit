@@ -228,6 +228,44 @@ class EndpointRegistry:
                 return None
         return _err(400, f"unbekannter account '{wanted}'")
 
+    #: Routen, die ohne ?account= alle Accounts des Tenants als "ich"
+    #: zaehlen — ein Mensch mit zwei Steam-Accounts ist ein Spieler. Nur
+    #: hier, weil der Rest des Codes noch nicht auf mehrere eigene IDs
+    #: geprueft ist; neue Routen kommen dazu, sobald sie es sind.
+    _ALL_ACCOUNT_ROUTES = frozenset({
+        "/api/pubg/session-report",
+        "/api/pubg/sessions",
+        "/api/pubg/session-matches",
+        "/api/pubg/session-achievements",
+        "/api/pubg/trend-deltas",
+        "/api/pubg/top-speed",
+        "/api/pubg/vehicle-stats",
+        "/api/pubg/hot-drop",
+        "/api/pubg/landings",
+        "/api/pubg/payday-stats",
+        "/api/pubg/match-detail",
+        "/api/pubg/lobby-detail",
+    })
+
+    def _use_all_accounts(self):
+        """Alle aufgeloesten Accounts des Tenants als "ich" setzen.
+
+        Bei nur einem Account bleibt alles beim Alten — auch der Cache.
+        Der primaere steht vorn: wo genau ein Wert gebraucht wird
+        (Season-K/D, Anzeigename), nimmt der Code den ersten.
+        """
+        from pubg.identity import SelfAccounts
+        tracked = sorted((t for t in self._tracked() if t["account_id"]),
+                         key=lambda t: not t["is_primary"])
+        ids = [t["account_id"] for t in tracked]
+        if self.my_account_id in ids:
+            ids.remove(self.my_account_id)
+            ids.insert(0, self.my_account_id)
+        if len(ids) < 2:
+            return
+        self.my_account_id = SelfAccounts(ids)
+        self.cache = _AccountScopedCache(self.cache, "all")
+
     def _accounts(self):
         return _ok({"accounts": [
             {"name": t["name"], "accountId": t["account_id"],
@@ -245,7 +283,10 @@ class EndpointRegistry:
         err = self._apply_account_param(qs)
         if err is not None:
             return err
-        if qs.get("account") == "all":
+        if u.path in self._ALL_ACCOUNT_ROUTES and \
+                qs.get("account") in (None, "", "all"):
+            self._use_all_accounts()
+        elif qs.get("account") == "all":
             if route != ("GET", "/api/pubg/session"):
                 return _err(400, "account=all wird nur von /api/pubg/session "
                                  "unterstuetzt — andere Kennzahlen sind nicht "

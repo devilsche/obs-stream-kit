@@ -430,7 +430,15 @@ gemeinsam gespieltes Match wird nur einmal geladen.
 |---|---|
 | `?account=<name>` | Widget zeigt diesen Account (gilt für alle PUBG-Widgets) |
 | `?account=<accountId>` | dasselbe, über die PUBG-Account-ID |
-| `?account=all` | Summe über alle Accounts — **nur** `api/pubg/session` |
+| `?account=all` | Summe über alle Accounts — `api/pubg/session` und die Report-Routen (siehe unten) |
+
+**Ein Spieler, mehrere Steam-Accounts.** Die eigenen Accounts sind derselbe Mensch.
+Der Session-Report zählt deshalb ohne `account`-Parameter **alle** Accounts als „ich“:
+Matches, Phasen, Match-Detail, Lobby, Top Speed, Fahrzeuge, Landungen, Hot Drop,
+Payday und Achievements. Je Match spielt man nur mit einem Account. Dort steht der
+Name, mit dem gespielt wurde, und der Zweit-Account erscheint nie als Mitspieler.
+Verknüpft wird über die Account-ID, nicht über den Namen. Mit `?account=<name>`
+zeigt der Report weiterhin nur einen Account. Die übrigen Widgets folgen schrittweise.
 
 `account=all` addiert Matches, Kills, Damage, Wins und die übrigen additiven Werte;
 K/D, Kills/Match und Kopftreffer-Quote werden aus den Summen neu berechnet (nicht

@@ -2,6 +2,7 @@ import datetime
 import math
 import json
 from pubg.db_pg import get_setting
+from pubg.identity import as_set, pick_me
 
 
 
@@ -6787,7 +6788,7 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
     if not parts:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
     acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
-    my_team_id = acc_to_team.get(my_account_id)
+    my_team_id = pick_me(acc_to_team, my_account_id)
     if my_team_id is None:
         return {"hotDrop": False, "soloSurvived": False, "teamSurvived": False}
 
@@ -6942,7 +6943,7 @@ def _detect_hot_drop(conn, tenant_id: int, match_id, my_account_id, window_ms, w
           AND timestamp_ms <= ?
     """, [match_id] + list(squad_ids) + [landing_ms, survival_cutoff_ms])
                           .fetchall()}
-    solo_alive = my_account_id not in killed_in_window
+    solo_alive = not (as_set(my_account_id) & killed_in_window)
     team_alive = bool(squad_ids - killed_in_window)
     # Hot-Drop = mind. 1 Gegner-Team im Radius beim Landing UND
     # Schusswechsel zwischen Squad und genau diesem Team innerhalb
@@ -7175,7 +7176,7 @@ def _detect_first_fight(conn, tenant_id: int, match_id, my_account_id,
     acc_to_team = {p["account_id"]: p["team_id"] for p in parts}
     acc_to_survived = {p["account_id"]: p["time_survived"] for p in parts}
     # Mein Squad = mein team_id im Match
-    my_team_id = acc_to_team.get(my_account_id)
+    my_team_id = pick_me(acc_to_team, my_account_id)
     if my_team_id is None:
         return None
     squad_ids = {a for a, t in acc_to_team.items() if t == my_team_id}
@@ -8187,7 +8188,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "SELECT COUNT(*) AS c FROM match_team_mapping "
             "WHERE tenant_id = ? AND match_id = ?",
             (tenant_id, m["match_id"],)).fetchone() or {}).get("c", 0) or 0
-        my_special = spec.get(my_account_id, {})
+        my_special = pick_me(spec, my_account_id, {})
         my_entry = {
             "name": m.get("match_name") or my_name,
             "kills": m.get("effective_kills", m["kills"]),
@@ -8199,10 +8200,10 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
             "time_survived": m["time_survived"],
             "isSelf": True,
             "special": my_special,
-            "knocksReceived":  knocks_received.get(my_account_id, 0),
-            "revivesGiven":    revives_given.get(my_account_id, 0),
-            "revivesReceived": revives_received.get(my_account_id, 0),
-            "botKills":        bot_kills.get(my_account_id, 0),
+            "knocksReceived":  pick_me(knocks_received, my_account_id, 0),
+            "revivesGiven":    pick_me(revives_given, my_account_id, 0),
+            "revivesReceived": pick_me(revives_received, my_account_id, 0),
+            "botKills":        pick_me(bot_kills, my_account_id, 0),
         }
         # Mates-Liste mit special-Events anreichern
         squad_enriched = []
