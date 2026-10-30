@@ -4242,10 +4242,16 @@ def compute_top_speed(conn, tenant_id: int, my_account_id,
     def _name(acc):
         if acc in namen:
             return namen[acc]
+        # Lobby-Fremde kennt oft nur ein anderer Tenant (dessen Lobby-K/D-
+        # Sammler hat sie in players abgelegt) — Namen sind oeffentlich,
+        # der eigene Tenant hat nur Vorrang. Ohne das stand bei Tenant 6
+        # an jedem Lobby-Bestwert ein "?".
         r = conn.execute(
-            "SELECT name FROM players WHERE tenant_id = ? AND account_id = ? "
-            "UNION ALL SELECT name FROM participants WHERE account_id = ? "
-            "LIMIT 1", (tenant_id, acc, acc)).fetchone()
+            "(SELECT name FROM players "
+            " WHERE tenant_id IN (SELECT id FROM tenants) AND account_id = ? "
+            " ORDER BY (tenant_id = ?) DESC LIMIT 1) "
+            "UNION ALL (SELECT name FROM participants WHERE account_id = ? "
+            " LIMIT 1) LIMIT 1", (acc, tenant_id, acc)).fetchone()
         namen[acc] = (r["name"] if r else None) or "?"
         return namen[acc]
 
