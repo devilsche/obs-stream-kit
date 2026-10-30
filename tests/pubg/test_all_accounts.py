@@ -128,3 +128,45 @@ def test_ein_account_bleibt_unveraendert(zwei_accounts):
     reg.dispatch("GET", f"/api/pubg/session-matches?{RANGE}", b"", {})
     assert reg.my_account_id == "account.solo"
 
+
+
+@pytest.fixture
+def mitspieler_mit_zwei_accounts(zwei_accounts):
+    """Tenant 2 spielt mit dem Menschen hinter Haupt/Zweit — mal so, mal so."""
+    conn, t1, t2 = zwei_accounts
+    raw = conn.raw
+    db_pg.add_tracked_player(raw, t2, "Solo", platform="steam",
+                             account_id="account.solo", is_primary=True)
+    db_pg.upsert_player(raw, t2, "account.solo", "Solo", "steam", 1)
+    db_pg.upsert_player(raw, t2, HAUPT, "Haupt", "steam", 0)
+    db_pg.upsert_player(raw, t2, ZWEIT, "Zweit", "steam", 0)
+    for mid, acc, name, kills in (("s-1", HAUPT, "Haupt", 2),
+                                  ("s-2", ZWEIT, "Zweit", 4)):
+        db_pg.insert_match(raw, t2, mid, "Baltic_Main", "squad-fpp",
+                           False, 1500, f"2026-10-29T2{mid[-1]}:00:00Z", None)
+        db_pg.insert_participants(raw, t2, mid, [
+            _participant("account.solo", "Solo", 1, 1),
+            _participant(acc, name, 1, kills)])
+    raw.commit()
+    return conn, t1, t2
+
+
+def test_co_player_fasst_beide_accounts_zusammen(mitspieler_mit_zwei_accounts):
+    conn, _, t2 = mitspieler_mit_zwei_accounts
+    status, body = _get(conn, t2, "/api/pubg/co-player/Haupt",
+                        my_account_id="account.solo")
+    assert status == 200
+    hist = body["sharedHistory"]
+    assert hist["matches"] == 2
+    assert hist["mateKills"] == 6
+    assert hist["myKills"] == 2
+    # Lifetime/Name bleiben beim gefragten Account
+    assert body["accountId"] == HAUPT
+
+
+def test_co_player_ohne_zweit_account_unveraendert(mitspieler_mit_zwei_accounts):
+    conn, t1, t2 = mitspieler_mit_zwei_accounts
+    from pubg.identity import person_accounts
+    assert person_accounts(conn, "account.solo") == "account.solo"
+    assert isinstance(person_accounts(conn, ZWEIT), SelfAccounts)
+    assert person_accounts(conn, ZWEIT).primary == ZWEIT

@@ -438,7 +438,13 @@ Matches, Phasen, Match-Detail, Lobby, Top Speed, Fahrzeuge, Landungen, Hot Drop,
 Payday und Achievements. Je Match spielt man nur mit einem Account. Dort steht der
 Name, mit dem gespielt wurde, und der Zweit-Account erscheint nie als Mitspieler.
 Verknüpft wird über die Account-ID, nicht über den Namen. Mit `?account=<name>`
-zeigt der Report weiterhin nur einen Account. Die übrigen Widgets folgen schrittweise.
+zeigt der Report weiterhin nur einen Account.
+
+Auch als **Mitspieler** zählt so ein Spieler einmal. Ist ein Account bei irgendeinem
+Tenant zusammen mit weiteren hinterlegt, rechnet `co-player` die gemeinsamen Matches
+über alle diese Accounts: seine K/D mit dir, deine K/D mit ihm, Wins, Rauswürfe aus
+Fahrzeugen und gleiche Lobby. Lifetime und Season bleiben beim gesuchten Account.
+Die übrigen Widgets folgen schrittweise.
 
 `account=all` addiert Matches, Kills, Damage, Wins und die übrigen additiven Werte;
 K/D, Kills/Match und Kopftreffer-Quote werden aus den Summen neu berechnet (nicht

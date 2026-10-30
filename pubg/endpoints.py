@@ -283,7 +283,8 @@ class EndpointRegistry:
         err = self._apply_account_param(qs)
         if err is not None:
             return err
-        if u.path in self._ALL_ACCOUNT_ROUTES and \
+        if (u.path in self._ALL_ACCOUNT_ROUTES
+                or u.path.startswith("/api/pubg/co-player/")) and \
                 qs.get("account") in (None, "", "all"):
             self._use_all_accounts()
         elif qs.get("account") == "all":

@@ -1226,7 +1226,7 @@ def _compute_player_vehicle_evictions(conn, tenant_id: int, account_id, match_id
           AND event_type IN ('VehicleEnter','VehicleLeave',
                               'Knock','Kill','Revive')
         ORDER BY match_id, timestamp_ms ASC
-    """, [tenant_id] + list(match_ids)).fetchall()
+    """, list(match_ids)).fetchall()
     if not rows:
         return (0, 0)
 
@@ -1352,11 +1352,16 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
     ).fetchone()
     my_name = self_row["name"] if self_row else "Self"
 
+    # Ein Mensch, mehrere Steam-Accounts: gemeinsame Matches zaehlen ueber
+    # alle seine Accounts. Lifetime bleibt beim gefragten Account.
+    from pubg.identity import person_accounts
+    mate = person_accounts(conn, p["account_id"])
+
     if p["account_id"] == my_account_id:
         lifetime = conn.execute(
             "SELECT * FROM player_lifetime "
             "WHERE tenant_id = ? AND account_id = ? AND mode = 'all'",
-            (tenant_id, my_account_id,)
+            (tenant_id, p["account_id"],)
         ).fetchone()
         return {
             "name": p["name"],
@@ -1376,7 +1381,7 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
         JOIN participants me ON me.match_id = m.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
         WHERE m.tenant_id = ? AND mate.account_id = ?
         ORDER BY m.played_at DESC
-    """, (my_account_id, tenant_id, p["account_id"])).fetchall()
+    """, (my_account_id, tenant_id, mate)).fetchall()
 
     # Vehicle-Eviction-Counter ueber die geteilten Matches:
     #   dealt — Kills die DIESER Spieler an Gegnern im Vehicle verursacht hat
@@ -1387,7 +1392,7 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
     if shared_match_ids:
         try:
             evict_dealt, evict_taken = _compute_player_vehicle_evictions(
-                conn, tenant_id, p["account_id"], shared_match_ids)
+                conn, tenant_id, mate, shared_match_ids)
         except Exception:
             evict_dealt = evict_taken = 0
 
@@ -1456,7 +1461,7 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
         WHERE mtm_me.tenant_id = ? AND mtm_me.account_id = ?
           AND mtm_them.account_id = ?
           AND mtm_me.team_id != mtm_them.team_id
-    """, (tenant_id, my_account_id, p["account_id"])).fetchone()
+    """, (tenant_id, my_account_id, mate)).fetchone()
     lobby_only = (same_lobby["lobby_matches"] or 0) if same_lobby else 0
 
     return {

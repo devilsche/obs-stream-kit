@@ -72,3 +72,26 @@ def pick_me(mapping: dict, me, default=None):
                 return mapping[a]
         return default
     return mapping.get(me, default)
+
+
+def person_accounts(conn, account_id):
+    """Alle Accounts des Menschen hinter `account_id` — fuer Mitspieler.
+
+    Ein Tenant verfolgt nur eigene Accounts; wer bei einem Tenant mit
+    mehreren hinterlegt ist, ist ueberall derselbe Spieler. Der gefragte
+    Account steht vorn, damit Einzelwerte (Lifetime, Season) bei ihm
+    bleiben. Unbekannte oder einzelne Accounts kommen unveraendert zurueck.
+    """
+    if not account_id:
+        return account_id
+    rows = conn.execute(
+        "SELECT account_id FROM tracked_players "
+        "WHERE tenant_id IN (SELECT tenant_id FROM tracked_players "
+        "                    WHERE account_id = ?) "
+        "  AND account_id IS NOT NULL "
+        "ORDER BY (account_id = ?) DESC, is_primary DESC, account_id",
+        (account_id, account_id)).fetchall()
+    ids = [r["account_id"] for r in rows]
+    if len(set(ids)) < 2:
+        return account_id
+    return SelfAccounts(ids)
