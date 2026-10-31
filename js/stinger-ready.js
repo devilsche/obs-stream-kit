@@ -115,12 +115,22 @@
 
   // Haengt die Audio-Ausgabe, kommt weder Fehler noch abgelehntes play() —
   // das Video bleibt einfach auf dem ersten Frame stehen. Laeuft es nach
-  // kurzer Zeit nicht, stumm neu laden.
+  // kurzer Zeit nicht, stumm neu laden. Puffern zaehlt nicht: erst wenn genug
+  // Daten da sind (readyState >= 3) und es trotzdem 1,5 s steht, ist es das
+  // Audio — sonst laedt ein langsames Netz das Video grundlos neu.
   function watchStall(m) {
     if (m.tagName !== 'VIDEO') return;
     var t0 = Date.now();
-    setTimeout(function () {
-      if (m.muted || m.ended || m.currentTime > 0) return;
+    var stuckSince = null;
+    var iv = setInterval(function () {
+      if (m.muted || m.ended || m.currentTime > 0 || Date.now() - t0 > 10000) {
+        clearInterval(iv);
+        return;
+      }
+      if (m.readyState < 3) { stuckSince = null; return; }
+      if (stuckSince === null) { stuckSince = Date.now(); return; }
+      if (Date.now() - stuckSince < 1500) return;
+      clearInterval(iv);
       console.error('[stinger-ready] video stalled, reloading muted:', m.currentSrc || m.src);
       m.muted = true;
       m.addEventListener('loadeddata', function () {
@@ -129,7 +139,7 @@
         m.play().catch(function (e2) { console.error('[stinger-ready] muted replay failed:', e2); });
       }, { once: true });
       try { m.load(); } catch (e) {}
-    }, 1500);
+    }, 250);
   }
 
   function tryPlay(m) {
