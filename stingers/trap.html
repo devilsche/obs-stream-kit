@@ -114,11 +114,6 @@
         redAlert 0.6s ease-in-out 0.25s infinite;
     }
 
-    /* Das Video selbst bleibt unsichtbar: in OBS verliert ein stumm
-       laufendes Video seine Transparenz (schwarzer Kasten statt Greenscreen).
-       Gezeigt wird die Canvas, in die jedes Bild freigestellt gemalt wird. */
-    .video-source { opacity: 0; }
-
     .bg-video {
       position: absolute;
       bottom: 0;
@@ -128,6 +123,7 @@
       object-fit: contain;
       object-position: center bottom;
       z-index: 1;
+      filter: url(#greenKey);
     }
 
     .stripes {
@@ -264,11 +260,34 @@
 </head>
 <body>
 
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <filter id="greenKey" color-interpolation-filters="sRGB">
+        <feColorMatrix type="matrix" values="
+          1 0 0 0 0
+          0 1 0 0 0
+          0 0 1 0 0
+          -2 3 -2 0 -0.25
+        " result="chroma"/>
+        <feComponentTransfer in="chroma" result="mask">
+          <feFuncA type="discrete" tableValues="1 0"/>
+        </feComponentTransfer>
+        <feComposite in="SourceGraphic" in2="mask" operator="in" result="keyed"/>
+        <!-- Despill: reduce green tint in remaining pixels -->
+        <feColorMatrix in="keyed" type="matrix" values="
+          1    0    0    0 0
+          0.35 0.3  0.35 0 0
+          0    0    1    0 0
+          0    0    0    1 0
+        "/>
+      </filter>
+    </defs>
+  </svg>
+
   <div class="stage" id="stage">
     <div class="red-bg"></div>
-    <video class="bg-video video-source" id="bgVideo" data-stinger-autoplay preload="auto" playsinline
+    <video class="bg-video" id="bgVideo" data-stinger-autoplay preload="auto" playsinline
            src="../assets/stingers/trap.mp4"></video>
-    <canvas class="bg-video" id="bgCanvas" width="1280" height="720" aria-hidden="true"></canvas>
     <div class="flash"></div>
 
     <div class="shaker">
@@ -309,33 +328,6 @@
 
   <div class="time-indicator" id="timeInd">t = 0.00s</div>
 
-  <script>
-    // Greenscreen per Canvas freistellen: jedes Videobild malen, Gruen
-    // transparent, Restgruen entfaerben (gleiche Formel wie der alte
-    // SVG-Filter: Key bei 3G - 2R - 2B >= 0.75 * 255).
-    (function () {
-      var v = document.getElementById('bgVideo');
-      var c = document.getElementById('bgCanvas');
-      var ctx = c.getContext('2d', { willReadFrequently: true });
-      function paint() {
-        ctx.drawImage(v, 0, 0, c.width, c.height);
-        var img = ctx.getImageData(0, 0, c.width, c.height), d = img.data;
-        for (var i = 0; i < d.length; i += 4) {
-          var r = d[i], g = d[i + 1], b = d[i + 2];
-          if (3 * g - 2 * r - 2 * b >= 191) d[i + 3] = 0;
-          else d[i + 1] = 0.35 * r + 0.3 * g + 0.35 * b;
-        }
-        ctx.putImageData(img, 0, 0);
-      }
-      if (v.requestVideoFrameCallback) {
-        var onFrame = function () { paint(); v.requestVideoFrameCallback(onFrame); };
-        v.requestVideoFrameCallback(onFrame);
-      } else {
-        var tick = function () { if (!v.paused && !v.ended) paint(); requestAnimationFrame(tick); };
-        requestAnimationFrame(tick);
-      }
-    })();
-  </script>
   <script>
     (function () {
       'use strict';

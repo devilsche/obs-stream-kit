@@ -52,7 +52,7 @@
     'html.stinger-loading *::after { animation-play-state: paused !important; }' +
     // Stummer Neustart: Video waehrend des Nachladens unsichtbar (sonst
     // kurzer schwarzer Kasten), danach weich einblenden
-    'video.stinger-reload, video.stinger-wait { opacity: 0 !important; }' +
+    'video.stinger-reload { opacity: 0 !important; }' +
     'video.stinger-reveal { animation: stingerReveal .4s ease-out !important; }' +
     '@keyframes stingerReveal { from { opacity: 0; } to { opacity: 1; } }';
   (document.head || html).appendChild(styleEl);
@@ -165,7 +165,6 @@
   function tryPlay(m) {
     watchAudioFailure(m);
     watchStall(m);
-    if (m._stingerFollow) setTimeout(m._stingerFollow, 600);
     var p;
     try { p = m.play(); } catch (e) {
       console.warn('[stinger-ready] play() threw:', e);
@@ -173,7 +172,6 @@
     }
     if (!p || typeof p.catch !== 'function') return p || null;
     return p.catch(function (err) {
-      if (m._stingerFollow) m._stingerFollow();
       if (m.tagName === 'VIDEO' && !m.muted) {
         var p2 = playMuted(m, err);
         if (p2 && typeof p2.then === 'function') return p2;
@@ -260,54 +258,7 @@
     });
   }
 
-  // Ton und Bild trennen: Videos mit Tonspur laufen stumm, der Ton kommt aus
-  // einem unsichtbaren <audio> mit derselben Datei. Haengt die Audio-Ausgabe
-  // der Browser-Engine, haengt sonst das ganze Video — stumm laeuft es
-  // immer, und zwar puenktlich statt erst nach einem Neustart.
-  function splitVideoAudio() {
-    var videos = document.querySelectorAll('video[data-stinger-autoplay]');
-    Array.prototype.forEach.call(videos, function (v) {
-      var src = v.getAttribute('src');
-      if (v.muted || v.hasAttribute('muted') || !src) return;
-      var a = document.createElement('audio');
-      a.src = src;
-      a.preload = 'auto';
-      a.setAttribute('data-stinger-autoplay', '');
-      if (v.hasAttribute('data-delay')) a.setAttribute('data-delay', v.getAttribute('data-delay'));
-      v.muted = true;
-      v.setAttribute('muted', '');
-      // Das Video startet nicht selbst, sondern sobald der Ton wirklich
-      // laeuft — wie frueher, als Bild und Ton im selben Element hingen und
-      // die Animationen darauf abgestimmt wurden. Kommt kein Ton (Ausgabe
-      // haengt oder abgelehnt), startet das Bild nach 600 ms trotzdem.
-      v.removeAttribute('data-stinger-autoplay');
-      v.removeAttribute('autoplay');
-      v.autoplay = false;
-      // Bis zum ersten echten Frame unsichtbar — ein wartendes Video malt in
-      // OBS sonst einen schwarzen Kasten, wo der Greenscreen sein sollte
-      v.classList.add('stinger-wait');
-      var reveal = function () { v.classList.remove('stinger-wait'); };
-      if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(reveal);
-      else v.addEventListener('playing', reveal, { once: true });
-      var followed = false;
-      a._stingerFollow = function () {
-        if (followed) return;
-        followed = true;
-        v.play().catch(function (e) { console.error('[stinger-ready] video play failed:', e); });
-      };
-      a.addEventListener('playing', a._stingerFollow, { once: true });
-      v.parentNode.insertBefore(a, v.nextSibling);
-      // Pause/Springen (Tune-Panel) mitnehmen
-      v.addEventListener('pause', function () { a.pause(); });
-      v.addEventListener('seeked', function () {
-        try { a.currentTime = v.currentTime; } catch (e) {}
-        if (!v.paused) a.play().catch(function () {});
-      });
-    });
-  }
-
   function init() {
-    splitVideoAudio();
     waitForFonts();
     waitForMedia();
     // Absolute Safety: max 5s — auch wenn Assets langsam laden, irgendwann muss der Stinger starten
