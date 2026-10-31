@@ -49,7 +49,12 @@
   styleEl.textContent =
     'html.stinger-loading *, ' +
     'html.stinger-loading *::before, ' +
-    'html.stinger-loading *::after { animation-play-state: paused !important; }';
+    'html.stinger-loading *::after { animation-play-state: paused !important; }' +
+    // Stummer Neustart: Video waehrend des Nachladens unsichtbar (sonst
+    // kurzer schwarzer Kasten), danach weich einblenden
+    'video.stinger-reload { opacity: 0 !important; }' +
+    'video.stinger-reveal { animation: stingerReveal .4s ease-out !important; }' +
+    '@keyframes stingerReveal { from { opacity: 0; } to { opacity: 1; } }';
   (document.head || html).appendChild(styleEl);
 
   var started = false;
@@ -114,31 +119,46 @@
   }
 
   // Haengt die Audio-Ausgabe, kommt weder Fehler noch abgelehntes play() —
-  // das Video bleibt einfach auf dem ersten Frame stehen. Laeuft es nach
-  // kurzer Zeit nicht, stumm neu laden. Puffern zaehlt nicht: erst wenn genug
-  // Daten da sind (readyState >= 3) und es trotzdem 1,5 s steht, ist es das
-  // Audio — sonst laedt ein langsames Netz das Video grundlos neu.
+  // das Video bleibt einfach auf dem ersten Frame stehen. Dann stumm neu
+  // laden. Puffern zaehlt nicht: erst wenn mindestens 1 s Video geladen ist
+  // und es trotzdem 1,5 s steht, ist es das Audio (readyState taugt nicht —
+  // bei haengendem Audio bleibt er unter 3). Nach 6 s ohne Bewegung greift
+  // der Neustart in jedem Fall.
+  function bufferedAhead(m) {
+    try { return m.buffered.length ? m.buffered.end(m.buffered.length - 1) : 0; }
+    catch (e) { return 0; }
+  }
+
+  function reloadMuted(m, t0) {
+    console.error('[stinger-ready] video stalled, reloading muted:', m.currentSrc || m.src);
+    m.muted = true;
+    m.classList.add('stinger-reload');
+    m.addEventListener('playing', function () {
+      m.classList.remove('stinger-reload');
+      m.classList.add('stinger-reveal');
+    }, { once: true });
+    m.addEventListener('loadeddata', function () {
+      // Dort weiter, wo das Video laut Animation schon sein muesste
+      try { m.currentTime = (Date.now() - t0) / 1000; } catch (e) {}
+      m.play().catch(function (e2) { console.error('[stinger-ready] muted replay failed:', e2); });
+    }, { once: true });
+    try { m.load(); } catch (e) {}
+  }
+
   function watchStall(m) {
     if (m.tagName !== 'VIDEO') return;
     var t0 = Date.now();
     var stuckSince = null;
     var iv = setInterval(function () {
-      if (m.muted || m.ended || m.currentTime > 0 || Date.now() - t0 > 10000) {
+      if (m.muted || m.ended || m.currentTime > 0) { clearInterval(iv); return; }
+      var waited = Date.now() - t0;
+      var loaded = bufferedAhead(m) >= 1 || m.readyState >= 3;
+      if (!loaded) stuckSince = null;
+      else if (stuckSince === null) stuckSince = Date.now();
+      if ((stuckSince !== null && Date.now() - stuckSince >= 1500) || waited >= 6000) {
         clearInterval(iv);
-        return;
+        reloadMuted(m, t0);
       }
-      if (m.readyState < 3) { stuckSince = null; return; }
-      if (stuckSince === null) { stuckSince = Date.now(); return; }
-      if (Date.now() - stuckSince < 1500) return;
-      clearInterval(iv);
-      console.error('[stinger-ready] video stalled, reloading muted:', m.currentSrc || m.src);
-      m.muted = true;
-      m.addEventListener('loadeddata', function () {
-        // Dort weiter, wo das Video laut Animation schon sein muesste
-        try { m.currentTime = (Date.now() - t0) / 1000; } catch (e) {}
-        m.play().catch(function (e2) { console.error('[stinger-ready] muted replay failed:', e2); });
-      }, { once: true });
-      try { m.load(); } catch (e) {}
     }, 250);
   }
 
