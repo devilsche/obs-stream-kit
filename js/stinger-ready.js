@@ -113,8 +113,28 @@
     });
   }
 
+  // Haengt die Audio-Ausgabe, kommt weder Fehler noch abgelehntes play() —
+  // das Video bleibt einfach auf dem ersten Frame stehen. Laeuft es nach
+  // kurzer Zeit nicht, stumm neu laden.
+  function watchStall(m) {
+    if (m.tagName !== 'VIDEO') return;
+    var t0 = Date.now();
+    setTimeout(function () {
+      if (m.muted || m.ended || m.currentTime > 0) return;
+      console.error('[stinger-ready] video stalled, reloading muted:', m.currentSrc || m.src);
+      m.muted = true;
+      m.addEventListener('loadeddata', function () {
+        // Dort weiter, wo das Video laut Animation schon sein muesste
+        try { m.currentTime = (Date.now() - t0) / 1000; } catch (e) {}
+        m.play().catch(function (e2) { console.error('[stinger-ready] muted replay failed:', e2); });
+      }, { once: true });
+      try { m.load(); } catch (e) {}
+    }, 1500);
+  }
+
   function tryPlay(m) {
     watchAudioFailure(m);
+    watchStall(m);
     var p;
     try { p = m.play(); } catch (e) {
       console.warn('[stinger-ready] play() threw:', e);
