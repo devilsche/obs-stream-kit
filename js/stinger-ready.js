@@ -165,6 +165,7 @@
   function tryPlay(m) {
     watchAudioFailure(m);
     watchStall(m);
+    if (m._stingerFollow) setTimeout(m._stingerFollow, 600);
     var p;
     try { p = m.play(); } catch (e) {
       console.warn('[stinger-ready] play() threw:', e);
@@ -172,6 +173,7 @@
     }
     if (!p || typeof p.catch !== 'function') return p || null;
     return p.catch(function (err) {
+      if (m._stingerFollow) m._stingerFollow();
       if (m.tagName === 'VIDEO' && !m.muted) {
         var p2 = playMuted(m, err);
         if (p2 && typeof p2.then === 'function') return p2;
@@ -274,6 +276,20 @@
       if (v.hasAttribute('data-delay')) a.setAttribute('data-delay', v.getAttribute('data-delay'));
       v.muted = true;
       v.setAttribute('muted', '');
+      // Das Video startet nicht selbst, sondern sobald der Ton wirklich
+      // laeuft — wie frueher, als Bild und Ton im selben Element hingen und
+      // die Animationen darauf abgestimmt wurden. Kommt kein Ton (Ausgabe
+      // haengt oder abgelehnt), startet das Bild nach 600 ms trotzdem.
+      v.removeAttribute('data-stinger-autoplay');
+      v.removeAttribute('autoplay');
+      v.autoplay = false;
+      var followed = false;
+      a._stingerFollow = function () {
+        if (followed) return;
+        followed = true;
+        v.play().catch(function (e) { console.error('[stinger-ready] video play failed:', e); });
+      };
+      a.addEventListener('playing', a._stingerFollow, { once: true });
       v.parentNode.insertBefore(a, v.nextSibling);
       // Pause/Springen (Tune-Panel) mitnehmen
       v.addEventListener('pause', function () { a.pause(); });
