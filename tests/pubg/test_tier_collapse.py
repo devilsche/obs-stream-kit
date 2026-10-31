@@ -46,3 +46,30 @@ def test_dinner_served_ist_die_grundstufe():
 def test_dinner_served_allein_bleibt():
     got = keep_highest_tier([_a("chicken", "m1"), _a("god_mode_chicken", "m2")])
     assert [a["id"] for a in got] == ["chicken", "god_mode_chicken"]
+
+
+def test_achievements_list_markiert_nur_niedrigere_stufen(pg_compat):
+    """Heavy Hitter im letzten Match ist dessen hoechste Schadensstufe —
+    auch wenn er in der Session schon gepoppt hat (suppress_popup)."""
+    import json
+    from pubg.cache import TTLCache
+    from pubg.endpoints import EndpointRegistry
+    conn, t1, _ = pg_compat
+    rows = [("damage_1000", "m1", 0), ("damage_500", "m1", 1),
+            ("damage_500", "m2", 1)]
+    for aid, mid, sup in rows:
+        conn.execute(
+            "INSERT INTO pubg_achievements_seen (tenant_id, achievement_id, "
+            "match_id, label, played_at, detected_at, suppress_popup) "
+            "VALUES (?, ?, ?, ?, ?, 0, ?)",
+            (t1, aid, mid, aid, "2026-10-31T0%s:00:00Z" % mid[-1], sup))
+    conn.commit()
+    reg = EndpointRegistry(get_conn=lambda: conn, my_account_id="acc",
+                           platform="steam", cache=TTLCache(), client=None,
+                           poller_status=lambda: {}, tenant_id=t1)
+    payload = reg.dispatch("GET", "/api/pubg/achievements-list", b"", {})[0]
+    body = json.loads(payload) if isinstance(payload, (str, bytes)) else payload
+    got = {(a["achievementId"], a["matchId"]): a["lowerTier"]
+           for a in body["achievements"]}
+    assert got == {("damage_1000", "m1"): False, ("damage_500", "m1"): True,
+                   ("damage_500", "m2"): False}

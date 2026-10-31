@@ -2544,6 +2544,16 @@ class EndpointRegistry:
                 "durationSec":   r["duration_secs"],
                 "suppressed":    bool(r["suppress_popup"]),
             })
+        # Niedrigere Stufe derselben Reihe im selben Match (Heavy Hitter
+        # neben Damage Dealer) markieren. suppressed taugt dafuer nicht: das
+        # ist Popup-Logik und blendet auch die hoechste Stufe eines Matches
+        # aus, wenn sie in der Session schon einmal gepoppt hat.
+        from pubg.aggregations import keep_highest_tier
+        kept = {(k["id"], k["matchId"]) for k in keep_highest_tier(
+            [{"id": it["achievementId"], "matchId": it["matchId"]}
+             for it in items])}
+        for it in items:
+            it["lowerTier"] = (it["achievementId"], it["matchId"]) not in kept
         # Juengste zuerst
         items.sort(key=lambda x: x["unlockedAt"], reverse=True)
         result = {

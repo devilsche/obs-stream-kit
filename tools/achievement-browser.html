@@ -527,7 +527,7 @@
     // letzte Schub stehen.
     function computeDropKeys(list) {
       const keyOf = a => a.appId + ":" + a.apiName;
-      const items = list.filter(a => !a.suppressed && tsOf(a) > 0)
+      const items = list.filter(a => !a.lowerTier && tsOf(a) > 0)
         .sort((x, y) => tsOf(y) - tsOf(x));
       if (!items.length) return new Set();
       const top = items[0];
@@ -705,7 +705,7 @@
       if (showMode === "session") {
         // PUBG: playedAt >= Session-Start; Steam: unlockedAt >= Session-Start.
         view = sessionCutoffMs
-          ? view.filter(a => !a.suppressed && tsOf(a) >= sessionCutoffMs)
+          ? view.filter(a => !a.lowerTier && tsOf(a) >= sessionCutoffMs)
           : [];
       } else if (showMode === "drop") {
         view = view.filter(a => dropKeys.has(a.appId + ":" + a.apiName));
