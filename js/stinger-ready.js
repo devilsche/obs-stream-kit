@@ -286,7 +286,9 @@
       // Bis zum ersten echten Frame unsichtbar — ein wartendes Video malt in
       // OBS sonst einen schwarzen Kasten, wo der Greenscreen sein sollte
       v.classList.add('stinger-wait');
-      v.addEventListener('playing', function () { v.classList.remove('stinger-wait'); }, { once: true });
+      var reveal = function () { v.classList.remove('stinger-wait'); };
+      if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(reveal);
+      else v.addEventListener('playing', reveal, { once: true });
       var followed = false;
       a._stingerFollow = function () {
         if (followed) return;
