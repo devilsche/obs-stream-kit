@@ -46,6 +46,12 @@ var ClipPlayer = (function () {
     opts = opts || {};
     var containerId  = opts.containerId || 'clipContainer';
     var muted        = opts.muted !== undefined ? opts.muted : false;
+    // ?sound=0 — Clips von vornherein stumm (Ton kommt dann gar nicht erst
+    // ans Audiogeraet, das in OBS wegbrechen kann)
+    if (new URLSearchParams(window.location.search).get('sound') === '0') muted = true;
+    // Ist das Audio einmal gescheitert, starten alle folgenden Clips stumm —
+    // sonst kostet jeder Clip erneut Fehlversuch + Wartezeit.
+    var audioBroken  = false;
     var countdownSec = opts.countdown || parseInt(new URLSearchParams(window.location.search).get('countdown'), 10) || 5;
 
     var container        = document.getElementById(containerId);
@@ -146,7 +152,7 @@ var ClipPlayer = (function () {
       video.src = clip.mp4;
       video.autoplay = true;
       video.playsInline = true;
-      video.muted = !!muted;
+      video.muted = !!muted || audioBroken;
       video.preload = 'auto';
       container.appendChild(video);
 
@@ -173,7 +179,26 @@ var ClipPlayer = (function () {
 
       // Kommt binnen 12s kein Playback zustande (Netzwerk, abgelaufener Token),
       // wird der Clip uebersprungen statt die Szene haengen zu lassen.
-      var stallTimer = setTimeout(function () { goNext(false); }, 12000);
+      var audioRetried = false;
+      function retryMuted(reason) {
+        if (audioRetried || video.muted) return false;
+        audioRetried = true;
+        audioBroken = true;
+        console.error('[clip-player] audio failed (' + reason + '), playing muted');
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(function () { goNext(false); }, 12000);
+        video.muted = true;
+        video.src = clip.mp4;
+        var again = video.play();
+        if (again && again.catch) again.catch(function () { goNext(false); });
+        return true;
+      }
+
+      // Haengt das Video mit Ton, ohne je zu spielen oder einen Fehler zu
+      // werfen (kaputtes Audiogeraet in OBS), erst stumm nachversuchen.
+      var stallTimer = setTimeout(function () {
+        if (!retryMuted('stall')) goNext(false);
+      }, 12000);
 
       video.addEventListener('playing', function () { clearTimeout(stallTimer); });
       // Das echte Ende des Videos schaltet weiter — kein Timer auf clip.duration
@@ -182,23 +207,12 @@ var ClipPlayer = (function () {
         clipTimer = setTimeout(function () { goNext(true); }, endHoldMs);
       });
 
-      var audioRetried = false;
       video.addEventListener('error', function () {
         // Kann die Browser-Engine kein Audio-Geraet oeffnen (in OBS je nach
         // Audio-Einstellung der Source), wirft sie sofort DECODE /
         // AUDIO_RENDERER_ERROR — das Video selbst ist heil. Ohne diesen
         // Rueckfall wuerde die Szene stumm durch die ganze Clip-Liste rasen.
-        if (!audioRetried && !video.muted) {
-          audioRetried = true;
-          clearTimeout(stallTimer);
-          stallTimer = setTimeout(function () { goNext(false); }, 12000);
-          video.muted = true;
-          video.src = clip.mp4;
-          var again = video.play();
-          if (again && again.catch) again.catch(function () { goNext(false); });
-          return;
-        }
-        goNext(false);
+        if (!retryMuted('error')) goNext(false);
       });
 
       var started = video.play();
@@ -207,13 +221,7 @@ var ClipPlayer = (function () {
           // Autoplay mit Ton blockiert der Browser ohne Nutzerinteraktion
           // (in OBS nicht, im normalen Tab schon) — dann stumm weiterlaufen,
           // statt auf einen Klick zu warten, der nie kommt.
-          if (!video.muted) {
-            video.muted = true;
-            var retry = video.play();
-            if (retry && retry.catch) retry.catch(function () { goNext(false); });
-          } else {
-            goNext(false);
-          }
+          if (!retryMuted('play rejected')) goNext(false);
         });
       }
     }
@@ -307,7 +315,7 @@ var ClipPlayer = (function () {
         }
         // Trailer: HLS-Video
         var video = document.createElement('video');
-        video.muted = (muted === false) ? false : true; // Default stumm in OBS
+        video.muted = !!muted || audioBroken;
         video.autoplay = true; video.playsInline = true;
         container.appendChild(video);
         var advanced = false;

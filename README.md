@@ -61,6 +61,7 @@ Automatischer Twitch Clip-Player mit Countdown-Overlay und BRB-Animation.
 | `count` | nein | `100` | Anzahl Clips (max 100) |
 | `countdown` | nein | `5` | Countdown-Sekunden zwischen Clips |
 | `endHold` | nein | `1.5` | Sekunden, die der letzte Frame nach Clip-Ende stehen bleibt, bevor ausgeblendet wird |
+| `sound` | nein | – | `0` = Clips immer stumm. Ohne den Parameter laufen sie mit Ton; scheitert das Audiogerät (Fehler oder Hänger), spielen sie stumm weiter |
 
 Im Server-Betrieb werden die Clips server-seitig über `/s/<token>/api/twitch/clips` geladen — der Twitch-Channel und die App-Credentials des Tenants bleiben am Server, das Client-Secret landet **nie** im Browser. Der `clips`-Parameter schränkt den Abruf auf die genannten Slugs ein (`?slugs=…` am selben Endpoint); auch dieser Modus braucht den Server, weil nur er die abspielbaren Clip-URLs holen kann.
 
