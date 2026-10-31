@@ -121,8 +121,8 @@
   // Haengt die Audio-Ausgabe, kommt weder Fehler noch abgelehntes play() —
   // das Video bleibt einfach auf dem ersten Frame stehen. Dann stumm neu
   // laden. Puffern zaehlt nicht: erst wenn mindestens 1 s Video geladen ist
-  // und es trotzdem 1,5 s steht, ist es das Audio (readyState taugt nicht —
-  // bei haengendem Audio bleibt er unter 3). Nach 6 s ohne Bewegung greift
+  // und es trotzdem 0,6 s steht, ist es das Audio (readyState taugt nicht —
+  // bei haengendem Audio bleibt er unter 3). Nach 1,2 s ohne Bewegung greift
   // der Neustart in jedem Fall.
   function bufferedAhead(m) {
     try { return m.buffered.length ? m.buffered.end(m.buffered.length - 1) : 0; }
@@ -130,7 +130,7 @@
   }
 
   function reloadMuted(m, t0) {
-    console.error('[stinger-ready] video stalled, reloading muted:', m.currentSrc || m.src);
+    if (!soundOff) console.error('[stinger-ready] video stalled, reloading muted:', m.currentSrc || m.src);
     m.muted = true;
     m.classList.add('stinger-reload');
     m.addEventListener('playing', function () {
@@ -155,14 +155,24 @@
       var loaded = bufferedAhead(m) >= 1 || m.readyState >= 3;
       if (!loaded) stuckSince = null;
       else if (stuckSince === null) stuckSince = Date.now();
-      if ((stuckSince !== null && Date.now() - stuckSince >= 1500) || waited >= 6000) {
+      // Gesunder Start mit Ton braucht in OBS < 0,3 s — alles darueber ist
+      // die haengende Audio-Ausgabe, und jede Wartezeit sieht man
+      if ((stuckSince !== null && Date.now() - stuckSince >= 600) || waited >= 1200) {
         clearInterval(iv);
         reloadMuted(m, t0);
       }
     }, 250);
   }
 
+  // ?sound=0 — Stinger ohne eigenen Ton (z.B. wenn Streamer.bot ihn spielt).
+  // Videos gehen direkt den erprobten stummen Weg, Audios bleiben still.
+  var soundOff = new URLSearchParams(window.location.search).get('sound') === '0';
+
   function tryPlay(m) {
+    if (soundOff) {
+      if (m.tagName === 'VIDEO') reloadMuted(m, Date.now());
+      return null;
+    }
     watchAudioFailure(m);
     watchStall(m);
     var p;

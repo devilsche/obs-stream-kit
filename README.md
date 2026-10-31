@@ -322,6 +322,8 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 
 > **Audio:** Stinger mit eigener MP3 binden die Datei via `<audio autoplay>` ein — OBS Browser-Sources spielen das automatisch ab (stelle sicher dass **Audio über OBS steuern** aktiviert ist). Weitere Sounds: Datei in `assets/stingers/` ablegen und im Stinger-HTML per `<audio autoplay src="...">` referenzieren.
 
+> **`?sound=0`:** Stinger ohne eigenen Ton, etwa wenn Streamer.bot den Sound abspielt. Videos (Trap, Kickers) laufen dann stumm und sofort. Ohne Parameter gilt: Hängt die Audio-Ausgabe von OBS, lädt ein Video-Stinger nach spätestens 1,2 s stumm neu und blendet ein.
+
 ### Setup in Streamer.bot
 
 1. Pro Stinger eine Browser-Source in OBS anlegen (1920×1080), **unsichtbar**
