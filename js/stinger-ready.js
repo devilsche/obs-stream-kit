@@ -52,7 +52,7 @@
     'html.stinger-loading *::after { animation-play-state: paused !important; }' +
     // Stummer Neustart: Video waehrend des Nachladens unsichtbar (sonst
     // kurzer schwarzer Kasten), danach weich einblenden
-    'video.stinger-reload { opacity: 0 !important; }' +
+    'video.stinger-reload, video.stinger-wait { opacity: 0 !important; }' +
     'video.stinger-reveal { animation: stingerReveal .4s ease-out !important; }' +
     '@keyframes stingerReveal { from { opacity: 0; } to { opacity: 1; } }';
   (document.head || html).appendChild(styleEl);
@@ -283,6 +283,10 @@
       v.removeAttribute('data-stinger-autoplay');
       v.removeAttribute('autoplay');
       v.autoplay = false;
+      // Bis zum ersten echten Frame unsichtbar — ein wartendes Video malt in
+      // OBS sonst einen schwarzen Kasten, wo der Greenscreen sein sollte
+      v.classList.add('stinger-wait');
+      v.addEventListener('playing', function () { v.classList.remove('stinger-wait'); }, { once: true });
       var followed = false;
       a._stingerFollow = function () {
         if (followed) return;
