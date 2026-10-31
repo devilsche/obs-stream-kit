@@ -258,7 +258,34 @@
     });
   }
 
+  // Ton und Bild trennen: Videos mit Tonspur laufen stumm, der Ton kommt aus
+  // einem unsichtbaren <audio> mit derselben Datei. Haengt die Audio-Ausgabe
+  // der Browser-Engine, haengt sonst das ganze Video — stumm laeuft es
+  // immer, und zwar puenktlich statt erst nach einem Neustart.
+  function splitVideoAudio() {
+    var videos = document.querySelectorAll('video[data-stinger-autoplay]');
+    Array.prototype.forEach.call(videos, function (v) {
+      var src = v.getAttribute('src');
+      if (v.muted || v.hasAttribute('muted') || !src) return;
+      var a = document.createElement('audio');
+      a.src = src;
+      a.preload = 'auto';
+      a.setAttribute('data-stinger-autoplay', '');
+      if (v.hasAttribute('data-delay')) a.setAttribute('data-delay', v.getAttribute('data-delay'));
+      v.muted = true;
+      v.setAttribute('muted', '');
+      v.parentNode.insertBefore(a, v.nextSibling);
+      // Pause/Springen (Tune-Panel) mitnehmen
+      v.addEventListener('pause', function () { a.pause(); });
+      v.addEventListener('seeked', function () {
+        try { a.currentTime = v.currentTime; } catch (e) {}
+        if (!v.paused) a.play().catch(function () {});
+      });
+    });
+  }
+
   function init() {
+    splitVideoAudio();
     waitForFonts();
     waitForMedia();
     // Absolute Safety: max 5s — auch wenn Assets langsam laden, irgendwann muss der Stinger starten
