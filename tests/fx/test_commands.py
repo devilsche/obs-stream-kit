@@ -28,6 +28,14 @@ def test_parse_set_normalizes_values():
         "color": "9fc4ff", "splash": False}}
 
 
+def test_parse_set_sound_levels_are_clamped():
+    out = commands.parse("rain", {"cmd": "set", "sound": "off", "volume": "1.7",
+                                  "thunder": "-1"})
+    assert out["params"] == {"sound": False, "volume": 1.0, "thunder": 0.0}
+    with pytest.raises(ValueError):
+        commands.parse("rain", {"cmd": "set", "volume": "loud"})
+
+
 def test_parse_set_wind_random_and_short_color():
     out = commands.parse("rain", {"cmd": "set", "wind": "random", "color": "abc"})
     assert out["params"] == {"wind": "random", "color": "aabbcc"}

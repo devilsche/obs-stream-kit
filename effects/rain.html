@@ -114,6 +114,7 @@
       <dt>Rain</dt><dd id="tiRunning"></dd>
       <dt>Drops</dt><dd id="tiDrops"></dd>
       <dt>Remote</dt><dd id="tiRemote"></dd>
+      <dt>Audio</dt><dd id="tiAudio"></dd>
     </dl>
     <div class="tune-actions">
       <button type="button" class="tune-btn" id="btnStrike">Lightning (L)</button>
@@ -125,7 +126,8 @@
     </div>
     <p class="tune-hint">
       URL params: ?intensity=light|medium|heavy|storm · ?wind=-1…1|random ·
-      ?color=9fc4ff · ?lightning=0|1|2 · ?splash=0|1<br>
+      ?color=9fc4ff · ?lightning=0|1|2 · ?splash=0|1 ·
+      ?sound=0|1 · ?volume=0…1 · ?thunder=0…1<br>
       Remote: …/api/fx/rain?cmd=strike|gust|stop|start|reset|set&amp;wind=random
     </p>
   </section>
@@ -172,8 +174,15 @@
         return v === undefined ? null : v;
       }
 
+      function parseLevel(raw) {
+        if (raw === null || raw === undefined || raw === '') return null;
+        var f = parseFloat(raw);
+        return isNaN(f) ? null : clamp(f, 0, 1);
+      }
+
       function readUrlSettings() {
-        var s = { intensity: 'medium', wind: 0, lightning: 0, color: 'aecbeb', splash: true };
+        var s = { intensity: 'medium', wind: 0, lightning: 0, color: 'aecbeb', splash: true,
+                  sound: true, volume: 0.6, thunder: 1 };
         var i = (params.get('intensity') || '').toLowerCase();
         if (INTENSITY[i]) s.intensity = i;
         var w = parseWind(params.get('wind'));
@@ -183,6 +192,11 @@
         var c = parseColor(params.get('color'));
         if (c) s.color = c;
         s.splash = params.get('splash') !== '0';
+        s.sound = params.get('sound') !== '0';
+        var v = parseLevel(params.get('volume'));
+        if (v !== null) s.volume = v;
+        var t = parseLevel(params.get('thunder'));
+        if (t !== null) s.thunder = t;
         return s;
       }
       function copy(o) { var r = {}; for (var k in o) r[k] = o[k]; return r; }
@@ -308,7 +322,8 @@
         zigzag(mx, my, x1, y1, spread / 2, depth - 1, out);
       }
 
-      function makeBolt() {
+      // dist 0 = nah (dick, hell, Knall), 1 = fern (duenn, blasser, Grollen)
+      function makeBolt(dist) {
         var x0 = rand(W * 0.15, W * 0.85);
         var y1 = rand(H * 0.45, H * 0.8);
         var x1 = x0 + rand(-220, 220);
@@ -324,11 +339,14 @@
           zigzag(start[0], start[1], bx, by, 70, 4, br);
           paths.push({ pts: br, w: 1.6 });
         }
-        return { paths: paths, t: 0, side: x0 < W * 0.38 ? 'left' : (x0 > W * 0.62 ? 'right' : 'center') };
+        return { paths: paths, t: 0, k: 1.25 - dist * 0.6, dim: 1 - dist * 0.35,
+                 side: x0 < W * 0.38 ? 'left' : (x0 > W * 0.62 ? 'right' : 'center') };
       }
 
       function strike() {
-        bolt = makeBolt();
+        var dist = Math.random();
+        bolt = makeBolt(dist);
+        if (audio) audio.thunder(dist);
         flashEl.dataset.side = bolt.side;
         flashEl.classList.remove('is-flashing');
         void flashEl.offsetWidth;   // Animation neu starten
@@ -350,7 +368,7 @@
       function drawBolt() {
         bctx.clearRect(0, 0, W, H);
         if (!bolt) return;
-        var a = boltAlpha(bolt.t);
+        var a = boltAlpha(bolt.t) * bolt.dim;
         if (a <= 0) { bolt = null; return; }
         bctx.lineCap = 'round';
         bctx.lineJoin = 'round';
@@ -362,16 +380,169 @@
           bctx.shadowColor = 'rgba(' + rgb + ',' + a + ')';
           bctx.shadowBlur = 28;
           bctx.strokeStyle = 'rgba(' + rgb + ',' + (a * 0.55) + ')';
-          bctx.lineWidth = p.w * 3;
+          bctx.lineWidth = p.w * 3 * bolt.k;
           bctx.stroke();
           // Kern
           bctx.shadowBlur = 8;
           bctx.strokeStyle = 'rgba(255,255,255,' + a + ')';
-          bctx.lineWidth = p.w;
+          bctx.lineWidth = p.w * bolt.k;
           bctx.stroke();
         });
         bctx.shadowBlur = 0;
       }
+
+      // ── Sound: alles synthetisch per Web Audio, keine Dateien ──
+      // Regen = gefiltertes Rauschen + Prasseln, Wind = Bandpass-Rauschen,
+      // Donner = tiefpassgefiltertes Braunrauschen mit Nachrollen, nahe
+      // Einschlaege zusaetzlich mit Knall. Folgt live Tropfenzahl und Wind.
+      var audio = (function () {
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        var ac;
+        try { ac = new AC(); } catch (e) { return null; }
+        var sr = ac.sampleRate;
+
+        function noiseBuffer(sec, brown) {
+          var buf = ac.createBuffer(1, Math.floor(sr * sec), sr);
+          var d = buf.getChannelData(0);
+          var last = 0, peak = 0;
+          for (var i = 0; i < d.length; i++) {
+            var w = Math.random() * 2 - 1;
+            if (brown) { last = (last + 0.02 * w) / 1.02; d[i] = last; }
+            else d[i] = w;
+            if (Math.abs(d[i]) > peak) peak = Math.abs(d[i]);
+          }
+          for (var j = 0; j < d.length; j++) d[j] *= 0.9 / peak;
+          return buf;
+        }
+        var white = noiseBuffer(3, false);
+        var brown = noiseBuffer(8, true);
+
+        function filter(type, freq, q) {
+          var f = ac.createBiquadFilter();
+          f.type = type;
+          f.frequency.value = freq;
+          if (q) f.Q.value = q;
+          return f;
+        }
+        function gain(v) { var g = ac.createGain(); g.gain.value = v; return g; }
+        function chain(nodes) {
+          for (var i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]);
+        }
+        function loop(buf) {
+          var src = ac.createBufferSource();
+          src.buffer = buf;
+          src.loop = true;
+          src.start(0, Math.random() * buf.duration);
+          return src;
+        }
+
+        var comp = ac.createDynamicsCompressor();
+        comp.threshold.value = -14;
+        comp.ratio.value = 4;
+        comp.connect(ac.destination);
+        var master = gain(0);
+        master.connect(comp);
+
+        var rainGain = gain(0), heavyGain = gain(0), windGain = gain(0);
+        var windBP = filter('bandpass', 400, 0.8);
+        chain([loop(white), filter('highpass', 500), filter('lowpass', 6500), rainGain, master]);
+        // Ohne Tiefbass, damit der Donner nicht im Dauerrauschen untergeht
+        chain([loop(brown), filter('highpass', 180), filter('lowpass', 1200), heavyGain, master]);
+        chain([loop(white), windBP, windGain, master]);
+        var dropBus = gain(1);
+        dropBus.connect(master);
+
+        var dropAcc = 0;
+        function plink(when) {
+          var src = ac.createBufferSource();
+          src.buffer = white;
+          var g = gain(0);
+          chain([src, filter('bandpass', rand(1800, 6000), rand(2, 6)), g, dropBus]);
+          g.gain.setValueAtTime(0, when);
+          g.gain.linearRampToValueAtTime(rand(0.04, 0.12), when + 0.002);
+          g.gain.exponentialRampToValueAtTime(0.0001, when + rand(0.02, 0.06));
+          src.start(when, Math.random() * 2.5, 0.08);
+        }
+
+        function update(dt, drops, wind) {
+          var on = cur.sound;
+          var t = ac.currentTime;
+          var r = Math.min(drops / 870, 1);   // 870 = storm
+          rainGain.gain.setTargetAtTime(0.32 * Math.sqrt(r), t, 0.4);
+          heavyGain.gain.setTargetAtTime(0.3 * r * r, t, 0.6);
+          var w = Math.min(Math.abs(wind), 1.6);
+          windGain.gain.setTargetAtTime(0.16 * w * w, t, 0.5);
+          windBP.frequency.setTargetAtTime(350 + 400 * w, t, 0.5);
+          if (!on || ac.state !== 'running') { dropAcc = 0; return; }
+          dropAcc += dt * r * 45;
+          while (dropAcc >= 1) { dropAcc -= 1; plink(t + Math.random() * 0.05); }
+        }
+
+        function thunder(dist) {
+          var level = cur.sound ? cur.thunder : 0;
+          if (level <= 0 || ac.state !== 'running') return;
+          var near = dist < 0.35;
+          var t0 = ac.currentTime + 0.25 + dist * 2.6;
+          var loud = level * (1.6 - dist * 0.7);
+          var dur = 3.5 + dist * 3 + Math.random() * 1.5;
+
+          // Grollen mit 2–4 Nachschwellungen
+          var src = ac.createBufferSource();
+          src.buffer = brown;
+          var lp = filter('lowpass', near ? 900 : 380, 0.7);
+          var g = gain(0.0001);
+          chain([src, lp, g, master]);
+          lp.frequency.setValueAtTime(near ? 900 : 380, t0);
+          lp.frequency.exponentialRampToValueAtTime(90, t0 + dur);
+          var attackEnd = t0 + (near ? 0.04 : 0.3 + dist * 0.4);
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(loud, attackEnd);
+          var rolls = 2 + ((Math.random() * 3) | 0);
+          var tt = attackEnd + 0.1;
+          var seg = (t0 + dur - tt) / (rolls + 1);
+          var lvl = loud;
+          for (var i = 0; i < rolls; i++) {
+            lvl *= rand(0.5, 0.8);
+            g.gain.exponentialRampToValueAtTime(lvl * rand(0.35, 0.6), tt + seg * 0.5);
+            g.gain.exponentialRampToValueAtTime(lvl, tt + seg);
+            tt += seg;
+          }
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+          src.start(t0, Math.random() * 2, dur + 0.2);
+
+          // Knall bei nahen Einschlaegen: zwei kurze, helle Rauschstoesse
+          if (near) {
+            [0, rand(0.06, 0.12)].forEach(function (off, n) {
+              var c = ac.createBufferSource();
+              c.buffer = white;
+              var cg = gain(0.0001);
+              chain([c, filter('highpass', 900), cg, master]);
+              var tc = t0 + off;
+              cg.gain.setValueAtTime(0.0001, tc);
+              cg.gain.linearRampToValueAtTime(loud * (n ? 0.5 : 0.9), tc + 0.005);
+              cg.gain.exponentialRampToValueAtTime(0.0001, tc + (n ? 0.2 : 0.35));
+              c.start(tc, Math.random() * 2, 0.4);
+            });
+          }
+        }
+
+        function setMaster() {
+          master.gain.setTargetAtTime(cur.sound ? cur.volume : 0, ac.currentTime, 0.3);
+        }
+
+        // Ausserhalb von OBS startet der AudioContext erst nach einer Geste
+        function resume() { if (ac.state === 'suspended') ac.resume(); }
+        document.addEventListener('pointerdown', resume);
+        document.addEventListener('keydown', resume);
+
+        return {
+          update: update, thunder: thunder, setMaster: setMaster, resume: resume,
+          suspend: function () { ac.suspend(); },
+          state: function () { return ac.state; }
+        };
+      })();
+      if (audio) audio.setMaster();
 
       // ── Befehle (Streamer.bot → API → hier) ──
       function applySettings(changed) {
@@ -379,6 +550,7 @@
         if ('lightning' in changed) scheduleStrike();
         if ('wind' in changed && cur.wind === 'random') nextWindChange = time;
         if ('color' in changed) colorTarget = hexToRgb(cur.color);
+        if (audio && ('sound' in changed || 'volume' in changed)) audio.setMaster();
         updateTune();
       }
 
@@ -504,9 +676,12 @@
         if (bolt) bolt.t += dt;
         drawBolt();
 
+        if (audio && dt > 0) audio.update(dt, drops.length, tanA / MAX_TAN);
+
         if (tuneMode && ++drawCount % 15 === 0) {
           tiDrops.textContent = String(drops.length);
           tiWind.textContent = windLabel();
+          if (drawCount % 60 === 0) updateTune();
         }
 
         requestAnimationFrame(frame);
@@ -570,6 +745,9 @@
         document.getElementById('tiSplash').textContent = cur.splash ? 'on' : 'off';
         document.getElementById('tiRunning').textContent = running ? 'running' : 'stopped';
         tiRemote.textContent = remoteState;
+        document.getElementById('tiAudio').textContent = !audio ? 'unsupported'
+          : (!cur.sound ? 'off' : audio.state() + ' · vol ' + cur.volume + ' · thunder ' + cur.thunder)
+            + (audio.state() === 'suspended' ? ' (click to enable)' : '');
         btnStop.textContent = running ? 'Stop (S)' : 'Start (S)';
       }
 
@@ -580,6 +758,7 @@
         function toggleRunning() { applyCommand({ cmd: running ? 'stop' : 'start' }); }
         function togglePause() {
           paused = !paused;
+          if (audio) { if (paused) audio.suspend(); else audio.resume(); }
           btnPause.textContent = paused ? 'Resume (Space)' : 'Pause (Space)';
         }
         document.getElementById('btnStrike').addEventListener('click', strike);

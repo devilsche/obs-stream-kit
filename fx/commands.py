@@ -48,6 +48,16 @@ def _color(v):
     return hex_
 
 
+def _level(v):
+    try:
+        f = float(v)
+    except ValueError:
+        return None
+    if f != f:  # NaN
+        return None
+    return max(0.0, min(1.0, f))
+
+
 def _flag(v):
     return {"1": True, "on": True, "0": False, "off": False}.get(v.lower())
 
@@ -61,6 +71,9 @@ EFFECTS = {
             "lightning": _lightning,
             "color": _color,
             "splash": _flag,
+            "sound": _flag,
+            "volume": _level,
+            "thunder": _level,
         },
     },
 }

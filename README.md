@@ -339,12 +339,12 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 
 ## Effects
 
-Stumme Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`.
+Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle stumm außer Rain.
 
 | Datei | Beschreibung | Dauer |
 |-------|-------------|-------|
 | `effects/snow.html` | Schneefall (Greenscreen-Video) | Loop |
-| `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze | Loop |
+| `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze — mit synthetischem Regen-/Wind-/Donner-Sound | Loop |
 | `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
@@ -359,9 +359,14 @@ Stumme Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`
 | `color` | Hex ohne `#`, z.B. `9fc4ff` | `aecbeb` |
 | `lightning` | `0` aus, `1` selten (14–32 s), `2` oft (5–12 s) | `0` |
 | `splash` | `1` an, `0` aus | `1` |
+| `sound` | `1` an, `0` aus | `1` |
+| `volume` | `0` … `1`, Gesamtlautstärke | `0.6` |
+| `thunder` | `0` … `1`, Donner relativ zum Regen (`0` = kein Donner) | `1` |
 | `tune` | `1` blendet das Tune-Panel ein (`L` = Blitz, `G` = Böe, `S` = Stop/Start, Leertaste = Pause) | — |
 
 Beispiel Gewitter: `effects/rain.html?intensity=storm&wind=random&lightning=2`
+
+**Sound:** komplett im Browser erzeugt (Web Audio), keine Audiodateien. Regenrauschen und Prasseln folgen der Tropfenmenge, Wind rauscht mit Stärke und Böen, jeder Blitz bekommt Donner — nah: Knall nach ~0,3 s, fern: tiefes Grollen nach bis zu ~3 s. In OBS bei der Source **„Audio über OBS steuern"** aktivieren, dann erscheint Rain im Audio-Mixer. Im normalen Browser-Tab startet der Ton erst nach einem Klick (Autoplay-Sperre).
 
 #### Rain live steuern (Streamer.bot)
 
@@ -377,12 +382,12 @@ Der Token ist derselbe wie in der Source-URL. Fertige URLs zum Kopieren stehen i
 |--------|---------|
 | `cmd=strike` | Blitz jetzt |
 | `cmd=gust` | kräftige Windböe (~2,5 s) |
-| `cmd=set&…` | Werte live ändern, gleiche Parameter wie in der URL (`intensity`, `wind`, `color`, `lightning`, `splash`), beliebig kombinierbar |
+| `cmd=set&…` | Werte live ändern, gleiche Parameter wie in der URL (`intensity`, `wind`, `color`, `lightning`, `splash`, `sound`, `volume`, `thunder`), beliebig kombinierbar |
 | `cmd=stop` | Regen hört auf — Tropfen fallen zu Ende, keine neuen |
 | `cmd=start` | Regen setzt wieder ein |
 | `cmd=reset` | zurück auf die Werte aus der Source-URL |
 
-Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sunny` → `cmd=stop`.
+Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sunny` → `cmd=stop`, `!mute` → `cmd=set&sound=0`.
 
 Funktioniert nur, wenn die Source über die Token-URL (`/s/<token>/effects/rain.html`) geladen wird. Befehle, die geschickt werden, während die Source nicht läuft, werden beim Start nicht nachgeholt. Ungültige Befehle beantwortet der Server mit HTTP 400.
 
