@@ -337,6 +337,34 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 
 ---
 
+## Effects
+
+Stumme Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`.
+
+| Datei | Beschreibung | Dauer |
+|-------|-------------|-------|
+| `effects/snow.html` | Schneefall (Greenscreen-Video) | Loop |
+| `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze | Loop |
+| `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
+| `effects/explosion.html` | Explosion (Video) | ~14s |
+| `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
+| `effects/lens-flare.html` | Lens Flare — `?n=1…7` wählt die Variante | Videolänge |
+
+**Parameter für `rain.html`:**
+
+| Parameter | Werte | Standard |
+|-----------|-------|----------|
+| `intensity` | `light`, `medium`, `heavy`, `storm` | `medium` |
+| `wind` | `-1` (stark links) … `0` … `1` (stark rechts), Kommawerte erlaubt | `0` |
+| `color` | Hex ohne `#`, z.B. `9fc4ff` | `aecbeb` |
+| `lightning` | `0` aus, `1` selten (14–32 s), `2` oft (5–12 s) | `0` |
+| `splash` | `1` an, `0` aus | `1` |
+| `tune` | `1` blendet das Tune-Panel ein (`L` = Blitz, Leertaste = Pause) | — |
+
+Beispiel Gewitter: `effects/rain.html?intensity=storm&wind=0.6&lightning=2`
+
+---
+
 ## Transition
 
 | Datei | Beschreibung | OBS-Setup |

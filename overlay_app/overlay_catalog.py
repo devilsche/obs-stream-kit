@@ -160,6 +160,22 @@ EFFECT_META = {
          "options": [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]],
          "tooltip": "Seven different lens flare videos"},
     ]},
+    "rain.html": {"switches": [
+        {"key": "intensity", "label": "Intensity", "type": "select", "default": "medium",
+         "options": [["light","Light"],["medium","Medium"],["heavy","Heavy"],["storm","Storm"]],
+         "tooltip": "Amount and speed of rain drops"},
+        {"key": "wind", "label": "Wind", "type": "select", "default": "0",
+         "options": [["-1","Strong left"],["-0.5","Left"],["0","None"],["0.5","Right"],["1","Strong right"]],
+         "tooltip": "Slant of the rain (any value from -1 to 1 works via URL)"},
+        {"key": "color", "label": "Color", "type": "text", "default": "aecbeb",
+         "placeholder": "e.g. 9fc4ff", "tooltip": "Hex color of the drops, without #"},
+        {"key": "lightning", "label": "Lightning", "type": "select", "default": "0",
+         "options": [["0","Off"],["1","Rare"],["2","Frequent"]],
+         "tooltip": "Occasional lightning bolt with a soft screen flash"},
+        {"key": "splash", "label": "Splash", "type": "select", "default": "1",
+         "options": [["1","On"],["0","Off"]],
+         "tooltip": "Small splashes where drops hit the ground"},
+    ]},
 }
 
 TRANSITIONS = [
