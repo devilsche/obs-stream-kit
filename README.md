@@ -355,13 +355,36 @@ Stumme Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`
 | Parameter | Werte | Standard |
 |-----------|-------|----------|
 | `intensity` | `light`, `medium`, `heavy`, `storm` | `medium` |
-| `wind` | `-1` (stark links) … `0` … `1` (stark rechts), Kommawerte erlaubt | `0` |
+| `wind` | `-1` (stark links) … `0` … `1` (stark rechts), Kommawerte erlaubt — oder `random`: wechselt alle 6–15 s weich Richtung und Stärke | `0` |
 | `color` | Hex ohne `#`, z.B. `9fc4ff` | `aecbeb` |
 | `lightning` | `0` aus, `1` selten (14–32 s), `2` oft (5–12 s) | `0` |
 | `splash` | `1` an, `0` aus | `1` |
-| `tune` | `1` blendet das Tune-Panel ein (`L` = Blitz, Leertaste = Pause) | — |
+| `tune` | `1` blendet das Tune-Panel ein (`L` = Blitz, `G` = Böe, `S` = Stop/Start, Leertaste = Pause) | — |
 
-Beispiel Gewitter: `effects/rain.html?intensity=storm&wind=0.6&lightning=2`
+Beispiel Gewitter: `effects/rain.html?intensity=storm&wind=random&lightning=2`
+
+#### Rain live steuern (Streamer.bot)
+
+Die laufende Source fragt jede Sekunde beim Server nach neuen Befehlen — kein Reload, kein Flackern. Befehle schickt Streamer.bot per Sub-Action **Core → Network → Fetch URL** an:
+
+```
+https://stream-overlay.com/s/<token>/api/fx/rain?cmd=…
+```
+
+Der Token ist derselbe wie in der Source-URL. Fertige URLs zum Kopieren stehen im Dashboard unter **Stream → Rain → Remote commands**.
+
+| Befehl | Wirkung |
+|--------|---------|
+| `cmd=strike` | Blitz jetzt |
+| `cmd=gust` | kräftige Windböe (~2,5 s) |
+| `cmd=set&…` | Werte live ändern, gleiche Parameter wie in der URL (`intensity`, `wind`, `color`, `lightning`, `splash`), beliebig kombinierbar |
+| `cmd=stop` | Regen hört auf — Tropfen fallen zu Ende, keine neuen |
+| `cmd=start` | Regen setzt wieder ein |
+| `cmd=reset` | zurück auf die Werte aus der Source-URL |
+
+Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sunny` → `cmd=stop`.
+
+Funktioniert nur, wenn die Source über die Token-URL (`/s/<token>/effects/rain.html`) geladen wird. Befehle, die geschickt werden, während die Source nicht läuft, werden beim Start nicht nachgeholt. Ungültige Befehle beantwortet der Server mit HTTP 400.
 
 ---
 

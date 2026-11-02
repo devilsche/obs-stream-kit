@@ -5,6 +5,7 @@ nginx-Pfad-Routing erreichbar). Haelt die Daten-/Auth-Schicht:
 - bp_auth     — Twitch-OAuth + Sessions (/app/login, /app/oauth/callback, /app/logout)
 - bp_api      — PUBG/Steam-Daten (/api/*, /s/<token>/api/*)
 - bp_twitch   — Twitch-Clips (/s/<token>/api/twitch/clips)
+- bp_fx       — Effect-Befehle (/s/<token>/api/fx/<effekt>), z.B. Blitz per Streamer.bot
 
 Das Frontend (app/) rendert das Dashboard und liefert Widgets/Tools/Overlays
 aus; Browser-Daten-Calls landen via nginx hier. Auth/Session-DB ist geteilt
@@ -20,6 +21,7 @@ from webcore.metrics import register_metrics
 from webcore.auth import bp_auth
 from webcore.views_twitch import bp_twitch
 from app.views_api import bp_api
+from fx.endpoints import bp_fx
 
 
 def create_app(testing: bool = False) -> Flask:
@@ -36,6 +38,7 @@ def create_app(testing: bool = False) -> Flask:
     app.register_blueprint(bp_auth)
     app.register_blueprint(bp_api)
     app.register_blueprint(bp_twitch)
+    app.register_blueprint(bp_fx)
 
     @app.route("/healthz")
     def healthz():

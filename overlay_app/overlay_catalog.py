@@ -165,8 +165,9 @@ EFFECT_META = {
          "options": [["light","Light"],["medium","Medium"],["heavy","Heavy"],["storm","Storm"]],
          "tooltip": "Amount and speed of rain drops"},
         {"key": "wind", "label": "Wind", "type": "select", "default": "0",
-         "options": [["-1","Strong left"],["-0.5","Left"],["0","None"],["0.5","Right"],["1","Strong right"]],
-         "tooltip": "Slant of the rain (any value from -1 to 1 works via URL)"},
+         "options": [["-1","Strong left"],["-0.5","Left"],["0","None"],["0.5","Right"],["1","Strong right"],
+                     ["random","Random"]],
+         "tooltip": "Slant of the rain (any value from -1 to 1 works via URL). Random drifts on its own."},
         {"key": "color", "label": "Color", "type": "text", "default": "aecbeb",
          "placeholder": "e.g. 9fc4ff", "tooltip": "Hex color of the drops, without #"},
         {"key": "lightning", "label": "Lightning", "type": "select", "default": "0",
@@ -175,6 +176,17 @@ EFFECT_META = {
         {"key": "splash", "label": "Splash", "type": "select", "default": "1",
          "options": [["1","On"],["0","Off"]],
          "tooltip": "Small splashes where drops hit the ground"},
+    ],
+    # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/rain
+    "commands": [
+        {"q": "cmd=strike", "label": "Lightning now"},
+        {"q": "cmd=gust", "label": "Wind gust"},
+        {"q": "cmd=set&intensity=storm&wind=random&lightning=2", "label": "Thunderstorm"},
+        {"q": "cmd=set&intensity=light&wind=0&lightning=0", "label": "Calm drizzle"},
+        {"q": "cmd=set&wind=random", "label": "Random wind"},
+        {"q": "cmd=stop", "label": "Stop rain (fades out)"},
+        {"q": "cmd=start", "label": "Start rain"},
+        {"q": "cmd=reset", "label": "Back to URL settings"},
     ]},
 }
 
@@ -251,5 +263,6 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
         out.append({"key": key, "label": key.replace("-", " ").title(),
                     "file": fn, "size": size, "desc": desc,
                     "params": list(params) if params else [],
-                    "switches": meta.get("switches", [])})
+                    "switches": meta.get("switches", []),
+                    "commands": meta.get("commands", [])})
     return out

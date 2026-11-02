@@ -111,15 +111,22 @@
       <dt>Color</dt><dd id="tiColor"></dd>
       <dt>Lightning</dt><dd id="tiLightning"></dd>
       <dt>Splash</dt><dd id="tiSplash"></dd>
+      <dt>Rain</dt><dd id="tiRunning"></dd>
       <dt>Drops</dt><dd id="tiDrops"></dd>
+      <dt>Remote</dt><dd id="tiRemote"></dd>
     </dl>
     <div class="tune-actions">
       <button type="button" class="tune-btn" id="btnStrike">Lightning (L)</button>
+      <button type="button" class="tune-btn" id="btnGust">Gust (G)</button>
+    </div>
+    <div class="tune-actions">
+      <button type="button" class="tune-btn" id="btnStop">Stop (S)</button>
       <button type="button" class="tune-btn" id="btnPause">Pause (Space)</button>
     </div>
     <p class="tune-hint">
-      URL params: ?intensity=light|medium|heavy|storm · ?wind=-1…1 ·
-      ?color=9fc4ff · ?lightning=0|1|2 · ?splash=0|1
+      URL params: ?intensity=light|medium|heavy|storm · ?wind=-1…1|random ·
+      ?color=9fc4ff · ?lightning=0|1|2 · ?splash=0|1<br>
+      Remote: …/api/fx/rain?cmd=strike|gust|stop|start|reset|set&amp;wind=random
     </p>
   </section>
 
@@ -132,7 +139,6 @@
       var reduceMotion = window.matchMedia &&
         window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      // ── Parameter ──
       // Tropfen pro Ebene [hinten, mitte, vorne]
       var INTENSITY = {
         light:  [70, 45, 20],
@@ -140,71 +146,129 @@
         heavy:  [300, 180, 80],
         storm:  [460, 280, 130]
       };
-      var intensityKey = (params.get('intensity') || 'medium').toLowerCase();
-      if (!INTENSITY[intensityKey]) intensityKey = 'medium';
-      var speedBoost = intensityKey === 'storm' ? 1.15 : 1;
+      // Abstand zwischen Zufallsblitzen in s, Index = lightning-Stufe
+      var LIGHTNING_RANGES = [null, [14, 32], [5, 12]];
+      var LIGHTNING_NAMES = ['off', 'rare', 'frequent'];
+      var MAX_TAN = 0.5;   // wind=1 → ~27° Neigung
 
-      var wind = parseFloat(params.get('wind'));
-      if (isNaN(wind)) wind = 0;
-      wind = Math.max(-1, Math.min(1, wind));
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
+      // ── Einstellungen (URL = Basis, Befehle aendern live) ──
       function parseColor(raw) {
         if (!raw) return null;
-        var hex = raw.replace(/^#/, '').trim();
-        if (/^[0-9a-f]{3}$/i.test(hex)) {
-          hex = hex.replace(/(.)/g, '$1$1');
-        }
-        if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
-        return {
-          r: parseInt(hex.slice(0, 2), 16),
-          g: parseInt(hex.slice(2, 4), 16),
-          b: parseInt(hex.slice(4, 6), 16)
-        };
+        var hex = String(raw).replace(/^#/, '').trim().toLowerCase();
+        if (/^[0-9a-f]{3}$/.test(hex)) hex = hex.replace(/(.)/g, '$1$1');
+        return /^[0-9a-f]{6}$/.test(hex) ? hex : null;
       }
-      var color = parseColor(params.get('color')) || { r: 174, g: 203, b: 235 };
-      var rgb = color.r + ',' + color.g + ',' + color.b;
+      function parseWind(raw) {
+        if (raw === null || raw === undefined) return null;
+        if (String(raw).toLowerCase() === 'random') return 'random';
+        var f = parseFloat(raw);
+        return isNaN(f) ? null : clamp(f, -1, 1);
+      }
+      function parseLightning(raw) {
+        var v = { '0': 0, off: 0, '1': 1, rare: 1, '2': 2, frequent: 2 }[String(raw).toLowerCase()];
+        return v === undefined ? null : v;
+      }
 
-      // 0/off = aus, 1/rare = selten, 2/frequent = oft
-      var LIGHTNING = { off: null, rare: [14, 32], frequent: [5, 12] };
-      var lightningRaw = (params.get('lightning') || '0').toLowerCase();
-      var lightningKey = { '0': 'off', '1': 'rare', '2': 'frequent' }[lightningRaw] || lightningRaw;
-      if (!(lightningKey in LIGHTNING)) lightningKey = 'off';
-      if (reduceMotion) lightningKey = 'off';
+      function readUrlSettings() {
+        var s = { intensity: 'medium', wind: 0, lightning: 0, color: 'aecbeb', splash: true };
+        var i = (params.get('intensity') || '').toLowerCase();
+        if (INTENSITY[i]) s.intensity = i;
+        var w = parseWind(params.get('wind'));
+        if (w !== null) s.wind = w;
+        var l = parseLightning(params.get('lightning'));
+        if (l !== null) s.lightning = l;
+        var c = parseColor(params.get('color'));
+        if (c) s.color = c;
+        s.splash = params.get('splash') !== '0';
+        return s;
+      }
+      function copy(o) { var r = {}; for (var k in o) r[k] = o[k]; return r; }
 
-      var splashOn = params.get('splash') !== '0';
+      var base = readUrlSettings();
+      var cur = copy(base);
+      var running = true;
 
-      // ── Ebenen ──
+      function hexToRgb(hex) {
+        return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+      }
+      var colorNow = hexToRgb(cur.color);
+      var colorTarget = colorNow.slice();
+      var rgb = colorNow.join(',');
+
+      // ── Ebenen + Tropfen ──
       var LAYERS = [
         { speed: 950,  len: [10, 18], width: 1.0, alpha: [0.16, 0.24, 0.32], drift: 0.8 },
         { speed: 1350, len: [18, 30], width: 1.3, alpha: [0.28, 0.38, 0.48], drift: 0.9 },
         { speed: 1850, len: [30, 52], width: 1.8, alpha: [0.42, 0.56, 0.70], drift: 1.0, ground: true }
       ];
-      var MAX_TAN = 0.5;   // wind=1 → ~27° Neigung
 
-      function rand(a, b) { return a + Math.random() * (b - a); }
+      function targetCount(li) {
+        if (!running) return 0;
+        var n = INTENSITY[cur.intensity][li];
+        return reduceMotion ? Math.round(n / 2) : n;
+      }
+
+      function spawn(d, initial) {
+        var layer = LAYERS[d.layer];
+        d.v = layer.speed * (cur.intensity === 'storm' ? 1.15 : 1) * rand(0.85, 1.15);
+        d.len = rand(layer.len[0], layer.len[1]);
+        d.bucket = (Math.random() * 3) | 0;
+        // Seitlich ueber den Rand hinaus spawnen, damit Wind-Tropfen von
+        // ausserhalb hereinkommen statt im Bild aufzutauchen.
+        var margin = H * 0.8 + 40;
+        d.x = rand(-margin, W + margin);
+        d.y = initial ? rand(-H * 0.2, H) : -d.len - rand(0, 160);
+        d.gy = layer.ground ? H - rand(10, 150) : Infinity;
+        d.dead = false;
+      }
 
       var drops = [];
       LAYERS.forEach(function (layer, li) {
-        var n = INTENSITY[intensityKey][li];
-        if (reduceMotion) n = Math.round(n / 2);
-        for (var i = 0; i < n; i++) {
+        for (var i = 0, n = targetCount(li); i < n; i++) {
           var d = { layer: li };
           spawn(d, true);
           drops.push(d);
         }
       });
+      var counts = [0, 0, 0];
+      var spawnAcc = [0, 0, 0];
 
-      function spawn(d, initial) {
-        var layer = LAYERS[d.layer];
-        d.v = layer.speed * speedBoost * rand(0.85, 1.15);
-        d.len = rand(layer.len[0], layer.len[1]);
-        d.bucket = (Math.random() * 3) | 0;
-        // Seitlich ueber den Rand hinaus spawnen, damit Wind-Tropfen von
-        // ausserhalb hereinkommen statt im Bild aufzutauchen.
-        var margin = H * MAX_TAN + 40;
-        d.x = rand(-margin, W + margin);
-        d.y = initial ? rand(-H * 0.2, H) : -d.len - rand(0, 160);
-        d.gy = layer.ground ? H - rand(10, 150) : Infinity;
+      // ── Wind: fest, Zufall oder Boee ──
+      var windNow = typeof cur.wind === 'number' ? cur.wind : 0;
+      var windTarget = windNow;
+      var nextWindChange = 0;
+      var gustT = -1;
+      var gustDir = 1;
+
+      function startGust() {
+        gustT = 0;
+        gustDir = windNow > 0.05 ? 1 : (windNow < -0.05 ? -1 : (Math.random() < 0.5 ? -1 : 1));
+      }
+
+      function updateWind(dt) {
+        if (cur.wind === 'random') {
+          if (time >= nextWindChange) {
+            windTarget = rand(-0.9, 0.9);
+            nextWindChange = time + rand(6, 15);
+          }
+        } else {
+          windTarget = cur.wind;
+        }
+        var step = 0.35 * dt;
+        windNow += clamp(windTarget - windNow, -step, step);
+
+        var gust = 0;
+        if (gustT >= 0) {
+          gustT += dt;
+          if (gustT >= 2.5) gustT = -1;
+          else gust = gustDir * 0.55 * Math.sin(Math.PI * gustT / 2.5);
+        }
+        // Leichtes Pendeln, damit der Regen nicht starr wirkt
+        var sway = reduceMotion ? 0 : 0.07 * Math.sin(time * 0.37) + 0.04 * Math.sin(time * 1.13);
+        return clamp(windNow + gust + sway, -1.6, 1.6) * MAX_TAN;
       }
 
       // ── Spritzer ──
@@ -230,9 +294,9 @@
       var bolt = null;
       var nextStrike = Infinity;
 
-      function scheduleStrike(now) {
-        var range = LIGHTNING[lightningKey];
-        nextStrike = range ? now + rand(range[0], range[1]) : Infinity;
+      function scheduleStrike() {
+        var range = reduceMotion ? null : LIGHTNING_RANGES[cur.lightning];
+        nextStrike = range ? time + rand(range[0], range[1]) : Infinity;
       }
 
       // Zickzack per Mittelpunkt-Verschiebung
@@ -309,6 +373,27 @@
         bctx.shadowBlur = 0;
       }
 
+      // ── Befehle (Streamer.bot → API → hier) ──
+      function applySettings(changed) {
+        for (var k in changed) cur[k] = changed[k];
+        if ('lightning' in changed) scheduleStrike();
+        if ('wind' in changed && cur.wind === 'random') nextWindChange = time;
+        if ('color' in changed) colorTarget = hexToRgb(cur.color);
+        updateTune();
+      }
+
+      function applyCommand(c) {
+        switch (c.cmd) {
+          case 'strike': strike(); break;
+          case 'gust':   startGust(); break;
+          case 'stop':   running = false; break;
+          case 'start':  running = true; break;
+          case 'reset':  running = true; applySettings(copy(base)); break;
+          case 'set':    applySettings(c.params || {}); break;
+        }
+        updateTune();
+      }
+
       // ── Render-Loop ──
       var canvas = document.getElementById('rain');
       var ctx = canvas.getContext('2d');
@@ -317,6 +402,8 @@
       var time = 0;
       var last = null;
       var paused = false;
+      var drawCount = 0;
+      scheduleStrike();
 
       function frame(now) {
         var dt = last === null ? 0 : Math.min((now - last) / 1000, 0.05);
@@ -324,12 +411,19 @@
         if (paused) dt = 0;
         time += dt;
 
-        if (nextStrike === Infinity && lightningKey !== 'off') scheduleStrike(time);
-        if (time >= nextStrike) { strike(); scheduleStrike(time); }
+        if (time >= nextStrike) {
+          if (running) strike();
+          scheduleStrike();
+        }
 
-        // Leichte Boeen, damit der Regen nicht starr wirkt
-        var gust = reduceMotion ? 0 : 0.07 * Math.sin(time * 0.37) + 0.04 * Math.sin(time * 1.13);
-        var tanA = (wind + gust) * MAX_TAN;
+        var tanA = updateWind(dt);
+
+        // Farbe weich ueberblenden
+        var cstep = 255 * 1.5 * dt;
+        for (var ci = 0; ci < 3; ci++) {
+          colorNow[ci] += clamp(colorTarget[ci] - colorNow[ci], -cstep, cstep);
+        }
+        rgb = Math.round(colorNow[0]) + ',' + Math.round(colorNow[1]) + ',' + Math.round(colorNow[2]);
 
         ctx.clearRect(0, 0, W, H);
 
@@ -350,18 +444,42 @@
           }
         }
 
-        // Bewegung + Recycling
+        // Bewegung + Recycling. Zu viele Tropfen (Stop, weniger Intensitaet)
+        // fallen einfach zu Ende und kommen nicht wieder.
+        counts[0] = counts[1] = counts[2] = 0;
+        for (var c0 = 0; c0 < drops.length; c0++) counts[drops[c0].layer]++;
+        var anyDead = false;
         for (var j = 0; j < drops.length; j++) {
           var dr = drops[j];
           var dl = LAYERS[dr.layer];
           var dy = dr.v * dt;
           dr.y += dy;
           dr.x += dy * tanA * dl.drift;
-          if (dr.y >= dr.gy) {
-            if (splashOn) addSplash(dr.x, dr.gy, dr.v * tanA);
-            spawn(dr, false);
-          } else if (dr.y - dr.len > H) {
-            spawn(dr, false);
+          var landed = dr.y >= dr.gy;
+          if (landed || dr.y - dr.len > H) {
+            if (landed && cur.splash) addSplash(dr.x, dr.gy, dr.v * tanA);
+            if (counts[dr.layer] > targetCount(dr.layer)) {
+              dr.dead = true;
+              anyDead = true;
+              counts[dr.layer]--;
+            } else {
+              spawn(dr, false);
+            }
+          }
+        }
+        if (anyDead) drops = drops.filter(function (d) { return !d.dead; });
+
+        // Fehlende Tropfen nach und nach oben nachschieben (Start, mehr Intensitaet)
+        for (var la = 0; la < LAYERS.length; la++) {
+          var target = targetCount(la);
+          if (counts[la] >= target) { spawnAcc[la] = 0; continue; }
+          spawnAcc[la] += target * dt * 0.9;
+          while (spawnAcc[la] >= 1 && counts[la] < target) {
+            var nd = { layer: la };
+            spawn(nd, false);
+            drops.push(nd);
+            counts[la]++;
+            spawnAcc[la] -= 1;
           }
         }
 
@@ -386,33 +504,99 @@
         if (bolt) bolt.t += dt;
         drawBolt();
 
+        if (tuneMode && ++drawCount % 15 === 0) {
+          tiDrops.textContent = String(drops.length);
+          tiWind.textContent = windLabel();
+        }
+
         requestAnimationFrame(frame);
       }
-      requestAnimationFrame(frame);
+
+      // ── Remote-Polling: nur wenn per Token-URL ausgeliefert ──
+      var remoteState = 'off (no token URL)';
+      var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+      if (tokenMatch) {
+        var pollUrl = '/s/' + tokenMatch[1] + '/api/fx/rain/poll';
+        var seq = null;
+        var epoch = null;
+        remoteState = 'connecting';
+        var pollOnce = function () {
+          var delay = 1000;
+          fetch(pollUrl + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (data) {
+              if (epoch !== null && data.epoch !== epoch) {
+                // Server neu gestartet: Zaehler beginnt bei 0, alles ab dort holen
+                epoch = data.epoch;
+                seq = 0;
+                delay = 0;
+                return;
+              }
+              epoch = data.epoch;
+              if (seq !== null) (data.commands || []).forEach(applyCommand);
+              seq = data.seq;
+              remoteState = 'listening (seq ' + seq + ')';
+            })
+            .catch(function () {
+              remoteState = 'error, retrying';
+              delay = 3000;
+            })
+            .then(function () {
+              if (tuneMode) tiRemote.textContent = remoteState;
+              setTimeout(pollOnce, delay);
+            });
+        };
+        pollOnce();
+      }
 
       // ── Tune-Modus ──
-      if (params.get('tune') !== '1') return;
-
-      document.getElementById('tunePanel').classList.add('visible');
-      document.getElementById('tiIntensity').textContent = intensityKey;
-      document.getElementById('tiWind').textContent = wind.toFixed(2);
-      document.getElementById('tiColor').textContent = 'rgb(' + rgb + ')';
-      document.getElementById('tiLightning').textContent = lightningKey;
-      document.getElementById('tiSplash').textContent = splashOn ? 'on' : 'off';
-      document.getElementById('tiDrops').textContent = String(drops.length);
-
+      var tuneMode = params.get('tune') === '1';
+      var tiDrops = document.getElementById('tiDrops');
+      var tiWind = document.getElementById('tiWind');
+      var tiRemote = document.getElementById('tiRemote');
+      var btnStop = document.getElementById('btnStop');
       var btnPause = document.getElementById('btnPause');
-      function togglePause() {
-        paused = !paused;
-        btnPause.textContent = paused ? 'Resume (Space)' : 'Pause (Space)';
+
+      function windLabel() {
+        return (cur.wind === 'random' ? 'random' : 'fixed') + ' · now ' + windNow.toFixed(2);
       }
-      document.getElementById('btnStrike').addEventListener('click', strike);
-      btnPause.addEventListener('click', togglePause);
-      document.addEventListener('keydown', function (e) {
-        if (e.target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
-        if (e.key === 'l' || e.key === 'L') strike();
-        if (e.key === ' ') { e.preventDefault(); togglePause(); }
-      });
+
+      function updateTune() {
+        if (!tuneMode) return;
+        document.getElementById('tiIntensity').textContent = cur.intensity;
+        tiWind.textContent = windLabel();
+        document.getElementById('tiColor').textContent = '#' + cur.color;
+        document.getElementById('tiLightning').textContent = LIGHTNING_NAMES[cur.lightning];
+        document.getElementById('tiSplash').textContent = cur.splash ? 'on' : 'off';
+        document.getElementById('tiRunning').textContent = running ? 'running' : 'stopped';
+        tiRemote.textContent = remoteState;
+        btnStop.textContent = running ? 'Stop (S)' : 'Start (S)';
+      }
+
+      if (tuneMode) {
+        document.getElementById('tunePanel').classList.add('visible');
+        updateTune();
+
+        function toggleRunning() { applyCommand({ cmd: running ? 'stop' : 'start' }); }
+        function togglePause() {
+          paused = !paused;
+          btnPause.textContent = paused ? 'Resume (Space)' : 'Pause (Space)';
+        }
+        document.getElementById('btnStrike').addEventListener('click', strike);
+        document.getElementById('btnGust').addEventListener('click', startGust);
+        btnStop.addEventListener('click', toggleRunning);
+        btnPause.addEventListener('click', togglePause);
+        document.addEventListener('keydown', function (e) {
+          if (e.target.tagName === 'BUTTON' && (e.key === ' ' || e.key === 'Enter')) return;
+          var k = e.key.toLowerCase();
+          if (k === 'l') strike();
+          else if (k === 'g') startGust();
+          else if (k === 's') toggleRunning();
+          else if (e.key === ' ') { e.preventDefault(); togglePause(); }
+        });
+      }
+
+      requestAnimationFrame(frame);
     })();
   </script>
 

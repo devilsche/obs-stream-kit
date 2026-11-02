@@ -3,7 +3,7 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None) %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='') %}
 <button type="button" class="url-card" hidden
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
@@ -13,6 +13,7 @@
         {% if hint %}data-hint="{{ hint }}"{% endif %}
         {% if chrome_preview %}data-chrome-preview="true"{% endif %}
         {% if preview_size %}data-preview-w="{{ preview_size[0] }}" data-preview-h="{{ preview_size[1] }}"{% endif %}
+        {% if commands %}data-commands='{{ commands|tojson }}' data-fx="{{ fx }}"{% endif %}
         data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
   <span class="url-card__corner" aria-hidden="true"></span>
   <span class="url-card__top">
@@ -95,7 +96,8 @@ G1R_STEAM_NAME=</code></pre>
         {% for e in effects %}
         {{ src_card('overlay','Effect',e.label,
                     base_url~'/s/'~token~'/effects/'~e.file,'effects/'~e.file,
-                    e.size,e.desc,e.switches or [],e.params or [],False,'','decor') }}
+                    e.size,e.desc,e.switches or [],e.params or [],False,'','stream',None,
+                    e.commands or [],base_url~'/s/'~token~'/api/fx/'~e.key) }}
         {% endfor %}
         {% for t in transitions %}
         {{ src_card('overlay','Transition',t.label,
@@ -410,6 +412,22 @@ G1R_STEAM_NAME=</code></pre>
           <div class="url-chrome-chrome" id="cpChrome">PREVIEW</div>
         </div>
       </div>` : "";
+    // Live-Befehle (Effects): eine kopierbare URL pro Befehl fuer Streamer.bot
+    const commands = parseJSON(card.dataset.commands, []);
+    const commandsHtml = commands.length ? `
+      <div class="url-dbox url-cmdbox">
+        <h2>Remote commands <span class="url-dbox__tag">Streamer.bot</span></h2>
+        <p class="url-dbox__desc">Use a <b>Fetch URL</b> sub-action with one of these URLs. The running source reacts within about a second, without reloading.</p>
+        <ul class="url-cmdlist">${commands.map(c => {
+          const u = card.dataset.fx + "?" + c.q;
+          return `<li class="url-cmd">
+            <span class="url-cmd__label">${escapeHtml(c.label)}</span>
+            <code class="url-cmd__url">${escapeHtml(u)}</code>
+            <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(u)}" aria-label="Copy URL: ${escapeAttr(c.label)}"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span></button>
+          </li>`;
+        }).join("")}</ul>
+        <span class="url-copied" id="urlCmdStatus" role="status" aria-live="polite"></span>
+      </div>` : "";
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
@@ -444,6 +462,7 @@ G1R_STEAM_NAME=</code></pre>
             <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
+        ${commandsHtml}
         ${infoBits.length ? `<div class="url-dbox url-infobox">
           <h2>Info</h2>
           <div class="url-param url-param--info" id="urlSizeInfo">${infoBits.join("<br>")}</div>
@@ -824,6 +843,27 @@ G1R_STEAM_NAME=</code></pre>
         checkDirty();
       });
     }
+
+    document.querySelectorAll(".url-cmd__copy").forEach(btn => btn.addEventListener("click", async () => {
+      const st = document.getElementById("urlCmdStatus");
+      const done = () => {
+        st.textContent = "Copied: " + btn.closest(".url-cmd").querySelector(".url-cmd__label").textContent;
+        btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span>';
+        setTimeout(() => {
+          btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span>';
+          st.textContent = "";
+        }, 1500);
+      };
+      try { await navigator.clipboard.writeText(btn.dataset.url); done(); }
+      catch (_) {
+        const ta = document.createElement("textarea");
+        ta.value = btn.dataset.url; ta.className = "url-copy-helper";
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand("copy"); done(); }
+        catch (_) { st.textContent = "Copy failed — please select the URL manually."; }
+        document.body.removeChild(ta);
+      }
+    }));
 
     document.getElementById("btnCopy").addEventListener("click", async () => {
       const url = (meta && meta.shownUrl) || buildUrl(base, scope);
