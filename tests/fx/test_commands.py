@@ -135,3 +135,46 @@ def test_endpoint_errors():
     assert c.get("/s/tok/api/fx/rain?cmd=explode").status_code == 400
     assert c.get("/s/tok/api/fx/lava?cmd=strike").status_code == 404
     assert _app(None).test_client().get("/s/tok/api/fx/rain?cmd=strike").status_code == 404
+
+
+# --- xmas ---
+
+def test_xmas_set_normalizes_values():
+    out = commands.parse("xmas", {"cmd": "set", "lights": "FRAME", "pattern": "chase",
+                                  "colors": "theme", "lightsy": "999", "sag": "40",
+                                  "baubles": "left", "blen": "3", "bsize": "0.8",
+                                  "tree": "0", "treepos": "left", "treex": "460",
+                                  "tsize": "1.2", "treesnow": "1", "snow": "off"})
+    assert out["params"] == {
+        "lights": "frame", "pattern": "chase", "colors": "theme", "lightsy": 400,
+        "sag": 40, "baubles": "left", "blen": 2.0, "bsize": 0.8, "tree": False,
+        "treepos": "left", "treex": 460, "tsize": 1.2, "treesnow": True, "snow": False}
+
+
+def test_xmas_ornament_name_is_sanitized():
+    out = commands.parse("xmas", {"cmd": "ornament", "name": "  <b>Kekskrümel</b>_99 extra lang name  "})
+    assert out == {"cmd": "ornament", "params": {"name": "bKekskrümelb_99 extr"}}
+    assert commands.parse("xmas", {"cmd": "ornament"})["params"] == {}
+
+
+def test_xmas_simple_commands():
+    for cmd in ("celebrate", "clear", "reset"):
+        assert commands.parse("xmas", {"cmd": cmd}) == {"cmd": cmd, "params": {}}
+
+
+def test_xmas_ornaments_are_kept_as_state():
+    commands.push(1, "xmas", commands.parse("xmas", {"cmd": "ornament", "name": "Hat3"}))
+    commands.push(1, "xmas", commands.parse("xmas", {"cmd": "ornament"}))
+    commands.push(1, "xmas", commands.parse("xmas", {"cmd": "celebrate"}))
+    state = commands.poll(1, "xmas", None)["state"]
+    assert state == {"ornaments": ["Hat3", ""]}
+    for i in range(commands.MAX_ORNAMENTS + 3):
+        commands.push(1, "xmas", {"cmd": "ornament", "params": {"name": str(i)}})
+    orn = commands.poll(1, "xmas", None)["state"]["ornaments"]
+    assert len(orn) == commands.MAX_ORNAMENTS
+    assert orn[-1] == str(commands.MAX_ORNAMENTS + 2)
+    commands.push(1, "xmas", {"cmd": "clear", "params": {}})
+    assert commands.poll(1, "xmas", None)["state"] == {"ornaments": []}
+    # andere Tenants und Effekte sehen davon nichts
+    assert commands.poll(2, "xmas", None)["state"] == {}
+    assert commands.poll(1, "rain", None)["state"] == {}

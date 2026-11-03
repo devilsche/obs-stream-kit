@@ -13,6 +13,8 @@ import time
 from collections import deque
 
 MAX_KEEP = 20
+MAX_ORNAMENTS = 12
+MAX_NAME = 20
 EPOCH = format(int(time.time() * 1000), "x")
 
 _HEX_RE = re.compile(r"^[0-9a-f]{3}([0-9a-f]{3})?$")
@@ -62,6 +64,61 @@ def _flag(v):
     return {"1": True, "on": True, "0": False, "off": False}.get(v.lower())
 
 
+def _choice(*options):
+    def conv(v):
+        v = v.lower()
+        return v if v in options else None
+    return conv
+
+
+def _int_range(lo, hi):
+    def conv(v):
+        try:
+            f = float(v)
+        except ValueError:
+            return None
+        if f != f:  # NaN
+            return None
+        return int(max(lo, min(hi, round(f))))
+    return conv
+
+
+def _float_range(lo, hi):
+    def conv(v):
+        try:
+            f = float(v)
+        except ValueError:
+            return None
+        if f != f:  # NaN
+            return None
+        return round(max(lo, min(hi, f)), 2)
+    return conv
+
+
+_NAME_DROP_RE = re.compile(r"[^\w .\-]")
+
+
+def _name(v):
+    """Chat-Name für eine Follower-Kugel: nur Buchstaben/Ziffern/_ .-,
+    Leerraum zusammengezogen, höchstens MAX_NAME Zeichen."""
+    v = _NAME_DROP_RE.sub("", v)
+    v = " ".join(v.split())[:MAX_NAME].strip()
+    return v or None
+
+
+def _xmas_state(state, command):
+    """Follower-Kugeln überdauern ein Neuladen der Source: der Server merkt
+    sich die Namen (nur im Speicher, wie die Befehle selbst)."""
+    orn = list(state.get("ornaments", []))
+    if command["cmd"] == "ornament":
+        orn = (orn + [command["params"].get("name", "")])[-MAX_ORNAMENTS:]
+    elif command["cmd"] == "clear":
+        orn = []
+    else:
+        return state
+    return {"ornaments": orn}
+
+
 EFFECTS = {
     "rain": {
         "commands": ("strike", "gust", "set", "stop", "start", "reset"),
@@ -75,6 +132,35 @@ EFFECTS = {
             "volume": _level,
             "thunder": _level,
         },
+        # Extra-Argumente einzelner Befehle; ungültige werden ignoriert
+        "args": {
+            # near/far, damit ein von Streamer.bot gespielter Donner (WAV) zum
+            # Blitz passt; ohne Angabe wählt das Overlay die Entfernung zufällig
+            "strike": {"dist": _choice("near", "far")},
+        },
+    },
+    "xmas": {
+        "commands": ("set", "celebrate", "ornament", "clear", "reset"),
+        "settings": {
+            "lights": _choice("top", "frame", "off"),
+            "pattern": _choice("steady", "twinkle", "chase", "wave"),
+            "colors": _choice("classic", "warm", "theme", "icy"),
+            "lightsy": _int_range(0, 400),
+            "sag": _int_range(0, 160),
+            "baubles": _choice("both", "left", "right", "off"),
+            "blen": _float_range(0.3, 2.0),
+            "bsize": _float_range(0.5, 1.6),
+            "tree": _flag,
+            "treepos": _choice("left", "right"),
+            "treex": _int_range(0, 1500),
+            "tsize": _float_range(0.5, 1.5),
+            "treesnow": _flag,
+            "snow": _flag,
+        },
+        "args": {
+            "ornament": {"name": _name},
+        },
+        "state": _xmas_state,
     },
 }
 
@@ -98,17 +184,19 @@ def parse(effect: str, args) -> dict:
                 params[key] = val
         if not params:
             raise ValueError("set needs at least one valid setting")
-    elif cmd == "strike":
-        # near/far, damit ein von Streamer.bot gespielter Donner (WAV) zum
-        # Blitz passt; ohne Angabe wählt das Overlay die Entfernung zufällig
-        dist = str(args.get("dist") or "").strip().lower()
-        if dist in ("near", "far"):
-            params["dist"] = dist
+    else:
+        for key, conv in spec.get("args", {}).get(cmd, {}).items():
+            raw = args.get(key)
+            if raw is None or str(raw).strip() == "":
+                continue
+            val = conv(str(raw).strip())
+            if val is not None:
+                params[key] = val
     return {"cmd": cmd, "params": params}
 
 
 _lock = threading.Lock()
-_store = {}   # (tenant_id, effect) → {"seq": int, "items": deque}
+_store = {}   # (tenant_id, effect) → {"seq": int, "items": deque, "state": dict}
 
 
 def reset_store():
@@ -119,15 +207,19 @@ def reset_store():
 def push(tenant_id: int, effect: str, command: dict) -> int:
     with _lock:
         slot = _store.setdefault((tenant_id, effect),
-                                 {"seq": 0, "items": deque(maxlen=MAX_KEEP)})
+                                 {"seq": 0, "items": deque(maxlen=MAX_KEEP), "state": {}})
         slot["seq"] += 1
         slot["items"].append({"seq": slot["seq"], "ts": time.time(), **command})
+        reducer = EFFECTS.get(effect, {}).get("state")
+        if reducer:
+            slot["state"] = reducer(slot["state"], command)
         return slot["seq"]
 
 
 def poll(tenant_id: int, effect: str, since) -> dict:
     """since=None → nur aktuellen Stand melden (Overlay startet frisch und
-    soll alte Befehle nicht nachspielen)."""
+    soll alte Befehle nicht nachspielen). `state` ist der dauerhafte Teil
+    (z. B. Follower-Kugeln), den das Overlay beim Start übernimmt."""
     with _lock:
         slot = _store.get((tenant_id, effect))
         seq = slot["seq"] if slot else 0
@@ -136,4 +228,5 @@ def poll(tenant_id: int, effect: str, since) -> dict:
         else:
             cmds = [{"seq": c["seq"], "cmd": c["cmd"], "params": c["params"]}
                     for c in slot["items"] if c["seq"] > since]
-    return {"epoch": EPOCH, "seq": seq, "commands": cmds}
+        state = dict(slot["state"]) if slot else {}
+    return {"epoch": EPOCH, "seq": seq, "commands": cmds, "state": state}

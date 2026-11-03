@@ -352,6 +352,7 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 |-------|-------------|-------|
 | `effects/snow.html` | Schneefall (Greenscreen-Video) | Loop |
 | `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze — mit synthetischem Regen-/Wind-/Donner-Sound | Loop |
+| `effects/xmas.html` | Weihnachtsschmuck: Lichterkette, Baum mit Stern und Geschenken, hängende Kugeln, Schneehaufen — alles einzeln schalt- und einstellbar, Follower-Kugeln und Celebrate per Streamer.bot | Dauerhaft |
 | `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
@@ -397,6 +398,39 @@ Der Token ist derselbe wie in der Source-URL. Fertige URLs zum Kopieren stehen i
 Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sunny` → `cmd=stop`, `!mute` → `cmd=set&sound=0`.
 
 Funktioniert nur, wenn die Source über die Token-URL (`/s/<token>/effects/rain.html`) geladen wird. Befehle, die geschickt werden, während die Source nicht läuft, werden beim Start nicht nachgeholt. Ungültige Befehle beantwortet der Server mit HTTP 400.
+
+### Weihnachtsschmuck (`xmas.html`)
+
+Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashboard unter **Stream → Xmas** als Schalter und lassen sich live per Streamer.bot ändern.
+
+| Parameter | Werte | Standard |
+|-----------|-------|----------|
+| `lights` | `top` (oben), `frame` (oben + Seiten), `off` | `top` |
+| `pattern` | `steady`, `twinkle`, `chase` (Lauflicht), `wave` | `twinkle` |
+| `colors` | `classic`, `warm` (Warmweiß), `theme` (Lila/Gold), `icy` — gilt für Lichter und hängende Kugeln | `classic` |
+| `lightsy` | 0–400 px — Lichterkette tiefer setzen (z. B. unter einen Kompass) | `0` |
+| `sag` | 0–160 px — Durchhang der Bögen | `74` |
+| `baubles` | `both`, `left`, `right`, `off` — hängende Kugeln in den oberen Ecken | `both` |
+| `blen` | 0.3–2 — Fadenlänge (Faktor), kurz z. B. über einer Minimap | `1` |
+| `bsize` | 0.5–1.6 — Kugelgröße (Faktor) | `1` |
+| `tree` | `1` / `0` | `1` |
+| `treepos` | `right`, `left` | `right` |
+| `treex` | 0–1500 px Abstand zum Rand (`460` = neben einer 400-px-Cam) | `40` |
+| `tsize` | 0.5–1.5 — Baumgröße (Faktor) | `1` |
+| `treesnow` | `1` / `0` — Schnee auf den Ästen | `1` |
+| `snow` | `1` / `0` — Schneehaufen unten | `1` |
+
+**Befehle** (`https://stream-overlay.com/s/<token>/api/fx/xmas?cmd=…`, Streamer.bot **Fetch URL**):
+
+| Befehl | Wirkung |
+|--------|---------|
+| `cmd=set&…` | beliebige Parameter von oben live ändern, z. B. `cmd=set&lights=off` oder `cmd=set&tree=0&snow=0` |
+| `cmd=celebrate` | 4 s Lauflicht, alles heller, Kugeln wackeln, Stern dreht schnell — z. B. bei Sub |
+| `cmd=ornament&name=%user%` | Follower hängt eine Kugel an den Baum, Name kurz sichtbar. 12 Plätze, danach wird die älteste ersetzt |
+| `cmd=clear` | Follower-Kugeln entfernen |
+| `cmd=reset` | zurück auf die Werte aus der Source-URL |
+
+Die Follower-Kugeln merkt sich der Server (bis zu seinem nächsten Neustart), ein Neuladen der Source verliert sie also nicht. `?tune=1` zeigt Verbindungsstatus; Tasten **C** = Celebrate, **O** = Test-Kugel.
 
 #### Rain-Sound über Streamer.bot (WAV)
 

@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Christmas Decor</title>
+  <!--
+    Weihnachtsschmuck als OBS-Source (1920×1080, transparent):
+    Lichterkette, Baum, hängende Kugeln, Schneehaufen.
+
+    URL-Parameter (alle auch live per Streamer.bot: /s/<token>/api/fx/xmas?cmd=set&…):
+      lights=top|frame|off        Lichterkette oben / oben+Seiten / aus
+      pattern=steady|twinkle|chase|wave
+      colors=classic|warm|theme|icy
+      lightsy=0..400              Lichterkette tiefer setzen (px)
+      sag=0..160                  Durchhang der Bögen (px), Standard 74
+      baubles=both|left|right|off hängende Kugeln
+      blen=0.3..2                 Fadenlänge der Kugeln (Faktor)
+      bsize=0.5..1.6              Kugelgröße (Faktor)
+      tree=1|0  treepos=right|left  treex=0..1500 (Abstand zum Rand, px)
+      tsize=0.5..1.5              Baumgröße (Faktor)
+      treesnow=1|0  snow=1|0      Schnee auf dem Baum / Schneehaufen unten
+      tune=1                      Statusanzeige; Tasten C = celebrate, O = Kugel
+
+    Befehle: cmd=celebrate | cmd=ornament&name=… | cmd=clear | cmd=reset | cmd=set&…
+  -->
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 1920px; height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .stage {
+      position: relative;
+      width: 1920px; height: 1080px;
+      overflow: hidden;
+      --blen: 1; --bsize: 1; --tsize: 1; --treex: 40px;
+      --c1: #ff3b3b; --c2: #2ecc71; --c3: #ffd23f; --c4: #3fa9ff; --c5: #ff8a1f;
+    }
+    .stage[data-colors="warm"]  { --c1: #ffd9a0; --c2: #ffcf87; --c3: #ffe6c2; --c4: #ffc56e; --c5: #fff0d6; }
+    .stage[data-colors="theme"] { --c1: #f2b705; --c2: #b07ad6; --c3: #ffd75e; --c4: #8e4bb8; --c5: #fff3c4; }
+    .stage[data-colors="icy"]   { --c1: #bfe9ff; --c2: #ffffff; --c3: #7cc7ff; --c4: #dff5ff; --c5: #a5d8ff; }
+
+    /* ── Glühbirnen ── */
+    .bulb .glow { filter: url(#bulbGlow); }
+    .bulb .lit { animation: shimmer 3s ease-in-out infinite; }
+    .k1 .glow, .k1 .body { fill: var(--c1); }
+    .k2 .glow, .k2 .body { fill: var(--c2); }
+    .k3 .glow, .k3 .body { fill: var(--c3); }
+    .k4 .glow, .k4 .body { fill: var(--c4); }
+    .k5 .glow, .k5 .body { fill: var(--c5); }
+    .bulb .socket { fill: #2b2f2a; }
+    .wire { fill: none; stroke: #1f2420; stroke-width: 3; }
+
+    @keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.82; } }
+    @keyframes twinkle { 0%, 100% { opacity: 1; } 40% { opacity: 0.2; } 55% { opacity: 1; } }
+    @keyframes chase   { 0%, 18% { opacity: 1; } 30%, 100% { opacity: 0.22; } }
+    @keyframes wave    { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+    .stage[data-pattern="twinkle"] .bulb .lit { animation: twinkle 2.2s ease-in-out infinite; }
+    .stage[data-pattern="chase"]   .bulb .lit { animation: chase 1.5s linear infinite; }
+    .stage[data-pattern="wave"]    .bulb .lit { animation: wave 4s ease-in-out infinite; }
+
+    /* ri-* zufällige Versätze (steady/twinkle), ci-* fortlaufend (chase/wave) */
+    .ri-0 .lit { animation-delay: -0.1s; } .ri-1 .lit { animation-delay: -1.3s; }
+    .ri-2 .lit { animation-delay: -0.7s; } .ri-3 .lit { animation-delay: -1.9s; }
+    .ri-4 .lit { animation-delay: -0.4s; } .ri-5 .lit { animation-delay: -1.6s; }
+    .ri-6 .lit { animation-delay: -1.0s; } .ri-7 .lit { animation-delay: -2.1s; }
+    .ri-8 .lit { animation-delay: -0.25s; } .ri-9 .lit { animation-delay: -1.45s; }
+    .stage[data-pattern="chase"] .ci-0 .lit { animation-delay: 0s; }    .stage[data-pattern="chase"] .ci-1 .lit { animation-delay: .15s; }
+    .stage[data-pattern="chase"] .ci-2 .lit { animation-delay: .3s; }   .stage[data-pattern="chase"] .ci-3 .lit { animation-delay: .45s; }
+    .stage[data-pattern="chase"] .ci-4 .lit { animation-delay: .6s; }   .stage[data-pattern="chase"] .ci-5 .lit { animation-delay: .75s; }
+    .stage[data-pattern="chase"] .ci-6 .lit { animation-delay: .9s; }   .stage[data-pattern="chase"] .ci-7 .lit { animation-delay: 1.05s; }
+    .stage[data-pattern="chase"] .ci-8 .lit { animation-delay: 1.2s; }  .stage[data-pattern="chase"] .ci-9 .lit { animation-delay: 1.35s; }
+    .stage[data-pattern="wave"] .ci-0 .lit { animation-delay: 0s; }     .stage[data-pattern="wave"] .ci-1 .lit { animation-delay: -.4s; }
+    .stage[data-pattern="wave"] .ci-2 .lit { animation-delay: -.8s; }   .stage[data-pattern="wave"] .ci-3 .lit { animation-delay: -1.2s; }
+    .stage[data-pattern="wave"] .ci-4 .lit { animation-delay: -1.6s; }  .stage[data-pattern="wave"] .ci-5 .lit { animation-delay: -2s; }
+    .stage[data-pattern="wave"] .ci-6 .lit { animation-delay: -2.4s; }  .stage[data-pattern="wave"] .ci-7 .lit { animation-delay: -2.8s; }
+    .stage[data-pattern="wave"] .ci-8 .lit { animation-delay: -3.2s; }  .stage[data-pattern="wave"] .ci-9 .lit { animation-delay: -3.6s; }
+
+    /* Celebrate: schnelles Lauflicht, alles heller, Kugeln wackeln */
+    .stage[data-celebrate="1"] .bulb .lit { animation: chase 0.5s linear infinite !important; }
+    .stage[data-celebrate="1"] .lights,
+    .stage[data-celebrate="1"] .tree { filter: brightness(1.35) saturate(1.2); }
+
+    .lights { position: absolute; inset: 0; pointer-events: none; }
+    .stage[data-lights="off"] .lights { display: none; }
+    .stage[data-lights="top"] .lights .side { display: none; }
+
+    /* ── Baum ── */
+    .tree {
+      position: absolute;
+      bottom: 24px;
+      right: var(--treex);
+      width: calc(380px * var(--tsize));
+      height: calc(494px * var(--tsize));
+    }
+    .stage[data-treepos="left"] .tree { right: auto; left: var(--treex); }
+    .stage[data-tree="0"] .tree { display: none; }
+    .tree svg { width: 100%; height: 100%; overflow: visible; }
+    .tree .snowcap { fill: #f4f8ff; }
+    .stage[data-treesnow="0"] .tree .snowcap { display: none; }
+    .star-rays { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
+    .star { filter: url(#starGlow); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stage[data-celebrate="1"] .star-rays { animation-duration: 1.5s; }
+
+    .orn { transform-box: fill-box; transform-origin: 50% 0; }
+    .orn--new { animation: ornDrop 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+    @keyframes ornDrop {
+      from { transform: translateY(-60px) scale(0.3); opacity: 0; }
+      to   { transform: none; opacity: 1; }
+    }
+    .stage[data-celebrate="1"] .orn { animation: jiggle 0.35s ease-in-out 4; }
+    @keyframes jiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+    .name-tag {
+      font: 700 15px 'DM Sans', sans-serif;
+      fill: #fff;
+      paint-order: stroke;
+      stroke: rgba(0, 0, 0, 0.65);
+      stroke-width: 4px;
+      animation: tagFade 4s ease-in forwards;
+    }
+    @keyframes tagFade { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+
+    /* ── Hängende Kugeln ── */
+    .baubles { position: absolute; inset: 0; pointer-events: none; }
+    .stage[data-baubles="off"] .baubles { display: none; }
+    .stage[data-baubles="left"]  .bauble:nth-child(n+4) { display: none; }
+    .stage[data-baubles="right"] .bauble:nth-child(-n+3) { display: none; }
+    .bauble {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      height: calc(var(--h) * var(--blen));
+      background: rgba(230, 230, 230, 0.55);
+      transform-origin: 50% 0;
+      animation: sway 5s ease-in-out infinite;
+    }
+    .bauble::before {           /* Kappe */
+      content: '';
+      position: absolute;
+      left: -7px; bottom: -6px;
+      width: 16px; height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(#e9d58a, #a8892c);
+    }
+    .bauble::after {            /* Kugel */
+      content: '';
+      position: absolute;
+      left: calc(1px - 32px * var(--bsize));
+      bottom: calc(-2px - 64px * var(--bsize));
+      width: calc(64px * var(--bsize));
+      height: calc(64px * var(--bsize));
+      border-radius: 50%;
+      background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.85) 0 7%, transparent 18%),
+                  radial-gradient(circle at 50% 50%, var(--bc) 0 55%, color-mix(in srgb, var(--bc) 55%, #000) 100%);
+      box-shadow: 0 0 22px color-mix(in srgb, var(--bc) 45%, transparent);
+    }
+    .bauble:nth-child(1) { left: 70px;   --h: 150px; --bc: var(--c1); animation-delay: -1s; }
+    .bauble:nth-child(2) { left: 170px;  --h: 230px; --bc: var(--c3); animation-delay: -2.4s; }
+    .bauble:nth-child(3) { left: 265px;  --h: 120px; --bc: var(--c4); animation-delay: -0.3s; }
+    .bauble:nth-child(4) { left: 1660px; --h: 300px; --bc: var(--c2); animation-delay: -3s; }
+    .bauble:nth-child(5) { left: 1760px; --h: 360px; --bc: var(--c1); animation-delay: -1.7s; }
+    .bauble:nth-child(6) { left: 1855px; --h: 330px; --bc: var(--c5); animation-delay: -4.1s; }
+    @keyframes sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+    .stage[data-celebrate="1"] .bauble { animation: sway 0.5s ease-in-out infinite; }
+
+    /* ── Schneehaufen ── */
+    .snow { position: absolute; inset: 0; pointer-events: none; }
+    .stage[data-snow="0"] .snow { display: none; }
+    .snow svg { position: absolute; bottom: 0; width: 620px; height: 95px; }
+    .snow__l { left: 0; }
+    .snow__r { right: 0; transform: scaleX(-1); }
+    .snow .pile { fill: #f2f6fd; }
+    .snow .shade { fill: #c9d7ec; }
+
+    /* ── Statusanzeige (?tune=1) ── */
+    .tune {
+      position: absolute; left: 50%; top: 200px; transform: translateX(-50%);
+      display: none;
+      padding: 10px 16px; border-radius: 8px;
+      background: rgba(20, 10, 30, 0.9); border: 2px solid #f2b705;
+      color: #f2b705; font: 14px 'Courier New', monospace;
+    }
+    .tune.is-on { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage *, .stage *::before, .stage *::after { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <svg width="0" height="0" aria-hidden="true">
+      <defs>
+        <filter id="bulbGlow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="7" /></filter>
+        <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+        </filter>
+        <linearGradient id="treeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7a4a" /><stop offset="1" stop-color="#14472b" /></linearGradient>
+        <radialGradient id="ornR" cx=".35" cy=".3"><stop offset="0" stop-color="#ff9a9a" /><stop offset=".5" stop-color="#d42a2a" /><stop offset="1" stop-color="#6e0d0d" /></radialGradient>
+        <radialGradient id="ornG" cx=".35" cy=".3"><stop offset="0" stop-color="#fff1a8" /><stop offset=".5" stop-color="#e2ad1c" /><stop offset="1" stop-color="#7a5506" /></radialGradient>
+        <radialGradient id="ornB" cx=".35" cy=".3"><stop offset="0" stop-color="#b6dcff" /><stop offset=".5" stop-color="#2a78d4" /><stop offset="1" stop-color="#0d2f6e" /></radialGradient>
+        <radialGradient id="ornP" cx=".35" cy=".3"><stop offset="0" stop-color="#e4c4ff" /><stop offset=".5" stop-color="#8e4bb8" /><stop offset="1" stop-color="#3b1656" /></radialGradient>
+      </defs>
+    </svg>
+
+    <svg class="lights" id="lights" viewBox="0 0 1920 1080" aria-hidden="true"></svg>
+
+    <div class="baubles" aria-hidden="true">
+      <span class="bauble"></span><span class="bauble"></span><span class="bauble"></span>
+      <span class="bauble"></span><span class="bauble"></span><span class="bauble"></span>
+    </div>
+
+    <div class="snow" aria-hidden="true">
+      <svg class="snow__l" viewBox="0 0 620 130" preserveAspectRatio="none">
+        <path class="shade" d="M0 130 L0 40 Q60 10 130 40 Q200 70 260 55 Q340 35 420 80 Q500 115 620 130 Z" />
+        <path class="pile" d="M0 130 L0 52 Q60 22 130 50 Q200 78 260 66 Q340 48 420 90 Q500 122 620 130 Z" />
+      </svg>
+      <svg class="snow__r" viewBox="0 0 620 130" preserveAspectRatio="none">
+        <path class="shade" d="M0 130 L0 30 Q80 0 150 35 Q230 72 300 62 Q380 50 450 92 Q520 122 620 130 Z" />
+        <path class="pile" d="M0 130 L0 42 Q80 12 150 46 Q230 80 300 72 Q380 62 450 100 Q520 126 620 130 Z" />
+      </svg>
+    </div>
+
+    <div class="tree" aria-hidden="true">
+      <svg viewBox="0 0 400 520">
+        <rect x="182" y="405" width="36" height="50" fill="#5a3a22" />
+        <path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" fill="url(#treeG)" />
+        <path class="snowcap" d="M38 402 Q120 422 200 412 Q280 422 362 402 Q350 392 330 396 Q300 404 270 398 Q235 408 200 402 Q160 410 130 398 Q95 406 62 396 Q48 394 38 402 Z" />
+        <path d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" fill="url(#treeG)" />
+        <path class="snowcap" d="M78 300 Q140 318 200 310 Q260 318 322 300 Q310 292 292 296 Q262 304 236 297 Q215 306 190 300 Q160 307 132 297 Q102 304 78 300 Z" />
+        <path d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" fill="url(#treeG)" />
+        <path class="snowcap" d="M118 202 Q160 216 200 210 Q240 216 282 202 Q270 195 252 199 Q228 207 205 200 Q182 207 160 199 Q138 205 118 202 Z" />
+
+        <path id="garl1" d="M140 178 Q200 206 262 172" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
+        <path id="garl2" d="M106 272 Q200 304 298 262" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
+        <path id="garl3" d="M74 372 Q200 410 330 362" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
+        <g id="treeLights"></g>
+
+        <g id="ornaments">
+          <g class="orn"><line x1="160" y1="140" x2="160" y2="148" stroke="#ccc" /><circle cx="160" cy="160" r="13" fill="url(#ornR)" /></g>
+          <g class="orn"><line x1="236" y1="222" x2="236" y2="230" stroke="#ccc" /><circle cx="236" cy="243" r="14" fill="url(#ornG)" /></g>
+          <g class="orn"><line x1="140" y1="312" x2="140" y2="320" stroke="#ccc" /><circle cx="140" cy="334" r="15" fill="url(#ornB)" /></g>
+          <g class="orn"><line x1="272" y1="320" x2="272" y2="328" stroke="#ccc" /><circle cx="272" cy="342" r="15" fill="url(#ornP)" /></g>
+        </g>
+        <g id="followers"></g>
+
+        <rect x="90" y="430" width="70" height="56" rx="4" fill="#c4302b" />
+        <rect x="120" y="430" width="10" height="56" fill="#f2d16b" />
+        <rect x="90" y="452" width="70" height="10" fill="#f2d16b" />
+        <rect x="240" y="440" width="84" height="46" rx="4" fill="#2a64b8" />
+        <rect x="276" y="440" width="10" height="46" fill="#ffffff" />
+        <rect x="240" y="458" width="84" height="9" fill="#ffffff" />
+        <rect x="168" y="456" width="62" height="30" rx="4" fill="#7d3ca3" />
+        <rect x="194" y="456" width="9" height="30" fill="#f2b705" />
+
+        <g transform="translate(200 34)">
+          <g class="star-rays" opacity=".55">
+            <path d="M0 -62 L5 -8 L62 0 L5 8 L0 62 L-5 8 L-62 0 L-5 -8 Z" fill="#fff3b0" />
+          </g>
+          <path class="star" d="M0 -30 L8.8 -12 L28.5 -9.3 L14.3 4.6 L17.6 24.3 L0 15 L-17.6 24.3 L-14.3 4.6 L-28.5 -9.3 L-8.8 -12 Z" fill="#ffd23f" stroke="#fff6c8" stroke-width="2" />
+        </g>
+      </svg>
+    </div>
+
+    <div class="tune" id="tune"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var NS = 'http://www.w3.org/2000/svg';
+      var stage = document.getElementById('stage');
+      var params = new URLSearchParams(window.location.search);
+      var tuneMode = params.get('tune') === '1';
+
+      // ── Einstellungen (gleiche Regeln wie fx/commands.py) ──
+      function choice() {
+        var opts = Array.prototype.slice.call(arguments);
+        return function (v) { v = String(v).toLowerCase(); return opts.indexOf(v) >= 0 ? v : undefined; };
+      }
+      function num(lo, hi, isInt) {
+        return function (v) {
+          var f = parseFloat(v);
+          if (!isFinite(f)) return undefined;
+          f = Math.max(lo, Math.min(hi, f));
+          return isInt ? Math.round(f) : f;
+        };
+      }
+      function flag(v) { return { '1': true, on: true, '0': false, off: false }[String(v).toLowerCase()]; }
+      var SETTINGS = {
+        lights: [choice('top', 'frame', 'off'), 'top'],
+        pattern: [choice('steady', 'twinkle', 'chase', 'wave'), 'twinkle'],
+        colors: [choice('classic', 'warm', 'theme', 'icy'), 'classic'],
+        lightsy: [num(0, 400, true), 0],
+        sag: [num(0, 160, true), 74],
+        baubles: [choice('both', 'left', 'right', 'off'), 'both'],
+        blen: [num(0.3, 2), 1],
+        bsize: [num(0.5, 1.6), 1],
+        tree: [flag, true],
+        treepos: [choice('left', 'right'), 'right'],
+        treex: [num(0, 1500, true), 40],
+        tsize: [num(0.5, 1.5), 1],
+        treesnow: [flag, true],
+        snow: [flag, true]
+      };
+      var base = {};
+      Object.keys(SETTINGS).forEach(function (k) {
+        var raw = params.get(k), v = raw === null ? undefined : SETTINGS[k][0](raw);
+        base[k] = v === undefined ? SETTINGS[k][1] : v;
+      });
+      var cur = {};
+
+      function el(name, attrs, parent) {
+        var e = document.createElementNS(NS, name);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      }
+
+      // Pseudozufall mit festem Startwert: Farben/Versätze bleiben bei jedem Laden gleich
+      var seed = 7;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+
+      var bulbIndex = 0;
+      function bulb(parent, x, y, rot, size) {
+        var g = el('g', {
+          'class': 'bulb k' + (1 + (bulbIndex % 5)) + ' ci-' + (bulbIndex % 10) + ' ri-' + Math.floor(rnd() * 10),
+          transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + rot.toFixed(1) + ') scale(' + size + ')'
+        }, parent);
+        el('ellipse', { 'class': 'glow lit', cx: 0, cy: 18, rx: 14, ry: 16, opacity: 0.75 }, g);
+        el('rect', { 'class': 'socket', x: -5, y: 0, width: 10, height: 9, rx: 2 }, g);
+        el('path', { 'class': 'body lit', d: 'M0 8 C9 10 9 24 0 32 C-9 24 -9 10 0 8 Z' }, g);
+        bulbIndex++;
+      }
+
+      function stringAlong(svg, d, cls, step, baseRot) {
+        var grp = el('g', { 'class': cls }, svg);
+        var path = el('path', { 'class': 'wire', d: d }, grp);
+        var len = path.getTotalLength();
+        for (var s = step / 2; s < len; s += step) {
+          var p = path.getPointAtLength(s);
+          var q = path.getPointAtLength(Math.min(len, s + 1));
+          var ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
+          bulb(grp, p.x, p.y, baseRot + ang * 0.6 + (rnd() * 10 - 5), 1);
+        }
+      }
+
+      // ── Lichterkette (neu gebaut, wenn Höhe/Durchhang sich ändern) ──
+      var lightsSvg = document.getElementById('lights');
+      function buildLights() {
+        while (lightsSvg.firstChild) lightsSvg.removeChild(lightsSvg.firstChild);
+        seed = 7; bulbIndex = 0;
+        var y = 6 + cur.lightsy, sag = cur.sag;
+        var top = 'M-10 ' + y;
+        for (var i = 0; i < 5; i++) {
+          var x0 = -10 + i * 388;
+          top += ' Q' + (x0 + 194) + ' ' + (y + sag * (i % 2 ? 0.85 : 1) + 10) + ' ' + (x0 + 388) + ' ' + y;
+        }
+        stringAlong(lightsSvg, top, 'top', 52, 0);
+        var sy = y + 4;
+        stringAlong(lightsSvg, 'M6 ' + sy + ' Q40 ' + (sy + 270) + ' 8 ' + (sy + 530) + ' Q40 ' + (sy + 790) + ' 6 1075', 'side', 58, -90);
+        stringAlong(lightsSvg, 'M1914 ' + sy + ' Q1880 ' + (sy + 270) + ' 1912 ' + (sy + 530) + ' Q1880 ' + (sy + 790) + ' 1914 1075', 'side', 58, -90);
+      }
+
+      // Lichter am Baum (einmalig)
+      var treeLights = document.getElementById('treeLights');
+      ['garl1', 'garl2', 'garl3'].forEach(function (id) {
+        var p = document.getElementById(id), len = p.getTotalLength();
+        for (var s = 8; s < len; s += 22) {
+          var pt = p.getPointAtLength(s);
+          bulb(treeLights, pt.x, pt.y - 4, rnd() * 30 - 15, 0.42);
+        }
+      });
+
+      // CSS-Variablen per <style> (keine Inline-Styles)
+      var varStyle = document.createElement('style');
+      document.head.appendChild(varStyle);
+
+      function applySettings(changed) {
+        var rebuild = !Object.keys(cur).length;
+        for (var k in changed) {
+          if (cur[k] !== changed[k] && (k === 'lightsy' || k === 'sag')) rebuild = true;
+          cur[k] = changed[k];
+        }
+        ['lights', 'pattern', 'colors', 'baubles', 'treepos'].forEach(function (k) { stage.dataset[k] = cur[k]; });
+        ['tree', 'treesnow', 'snow'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
+        varStyle.textContent = '.stage{--blen:' + cur.blen + ';--bsize:' + cur.bsize +
+                               ';--tsize:' + cur.tsize + ';--treex:' + cur.treex + 'px}';
+        if (rebuild) buildLights();
+      }
+      applySettings(copy(base));
+
+      function copy(o) { var r = {}; for (var k in o) r[k] = o[k]; return r; }
+
+      // ── Celebrate ──
+      var celebrateTimer;
+      function celebrate() {
+        stage.dataset.celebrate = '0';
+        void stage.offsetWidth;   // Animationen neu starten
+        stage.dataset.celebrate = '1';
+        clearTimeout(celebrateTimer);
+        celebrateTimer = setTimeout(function () { stage.dataset.celebrate = '0'; }, 4000);
+      }
+
+      // ── Follower-Kugeln: 12 Plätze, der älteste wird überschrieben ──
+      var SLOTS = [[118, 222], [282, 214], [176, 386], [250, 398], [108, 360], [304, 382],
+                   [204, 328], [226, 168], [182, 262], [258, 290], [152, 232], [320, 352]];
+      var GRADS = ['ornR', 'ornG', 'ornB', 'ornP'];
+      var followers = document.getElementById('followers');
+      var slotNodes = [];
+      var total = 0;
+      function addOrnament(name, animate) {
+        var i = total % SLOTS.length, s = SLOTS[i];
+        if (slotNodes[i]) followers.removeChild(slotNodes[i]);
+        var g = el('g', { 'class': 'orn' + (animate ? ' orn--new' : '') }, followers);
+        el('line', { x1: s[0], y1: s[1] - 12, x2: s[0], y2: s[1] - 4, stroke: '#ccc' }, g);
+        el('circle', { cx: s[0], cy: s[1] + 8, r: 12, fill: 'url(#' + GRADS[total % GRADS.length] + ')' }, g);
+        if (animate && name) {
+          var tag = el('text', { 'class': 'name-tag', x: s[0], y: s[1] - 18, 'text-anchor': 'middle' }, g);
+          tag.textContent = name;
+          tag.addEventListener('animationend', function () { if (tag.parentNode) tag.parentNode.removeChild(tag); });
+        }
+        slotNodes[i] = g;
+        total++;
+      }
+      function clearOrnaments() {
+        while (followers.firstChild) followers.removeChild(followers.firstChild);
+        slotNodes = [];
+        total = 0;
+      }
+      function applyState(state) {
+        if (!state || !state.ornaments) return;
+        clearOrnaments();
+        state.ornaments.forEach(function (n) { addOrnament(n, false); });
+      }
+
+      function applyCommand(c) {
+        var p = c.params || {};
+        switch (c.cmd) {
+          case 'set':       applySettings(p); break;
+          case 'reset':     applySettings(copy(base)); break;
+          case 'celebrate': celebrate(); break;
+          case 'ornament':  addOrnament(p.name || '', true); break;
+          case 'clear':     clearOrnaments(); break;
+        }
+      }
+
+      // ── Remote-Polling: nur wenn per Token-URL ausgeliefert ──
+      var tuneEl = document.getElementById('tune');
+      var remoteState = 'off (no token URL)';
+      function showTune() {
+        if (tuneMode) tuneEl.textContent = 'remote: ' + remoteState + ' | ornaments: ' + total + ' | keys: C celebrate, O ornament';
+      }
+      if (tuneMode) tuneEl.classList.add('is-on');
+      var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+      if (tokenMatch) {
+        var pollUrl = '/s/' + tokenMatch[1] + '/api/fx/xmas/poll';
+        var seq = null;
+        var epoch = null;
+        remoteState = 'connecting';
+        var pollOnce = function () {
+          var delay = 1000;
+          fetch(pollUrl + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (data) {
+              if (epoch !== null && data.epoch !== epoch) {
+                // Server neu gestartet: Zähler beginnt bei 0, alles ab dort holen
+                epoch = data.epoch;
+                seq = 0;
+                delay = 0;
+                return;
+              }
+              epoch = data.epoch;
+              if (seq === null) applyState(data.state);
+              else (data.commands || []).forEach(applyCommand);
+              seq = data.seq;
+              remoteState = 'listening (seq ' + seq + ')';
+            })
+            .catch(function () {
+              remoteState = 'error, retrying';
+              delay = 3000;
+            })
+            .then(function () {
+              showTune();
+              setTimeout(pollOnce, delay);
+            });
+        };
+        pollOnce();
+      }
+      showTune();
+
+      if (tuneMode) {
+        var testNames = ['Hat3', 'PixelPaul', 'Mia_GG', 'Lunatic', 'Nordlicht'];
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'c' || e.key === 'C') celebrate();
+          else if (e.key === 'o' || e.key === 'O') { addOrnament(testNames[total % testNames.length], true); showTune(); }
+        });
+      }
+    })();
+  </script>
+</body>
+</html>
