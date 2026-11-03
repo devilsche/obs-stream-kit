@@ -407,6 +407,9 @@ Fällt unter Windows das Audiogerät kurz weg, öffnet die OBS-Browser-Source ih
 | `assets/effects/rain-loop-light.wav` | 20 s Nieselregen, nahtlos | OBS **Media Source** mit „Loop“ |
 | `assets/effects/rain-loop-medium.wav` | 20 s Regen, nahtlos | OBS **Media Source** mit „Loop“ |
 | `assets/effects/rain-loop-storm.wav` | 20 s Sturmregen mit Wind, nahtlos | OBS **Media Source** mit „Loop“ |
+| `assets/effects/wind-loop-light.wav` | 20 s leichter, schwankender Wind, nahtlos | OBS **Media Source** mit „Loop“ |
+| `assets/effects/wind-loop-strong.wav` | 20 s starker, schwankender Wind, nahtlos | OBS **Media Source** mit „Loop“ |
+| `assets/effects/wind-gust.wav` | einzelne Böe (~3 s) | Streamer.bot **Play Sound** zusammen mit `cmd=gust` |
 | `assets/effects/thunder-near-1.wav`, `-2` | naher Einschlag mit Knall, ~0,5 s Verzögerung eingebaut | Streamer.bot **Play Sound** zusammen mit `cmd=strike&dist=near` |
 | `assets/effects/thunder-far-1.wav`, `-2` | fernes Grollen, ~2–2,6 s Verzögerung eingebaut | Streamer.bot **Play Sound** zusammen mit `cmd=strike&dist=far` |
 

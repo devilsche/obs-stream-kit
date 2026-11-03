@@ -223,7 +223,7 @@ EFFECT_META = {
         {"q": "cmd=strike", "label": "Lightning now"},
         {"q": "cmd=strike&dist=near", "label": "Near lightning (pair with thunder-near WAV)"},
         {"q": "cmd=strike&dist=far", "label": "Far lightning (pair with thunder-far WAV)"},
-        {"q": "cmd=gust", "label": "Wind gust"},
+        {"q": "cmd=gust", "label": "Wind gust (pair with wind-gust WAV)"},
         {"q": "cmd=set&intensity=storm&wind=random&lightning=2", "label": "Thunderstorm"},
         {"q": "cmd=set&intensity=light&wind=0&lightning=0", "label": "Calm drizzle"},
         {"q": "cmd=set&wind=random", "label": "Random wind"},
