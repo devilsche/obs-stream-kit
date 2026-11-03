@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Summer Decor</title>
+  <!--
+    Sommerdeko als OBS-Source (1920×1080, transparent):
+    Sonne mit Sonnenbrille in der Ecke, Strand unten mit Follower-Sandburgen
+    (Fahne mit Namen), Sonnenschirm, Hitzeflimmern, abends Glühwürmchen.
+
+    URL-Parameter (alle auch live per Streamer.bot: /s/<token>/api/fx/summer?cmd=set&…):
+      sun=1|0  sunpos=left|right  beach=1|0  umbrella=1|0  shimmer=1|0
+      evening=1|0   Abendstimmung: Sonne weg, dunkler Schleier, Glühwürmchen
+      tune=1        Statusanzeige; Testtasten siehe unten
+
+    Befehle: cmd=castle&name=… (Follow) | cmd=celebrate[&name=…] | cmd=ice&name=…
+             cmd=clear[&kind=castles|heat] | cmd=reset | cmd=set&…
+    Hitze: cmd=heattoggle bzw. cmd=heatwave[&secs=…] / cmd=heatstop; während der
+    Hitzewelle steigt die Hitze um heatrate % pro Minute (Sonne größer, Bild
+    wärmer, Eis schmilzt schneller). cmd=splash&name=… kühlt um splash % und zählt
+    für „Top coolers“; cmd=cool kühlt alles ab; cmd=leaders zeigt die Rangliste.
+      heatrate=1..300 (20)  splash=1..50 (5)
+    Der Server speichert nur die Ereignisse (fx/season_db.py); Hitze und
+    Rangliste rechnet die Source beim Laden mit diesen Regeln nach.
+  -->
+  <link rel="stylesheet" href="../js/season-kit.css" />
+  <style>
+    .stage {
+      --tag-big: #fff3b0; --spot: #ffb43a; --hud-bg: rgba(20, 50, 80, 0.82); --hud-line: rgba(255, 220, 120, 0.8);
+      --heat: 0;
+    }
+
+    /* Wärme-Schleier aus der Sonnenecke */
+    .tint { position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--heat) * 0.5); background: radial-gradient(circle at 92% 6%, rgba(255, 170, 40, 0.7), rgba(255, 120, 30, 0.2) 45%, transparent 75%); }
+    .stage[data-sunpos="left"] .tint { background: radial-gradient(circle at 8% 6%, rgba(255, 170, 40, 0.7), rgba(255, 120, 30, 0.2) 45%, transparent 75%); }
+    .stage[data-sun="0"] .tint { display: none; }
+    .stage[data-evening="1"] .tint { display: block; opacity: 0.5; background: linear-gradient(rgba(20, 20, 70, 0.7), rgba(60, 30, 80, 0.3) 60%, rgba(255, 120, 60, 0.15)); }
+
+    /* Sonne */
+    .stage[data-sun="0"] .sun, .stage[data-evening="1"] .sun { display: none; }
+    .sun__rays { fill: #ffd23f; opacity: 0.55; animation: spin 40s linear infinite; transform-box: fill-box; transform-origin: center; }
+    .sun__disc { fill: url(#sunG); filter: url(#sunGlow); }
+    .sun__inner { transform-box: fill-box; transform-origin: center; transform: scale(calc(0.85 + var(--heat) * 0.4)); transition: transform 1s; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stage[data-celebrate="1"] .sun__rays { animation-duration: 3s; opacity: 0.9; }
+    .sun__face { fill: none; stroke: #c96a00; stroke-width: 5; stroke-linecap: round; }
+    .sun__shades { fill: #1d1d24; }
+
+    /* Strand */
+    .stage[data-beach="0"] .beach { display: none; }
+    .sand { fill: url(#sandG); }
+    .sand-dot { fill: #b8955a; opacity: 0.5; }
+    .shell { fill: #ffe0d0; stroke: #d9a08a; stroke-width: 1.5; }
+    .castle { fill: #e2c27f; stroke: #b8955a; stroke-width: 2; }
+    .castle-door { fill: #9b7a45; }
+    .flagpole { stroke: #6b4a2b; stroke-width: 2.5; }
+    .flag { transform-box: fill-box; transform-origin: 0% 50%; animation: flutter 1.6s ease-in-out infinite; }
+    .stage[data-celebrate="1"] .flag { animation-duration: 0.3s; }
+    @keyframes flutter { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(8deg) scaleX(0.85); } }
+    .f1 { fill: #e84a5f; } .f2 { fill: #2a9df4; } .f3 { fill: #f2b705; } .f4 { fill: #8e4bb8; } .f5 { fill: #2ec27e; }
+    .castle-g { transform-box: fill-box; transform-origin: 50% 100%; }
+    .castle-g--new { animation: rise 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+    @keyframes rise { from { transform: scaleY(0); } to { transform: none; } }
+    .stage[data-umbrella="0"] .umbrella { display: none; }
+    .umbrella__top { fill: #e84a5f; }
+    .umbrella__stripe { fill: #ffffff; }
+    .umbrella__pole { stroke: #e8e2d0; stroke-width: 5; }
+
+    /* Eis */
+    .cone { fill: #d9a35a; stroke: #a8742e; stroke-width: 2; }
+    .cone-grid { fill: none; stroke: #a8742e; stroke-width: 1.2; }
+    .scoop1 { fill: #ffb3c8; } .scoop2 { fill: #fff3d6; } .scoop3 { fill: #8b5a3c; } .scoop4 { fill: #b9f0c0; }
+
+    /* Wasserball */
+    .ball-w { fill: #ffffff; stroke: #2a64b8; stroke-width: 2; }
+    .ball-r { fill: #e84a5f; } .ball-b { fill: #2a9df4; } .ball-y { fill: #f2b705; }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage" aria-hidden="true">
+    <div class="tint"></div>
+    <svg width="0" height="0">
+      <defs>
+        <radialGradient id="sunG" cx=".42" cy=".4"><stop offset="0" stop-color="#fff7c2" /><stop offset=".55" stop-color="#ffd23f" /><stop offset="1" stop-color="#ff9f1c" /></radialGradient>
+        <filter id="sunGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="14" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+        <linearGradient id="sandG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3dca2" /><stop offset="1" stop-color="#d9b874" /></linearGradient>
+      </defs>
+    </svg>
+
+    <svg class="layer sun" viewBox="0 0 1920 1080">
+      <g id="sunPos">
+        <g class="sun__inner">
+          <path class="sun__rays" id="rays" />
+          <circle class="sun__disc" r="92" />
+          <path class="sun__face" d="M-38 22 Q0 52 38 22" />
+          <path class="sun__shades" d="M-62 -22 L-8 -22 Q-8 12 -34 12 Q-60 12 -62 -22 Z M8 -22 L62 -22 Q60 12 34 12 Q8 12 8 -22 Z M-8 -18 L8 -18 L8 -12 L-8 -12 Z" />
+        </g>
+      </g>
+    </svg>
+    <canvas class="layer" id="backCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer beach" viewBox="0 0 1920 1080">
+      <g class="umbrella" id="umbrella"></g>
+      <path class="sand" id="sand" />
+      <g id="sandDeco"></g>
+      <g id="castles"></g>
+      <g id="ices"></g>
+    </svg>
+    <canvas class="layer" id="frontCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080">
+      <g id="ballG"></g>
+      <g id="tags"></g>
+    </svg>
+    <div class="hud">
+      <div class="hud__box" id="boardBox"><h2>Top coolers</h2><ol id="boardList"></ol></div>
+    </div>
+    <div class="tune" id="tune"></div>
+  </div>
+
+  <script src="../js/season-kit.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var K = SeasonKit, W = K.W, H = K.H, el = K.el, rnd = K.rnd, rand = K.rand, clamp01 = K.clamp01;
+      var stage = document.getElementById('stage');
+      var tags = document.getElementById('tags');
+      var base = K.settings({
+        sun: [K.flag, true], sunpos: [K.choice('left', 'right'), 'right'], beach: [K.flag, true],
+        umbrella: [K.flag, true], shimmer: [K.flag, true], evening: [K.flag, false],
+        heatrate: [K.num(1, 300, true), 20], splash: [K.num(1, 50, true), 5]
+      });
+      var cur = {};
+      var css = K.styleSheet();
+      var leaders = K.Leaders(document.getElementById('boardBox'), document.getElementById('boardList'));
+
+      // ── Spielstand (aus den Ereignissen nachgerechnet): heat 0…100 ──
+      var ST;
+      function resetState() { ST = { heat: 0, wave: false, since: 0, until: Infinity }; leaders.reset(); }
+      resetState();
+      function advance(t) {
+        if (!ST.wave) return;
+        var end = Math.min(t, ST.until);
+        if (end > ST.since) ST.heat = Math.min(100, ST.heat + cur.heatrate / 60 * (end - ST.since));
+        ST.since = Math.max(ST.since, end);
+        if (t >= ST.until) ST.wave = false;
+      }
+      function apply(k, name, t, secs) {
+        advance(t);
+        var r = { k: k, name: name };
+        if (k === 'start') { ST.wave = true; ST.since = t; ST.until = secs ? t + secs : Infinity; }
+        else if (k === 'stop') ST.wave = false;
+        else if (k === 'splash') { r.done = Math.min(cur.splash, ST.heat); ST.heat -= r.done; if (r.done > 0) leaders.add(name); }
+        else if (k === 'cool') ST.heat = 0;
+        return r;
+      }
+      var shownHeat = 0;
+
+      // ── Sonne ──
+      (function () {
+        var d = '';
+        for (var i = 0; i < 16; i++) {
+          var a = i / 16 * Math.PI * 2, b = a + 0.1, c = a - 0.1, R = i % 2 ? 150 : 185;
+          d += 'M' + (Math.cos(c) * 100).toFixed(0) + ' ' + (Math.sin(c) * 100).toFixed(0) +
+               ' L' + (Math.cos(a) * R).toFixed(0) + ' ' + (Math.sin(a) * R).toFixed(0) +
+               ' L' + (Math.cos(b) * 100).toFixed(0) + ' ' + (Math.sin(b) * 100).toFixed(0) + ' Z ';
+        }
+        document.getElementById('rays').setAttribute('d', d);
+      })();
+
+      // ── Strand ──
+      function sandY(x) { return H - 70 - 10 * Math.sin(x / 140) - 6 * Math.sin(x / 47 + 1); }
+      (function () {
+        var d = 'M0 ' + H;
+        for (var x = 0; x <= W; x += 16) d += ' L' + x + ' ' + sandY(x).toFixed(1);
+        document.getElementById('sand').setAttribute('d', d + ' L' + W + ' ' + H + ' Z');
+        var deco = document.getElementById('sandDeco');
+        for (var i = 0; i < 160; i++) { var dx = rnd() * W; el('circle', { 'class': 'sand-dot', cx: dx.toFixed(0), cy: (sandY(dx) + 10 + rnd() * 50).toFixed(0), r: (1 + rnd() * 2).toFixed(1) }, deco); }
+        [[300, 1], [1130, -1], [1590, 1]].forEach(function (s) {
+          var g = el('g', { transform: 'translate(' + s[0] + ' ' + (sandY(s[0]) + 28).toFixed(0) + ') scale(' + s[1] + ' 1)' }, deco);
+          el('path', { 'class': 'shell', d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
+        });
+        var u = document.getElementById('umbrella'), ux = 1500, uy = sandY(1500) + 20;
+        el('line', { 'class': 'umbrella__pole', x1: ux, y1: uy, x2: ux - 30, y2: uy - 260 }, u);
+        var top = el('g', { transform: 'translate(' + (ux - 30) + ' ' + (uy - 260) + ') rotate(-7)' }, u);
+        el('path', { 'class': 'umbrella__top', d: 'M-150 30 Q0 -70 150 30 Q120 18 100 30 Q75 16 50 30 Q25 16 0 30 Q-25 16 -50 30 Q-75 16 -100 30 Q-120 18 -150 30 Z' }, top);
+        el('path', { 'class': 'umbrella__stripe', d: 'M-50 30 Q-30 -30 0 -40 Q-14 -10 0 30 Q-25 16 -50 30 Z M50 30 Q30 -30 0 -40 Q14 -10 0 30 Q25 16 50 30 Z' }, top);
+      })();
+
+      // ── Sandburgen der Follower: 24 Plätze ──
+      var castlesG = document.getElementById('castles');
+      var CASTLE_X = [];
+      for (var ci = 0; ci < 24; ci++) CASTLE_X.push(90 + ((ci * 7) % 24) * 76);
+      var castles = [], cNext = 0, cTotal = 0;
+      function addCastle(name, animate) {
+        var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.8 + (i % 3) * 0.15;
+        if (castles[i]) castlesG.removeChild(castles[i].node);
+        var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, castlesG);
+        var g = el('g', { 'class': 'castle-g' + (animate ? ' castle-g--new' : '') }, outer);
+        el('path', { 'class': 'castle', d: 'M-50 0 L-50 -40 L50 -40 L50 0 Z' }, g);
+        el('path', { 'class': 'castle', d: 'M-58 0 L-58 -64 L-52 -64 L-52 -72 L-44 -72 L-44 -64 L-36 -64 L-36 -72 L-28 -72 L-28 -64 L-24 -64 L-24 0 Z' }, g);
+        el('path', { 'class': 'castle', d: 'M24 0 L24 -64 L28 -64 L28 -72 L36 -72 L36 -64 L44 -64 L44 -72 L52 -72 L52 -64 L58 -64 L58 0 Z' }, g);
+        el('path', { 'class': 'castle', d: 'M-16 -40 L-16 -84 L-10 -84 L-10 -92 L-2 -92 L-2 -84 L2 -84 L2 -92 L10 -92 L10 -84 L16 -84 L16 -40 Z' }, g);
+        el('path', { 'class': 'castle-door', d: 'M-10 0 L-10 -20 Q0 -32 10 -20 L10 0 Z' }, g);
+        el('line', { 'class': 'flagpole', x1: 0, y1: -92, x2: 0, y2: -140 }, g);
+        el('path', { 'class': 'flag f' + (1 + i % 5), d: 'M1 -140 L36 -132 L1 -122 Z' }, g);
+        castles[i] = { node: outer, inner: g, x: x, y: y - 150 * k, label: name };
+        cNext++;
+        if (animate) K.tag(tags, name, x, y - 160 * k, false);
+      }
+      function clearCastles() {
+        while (castlesG.firstChild) castlesG.removeChild(castlesG.firstChild);
+        castles = []; cNext = 0; cTotal = 0;
+      }
+
+      // ── Eis: schmilzt in 40 s (kühl) bis 12 s (volle Hitze), nur Show ──
+      var icesG = document.getElementById('ices');
+      var ices = [];
+      function addIce(name) {
+        var x = rand(200, W - 200), y = sandY(x) + 30, flavor = 1 + Math.floor(Math.random() * 4);
+        var g = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, icesG);
+        var puddle = el('ellipse', { 'class': 'scoop' + flavor, cx: 0, cy: 2, rx: 0, ry: 0 }, g);
+        el('path', { 'class': 'cone', d: 'M-20 -70 L20 -70 L0 0 Z' }, g);
+        el('path', { 'class': 'cone-grid', d: 'M-14 -62 L8 -24 M-6 -70 L13 -40 M14 -62 L-8 -24 M6 -70 L-13 -40' }, g);
+        var drip = el('path', { 'class': 'scoop' + flavor }, g);
+        var scoop = el('circle', { 'class': 'scoop' + flavor, cx: 0, cy: -84, r: 26 }, g);
+        ices.push({ node: g, scoop: scoop, drip: drip, puddle: puddle, m: 0 });
+        K.tag(tags, (name || 'Someone') + ' got an ice cream!', x, y - 150, true);
+      }
+      function stepIces(dt) {
+        for (var i = ices.length - 1; i >= 0; i--) {
+          var c = ices[i];
+          c.m += dt / (40 - 28 * shownHeat / 100);
+          var m = Math.min(1, c.m), dl = m * 46;
+          c.scoop.setAttribute('r', (26 * (1 - m * 0.85)).toFixed(1));
+          c.scoop.setAttribute('cy', (-84 + m * 30).toFixed(1));
+          c.drip.setAttribute('d', m < 0.05 ? '' : 'M-10 -72 Q-12 ' + (-72 + dl).toFixed(0) + ' -6 ' + (-70 + dl).toFixed(0) + ' Q-2 ' + (-72 + dl).toFixed(0) + ' -2 -72 Z M6 -72 Q6 ' + (-72 + dl * 0.6).toFixed(0) + ' 10 ' + (-70 + dl * 0.6).toFixed(0) + ' Q14 ' + (-72 + dl * 0.6).toFixed(0) + ' 12 -72 Z');
+          c.puddle.setAttribute('rx', (m * 46).toFixed(1));
+          c.puddle.setAttribute('ry', (m * 9).toFixed(1));
+          if (c.m > 1.4) { icesG.removeChild(c.node); ices.splice(i, 1); }
+        }
+      }
+
+      // ── Partikel ──
+      var backCanvas = document.getElementById('backCanvas');
+      var back = K.Particles(backCanvas);
+      var front = K.Particles(document.getElementById('frontCanvas'));
+      var bctx = backCanvas.getContext('2d');
+      function droplet(ctx, p, a) {
+        ctx.globalAlpha = a * 0.9; ctx.fillStyle = p.c || '#8fd3ff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      function firefly(ctx, p, a) {
+        ctx.globalAlpha = a * (0.5 + 0.5 * Math.sin(p.age * p.vph * 2));
+        var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16);
+        g.addColorStop(0, 'rgba(255,250,170,1)'); g.addColorStop(0.3, 'rgba(220,255,120,.6)'); g.addColorStop(1, 'rgba(200,255,100,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      // Hitzeflimmern: wellige Linien steigen vom Sand auf
+      var shimmerT = 0;
+      function drawShimmer() {
+        var h = shownHeat / 100;
+        if (!cur.shimmer || h < 0.15 || cur.evening) return;
+        bctx.save();
+        bctx.strokeStyle = 'rgba(255,255,255,' + (h * 0.22).toFixed(3) + ')';
+        bctx.lineWidth = 2;
+        for (var j = 0; j < 7; j++) {
+          var yy = sandY(0) - ((shimmerT * 40 + j * 40) % 280);
+          bctx.globalAlpha = clamp01(1 - (sandY(0) - yy) / 280);
+          bctx.beginPath();
+          for (var x = 0; x <= W; x += 24) {
+            var y = yy + Math.sin(x / 60 + shimmerT * 3 + j) * 5;
+            if (x === 0) bctx.moveTo(x, y); else bctx.lineTo(x, y);
+          }
+          bctx.stroke();
+        }
+        bctx.restore();
+      }
+
+      // ── Animationen ──
+      function splashAnim(r) {
+        var x = rand(300, W - 300), y = rand(300, 650);
+        for (var i = 0; i < 70; i++) {
+          var a = rand(0, Math.PI * 2), sp = rand(150, 700);
+          front.add({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 200, g: 1400, term: 900, sway: 0, vr: 0, r: rand(3, 8), c: Math.random() < 0.3 ? '#ffffff' : '#7cc8ff', life: 1.6, draw: droplet });
+        }
+        K.tag(tags, r.done > 0 ? (r.name || 'Someone') + ' cooled things down!' : (r.name || 'Someone') + ' splashed around!', x, y - 80, true);
+      }
+      var ballG = document.getElementById('ballG');
+      function celebrate(name) {
+        K.pulse(stage, 'celebrate', 3500);
+        if (name) K.tag(tags, 'Thank you, ' + name + '!', W / 2, 420, true);
+        for (var i = 0; i < 60; i++) front.add({ x: rand(0, W), y: -20, vy: rand(80, 200), term: rand(120, 220), sway: rand(10, 40), r: rand(3, 7), c: ['#e84a5f', '#2a9df4', '#f2b705', '#2ec27e', '#ffffff'][i % 5], floor: sandY, draw: droplet });
+        if (K.reduced) return;
+        var b = el('g', {}, ballG), spin = el('g', {}, b);
+        el('circle', { 'class': 'ball-w', r: 44 }, spin);
+        el('path', { 'class': 'ball-r', d: 'M0 0 L0 -44 A44 44 0 0 1 38 -22 Z' }, spin);
+        el('path', { 'class': 'ball-b', d: 'M0 0 L38 22 A44 44 0 0 1 0 44 Z' }, spin);
+        el('path', { 'class': 'ball-y', d: 'M0 0 L-38 22 A44 44 0 0 1 -38 -22 Z' }, spin);
+        el('circle', { 'class': 'ball-w', r: 7 }, spin);
+        var t0 = performance.now();
+        (function step(now) {
+          var t = (now - t0) / 1000, x = -60 + t * 520;
+          var bounce = Math.abs(Math.sin(t * 3.2)) * 260 * Math.exp(-t * 0.25);
+          b.setAttribute('transform', 'translate(' + x.toFixed(0) + ' ' + (sandY(Math.max(0, Math.min(W, x))) - 40 - bounce).toFixed(0) + ')');
+          spin.setAttribute('transform', 'rotate(' + (t * 300).toFixed(0) + ')');
+          if (x < W + 80) requestAnimationFrame(step); else ballG.removeChild(b);
+        })(t0);
+      }
+
+      // ── Einstellungen ──
+      function applySettings(changed) {
+        for (var k in changed) cur[k] = changed[k];
+        stage.dataset.sunpos = cur.sunpos;
+        ['sun', 'beach', 'umbrella', 'shimmer', 'evening'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
+        document.getElementById('sunPos').setAttribute('transform', cur.sunpos === 'left' ? 'translate(150 150)' : 'translate(1770 150)');
+      }
+      applySettings(K.copy(base));
+
+      // ── Hauptschleife ──
+      var ffAcc = 0;
+      K.loop(function (dt) {
+        advance(K.serverNow());
+        if (shownHeat < ST.heat || K.reduced) shownHeat = ST.heat;
+        else if (shownHeat > ST.heat) shownHeat = Math.max(ST.heat, shownHeat - Math.max(10, (shownHeat - ST.heat) * 1.2) * dt);
+        css('.stage{--heat:' + (shownHeat / 100).toFixed(3) + '}');
+        stepIces(dt);
+        if (cur.evening) {
+          ffAcc += dt * 3;
+          while (ffAcc >= 1 && back.count() < 60) {
+            ffAcc--;
+            back.add({ x: rand(0, W), y: rand(H - 520, H - 120), vy: -rand(5, 15), term: 20, g: 0, sway: rand(20, 50), vph: rand(0.8, 2), vr: 0, wf: 0, life: rand(5, 9), draw: firefly });
+          }
+        }
+        shimmerT += dt;
+        back.step(dt);
+        drawShimmer();
+        front.step(dt);
+      });
+
+      // ── Spotlight: alle 8 s eine Sandburg, jedes 4. Mal der beste Abkühler ──
+      var spotRound = 0;
+      setInterval(function () {
+        spotRound++;
+        var top = leaders.top()[0];
+        if (top && spotRound % 4 === 0) { K.tag(tags, 'Top cooler: ' + top[0] + ' · ' + top[1] + '×', W / 2, 420, false); return; }
+        if (!cur.beach) return;
+        var pool = castles.filter(function (c) { return c && c.label; });
+        if (!pool.length) return;
+        var c = pool[Math.floor(Math.random() * pool.length)];
+        K.spot(c.inner);
+        K.tag(tags, c.label, c.x, c.y, false);
+      }, 8000);
+
+      // ── Befehle ──
+      var EVENTS = { heatwave: 'start', heatstop: 'stop', splash: 'splash', cool: 'cool' };
+      function command(c) {
+        var p = c.params || {};
+        switch (c.cmd) {
+          case 'set':       applySettings(p); return;
+          case 'reset':     applySettings(K.copy(base)); return;
+          case 'celebrate': celebrate(p.name || ''); return;
+          case 'castle':    addCastle(p.name || '', true); cTotal++; return;
+          case 'ice':       addIce(p.name || ''); return;
+          case 'leaders':   leaders.show(); return;
+          case 'clear':
+            if (!p.kind || p.kind === 'castles') clearCastles();
+            if (!p.kind || p.kind === 'heat') resetState();
+            return;
+        }
+        var cmd = c.cmd;
+        // ohne Server-DB (oder lokal im Tune-Modus) schaltet das Overlay selbst um
+        if (cmd === 'heattoggle') cmd = ST.wave ? 'heatstop' : 'heatwave';
+        if (!EVENTS[cmd]) return;
+        var r = apply(EVENTS[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : K.serverNow(), p.secs);
+        if (r.k === 'splash') splashAnim(r);
+      }
+      function state(s) {
+        if (!s.items) return;
+        resetState();
+        (s.events || []).forEach(function (e) { apply(e.k, e.n || '', e.t, e.s); });
+        advance(K.serverNow());
+        shownHeat = ST.heat;
+        clearCastles();
+        s.items.forEach(function (it) { addCastle(it.name, false); });
+        cTotal = s.item_total || 0;
+      }
+
+      var tn = K.testName;
+      K.connect('summer', {
+        state: state, command: command,
+        status: function () {
+          return 'castles: ' + cTotal + ' | heat: ' + Math.round(ST.heat) + '%' + (ST.wave ? ' (heatwave)' : '') +
+                 ' | keys: C celebrate, B sandcastle, H heatwave on/off, S splash, I ice cream, L leaders';
+        },
+        keys: {
+          c: function () { return { cmd: 'celebrate', params: { name: tn() } }; },
+          b: function () { return { cmd: 'castle', params: { name: tn() + cNext } }; },
+          h: function () { return { cmd: 'heattoggle', params: {} }; },
+          s: function () { return { cmd: 'splash', params: { name: tn() } }; },
+          i: function () { return { cmd: 'ice', params: { name: tn() } }; },
+          l: function () { return { cmd: 'leaders', params: {} }; }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

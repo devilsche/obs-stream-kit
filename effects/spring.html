@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Spring Decor</title>
+  <!--
+    Frühlingsdeko als OBS-Source (1920×1080, transparent):
+    Blumenwiese unten (Follower pflanzen Blumen mit Namen), Kirschblütenzweig
+    oben, rieselnde Blütenblätter, Bienen und Schmetterlinge.
+
+    URL-Parameter (alle auch live per Streamer.bot: /s/<token>/api/fx/spring?cmd=set&…):
+      meadow=1|0  petals=1|0  bugs=1|0  branch=left|right|off
+      colors=bright|pastel|cherry|theme
+      tune=1      Statusanzeige; Testtasten siehe unten
+
+    Befehle: cmd=flower&name=… (Follow) | cmd=celebrate[&name=…] | cmd=bee&name=…
+             cmd=clear[&kind=flowers|garden] | cmd=reset | cmd=set&…
+    Garten: die Erde trocknet mit dryrate % pro Minute aus (unter 30 % lassen die
+    Blumen die Köpfe hängen), Unkraut wächst mit weedrate % pro Minute — beides ab
+    dem ersten Ereignis, auch wenn die Source gerade nicht läuft.
+    cmd=raintoggle bzw. cmd=rainfall[&secs=…] / cmd=rainstop: Regen gießt mit
+    rainrate % pro Minute. cmd=water&name=… (+waterpct %), cmd=weed&name=…
+    (−3 %; pullneed Leute in pullwin s ziehen die Hälfte raus) — beides zählt für
+    „Top gardeners“; cmd=leaders zeigt die Rangliste.
+      dryrate=0..100 (2)  weedrate=0..100 (1)  waterpct=1..50 (10)  rainrate=1..300 (30)
+      pullneed=1..20 (3)  pullwin=5..120 (20)
+    Der Server speichert nur die Ereignisse (fx/season_db.py); Wasser, Unkraut
+    und Rangliste rechnet die Source beim Laden mit diesen Regeln nach.
+  -->
+  <link rel="stylesheet" href="../js/season-kit.css" />
+  <style>
+    .stage {
+      --tag-big: #ffe3f0; --spot: #ff9fd0; --hud-bg: rgba(30, 40, 22, 0.82); --hud-line: rgba(255, 190, 220, 0.75);
+      --hud-bar: linear-gradient(90deg, #a8e06a, #ffffff);
+      --wilt: 0;
+      --f1: #ff5d8f; --f2: #ffd23f; --f3: #8e6cff; --f4: #ff8a3d; --f5: #ffffff;
+    }
+    .stage[data-colors="pastel"] { --f1: #ffb3c8; --f2: #fff0a8; --f3: #c9b8ff; --f4: #ffcfa8; --f5: #d8f3ff; }
+    .stage[data-colors="cherry"] { --f1: #ffc2d6; --f2: #ffffff; --f3: #ff9ec0; --f4: #ffe0ea; --f5: #f78fb3; }
+    .stage[data-colors="theme"]  { --f1: #f2b705; --f2: #b07ad6; --f3: #5e2a79; --f4: #ffd75e; --f5: #e8d4ff; }
+    .p1 { fill: var(--f1); } .p2 { fill: var(--f2); } .p3 { fill: var(--f3); } .p4 { fill: var(--f4); } .p5 { fill: var(--f5); }
+
+    /* Kirschzweig */
+    .stage[data-branch="off"] .branch { display: none; }
+    .branch__sway { animation: sway 8s ease-in-out infinite; transform-origin: 0 150px; }
+    @keyframes sway { 0%, 100% { transform: rotate(-0.7deg); } 50% { transform: rotate(0.7deg); } }
+    .branch__wood { fill: none; stroke: #4b2e2a; stroke-linecap: round; }
+    .blossom-petal { fill: #ffd0e0; stroke: #f59ab9; stroke-width: 0.8; }
+    .blossom-core { fill: #e0457b; }
+
+    /* Wiese */
+    .stage[data-meadow="0"] .meadow { display: none; }
+    .grass { fill: #4f9a3a; }
+    .grass--dry { fill: #b4a14a; opacity: var(--wilt); }
+    .blade { fill: none; stroke: #3d8a2e; stroke-width: 3; stroke-linecap: round; }
+    .weed { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1); transform: scale(0); }
+    .weed.is-on { transform: none; }
+    .weed__leaf { fill: #2f5e22; }
+    .weed__seed { fill: #e8e2a0; }
+
+    /* Blumen */
+    .stem { fill: none; stroke: #3d8a2e; stroke-width: 4; stroke-linecap: round; }
+    .leaf { fill: #4fa23c; }
+    .fl-grow { transform-box: fill-box; transform-origin: 50% 100%; }
+    .fl-grow--new { animation: grow 1.6s cubic-bezier(0.3, 1.2, 0.5, 1) both; }
+    @keyframes grow { from { transform: scaleY(0); } to { transform: none; } }
+    .head { transform-box: fill-box; transform-origin: 50% 100%; transform: rotate(calc(var(--wilt) * var(--side, 1) * 110deg)) scale(calc(1 - var(--wilt) * 0.2)); transition: transform 1s; }
+    .head--l { --side: -1; }
+    .bloom { transform-box: fill-box; transform-origin: 50% 50%; }
+    .fl-grow--new .bloom { animation: open 1.2s 1.1s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+    @keyframes open { from { transform: scale(0.15) rotate(-40deg); } to { transform: none; } }
+    .stage[data-celebrate="1"] .bloom { animation: party 0.5s ease-in-out 6; }
+    @keyframes party { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3) rotate(15deg); } }
+    .center { fill: #f5b800; }
+    .center--dark { fill: #2a1b12; }
+
+    /* Biene + Schmetterling */
+    .stage[data-bugs="0"] .bugs { display: none; }
+    .bee__body { fill: #ffcc1f; stroke: #2a1b12; stroke-width: 2; }
+    .bee__stripe { fill: #2a1b12; }
+    .wing { fill: rgba(235, 248, 255, 0.85); stroke: rgba(120, 160, 190, 0.8); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 100%; animation: flap 0.08s linear infinite alternate; }
+    @keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(0.3); } }
+    .bfly-wing { transform-box: fill-box; transform-origin: 100% 50%; animation: bflap 0.35s ease-in-out infinite alternate; }
+    .bfly-wing--r { transform-origin: 0% 50%; }
+    @keyframes bflap { from { transform: scaleX(1); } to { transform: scaleX(0.25); } }
+    .bfly-a { fill: #ff8a3d; stroke: #3a2010; stroke-width: 2; }
+    .bfly-b { fill: #6fb7ff; stroke: #1a2f50; stroke-width: 2; }
+    .bfly-body { fill: #2a1b12; }
+
+    /* Gießkanne */
+    .can { display: none; }
+    .can.is-on { display: inline; }
+    .can__body { fill: #3fa9a0; stroke: #1f6660; stroke-width: 3; }
+    .can__handle { fill: none; stroke: #1f6660; stroke-width: 6; }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage" aria-hidden="true">
+    <svg width="0" height="0">
+      <defs>
+        <g id="blossom">
+          <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" />
+          <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(72)" />
+          <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(144)" />
+          <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(216)" />
+          <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(288)" />
+          <circle class="blossom-core" r="2.6" />
+        </g>
+      </defs>
+    </svg>
+
+    <canvas class="layer" id="backCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer branch" viewBox="0 0 1920 1080"><g id="branchFlip"><g class="branch__sway" id="branch"></g></g></svg>
+    <svg class="layer meadow" viewBox="0 0 1920 1080">
+      <g id="weedsG"></g>
+      <g id="flowers"></g>
+      <path class="grass" id="grass" />
+      <path class="grass grass--dry" id="grassDry" />
+      <g id="blades"></g>
+    </svg>
+    <svg class="layer bugs" viewBox="0 0 1920 1080"><g id="bugs"></g></svg>
+    <canvas class="layer" id="frontCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080">
+      <g class="can" id="can">
+        <path class="can__body" d="M-40 -30 L30 -30 L36 30 L-46 30 Z" />
+        <path class="can__body" d="M30 -20 L90 -46 L94 -38 L36 -4 Z" />
+        <path class="can__handle" d="M-40 -20 Q-74 0 -40 22" />
+      </g>
+      <g id="tags"></g>
+    </svg>
+    <div class="hud">
+      <div class="hud__box hud__group" id="groupBox"><span id="groupText"></span><div class="hud__bar"></div></div>
+      <div class="hud__box" id="boardBox"><h2>Top gardeners</h2><ol id="boardList"></ol></div>
+    </div>
+    <div class="tune" id="tune"></div>
+  </div>
+
+  <script src="../js/season-kit.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var K = SeasonKit, W = K.W, H = K.H, el = K.el, rnd = K.rnd, rand = K.rand, clamp01 = K.clamp01;
+      var stage = document.getElementById('stage');
+      var tags = document.getElementById('tags');
+      var base = K.settings({
+        meadow: [K.flag, true], petals: [K.flag, true], bugs: [K.flag, true],
+        branch: [K.choice('left', 'right', 'off'), 'left'],
+        colors: [K.choice('bright', 'pastel', 'cherry', 'theme'), 'bright'],
+        dryrate: [K.num(0, 100), 2], weedrate: [K.num(0, 100), 1], waterpct: [K.num(1, 50, true), 10],
+        rainrate: [K.num(1, 300, true), 30], pullneed: [K.num(1, 20, true), 3], pullwin: [K.num(5, 120, true), 20]
+      });
+      var cur = {};
+      var css = K.styleSheet();
+      var leaders = K.Leaders(document.getElementById('boardBox'), document.getElementById('boardList'));
+      var pullers = K.Group(function () { return cur.pullneed; }, function () { return cur.pullwin; });
+
+      // ── Spielstand (aus den Ereignissen nachgerechnet) ──
+      // water/weeds 0…100; ohne Ereignisse steht der Garten still (frisch gegossen)
+      var ST;
+      function resetState() {
+        ST = { began: false, t: 0, water: 100, weeds: 0, raining: false, since: 0, until: Infinity };
+        leaders.reset(); pullers.reset();
+      }
+      resetState();
+      function advance(t) {
+        if (!ST.began || t <= ST.t) return;
+        var d = t - ST.t;
+        var rain = ST.raining ? Math.max(0, Math.min(t, ST.until) - Math.max(ST.t, ST.since)) : 0;
+        ST.water = Math.max(0, Math.min(100, ST.water - cur.dryrate / 60 * d + cur.rainrate / 60 * rain));
+        ST.weeds = Math.min(100, ST.weeds + cur.weedrate / 60 * d);
+        ST.t = t;
+        if (ST.raining && t >= ST.until) ST.raining = false;
+      }
+      function apply(k, name, t, secs) {
+        if (k === 'begin') { ST.began = true; ST.t = t; ST.water = 100; ST.weeds = 0; return { k: k }; }
+        advance(t);
+        var r = { k: k, name: name };
+        if (k === 'start') { ST.raining = true; ST.since = t; ST.until = secs ? t + secs : Infinity; }
+        else if (k === 'stop') ST.raining = false;
+        else if (k === 'water') { r.done = Math.min(cur.waterpct, 100 - ST.water); ST.water += r.done; }
+        else if (k === 'weed') {
+          r.done = Math.min(3, ST.weeds); ST.weeds -= r.done;
+          if (ST.weeds > 0) {
+            var g = pullers.add(name, t);
+            r.count = g.count; r.need = g.need;
+            if (g.success) { r.success = true; ST.weeds = Math.max(0, ST.weeds - 50); }
+          }
+        }
+        if (r.done > 0) leaders.add(name);
+        return r;
+      }
+
+      // ── Wiese ──
+      function groundY(x) { return H - 44 - 8 * Math.sin(x / 110) - 5 * Math.sin(x / 37); }
+      (function () {
+        var d = 'M0 ' + H;
+        for (var x = 0; x <= W; x += 16) d += ' L' + x + ' ' + groundY(x).toFixed(1);
+        d += ' L' + W + ' ' + H + ' Z';
+        document.getElementById('grass').setAttribute('d', d);
+        document.getElementById('grassDry').setAttribute('d', d);
+        var blades = document.getElementById('blades');
+        for (var bx = 0; bx < W; bx += 9) {
+          var y = groundY(bx) + 6, h = 14 + rnd() * 26, lean = (rnd() - 0.5) * 16;
+          el('path', { 'class': 'blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, blades);
+        }
+      })();
+
+      // Unkraut: 40 Büschel in fester Reihenfolge, sichtbar je nach Stand
+      var weedNodes = [];
+      (function () {
+        var g = document.getElementById('weedsG');
+        for (var i = 0; i < 40; i++) {
+          var x = 30 + rnd() * (W - 60), y = groundY(x) + 4;
+          var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, g);
+          var w = el('g', { 'class': 'weed' }, outer);
+          var dd = '';
+          for (var k = 0; k < 6; k++) {
+            var a = -Math.PI / 2 + (k - 2.5) * 0.35, l = 30 + rnd() * 40;
+            dd += 'M0 0 L' + (Math.cos(a - 0.12) * l * 0.5).toFixed(0) + ' ' + (Math.sin(a - 0.12) * l * 0.5).toFixed(0) +
+                  ' L' + (Math.cos(a) * l).toFixed(0) + ' ' + (Math.sin(a) * l).toFixed(0) +
+                  ' L' + (Math.cos(a + 0.12) * l * 0.5).toFixed(0) + ' ' + (Math.sin(a + 0.12) * l * 0.5).toFixed(0) + ' Z ';
+          }
+          el('path', { 'class': 'weed__leaf', d: dd }, w);
+          if (rnd() < 0.4) el('circle', { 'class': 'weed__seed', cx: 0, cy: -46, r: 6 }, w);
+          weedNodes.push({ node: w, x: x, y: y, order: rnd() });
+        }
+        weedNodes.sort(function (a, b) { return a.order - b.order; });
+      })();
+      var shownWeeds = -1;
+      function showWeeds(pct) {
+        var n = Math.round(pct / 100 * weedNodes.length);
+        if (n === shownWeeds) return;
+        shownWeeds = n;
+        weedNodes.forEach(function (w, i) { w.node.classList.toggle('is-on', i < n); });
+      }
+
+      // ── Blumen der Follower: 40 Plätze über die Breite ──
+      var flowersG = document.getElementById('flowers');
+      var SLOTS = [];
+      for (var si = 0; si < 40; si++) SLOTS.push(50 + ((si * 23) % 40) * 46 + rnd() * 14);
+      var flowers = [], flNext = 0, flTotal = 0;
+      function addFlower(name, animate) {
+        var i = flNext % SLOTS.length, x = SLOTS[i], y = groundY(x) + 8;
+        if (flowers[i]) flowersG.removeChild(flowers[i].node);
+        var h = 70 + ((i * 37) % 90), type = i % 3, col = 'p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
+        var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, flowersG);
+        var grow = el('g', { 'class': 'fl-grow' + (animate ? ' fl-grow--new' : '') }, outer);
+        el('path', { 'class': 'stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
+        el('path', { 'class': 'leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
+        var hp = el('g', { transform: 'translate(0 ' + (-h) + ')' }, grow);
+        var head = el('g', { 'class': 'head' + (i % 2 ? '' : ' head--l') }, hp);
+        var bloom = el('g', { 'class': 'bloom' }, head);
+        if (type === 0) {          // Margerite
+          for (var k = 0; k < 10; k++) el('ellipse', { 'class': col, cx: 0, cy: -13, rx: 5, ry: 12, transform: 'rotate(' + k * 36 + ')' }, bloom);
+          el('circle', { 'class': 'center', r: 8 }, bloom);
+        } else if (type === 1) {   // Tulpe
+          el('path', { 'class': col, d: 'M-16 -4 Q-20 -30 -12 -38 L-6 -24 L0 -40 L6 -24 L12 -38 Q20 -30 16 -4 Q0 6 -16 -4 Z' }, bloom);
+        } else {                   // Mohn
+          for (var m = 0; m < 5; m++) el('circle', { 'class': col, cx: 0, cy: -12, r: 11, transform: 'rotate(' + m * 72 + ')' }, bloom);
+          el('circle', { 'class': 'center--dark', r: 7 }, bloom);
+        }
+        flowers[i] = { node: outer, head: head, x: x, y: y - h, label: name };
+        flNext++;
+        if (animate) setTimeout(function () { K.tag(tags, name, x, y - h - 40, false); }, 1300);
+      }
+      function clearFlowers() {
+        while (flowersG.firstChild) flowersG.removeChild(flowersG.firstChild);
+        flowers = []; flNext = 0; flTotal = 0;
+      }
+
+      // ── Kirschzweig ──
+      var branchFlip = document.getElementById('branchFlip');
+      var blossoms = [];
+      (function () {
+        var branch = document.getElementById('branch');
+        [{ d: 'M-20 140 Q140 120 300 160 Q400 186 470 172', w: 15 }, { d: 'M140 130 Q190 80 260 64', w: 7 },
+         { d: 'M290 158 Q330 220 310 280', w: 6 }, { d: 'M380 180 Q420 140 480 128', w: 5 }].forEach(function (t) {
+          var p = el('path', { 'class': 'branch__wood', d: t.d, 'stroke-width': t.w }, branch);
+          var len = p.getTotalLength();
+          for (var s = len * 0.25; s < len; s += 24) {
+            var pt = p.getPointAtLength(s), n = rnd() < 0.5 ? 1 : 2;
+            for (var k = 0; k < n; k++) {
+              var bx = pt.x + (rnd() - 0.5) * 36, by = pt.y + (rnd() - 0.5) * 28;
+              el('use', { href: '#blossom', transform: 'translate(' + bx.toFixed(0) + ' ' + by.toFixed(0) + ') rotate(' + (rnd() * 72).toFixed(0) + ') scale(' + (1 + rnd() * 0.7).toFixed(2) + ')' }, branch);
+              blossoms.push([bx, by]);
+            }
+          }
+        });
+      })();
+
+      // ── Partikel ──
+      var back = K.Particles(document.getElementById('backCanvas'));
+      var front = K.Particles(document.getElementById('frontCanvas'));
+      var petalCols = [];
+      function readCols() {
+        var cs = getComputedStyle(stage);
+        petalCols = [1, 2, 3, 4, 5].map(function (i) { return cs.getPropertyValue('--f' + i).trim(); });
+      }
+      function petal(ctx, p, a) {
+        ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.scale(Math.cos(p.ph * 1.4), 1);
+        ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.ellipse(0, 0, p.r, p.r * 0.6, 0, 0, 6.283); ctx.fill();
+        ctx.restore();
+      }
+      function rainDrop(ctx, p, a) {
+        ctx.globalAlpha = a * 0.6; ctx.strokeStyle = '#cfe6ff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 4, p.y - 22); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      function spray(ctx, p, a) {
+        ctx.globalAlpha = a; ctx.fillStyle = '#9fd6ff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      function blossomPetal(x, y) {
+        var c = cur.colors === 'theme' ? petalCols[Math.floor(Math.random() * 5)] : (Math.random() < 0.7 ? '#ffc6d9' : '#ffffff');
+        back.add({ x: x, y: y, vy: rand(30, 60), term: rand(40, 70), sway: rand(20, 50), r: rand(5, 8), c: c, floor: groundY, draw: petal });
+      }
+
+      // ── Bienen + Schmetterlinge ──
+      var bugsG = document.getElementById('bugs');
+      function makeBee() {
+        var g = el('g', {}, bugsG);
+        el('ellipse', { 'class': 'wing', cx: -4, cy: -14, rx: 7, ry: 11 }, g);
+        el('ellipse', { 'class': 'wing', cx: 6, cy: -14, rx: 7, ry: 11 }, g);
+        el('ellipse', { 'class': 'bee__body', cx: 0, cy: 0, rx: 18, ry: 12 }, g);
+        el('rect', { 'class': 'bee__stripe', x: -6, y: -11, width: 5, height: 22 }, g);
+        el('rect', { 'class': 'bee__stripe', x: 4, y: -11, width: 5, height: 22 }, g);
+        return g;
+      }
+      function makeBfly(cls) {
+        var g = el('g', {}, bugsG);
+        el('path', { 'class': 'bfly-wing ' + cls, d: 'M0 0 Q-30 -34 -26 -4 Q-30 20 0 4 Z' }, g);
+        el('path', { 'class': 'bfly-wing bfly-wing--r ' + cls, d: 'M0 0 Q30 -34 26 -4 Q30 20 0 4 Z' }, g);
+        el('ellipse', { 'class': 'bfly-body', cx: 0, cy: 0, rx: 3, ry: 12 }, g);
+        return g;
+      }
+      // Flug über Wegpunkte (sanft, mit Zittern), am Ende weg
+      function fly(node, pts, dur) {
+        if (K.reduced) { bugsG.removeChild(node); return; }
+        var t0 = performance.now();
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / dur), n = pts.length - 1;
+          var seg = Math.min(n - 1, Math.floor(k * n)), f = k * n - seg;
+          var a = pts[seg], b = pts[seg + 1], e = f * f * (3 - 2 * f);
+          var x = a[0] + (b[0] - a[0]) * e + Math.sin(now / 160) * 6, y = a[1] + (b[1] - a[1]) * e + Math.cos(now / 130) * 5;
+          node.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')' + (b[0] < a[0] ? ' scale(-1 1)' : ''));
+          if (k < 1) requestAnimationFrame(step); else bugsG.removeChild(node);
+        })(t0);
+      }
+      function sendBee(name) {
+        var live = flowers.filter(Boolean);
+        var target = live.length ? live[Math.floor(Math.random() * live.length)] : { x: W / 2, y: H - 160, head: null };
+        var fromLeft = target.x > W / 2, sx = fromLeft ? -60 : W + 60, ex = fromLeft ? W + 60 : -60, ty = target.y - 20;
+        fly(makeBee(), [[sx, rand(300, 600)], [target.x + (fromLeft ? -200 : 200), ty - 120], [target.x, ty], [target.x, ty],
+                        [target.x + (fromLeft ? 180 : -180), ty - 160], [ex, rand(200, 500)]], 6500);
+        if (target.head) setTimeout(function () { K.spot(target.head); }, 2400);
+        K.tag(tags, (name || 'Someone') + ' sent a bee!', target.x, ty - 90, true);
+      }
+      function wanderButterfly() {
+        if (!cur.bugs) return;
+        var y0 = rand(H - 420, H - 220), left = Math.random() < 0.5;
+        var pts = [[left ? -60 : W + 60, y0]];
+        for (var i = 1; i < 6; i++) pts.push([left ? i * W / 5 : W - i * W / 5, y0 + rand(-120, 120)]);
+        pts[pts.length - 1][0] = left ? W + 60 : -60;
+        fly(makeBfly(Math.random() < 0.5 ? 'bfly-a' : 'bfly-b'), pts, 16000);
+      }
+      setInterval(wanderButterfly, 25000);
+      setTimeout(wanderButterfly, 3000);
+
+      // ── Animationen zu den Ereignissen ──
+      var can = document.getElementById('can'), watering = false;
+      function waterAnim(r) {
+        var live = flowers.filter(Boolean);
+        var t = live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 200 };
+        K.tag(tags, (r.name || 'Someone') + ' watered the flowers!', t.x, t.y - 150, true);
+        if (K.reduced || watering) return;
+        watering = true;
+        can.classList.add('is-on');
+        var cx = t.x - 90, cy = t.y - 110, t0 = performance.now();
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / 1600);
+          can.setAttribute('transform', 'translate(' + cx.toFixed(0) + ' ' + cy.toFixed(0) + ') rotate(' + (Math.min(1, k * 4) * 30).toFixed(0) + ')');
+          if (k > 0.2 && k < 0.9) for (var i = 0; i < 3; i++) front.add({ x: cx + 80 + rand(-6, 6), y: cy + 10, vx: rand(10, 60), vy: rand(0, 80), term: 500, g: 1200, sway: 0, r: rand(2, 3.5), floor: groundY, draw: spray });
+          if (k < 1) requestAnimationFrame(step); else { can.classList.remove('is-on'); watering = false; }
+        })(t0);
+      }
+      var groupBox = document.getElementById('groupBox'), groupText = document.getElementById('groupText'), groupTimer;
+      function weedAnim(r) {
+        var visible = weedNodes.filter(function (w) { return w.node.classList.contains('is-on'); });
+        var w = visible[visible.length - 1];
+        if (!(r.done > 0)) { K.tag(tags, (r.name || 'Someone') + ': no weeds', W / 2, 420, true); return; }
+        var burst = r.success ? visible : (w ? [w] : []);
+        burst.forEach(function (v) {
+          for (var i = 0; i < (r.success ? 3 : 6); i++) front.add({ x: v.x, y: v.y - 20, vx: rand(-200, 200), vy: rand(-700, -400), term: 700, sway: 0, r: rand(5, 9), c: '#2f5e22', life: 1.4, draw: petal });
+        });
+        if (w) K.tag(tags, (r.name || 'Someone') + ' pulled weeds', w.x, w.y - 80, false);
+        if (!r.need) return;
+        groupBox.classList.add('is-on');
+        clearTimeout(groupTimer);
+        if (r.success) {
+          groupText.textContent = 'Weeds pulled!';
+          groupTimer = setTimeout(function () { groupBox.classList.remove('is-on'); }, 3000);
+        } else {
+          groupTimer = setTimeout(function () { groupBox.classList.remove('is-on'); }, cur.pullwin * 1000);
+        }
+      }
+      function celebrate(name) {
+        K.pulse(stage, 'celebrate', 3500);
+        for (var i = 0; i < 140; i++) front.add({ x: rand(0, W), y: -30 - rand(0, 200), vy: rand(80, 160), term: rand(60, 110), sway: rand(30, 70), r: rand(5, 9), c: petalCols[Math.floor(Math.random() * 5)], floor: groundY, draw: petal });
+        if (name) K.tag(tags, 'Thank you, ' + name + '!', W / 2, 420, true);
+      }
+
+      // ── Einstellungen ──
+      function applySettings(changed) {
+        for (var k in changed) cur[k] = changed[k];
+        ['branch', 'colors'].forEach(function (k) { stage.dataset[k] = cur[k]; });
+        ['meadow', 'petals', 'bugs'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
+        branchFlip.setAttribute('transform', cur.branch === 'right' ? 'translate(1920 0) scale(-1 1)' : '');
+        readCols();
+      }
+      applySettings(K.copy(base));
+
+      // ── Hauptschleife ──
+      var petalAcc = 0, rainAcc = 0, shownWater = 100;
+      K.loop(function (dt) {
+        var now = K.serverNow();
+        advance(now);
+        shownWater += (ST.water - shownWater) * Math.min(1, dt * 2);
+        var wilt = clamp01((30 - shownWater) / 30), hudp = 0;
+        var live = pullers.live(now);
+        if (live) { groupText.textContent = 'Pull together! ' + live.count + '/' + live.need; hudp = live.left; }
+        css('.stage{--wilt:' + wilt.toFixed(3) + ';--hudp:' + hudp.toFixed(3) + '}');
+        showWeeds(ST.weeds);
+
+        if (cur.petals && cur.branch !== 'off') {
+          petalAcc += dt * 2;
+          while (petalAcc >= 1) {
+            petalAcc--;
+            var b = blossoms[Math.floor(Math.random() * blossoms.length)];
+            blossomPetal(cur.branch === 'right' ? W - b[0] : b[0], b[1]);
+          }
+        }
+        if (ST.raining) {
+          rainAcc += dt * 160;
+          while (rainAcc >= 1) { rainAcc--; back.add({ x: rand(-100, W + 100), y: -30, vy: 900, term: 900, g: 0, sway: 0, vr: 0, wf: 0.3, floor: groundY, draw: rainDrop }); }
+        }
+        back.step(dt); front.step(dt);
+      });
+
+      // ── Spotlight: alle 8 s eine Blume, jedes 4. Mal der beste Gärtner ──
+      var spotRound = 0;
+      setInterval(function () {
+        spotRound++;
+        var top = leaders.top()[0];
+        if (top && spotRound % 4 === 0) { K.tag(tags, 'Top gardener: ' + top[0] + ' · ' + top[1] + '×', W / 2, 420, false); return; }
+        if (!cur.meadow) return;
+        var pool = flowers.filter(function (f) { return f && f.label; });
+        if (!pool.length) return;
+        var f = pool[Math.floor(Math.random() * pool.length)];
+        K.spot(f.head);
+        K.tag(tags, f.label, f.x, f.y - 50, false);
+      }, 8000);
+
+      // ── Befehle ──
+      var EVENTS = { rainfall: 'start', rainstop: 'stop', water: 'water', weed: 'weed' };
+      function command(c) {
+        var p = c.params || {};
+        switch (c.cmd) {
+          case 'set':       applySettings(p); return;
+          case 'reset':     applySettings(K.copy(base)); return;
+          case 'celebrate': celebrate(p.name || ''); return;
+          case 'flower':    addFlower(p.name || '', true); flTotal++; return;
+          case 'bee':       sendBee(p.name || ''); return;
+          case 'leaders':   leaders.show(); return;
+          case 'clear':
+            if (!p.kind || p.kind === 'flowers') clearFlowers();
+            if (!p.kind || p.kind === 'garden') { resetState(); shownWater = 100; }
+            return;
+        }
+        var cmd = c.cmd;
+        // ohne Server-DB (oder lokal im Tune-Modus) schaltet das Overlay selbst um
+        if (cmd === 'raintoggle') cmd = ST.raining ? 'rainstop' : 'rainfall';
+        if (!EVENTS[cmd]) return;
+        var t = typeof c.ts === 'number' ? c.ts : K.serverNow();
+        if (!ST.began) apply('begin', '', t);     // erstes Ereignis: Garten startet
+        var r = apply(EVENTS[cmd], p.name || '', t, p.secs);
+        if (r.k === 'water') waterAnim(r);
+        else if (r.k === 'weed') weedAnim(r);
+      }
+      function state(s) {
+        if (!s.items) return;
+        resetState();
+        (s.events || []).forEach(function (e) { apply(e.k, e.n || '', e.t, e.s); });
+        advance(K.serverNow());
+        shownWater = ST.water;
+        clearFlowers();
+        s.items.forEach(function (it) { addFlower(it.name, false); });
+        flTotal = s.item_total || 0;
+      }
+
+      var tn = K.testName;
+      K.connect('spring', {
+        state: state, command: command,
+        status: function () {
+          return 'flowers: ' + flTotal + ' | water: ' + Math.round(ST.water) + '%' + (ST.raining ? ' (raining)' : '') +
+                 ' | weeds: ' + Math.round(ST.weeds) + '%' +
+                 ' | keys: C celebrate, F flower, R rain on/off, W water, P pull weeds, B bee, L leaders';
+        },
+        keys: {
+          c: function () { return { cmd: 'celebrate', params: { name: tn() } }; },
+          f: function () { return { cmd: 'flower', params: { name: tn() + flNext } }; },
+          r: function () { return { cmd: 'raintoggle', params: {} }; },
+          w: function () { return { cmd: 'water', params: { name: tn() } }; },
+          p: function () { return { cmd: 'weed', params: { name: tn() } }; },
+          b: function () { return { cmd: 'bee', params: { name: tn() } }; },
+          l: function () { return { cmd: 'leaders', params: {} }; }
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

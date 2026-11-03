@@ -354,6 +354,9 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 | `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze — mit synthetischem Regen-/Wind-/Donner-Sound | Loop |
 | `effects/xmas.html` | Weihnachtsschmuck: Lichterkette, Baum mit Stern, hängende Kugeln, Schneehaufen — alles einzeln schalt- und einstellbar; Follower-Kugeln und Geschenke (Sub, Bits, Raid …) per Streamer.bot, dauerhaft gespeichert | Dauerhaft |
 | `effects/autumn.html` | Herbstdeko: Blätterranke mit Lichtern, Ast in der Ecke, fallendes Laub, Laubhaufen, Follower-Kürbisse mit Namen — der Chat recht das Laub weg (Rangliste) oder springt hinein | Dauerhaft |
+| `effects/winter.html` | Winterdeko ohne Weihnachten: Eiszapfen, Raureif, Schneedecke, Schneemann (wächst mit Subs), Follower-Mini-Schneemänner — schippen, kratzen, Eiszapfen abbrechen, Schneebälle | Dauerhaft |
+| `effects/spring.html` | Frühlingsdeko: Blumenwiese mit Follower-Blumen, Kirschblütenzweig, Bienen und Schmetterlinge — gießen, Unkraut zupfen | Dauerhaft |
+| `effects/summer.html` | Sommerdeko: Sonne, Strand mit Follower-Sandburgen, Hitzeflimmern, Abend mit Glühwürmchen — Hitzewelle abkühlen, Eis schmilzt | Dauerhaft |
 | `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
@@ -508,6 +511,53 @@ Gleiches Prinzip wie der Weihnachtsschmuck: eine Source, jedes Element einzeln a
 **Dauerhaft:** Kürbisse und das Laub-Protokoll liegen in der Tabelle `fx_autumn_item`. Sichtbar sind die neuesten **30 Kürbisse**; alle 8 s leuchtet einer auf und zeigt seinen Namen. Wie beim Schnee rechnet die Source Laubhöhe und Rangliste beim Laden aus den Ereignissen nach — Neuladen und Server-Neustarts verlieren nichts.
 
 `?tune=1` zeigt Verbindungsstatus und Laubstand; Tasten **C** = Celebrate, **P** = Test-Kürbis, **F** = Laubfall an/aus, **R** = Rechen, **J** = Reinspringen, **W** = Böe, **X** = Wegfegen, **L** = Rangliste (nur lokal, nicht gespeichert).
+
+### Winter, Frühling, Sommer (`winter.html`, `spring.html`, `summer.html`)
+
+Gleiches Prinzip wie Herbst und Weihnachten: eine Source pro Jahreszeit, alles einzeln an/aus im Dashboard unter **Stream → Winter / Spring / Summer** und live per Streamer.bot (`https://stream-overlay.com/s/<token>/api/fx/<jahreszeit>?cmd=…`). Follower hinterlassen etwas mit ihrem Namen (pro Name einmal, alle 8 s leuchtet eins mit Namen auf), der Chat spielt ein kleines Aufräum-Spiel mit Rangliste. Alles liegt dauerhaft in der Tabelle `fx_season_item`; Stände und Ranglisten rechnet die Source beim Laden aus den gespeicherten Ereignissen nach. Geleert wird nur per `cmd=clear`. Alle drei teilen sich `js/season-kit.js` und `js/season-kit.css`.
+
+**Winter** — Eiszapfen oben, Raureif aus den Ecken, Schneedecke, Schneemann, Mini-Schneemänner, fallender Schnee.
+
+| Ereignis / Befehl | Wirkung |
+|-------------------|---------|
+| Follow: `cmd=mini&name=%user%` | Mini-Schneemann mit bunter Mütze (sichtbar die neuesten 30) |
+| Sub: `cmd=build&name=%user%` | nächstes Teil am großen Schneemann: Kugel, Bauch, Kopf, Gesicht, Karotte, Knöpfe und Arme, Schal, Zylinder (8 Teile, dann zieht er den Hut). `cmd=snowmanreset` beginnt einen neuen |
+| `cmd=celebrate&name=%user%` | Schneefontäne, Schneemann winkt, „Thank you, …!“ |
+| `!snow` → `cmd=snowtoggle` | Schneefall an/aus: Schnee wächst um `snowrate` % pro Minute, Raureif halb so schnell, Eiszapfen mit dem Schnee (bei 70 % voll lang) |
+| `!shovel` / `!scrape` / `!icicle` → `cmd=shovel` / `cmd=scrape` / `cmd=icicle` `&name=%user%` | Schnee schippen (−`shovel` %), Raureif freikratzen (−`scrape` %), Eiszapfen abbrechen — alles zählt für „Top helpers“ |
+| `!shake` → `cmd=shake&name=%user%` | `shakeneed` verschiedene Leute in `shakewin` s schütteln allen Schnee ab |
+| `!snowball` → `cmd=snowball&name=%user%` | Schneeball klatscht an den Bildschirm und rutscht ab (nur Show) |
+| `cmd=leaders` / `cmd=melt` | Rangliste 10 s zeigen / Schnee und Raureif tauen (Rangliste bleibt) |
+| `cmd=clear&kind=snow\|minis\|snowman` | Schnee + Rangliste / Mini-Schneemänner / Schneemann dauerhaft löschen |
+
+Parameter: `icicles`, `frost`, `cover`, `minis`, `snowman`, `falling` (je `1`/`0`), `density` (`light`/`medium`/`heavy`), `smpos` (`left`/`right`), `smx` (0–1500 px vom Rand, Standard 260), `snowrate` (20), `shovel` (5), `scrape` (5), `shakeneed` (5), `shakewin` (20). Testtasten mit `?tune=1`: **C** **M** **B** **S** **V** **K** **X** **I** **N** **L**.
+
+**Frühling** — Blumenwiese, Kirschblütenzweig mit rieselnden Blüten, Schmetterlinge.
+
+| Ereignis / Befehl | Wirkung |
+|-------------------|---------|
+| Follow: `cmd=flower&name=%user%` | Blume wächst aus der Wiese und blüht auf (Margerite, Tulpe, Mohn; sichtbar die neuesten 40) |
+| `cmd=celebrate&name=%user%` | alle Blumen tanzen, Blütenregen, „Thank you, …!“ |
+| `!rain` → `cmd=raintoggle` | Regen gießt mit `rainrate` % pro Minute — in die bestehende `!rain`-Action mit aufnehmen |
+| `!water` → `cmd=water&name=%user%` | Gießkanne, +`waterpct` %, zählt für „Top gardeners“ |
+| `!weed` → `cmd=weed&name=%user%` | zupft etwas Unkraut (−3 %, zählt); `pullneed` Leute in `pullwin` s ziehen die Hälfte raus |
+| `!bee` → `cmd=bee&name=%user%` | Biene fliegt eine Blume an (nur Show) |
+| `cmd=leaders` / `cmd=clear&kind=garden\|flowers` | Rangliste / frischer Garten (volles Wasser, kein Unkraut, Rangliste leer) bzw. Blumen dauerhaft löschen |
+
+Die Erde trocknet mit `dryrate` % pro Minute aus (Standard 2 = in 50 min leer), Unkraut wächst mit `weedrate` % pro Minute (Standard 1) — **ab dem ersten Ereignis und auch, während du offline bist**: nach einer Nacht ist der Garten trocken und verwildert, der Chat muss beim Streamstart erst gießen und zupfen. Unter 30 % Wasser lassen die Blumen die Köpfe hängen und das Gras wird gelb. Wer das nicht will, stellt `dryrate=0` und `weedrate=0`. Weitere Parameter: `meadow`, `petals`, `bugs` (`1`/`0`), `branch` (`left`/`right`/`off`), `colors` (`bright`/`pastel`/`cherry`/`theme`), `waterpct` (10), `rainrate` (30), `pullneed` (3), `pullwin` (20). Testtasten: **C** **F** **R** **W** **P** **B** **L**.
+
+**Sommer** — Sonne mit Sonnenbrille, Strand mit Sandburgen und Sonnenschirm, Hitzeflimmern, abends Glühwürmchen.
+
+| Ereignis / Befehl | Wirkung |
+|-------------------|---------|
+| Follow: `cmd=castle&name=%user%` | Sandburg mit Fahne (sichtbar die neuesten 24) |
+| `cmd=celebrate&name=%user%` | Wasserball hüpft über den Strand, Konfetti, „Thank you, …!“ |
+| `!sun` → `cmd=heattoggle` | Hitzewelle an/aus: Hitze steigt um `heatrate` % pro Minute — Sonne wird größer, das Bild wärmer, ab 15 % flimmert die Luft |
+| `!splash` → `cmd=splash&name=%user%` | Wasserfontäne, −`splash` % Hitze, zählt für „Top coolers“ |
+| `!ice` → `cmd=ice&name=%user%` | Eis im Sand, schmilzt in 40 s (kühl) bis 12 s (volle Hitze) — nur Show |
+| `cmd=leaders` / `cmd=cool` / `cmd=clear&kind=heat\|castles` | Rangliste / alles abkühlen (Rangliste bleibt) / Hitze + Rangliste bzw. Sandburgen dauerhaft löschen |
+
+Parameter: `sun`, `beach`, `umbrella`, `shimmer` (`1`/`0`), `sunpos` (`left`/`right`), `evening` (`1` = Abend mit Glühwürmchen), `heatrate` (20), `splash` (5). Testtasten: **C** **B** **H** **S** **I** **L**.
 
 #### Rain-Sound über Streamer.bot (WAV)
 

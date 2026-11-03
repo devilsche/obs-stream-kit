@@ -1,0 +1,81 @@
+/* Gemeinsame Grundlage der Jahreszeiten-Deko (effects/winter|spring|summer.html):
+   transparente 1920×1080-Bühne, Ebenen, Namensschilder, Spotlight,
+   Ranglisten-HUD und Statusanzeige. Farben je Jahreszeit über
+   --tag-big, --spot, --hud-bg, --hud-line, --hud-bar. */
+@font-face {
+  font-family: 'DM Sans';
+  src: url('../assets/DM-Sans.woff2') format('woff2');
+  font-weight: 100 900;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 1920px; height: 1080px;
+  overflow: hidden;
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
+.name-tag {
+  font: 700 17px 'DM Sans', sans-serif;
+  fill: #fff;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 4px;
+  animation: tagFade 3.6s ease-in-out forwards;
+}
+.name-tag--big { font-size: 28px; font-weight: 800; fill: var(--tag-big, #ffd75e); stroke-width: 6px; }
+@keyframes tagFade { 0% { opacity: 0; } 12%, 75% { opacity: 1; } 100% { opacity: 0; } }
+
+.is-spot { animation: spot 3.2s ease-in-out both; }
+@keyframes spot {
+  0%, 100% { filter: none; }
+  20%, 80% { filter: drop-shadow(0 0 8px #fff6d0) drop-shadow(0 0 18px var(--spot, #ffd23f)) brightness(1.2); }
+}
+
+/* Anzeige oben: Gruppenaktion und Rangliste */
+.hud {
+  position: absolute; left: 50%; top: calc(150px + var(--hudy, 0px)); transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 10px;
+  color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+.hud__box {
+  display: none;
+  min-width: 320px;
+  padding: 10px 22px 12px;
+  border-radius: 14px;
+  background: var(--hud-bg, rgba(20, 24, 36, 0.82));
+  border: 2px solid var(--hud-line, rgba(255, 255, 255, 0.6));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.hud__box.is-on { display: block; animation: hudIn 0.3s ease-out; }
+@keyframes hudIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.hud__box h2 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
+.hud__box ol { list-style: none; font-size: 20px; font-weight: 600; }
+.hud__box li { display: flex; justify-content: space-between; gap: 30px; padding: 2px 0; }
+.hud__box li:first-child { color: var(--tag-big, #ffd75e); font-weight: 800; }
+.hud__group { font-size: 26px; font-weight: 800; text-align: center; }
+.hud__bar { margin-top: 8px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+.hud__bar::after {
+  content: ''; display: block; height: 100%;
+  background: var(--hud-bar, linear-gradient(90deg, #bfe9ff, #ffffff));
+  transform-origin: 0 50%;
+  transform: scaleX(var(--hudp, 0));
+}
+
+/* Statusanzeige (?tune=1) */
+.tune {
+  position: absolute; left: 50%; top: 300px; transform: translateX(-50%);
+  display: none; max-width: 1400px;
+  padding: 10px 16px; border-radius: 8px;
+  background: rgba(20, 10, 30, 0.9); border: 2px solid #f2b705;
+  color: #f2b705; font: 14px 'Courier New', monospace;
+}
+.tune.is-on { display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage *, .stage *::before, .stage *::after { animation: none !important; transition: none !important; }
+}
