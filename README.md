@@ -449,7 +449,7 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 
 | Befehl | Wirkung |
 |--------|---------|
-| `cmd=snowtoggle` | Schneefall an/aus — in die `!snow`-Action, die das Schneefall-Video ein- und ausblendet. Solange es schneit, wächst der Schnee um `snowrate` % pro Minute. Ab ~35 % Kappen auf den Kugeln, ab ~60 % Mütze auf dem Stern, ab 70 % gedämpfte Lichter |
+| `cmd=snowtoggle` | Schneefall an/aus — in die `!snow`-Action, die das Schneefall-Video ein- und ausblendet. Solange es schneit, wächst der Schnee um `snowrate` % pro Minute. Ab ~35 % Kappen auf den Kugeln, ab ~60 % Mütze auf dem Stern, ab 70 % gedämpfte Lichter; vor dem Baum steigt eine Schneewehe, die bei 100 % alle Geschenke begräbt und die unterste Baumstufe halb verschluckt |
 | `cmd=snowfall` / `cmd=snowstop` | Schneefall gezielt an bzw. aus; `cmd=snowfall&secs=120` hört nach 120 s von selbst auf |
 | `cmd=shovel&name=%user%` | −`shovel` %, Schaufel wirft einen Brocken weg, Name kurz sichtbar; zählt für die Rangliste (nur wenn es etwas zu schippen gab). Cooldown pro User in Streamer.bot setzen, z. B. 10 s |
 | `cmd=shake&name=%user%` | einzeln nur ein Wackeln; `shakeneed` verschiedene Leute innerhalb `shakewin` s schütteln den ganzen Schnee ab. Oben zeigt „Shake it off! 3/5“ mit Zeitbalken den Stand. Schneit es noch, schneit es danach wieder zu |

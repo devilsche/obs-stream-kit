@@ -224,8 +224,8 @@
     /* ── Schnee ──
        --snow 0..1 Gesamtmenge, --cap Kappen auf den hängenden Kugeln (ab ~35 %),
        --hat Mütze auf dem Stern (ab ~60 %), --dim Lichter gedämpft (ab 70 %),
-       --ground Schneedecke in der Mitte (ab ~25 %) */
-    .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --ground: 0; --hudp: 0; }
+       --ground Schneedecke in der Mitte (ab ~25 %), --drift Wehe vor dem Baum (ab 20 %) */
+    .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --ground: 0; --drift: 0; --hudp: 0; }
     .wire-snow {
       fill: none;
       stroke: #f4f8ff;
@@ -269,6 +269,12 @@
     .tree .starhat { fill: #f4f8ff; opacity: var(--hat); }
     .gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--snow)); }
     .tree .mound { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(1 + 0.6 * var(--snow))); }
+    .tree .drift {
+      fill: url(#moundG);
+      transform-box: fill-box;
+      transform-origin: 50% 100%;
+      transform: scaleY(var(--drift));
+    }
     .snow svg { transform-origin: 50% 100%; }
     .snow__mid {
       left: 0;
@@ -435,6 +441,9 @@
         <path class="mound" id="mound" d="M-80 540 Q-48 504 22 506 Q104 492 200 498 Q298 490 378 504 Q448 506 480 540 Z" />
         <g id="giftsBack"></g>
         <g id="giftsFront"></g>
+        <!-- Schneewehe vor Baum und Geschenken: steigt mit dem Schnee, bei 100 %
+             sind die Geschenke begraben und die unterste Stufe halb im Schnee -->
+        <path class="drift" d="M-170 540 Q-120 470 -60 410 Q-10 318 50 316 Q120 292 200 305 Q280 288 350 316 Q410 318 460 410 Q520 470 570 540 Z" />
         <text class="counter" id="counter" x="200" y="536" text-anchor="middle"></text>
         <g id="tags"></g>
 
@@ -867,7 +876,7 @@
         }
         dynStyle.textContent = '.stage{--snow:' + s.toFixed(3) + ';--cap:' + clamp01((s - 0.3) / 0.3).toFixed(3) +
           ';--hat:' + clamp01((s - 0.6) / 0.25).toFixed(3) + ';--dim:' + clamp01((s - 0.7) / 0.3).toFixed(3) +
-          ';--ground:' + clamp01((s - 0.25) / 0.75).toFixed(3) +
+          ';--ground:' + clamp01((s - 0.25) / 0.75).toFixed(3) + ';--drift:' + clamp01((s - 0.2) / 0.8).toFixed(3) +
           ';--hudp:' + p.toFixed(3) + '}';
         requestAnimationFrame(snowTick);
       }
