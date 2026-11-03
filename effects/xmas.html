@@ -102,7 +102,7 @@
     /* ── Baum ── */
     .tree {
       position: absolute;
-      bottom: 24px;
+      bottom: 0;
       right: var(--treex);
       width: calc(380px * var(--tsize));
       height: calc(513px * var(--tsize));
@@ -110,8 +110,11 @@
     .stage[data-treepos="left"] .tree { right: auto; left: var(--treex); }
     .stage[data-tree="0"] .tree { display: none; }
     .tree svg { width: 100%; height: 100%; overflow: visible; }
-    .tree .snowcap { fill: #f4f8ff; }
-    .stage[data-treesnow="0"] .tree .snowcap { display: none; }
+    .tree .snowcap, .tree .mound { fill: #f4f8ff; }
+    .tree .mound-shade { fill: #c9d7ec; }
+    .stage[data-treesnow="0"] .tree .snowcap,
+    .stage[data-treesnow="0"] .tree .mound,
+    .stage[data-treesnow="0"] .tree .mound-shade { display: none; }
     .star-rays { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
     .star { filter: url(#starGlow); }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -261,7 +264,7 @@
 
     <div class="tree" aria-hidden="true">
       <svg viewBox="0 0 400 540">
-        <rect x="182" y="405" width="36" height="50" fill="#5a3a22" />
+        <rect x="182" y="405" width="36" height="112" fill="#5a3a22" />
         <path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" fill="url(#treeG)" />
         <path class="snowcap" d="M38 402 Q120 422 200 412 Q280 422 362 402 Q350 392 330 396 Q300 404 270 398 Q235 408 200 402 Q160 410 130 398 Q95 406 62 396 Q48 394 38 402 Z" />
         <path d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" fill="url(#treeG)" />
@@ -281,6 +284,9 @@
           <g class="orn"><line x1="272" y1="320" x2="272" y2="328" stroke="#ccc" /><circle cx="272" cy="342" r="15" fill="url(#ornP)" /></g>
         </g>
         <g id="followers"></g>
+        <!-- Schneehügel: wandert mit dem Baum, damit er nie in der Luft steht -->
+        <path class="mound-shade" d="M-80 540 Q-50 498 20 500 Q100 484 200 490 Q300 482 380 498 Q450 500 480 540 Z" />
+        <path class="mound" d="M-80 540 Q-48 506 22 508 Q104 494 200 500 Q298 492 378 506 Q448 508 480 540 Z" />
         <g id="giftsBack"></g>
         <g id="giftsFront"></g>
         <text class="counter" id="counter" x="200" y="536" text-anchor="middle"></text>
