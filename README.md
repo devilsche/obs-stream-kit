@@ -319,10 +319,17 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/resistance-futile.html` | Star-Trek-Borg (CRT-Terminal-Look) | ~3.8s | 1920×1080 |
 | `stingers/heart.html` | Geheimer Herzschlag (Sparkle-Heart) | ~5.4s | 1920×1080 |
 | `stingers/kickers-remake.html` | Kickers-Intro CSS-Nachbau (Fußballfeld + Ball-Swarm + 2× HURRA + Titel „Die tollen Superzocker") — `?tune=1` fürs Tune-Panel | ~7.7s | 1920×1080 |
+| `stingers/sad.html` | `!sad` — Regenwolke mit traurigem Gesicht + Sad Trombone, Titel „sad.“ — `?x=20` verschiebt die Wolke (15–85 %) | ~4.6s | 1920×1080 |
+| `stingers/you-died.html` | `!sad` Souls-Style: schwarzer Balken, roter Serifentext, Gong — `?text=HOPE%20DIED` eigener Text | ~4.7s | 1920×1080 |
+| `stingers/motivation.html` | `!sad` Statusbalken fällt 100 → 64 → 21 → 3 %, Stempel „sad.“ — `?label=Skill` eigener Name | ~4.3s | 1920×1080 |
 
 > **Audio:** Stinger mit eigener MP3 binden die Datei via `<audio autoplay>` ein — OBS Browser-Sources spielen das automatisch ab (stelle sicher dass **Audio über OBS steuern** aktiviert ist). Weitere Sounds: Datei in `assets/stingers/` ablegen und im Stinger-HTML per `<audio autoplay src="...">` referenzieren.
 
 > **`?sound=0`:** Stinger ohne eigenen Ton, etwa wenn Streamer.bot den Sound abspielt. Videos (Trap, Kickers) laufen dann stumm und sofort. Ohne Parameter gilt: Hängt die Audio-Ausgabe von OBS, lädt ein Video-Stinger nach spätestens 1,2 s stumm neu und blendet ein.
+
+> **Synthetischer Sound:** `sad`, `you-died` und `motivation` erzeugen ihren Ton per Web Audio im Browser (keine MP3, `js/stinger-kit.js`). `?volume=0.8` (0–1) regelt die Lautstärke, `?sound=0` schaltet stumm, `?tune=1` öffnet das Timing-Panel. Im normalen Browser startet der Ton erst nach einem Klick, OBS spielt ihn direkt.
+
+> **Tipp für `!sad`:** Eine Browser-Source sieht das Spiel dahinter nicht und kann es daher nicht entsättigen. Dafür auf der Game-Capture-Source einen Filter **Farbkorrektur** mit Sättigung −1 anlegen (deaktiviert) und in der Streamer.bot-Action per **OBS Set Source Filter State** für die Dauer des Stingers ein- und wieder ausschalten.
 
 ### Setup in Streamer.bot
 

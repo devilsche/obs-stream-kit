@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <script src="../js/stinger-kit.js"></script>
+  <title>You Died Stinger</title>
+  <!--
+    Souls-Style Todesbildschirm — schwarzer Balken, roter Serifentext, Gong
+    (synthetisch, keine MP3).
+    URL-Parameter:
+      ?text=HOPE%20DIED  eigener Text (max. 32 Zeichen), Standard YOU DIED
+      ?sound=0           stumm
+      ?volume=0.8        Lautstärke 0–1
+      ?tune=1            Timing-Panel
+  -->
+  <style>
+    @font-face {
+      font-family: 'Cinzel';
+      src: url('../assets/fonts/Cinzel.woff2') format('woff2');
+      font-weight: 400 700;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --dim-in: 0s; --bar-in: 0.15s; --text-in: 0.5s; --stage-out: 3.9s;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    /* Langsam, fast unmerklich größer werden — wie im Original */
+    @keyframes textIn {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+      35%  { opacity: 1; }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1.09); }
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOut 0.8s ease-in var(--stage-out) forwards;
+    }
+
+    .dim {
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse at center,
+        rgba(0, 0, 0, 0.15) 30%, rgba(0, 0, 0, 0.55) 100%);
+      opacity: 0;
+      animation: fadeIn 0.8s ease-out var(--dim-in) forwards;
+    }
+
+    .bar {
+      position: absolute;
+      left: 0; right: 0;
+      top: 50%;
+      height: 260px;
+      transform: translateY(-50%);
+      background: linear-gradient(to bottom,
+        rgba(0, 0, 0, 0) 0%,
+        rgba(0, 0, 0, 0.82) 28%,
+        rgba(0, 0, 0, 0.88) 50%,
+        rgba(0, 0, 0, 0.82) 72%,
+        rgba(0, 0, 0, 0) 100%);
+      opacity: 0;
+      animation: fadeIn 0.9s ease-out var(--bar-in) forwards;
+    }
+
+    .text {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: 'Cinzel', 'Times New Roman', serif;
+      font-weight: 500;
+      font-size: 150px;
+      line-height: 1;
+      letter-spacing: 6px;
+      color: #a31515;
+      white-space: nowrap;
+      opacity: 0;
+      text-shadow: 0 0 28px rgba(140, 10, 10, 0.45);
+      animation: textIn 3.4s cubic-bezier(0.3, 0.1, 0.3, 1) var(--text-in) forwards;
+    }
+    .text[data-size="m"] { font-size: 120px; }
+    .text[data-size="s"] { font-size: 90px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .text { animation: fadeIn 1.2s ease-out var(--text-in) forwards; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="dim"></div>
+    <div class="bar"></div>
+    <div class="text" id="text">YOU DIED</div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var K = window.StingerKit;
+      var DEFAULTS = { 'dim-in': 0, 'bar-in': 0.15, 'text-in': 0.5, 'stage-out': 3.9 };
+      var LABELS = { 'dim-in': 'Dim in', 'bar-in': 'Bar in', 'text-in': 'Text + gong', 'stage-out': 'Fade out' };
+      var T = K.timings('you-died', DEFAULTS);
+      K.tune('you-died', DEFAULTS, LABELS);
+
+      var el = document.getElementById('text');
+      var custom = (K.params.get('text') || '').trim().slice(0, 32);
+      if (custom) el.textContent = custom.toUpperCase();
+      var n = el.textContent.length;
+      if (n > 20) el.dataset.size = 's';
+      else if (n > 13) el.dataset.size = 'm';
+
+      // Gong: unharmonische Teiltöne mit langem Ausklang, dumpfer Schlag
+      // darunter, alles durch einen synthetischen Hall
+      function playSound() {
+        var A = K.audio();
+        if (!A) return;
+        var ctx = A.ctx;
+        var t = ctx.currentTime + 0.02 + T['text-in'];
+
+        var rev = ctx.createConvolver();
+        var len = Math.floor(ctx.sampleRate * 3.2);
+        var ir = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (var c = 0; c < 2; c++) {
+          var d = ir.getChannelData(c);
+          for (var i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2);
+        }
+        rev.buffer = ir;
+        var wet = ctx.createGain(); wet.gain.value = 0.35;
+        rev.connect(wet); wet.connect(A.out);
+        var dry = ctx.createGain(); dry.gain.value = 0.8;
+        dry.connect(A.out);
+        dry.connect(rev);
+
+        var F0 = 68;
+        [[1, 0.5, 3.4], [1.47, 0.28, 2.6], [2.09, 0.2, 2.0], [2.56, 0.12, 1.5],
+         [3.14, 0.08, 1.1], [4.2, 0.05, 0.7]].forEach(function (p) {
+          var o = ctx.createOscillator();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(F0 * p[0] * 1.02, t);
+          o.frequency.exponentialRampToValueAtTime(F0 * p[0], t + 0.4);
+          var gn = ctx.createGain();
+          gn.gain.setValueAtTime(0, t);
+          gn.gain.linearRampToValueAtTime(p[1], t + 0.012);
+          gn.gain.exponentialRampToValueAtTime(0.0008, t + p[2]);
+          o.connect(gn); gn.connect(dry);
+          o.start(t);
+          o.stop(t + p[2] + 0.05);
+        });
+
+        // Schlag: kurzer, tiefpassgefilterter Rauschstoß
+        var hit = ctx.createBufferSource();
+        hit.buffer = K.noiseBuffer(ctx, 0.3);
+        var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+        var hg = ctx.createGain();
+        hg.gain.setValueAtTime(0.9, t);
+        hg.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+        hit.connect(lp); lp.connect(hg); hg.connect(dry);
+        hit.start(t);
+      }
+
+      K.onStart(playSound);
+    })();
+  </script>
+</body>
+</html>

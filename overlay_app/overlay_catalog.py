@@ -142,6 +142,29 @@ STINGER_META = {
          "default": "9001", "placeholder": "e.g. 9001",
          "tooltip": "Number shown on screen"},
     ]},
+    "sad.html": {"switches": [
+        {"key": "x", "label": "Cloud position", "type": "select", "default": "50",
+         "options": [["20", "Left"], ["35", "Left of center"], ["50", "Center"],
+                     ["65", "Right of center"], ["80", "Right"]],
+         "tooltip": "Horizontal position of the rain cloud (any value from 15 to 85 works via URL)"},
+        {"key": "volume", "label": "Volume", "type": "select", "default": "0.8",
+         "options": [["0.4", "40%"], ["0.6", "60%"], ["0.8", "80%"], ["1", "100%"]],
+         "tooltip": "Synthesized sad trombone and rain"},
+    ]},
+    "you-died.html": {"switches": [
+        {"key": "text", "label": "Text", "type": "text", "default": "",
+         "placeholder": "YOU DIED", "tooltip": "Own text, up to 32 characters, e.g. HOPE DIED or SKILL ISSUE"},
+        {"key": "volume", "label": "Volume", "type": "select", "default": "0.8",
+         "options": [["0.4", "40%"], ["0.6", "60%"], ["0.8", "80%"], ["1", "100%"]],
+         "tooltip": "Synthesized gong"},
+    ]},
+    "motivation.html": {"switches": [
+        {"key": "label", "label": "Bar label", "type": "text", "default": "",
+         "placeholder": "Motivation", "tooltip": "Name of the draining bar, up to 20 characters, e.g. Skill"},
+        {"key": "volume", "label": "Volume", "type": "select", "default": "0.8",
+         "options": [["0.4", "40%"], ["0.6", "60%"], ["0.8", "80%"], ["1", "100%"]],
+         "tooltip": "Synthesized error beeps and stamp"},
+    ]},
 }
 
 _PET_FONTS = [

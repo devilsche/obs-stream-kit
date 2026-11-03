@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <script src="../js/stinger-ready.js"></script>
+  <script src="../js/stinger-kit.js"></script>
+  <title>Motivation Stinger</title>
+  <!--
+    Statusfenster: "Motivation" fällt in drei Rucken von 100 % auf 3 %,
+    dann Stempel "sad.". Sound synthetisch, keine MP3.
+    URL-Parameter:
+      ?label=Skill  eigener Balken-Name (max. 20 Zeichen), Standard Motivation
+      ?sound=0      stumm
+      ?volume=0.8   Lautstärke 0–1
+      ?tune=1       Timing-Panel
+  -->
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-display: block;
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --win-in: 0s; --stamp-in: 2.6s; --stage-out: 3.8s;
+      --ok: #f2b705; --warn: #ff8a1f; --bad: #e03131;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    @keyframes popIn {
+      0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.85); }
+      70%  { opacity: 1; transform: translate(-50%, -50%) scale(1.02); }
+      100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    }
+    /* Drei gleiche Wackler mit eigenen Namen, damit jeder Ruck neu startet */
+    @keyframes shake1 { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-12px); } 45% { transform: translateX(10px); } 70% { transform: translateX(-6px); } }
+    @keyframes shake2 { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-14px); } 45% { transform: translateX(12px); } 70% { transform: translateX(-7px); } }
+    @keyframes shake3 { 0%,100% { transform: translateX(0) rotate(0); } 20% { transform: translateX(-18px) rotate(-0.6deg); } 45% { transform: translateX(14px) rotate(0.5deg); } 70% { transform: translateX(-8px) rotate(-0.3deg); } }
+    @keyframes bump {
+      0%   { transform: scale(1); }
+      30%  { transform: scale(0.97); }
+      100% { transform: scale(1); }
+    }
+    @keyframes stampIn {
+      0%   { opacity: 0; transform: translate(-50%, -50%) rotate(-14deg) scale(2.6); }
+      60%  { opacity: 1; transform: translate(-50%, -50%) rotate(-14deg) scale(0.94); }
+      100% { opacity: 1; transform: translate(-50%, -50%) rotate(-14deg) scale(1); }
+    }
+
+    .stage {
+      position: absolute; inset: 0;
+      animation: fadeOut 0.5s ease-in var(--stage-out) forwards;
+    }
+
+    .pop {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.85);
+      opacity: 0;
+      animation: popIn 0.4s cubic-bezier(0.2, 1.3, 0.4, 1) var(--win-in) forwards;
+    }
+    .bumper { animation: bump 0.3s ease-out var(--stamp-in); }
+
+    .win {
+      width: 880px;
+      padding: 30px 40px 36px;
+      border-radius: 16px;
+      background: rgba(16, 12, 26, 0.93);
+      border: 2px solid rgba(242, 183, 5, 0.55);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(94, 42, 121, 0.45);
+      color: #f4eefc;
+    }
+    .win[data-step="1"] { animation: shake1 0.35s ease-out; }
+    .win[data-step="2"] { animation: shake2 0.35s ease-out; }
+    .win[data-step="3"] { animation: shake3 0.45s ease-out; border-color: rgba(224, 49, 49, 0.7); }
+
+    .win__head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: rgba(244, 238, 252, 0.55);
+      margin-bottom: 22px;
+    }
+    .win__dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: var(--ok);
+      transition: background 0.2s;
+    }
+    .win[data-step="2"] .win__dot { background: var(--warn); }
+    .win[data-step="3"] .win__dot { background: var(--bad); }
+
+    .win__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 16px;
+    }
+    .win__label { font-size: 48px; font-weight: 800; }
+    .win__pct {
+      font-size: 56px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      color: var(--ok);
+      transition: color 0.2s;
+    }
+    .win[data-step="2"] .win__pct { color: var(--warn); }
+    .win[data-step="3"] .win__pct { color: var(--bad); }
+
+    .win__track {
+      height: 40px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.08);
+      overflow: hidden;
+    }
+    .win__fill {
+      height: 100%;
+      border-radius: 20px;
+      background: linear-gradient(to right, #c99400, var(--ok));
+      transform-origin: 0 50%;
+      transition: transform 0.35s cubic-bezier(0.5, 0, 0.3, 1.3), background 0.2s;
+    }
+    .win[data-step="1"] .win__fill { transform: scaleX(0.64); }
+    .win[data-step="2"] .win__fill { transform: scaleX(0.21); background: linear-gradient(to right, #c85f00, var(--warn)); }
+    .win[data-step="3"] .win__fill { transform: scaleX(0.03); background: var(--bad); }
+
+    .win__status {
+      margin-top: 18px;
+      font-size: 26px;
+      font-weight: 500;
+      color: rgba(244, 238, 252, 0.7);
+      min-height: 34px;
+    }
+
+    .stamp {
+      position: absolute;
+      top: 50%; left: 50%;
+      padding: 6px 48px 18px;
+      border: 12px solid var(--bad);
+      border-radius: 22px;
+      font-size: 190px;
+      font-weight: 900;
+      line-height: 1;
+      color: var(--bad);
+      opacity: 0;
+      transform: translate(-50%, -50%) rotate(-14deg) scale(2.6);
+      text-shadow: 0 6px 24px rgba(0, 0, 0, 0.55);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45), inset 0 0 0 4px rgba(224, 49, 49, 0.35);
+      animation: stampIn 0.28s cubic-bezier(0.5, 0, 0.6, 1.4) var(--stamp-in) forwards;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .pop { transform: translate(-50%, -50%); animation: fadeIn 0.4s ease-out var(--win-in) forwards; }
+      .bumper, .win[data-step] { animation: none; }
+      .win__fill { transition: background 0.2s; }
+      .stamp {
+        transform: translate(-50%, -50%) rotate(-14deg);
+        animation: fadeIn 0.3s ease-out var(--stamp-in) forwards;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="pop">
+      <div class="bumper">
+        <div class="win" id="win" data-step="0">
+          <div class="win__head"><span class="win__dot"></span>System status</div>
+          <div class="win__row">
+            <span class="win__label" id="label">Motivation</span>
+            <span class="win__pct" id="pct">100%</span>
+          </div>
+          <div class="win__track"><div class="win__fill"></div></div>
+          <div class="win__status" id="status">Running diagnostics…</div>
+        </div>
+      </div>
+    </div>
+    <div class="stamp">sad.</div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var K = window.StingerKit;
+      var DEFAULTS = { 'win-in': 0, 'd1': 0.7, 'd2': 1.35, 'd3': 2.0, 'stamp-in': 2.6, 'stage-out': 3.8 };
+      var LABELS = { 'win-in': 'Window in', 'd1': 'Drop to 64%', 'd2': 'Drop to 21%',
+                     'd3': 'Drop to 3%', 'stamp-in': 'Stamp', 'stage-out': 'Fade out' };
+      var T = K.timings('motivation', DEFAULTS);
+      K.tune('motivation', DEFAULTS, LABELS);
+
+      var label = (K.params.get('label') || '').trim().slice(0, 20);
+      if (label) document.getElementById('label').textContent = label;
+
+      var win = document.getElementById('win');
+      var pctEl = document.getElementById('pct');
+      var statusEl = document.getElementById('status');
+      var STEPS = [
+        { key: 'd1', pct: 64, status: 'Teammates: missing' },
+        { key: 'd2', pct: 21, status: 'Aim: not found' },
+        { key: 'd3', pct: 3,  status: 'Hope: deprecated' }
+      ];
+
+      var shown = 100;
+      function countTo(target) {
+        var from = shown, start = performance.now();
+        function step(now) {
+          var k = Math.min(1, (now - start) / 350);
+          shown = Math.round(from + (target - from) * (1 - Math.pow(1 - k, 3)));
+          pctEl.textContent = shown + '%';
+          if (k < 1) requestAnimationFrame(step);
+        }
+        requestAnimationFrame(step);
+      }
+
+      function playSound() {
+        var A = K.audio();
+        if (!A) return;
+        var ctx = A.ctx, base = ctx.currentTime + 0.02;
+
+        // Fehler-Piep: zwei Rechtecktöne abwärts, jeder Ruck tiefer
+        function beep(t, f, long) {
+          var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3200;
+          lp.connect(A.out);
+          [[0, f, 0.09], [0.1, f * 0.75, long ? 0.32 : 0.13]].forEach(function (b) {
+            var o = ctx.createOscillator();
+            o.type = 'square';
+            o.frequency.value = b[1];
+            var gn = ctx.createGain();
+            var s = t + b[0];
+            gn.gain.setValueAtTime(0, s);
+            gn.gain.linearRampToValueAtTime(0.11, s + 0.008);
+            gn.gain.setValueAtTime(0.11, s + b[2] - 0.02);
+            gn.gain.linearRampToValueAtTime(0, s + b[2]);
+            o.connect(gn); gn.connect(lp);
+            o.start(s);
+            o.stop(s + b[2] + 0.02);
+          });
+        }
+        beep(base + T['d1'], 880);
+        beep(base + T['d2'], 740);
+        beep(base + T['d3'], 587, true);
+
+        // Stempel: tiefer Schlag mit Tonhöhen-Fall + kurzes Papier-Klatschen
+        var t = base + T['stamp-in'] + 0.17;
+        var o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.setValueAtTime(150, t);
+        o.frequency.exponentialRampToValueAtTime(42, t + 0.2);
+        var og = ctx.createGain();
+        og.gain.setValueAtTime(0, t);
+        og.gain.linearRampToValueAtTime(0.95, t + 0.006);
+        og.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+        o.connect(og); og.connect(A.out);
+        o.start(t);
+        o.stop(t + 0.45);
+
+        var slap = ctx.createBufferSource();
+        slap.buffer = K.noiseBuffer(ctx, 0.15);
+        var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.8;
+        var sg = ctx.createGain();
+        sg.gain.setValueAtTime(0.55, t);
+        sg.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+        slap.connect(bp); bp.connect(sg); sg.connect(A.out);
+        slap.start(t);
+      }
+
+      K.onStart(function () {
+        playSound();
+        STEPS.forEach(function (s, i) {
+          setTimeout(function () {
+            win.dataset.step = String(i + 1);
+            statusEl.textContent = s.status;
+            countTo(s.pct);
+          }, T[s.key] * 1000);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
