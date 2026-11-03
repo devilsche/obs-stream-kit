@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Winter Decor Mockup</title>
+  <!--
+    Klickdummy Winterdeko (ohne Weihnachten): Eiszapfen oben, Raureif aus
+    den Ecken, Schneedecke, Schneemann, der mit Subs wächst, Follower-Mini-
+    Schneemänner. Gimmicks: schippen, Raureif freikratzen, Eiszapfen
+    abbrechen (gemeinsame Rangliste), Schneeball an den Bildschirm.
+    Nur zum Ansehen und Abstimmen, noch keine OBS-Source.
+  -->
+  <link rel="stylesheet" href="_season-dummy.css" />
+  <style>
+    .stage { --game-top: #2b3550; --game-mid: #56657e; --game-low: #6f7c86; --game-bottom: #4a5560; --game-mtn: #3a4762; --tag-big: #dff3ff; --spot: #9fdcff; --hud-bg: rgba(16, 30, 48, 0.82); --hud-line: rgba(200, 235, 255, 0.7); }
+
+    /* Eiszapfen + Schneekante oben */
+    .stage[data-icicles="0"] .icicles { display: none; }
+    .ridge { fill: #f4f9ff; }
+    .ridge-shade { fill: #cfe0f2; }
+    .ice { fill: url(#iceG); stroke: rgba(255, 255, 255, 0.7); stroke-width: 1; }
+    .icicles[data-celebrate="1"] .ice, .stage[data-celebrate="1"] .ice { filter: url(#sparkle); }
+
+    /* Raureif */
+    .stage[data-frost="0"] #frostCanvas { display: none; }
+
+    /* Schneedecke */
+    .stage[data-cover="0"] .cover { display: none; }
+    .cover__snow { fill: #f2f7fd; }
+    .cover__shade { fill: #c9d9ec; }
+
+    /* Schneemann */
+    .stage[data-snowman="0"] .snowman { display: none; }
+    .sm-ball { fill: url(#ballG); }
+    .sm-coal { fill: #23262b; }
+    .sm-nose { fill: #f07c1e; }
+    .sm-arm { fill: none; stroke: #5a3a22; stroke-width: 5; stroke-linecap: round; }
+    .sm-scarf { fill: #c4302b; }
+    .sm-scarf2 { fill: #f2b705; }
+    .sm-hat { fill: #1f1f26; }
+    .sm-band { fill: #5e2a79; }
+    .sm-part { display: none; transform-box: fill-box; transform-origin: 50% 100%; }
+    .sm-part.is-on { display: inline; }
+    .sm-part.is-new { animation: pop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+    @keyframes pop { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+    .sm-armr { transform-box: fill-box; transform-origin: 0% 100%; }
+    .stage[data-celebrate="1"] .sm-armr { animation: wave 0.4s ease-in-out 5; }
+    @keyframes wave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-28deg); } }
+    .sm-hatg { transform-box: fill-box; transform-origin: 20% 100%; }
+    .stage[data-celebrate="1"] .sm-hatg, .snowman.is-done .sm-hatg { animation: tip 1.2s ease-in-out; }
+    @keyframes tip { 0%, 100% { transform: none; } 40%, 60% { transform: translate(-6px, -18px) rotate(-18deg); } }
+
+    /* Mini-Schneemänner der Follower */
+    .stage[data-minis="0"] .minis { display: none; }
+    .mini { transform-box: fill-box; transform-origin: 50% 100%; }
+    .mini--new { animation: pop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+    .mini__ball { fill: url(#ballG); }
+    .mini__hat1 { fill: #c4302b; } .mini__hat2 { fill: #2a64b8; } .mini__hat3 { fill: #2e9e5b; } .mini__hat4 { fill: #8e4bb8; }
+    .stage[data-celebrate="1"] .mini { animation: hop 0.35s ease-in-out 4; }
+    @keyframes hop { 0%, 100% { transform: none; } 50% { transform: translateY(-12px); } }
+
+    /* Schneeball-Klatscher */
+    .splat { fill: #f7fbff; stroke: #c9d9ec; stroke-width: 2; }
+    .splat-g { animation: splat 5s ease-in forwards; transform-box: fill-box; transform-origin: 50% 0; }
+    @keyframes splat {
+      0% { transform: scale(0.4); opacity: 1; }
+      6% { transform: scale(1.08); }
+      10%, 70% { transform: none; opacity: 1; }
+      100% { transform: translateY(60px) scaleY(1.2); opacity: 0; }
+    }
+    .ball { fill: #f7fbff; stroke: #b8cde4; stroke-width: 2; }
+
+    /* Eiskratzer */
+    .scraper { display: none; }
+    .scraper.is-on { display: inline; }
+    .scraper__blade { fill: #7fc4ff; stroke: #2a64b8; stroke-width: 3; }
+    .scraper__grip { fill: #2a64b8; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <header>
+    <h1>Winter decor: click dummy</h1>
+    <p>Winter without Christmas. Icicles grow while it snows, frost creeps in from the corners, and a snowman gets one more piece with every sub. Chat shovels, scrapes and breaks icicles (shared leaderboard) and throws snowballs at the screen.</p>
+    <nav aria-label="Other season mockups"><a href="autumn-decor.html">Autumn</a><a href="spring-decor.html">Spring</a><a href="summer-decor.html">Summer</a></nav>
+  </header>
+
+  <main class="layout">
+    <form class="controls" id="controls" aria-label="Decor settings">
+      <fieldset>
+        <legend>Elements</legend>
+        <label class="check"><input type="checkbox" data-key="icicles" checked> Icicles (top)</label>
+        <label class="check"><input type="checkbox" data-key="frost" checked> Frost in the corners</label>
+        <label class="check"><input type="checkbox" data-key="falling" checked> Falling snow</label>
+        <label class="check"><input type="checkbox" data-key="cover" checked> Snow cover</label>
+        <label class="check"><input type="checkbox" data-key="snowman" checked> Snowman</label>
+        <label class="check"><input type="checkbox" data-key="minis" checked> Follower snowmen</label>
+        <label class="check"><input type="checkbox" data-key="game" checked> Game placeholder</label>
+      </fieldset>
+      <div class="field">
+        <label for="f-smpos">Snowman position</label>
+        <select id="f-smpos" data-key="smpos">
+          <option value="right">Bottom right</option>
+          <option value="left">Bottom left, next to cam</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="snowLvl">Snow</label>
+        <div class="field__row"><input type="range" id="snowLvl" min="0" max="100" value="40" /><output id="snowLvlOut" for="snowLvl">40%</output></div>
+      </div>
+      <div class="field">
+        <label for="frostLvl">Frost</label>
+        <div class="field__row"><input type="range" id="frostLvl" min="0" max="100" value="35" /><output id="frostLvlOut" for="frostLvl">35%</output></div>
+      </div>
+
+      <fieldset>
+        <legend>Gimmicks (later via Streamer.bot)</legend>
+        <button type="button" class="btn" id="fall" aria-pressed="false">Snowfall: snow, frost and icicles grow (!snow)</button>
+        <button type="button" class="btn" id="shovel">Chatter shovels (!shovel)</button>
+        <button type="button" class="btn" id="scrape">Chatter scrapes frost (!scrape)</button>
+        <button type="button" class="btn" id="icicle">Chatter breaks an icicle (!icicle)</button>
+        <button type="button" class="btn" id="snowball">Chatter throws a snowball (!snowball)</button>
+        <button type="button" class="btn" id="sub">Sub: snowman grows</button>
+        <button type="button" class="btn" id="follow">Follower builds a mini snowman</button>
+        <button type="button" class="btn" id="celebrate">Celebrate (e.g. raid)</button>
+        <button type="button" class="btn" id="board">Show top helpers</button>
+        <p class="hint">Shoveling, scraping and breaking icicles all count toward one "Top helpers" leaderboard. The snowman is stored permanently and is finished after 8 subs. The !shake group action from the Christmas decor would work here too.</p>
+      </fieldset>
+    </form>
+
+    <div class="stage-col" id="col">
+    <div class="stage-wrap">
+      <div class="stage" id="stage" data-icicles="1" data-frost="1" data-falling="1" data-cover="1" data-snowman="1"
+           data-minis="1" data-smpos="right" data-game="1" role="img" aria-label="Stream preview with winter decor">
+        <div class="game" aria-hidden="true">
+          <div class="game__mtn"></div>
+          <div class="game__label">GAMEPLAY</div>
+          <div class="game__compass">N · 15 · 30 · NE · 60</div>
+          <div class="game__map"></div>
+          <div class="game__hp"></div>
+          <div class="game__cam">CAM</div>
+        </div>
+
+        <svg width="0" height="0" aria-hidden="true">
+          <defs>
+            <linearGradient id="iceG" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#ffffff" stop-opacity=".95" />
+              <stop offset=".6" stop-color="#bfe6ff" stop-opacity=".85" />
+              <stop offset="1" stop-color="#8ccfff" stop-opacity=".7" />
+            </linearGradient>
+            <radialGradient id="ballG" cx=".38" cy=".32"><stop offset="0" stop-color="#ffffff" /><stop offset=".7" stop-color="#eef4fb" /><stop offset="1" stop-color="#bccde2" /></radialGradient>
+            <filter id="sparkle" x="-50%" y="-20%" width="200%" height="140%"><feGaussianBlur stdDeviation="3" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+          </defs>
+        </svg>
+
+        <canvas class="layer" id="backCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <canvas class="layer" id="frostCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer icicles" viewBox="0 0 1920 1080" aria-hidden="true"><g id="ice"></g><path class="ridge-shade" id="ridgeShade" /><path class="ridge" id="ridge" /></svg>
+        <svg class="layer cover" viewBox="0 0 1920 1080" aria-hidden="true"><path class="cover__shade" id="coverShade" /><path class="cover__snow" id="coverSnow" /></svg>
+        <svg class="layer minis" viewBox="0 0 1920 1080" aria-hidden="true"><g id="minis"></g></svg>
+        <svg class="layer snowman" id="snowmanSvg" viewBox="0 0 1920 1080" aria-hidden="true"><g id="snowman"></g></svg>
+        <canvas class="layer" id="frontCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g id="splats"></g>
+          <g class="scraper" id="scraper"><rect class="scraper__blade" x="-60" y="-14" width="120" height="28" rx="6" /><rect class="scraper__grip" x="-14" y="10" width="28" height="70" rx="10" /></g>
+          <g id="tags"></g>
+        </svg>
+        <div class="hud" aria-hidden="true">
+          <div class="hud__box" id="boardBox"><h2>Top helpers</h2><ol id="boardList"></ol></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <script src="_season-dummy.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = SD, W = S.W, H = S.H, el = S.el, rnd = S.rnd, rand = S.rand, clamp01 = S.clamp01;
+      var stage = S.stage;
+      var tags = document.getElementById('tags');
+      var snow = 0.4, frost = 0.35, falling = false;
+      var leaders = S.Leaders(document.getElementById('boardBox'), document.getElementById('boardList'));
+
+      // ── Schneedecke: Band + Haufen in den Ecken ──
+      function coverH(x, s) {
+        var w = 620;
+        function bump(d) { return d < w ? 0.5 + 0.5 * Math.cos(Math.PI * d / w) : 0; }
+        var wav = 6 * Math.sin(x / 70) + 4 * Math.sin(x / 23);
+        return 18 + 50 * s + wav * (0.4 + s) + Math.max(bump(x), bump(W - x)) * (30 + 140 * s);
+      }
+      function surface(x) { return H - coverH(x, snow); }
+      function drawCover() {
+        var d = 'M0 ' + H, ds = 'M0 ' + H;
+        for (var x = 0; x <= W; x += 20) {
+          var h = coverH(x, snow);
+          d += ' L' + x + ' ' + (H - h).toFixed(1);
+          ds += ' L' + x + ' ' + (H - h - 6).toFixed(1);
+        }
+        d += ' L' + W + ' ' + H + ' Z'; ds += ' L' + W + ' ' + H + ' Z';
+        document.getElementById('coverSnow').setAttribute('d', d);
+        document.getElementById('coverShade').setAttribute('d', ds);
+      }
+
+      // ── Eiszapfen + Schneekante oben ──
+      var iceG = document.getElementById('ice');
+      var icicles = [];
+      for (var x = 14; x < W; x += 34 + rnd() * 26) {
+        var ic = { x: x, w: 7 + rnd() * 8, max: 30 + rnd() * 110, grow: 1 };
+        ic.node = el('path', { 'class': 'ice' }, iceG);
+        icicles.push(ic);
+      }
+      function ridgeY(x, s) { return 6 + 12 * s + 4 * Math.sin(x / 40) + 3 * Math.sin(x / 13); }
+      function drawIce() {
+        var d = 'M0 0', ds = 'M0 0';
+        for (var x = 0; x <= W; x += 16) {
+          d += ' L' + x + ' ' + ridgeY(x, snow).toFixed(1);
+          ds += ' L' + x + ' ' + (ridgeY(x, snow) + 5).toFixed(1);
+        }
+        d += ' L' + W + ' 0 Z'; ds += ' L' + W + ' 0 Z';
+        document.getElementById('ridge').setAttribute('d', d);
+        document.getElementById('ridgeShade').setAttribute('d', ds);
+        icicles.forEach(function (ic) {
+          var len = ic.max * clamp01(snow * 1.4) * ic.grow;
+          var top = ridgeY(ic.x, snow) - 2;
+          ic.tip = top + len;
+          ic.node.setAttribute('d', len < 2 ? '' :
+            'M' + (ic.x - ic.w).toFixed(1) + ' ' + top.toFixed(1) +
+            ' Q' + (ic.x - ic.w * 0.3).toFixed(1) + ' ' + (top + len * 0.5).toFixed(1) + ' ' + ic.x.toFixed(1) + ' ' + (top + len).toFixed(1) +
+            ' Q' + (ic.x + ic.w * 0.3).toFixed(1) + ' ' + (top + len * 0.5).toFixed(1) + ' ' + (ic.x + ic.w).toFixed(1) + ' ' + top.toFixed(1) + ' Z');
+        });
+      }
+
+      // ── Raureif: Eiskristall-Äste aus den vier Ecken ──
+      var fctx = document.getElementById('frostCanvas').getContext('2d');
+      var segs = [];
+      [[0, 0, 1, 1], [W, 0, -1, 1], [0, H, 1, -1], [W, H, -1, -1]].forEach(function (c) {
+        function branch(x, y, ang, len, depth, d0) {
+          var steps = Math.round(len / 14);
+          for (var i = 0; i < steps; i++) {
+            var nx = x + Math.cos(ang) * 14, ny = y + Math.sin(ang) * 14;
+            var d = d0 + 14;
+            segs.push([x, y, nx, ny, d, depth]);
+            if (depth < 3 && rnd() < 0.22) branch(nx, ny, ang + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.5), len * 0.45, depth + 1, d);
+            x = nx; y = ny; d0 = d; ang += (rnd() - 0.5) * 0.25;
+          }
+        }
+        for (var k = 0; k < 26; k++) {
+          var a = Math.atan2(c[3], c[2]) + (rnd() - 0.5) * 1.6;
+          branch(c[0], c[1], a, 260 + rnd() * 460, 0, 0);
+        }
+      });
+      function drawFrost() {
+        fctx.clearRect(0, 0, W, H);
+        var R = frost * 720;
+        if (R < 4) return;
+        [[0, 0], [W, 0], [0, H], [W, H]].forEach(function (c) {
+          var g = fctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], R);
+          g.addColorStop(0, 'rgba(235,246,255,.55)'); g.addColorStop(0.6, 'rgba(220,238,255,.18)'); g.addColorStop(1, 'rgba(220,238,255,0)');
+          fctx.fillStyle = g;
+          fctx.fillRect(0, 0, W, H);
+        });
+        fctx.lineCap = 'round';
+        segs.forEach(function (s) {
+          if (s[4] > R) return;
+          var a = clamp01((R - s[4]) / 80);
+          fctx.strokeStyle = 'rgba(245,252,255,' + (0.85 * a).toFixed(2) + ')';
+          fctx.lineWidth = Math.max(0.8, 3.2 - s[5] * 0.8);
+          fctx.beginPath(); fctx.moveTo(s[0], s[1]); fctx.lineTo(s[2], s[3]); fctx.stroke();
+        });
+      }
+
+      // ── Schneemann: 8 Teile, einer pro Sub ──
+      var smG = document.getElementById('snowman');
+      var smParts = [];
+      function part(step, build) {
+        var g = el('g', { 'class': 'sm-part', 'data-step': step }, smG);
+        build(g);
+        smParts.push(g);
+        return g;
+      }
+      part(1, function (g) { el('circle', { 'class': 'sm-ball', cx: 0, cy: -70, r: 74 }, g); });
+      part(2, function (g) { el('circle', { 'class': 'sm-ball', cx: 0, cy: -180, r: 54 }, g); });
+      part(3, function (g) { el('circle', { 'class': 'sm-ball', cx: 0, cy: -262, r: 40 }, g); });
+      part(4, function (g) {
+        el('circle', { 'class': 'sm-coal', cx: -14, cy: -272, r: 5 }, g);
+        el('circle', { 'class': 'sm-coal', cx: 14, cy: -272, r: 5 }, g);
+        [-16, -8, 0, 8, 16].forEach(function (dx, i) { el('circle', { 'class': 'sm-coal', cx: dx, cy: -246 + Math.abs(i - 2) * -3, r: 3 }, g); });
+      });
+      part(5, function (g) { el('path', { 'class': 'sm-nose', d: 'M-2 -266 L40 -258 L-2 -254 Z' }, g); });
+      part(6, function (g) {
+        [-200, -176, -152].forEach(function (y) { el('circle', { 'class': 'sm-coal', cx: 0, cy: y, r: 6 }, g); });
+        el('path', { 'class': 'sm-arm', d: 'M-48 -190 L-118 -236 M-96 -222 L-112 -252' }, g);
+        var r = el('g', { 'class': 'sm-armr' }, g);
+        el('path', { 'class': 'sm-arm', d: 'M48 -190 L118 -236 M96 -222 L114 -250' }, r);
+      });
+      part(7, function (g) {
+        el('path', { 'class': 'sm-scarf', d: 'M-42 -232 Q0 -214 42 -232 L44 -218 Q0 -200 -44 -218 Z' }, g);
+        el('path', { 'class': 'sm-scarf', d: 'M18 -222 L32 -168 L16 -166 L8 -220 Z' }, g);
+        el('rect', { 'class': 'sm-scarf2', x: 18, y: -190, width: 14, height: 6, transform: 'rotate(14 25 -187)' }, g);
+      });
+      part(8, function (g) {
+        var h = el('g', { 'class': 'sm-hatg' }, g);
+        el('rect', { 'class': 'sm-hat', x: -44, y: -300, width: 88, height: 10, rx: 4 }, h);
+        el('rect', { 'class': 'sm-hat', x: -30, y: -362, width: 60, height: 64, rx: 6 }, h);
+        el('rect', { 'class': 'sm-band', x: -30, y: -312, width: 60, height: 10 }, h);
+      });
+      var PART_NAMES = ['', 'the base', 'the belly', 'the head', 'eyes and a smile', 'a carrot nose', 'buttons and arms', 'a scarf', 'the top hat'];
+      var smStage = 3;
+      function showSnowman(animateStep) {
+        smParts.forEach(function (g) {
+          var st = +g.dataset.step;
+          g.classList.toggle('is-on', st <= smStage);
+          g.classList.toggle('is-new', st === animateStep);
+        });
+      }
+      function smX() { return stage.dataset.smpos === 'left' ? 560 : 1660; }
+      function placeSnowman() {
+        smG.setAttribute('transform', 'translate(' + smX() + ' ' + (surface(smX()) + 30).toFixed(1) + ')');
+      }
+
+      // ── Mini-Schneemänner der Follower ──
+      var minisG = document.getElementById('minis');
+      var MINI_X = [130, 1790, 250, 1520, 760, 1080, 380, 1400, 900, 1240, 640, 1880];
+      var minis = [], miniNext = 0;
+      function addMini(name) {
+        var i = miniNext % MINI_X.length;
+        if (minis[i]) minis[i].node.remove();
+
+        var outer = el('g', {}, minisG);
+        var g = el('g', { 'class': 'mini mini--new' }, outer);
+        el('circle', { 'class': 'mini__ball', cx: 0, cy: -20, r: 22 }, g);
+        el('circle', { 'class': 'mini__ball', cx: 0, cy: -54, r: 15 }, g);
+        el('circle', { 'class': 'sm-coal', cx: -5, cy: -57, r: 2.4 }, g);
+        el('circle', { 'class': 'sm-coal', cx: 5, cy: -57, r: 2.4 }, g);
+        el('path', { 'class': 'sm-nose', d: 'M0 -53 L14 -50 L0 -48 Z' }, g);
+        el('path', { 'class': 'mini__hat' + (1 + i % 4), d: 'M-16 -64 Q0 -98 16 -64 Z' }, g);
+        el('circle', { cx: 0, cy: -96, r: 5, fill: '#fff' }, g);
+        minis[i] = { node: outer, x: MINI_X[i], label: name };
+        miniNext++;
+        placeMinis();
+        S.tag(tags, name, MINI_X[i], surface(MINI_X[i]) - 110, false);
+      }
+      function placeMinis() {
+        minis.forEach(function (m) { if (m) m.node.setAttribute('transform', 'translate(' + m.x + ' ' + (surface(m.x) + 8).toFixed(1) + ')'); });
+      }
+
+      // ── Partikel ──
+      var back = S.Particles(document.getElementById('backCanvas'));
+      var front = S.Particles(document.getElementById('frontCanvas'));
+      function flake(ctx, p, a) {
+        ctx.globalAlpha = a * 0.9;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      function shard(ctx, p, a) {
+        ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.c || 'rgba(200,235,255,.95)';
+        ctx.beginPath(); ctx.moveTo(-p.r, 0); ctx.lineTo(0, -p.r * 2.4); ctx.lineTo(p.r, 0); ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
+      function drop(ctx, p, a) {
+        ctx.globalAlpha = a; ctx.fillStyle = '#bfe6ff';
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, 2.2, 4, 0, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+
+      // ── Zustand zeichnen ──
+      var snowSlider = S.slider('snowLvl', function (v) { snow = v; dirty = true; });
+      var frostSlider = S.slider('frostLvl', function (v) { frost = v; frostDirty = true; });
+      var dirty = true, frostDirty = true, flakeAcc = 0, dripAcc = 0;
+
+      S.loop(function (dt) {
+        if (falling) {
+          snow = Math.min(1, snow + 0.03 * dt); frost = Math.min(1, frost + 0.015 * dt);
+          snowSlider.set(snow); frostSlider.set(frost);
+          dirty = frostDirty = true;
+        }
+        icicles.forEach(function (ic) { if (ic.grow < 1) { ic.grow = Math.min(1, ic.grow + 0.06 * dt); dirty = true; } });
+        if (dirty) { drawCover(); drawIce(); placeSnowman(); placeMinis(); dirty = false; }
+        if (frostDirty) { drawFrost(); frostDirty = false; }
+
+        var rate = (stage.dataset.falling === '1' ? 25 : 0) + (falling ? 90 : 0);
+        flakeAcc += rate * dt;
+        while (flakeAcc >= 1) {
+          flakeAcc--;
+          var r = rand(1.5, 4.5);
+          (r > 3.6 ? front : back).add({ x: rand(-200, W + 200), y: -20, vy: 40 + r * 14, term: 40 + r * 16, sway: rand(10, 35), r: r, floor: surface, draw: flake });
+        }
+        if (stage.dataset.icicles === '1' && snow > 0.2) {
+          dripAcc += dt * 3;
+          while (dripAcc >= 1) {
+            dripAcc--;
+            var ic = icicles[Math.floor(Math.random() * icicles.length)];
+            if (ic.tip > 30) back.add({ x: ic.x, y: ic.tip, vy: 20, g: 900, term: 600, sway: 0, vr: 0, floor: surface, draw: drop });
+          }
+        }
+        back.step(dt); front.step(dt);
+      });
+
+      // ── Gimmicks ──
+      function help(name, text, x, y) {
+        leaders.add(name);
+        S.tag(tags, name + ' ' + text, x, y, true);
+      }
+      S.on('shovel', function () {
+        var name = S.pick(), left = Math.random() < 0.5, x = left ? rand(120, 420) : W - rand(120, 420);
+        snow = Math.max(0, snow - 0.05); snowSlider.set(snow); dirty = true;
+        for (var i = 0; i < 26; i++) front.add({ x: x + rand(-30, 30), y: surface(x), vx: (left ? 1 : -1) * rand(120, 380), vy: rand(-700, -350), term: 500, sway: 0, r: rand(4, 10), floor: null, life: 1.6, draw: flake });
+        help(name, 'shoveled!', x, surface(x) - 90);
+      });
+      var scraper = document.getElementById('scraper');
+      S.on('scrape', function () {
+        var name = S.pick(), c = [[0, 0], [W, 0], [0, H], [W, H]][Math.floor(Math.random() * 4)];
+        frost = Math.max(0, frost - 0.05); frostSlider.set(frost); frostDirty = true;
+        var cx = c[0] ? W - 260 : 260, cy = c[1] ? H - 300 : 300;
+        help(name, 'scraped the frost!', cx, cy - 70);
+        if (S.reduced) return;
+        scraper.classList.add('is-on');
+        var t0 = performance.now();
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / 1100);
+          var x = cx + Math.sin(k * Math.PI * 4) * 110, y = cy + k * 60;
+          scraper.setAttribute('transform', 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ') rotate(' + (Math.sin(k * Math.PI * 4) * 20).toFixed(0) + ')');
+          if (Math.random() < 0.7) front.add({ x: x + rand(-50, 50), y: y - 10, vx: rand(-200, 200), vy: rand(-300, -100), term: 400, sway: 0, r: rand(2, 4), life: 1, draw: shard });
+          if (k < 1) requestAnimationFrame(step); else scraper.classList.remove('is-on');
+        })(t0);
+      });
+      S.on('icicle', function () {
+        var name = S.pick();
+        var cand = icicles.filter(function (ic) { return ic.tip > 40; });
+        if (!cand.length) { S.tag(tags, name + ': no icicles yet', W / 2, 420, true); return; }
+        var ic = cand[Math.floor(Math.random() * cand.length)];
+        var len = ic.tip;
+        for (var i = 0; i < 14; i++) front.add({ x: ic.x + rand(-ic.w, ic.w), y: rand(20, len), vx: rand(-60, 60), vy: rand(0, 120), g: 1400, term: 900, sway: 0, vr: rand(-6, 6), r: rand(3, ic.w), floor: surface, draw: shard });
+        ic.grow = 0; dirty = true;
+        help(name, 'broke an icicle!', ic.x, len + 60);
+      });
+      var splats = document.getElementById('splats');
+      S.on('snowball', function () {
+        var name = S.pick();
+        var tx = rand(500, 1420), ty = rand(300, 700), sx = rand(300, 1620), sy = H + 40;
+        var ball = el('circle', { 'class': 'ball', r: 10 }, splats);
+        var t0 = performance.now(), dur = S.reduced ? 1 : 650;
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / dur);
+          var x = sx + (tx - sx) * k, y = sy + (ty - sy) * k - Math.sin(k * Math.PI) * 180;
+          ball.setAttribute('cx', x.toFixed(0)); ball.setAttribute('cy', y.toFixed(0)); ball.setAttribute('r', (10 + k * 34).toFixed(1));
+          if (k < 1) return requestAnimationFrame(step);
+          ball.remove();
+          // Position außen, Animation innen: CSS-transform würde das translate überschreiben
+          var outer = el('g', { transform: 'translate(' + tx.toFixed(0) + ' ' + ty.toFixed(0) + ')' }, splats);
+          var g = el('g', { 'class': 'splat-g' }, outer);
+          var d = 'M0 -60';
+          for (var a = 0; a <= 16; a++) {
+            var ang = a / 16 * Math.PI * 2 - Math.PI / 2, rr = 46 + (a % 2 ? 14 : 30) * Math.random();
+            d += ' L' + (Math.cos(ang) * rr).toFixed(0) + ' ' + (Math.sin(ang) * rr).toFixed(0);
+          }
+          el('path', { 'class': 'splat', d: d + ' Z' }, g);
+          el('path', { 'class': 'splat', d: 'M-20 30 Q-18 90 -12 92 Q-6 90 -6 30 Z M14 34 Q16 70 20 72 Q26 70 26 34 Z' }, g);
+          setTimeout(function () { outer.remove(); }, 5100);
+          for (var i = 0; i < 16; i++) front.add({ x: tx, y: ty, vx: rand(-360, 360), vy: rand(-420, 120), term: 600, sway: 0, r: rand(3, 7), life: 0.9, draw: flake });
+          S.tag(tags, name + ' threw a snowball!', tx, ty - 110, true);
+        })(t0);
+      });
+      S.on('sub', function () {
+        var name = S.pick();
+        if (smStage >= 8) {
+          smStage = 0;
+          showSnowman(0);
+          S.tag(tags, 'Snowman reset (preview only)', smX(), H - 380, false);
+          return;
+        }
+        smStage++;
+        showSnowman(smStage);
+        S.tag(tags, name + ' added ' + PART_NAMES[smStage] + '!', smX(), surface(smX()) - 400, true);
+        if (smStage === 8) {
+          var sm = document.getElementById('snowmanSvg');
+          sm.classList.remove('is-done'); void sm.getBoundingClientRect(); sm.classList.add('is-done');
+          S.pulse('celebrate', 3000);
+        }
+      });
+      S.on('follow', function () { addMini(S.NAMES[miniNext % S.NAMES.length]); });
+      S.on('celebrate', function () {
+        S.pulse('celebrate', 4000);
+        [[0, 1], [W, -1]].forEach(function (c) {
+          for (var i = 0; i < 60; i++) front.add({ x: c[0] + c[1] * rand(0, 160), y: H - rand(20, 120), vx: c[1] * rand(250, 650), vy: rand(-1150, -650), term: 70, sway: rand(10, 30), r: rand(2, 6), floor: null, life: 4, draw: flake });
+        });
+        S.tag(tags, 'Thank you, ' + S.pick() + '!', W / 2, 420, true);
+      });
+      S.on('board', function () { leaders.show(); });
+      S.toggle('fall', function (v) { falling = v; });
+      S.bindControls(function (key) { if (key === 'smpos') dirty = true; });
+
+      showSnowman(0);
+      ['Hat3', 'Mia_GG', 'Lunatic', 'Nordlicht'].forEach(addMini);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spring Decor Mockup</title>
+  <!--
+    Klickdummy Frühlingsdeko: Blumenwiese unten (Follower pflanzen Blumen mit
+    Namen), Kirschblütenzweig oben, rieselnde Blütenblätter, Bienen und
+    Schmetterlinge. Spiel: Wasser trocknet aus (Blumen lassen die Köpfe
+    hängen), der Chat gießt (Rangliste) und zupft gemeinsam Unkraut.
+    Nur zum Ansehen und Abstimmen, noch keine OBS-Source.
+  -->
+  <link rel="stylesheet" href="_season-dummy.css" />
+  <style>
+    .stage {
+      --game-top: #4f7db0; --game-mid: #93b6d6; --game-low: #6f9a5a; --game-bottom: #48693a; --game-mtn: #5d7d9c;
+      --tag-big: #ffe3f0; --spot: #ff9fd0; --hud-bg: rgba(30, 40, 22, 0.82); --hud-line: rgba(255, 190, 220, 0.75);
+      --wilt: 0;
+      --f1: #ff5d8f; --f2: #ffd23f; --f3: #8e6cff; --f4: #ff8a3d; --f5: #ffffff;
+    }
+    .stage[data-colors="pastel"] { --f1: #ffb3c8; --f2: #fff0a8; --f3: #c9b8ff; --f4: #ffcfa8; --f5: #d8f3ff; }
+    .stage[data-colors="cherry"] { --f1: #ffc2d6; --f2: #ffffff; --f3: #ff9ec0; --f4: #ffe0ea; --f5: #f78fb3; }
+    .stage[data-colors="theme"]  { --f1: #f2b705; --f2: #b07ad6; --f3: #5e2a79; --f4: #ffd75e; --f5: #e8d4ff; }
+    .p1 { fill: var(--f1); } .p2 { fill: var(--f2); } .p3 { fill: var(--f3); } .p4 { fill: var(--f4); } .p5 { fill: var(--f5); }
+
+    /* Kirschzweig */
+    .stage[data-branch="off"] .branch { display: none; }
+    .branch__sway { animation: sway 8s ease-in-out infinite; transform-origin: 0 150px; }
+    @keyframes sway { 0%, 100% { transform: rotate(-0.7deg); } 50% { transform: rotate(0.7deg); } }
+    .branch__wood { fill: none; stroke: #4b2e2a; stroke-linecap: round; }
+    .blossom-petal { fill: #ffd0e0; stroke: #f59ab9; stroke-width: 0.8; }
+    .blossom-core { fill: #e0457b; }
+
+    /* Wiese */
+    .stage[data-meadow="0"] .meadow { display: none; }
+    .grass { fill: #4f9a3a; }
+    .grass--dry { fill: #b4a14a; opacity: var(--wilt); }
+    .blade { fill: none; stroke: #3d8a2e; stroke-width: 3; stroke-linecap: round; }
+    .weed { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1); transform: scale(0); }
+    .weed.is-on { transform: none; }
+    .weed path { fill: #2f5e22; }
+    .weed circle { fill: #e8e2a0; }
+
+    /* Blumen */
+    .stem { fill: none; stroke: #3d8a2e; stroke-width: 4; stroke-linecap: round; }
+    .leaf { fill: #4fa23c; }
+    .fl-grow { transform-box: fill-box; transform-origin: 50% 100%; }
+    .fl-grow--new { animation: grow 1.6s cubic-bezier(0.3, 1.2, 0.5, 1) both; }
+    @keyframes grow { from { transform: scaleY(0); } to { transform: none; } }
+    .head { transform-box: fill-box; transform-origin: 50% 100%; transform: rotate(calc(var(--wilt) * var(--side, 1) * 110deg)) scale(calc(1 - var(--wilt) * 0.2)); transition: transform 1s; }
+    .fl:nth-child(2n) .head { --side: -1; }
+    .bloom { transform-box: fill-box; transform-origin: 50% 50%; }
+    .fl-grow--new .bloom { animation: open 1.2s 1.1s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+    @keyframes open { from { transform: scale(0.15) rotate(-40deg); } to { transform: none; } }
+    .stage[data-celebrate="1"] .bloom { animation: party 0.5s ease-in-out 6; }
+    @keyframes party { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3) rotate(15deg); } }
+    .center { fill: #f5b800; }
+    .center--dark { fill: #2a1b12; }
+
+    /* Biene + Schmetterling */
+    .bee__body { fill: #ffcc1f; stroke: #2a1b12; stroke-width: 2; }
+    .bee__stripe { fill: #2a1b12; }
+    .wing { fill: rgba(235, 248, 255, 0.85); stroke: rgba(120, 160, 190, 0.8); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 100%; animation: flap 0.08s linear infinite alternate; }
+    @keyframes flap { from { transform: scaleY(1); } to { transform: scaleY(0.3); } }
+    .bfly-wing { transform-box: fill-box; transform-origin: 100% 50%; animation: bflap 0.35s ease-in-out infinite alternate; }
+    .bfly-wing--r { transform-origin: 0% 50%; }
+    @keyframes bflap { from { transform: scaleX(1); } to { transform: scaleX(0.25); } }
+    .bfly-a { fill: #ff8a3d; stroke: #3a2010; stroke-width: 2; }
+    .bfly-b { fill: #6fb7ff; stroke: #1a2f50; stroke-width: 2; }
+    .stage[data-bugs="0"] .bugs { display: none; }
+
+    /* Gießkanne */
+    .can { display: none; }
+    .can.is-on { display: inline; }
+    .can__body { fill: #3fa9a0; stroke: #1f6660; stroke-width: 3; }
+
+    .hud__count .bar { margin-top: 8px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.2); overflow: hidden; }
+    .hud__count .bar::after { content: ''; display: block; height: 100%; background: linear-gradient(90deg, #a8e06a, #fff); transform-origin: 0 50%; transform: scaleX(var(--pull, 0)); transition: transform 0.3s; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <header>
+    <h1>Spring decor: click dummy</h1>
+    <p>Followers plant a flower with their name. Without water the flowers let their heads hang, rain or chat watering lifts them again (leaderboard). Weeds creep in over time; chatters pull them out together. Bees and butterflies visit the meadow.</p>
+    <nav aria-label="Other season mockups"><a href="autumn-decor.html">Autumn</a><a href="winter-decor.html">Winter</a><a href="summer-decor.html">Summer</a></nav>
+  </header>
+
+  <main class="layout">
+    <form class="controls" id="controls" aria-label="Decor settings">
+      <fieldset>
+        <legend>Elements</legend>
+        <label class="check"><input type="checkbox" data-key="meadow" checked> Flower meadow</label>
+        <label class="check"><input type="checkbox" data-key="petals" checked> Falling petals</label>
+        <label class="check"><input type="checkbox" data-key="bugs" checked> Bees and butterflies</label>
+        <label class="check"><input type="checkbox" data-key="game" checked> Game placeholder</label>
+      </fieldset>
+      <div class="field">
+        <label for="f-branch">Blossom branch</label>
+        <select id="f-branch" data-key="branch">
+          <option value="left">Top left</option>
+          <option value="right">Top right</option>
+          <option value="off">Off</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-colors">Flower colors</label>
+        <select id="f-colors" data-key="colors">
+          <option value="bright">Bright</option>
+          <option value="pastel">Pastel</option>
+          <option value="cherry">Cherry blossom (pink/white)</option>
+          <option value="theme">Stream theme (purple/gold)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="water">Water</label>
+        <div class="field__row"><input type="range" id="water" min="0" max="100" value="80" /><output id="waterOut" for="water">80%</output></div>
+      </div>
+      <div class="field">
+        <label for="weeds">Weeds</label>
+        <div class="field__row"><input type="range" id="weeds" min="0" max="100" value="20" /><output id="weedsOut" for="weeds">20%</output></div>
+      </div>
+
+      <fieldset>
+        <legend>Gimmicks (later via Streamer.bot)</legend>
+        <button type="button" class="btn" id="time" aria-pressed="false">Time passes: soil dries, weeds grow</button>
+        <button type="button" class="btn" id="rain" aria-pressed="false">Rain (linked to !rain)</button>
+        <button type="button" class="btn" id="water-btn">Chatter waters (!water)</button>
+        <button type="button" class="btn" id="weed">Chatter pulls weeds (!weed)</button>
+        <button type="button" class="btn" id="bee">Chatter sends a bee (!bee)</button>
+        <button type="button" class="btn" id="follow">Follower plants a flower</button>
+        <button type="button" class="btn" id="celebrate">Celebrate (e.g. new sub)</button>
+        <button type="button" class="btn" id="board">Show top gardeners</button>
+        <p class="hint">Below 30% water the flowers droop and the grass turns yellow. One !weed pulls a little; 3 different chatters within 20 s pull a big patch. In the preview everything runs fast so you can see it.</p>
+      </fieldset>
+    </form>
+
+    <div class="stage-col" id="col">
+    <div class="stage-wrap">
+      <div class="stage" id="stage" data-meadow="1" data-petals="1" data-bugs="1" data-branch="left" data-colors="bright" data-game="1"
+           role="img" aria-label="Stream preview with spring decor">
+        <div class="game" aria-hidden="true">
+          <div class="game__mtn"></div>
+          <div class="game__label">GAMEPLAY</div>
+          <div class="game__compass">N · 15 · 30 · NE · 60</div>
+          <div class="game__map"></div>
+          <div class="game__hp"></div>
+          <div class="game__cam">CAM</div>
+        </div>
+        <svg width="0" height="0" aria-hidden="true">
+          <defs>
+            <g id="blossom">
+              <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" />
+              <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(72)" />
+              <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(144)" />
+              <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(216)" />
+              <ellipse class="blossom-petal" cx="0" cy="-7" rx="5" ry="7" transform="rotate(288)" />
+              <circle class="blossom-core" r="2.6" />
+            </g>
+          </defs>
+        </svg>
+
+        <canvas class="layer" id="backCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer branch" viewBox="0 0 1920 1080" aria-hidden="true"><g id="branchFlip"><g class="branch__sway" id="branch"></g></g></svg>
+        <svg class="layer meadow" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g id="weedsG"></g>
+          <g id="flowers"></g>
+          <path class="grass" id="grass" />
+          <path class="grass grass--dry" id="grassDry" />
+          <g id="blades"></g>
+        </svg>
+        <svg class="layer bugs" viewBox="0 0 1920 1080" aria-hidden="true"><g id="bugs"></g></svg>
+        <canvas class="layer" id="frontCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g class="can" id="can">
+            <path class="can__body" d="M-40 -30 L30 -30 L36 30 L-46 30 Z" />
+            <path class="can__body" d="M30 -20 L90 -46 L94 -38 L36 -4 Z" />
+            <path class="can__body" d="M-40 -20 Q-74 0 -40 22" fill="none" />
+          </g>
+          <g id="tags"></g>
+        </svg>
+        <div class="hud" aria-hidden="true">
+          <div class="hud__box hud__count" id="pullBox"><span id="pullText"></span><div class="bar"></div></div>
+          <div class="hud__box" id="boardBox"><h2>Top gardeners</h2><ol id="boardList"></ol></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <script src="_season-dummy.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = SD, W = S.W, H = S.H, el = S.el, rnd = S.rnd, rand = S.rand, clamp01 = S.clamp01;
+      var stage = S.stage;
+      var tags = document.getElementById('tags');
+      var water = 0.8, weeds = 0.2, timeOn = false, raining = false;
+      var leaders = S.Leaders(document.getElementById('boardBox'), document.getElementById('boardList'));
+      var varStyle = document.createElement('style');
+      document.head.appendChild(varStyle);
+
+      // ── Wiese: Grasband + Halme ──
+      function groundY(x) { return H - 44 - 8 * Math.sin(x / 110) - 5 * Math.sin(x / 37); }
+      (function () {
+        var d = 'M0 ' + H;
+        for (var x = 0; x <= W; x += 16) d += ' L' + x + ' ' + groundY(x).toFixed(1);
+        d += ' L' + W + ' ' + H + ' Z';
+        document.getElementById('grass').setAttribute('d', d);
+        document.getElementById('grassDry').setAttribute('d', d);
+        var blades = document.getElementById('blades');
+        for (var bx = 0; bx < W; bx += 9) {
+          var y = groundY(bx) + 6, h = 14 + rnd() * 26, lean = (rnd() - 0.5) * 16;
+          el('path', { 'class': 'blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, blades);
+        }
+      })();
+
+      // ── Unkraut: 40 Büschel, sichtbar je nach Stand ──
+      var weedNodes = [];
+      (function () {
+        var g = document.getElementById('weedsG');
+        for (var i = 0; i < 40; i++) {
+          var x = 30 + rnd() * (W - 60), y = groundY(x) + 4;
+          var w = el('g', { 'class': 'weed', transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' });
+          var inner = el('g', {}, w);
+          var dd = '';
+          for (var k = 0; k < 6; k++) {
+            var a = -Math.PI / 2 + (k - 2.5) * 0.35, l = 30 + rnd() * 40;
+            dd += 'M0 0 L' + (Math.cos(a - 0.12) * l * 0.5).toFixed(0) + ' ' + (Math.sin(a - 0.12) * l * 0.5).toFixed(0) + ' L' + (Math.cos(a) * l).toFixed(0) + ' ' + (Math.sin(a) * l).toFixed(0) + ' L' + (Math.cos(a + 0.12) * l * 0.5).toFixed(0) + ' ' + (Math.sin(a + 0.12) * l * 0.5).toFixed(0) + ' Z ';
+          }
+          el('path', { d: dd }, inner);
+          if (rnd() < 0.4) el('circle', { cx: 0, cy: -46, r: 6 }, inner);
+          // Platz für die Animation: Position außen, scale innen über CSS
+          var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, g);
+          w.removeAttribute('transform');
+          outer.appendChild(w);
+          weedNodes.push({ node: w, x: x, y: y, order: rnd() });
+        }
+        weedNodes.sort(function (a, b) { return a.order - b.order; });
+      })();
+      function showWeeds() {
+        var n = Math.round(weeds * weedNodes.length);
+        weedNodes.forEach(function (w, i) { w.node.classList.toggle('is-on', i < n); });
+      }
+
+      // ── Blumen der Follower ──
+      var flowersG = document.getElementById('flowers');
+      var SLOTS = [];
+      for (var i = 0; i < 30; i++) SLOTS.push(70 + ((i * 617) % 30) * 61 + rnd() * 20);
+      var flowers = [], flNext = 0;
+      function addFlower(name, animate) {
+        var i = flNext % SLOTS.length, x = SLOTS[i], y = groundY(x) + 8;
+        if (flowers[i]) flowers[i].node.remove();
+        var h = 70 + ((i * 37) % 90), type = i % 3, col = 'p' + (1 + (i * 3) % 5);
+        var outer = el('g', { 'class': 'fl', transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, flowersG);
+        var grow = el('g', { 'class': 'fl-grow' + (animate ? ' fl-grow--new' : '') }, outer);
+        el('path', { 'class': 'stem', d: 'M0 0 Q' + (i % 2 ? 8 : -8) + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
+        el('path', { 'class': 'leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (i % 2 ? -26 : 26) + ' ' + (-h * 0.5) + ' ' + (i % 2 ? -30 : 30) + ' ' + (-h * 0.62) + ' Q' + (i % 2 ? -8 : 8) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
+        var hp = el('g', { transform: 'translate(0 ' + (-h) + ')' }, grow);
+        var head = el('g', { 'class': 'head' }, hp);
+        var bloom = el('g', { 'class': 'bloom' }, head);
+        if (type === 0) {          // Margerite
+          for (var k = 0; k < 10; k++) el('ellipse', { 'class': col, cx: 0, cy: -13, rx: 5, ry: 12, transform: 'rotate(' + k * 36 + ')' }, bloom);
+          el('circle', { 'class': 'center', r: 8 }, bloom);
+        } else if (type === 1) {   // Tulpe
+          el('path', { 'class': col, d: 'M-16 -4 Q-20 -30 -12 -38 L-6 -24 L0 -40 L6 -24 L12 -38 Q20 -30 16 -4 Q0 6 -16 -4 Z' }, bloom);
+        } else {                   // Mohn
+          for (var m = 0; m < 5; m++) el('circle', { 'class': col, cx: 0, cy: -12, r: 11, transform: 'rotate(' + m * 72 + ')' }, bloom);
+          el('circle', { 'class': 'center--dark', r: 7 }, bloom);
+        }
+        flowers[i] = { node: outer, head: head, x: x, y: y - h, label: name };
+        flNext++;
+        if (animate) setTimeout(function () { S.tag(tags, name, x, y - h - 40, false); }, 1300);
+      }
+
+      // ── Kirschzweig ──
+      var branchFlip = document.getElementById('branchFlip');
+      var blossoms = [];
+      (function () {
+        var branch = document.getElementById('branch');
+        [{ d: 'M-20 140 Q140 120 300 160 Q400 186 470 172', w: 15 }, { d: 'M140 130 Q190 80 260 64', w: 7 },
+         { d: 'M290 158 Q330 220 310 280', w: 6 }, { d: 'M380 180 Q420 140 480 128', w: 5 }].forEach(function (t) {
+          var p = el('path', { 'class': 'branch__wood', d: t.d, 'stroke-width': t.w }, branch);
+          var len = p.getTotalLength();
+          for (var s = len * 0.25; s < len; s += 24) {
+            var pt = p.getPointAtLength(s);
+            for (var k = 0; k < (rnd() < 0.5 ? 1 : 2); k++) {
+              var bx = pt.x + (rnd() - 0.5) * 36, by = pt.y + (rnd() - 0.5) * 28;
+              el('use', { href: '#blossom', transform: 'translate(' + bx.toFixed(0) + ' ' + by.toFixed(0) + ') rotate(' + (rnd() * 72).toFixed(0) + ') scale(' + (1 + rnd() * 0.7).toFixed(2) + ')' }, branch);
+              blossoms.push([bx, by]);
+            }
+          }
+        });
+      })();
+
+      // ── Partikel ──
+      var back = S.Particles(document.getElementById('backCanvas'));
+      var front = S.Particles(document.getElementById('frontCanvas'));
+      var petalCols = [];
+      function readCols() {
+        var cs = getComputedStyle(stage);
+        petalCols = [1, 2, 3, 4, 5].map(function (i) { return cs.getPropertyValue('--f' + i).trim(); });
+      }
+      readCols();
+      function petal(ctx, p, a) {
+        ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.scale(Math.cos(p.ph * 1.4), 1);
+        ctx.fillStyle = p.c;
+        ctx.beginPath(); ctx.ellipse(0, 0, p.r, p.r * 0.6, 0, 0, 6.283); ctx.fill();
+        ctx.restore();
+      }
+      function rainDrop(ctx, p, a) {
+        ctx.globalAlpha = a * 0.6; ctx.strokeStyle = '#cfe6ff'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - 4, p.y - 22); ctx.stroke(); ctx.globalAlpha = 1;
+      }
+      function spray(ctx, p, a) {
+        ctx.globalAlpha = a; ctx.fillStyle = '#9fd6ff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      function blossomPetal(x, y, front_) {
+        (front_ ? front : back).add({ x: x, y: y, vy: rand(30, 60), term: rand(40, 70), sway: rand(20, 50), r: rand(5, 8), c: stage.dataset.colors === 'theme' ? petalCols[Math.floor(Math.random() * 5)] : (Math.random() < 0.7 ? '#ffc6d9' : '#ffffff'), floor: groundY, draw: petal });
+      }
+
+      // ── Bienen + Schmetterlinge ──
+      var bugsG = document.getElementById('bugs');
+      function makeBee() {
+        var g = el('g', {}, bugsG);
+        el('ellipse', { 'class': 'wing', cx: -4, cy: -14, rx: 7, ry: 11 }, g);
+        el('ellipse', { 'class': 'wing', cx: 6, cy: -14, rx: 7, ry: 11 }, g);
+        el('ellipse', { 'class': 'bee__body', cx: 0, cy: 0, rx: 18, ry: 12 }, g);
+        el('rect', { 'class': 'bee__stripe', x: -6, y: -11, width: 5, height: 22 }, g);
+        el('rect', { 'class': 'bee__stripe', x: 4, y: -11, width: 5, height: 22 }, g);
+        return g;
+      }
+      function makeBfly(cls) {
+        var g = el('g', {}, bugsG);
+        el('path', { 'class': 'bfly-wing ' + cls, d: 'M0 0 Q-30 -34 -26 -4 Q-30 20 0 4 Z' }, g);
+        el('path', { 'class': 'bfly-wing bfly-wing--r ' + cls, d: 'M0 0 Q30 -34 26 -4 Q30 20 0 4 Z' }, g);
+        el('ellipse', { cx: 0, cy: 0, rx: 3, ry: 12, fill: '#2a1b12' }, g);
+        return g;
+      }
+      // Flug über Wegpunkte; on(t) bekommt die Position
+      function fly(node, pts, dur, done) {
+        if (S.reduced) { node.remove(); if (done) done(); return; }
+        var t0 = performance.now();
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / dur), n = pts.length - 1;
+          var seg = Math.min(n - 1, Math.floor(k * n)), f = k * n - seg;
+          var a = pts[seg], b = pts[seg + 1];
+          var e = f * f * (3 - 2 * f);
+          var x = a[0] + (b[0] - a[0]) * e + Math.sin(now / 160) * 6, y = a[1] + (b[1] - a[1]) * e + Math.cos(now / 130) * 5;
+          node.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')' + (b[0] < a[0] ? ' scale(-1 1)' : ''));
+          if (k < 1) requestAnimationFrame(step); else { node.remove(); if (done) done(); }
+        })(t0);
+      }
+      function sendBee(name) {
+        var live = flowers.filter(Boolean);
+        var target = live.length ? live[Math.floor(Math.random() * live.length)] : { x: W / 2, y: H - 160, head: null };
+        var fromLeft = target.x > W / 2, sx = fromLeft ? -60 : W + 60, ex = fromLeft ? W + 60 : -60;
+        var ty = target.y - 20;
+        fly(makeBee(), [[sx, rand(300, 600)], [target.x + (fromLeft ? -200 : 200), ty - 120], [target.x, ty], [target.x, ty], [target.x + (fromLeft ? 180 : -180), ty - 160], [ex, rand(200, 500)]], 6500);
+        if (target.head) {
+          setTimeout(function () {
+            target.head.classList.remove('is-spot'); void target.head.getBoundingClientRect(); target.head.classList.add('is-spot');
+          }, 2400);
+        }
+        if (name) S.tag(tags, name + ' sent a bee!', target.x, ty - 90, true);
+      }
+      function wanderButterfly() {
+        if (stage.dataset.bugs !== '1') return;
+        var y0 = rand(H - 420, H - 220), left = Math.random() < 0.5;
+        var pts = [[left ? -60 : W + 60, y0]];
+        for (var i = 1; i < 6; i++) pts.push([left ? i * W / 5 : W - i * W / 5, y0 + rand(-120, 120)]);
+        pts[pts.length - 1][0] = left ? W + 60 : -60;
+        fly(makeBfly(Math.random() < 0.5 ? 'bfly-a' : 'bfly-b'), pts, 16000);
+      }
+      setInterval(wanderButterfly, 9000);
+      setTimeout(wanderButterfly, 800);
+
+      // ── Gemeinsames Unkrautzupfen ──
+      var pulls = [], PULL_NEED = 3, PULL_WIN = 20;
+      var pullBox = document.getElementById('pullBox'), pullText = document.getElementById('pullText');
+      var pullTimer;
+      function weedPull(name) {
+        var now = performance.now() / 1000;
+        pulls = pulls.filter(function (p) { return now - p.t < PULL_WIN; });
+        if (!pulls.some(function (p) { return p.n === name; })) pulls.push({ n: name, t: now });
+        var visible = weedNodes.filter(function (w) { return w.node.classList.contains('is-on'); });
+        var w = visible[visible.length - 1];
+        weeds = Math.max(0, weeds - 0.03);
+        if (pulls.length >= PULL_NEED) {
+          weeds = Math.max(0, weeds - 0.5); pulls = [];
+          pullText.textContent = 'Weeds pulled!';
+          visible.forEach(function (v) { for (var i = 0; i < 3; i++) front.add({ x: v.x, y: v.y - 20, vx: rand(-200, 200), vy: rand(-700, -400), term: 700, sway: 0, r: rand(5, 9), c: '#2f5e22', life: 1.4, draw: petal }); });
+        } else {
+          pullText.textContent = 'Pull together! ' + pulls.length + '/' + PULL_NEED;
+          if (w) for (var i = 0; i < 6; i++) front.add({ x: w.x, y: w.y - 20, vx: rand(-150, 150), vy: rand(-600, -300), term: 700, sway: 0, r: rand(5, 9), c: '#2f5e22', life: 1.2, draw: petal });
+        }
+        varStyle.textContent = '.stage{--wilt:' + wilt().toFixed(3) + ';--pull:' + (pulls.length / PULL_NEED).toFixed(2) + '}';
+        weedSlider.set(weeds); showWeeds();
+        pullBox.classList.add('is-on');
+        clearTimeout(pullTimer);
+        pullTimer = setTimeout(function () { pullBox.classList.remove('is-on'); }, 5000);
+        leaders.add(name);
+        if (w) S.tag(tags, name + ' pulled weeds', w.x, w.y - 80, false);
+      }
+
+      // ── Zustand ──
+      function wilt() { return clamp01((0.3 - water) / 0.3); }
+      var waterSlider = S.slider('water', function (v) { water = v; });
+      var weedSlider = S.slider('weeds', function (v) { weeds = v; showWeeds(); });
+      var petalAcc = 0, rainAcc = 0, lastWilt = -1;
+      S.loop(function (dt) {
+        if (timeOn) { water = Math.max(0, water - 0.03 * dt); weeds = Math.min(1, weeds + 0.012 * dt); waterSlider.set(water); weedSlider.set(weeds); showWeeds(); }
+        if (raining) { water = Math.min(1, water + 0.06 * dt); waterSlider.set(water); }
+        var wl = wilt();
+        if (Math.abs(wl - lastWilt) > 0.005) {
+          varStyle.textContent = '.stage{--wilt:' + wl.toFixed(3) + ';--pull:' + (pulls.length / PULL_NEED).toFixed(2) + '}';
+          lastWilt = wl;
+        }
+        if (stage.dataset.petals === '1' && stage.dataset.branch !== 'off') {
+          petalAcc += dt * 3;
+          while (petalAcc >= 1) {
+            petalAcc--;
+            var b = blossoms[Math.floor(Math.random() * blossoms.length)];
+            blossomPetal(stage.dataset.branch === 'right' ? W - b[0] : b[0], b[1], false);
+          }
+        }
+        if (raining) {
+          rainAcc += dt * 160;
+          while (rainAcc >= 1) { rainAcc--; back.add({ x: rand(-100, W + 100), y: -30, vy: 900, term: 900, g: 0, sway: 0, vr: 0, wf: 0.3, floor: groundY, draw: rainDrop }); }
+        }
+        back.step(dt); front.step(dt);
+      });
+
+      // ── Gimmicks ──
+      var can = document.getElementById('can');
+      S.on('water-btn', function () {
+        var name = S.pick();
+        var live = flowers.filter(Boolean);
+        var t = live.length ? live[Math.floor(Math.random() * live.length)] : { x: W / 2, y: H - 200 };
+        water = Math.min(1, water + 0.08); waterSlider.set(water);
+        leaders.add(name);
+        S.tag(tags, name + ' watered the flowers!', t.x, t.y - 150, true);
+        if (S.reduced) return;
+        can.classList.add('is-on');
+        var cx = t.x - 90, cy = t.y - 110, t0 = performance.now();
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / 1600);
+          can.setAttribute('transform', 'translate(' + cx.toFixed(0) + ' ' + cy.toFixed(0) + ') rotate(' + (Math.min(1, k * 4) * 30).toFixed(0) + ')');
+          if (k > 0.2 && k < 0.9) for (var i = 0; i < 3; i++) front.add({ x: cx + 80 + rand(-6, 6), y: cy + 10, vx: rand(10, 60), vy: rand(0, 80), term: 500, g: 1200, sway: 0, r: rand(2, 3.5), floor: groundY, draw: spray });
+          if (k < 1) requestAnimationFrame(step); else can.classList.remove('is-on');
+        })(t0);
+      });
+      S.on('weed', function () { weedPull(S.pick()); });
+      S.on('bee', function () { sendBee(S.pick()); });
+      S.on('follow', function () { addFlower(S.NAMES[flNext % S.NAMES.length] + (flNext >= S.NAMES.length ? flNext : ''), true); });
+      S.on('celebrate', function () {
+        S.pulse('celebrate', 3500);
+        for (var i = 0; i < 140; i++) front.add({ x: rand(0, W), y: -30 - rand(0, 200), vy: rand(80, 160), term: rand(60, 110), sway: rand(30, 70), r: rand(5, 9), c: petalCols[Math.floor(Math.random() * 5)], floor: groundY, draw: petal });
+        S.tag(tags, 'Thank you, ' + S.pick() + '!', W / 2, 420, true);
+      });
+      S.on('board', function () { leaders.show(); });
+      S.toggle('time', function (v) { timeOn = v; });
+      S.toggle('rain', function (v) { raining = v; });
+      S.bindControls(function (key) {
+        if (key === 'colors') readCols();
+        if (key === 'branch') branchFlip.setAttribute('transform', stage.dataset.branch === 'right' ? 'translate(1920 0) scale(-1 1)' : '');
+      });
+
+      // Spotlight: alle 8 s eine Blume
+      setInterval(function () {
+        var live = flowers.filter(Boolean);
+        if (!live.length) return;
+        var f = live[Math.floor(Math.random() * live.length)];
+        f.head.classList.remove('is-spot'); void f.head.getBoundingClientRect(); f.head.classList.add('is-spot');
+        S.tag(tags, f.label, f.x, f.y - 50, false);
+      }, 8000);
+
+      for (var n = 0; n < 12; n++) addFlower(S.NAMES[n % S.NAMES.length] + (n >= S.NAMES.length ? n : ''), false);
+      showWeeds();
+    })();
+  </script>
+</body>
+</html>

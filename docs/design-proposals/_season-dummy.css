@@ -1,0 +1,163 @@
+/* Gemeinsames Gerüst der Jahreszeiten-Klickdummys (winter/spring/summer-decor.html):
+   Seitenlayout, Steuerleiste, skalierte 1920×1080-Bühne, Spiel-Platzhalter,
+   Namensschilder und Ranglisten-HUD. */
+@font-face {
+  font-family: 'DM Sans';
+  src: url('../../assets/DM-Sans.woff2') format('woff2');
+  font-weight: 100 900;
+}
+
+:root {
+  --bg: #f4f3f1;
+  --panel: #ffffff;
+  --text: #1d1a17;
+  --muted: #605a52;
+  --line: #dcd6cd;
+  --accent: #5e2a79;
+  --focus: #5e2a79;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121114; --panel: #1c1a20; --text: #f1eef4; --muted: #a8a1b0;
+    --line: #34303b; --accent: #f2b705; --focus: #f2b705;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.45 'DM Sans', system-ui, sans-serif;
+}
+.skip {
+  position: absolute; left: 12px; top: -60px;
+  background: var(--panel); color: var(--text);
+  padding: 10px 14px; border-radius: 8px; border: 2px solid var(--focus);
+  z-index: 10;
+}
+.skip:focus { top: 12px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+header { padding: 20px 24px 8px; }
+header h1 { font-size: 22px; }
+header p { color: var(--muted); max-width: 900px; }
+header nav { margin-top: 6px; display: flex; gap: 16px; flex-wrap: wrap; }
+header nav a { color: var(--accent); font-weight: 600; min-height: 24px; display: inline-block; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 290px 1fr;
+  gap: 20px;
+  padding: 12px 24px 24px;
+  align-items: start;
+}
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 12px 16px; } }
+
+.controls {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  display: grid;
+  gap: 16px;
+}
+fieldset { border: 0; display: grid; gap: 8px; }
+legend { font-weight: 700; margin-bottom: 6px; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 28px; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+.field { display: grid; gap: 4px; }
+.field label { font-weight: 600; }
+.field__row { display: flex; align-items: center; gap: 10px; }
+.field__row input[type="range"] { flex: 1; min-height: 28px; accent-color: var(--accent); }
+.field__row output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+select {
+  min-height: 36px; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit;
+}
+.btn {
+  min-height: 40px; padding: 8px 12px; border-radius: 8px;
+  border: 2px solid var(--accent); background: transparent; color: var(--text);
+  font: 600 14px 'DM Sans', sans-serif; cursor: pointer; text-align: left;
+}
+.btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+.btn[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+.hint { color: var(--muted); font-size: 13px; }
+
+.stage-col { min-width: 0; }
+.stage-wrap {
+  --s: 0.5;
+  width: calc(1920px * var(--s));
+  height: calc(1080px * var(--s));
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: repeating-conic-gradient(#2a2a2a 0 25%, #333 0 50%) 0 0 / 40px 40px;
+}
+
+/* ═══════════════ Bühne 1920×1080 ═══════════════ */
+.stage {
+  position: relative;
+  width: 1920px; height: 1080px;
+  transform: scale(var(--s));
+  transform-origin: 0 0;
+  overflow: hidden;
+  font-family: 'DM Sans', sans-serif;
+}
+.layer { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
+/* Gestellter Gameplay-Hintergrund; die Farbe setzt jede Jahreszeit über --game-top/--game-bottom */
+.game { position: absolute; inset: 0; background: linear-gradient(var(--game-top, #33405a) 0%, var(--game-mid, #5a6a80) 55%, var(--game-low, #5b6b58) 56%, var(--game-bottom, #3e4a3a) 100%); }
+.stage[data-game="0"] .game { display: none; }
+.game__mtn { position: absolute; left: 0; right: 0; top: 330px; height: 300px; background: var(--game-mtn, #3a4660); clip-path: polygon(0 100%, 0 55%, 12% 25%, 24% 60%, 38% 10%, 52% 58%, 66% 20%, 80% 62%, 92% 30%, 100% 50%, 100% 100%); }
+.game__label { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); color: rgba(255,255,255,.25); font-size: 64px; font-weight: 800; letter-spacing: 8px; }
+.game__compass { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); width: 640px; height: 34px; border-radius: 6px; background: rgba(0,0,0,.35); color: rgba(255,255,255,.8); font-size: 18px; letter-spacing: 18px; text-align: center; line-height: 34px; }
+.game__map { position: absolute; right: 30px; top: 70px; width: 250px; height: 250px; border: 2px solid rgba(255,255,255,.5); background: rgba(40,50,40,.75); }
+.game__hp { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); width: 520px; height: 18px; border-radius: 9px; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5); }
+.game__hp::after { content: ''; position: absolute; inset: 2px 30% 2px 2px; border-radius: 6px; background: #e8e8e8; }
+.game__cam { position: absolute; left: 30px; bottom: 30px; width: 400px; height: 225px; border: 3px solid #f2b705; background: #222 linear-gradient(135deg, #3a2f4a, #1f1a28); color: rgba(255,255,255,.5); display: grid; place-items: center; font-size: 22px; letter-spacing: 4px; }
+
+/* Namensschilder */
+.name-tag {
+  font: 700 17px 'DM Sans', sans-serif;
+  fill: #fff;
+  paint-order: stroke;
+  stroke: rgba(0, 0, 0, 0.7);
+  stroke-width: 4px;
+  animation: tagFade 3.6s ease-in-out forwards;
+}
+.name-tag--big { font-size: 30px; font-weight: 800; fill: var(--tag-big, #ffd75e); stroke-width: 6px; }
+@keyframes tagFade { 0% { opacity: 0; } 12%, 75% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Spotlight */
+.is-spot { animation: spot 3.2s ease-in-out both; }
+@keyframes spot {
+  0%, 100% { filter: none; }
+  20%, 80% { filter: drop-shadow(0 0 8px #fff6d0) drop-shadow(0 0 18px var(--spot, #ffd23f)) brightness(1.2); }
+}
+
+/* Ranglisten-HUD und Gemeinschafts-Zähler */
+.hud {
+  position: absolute; left: 50%; top: 150px; transform: translateX(-50%);
+  display: grid; justify-items: center; gap: 10px;
+  color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+.hud__box {
+  display: none;
+  min-width: 320px;
+  padding: 10px 22px 12px;
+  border-radius: 14px;
+  background: var(--hud-bg, rgba(20, 24, 36, 0.82));
+  border: 2px solid var(--hud-line, rgba(255, 255, 255, 0.6));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.hud__box.is-on { display: block; animation: hudIn 0.3s ease-out; }
+@keyframes hudIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+.hud__box h2 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
+.hud__box ol { list-style: none; font-size: 20px; font-weight: 600; }
+.hud__box li { display: flex; justify-content: space-between; gap: 30px; padding: 2px 0; }
+.hud__box li:first-child { color: var(--tag-big, #ffd75e); font-weight: 800; }
+.hud__count { font-size: 26px; font-weight: 800; text-align: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage *, .stage *::before, .stage *::after { animation: none !important; transition: none !important; }
+}

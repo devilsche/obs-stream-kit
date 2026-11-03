@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Summer Decor Mockup</title>
+  <!--
+    Klickdummy Sommerdeko: Sonne in der Ecke, Strand unten mit Follower-
+    Sandburgen (Fahne mit Namen), Hitzeflimmern, abends Glühwürmchen.
+    Spiel: bei Hitzewelle steigt die Hitze, der Chat kühlt mit Wasser
+    (Rangliste); Eis schmilzt in der Sonne, je heißer, desto schneller.
+    Nur zum Ansehen und Abstimmen, noch keine OBS-Source.
+  -->
+  <link rel="stylesheet" href="_season-dummy.css" />
+  <style>
+    .stage {
+      --game-top: #3d8fd6; --game-mid: #9ccbef; --game-low: #c9b27a; --game-bottom: #9b8455; --game-mtn: #5f8fb8;
+      --tag-big: #fff3b0; --spot: #ffb43a; --hud-bg: rgba(20, 50, 80, 0.82); --hud-line: rgba(255, 220, 120, 0.8);
+      --heat: 0.3;
+    }
+
+    /* Wärme-Schleier aus der Sonnenecke */
+    .tint { position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--heat) * 0.55); background: radial-gradient(circle at 92% 6%, rgba(255, 170, 40, 0.75), rgba(255, 120, 30, 0.25) 45%, transparent 75%); }
+    .stage[data-sunpos="left"] .tint { background: radial-gradient(circle at 8% 6%, rgba(255, 170, 40, 0.75), rgba(255, 120, 30, 0.25) 45%, transparent 75%); }
+    .stage[data-evening="1"] .tint { opacity: 0.55; background: linear-gradient(rgba(20, 20, 70, 0.75), rgba(60, 30, 80, 0.35) 60%, rgba(255, 120, 60, 0.2)); }
+
+    /* Sonne */
+    .stage[data-sun="0"] .sun, .stage[data-evening="1"] .sun { display: none; }
+    .sun__rays { fill: #ffd23f; opacity: 0.55; animation: spin 40s linear infinite; transform-box: fill-box; transform-origin: center; }
+    .sun__disc { fill: url(#sunG); filter: url(#sunGlow); }
+    .sun__inner { transform-box: fill-box; transform-origin: center; transform: scale(calc(0.85 + var(--heat) * 0.4)); transition: transform 1s; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stage[data-celebrate="1"] .sun__rays { animation-duration: 3s; opacity: 0.9; }
+    .sun__face { fill: none; stroke: #c96a00; stroke-width: 5; stroke-linecap: round; }
+    .sun__shades { fill: #1d1d24; }
+
+    /* Strand */
+    .stage[data-beach="0"] .beach { display: none; }
+    .sand { fill: url(#sandG); }
+    .sand-dot { fill: #b8955a; opacity: 0.5; }
+    .shell { fill: #ffe0d0; stroke: #d9a08a; stroke-width: 1.5; }
+    .castle { fill: #e2c27f; stroke: #b8955a; stroke-width: 2; }
+    .castle-door { fill: #9b7a45; }
+    .flagpole { stroke: #6b4a2b; stroke-width: 2.5; }
+    .flag { transform-box: fill-box; transform-origin: 0% 50%; animation: flutter 1.6s ease-in-out infinite; }
+    .stage[data-celebrate="1"] .flag { animation-duration: 0.3s; }
+    @keyframes flutter { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(8deg) scaleX(0.85); } }
+    .f1 { fill: #e84a5f; } .f2 { fill: #2a9df4; } .f3 { fill: #f2b705; } .f4 { fill: #8e4bb8; } .f5 { fill: #2ec27e; }
+    .castle-g { transform-box: fill-box; transform-origin: 50% 100%; }
+    .castle-g--new { animation: rise 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+    @keyframes rise { from { transform: scaleY(0); } to { transform: none; } }
+    .umbrella__top { fill: #e84a5f; }
+    .umbrella__stripe { fill: #ffffff; }
+    .umbrella__pole { stroke: #e8e2d0; stroke-width: 5; }
+    .stage[data-umbrella="0"] .umbrella { display: none; }
+
+    /* Eis */
+    .cone { fill: #d9a35a; stroke: #a8742e; stroke-width: 2; }
+    .cone-grid { fill: none; stroke: #a8742e; stroke-width: 1.2; }
+    .scoop1 { fill: #ffb3c8; } .scoop2 { fill: #fff3d6; } .scoop3 { fill: #8b5a3c; } .scoop4 { fill: #b9f0c0; }
+
+    /* Wasserball */
+    .ball-w { fill: #ffffff; stroke: #2a64b8; stroke-width: 2; }
+    .ball-r { fill: #e84a5f; } .ball-b { fill: #2a9df4; } .ball-y { fill: #f2b705; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <header>
+    <h1>Summer decor: click dummy</h1>
+    <p>A sun in the corner and a beach along the bottom. Followers build a sandcastle with their name on the flag. During a heatwave the heat rises and chat cools things down with water (leaderboard); ice creams melt, faster the hotter it is. In the evening fireflies come out.</p>
+    <nav aria-label="Other season mockups"><a href="autumn-decor.html">Autumn</a><a href="winter-decor.html">Winter</a><a href="spring-decor.html">Spring</a></nav>
+  </header>
+
+  <main class="layout">
+    <form class="controls" id="controls" aria-label="Decor settings">
+      <fieldset>
+        <legend>Elements</legend>
+        <label class="check"><input type="checkbox" data-key="sun" checked> Sun</label>
+        <label class="check"><input type="checkbox" data-key="beach" checked> Beach with sandcastles</label>
+        <label class="check"><input type="checkbox" data-key="umbrella" checked> Beach umbrella</label>
+        <label class="check"><input type="checkbox" data-key="shimmer" checked> Heat shimmer</label>
+        <label class="check"><input type="checkbox" data-key="evening"> Evening with fireflies</label>
+        <label class="check"><input type="checkbox" data-key="game" checked> Game placeholder</label>
+      </fieldset>
+      <div class="field">
+        <label for="f-sunpos">Sun position</label>
+        <select id="f-sunpos" data-key="sunpos">
+          <option value="right">Top right</option>
+          <option value="left">Top left</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="heat">Heat</label>
+        <div class="field__row"><input type="range" id="heat" min="0" max="100" value="30" /><output id="heatOut" for="heat">30%</output></div>
+      </div>
+
+      <fieldset>
+        <legend>Gimmicks (later via Streamer.bot)</legend>
+        <button type="button" class="btn" id="wave" aria-pressed="false">Heatwave: heat rises (!sun)</button>
+        <button type="button" class="btn" id="splash">Chatter cools down (!splash)</button>
+        <button type="button" class="btn" id="ice">Chatter gets an ice cream (!ice)</button>
+        <button type="button" class="btn" id="follow">Follower builds a sandcastle</button>
+        <button type="button" class="btn" id="celebrate">Celebrate (e.g. new sub)</button>
+        <button type="button" class="btn" id="board">Show top coolers</button>
+        <p class="hint">The sun grows and the screen gets warmer with the heat. Each !splash takes 5% off. Ice creams melt in about 40 s when it is cool and 12 s at full heat. In the preview the heatwave and the melting run faster.</p>
+      </fieldset>
+    </form>
+
+    <div class="stage-col" id="col">
+    <div class="stage-wrap">
+      <div class="stage" id="stage" data-sun="1" data-beach="1" data-umbrella="1" data-shimmer="1" data-evening="0" data-sunpos="right" data-game="1"
+           role="img" aria-label="Stream preview with summer decor">
+        <div class="game" aria-hidden="true">
+          <div class="game__mtn"></div>
+          <div class="game__label">GAMEPLAY</div>
+          <div class="game__compass">N · 15 · 30 · NE · 60</div>
+          <div class="game__map"></div>
+          <div class="game__hp"></div>
+          <div class="game__cam">CAM</div>
+        </div>
+        <div class="tint" aria-hidden="true"></div>
+        <svg width="0" height="0" aria-hidden="true">
+          <defs>
+            <radialGradient id="sunG" cx=".42" cy=".4"><stop offset="0" stop-color="#fff7c2" /><stop offset=".55" stop-color="#ffd23f" /><stop offset="1" stop-color="#ff9f1c" /></radialGradient>
+            <filter id="sunGlow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="14" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
+            <linearGradient id="sandG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f3dca2" /><stop offset="1" stop-color="#d9b874" /></linearGradient>
+          </defs>
+        </svg>
+
+        <svg class="layer sun" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g id="sunPos">
+            <g class="sun__inner">
+              <path class="sun__rays" id="rays" />
+              <circle class="sun__disc" r="92" />
+              <path class="sun__face" d="M-38 22 Q0 52 38 22" />
+              <path class="sun__shades" d="M-62 -22 L-8 -22 Q-8 12 -34 12 Q-60 12 -62 -22 Z M8 -22 L62 -22 Q60 12 34 12 Q8 12 8 -22 Z M-8 -18 L8 -18 L8 -12 L-8 -12 Z" />
+            </g>
+          </g>
+        </svg>
+        <canvas class="layer" id="backCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer beach" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g class="umbrella" id="umbrella"></g>
+          <path class="sand" id="sand" />
+          <g id="sandDeco"></g>
+          <g id="castles"></g>
+          <g id="ices"></g>
+        </svg>
+        <canvas class="layer" id="frontCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g id="ballG"></g>
+          <g id="tags"></g>
+        </svg>
+        <div class="hud" aria-hidden="true">
+          <div class="hud__box" id="boardBox"><h2>Top coolers</h2><ol id="boardList"></ol></div>
+        </div>
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <script src="_season-dummy.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = SD, W = S.W, H = S.H, el = S.el, rnd = S.rnd, rand = S.rand, clamp01 = S.clamp01;
+      var stage = S.stage;
+      var tags = document.getElementById('tags');
+      var heat = 0.3, heatwave = false;
+      var leaders = S.Leaders(document.getElementById('boardBox'), document.getElementById('boardList'));
+      var varStyle = document.createElement('style');
+      document.head.appendChild(varStyle);
+
+      // ── Sonne ──
+      (function () {
+        var d = '';
+        for (var i = 0; i < 16; i++) {
+          var a = i / 16 * Math.PI * 2, b = a + 0.1, c = a - 0.1, R = i % 2 ? 150 : 185;
+          d += 'M' + (Math.cos(c) * 100).toFixed(0) + ' ' + (Math.sin(c) * 100).toFixed(0) +
+               ' L' + (Math.cos(a) * R).toFixed(0) + ' ' + (Math.sin(a) * R).toFixed(0) +
+               ' L' + (Math.cos(b) * 100).toFixed(0) + ' ' + (Math.sin(b) * 100).toFixed(0) + ' Z ';
+        }
+        document.getElementById('rays').setAttribute('d', d);
+      })();
+      function placeSun() {
+        document.getElementById('sunPos').setAttribute('transform', stage.dataset.sunpos === 'left' ? 'translate(150 150)' : 'translate(1770 150)');
+      }
+
+      // ── Strand ──
+      function sandY(x) { return H - 70 - 10 * Math.sin(x / 140) - 6 * Math.sin(x / 47 + 1); }
+      (function () {
+        var d = 'M0 ' + H;
+        for (var x = 0; x <= W; x += 16) d += ' L' + x + ' ' + sandY(x).toFixed(1);
+        document.getElementById('sand').setAttribute('d', d + ' L' + W + ' ' + H + ' Z');
+        var deco = document.getElementById('sandDeco');
+        for (var i = 0; i < 160; i++) { var dx = rnd() * W; el('circle', { 'class': 'sand-dot', cx: dx.toFixed(0), cy: (sandY(dx) + 10 + rnd() * 50).toFixed(0), r: (1 + rnd() * 2).toFixed(1) }, deco); }
+        [[300, 1], [1130, -1], [1590, 1]].forEach(function (s) {
+          var g = el('g', { transform: 'translate(' + s[0] + ' ' + (sandY(s[0]) + 28).toFixed(0) + ') scale(' + s[1] + ' 1)' }, deco);
+          el('path', { 'class': 'shell', d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
+        });
+        var u = document.getElementById('umbrella'), ux = 1500, uy = sandY(1500) + 20;
+        el('line', { 'class': 'umbrella__pole', x1: ux, y1: uy, x2: ux - 30, y2: uy - 260 }, u);
+        var top = el('g', { transform: 'translate(' + (ux - 30) + ' ' + (uy - 260) + ') rotate(-7)' }, u);
+        el('path', { 'class': 'umbrella__top', d: 'M-150 30 Q0 -70 150 30 Q120 18 100 30 Q75 16 50 30 Q25 16 0 30 Q-25 16 -50 30 Q-75 16 -100 30 Q-120 18 -150 30 Z' }, top);
+        el('path', { 'class': 'umbrella__stripe', d: 'M-50 30 Q-30 -30 0 -40 Q-14 -10 0 30 Q-25 16 -50 30 Z M50 30 Q30 -30 0 -40 Q14 -10 0 30 Q25 16 50 30 Z' }, top);
+      })();
+
+      // ── Sandburgen der Follower ──
+      var castlesG = document.getElementById('castles');
+      var CASTLE_X = [520, 1760, 780, 1300, 960, 1660, 640, 1150, 1840, 880, 1420, 1040];
+      var castles = [], cNext = 0;
+      function addCastle(name, animate) {
+        var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.8 + (i % 3) * 0.15;
+        if (castles[i]) castles[i].node.remove();
+        var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, castlesG);
+        var g = el('g', { 'class': 'castle-g' + (animate ? ' castle-g--new' : '') }, outer);
+        el('path', { 'class': 'castle', d: 'M-50 0 L-50 -40 L50 -40 L50 0 Z' }, g);
+        el('path', { 'class': 'castle', d: 'M-58 0 L-58 -64 L-52 -64 L-52 -72 L-44 -72 L-44 -64 L-36 -64 L-36 -72 L-28 -72 L-28 -64 L-24 -64 L-24 0 Z' }, g);
+        el('path', { 'class': 'castle', d: 'M24 0 L24 -64 L28 -64 L28 -72 L36 -72 L36 -64 L44 -64 L44 -72 L52 -72 L52 -64 L58 -64 L58 0 Z' }, g);
+        el('path', { 'class': 'castle', d: 'M-16 -40 L-16 -84 L-10 -84 L-10 -92 L-2 -92 L-2 -84 L2 -84 L2 -92 L10 -92 L10 -84 L16 -84 L16 -40 Z' }, g);
+        el('path', { 'class': 'castle-door', d: 'M-10 0 L-10 -20 Q0 -32 10 -20 L10 0 Z' }, g);
+        el('line', { 'class': 'flagpole', x1: 0, y1: -92, x2: 0, y2: -140 }, g);
+        el('path', { 'class': 'flag f' + (1 + i % 5), d: 'M1 -140 L36 -132 L1 -122 Z' }, g);
+        castles[i] = { node: outer, inner: g, x: x, y: y - 150 * k, label: name };
+        cNext++;
+        if (animate) S.tag(tags, name, x, y - 160 * k, false);
+      }
+
+      // ── Eis ──
+      var icesG = document.getElementById('ices');
+      var ices = [];
+      function addIce(name) {
+        var x = rand(200, W - 200), y = sandY(x) + 30, flavor = 1 + Math.floor(Math.random() * 4);
+        var g = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, icesG);
+        var puddle = el('ellipse', { 'class': 'scoop' + flavor, cx: 0, cy: 2, rx: 0, ry: 0 }, g);
+        el('path', { 'class': 'cone', d: 'M-20 -70 L20 -70 L0 0 Z' }, g);
+        el('path', { 'class': 'cone-grid', d: 'M-14 -62 L8 -24 M-6 -70 L13 -40 M14 -62 L-8 -24 M6 -70 L-13 -40' }, g);
+        var drip = el('path', { 'class': 'scoop' + flavor }, g);
+        var scoop = el('circle', { 'class': 'scoop' + flavor, cx: 0, cy: -84, r: 26 }, g);
+        ices.push({ node: g, scoop: scoop, drip: drip, puddle: puddle, m: 0 });
+        S.tag(tags, name + ' got an ice cream!', x, y - 150, true);
+      }
+      function stepIces(dt) {
+        for (var i = ices.length - 1; i >= 0; i--) {
+          var c = ices[i];
+          c.m += 3 * dt / (40 - 28 * heat);   // Stream: 40 s kühl … 12 s heiß; Vorschau 3× schneller
+          var m = Math.min(1, c.m);
+          c.scoop.setAttribute('r', (26 * (1 - m * 0.85)).toFixed(1));
+          c.scoop.setAttribute('cy', (-84 + m * 30).toFixed(1));
+          var dl = m * 46;
+          c.drip.setAttribute('d', m < 0.05 ? '' : 'M-10 -72 Q-12 ' + (-72 + dl).toFixed(0) + ' -6 ' + (-70 + dl).toFixed(0) + ' Q-2 ' + (-72 + dl).toFixed(0) + ' -2 -72 Z M6 -72 Q6 ' + (-72 + dl * 0.6).toFixed(0) + ' 10 ' + (-70 + dl * 0.6).toFixed(0) + ' Q14 ' + (-72 + dl * 0.6).toFixed(0) + ' 12 -72 Z');
+          c.puddle.setAttribute('rx', (m * 46).toFixed(1));
+          c.puddle.setAttribute('ry', (m * 9).toFixed(1));
+          if (c.m > 1.4) { c.node.remove(); ices.splice(i, 1); }
+        }
+      }
+
+      // ── Partikel ──
+      var back = S.Particles(document.getElementById('backCanvas'));
+      var front = S.Particles(document.getElementById('frontCanvas'));
+      var bctxRaw = document.getElementById('backCanvas').getContext('2d');
+      function droplet(ctx, p, a) {
+        ctx.globalAlpha = a * 0.9; ctx.fillStyle = p.c || '#8fd3ff';
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+      function firefly(ctx, p, a) {
+        var tw = 0.5 + 0.5 * Math.sin(p.age * p.vph * 2);
+        ctx.globalAlpha = a * tw;
+        var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14);
+        g.addColorStop(0, 'rgba(255,250,170,1)'); g.addColorStop(0.3, 'rgba(220,255,120,.6)'); g.addColorStop(1, 'rgba(200,255,100,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
+      }
+
+      // Hitzeflimmern: wellige Linien steigen vom Sand auf
+      var shimmerT = 0;
+      function drawShimmer(ctx) {
+        if (stage.dataset.shimmer !== '1' || heat < 0.15 || stage.dataset.evening === '1') return;
+        ctx.save();
+        ctx.strokeStyle = 'rgba(255,255,255,' + (heat * 0.22).toFixed(3) + ')';
+        ctx.lineWidth = 2;
+        for (var j = 0; j < 7; j++) {
+          var yy = sandY(0) - ((shimmerT * 40 + j * 40) % 280);
+          ctx.globalAlpha = clamp01(1 - (sandY(0) - yy) / 280);
+          ctx.beginPath();
+          for (var x = 0; x <= W; x += 24) {
+            var y = yy + Math.sin(x / 60 + shimmerT * 3 + j) * 5;
+            if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // ── Zustand ──
+      var heatSlider = S.slider('heat', function (v) { heat = v; });
+      var ffAcc = 0, lastHeat = -1;
+      S.loop(function (dt) {
+        if (heatwave) { heat = Math.min(1, heat + 0.03 * dt); heatSlider.set(heat); }
+        if (Math.abs(heat - lastHeat) > 0.003) { varStyle.textContent = '.stage{--heat:' + heat.toFixed(3) + '}'; lastHeat = heat; }
+        stepIces(dt);
+        if (stage.dataset.evening === '1') {
+          ffAcc += dt * 3;
+          while (ffAcc >= 1 && back.count() < 60) {
+            ffAcc--;
+            back.add({ x: rand(0, W), y: rand(H - 520, H - 120), vy: -rand(5, 15), term: 20, g: 0, sway: rand(20, 50), vph: rand(0.8, 2), vr: 0, wf: 0, life: rand(5, 9), draw: firefly });
+          }
+        }
+        shimmerT += dt;
+        back.step(dt);
+        drawShimmer(bctxRaw);
+        front.step(dt);
+      });
+
+      // ── Gimmicks ──
+      S.on('splash', function () {
+        var name = S.pick(), x = rand(300, W - 300), y = rand(300, 650);
+        heat = Math.max(0, heat - 0.05); heatSlider.set(heat);
+        leaders.add(name);
+        for (var i = 0; i < 70; i++) {
+          var a = rand(0, Math.PI * 2), sp = rand(150, 700);
+          front.add({ x: x, y: y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 200, g: 1400, term: 900, sway: 0, vr: 0, r: rand(3, 8), c: Math.random() < 0.3 ? '#ffffff' : '#7cc8ff', life: 1.6, draw: droplet });
+        }
+        S.tag(tags, name + ' cooled things down!', x, y - 80, true);
+      });
+      S.on('ice', function () { addIce(S.pick()); });
+      S.on('follow', function () { addCastle(S.NAMES[cNext % S.NAMES.length] + (cNext >= S.NAMES.length ? cNext : ''), true); });
+      var ballG = document.getElementById('ballG');
+      S.on('celebrate', function () {
+        S.pulse('celebrate', 3500);
+        S.tag(tags, 'Thank you, ' + S.pick() + '!', W / 2, 420, true);
+        if (S.reduced) return;
+        var b = el('g', {}, ballG);
+        var spin = el('g', {}, b);
+        el('circle', { 'class': 'ball-w', r: 44 }, spin);
+        el('path', { 'class': 'ball-r', d: 'M0 0 L0 -44 A44 44 0 0 1 38 -22 Z' }, spin);
+        el('path', { 'class': 'ball-b', d: 'M0 0 L38 22 A44 44 0 0 1 0 44 Z' }, spin);
+        el('path', { 'class': 'ball-y', d: 'M0 0 L-38 22 A44 44 0 0 1 -38 -22 Z' }, spin);
+        el('circle', { cx: 0, cy: 0, r: 7, fill: '#fff' }, spin);
+        var t0 = performance.now();
+        (function step(now) {
+          var t = (now - t0) / 1000, x = -60 + t * 520;
+          var bounce = Math.abs(Math.sin(t * 3.2)) * 260 * Math.exp(-t * 0.25);
+          var y = sandY(Math.max(0, Math.min(W, x))) - 40 - bounce;
+          b.setAttribute('transform', 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')');
+          spin.setAttribute('transform', 'rotate(' + (t * 300).toFixed(0) + ')');
+          if (x < W + 80) requestAnimationFrame(step); else b.remove();
+        })(t0);
+        for (var i = 0; i < 60; i++) front.add({ x: rand(0, W), y: -20, vy: rand(80, 200), term: rand(120, 220), sway: rand(10, 40), r: rand(3, 7), c: ['#e84a5f', '#2a9df4', '#f2b705', '#2ec27e', '#ffffff'][i % 5], floor: sandY, draw: droplet });
+      });
+      S.on('board', function () { leaders.show(); });
+      S.toggle('wave', function (v) { heatwave = v; });
+      S.bindControls(function (key) { if (key === 'sunpos') placeSun(); });
+
+      // Spotlight: alle 8 s eine Sandburg
+      setInterval(function () {
+        var live = castles.filter(Boolean);
+        if (!live.length) return;
+        var c = live[Math.floor(Math.random() * live.length)];
+        c.inner.classList.remove('is-spot'); void c.inner.getBoundingClientRect(); c.inner.classList.add('is-spot');
+        S.tag(tags, c.label, c.x, c.y, false);
+      }, 8000);
+
+      placeSun();
+      for (var n = 0; n < 6; n++) addCastle(S.NAMES[n], false);
+    })();
+  </script>
+</body>
+</html>
