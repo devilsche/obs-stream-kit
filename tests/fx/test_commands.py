@@ -160,21 +160,13 @@ def test_xmas_ornament_name_is_sanitized():
 def test_xmas_simple_commands():
     for cmd in ("celebrate", "clear", "reset"):
         assert commands.parse("xmas", {"cmd": cmd}) == {"cmd": cmd, "params": {}}
+    assert commands.parse("xmas", {"cmd": "clear", "kind": "gifts"})["params"] == {"kind": "gifts"}
 
 
-def test_xmas_ornaments_are_kept_as_state():
-    commands.push(1, "xmas", commands.parse("xmas", {"cmd": "ornament", "name": "Hat3"}))
-    commands.push(1, "xmas", commands.parse("xmas", {"cmd": "ornament"}))
-    commands.push(1, "xmas", commands.parse("xmas", {"cmd": "celebrate"}))
-    state = commands.poll(1, "xmas", None)["state"]
-    assert state == {"ornaments": ["Hat3", ""]}
-    for i in range(commands.MAX_ORNAMENTS + 3):
-        commands.push(1, "xmas", {"cmd": "ornament", "params": {"name": str(i)}})
-    orn = commands.poll(1, "xmas", None)["state"]["ornaments"]
-    assert len(orn) == commands.MAX_ORNAMENTS
-    assert orn[-1] == str(commands.MAX_ORNAMENTS + 2)
-    commands.push(1, "xmas", {"cmd": "clear", "params": {}})
-    assert commands.poll(1, "xmas", None)["state"] == {"ornaments": []}
-    # andere Tenants und Effekte sehen davon nichts
-    assert commands.poll(2, "xmas", None)["state"] == {}
-    assert commands.poll(1, "rain", None)["state"] == {}
+def test_xmas_gift_defaults_and_limits():
+    assert commands.parse("xmas", {"cmd": "gift", "name": "Mia"})["params"] == {
+        "name": "Mia", "type": "sub", "amount": 1}
+    out = commands.parse("xmas", {"cmd": "gift", "name": "Bob", "type": "BITS", "amount": "999999"})
+    assert out["params"] == {"name": "Bob", "type": "bits", "amount": 100000}
+    assert commands.parse("xmas", {"cmd": "gift", "type": "laser"})["params"] == {
+        "type": "sub", "amount": 1}

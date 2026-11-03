@@ -352,7 +352,7 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 |-------|-------------|-------|
 | `effects/snow.html` | Schneefall (Greenscreen-Video) | Loop |
 | `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze — mit synthetischem Regen-/Wind-/Donner-Sound | Loop |
-| `effects/xmas.html` | Weihnachtsschmuck: Lichterkette, Baum mit Stern und Geschenken, hängende Kugeln, Schneehaufen — alles einzeln schalt- und einstellbar, Follower-Kugeln und Celebrate per Streamer.bot | Dauerhaft |
+| `effects/xmas.html` | Weihnachtsschmuck: Lichterkette, Baum mit Stern, hängende Kugeln, Schneehaufen — alles einzeln schalt- und einstellbar; Follower-Kugeln und Geschenke (Sub, Bits, Raid …) per Streamer.bot, dauerhaft gespeichert | Dauerhaft |
 | `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
@@ -426,11 +426,25 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 |--------|---------|
 | `cmd=set&…` | beliebige Parameter von oben live ändern, z. B. `cmd=set&lights=off` oder `cmd=set&tree=0&snow=0` |
 | `cmd=celebrate` | 4 s Lauflicht, alles heller, Kugeln wackeln, Stern dreht schnell — z. B. bei Sub |
-| `cmd=ornament&name=%user%` | Follower hängt eine Kugel an den Baum, Name kurz sichtbar. 12 Plätze, danach wird die älteste ersetzt |
-| `cmd=clear` | Follower-Kugeln entfernen |
+| `cmd=ornament&name=%user%` | Follow: Kugel an den Baum, Name kurz sichtbar. Pro Name nur eine Kugel (Refollow zählt nicht doppelt) |
+| `cmd=gift&type=…&name=%user%&amount=…` | Geschenk unter den Baum, Name kurz sichtbar. Typen und Streamer.bot-Variablen siehe unten |
+| `cmd=clear` | **alles dauerhaft löschen**; `&kind=ornaments` bzw. `&kind=gifts` nur eine Sorte |
 | `cmd=reset` | zurück auf die Werte aus der Source-URL |
 
-Die Follower-Kugeln merkt sich der Server (bis zu seinem nächsten Neustart), ein Neuladen der Source verliert sie also nicht. `?tune=1` zeigt Verbindungsstatus; Tasten **C** = Celebrate, **O** = Test-Kugel.
+| Ereignis (Streamer.bot-Trigger) | Befehl | Aussehen |
+|---------------------------------|--------|----------|
+| Follow | `cmd=ornament&name=%user%` | Kugel |
+| Sub | `cmd=gift&type=sub&name=%user%` | rotes Paket, goldene Schleife |
+| Resub | `cmd=gift&type=resub&name=%user%&amount=%cumulative%` | grünes Paket, ab 12 Monaten größer |
+| Gift Sub / Gift Bomb | `cmd=gift&type=giftsub&name=%user%&amount=%gifts%` | lila Paket, wächst mit der Anzahl |
+| Cheer | `cmd=gift&type=bits&name=%user%&amount=%bits%` | kleines blaues Paket, ab 1000 / 10000 Bits größer |
+| Raid | `cmd=gift&type=raid&name=%user%&amount=%viewers%` | großes oranges Paket, ab 50 Zuschauern größer |
+
+**Dauerhaft:** Kugeln und Geschenke liegen in der Datenbank (Tabelle `fx_xmas_item`) und überstehen Neuladen, Szenenwechsel und Server-Neustarts — geleert wird nur per `cmd=clear`. Sichtbar sind die neuesten **60 Kugeln** und **15 Geschenke**, ältere bleiben gespeichert; unter dem Baum zählt eine Zeile alle („128 ornaments · 23 gifts“).
+
+**Spotlight:** Alle 8 s leuchtet eine zufällige Kugel oder ein Geschenk auf und zeigt kurz den Namen — so kommt im Lauf des Streams jeder mal dran.
+
+`?tune=1` zeigt Verbindungsstatus; Tasten **C** = Celebrate, **O** = Test-Kugel, **G** = Test-Geschenk (nur lokal, nicht gespeichert).
 
 #### Rain-Sound über Streamer.bot (WAV)
 

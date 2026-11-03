@@ -13,7 +13,6 @@ import time
 from collections import deque
 
 MAX_KEEP = 20
-MAX_ORNAMENTS = 12
 MAX_NAME = 20
 EPOCH = format(int(time.time() * 1000), "x")
 
@@ -106,19 +105,6 @@ def _name(v):
     return v or None
 
 
-def _xmas_state(state, command):
-    """Follower-Kugeln überdauern ein Neuladen der Source: der Server merkt
-    sich die Namen (nur im Speicher, wie die Befehle selbst)."""
-    orn = list(state.get("ornaments", []))
-    if command["cmd"] == "ornament":
-        orn = (orn + [command["params"].get("name", "")])[-MAX_ORNAMENTS:]
-    elif command["cmd"] == "clear":
-        orn = []
-    else:
-        return state
-    return {"ornaments": orn}
-
-
 EFFECTS = {
     "rain": {
         "commands": ("strike", "gust", "set", "stop", "start", "reset"),
@@ -140,7 +126,7 @@ EFFECTS = {
         },
     },
     "xmas": {
-        "commands": ("set", "celebrate", "ornament", "clear", "reset"),
+        "commands": ("set", "celebrate", "ornament", "gift", "clear", "reset"),
         "settings": {
             "lights": _choice("top", "frame", "off"),
             "pattern": _choice("steady", "twinkle", "chase", "wave"),
@@ -159,8 +145,15 @@ EFFECTS = {
         },
         "args": {
             "ornament": {"name": _name},
+            "gift": {"name": _name,
+                     "type": _choice("sub", "resub", "giftsub", "bits", "raid"),
+                     "amount": _int_range(1, 100000)},
+            "clear": {"kind": _choice("ornaments", "gifts")},
         },
-        "state": _xmas_state,
+        # Werte, die ein Befehl immer mitbringt, auch wenn Streamer.bot sie weglässt
+        "defaults": {
+            "gift": {"type": "sub", "amount": 1},
+        },
     },
 }
 
@@ -192,11 +185,13 @@ def parse(effect: str, args) -> dict:
             val = conv(str(raw).strip())
             if val is not None:
                 params[key] = val
+        for key, val in spec.get("defaults", {}).get(cmd, {}).items():
+            params.setdefault(key, val)
     return {"cmd": cmd, "params": params}
 
 
 _lock = threading.Lock()
-_store = {}   # (tenant_id, effect) → {"seq": int, "items": deque, "state": dict}
+_store = {}   # (tenant_id, effect) → {"seq": int, "items": deque}
 
 
 def reset_store():
@@ -207,19 +202,15 @@ def reset_store():
 def push(tenant_id: int, effect: str, command: dict) -> int:
     with _lock:
         slot = _store.setdefault((tenant_id, effect),
-                                 {"seq": 0, "items": deque(maxlen=MAX_KEEP), "state": {}})
+                                 {"seq": 0, "items": deque(maxlen=MAX_KEEP)})
         slot["seq"] += 1
         slot["items"].append({"seq": slot["seq"], "ts": time.time(), **command})
-        reducer = EFFECTS.get(effect, {}).get("state")
-        if reducer:
-            slot["state"] = reducer(slot["state"], command)
         return slot["seq"]
 
 
 def poll(tenant_id: int, effect: str, since) -> dict:
     """since=None → nur aktuellen Stand melden (Overlay startet frisch und
-    soll alte Befehle nicht nachspielen). `state` ist der dauerhafte Teil
-    (z. B. Follower-Kugeln), den das Overlay beim Start übernimmt."""
+    soll alte Befehle nicht nachspielen)."""
     with _lock:
         slot = _store.get((tenant_id, effect))
         seq = slot["seq"] if slot else 0
@@ -228,5 +219,4 @@ def poll(tenant_id: int, effect: str, since) -> dict:
         else:
             cmds = [{"seq": c["seq"], "cmd": c["cmd"], "params": c["params"]}
                     for c in slot["items"] if c["seq"] > since]
-        state = dict(slot["state"]) if slot else {}
-    return {"epoch": EPOCH, "seq": seq, "commands": cmds, "state": state}
+    return {"epoch": EPOCH, "seq": seq, "commands": cmds}

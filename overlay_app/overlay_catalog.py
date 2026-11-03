@@ -232,8 +232,15 @@ EFFECT_META = {
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/xmas
     "commands": [
         {"q": "cmd=celebrate", "label": "Celebrate (e.g. new sub)"},
-        {"q": "cmd=ornament&name=%user%", "label": "Follower hangs an ornament (%user% = Streamer.bot variable)"},
-        {"q": "cmd=clear", "label": "Remove follower ornaments"},
+        {"q": "cmd=ornament&name=%user%", "label": "Follow: hang an ornament (%user% = Streamer.bot variable)"},
+        {"q": "cmd=gift&type=sub&name=%user%", "label": "Sub: gift under the tree"},
+        {"q": "cmd=gift&type=resub&name=%user%&amount=%cumulative%", "label": "Resub: gift (amount = months)"},
+        {"q": "cmd=gift&type=giftsub&name=%user%&amount=%gifts%", "label": "Gift subs: bigger gift (amount = number of subs)"},
+        {"q": "cmd=gift&type=bits&name=%user%&amount=%bits%", "label": "Bits: gift (1000+ and 10000+ get bigger)"},
+        {"q": "cmd=gift&type=raid&name=%user%&amount=%viewers%", "label": "Raid: gift (50+ viewers get bigger)"},
+        {"q": "cmd=clear&kind=ornaments", "label": "Remove all ornaments (permanent)"},
+        {"q": "cmd=clear&kind=gifts", "label": "Remove all gifts (permanent)"},
+        {"q": "cmd=clear", "label": "Remove ornaments and gifts (permanent)"},
         {"q": "cmd=set&lights=off", "label": "Light string off"},
         {"q": "cmd=set&lights=top", "label": "Light string on"},
         {"q": "cmd=set&pattern=chase", "label": "Lights: chase"},

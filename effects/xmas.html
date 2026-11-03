@@ -22,7 +22,10 @@
       treesnow=1|0  snow=1|0      Schnee auf dem Baum / Schneehaufen unten
       tune=1                      Statusanzeige; Tasten C = celebrate, O = Kugel
 
-    Befehle: cmd=celebrate | cmd=ornament&name=… | cmd=clear | cmd=reset | cmd=set&…
+    Befehle: cmd=celebrate | cmd=ornament&name=… | cmd=gift&name=…&type=sub|resub|giftsub|bits|raid&amount=…
+             cmd=clear[&kind=ornaments|gifts] | cmd=reset | cmd=set&…
+    Kugeln und Geschenke speichert der Server dauerhaft (fx/xmas_db.py); sichtbar
+    sind die neuesten 60 Kugeln und 15 Geschenke, der Zähler zeigt alle.
   -->
   <style>
     @font-face {
@@ -102,7 +105,7 @@
       bottom: 24px;
       right: var(--treex);
       width: calc(380px * var(--tsize));
-      height: calc(494px * var(--tsize));
+      height: calc(513px * var(--tsize));
     }
     .stage[data-treepos="left"] .tree { right: auto; left: var(--treex); }
     .stage[data-tree="0"] .tree { display: none; }
@@ -122,15 +125,38 @@
     }
     .stage[data-celebrate="1"] .orn { animation: jiggle 0.35s ease-in-out 4; }
     @keyframes jiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+    .gift-drop { animation: giftDrop 0.8s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+    @keyframes giftDrop {
+      from { transform: translateY(-160px); opacity: 0; }
+      40%  { opacity: 1; }
+      to   { transform: none; opacity: 1; }
+    }
+    .stage[data-celebrate="1"] .gift-body { animation: jiggle 0.35s ease-in-out 4; transform-box: fill-box; transform-origin: 50% 100%; }
+
+    /* Spotlight: eine Kugel/ein Geschenk leuchtet auf und zeigt den Namen */
+    .is-spot { animation: spot 3.2s ease-in-out both; }
+    @keyframes spot {
+      0%, 100% { filter: none; }
+      20%, 80% { filter: drop-shadow(0 0 6px #fff6c8) drop-shadow(0 0 14px #ffd23f) brightness(1.3); }
+    }
+    .counter {
+      font: 700 14px 'DM Sans', sans-serif;
+      letter-spacing: 1px;
+      fill: rgba(255, 255, 255, 0.92);
+      paint-order: stroke;
+      stroke: rgba(0, 0, 0, 0.6);
+      stroke-width: 4px;
+    }
+
     .name-tag {
       font: 700 15px 'DM Sans', sans-serif;
       fill: #fff;
       paint-order: stroke;
       stroke: rgba(0, 0, 0, 0.65);
       stroke-width: 4px;
-      animation: tagFade 4s ease-in forwards;
+      animation: tagFade 3.4s ease-in-out forwards;
     }
-    @keyframes tagFade { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes tagFade { 0% { opacity: 0; } 12%, 75% { opacity: 1; } 100% { opacity: 0; } }
 
     /* ── Hängende Kugeln ── */
     .baubles { position: absolute; inset: 0; pointer-events: none; }
@@ -234,7 +260,7 @@
     </div>
 
     <div class="tree" aria-hidden="true">
-      <svg viewBox="0 0 400 520">
+      <svg viewBox="0 0 400 540">
         <rect x="182" y="405" width="36" height="50" fill="#5a3a22" />
         <path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" fill="url(#treeG)" />
         <path class="snowcap" d="M38 402 Q120 422 200 412 Q280 422 362 402 Q350 392 330 396 Q300 404 270 398 Q235 408 200 402 Q160 410 130 398 Q95 406 62 396 Q48 394 38 402 Z" />
@@ -255,15 +281,10 @@
           <g class="orn"><line x1="272" y1="320" x2="272" y2="328" stroke="#ccc" /><circle cx="272" cy="342" r="15" fill="url(#ornP)" /></g>
         </g>
         <g id="followers"></g>
-
-        <rect x="90" y="430" width="70" height="56" rx="4" fill="#c4302b" />
-        <rect x="120" y="430" width="10" height="56" fill="#f2d16b" />
-        <rect x="90" y="452" width="70" height="10" fill="#f2d16b" />
-        <rect x="240" y="440" width="84" height="46" rx="4" fill="#2a64b8" />
-        <rect x="276" y="440" width="10" height="46" fill="#ffffff" />
-        <rect x="240" y="458" width="84" height="9" fill="#ffffff" />
-        <rect x="168" y="456" width="62" height="30" rx="4" fill="#7d3ca3" />
-        <rect x="194" y="456" width="9" height="30" fill="#f2b705" />
+        <g id="giftsBack"></g>
+        <g id="giftsFront"></g>
+        <text class="counter" id="counter" x="200" y="536" text-anchor="middle"></text>
+        <g id="tags"></g>
 
         <g transform="translate(200 34)">
           <g class="star-rays" opacity=".55">
@@ -414,37 +435,157 @@
         celebrateTimer = setTimeout(function () { stage.dataset.celebrate = '0'; }, 4000);
       }
 
-      // ── Follower-Kugeln: 12 Plätze, der älteste wird überschrieben ──
-      var SLOTS = [[118, 222], [282, 214], [176, 386], [250, 398], [108, 360], [304, 382],
-                   [204, 328], [226, 168], [182, 262], [258, 290], [152, 232], [320, 352]];
+      // ── Follower-Kugeln: Wabenraster in den drei Baumstufen ──
+      // (Spitze x, Spitze y, Basis y, halbe Basisbreite) — wie die Pfade im SVG
+      var TIERS = [[200, 38, 202, 82], [200, 90, 300, 122], [200, 150, 402, 162]];
+      var FIXED = [[160, 160], [236, 243], [140, 334], [272, 342]];
+      var MAX_ORN = 60;
       var GRADS = ['ornR', 'ornG', 'ornB', 'ornP'];
-      var followers = document.getElementById('followers');
-      var slotNodes = [];
-      var total = 0;
-      function addOrnament(name, animate) {
-        var i = total % SLOTS.length, s = SLOTS[i];
-        if (slotNodes[i]) followers.removeChild(slotNodes[i]);
-        var g = el('g', { 'class': 'orn' + (animate ? ' orn--new' : '') }, followers);
-        el('line', { x1: s[0], y1: s[1] - 12, x2: s[0], y2: s[1] - 4, stroke: '#ccc' }, g);
-        el('circle', { cx: s[0], cy: s[1] + 8, r: 12, fill: 'url(#' + GRADS[total % GRADS.length] + ')' }, g);
-        if (animate && name) {
-          var tag = el('text', { 'class': 'name-tag', x: s[0], y: s[1] - 18, 'text-anchor': 'middle' }, g);
-          tag.textContent = name;
-          tag.addEventListener('animationend', function () { if (tag.parentNode) tag.parentNode.removeChild(tag); });
+      var SLOTS = (function () {
+        var d = 27, out = [];
+        function inside(x, y) {
+          return TIERS.some(function (t) {
+            if (y < t[1] + 34 || y > t[2] - 14) return false;
+            return Math.abs(x - 200) <= t[3] * (y - t[1]) / (t[2] - t[1]) - 13;
+          });
         }
-        slotNodes[i] = g;
-        total++;
+        for (var r = 0, y = 72; y < 400; y += d * 0.866, r++) {
+          for (var x = 200 - 8 * d + (r % 2 ? d / 2 : 0); x <= 200 + 8 * d; x += d) {
+            if (!inside(x, y)) continue;
+            if (FIXED.some(function (f) { return Math.hypot(f[0] - x, f[1] - y) < d; })) continue;
+            out.push([x + (rnd() * 6 - 3), y + (rnd() * 6 - 3)]);
+          }
+        }
+        // gemischte Reihenfolge: der Baum füllt sich gleichmäßig statt von oben
+        for (var k = out.length - 1; k > 0; k--) {
+          var m = Math.floor(rnd() * (k + 1)), tmp = out[k]; out[k] = out[m]; out[m] = tmp;
+        }
+        return out.slice(0, MAX_ORN);
+      })();
+
+      // ── Geschenke: hintere Reihe zuerst, vordere davor ──
+      var GIFT_SLOTS = [
+        [200, 512, 1], [150, 490, 0], [250, 490, 0], [135, 514, 1], [265, 514, 1],
+        [100, 492, 0], [300, 492, 0], [75, 516, 1], [325, 516, 1], [55, 494, 0],
+        [345, 494, 0], [18, 518, 1], [382, 518, 1], [-35, 520, 1], [435, 520, 1]
+      ];
+      var GIFT_LOOK = {
+        sub:     { w: 52, h: 40, box: '#c4302b', rib: '#f2d16b' },
+        resub:   { w: 56, h: 44, box: '#2e8b57', rib: '#e8443a' },
+        giftsub: { w: 58, h: 46, box: '#7d3ca3', rib: '#f2b705' },
+        bits:    { w: 40, h: 32, box: '#2a64b8', rib: '#ffffff' },
+        raid:    { w: 66, h: 50, box: '#e8772e', rib: '#ffffff' }
+      };
+      function giftScale(type, amount) {
+        amount = amount || 1;
+        if (type === 'giftsub') return Math.min(1.6, 1 + Math.log(amount) / Math.LN2 / 6);
+        if (type === 'bits') return amount >= 10000 ? 1.55 : amount >= 1000 ? 1.3 : 1;
+        if (type === 'resub') return amount >= 12 ? 1.15 : 1;
+        if (type === 'raid') return amount >= 50 ? 1.25 : 1;
+        return 1;
       }
-      function clearOrnaments() {
-        while (followers.firstChild) followers.removeChild(followers.firstChild);
-        slotNodes = [];
-        total = 0;
+      function giftLabel(gift) {
+        var n = gift.amount || 1, who = gift.name || '';
+        var what = {
+          sub: 'sub', resub: n > 1 ? n + ' months' : 'resub',
+          giftsub: n + (n === 1 ? ' gift sub' : ' gift subs'),
+          bits: n + ' bits', raid: 'raid with ' + n
+        }[gift.type] || '';
+        return who ? who + (what ? ' · ' + what : '') : what;
       }
+
+      var followers = document.getElementById('followers');
+      var giftsBack = document.getElementById('giftsBack');
+      var giftsFront = document.getElementById('giftsFront');
+      var tagsLayer = document.getElementById('tags');
+      var counterEl = document.getElementById('counter');
+      var ornNodes = [], giftNodes = [];
+      var ornNext = 0, giftNext = 0;
+      var ornTotal = 0, giftTotal = 0;
+
+      function showTag(text, x, y) {
+        if (!text) return;
+        var tag = el('text', { 'class': 'name-tag', x: x.toFixed(1), y: y.toFixed(1), 'text-anchor': 'middle' }, tagsLayer);
+        tag.textContent = text;
+        tag.addEventListener('animationend', function () { if (tag.parentNode) tag.parentNode.removeChild(tag); });
+      }
+
+      function updateCounter() {
+        var parts = [];
+        if (ornTotal) parts.push(ornTotal + (ornTotal === 1 ? ' ornament' : ' ornaments'));
+        if (giftTotal) parts.push(giftTotal + (giftTotal === 1 ? ' gift' : ' gifts'));
+        counterEl.textContent = parts.join(' · ');
+      }
+
+      function addOrnament(name, animate) {
+        var i = ornNext % SLOTS.length, s = SLOTS[i];
+        if (ornNodes[i]) followers.removeChild(ornNodes[i].node);
+        var g = el('g', { 'class': 'orn' + (animate ? ' orn--new' : '') }, followers);
+        el('line', { x1: s[0].toFixed(1), y1: (s[1] - 13).toFixed(1), x2: s[0].toFixed(1), y2: (s[1] - 6).toFixed(1), stroke: '#ccc' }, g);
+        el('circle', { cx: s[0].toFixed(1), cy: (s[1] + 4).toFixed(1), r: 10, fill: 'url(#' + GRADS[ornNext % GRADS.length] + ')' }, g);
+        ornNodes[i] = { node: g, label: name, x: s[0], y: s[1] - 14 };
+        ornNext++;
+        if (animate) showTag(name, s[0], s[1] - 16);
+      }
+
+      function addGift(gift, animate) {
+        var i = giftNext % GIFT_SLOTS.length, slot = GIFT_SLOTS[i];
+        if (giftNodes[i]) giftNodes[i].node.parentNode.removeChild(giftNodes[i].node);
+        var look = GIFT_LOOK[gift.type] || GIFT_LOOK.sub;
+        var k = giftScale(gift.type, gift.amount), w = look.w * k, h = look.h * k;
+        var outer = el('g', { transform: 'translate(' + slot[0] + ' ' + slot[1] + ')' }, slot[2] ? giftsFront : giftsBack);
+        var g = el('g', { 'class': 'gift-body' + (animate ? ' gift-drop' : '') }, outer);
+        el('rect', { x: (-w / 2).toFixed(1), y: (-h).toFixed(1), width: w.toFixed(1), height: h.toFixed(1), rx: 3, fill: look.box }, g);
+        el('rect', { x: (-w / 2).toFixed(1), y: (-h).toFixed(1), width: w.toFixed(1), height: (h * 0.18).toFixed(1), fill: 'rgba(255,255,255,.12)' }, g);
+        el('rect', { x: -4 * k, y: (-h).toFixed(1), width: 8 * k, height: h.toFixed(1), fill: look.rib }, g);
+        el('rect', { x: (-w / 2).toFixed(1), y: (-h * 0.58).toFixed(1), width: w.toFixed(1), height: 7 * k, fill: look.rib }, g);
+        el('ellipse', { cx: -9 * k, cy: -h - 5 * k, rx: 10 * k, ry: 6 * k, fill: look.rib, transform: 'rotate(-25 ' + (-9 * k) + ' ' + (-h - 5 * k) + ')' }, g);
+        el('ellipse', { cx: 9 * k, cy: -h - 5 * k, rx: 10 * k, ry: 6 * k, fill: look.rib, transform: 'rotate(25 ' + (9 * k) + ' ' + (-h - 5 * k) + ')' }, g);
+        el('circle', { cx: 0, cy: -h - 3 * k, r: 4 * k, fill: look.rib }, g);
+        var label = giftLabel(gift);
+        giftNodes[i] = { node: outer, label: label, x: slot[0], y: slot[1] - h - 18 * k };
+        giftNext++;
+        if (animate) showTag(label, slot[0], slot[1] - h - 18 * k);
+      }
+
+      function clearItems(kind) {
+        if (kind !== 'gifts') {
+          while (followers.firstChild) followers.removeChild(followers.firstChild);
+          ornNodes = []; ornNext = 0; ornTotal = 0;
+        }
+        if (kind !== 'ornaments') {
+          [giftsBack, giftsFront].forEach(function (grp) { while (grp.firstChild) grp.removeChild(grp.firstChild); });
+          giftNodes = []; giftNext = 0; giftTotal = 0;
+        }
+        updateCounter();
+      }
+
       function applyState(state) {
         if (!state || !state.ornaments) return;
-        clearOrnaments();
-        state.ornaments.forEach(function (n) { addOrnament(n, false); });
+        clearItems();
+        state.ornaments.forEach(function (o) { addOrnament(o.name, false); });
+        (state.gifts || []).forEach(function (gf) { addGift(gf, false); });
+        ornTotal = state.ornament_total || 0;
+        giftTotal = state.gift_total || 0;
+        updateCounter();
       }
+
+      // ── Spotlight: alle 8 s leuchtet ein benanntes Stück auf ──
+      var lastSpot = null;
+      setInterval(function () {
+        if (stage.dataset.tree === '0') return;
+        var pool = ornNodes.concat(giftNodes).filter(function (it) { return it && it.label; });
+        if (!pool.length) return;
+        var pick = pool[Math.floor(Math.random() * pool.length)];
+        if (pick === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
+        lastSpot = pick;
+        var target = pick.node.firstChild && pick.node.firstChild.tagName === 'g' ? pick.node.firstChild : pick.node;
+        target.classList.remove('is-spot');
+        void target.getBoundingClientRect();
+        target.classList.add('is-spot');
+        setTimeout(function () { target.classList.remove('is-spot'); }, 3300);
+        showTag(pick.label, pick.x, pick.y);
+      }, 8000);
 
       function applyCommand(c) {
         var p = c.params || {};
@@ -452,8 +593,9 @@
           case 'set':       applySettings(p); break;
           case 'reset':     applySettings(copy(base)); break;
           case 'celebrate': celebrate(); break;
-          case 'ornament':  addOrnament(p.name || '', true); break;
-          case 'clear':     clearOrnaments(); break;
+          case 'ornament':  addOrnament(p.name || '', true); ornTotal++; updateCounter(); break;
+          case 'gift':      addGift({ name: p.name || '', type: p.type, amount: p.amount }, true); giftTotal++; updateCounter(); break;
+          case 'clear':     clearItems(p.kind); break;
         }
       }
 
@@ -461,7 +603,8 @@
       var tuneEl = document.getElementById('tune');
       var remoteState = 'off (no token URL)';
       function showTune() {
-        if (tuneMode) tuneEl.textContent = 'remote: ' + remoteState + ' | ornaments: ' + total + ' | keys: C celebrate, O ornament';
+        if (tuneMode) tuneEl.textContent = 'remote: ' + remoteState + ' | ornaments: ' + ornTotal + ' | gifts: ' + giftTotal +
+                                           ' | keys: C celebrate, O ornament, G gift';
       }
       if (tuneMode) tuneEl.classList.add('is-on');
       var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
@@ -505,7 +648,13 @@
         var testNames = ['Hat3', 'PixelPaul', 'Mia_GG', 'Lunatic', 'Nordlicht'];
         document.addEventListener('keydown', function (e) {
           if (e.key === 'c' || e.key === 'C') celebrate();
-          else if (e.key === 'o' || e.key === 'O') { addOrnament(testNames[total % testNames.length], true); showTune(); }
+          else if (e.key === 'o' || e.key === 'O') { applyCommand({ cmd: 'ornament', params: { name: testNames[ornTotal % testNames.length] } }); showTune(); }
+          else if (e.key === 'g' || e.key === 'G') {
+            var types = ['sub', 'resub', 'giftsub', 'bits', 'raid'], t = types[giftTotal % types.length];
+            applyCommand({ cmd: 'gift', params: { name: testNames[giftTotal % testNames.length], type: t,
+                                                  amount: { sub: 1, resub: 14, giftsub: 5, bits: 1000, raid: 42 }[t] } });
+            showTune();
+          }
         });
       }
     })();
