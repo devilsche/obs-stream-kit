@@ -142,9 +142,13 @@
         dry.connect(A.out);
         dry.connect(rev);
 
-        var F0 = 68;
-        [[1, 0.5, 3.4], [1.47, 0.28, 2.6], [2.09, 0.2, 2.0], [2.56, 0.12, 1.5],
-         [3.14, 0.08, 1.1], [4.2, 0.05, 0.7]].forEach(function (p) {
+        // Grundton 146 Hz statt Tiefbass — sonst hört man auf Laptop- und
+        // Headset-Lautsprechern nichts. Die Teiltöne bis ~1,5 kHz tragen den
+        // Klang, der Sub-Ton darunter ist nur Fundament für große Boxen.
+        var F0 = 146;
+        [[0.5, 0.18, 2.6], [1, 0.26, 3.4], [1.47, 0.24, 3.0], [2.09, 0.24, 2.6],
+         [2.56, 0.2, 2.2], [3.14, 0.17, 1.9], [4.2, 0.12, 1.5], [5.43, 0.09, 1.1],
+         [6.8, 0.06, 0.8], [8.9, 0.04, 0.5]].forEach(function (p) {
           var o = ctx.createOscillator();
           o.type = 'sine';
           o.frequency.setValueAtTime(F0 * p[0] * 1.02, t);
@@ -158,15 +162,24 @@
           o.stop(t + p[2] + 0.05);
         });
 
-        // Schlag: kurzer, tiefpassgefilterter Rauschstoß
+        // Schlag: dumpfer Rauschstoß + heller, metallischer Anschlag
         var hit = ctx.createBufferSource();
         hit.buffer = K.noiseBuffer(ctx, 0.3);
-        var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 420;
+        var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 600;
         var hg = ctx.createGain();
-        hg.gain.setValueAtTime(0.9, t);
+        hg.gain.setValueAtTime(0.7, t);
         hg.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
         hit.connect(lp); lp.connect(hg); hg.connect(dry);
         hit.start(t);
+
+        var ring = ctx.createBufferSource();
+        ring.buffer = K.noiseBuffer(ctx, 0.6);
+        var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 3;
+        var rgn = ctx.createGain();
+        rgn.gain.setValueAtTime(0.35, t);
+        rgn.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+        ring.connect(bp); bp.connect(rgn); rgn.connect(dry);
+        ring.start(t);
       }
 
       K.onStart(playSound);
