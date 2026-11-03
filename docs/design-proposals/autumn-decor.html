@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Autumn Decor Mockup</title>
+  <!--
+    Klickdummy Herbstdeko — Blätterranke oben, Ast in der Ecke, fallendes
+    Laub, wachsende Laubhaufen, Follower-Kürbisse mit Namen. Gimmicks:
+    rechen (!rake, Rangliste), reinspringen (!jump), Windböe, Feiern.
+    Nur zum Ansehen und Abstimmen, noch keine OBS-Source.
+    Bühne = 1920×1080 wie im Stream, skaliert aufs Fenster.
+  -->
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+    }
+
+    :root {
+      --bg: #f6f2ec;
+      --panel: #ffffff;
+      --text: #22180f;
+      --muted: #66584a;
+      --line: #ddd2c4;
+      --accent: #5e2a79;
+      --focus: #5e2a79;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #14100c; --panel: #1f1912; --text: #f4ece2; --muted: #b0a291;
+        --line: #3a2f24; --accent: #f2b705; --focus: #f2b705;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.45 'DM Sans', system-ui, sans-serif;
+    }
+    .skip {
+      position: absolute; left: 12px; top: -60px;
+      background: var(--panel); color: var(--text);
+      padding: 10px 14px; border-radius: 8px; border: 2px solid var(--focus);
+      z-index: 10;
+    }
+    .skip:focus { top: 12px; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+    header { padding: 20px 24px 8px; }
+    header h1 { font-size: 22px; }
+    header p { color: var(--muted); max-width: 900px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      gap: 20px;
+      padding: 12px 24px 24px;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 12px 16px; } }
+
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      gap: 16px;
+    }
+    fieldset { border: 0; display: grid; gap: 8px; }
+    legend { font-weight: 700; margin-bottom: 6px; }
+    .check { display: flex; align-items: center; gap: 10px; min-height: 28px; cursor: pointer; }
+    .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .field { display: grid; gap: 4px; }
+    .field label { font-weight: 600; }
+    .field__row { display: flex; align-items: center; gap: 10px; }
+    .field__row input[type="range"] { flex: 1; min-height: 28px; accent-color: var(--accent); }
+    .field__row output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+    select {
+      min-height: 36px; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit;
+    }
+    .btn {
+      min-height: 40px; padding: 8px 12px; border-radius: 8px;
+      border: 2px solid var(--accent); background: transparent; color: var(--text);
+      font: 600 14px 'DM Sans', sans-serif; cursor: pointer; text-align: left;
+    }
+    .btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+    .btn[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    .stage-col { min-width: 0; }
+    .stage-wrap {
+      --s: 0.5;
+      width: calc(1920px * var(--s));
+      height: calc(1080px * var(--s));
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: repeating-conic-gradient(#2a2a2a 0 25%, #333 0 50%) 0 0 / 40px 40px;
+    }
+
+    /* ═══════════════ Bühne 1920×1080 ═══════════════ */
+    .stage {
+      position: relative;
+      width: 1920px; height: 1080px;
+      transform: scale(var(--s));
+      transform-origin: 0 0;
+      overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      --l1: #d9480f; --l2: #f08c00; --l3: #c92a2a; --l4: #fab005; --l5: #a0522d;
+    }
+    .stage[data-scheme="golden"] { --l1: #f2b705; --l2: #e9a400; --l3: #ffd43b; --l4: #d4a017; --l5: #c98a00; }
+    .stage[data-scheme="maple"]  { --l1: #c92a2a; --l2: #e03131; --l3: #a61e4d; --l4: #d9480f; --l5: #b02a1a; }
+    .stage[data-scheme="theme"]  { --l1: #f2b705; --l2: #8e4bb8; --l3: #5e2a79; --l4: #ffd75e; --l5: #b07ad6; }
+
+    /* Gestellter Gameplay-Hintergrund */
+    .game { position: absolute; inset: 0; background: linear-gradient(#3a3550 0%, #6b5a62 55%, #6a5a3a 56%, #43382a 100%); }
+    .stage[data-game="0"] .game { display: none; }
+    .game__mtn { position: absolute; left: 0; right: 0; top: 330px; height: 300px; background: #3f3a4e; clip-path: polygon(0 100%, 0 55%, 12% 25%, 24% 60%, 38% 10%, 52% 58%, 66% 20%, 80% 62%, 92% 30%, 100% 50%, 100% 100%); }
+    .game__label { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); color: rgba(255,255,255,.25); font-size: 64px; font-weight: 800; letter-spacing: 8px; }
+    .game__compass { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); width: 640px; height: 34px; border-radius: 6px; background: rgba(0,0,0,.35); color: rgba(255,255,255,.8); font-size: 18px; letter-spacing: 18px; text-align: center; line-height: 34px; }
+    .game__map { position: absolute; right: 30px; top: 70px; width: 250px; height: 250px; border: 2px solid rgba(255,255,255,.5); background: rgba(60,50,30,.75); }
+    .game__hp { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); width: 520px; height: 18px; border-radius: 9px; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5); }
+    .game__hp::after { content: ''; position: absolute; inset: 2px 30% 2px 2px; border-radius: 6px; background: #e8e8e8; }
+    .game__cam { position: absolute; left: 30px; bottom: 30px; width: 400px; height: 225px; border: 3px solid #f2b705; background: #222 linear-gradient(135deg, #3a2f4a, #1f1a28); color: rgba(255,255,255,.5); display: grid; place-items: center; font-size: 22px; letter-spacing: 4px; }
+
+    .layer { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
+    /* ── Blattfarben ── */
+    .c1 { fill: var(--l1); } .c2 { fill: var(--l2); } .c3 { fill: var(--l3); }
+    .c4 { fill: var(--l4); } .c5 { fill: var(--l5); }
+    .vein { fill: none; stroke: rgba(50, 20, 0, 0.45); stroke-width: 1.4; }
+
+    /* ── Blätterranke oben ── */
+    .vine { fill: none; stroke: #5b3d22; stroke-width: 5; stroke-linecap: round; }
+    .vine-leaf { transform-box: fill-box; transform-origin: 50% 0; }
+    .acorn__cap { fill: #6b4423; }
+    .acorn__nut { fill: #b07a3c; }
+    .stage[data-garland="0"] .garland { display: none; }
+
+    .fl .glow { fill: #ffcf7a; filter: url(#bulbGlow); opacity: 0.8; }
+    .fl .dot  { fill: #fff2c9; }
+    .fl { animation: twinkle 2.6s ease-in-out infinite; }
+    .stage[data-fairy="0"] .fl { display: none; }
+    @keyframes twinkle { 0%, 100% { opacity: 1; } 45% { opacity: 0.25; } 60% { opacity: 1; } }
+    .ri-0 { animation-delay: -0.1s; } .ri-1 { animation-delay: -1.3s; } .ri-2 { animation-delay: -0.7s; }
+    .ri-3 { animation-delay: -1.9s; } .ri-4 { animation-delay: -0.4s; } .ri-5 { animation-delay: -1.6s; }
+    .ri-6 { animation-delay: -1.0s; } .ri-7 { animation-delay: -2.1s; } .ri-8 { animation-delay: -0.25s; }
+    .ri-9 { animation-delay: -1.45s; }
+    .stage[data-celebrate="1"] .fl { animation-duration: 0.4s; }
+
+    /* ── Ast in der Ecke ── */
+    .branch { animation: sway 7s ease-in-out infinite; transform-origin: 0 0; }
+    .branch__wood { fill: none; stroke: #4a3020; stroke-linecap: round; }
+    .stage[data-branch="0"] .branch { display: none; }
+    .bl { transition: opacity 0.4s; }
+    .bl--gone { opacity: 0; }
+    .bl--grow { animation: grow 1.4s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+    @keyframes grow { from { transform: scale(0); } to { transform: none; } }
+    .bl { transform-box: fill-box; transform-origin: 50% 0; }
+    @keyframes sway { 0%, 100% { transform: rotate(-0.8deg); } 50% { transform: rotate(0.8deg); } }
+
+    /* ── Laubhaufen + Kürbisse ── */
+    .stage[data-pile="0"] #pileCanvas,
+    .stage[data-pile="0"] .pumpkins { display: none; }
+    .stage[data-pumpkins="0"] .pumpkins { display: none; }
+    .stage[data-falling="0"] #backCanvas { display: none; }
+
+    .pk__body  { fill: #e8740c; }
+    .pk__lobe  { fill: #f08c1a; }
+    .pk__rib   { fill: none; stroke: #b5520a; stroke-width: 2.5; }
+    .pk__stem  { fill: #5a6b2a; }
+    .pk__face  { fill: #ffd75e; display: none; }
+    .pk__light { fill: #ffb43a; filter: url(#bulbGlow); opacity: 0; }
+    .stage[data-faces="1"] .pk__face { display: inline; animation: flicker 2.2s ease-in-out infinite; }
+    .stage[data-faces="1"] .pk__light { opacity: 0.55; animation: flicker 2.2s ease-in-out infinite; }
+    .stage[data-celebrate="1"] .pk__light { opacity: 1; }
+    @keyframes flicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
+    .pk { transform-box: fill-box; transform-origin: 50% 100%; }
+    .pk--new .pk__inner { animation: drop 0.8s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+    @keyframes drop { from { transform: translateY(-220px); } to { transform: none; } }
+    .stage[data-celebrate="1"] .pk__inner { animation: hop 0.35s ease-in-out 4; }
+    @keyframes hop { 0%, 100% { transform: none; } 50% { transform: translateY(-14px); } }
+
+    .name-tag { font: 700 17px 'DM Sans', sans-serif; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.7); stroke-width: 4px; }
+    .name-tag--fade { animation: tagFade 4s ease-in forwards; }
+    @keyframes tagFade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+    .big-tag { font: 800 30px 'DM Sans', sans-serif; fill: #ffd75e; paint-order: stroke; stroke: rgba(0,0,0,.75); stroke-width: 6px; animation: rise 2.4s ease-out forwards; }
+    @keyframes rise { 0% { opacity: 0; transform: translateY(14px); } 15% { opacity: 1; transform: none; } 75% { opacity: 1; } 100% { opacity: 0; transform: translateY(-30px); } }
+
+    /* Rechen */
+    .rake { display: none; }
+    .rake--on { display: inline; }
+    .rake__handle { stroke: #8a5a2b; stroke-width: 9; stroke-linecap: round; }
+    .rake__head { fill: none; stroke: #9aa3ad; stroke-width: 5; stroke-linecap: round; }
+
+    /* ── HUD: Rangliste ── */
+    .hud {
+      position: absolute; left: 50%; top: 120px; transform: translateX(-50%);
+      min-width: 300px; padding: 14px 20px 16px; border-radius: 14px;
+      background: rgba(30, 18, 8, 0.82); border: 2px solid #c98a00; color: #fff;
+      opacity: 0; transition: opacity 0.4s;
+    }
+    .hud[data-show="1"] { opacity: 1; }
+    .hud__title { font-weight: 800; font-size: 22px; color: #ffd75e; margin-bottom: 6px; }
+    .hud ol { list-style: none; display: grid; gap: 4px; font-size: 20px; }
+    .hud li { display: flex; justify-content: space-between; gap: 30px; }
+    .hud li span:last-child { font-variant-numeric: tabular-nums; color: #ffcf7a; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage *, .stage *::before, .stage *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <header>
+    <h1>Autumn decor: click dummy</h1>
+    <p>Preview at stream size (1920×1080, scaled to fit). Leaves fall and pile up in the corners; chat rakes them away (leaderboard) or jumps in. Followers drop a pumpkin with their name on the pile. The game background is only a placeholder to show what gets covered.</p>
+  </header>
+
+  <main class="layout">
+    <form class="controls" id="controls" aria-label="Decor settings">
+      <fieldset>
+        <legend>Elements</legend>
+        <label class="check"><input type="checkbox" data-key="garland" checked> Leaf garland (top)</label>
+        <label class="check"><input type="checkbox" data-key="fairy" checked> Fairy lights on garland</label>
+        <label class="check"><input type="checkbox" data-key="branch" checked> Corner branch</label>
+        <label class="check"><input type="checkbox" data-key="falling" checked> Falling leaves</label>
+        <label class="check"><input type="checkbox" data-key="pile" checked> Leaf piles</label>
+        <label class="check"><input type="checkbox" data-key="pumpkins" checked> Pumpkins</label>
+        <label class="check"><input type="checkbox" data-key="faces"> Carved glowing faces</label>
+        <label class="check"><input type="checkbox" data-key="game" checked> Game placeholder</label>
+      </fieldset>
+
+      <div class="field">
+        <label for="f-scheme">Leaf colors</label>
+        <select id="f-scheme" data-key="scheme">
+          <option value="classic">Classic autumn</option>
+          <option value="golden">Golden</option>
+          <option value="maple">Red maple</option>
+          <option value="theme">Stream theme (purple/gold)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-density">Falling leaves</label>
+        <select id="f-density" data-key="density">
+          <option value="4">Light</option>
+          <option value="10" selected>Medium</option>
+          <option value="24">Heavy</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-spread">Pile shape</label>
+        <select id="f-spread" data-key="spread">
+          <option value="corners">Corners</option>
+          <option value="full">Full width</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-pile">Pile height</label>
+        <div class="field__row">
+          <input type="range" id="f-pile" min="0" max="100" value="45" />
+          <output id="pileOut" for="f-pile">45%</output>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend>Gimmicks (later via Streamer.bot)</legend>
+        <button type="button" class="btn" id="fall" aria-pressed="false">Leaf fall: pile grows (!leaves)</button>
+        <button type="button" class="btn" id="rake">Chatter rakes (!rake)</button>
+        <button type="button" class="btn" id="jump">Chatter jumps in (!jump)</button>
+        <button type="button" class="btn" id="gust">Wind gust</button>
+        <button type="button" class="btn" id="pumpkin">Follower drops a pumpkin</button>
+        <button type="button" class="btn" id="celebrate">Celebrate (e.g. new sub)</button>
+        <p class="hint">Raking removes 5% of the pile and counts toward a "Top rakers" leaderboard, like shoveling snow. In the preview the pile grows 3% per second so you can see it; on stream it would be slower.</p>
+      </fieldset>
+    </form>
+
+    <div class="stage-col" id="col">
+    <div class="stage-wrap" id="wrap">
+      <div class="stage" id="stage" data-scheme="classic" data-garland="1" data-fairy="1" data-branch="1"
+           data-falling="1" data-pile="1" data-pumpkins="1" data-faces="0" data-game="1"
+           role="img" aria-label="Stream preview with autumn decor">
+
+        <div class="game" aria-hidden="true">
+          <div class="game__mtn"></div>
+          <div class="game__label">GAMEPLAY</div>
+          <div class="game__compass">N · 15 · 30 · NE · 60</div>
+          <div class="game__map"></div>
+          <div class="game__hp"></div>
+          <div class="game__cam">CAM</div>
+        </div>
+
+        <svg width="0" height="0" aria-hidden="true">
+          <defs id="defs">
+            <filter id="bulbGlow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="6" /></filter>
+          </defs>
+        </svg>
+
+        <canvas class="layer" id="backCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer garland" id="garland" viewBox="0 0 1920 1080" aria-hidden="true"></svg>
+        <svg class="layer" viewBox="0 0 1920 1080" aria-hidden="true"><g class="branch" id="branch"></g></svg>
+        <canvas class="layer" id="pileCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer pumpkins" id="pumpkins" viewBox="0 0 1920 1080" aria-hidden="true"></svg>
+        <canvas class="layer" id="frontCanvas" width="1920" height="1080" aria-hidden="true"></canvas>
+        <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080" aria-hidden="true">
+          <g class="rake" id="rakeTool">
+            <line class="rake__handle" x1="0" y1="0" x2="150" y2="-230" />
+            <path class="rake__head" d="M-46 6 L46 -6 M-40 5 L-44 30 M-20 3 L-23 28 M0 0 L-2 26 M20 -3 L19 23 M40 -5 L40 20" />
+          </g>
+        </svg>
+
+        <div class="hud" id="hud" data-show="0">
+          <div class="hud__title">Top rakers</div>
+          <ol id="board"></ol>
+        </div>
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var NS = 'http://www.w3.org/2000/svg';
+      var W = 1920, H = 1080;
+      var stage = document.getElementById('stage');
+      var col = document.getElementById('col');
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ── Skalierung (per <style>, kein Inline-Style) ──
+      var scaleStyle = document.createElement('style');
+      document.head.appendChild(scaleStyle);
+      function fit() {
+        var s = Math.min(col.clientWidth / 1920, (window.innerHeight - 40) / 1080);
+        if (window.innerWidth <= 900) s = col.clientWidth / 1920;
+        scaleStyle.textContent = '.stage-wrap{--s:' + Math.max(0.15, s).toFixed(4) + '}';
+      }
+      window.addEventListener('resize', fit);
+      fit();
+
+      function el(name, attrs, parent) {
+        var e = document.createElementNS(NS, name);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      }
+      var seed = 11;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+      // ── Blattformen: Stiel bei y≈+18, Spitze bei y≈-20 ──
+      var LEAVES = [
+        { body: 'M0 -20 L4 -9 L12 -14 L10 -4 L19 -3 L11 4 L14 10 L4 8 L1 18 L-1 18 L-4 8 L-14 10 L-11 4 L-19 -3 L-10 -4 L-12 -14 L-4 -9 Z',
+          vein: 'M0 24 L0 -14 M0 4 L11 -2 M0 4 L-11 -2' },
+        { body: 'M0 -20 Q6 -17 5 -12 Q10 -10 7 -5 Q12 -2 8 3 Q12 7 6 10 Q6 16 0 18 Q-6 16 -6 10 Q-12 7 -8 3 Q-12 -2 -7 -5 Q-10 -10 -5 -12 Q-6 -17 0 -20 Z',
+          vein: 'M0 24 L0 -16' },
+        { body: 'M0 -18 Q11 -8 8 6 Q4 16 0 18 Q-4 16 -8 6 Q-11 -8 0 -18 Z',
+          vein: 'M0 24 L0 -12' }
+      ];
+      var defs = document.getElementById('defs');
+      LEAVES.forEach(function (l, i) {
+        var g = el('g', { id: 'lf' + i }, defs);
+        el('path', { d: l.body }, g);
+        el('path', { 'class': 'vein', d: l.vein }, g);
+        l.p2body = new Path2D(l.body);
+        l.p2vein = new Path2D(l.vein);
+      });
+      function leafUse(parent, i, x, y, rot, s, cls) {
+        return el('use', {
+          href: '#lf' + i, 'class': cls + ' c' + (1 + Math.floor(rnd() * 5)),
+          transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + rot.toFixed(1) + ') scale(' + s.toFixed(2) + ')'
+        }, parent);
+      }
+
+      // Farben für die Canvas-Blätter aus den CSS-Tokens
+      var palette = [], dark = [];
+      function shade(hex, f) {
+        var n = parseInt(hex.replace('#', ''), 16);
+        var r = (n >> 16) * f, g = ((n >> 8) & 255) * f, b = (n & 255) * f;
+        return 'rgb(' + Math.round(r) + ',' + Math.round(g) + ',' + Math.round(b) + ')';
+      }
+      function readPalette() {
+        var cs = getComputedStyle(stage);
+        palette = []; dark = [];
+        for (var i = 1; i <= 5; i++) {
+          var c = cs.getPropertyValue('--l' + i).trim();
+          palette.push(c); dark.push(shade(c, 0.62));
+        }
+      }
+      readPalette();
+
+      function drawLeaf(ctx, shape, x, y, rot, sx, s, color, alpha) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.scale(s * sx, s);
+        ctx.fillStyle = color;
+        ctx.fill(LEAVES[shape].p2body);
+        ctx.strokeStyle = 'rgba(50,20,0,.45)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke(LEAVES[shape].p2vein);
+        ctx.restore();
+      }
+
+      // ── Blätterranke oben mit Lichtern und Eicheln ──
+      var garland = document.getElementById('garland');
+      var vineD = 'M-10 4';
+      for (var i = 0; i < 5; i++) {
+        var x0 = -10 + i * 388;
+        vineD += ' Q' + (x0 + 194) + ' ' + (i % 2 ? 66 : 80) + ' ' + (x0 + 388) + ' 4';
+      }
+      var vine = el('path', { 'class': 'vine', d: vineD }, garland);
+      var vlen = vine.getTotalLength(), n = 0;
+      for (var s = 10; s < vlen; s += 30, n++) {
+        var p = vine.getPointAtLength(s);
+        var q = vine.getPointAtLength(Math.min(vlen, s + 1));
+        var ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
+        var side = n % 2 ? 1 : -1;
+        leafUse(garland, n % 3, p.x, p.y, 180 + ang + side * (30 + rnd() * 25), 1.1 + rnd() * 0.5, 'vine-leaf');
+        if (n % 9 === 4) {
+          var a = el('g', { transform: 'translate(' + p.x.toFixed(1) + ' ' + (p.y + 8).toFixed(1) + ')' }, garland);
+          el('ellipse', { 'class': 'acorn__nut', cx: 0, cy: 14, rx: 8, ry: 11 }, a);
+          el('path', { 'class': 'acorn__cap', d: 'M-10 6 Q0 -6 10 6 Q0 10 -10 6 Z' }, a);
+        }
+        if (n % 2 === 0) {
+          var f = el('g', { 'class': 'fl ri-' + Math.floor(rnd() * 10), transform: 'translate(' + p.x.toFixed(1) + ' ' + (p.y + 6).toFixed(1) + ')' }, garland);
+          el('circle', { 'class': 'glow', r: 11 }, f);
+          el('circle', { 'class': 'dot', r: 4 }, f);
+        }
+      }
+
+      // ── Ast oben links ──
+      var branch = document.getElementById('branch');
+      var twigs = [
+        { d: 'M-20 150 Q120 130 260 170 Q360 200 430 190', w: 16 },
+        { d: 'M120 140 Q170 90 240 70', w: 7 },
+        { d: 'M240 165 Q290 230 270 290', w: 6 },
+        { d: 'M330 190 Q380 150 440 140', w: 5 },
+        { d: 'M60 146 Q80 200 60 250', w: 5 }
+      ];
+      var branchLeaves = [];
+      twigs.forEach(function (t) {
+        var path = el('path', { 'class': 'branch__wood', d: t.d, 'stroke-width': t.w }, branch);
+        var len = path.getTotalLength();
+        for (var s = len * 0.3; s < len; s += 34) {
+          var p = path.getPointAtLength(s);
+          var u = leafUse(branch, Math.floor(rnd() * 3), p.x, p.y, rnd() * 90 + 135, 1.3 + rnd() * 0.6, 'bl');
+          branchLeaves.push({ node: u, x: p.x, y: p.y, gone: false });
+        }
+      });
+
+      // ── Laubhaufen ──
+      var pileCanvas = document.getElementById('pileCanvas');
+      var pctx = pileCanvas.getContext('2d');
+      var MAXH = 190;
+      function prof(x) {
+        var w = 660;
+        function bump(d) { return d < w ? 0.5 + 0.5 * Math.cos(Math.PI * d / w) : 0; }
+        var c = Math.max(bump(x), bump(W - x) * 0.92);
+        if (stage.dataset.spread === 'full') c = Math.max(c, 0.34 + 0.05 * Math.sin(x / 85));
+        return c;
+      }
+      function surface(x, lvl) { return H - prof(x) * MAXH * lvl; }
+
+      // Blätter im Haufen: x nach Haufenform verteilt, f = Schichthöhe (0 unten … 1 oben)
+      var pileLeaves = [];
+      for (var k = 0; k < 2600; k++) {
+        pileLeaves.push({
+          x: rnd() * W, f: rnd(), shape: Math.floor(rnd() * 3), rot: rnd() * Math.PI * 2,
+          s: 0.9 + rnd() * 0.7, ci: Math.floor(rnd() * 5), dk: rnd() < 0.45, jy: rnd() * 10
+        });
+      }
+      pileLeaves.sort(function (a, b) { return a.f - b.f; });
+
+      function drawPile(lvl) {
+        pctx.clearRect(0, 0, W, H);
+        if (lvl < 0.005) return;
+        var g = pctx.createLinearGradient(0, H - MAXH, 0, H);
+        g.addColorStop(0, '#7a3e10'); g.addColorStop(1, '#3d1d06');
+        pctx.fillStyle = g;
+        pctx.beginPath();
+        pctx.moveTo(0, H);
+        for (var x = 0; x <= W; x += 16) pctx.lineTo(x, H - prof(x) * MAXH * lvl * 0.88);
+        pctx.lineTo(W, H);
+        pctx.fill();
+        for (var i = 0; i < pileLeaves.length; i++) {
+          var l = pileLeaves[i];
+          if (l.f > lvl) break;
+          var pr = prof(l.x);
+          if (pr < 0.04 || rnd2(l) > pr * 1.4) continue;
+          var y = H - pr * MAXH * l.f + l.jy - 4;
+          drawLeaf(pctx, l.shape, l.x, y, l.rot, 1, l.s, l.dk && l.f < lvl - 0.08 ? dark[l.ci] : palette[l.ci], 1);
+        }
+      }
+      // Ausdünnen an flachen Stellen, stabil pro Blatt
+      function rnd2(l) { return (l.x * 7.13 + l.f * 91.7) % 1; }
+
+      // ── Kürbisse ──
+      var pumpkins = document.getElementById('pumpkins');
+      var PK_SLOTS = [110, 250, 390, 1820, 1690, 1550, 520, 1420, 780, 1120, 950];
+      var NAMES = ['Hat3', 'PixelPaul', 'Mia_GG', 'Lunatic', 'xSniperx', 'Kekskrümel', 'Nordlicht', 'Bubu', 'Herbstwind', 'Laubbläser'];
+      var pkList = [], pkNext = 0;
+      function buildPumpkin(x, name, scale) {
+        var g = el('g', { 'class': 'pk pk--new' }, pumpkins);
+        var inner = el('g', { 'class': 'pk__inner' }, g);
+        var body = el('g', { transform: 'scale(' + scale.toFixed(2) + ')' }, inner);
+        el('ellipse', { 'class': 'pk__light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
+        el('ellipse', { 'class': 'pk__body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
+        el('ellipse', { 'class': 'pk__body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
+        el('ellipse', { 'class': 'pk__lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
+        el('path', { 'class': 'pk__rib', d: 'M-12 -58 Q-20 -30 -12 -2 M12 -58 Q20 -30 12 -2' }, body);
+        el('path', { 'class': 'pk__stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
+        el('path', { 'class': 'pk__face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
+        var tag = el('text', { 'class': 'name-tag name-tag--fade', x: 0, y: -84 * scale - 6, 'text-anchor': 'middle' }, inner);
+        tag.textContent = name;
+        var pk = { node: g, x: x };
+        placePumpkin(pk, display);
+        return pk;
+      }
+      function placePumpkin(pk, lvl) {
+        var y = Math.min(H - 6, surface(pk.x, lvl) + 10);
+        pk.node.setAttribute('transform', 'translate(' + pk.x + ' ' + y.toFixed(1) + ')');
+      }
+
+      // ── Partikel (fallendes Laub hinten, Aufwirbeln vorne) ──
+      var backCanvas = document.getElementById('backCanvas'), bctx = backCanvas.getContext('2d');
+      var frontCanvas = document.getElementById('frontCanvas'), fctx = frontCanvas.getContext('2d');
+      var parts = [];
+      var wind = 0, windTarget = 0;
+      function spawn(o) {
+        if (reduced) return;
+        parts.push({
+          x: o.x, y: o.y, vx: o.vx || 0, vy: o.vy || rand(50, 90),
+          rot: rand(0, 6.28), vr: rand(-2, 2), ph: rand(0, 6.28), vph: rand(2, 5),
+          sway: rand(20, 60), shape: Math.floor(Math.random() * 3), ci: Math.floor(Math.random() * 5),
+          s: o.s || rand(0.8, 1.4), front: !!o.front, land: o.land !== false
+        });
+      }
+
+      // ── Zustand ──
+      var level = 0.45, display = 0.45, falling = false;
+      var rakers = {};
+      var pileRange = document.getElementById('f-pile'), pileOut = document.getElementById('pileOut');
+
+      function showLevel() {
+        pileRange.value = Math.round(level * 100);
+        pileOut.textContent = Math.round(level * 100) + '%';
+      }
+
+      var last = performance.now(), spawnAcc = 0, branchAcc = 0, drawnLevel = -1;
+      function frame(now) {
+        var dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+
+        if (falling) {
+          level = Math.min(1, level + 0.03 * dt);
+          showLevel();
+        }
+        // Anzeige: Wachsen sofort, Abtragen animiert
+        if (display < level) display = level;
+        else if (display > level) display = reduced ? level : Math.max(level, display - 0.12 * dt);
+        if (Math.abs(display - drawnLevel) > 0.002) {
+          drawPile(display);
+          pkList.forEach(function (pk) { placePumpkin(pk, display); });
+          drawnLevel = display;
+        }
+
+        // Wind
+        wind += (windTarget - wind) * Math.min(1, dt * 3);
+        windTarget *= Math.pow(0.35, dt);
+
+        // Fallendes Laub
+        var rate = (+document.getElementById('f-density').value) * (falling ? 1.8 : 1);
+        if (stage.dataset.falling === '1') {
+          spawnAcc += rate * dt;
+          while (spawnAcc >= 1) {
+            spawnAcc--;
+            spawn({ x: rand(-200, W + 200), y: -40 });
+          }
+        }
+        // Ast verliert beim Laubfall Blätter, sie wachsen später nach
+        if (falling && stage.dataset.branch === '1') {
+          branchAcc += dt;
+          if (branchAcc > 1.2) {
+            branchAcc = 0;
+            var live = branchLeaves.filter(function (b) { return !b.gone; });
+            if (live.length) {
+              var b = live[Math.floor(Math.random() * live.length)];
+              b.gone = true;
+              b.node.classList.remove('bl--grow');
+              b.node.classList.add('bl--gone');
+              spawn({ x: b.x, y: b.y, vy: 30, s: 1.4 });
+              setTimeout(function () {
+                b.gone = false;
+                b.node.classList.remove('bl--gone');
+                b.node.classList.add('bl--grow');
+              }, 9000);
+            }
+          }
+        }
+
+        bctx.clearRect(0, 0, W, H);
+        fctx.clearRect(0, 0, W, H);
+        for (var i = parts.length - 1; i >= 0; i--) {
+          var p = parts[i];
+          p.ph += p.vph * dt;
+          p.rot += p.vr * dt;
+          if (p.vy < 70) p.vy += 900 * dt;                // nach oben geworfen: Schwerkraft
+          else p.vy += (rand(60, 100) - p.vy) * dt * 0.8;  // Sinkgeschwindigkeit
+          p.vx += (wind - p.vx) * dt * 0.9;
+          p.x += (p.vx + Math.cos(p.ph) * p.sway) * dt;
+          p.y += p.vy * dt;
+
+          // Rand-Fade: nie hart über Kanten
+          var edge = clamp01(Math.min(p.x + 40, W + 40 - p.x) / 140) * clamp01((p.y + 40) / 90);
+          var floor = stage.dataset.pile === '1' ? surface(p.x, display) + 6 : H + 30;
+          var fade = p.land ? clamp01((floor - p.y) / 30) : clamp01((H + 30 - p.y) / 40);
+          if (fade <= 0 || p.x < -260 || p.x > W + 260) { parts.splice(i, 1); continue; }
+          drawLeaf(p.front ? fctx : bctx, p.shape, p.x, p.y, p.rot, Math.cos(p.ph * 1.3), p.s, palette[p.ci], edge * fade);
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+
+      // ── Rechen ──
+      var rakeTool = document.getElementById('rakeTool');
+      var fxSvg = document.getElementById('fxSvg');
+      var rakeSide = 0, raking = false;
+      function bigTag(x, y, text) {
+        var t = el('text', { 'class': 'big-tag', x: x, y: y, 'text-anchor': 'middle' }, fxSvg);
+        t.textContent = text;
+        setTimeout(function () { t.remove(); }, 2500);
+      }
+      function showBoard() {
+        var list = Object.keys(rakers).map(function (k) { return [k, rakers[k]]; })
+          .sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
+        var ol = document.getElementById('board');
+        ol.textContent = '';
+        list.forEach(function (r) {
+          var li = document.createElement('li');
+          var a = document.createElement('span'); a.textContent = r[0];
+          var b = document.createElement('span'); b.textContent = r[1] + ' rakes';
+          li.appendChild(a); li.appendChild(b); ol.appendChild(li);
+        });
+        var hud = document.getElementById('hud');
+        hud.dataset.show = '1';
+        clearTimeout(showBoard.t);
+        showBoard.t = setTimeout(function () { hud.dataset.show = '0'; }, 6000);
+      }
+      document.getElementById('rake').addEventListener('click', function () {
+        if (raking) return;
+        var name = NAMES[Math.floor(Math.random() * NAMES.length)];
+        rakers[name] = (rakers[name] || 0) + 1;
+        var left = rakeSide++ % 2 === 0;
+        var from = left ? 560 : W - 560, to = left ? 70 : W - 70;
+        level = Math.max(0, level - 0.05);
+        showLevel();
+        bigTag(left ? 330 : W - 330, surface(left ? 330 : W - 330, display) - 60, name + ' raked!');
+        if (reduced) { showBoard(); return; }
+        raking = true;
+        rakeTool.classList.add('rake--on');
+        var t0 = performance.now(), dur = 1400;
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / dur);
+          var stroke = (k * 3) % 1;                       // drei Züge
+          var x = from + (to - from) * (Math.floor(k * 3) / 3 + stroke / 3);
+          var y = surface(x, display) + 6 - Math.sin(stroke * Math.PI) * 10;
+          rakeTool.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')' + (left ? '' : ' scale(-1 1)'));
+          if (Math.random() < 0.6) spawn({ x: x + rand(-30, 30), y: y - 10, vx: (left ? -1 : 1) * rand(120, 320), vy: rand(-420, -200), front: true, land: false });
+          if (k < 1) requestAnimationFrame(step);
+          else { rakeTool.classList.remove('rake--on'); raking = false; showBoard(); }
+        })(t0);
+      });
+
+      // ── Reinspringen ──
+      document.getElementById('jump').addEventListener('click', function () {
+        var name = NAMES[Math.floor(Math.random() * NAMES.length)];
+        var left = Math.random() < 0.5;
+        var x = left ? rand(120, 380) : W - rand(120, 380);
+        var y = surface(x, display);
+        for (var i = 0; i < 70; i++) {
+          spawn({ x: x + rand(-50, 50), y: y + rand(0, 20), vx: rand(-380, 380), vy: rand(-1050, -450), front: true, s: rand(0.9, 1.6) });
+        }
+        bigTag(x, y - 140, name + ' jumped in!');
+      });
+
+      // ── Windböe ──
+      document.getElementById('gust').addEventListener('click', function () {
+        windTarget = 900;
+        for (var i = 0; i < 40; i++) {
+          var x = rand(20, 600);
+          spawn({ x: x, y: surface(x, display) + rand(0, 15), vx: rand(300, 700), vy: rand(-380, -120), front: true });
+        }
+      });
+
+      // ── Laubfall an/aus ──
+      var fallBtn = document.getElementById('fall');
+      fallBtn.addEventListener('click', function () {
+        falling = !falling;
+        fallBtn.setAttribute('aria-pressed', String(falling));
+      });
+
+      // ── Kürbis ──
+      document.getElementById('pumpkin').addEventListener('click', function () {
+        if (pkNext >= PK_SLOTS.length) { pkList.forEach(function (pk) { pk.node.remove(); }); pkList = []; pkNext = 0; }
+        var pk = buildPumpkin(PK_SLOTS[pkNext], NAMES[pkNext % NAMES.length], 0.85 + rnd() * 0.4);
+        pkList.push(pk);
+        pkNext++;
+      });
+
+      // ── Feiern ──
+      var celebrateTimer;
+      document.getElementById('celebrate').addEventListener('click', function () {
+        stage.dataset.celebrate = '0';
+        void stage.offsetWidth;
+        stage.dataset.celebrate = '1';
+        clearTimeout(celebrateTimer);
+        celebrateTimer = setTimeout(function () { stage.dataset.celebrate = '0'; }, 4000);
+        for (var i = 0; i < 90; i++) {
+          var left = i % 2 === 0;
+          spawn({ x: left ? rand(0, 200) : W - rand(0, 200), y: H - rand(20, 120), vx: (left ? 1 : -1) * rand(250, 650), vy: rand(-1150, -650), front: true });
+        }
+      });
+
+      // ── Steuerung ──
+      document.getElementById('controls').addEventListener('change', function (e) {
+        var t = e.target, key = t.dataset.key;
+        if (!key) return;
+        if (t.type === 'checkbox') stage.dataset[key] = t.checked ? '1' : '0';
+        else if (key !== 'density') stage.dataset[key] = t.value;
+        if (key === 'scheme') { readPalette(); drawnLevel = -1; }
+        if (key === 'spread') drawnLevel = -1;
+      });
+      pileRange.addEventListener('input', function () {
+        level = display = pileRange.value / 100;
+        pileOut.textContent = pileRange.value + '%';
+      });
+
+      // Zwei Start-Kürbisse, damit man sie gleich sieht
+      document.getElementById('pumpkin').click();
+      document.getElementById('pumpkin').click();
+    })();
+  </script>
+</body>
+</html>
