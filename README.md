@@ -319,7 +319,7 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/resistance-futile.html` | Star-Trek-Borg (CRT-Terminal-Look) | ~3.8s | 1920×1080 |
 | `stingers/heart.html` | Geheimer Herzschlag (Sparkle-Heart) | ~5.4s | 1920×1080 |
 | `stingers/kickers-remake.html` | Kickers-Intro CSS-Nachbau (Fußballfeld + Ball-Swarm + 2× HURRA + Titel „Die tollen Superzocker") — `?tune=1` fürs Tune-Panel | ~7.7s | 1920×1080 |
-| `stingers/sad.html` | `!sad` — Regenwolke mit traurigem Gesicht + Sad Trombone, Titel „sad.“ — `?x=20` verschiebt die Wolke (15–85 %) | ~4.6s | 1920×1080 |
+| `stingers/sad.html` | `!sad` — Regenwolke mit traurigem Gesicht + Sad Trombone, Titel „sad.“ — `?left=30` linke Wolkenkante in px (Standard 30, 740 = Mitte) | ~4.6s | 1920×1080 |
 | `stingers/you-died.html` | `!sad` Souls-Style: schwarzer Balken, roter Serifentext, Gong — `?text=HOPE%20DIED` eigener Text | ~4.7s | 1920×1080 |
 | `stingers/motivation.html` | `!sad` Statusbalken fällt 100 → 64 → 21 → 3 %, Stempel „sad.“ — `?label=Skill` eigener Name | ~4.3s | 1920×1080 |
 

@@ -9,7 +9,7 @@
   <!--
     !sad — Regenwolke + Sad Trombone (synthetisch, keine MP3).
     URL-Parameter:
-      ?x=50       horizontale Position der Wolke in % (15–85)
+      ?left=30    linke Kante der Wolke in px (0–1480), Standard 30
       ?sound=0    stumm
       ?volume=0.8 Lautstärke 0–1
       ?tune=1     Timing-Panel
@@ -25,7 +25,8 @@
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --x: 50%;
+      --x: 250px;
+      --tx: 300px;
       --cloud-in: 0s; --rain-in: 0.55s;
       --n1: 0.75s; --n2: 1.25s; --n3: 1.75s; --n4: 2.25s;
       --title-in: 2.3s; --rain-out: 3.7s; --cloud-out: 3.9s; --stage-out: 4.1s;
@@ -160,7 +161,7 @@
     .title {
       position: absolute;
       top: 700px;
-      left: var(--x);
+      left: var(--tx);
       transform: translate(-50%, -24px);
       font-size: 210px;
       font-weight: 200;
@@ -225,15 +226,17 @@
       var T = K.timings('sad', DEFAULTS);
       K.tune('sad', DEFAULTS, LABELS);
 
-      var xPct = parseFloat(K.params.get('x'));
-      xPct = isFinite(xPct) ? Math.max(15, Math.min(85, xPct)) : 50;
-      K.vars({ x: xPct + '%' });
+      // Wolke 440 px breit; Titel mittig darunter, aber nie angeschnitten
+      var left = parseFloat(K.params.get('left'));
+      left = isFinite(left) ? Math.max(0, Math.min(1480, left)) : 30;
+      var cx = left + 220;
+      K.vars({ x: cx + 'px', tx: Math.max(300, Math.min(1620, cx)) + 'px' });
 
       // ── Regen aus der Wolke ──
       var canvas = document.getElementById('rain');
       var g = canvas.getContext('2d');
       var W = 1920, H = 1080;
-      var CX = W * xPct / 100;
+      var CX = cx;
       var HALF = 190;           // halbe Breite der Regensäule
       var GROUND = 1000;
       var drops = [], splashes = [];
