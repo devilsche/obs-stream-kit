@@ -122,8 +122,7 @@
     .tree svg { width: 100%; height: 100%; overflow: visible; }
     .tree .snowcap { fill: #f4f8ff; }
     .tree .mound { fill: url(#moundG); }
-    .stage[data-treesnow="0"] .tree .snowcap,
-    .stage[data-treesnow="0"] .tree .mound { display: none; }
+    .stage[data-treesnow="0"] .tree .snowcap { display: none; }
     .star-rays { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
     .star { filter: url(#starGlow); }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -433,7 +432,7 @@
         </g>
         <g id="followers"></g>
         <!-- Schneehügel: wandert mit dem Baum, damit er nie in der Luft steht -->
-        <path class="mound" d="M-80 540 Q-48 504 22 506 Q104 492 200 498 Q298 490 378 504 Q448 506 480 540 Z" />
+        <path class="mound" id="mound" d="M-80 540 Q-48 504 22 506 Q104 492 200 498 Q298 490 378 504 Q448 506 480 540 Z" />
         <g id="giftsBack"></g>
         <g id="giftsFront"></g>
         <text class="counter" id="counter" x="200" y="536" text-anchor="middle"></text>
@@ -634,11 +633,29 @@
       })();
 
       // ── Geschenke: hintere Reihe zuerst, vordere davor ──
+      // [x, vorne?] — die Höhe kommt von der Hügeloberfläche (groundY), damit
+      // kein Geschenk schwebt, auch wenn aller Zusatzschnee weg ist
       var GIFT_SLOTS = [
-        [200, 512, 1], [150, 490, 0], [250, 490, 0], [135, 514, 1], [265, 514, 1],
-        [100, 492, 0], [300, 492, 0], [75, 516, 1], [325, 516, 1], [55, 494, 0],
-        [345, 494, 0], [18, 518, 1], [382, 518, 1], [-35, 520, 1], [435, 520, 1]
+        [200, 1], [150, 0], [250, 0], [135, 1], [265, 1],
+        [100, 0], [300, 0], [75, 1], [325, 1], [55, 0],
+        [345, 0], [18, 1], [382, 1], [-35, 1], [435, 1]
       ];
+      // Oberkante des Schneehügels: für jede x-Position die höchste Stelle der Kontur
+      var groundY = (function () {
+        var path = document.getElementById('mound'), len = path.getTotalLength(), top = {};
+        for (var d = 0; d <= len; d += 1) {
+          var pt = path.getPointAtLength(d), bx = Math.round(pt.x);
+          if (pt.y < 539 && (top[bx] === undefined || pt.y < top[bx])) top[bx] = pt.y;
+        }
+        return function (x) {
+          for (var off = 0; off < 40; off++) {
+            var bx = Math.round(x);
+            if (top[bx + off] !== undefined) return top[bx + off];
+            if (top[bx - off] !== undefined) return top[bx - off];
+          }
+          return 520;
+        };
+      })();
       var GIFT_LOOK = {
         sub:     { w: 52, h: 40, box: '#c4302b', rib: '#f2d16b' },
         resub:   { w: 56, h: 44, box: '#2e8b57', rib: '#e8443a' },
@@ -703,7 +720,9 @@
         if (giftNodes[i]) giftNodes[i].node.parentNode.removeChild(giftNodes[i].node);
         var look = GIFT_LOOK[gift.type] || GIFT_LOOK.sub;
         var k = giftScale(gift.type, gift.amount), w = look.w * k, h = look.h * k;
-        var outer = el('g', { transform: 'translate(' + slot[0] + ' ' + slot[1] + ')' }, slot[2] ? giftsFront : giftsBack);
+        // hintere Reihe sitzt knapp im Schnee, vordere tiefer (davor)
+        var baseY = groundY(slot[0]) + (slot[1] ? 16 : 4);
+        var outer = el('g', { transform: 'translate(' + slot[0] + ' ' + baseY.toFixed(1) + ')' }, slot[1] ? giftsFront : giftsBack);
         var g = el('g', { 'class': 'gift-body' + (animate ? ' gift-drop' : '') }, outer);
         el('rect', { x: (-w / 2).toFixed(1), y: (-h).toFixed(1), width: w.toFixed(1), height: h.toFixed(1), rx: 3, fill: look.box }, g);
         el('rect', { x: (-w / 2).toFixed(1), y: (-h).toFixed(1), width: w.toFixed(1), height: (h * 0.18).toFixed(1), fill: 'rgba(255,255,255,.12)' }, g);
@@ -714,9 +733,9 @@
         el('ellipse', { cx: 9 * k, cy: -h - 5 * k, rx: 10 * k, ry: 6 * k, fill: look.rib, transform: 'rotate(25 ' + (9 * k) + ' ' + (-h - 5 * k) + ')' }, g);
         el('circle', { cx: 0, cy: -h - 3 * k, r: 4 * k, fill: look.rib }, g);
         var label = giftLabel(gift);
-        giftNodes[i] = { node: outer, label: label, x: slot[0], y: slot[1] - h - 18 * k };
+        giftNodes[i] = { node: outer, label: label, x: slot[0], y: baseY - h - 18 * k };
         giftNext++;
-        if (animate) showTag(label, slot[0], slot[1] - h - 18 * k);
+        if (animate) showTag(label, slot[0], baseY - h - 18 * k);
       }
 
       function clearItems(kind) {
