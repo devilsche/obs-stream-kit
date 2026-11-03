@@ -10,6 +10,7 @@ Befehl zusätzlich in die DB; der erste Poll ohne `since` liefert sie als
 """
 import logging
 import sqlite3
+import time
 
 from flask import Blueprint, current_app, g, jsonify, abort, request
 
@@ -73,6 +74,7 @@ def poll(token, effect):
         abort(404)
     since = request.args.get("since", type=int)
     out = commands.poll(g.tenant_id, effect, since)
+    out["now"] = time.time()          # Uhrabgleich für zeitabhängige Effekte (Schneefall)
     out["state"] = {}
     if since is None and effect in _PERSISTENT:
         load = _PERSISTENT[effect][1]

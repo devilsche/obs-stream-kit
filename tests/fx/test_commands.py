@@ -174,14 +174,15 @@ def test_xmas_gift_defaults_and_limits():
 
 def test_xmas_snow_commands():
     assert commands.parse("xmas", {"cmd": "snowfall"}) == {"cmd": "snowfall", "params": {}}
+    assert commands.parse("xmas", {"cmd": "snowfall", "secs": "90"})["params"] == {"secs": 90}
     assert commands.parse("xmas", {"cmd": "shovel", "name": "Hat3"})["params"] == {"name": "Hat3"}
     assert commands.parse("xmas", {"cmd": "shake", "name": "Mia"})["params"] == {"name": "Mia"}
-    for cmd in ("melt", "leaders"):
+    for cmd in ("snowstop", "snowtoggle", "melt", "leaders"):
         assert commands.parse("xmas", {"cmd": cmd}) == {"cmd": cmd, "params": {}}
     assert commands.parse("xmas", {"cmd": "clear", "kind": "snow"})["params"] == {"kind": "snow"}
-    out = commands.parse("xmas", {"cmd": "set", "snowadd": "500", "shovel": "0",
+    out = commands.parse("xmas", {"cmd": "set", "snowrate": "999", "shovel": "0",
                                   "shakeneed": "3", "shakewin": "30"})
-    assert out["params"] == {"snowadd": 100, "shovel": 1, "shakeneed": 3, "shakewin": 30}
+    assert out["params"] == {"snowrate": 300, "shovel": 1, "shakeneed": 3, "shakewin": 30}
 
 
 def test_poll_commands_carry_server_time():

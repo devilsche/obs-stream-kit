@@ -127,7 +127,7 @@ EFFECTS = {
     },
     "xmas": {
         "commands": ("set", "celebrate", "ornament", "gift", "clear", "reset",
-                     "snowfall", "shovel", "shake", "melt", "leaders"),
+                     "snowfall", "snowstop", "snowtoggle", "shovel", "shake", "melt", "leaders"),
         "settings": {
             "lights": _choice("top", "frame", "off"),
             "pattern": _choice("steady", "twinkle", "chase", "wave"),
@@ -143,8 +143,8 @@ EFFECTS = {
             "tsize": _float_range(0.5, 1.5),
             "treesnow": _flag,
             "snow": _flag,
-            # Schnee-Regeln: % pro !snow, % pro Schippe, Rüttler in Sekunden
-            "snowadd": _int_range(5, 100),
+            # Schnee-Regeln: % pro Minute Schneefall, % pro Schippe, Rüttler in Sekunden
+            "snowrate": _int_range(1, 300),
             "shovel": _int_range(1, 50),
             "shakeneed": _int_range(1, 20),
             "shakewin": _int_range(5, 120),
@@ -157,6 +157,8 @@ EFFECTS = {
             "clear": {"kind": _choice("ornaments", "gifts", "snow")},
             "shovel": {"name": _name},
             "shake": {"name": _name},
+            # optional: Schneefall stoppt nach secs Sekunden von selbst
+            "snowfall": {"secs": _int_range(5, 86400)},
         },
         # Werte, die ein Befehl immer mitbringt, auch wenn Streamer.bot sie weglässt
         "defaults": {

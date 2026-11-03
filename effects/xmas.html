@@ -27,11 +27,12 @@
     Kugeln und Geschenke speichert der Server dauerhaft (fx/xmas_db.py); sichtbar
     sind die neuesten 60 Kugeln und 15 Geschenke, der Zähler zeigt alle.
 
-    Schnee: cmd=snowfall (+snowadd %, z. B. zusammen mit !snow), cmd=shovel&name=…
-    (−shovel %, zählt für die Rangliste), cmd=shake&name=… (shakeneed Leute in
-    shakewin s schütteln alles frei), cmd=melt, cmd=leaders (Rangliste zeigen),
-    cmd=clear&kind=snow (Schnee + Rangliste löschen).
-      snowadd=5..100 (35)  shovel=1..50 (5)  shakeneed=1..20 (5)  shakewin=5..120 (20)
+    Schnee: cmd=snowtoggle (an/aus, passend zum !snow-Video) bzw. cmd=snowfall[&secs=…]
+    und cmd=snowstop; solange es schneit, wächst der Schnee um snowrate % pro Minute.
+    cmd=shovel&name=… (−shovel %, zählt für die Rangliste), cmd=shake&name=…
+    (shakeneed Leute in shakewin s schütteln alles frei), cmd=melt, cmd=leaders
+    (Rangliste zeigen), cmd=clear&kind=snow (Schnee + Rangliste löschen).
+      snowrate=1..300 (20)  shovel=1..50 (5)  shakeneed=1..20 (5)  shakewin=5..120 (20)
     Der Server speichert nur die Ereignisse; Schneehöhe und Rangliste rechnet
     das Overlay beim Laden mit diesen Regeln nach.
   -->
@@ -118,11 +119,10 @@
     .stage[data-treepos="left"] .tree { right: auto; left: var(--treex); }
     .stage[data-tree="0"] .tree { display: none; }
     .tree svg { width: 100%; height: 100%; overflow: visible; }
-    .tree .snowcap, .tree .mound { fill: #f4f8ff; }
-    .tree .mound-shade { fill: #c9d7ec; }
+    .tree .snowcap { fill: #f4f8ff; }
+    .tree .mound { fill: url(#moundG); }
     .stage[data-treesnow="0"] .tree .snowcap,
-    .stage[data-treesnow="0"] .tree .mound,
-    .stage[data-treesnow="0"] .tree .mound-shade { display: none; }
+    .stage[data-treesnow="0"] .tree .mound { display: none; }
     .star-rays { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
     .star { filter: url(#starGlow); }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -222,7 +222,7 @@
     .snow .shade { fill: #c9d7ec; }
 
     /* ── Schnee ──
-       --snow 0..1 Gesamtmenge, --cap Kappen auf Birnen/Kugeln (ab ~35 %),
+       --snow 0..1 Gesamtmenge, --cap Kappen auf den hängenden Kugeln (ab ~35 %),
        --hat Mütze auf dem Stern (ab ~60 %), --dim Lichter gedämpft (ab 70 %) */
     .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --hudp: 0; }
     .wire-snow {
@@ -231,8 +231,9 @@
       stroke-linecap: round;
       stroke-width: calc(1px + 8px * var(--snow));
       opacity: min(1, calc(var(--snow) * 4));
+      /* halbe Strichbreite nach oben: der Schnee liegt auf dem Draht, nicht darunter */
+      transform: translateY(calc(-1.5px - 4px * var(--snow)));
     }
-    .bcap { fill: #f4f8ff; opacity: var(--cap); }
     .lights, .tree #treeLights { filter: brightness(calc(1 - 0.45 * var(--dim))); }
     .bsnow {
       position: absolute;
@@ -260,10 +261,10 @@
     }
     .tree .starhat { fill: #f4f8ff; opacity: var(--hat); }
     .gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--snow)); }
-    .tree .mound, .tree .mound-shade { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(1 + 0.9 * var(--snow))); }
+    .tree .mound { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(1 + 0.6 * var(--snow))); }
     .snow svg { transform-origin: 50% 100%; }
-    .snow__l { transform: scaleY(calc(1 + 1.1 * var(--snow))); }
-    .snow__r { transform: scaleX(-1) scaleY(calc(1 + 1.1 * var(--snow))); }
+    .snow__l { transform: scaleY(calc(1 + 0.6 * var(--snow))); }
+    .snow__r { transform: scaleX(-1) scaleY(calc(1 + 0.6 * var(--snow))); }
 
     /* Schippen, Rütteln, Brocken */
     .fx { position: absolute; inset: 0; pointer-events: none; }
@@ -350,6 +351,7 @@
           <feGaussianBlur stdDeviation="6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
         <linearGradient id="treeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7a4a" /><stop offset="1" stop-color="#14472b" /></linearGradient>
+        <linearGradient id="moundG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe9f6" /><stop offset=".18" stop-color="#f4f8ff" /><stop offset="1" stop-color="#f4f8ff" /></linearGradient>
         <radialGradient id="ornR" cx=".35" cy=".3"><stop offset="0" stop-color="#ff9a9a" /><stop offset=".5" stop-color="#d42a2a" /><stop offset="1" stop-color="#6e0d0d" /></radialGradient>
         <radialGradient id="ornG" cx=".35" cy=".3"><stop offset="0" stop-color="#fff1a8" /><stop offset=".5" stop-color="#e2ad1c" /><stop offset="1" stop-color="#7a5506" /></radialGradient>
         <radialGradient id="ornB" cx=".35" cy=".3"><stop offset="0" stop-color="#b6dcff" /><stop offset=".5" stop-color="#2a78d4" /><stop offset="1" stop-color="#0d2f6e" /></radialGradient>
@@ -379,19 +381,20 @@
     <div class="tree" aria-hidden="true">
       <svg viewBox="0 0 400 540">
         <rect x="182" y="405" width="36" height="112" fill="#5a3a22" />
+        <!-- Stufen von unten nach oben, Schnee jeweils direkt danach: so verdeckt
+             die obere Stufe auch den Schnee der unteren, wie beim Grün -->
         <path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" fill="url(#treeG)" />
+        <path class="frost" d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" />
+        <path class="ridge" d="M40 400 L200 152 L360 400" />
         <path class="snowcap" d="M38 402 Q120 422 200 412 Q280 422 362 402 Q350 392 330 396 Q300 404 270 398 Q235 408 200 402 Q160 410 130 398 Q95 406 62 396 Q48 394 38 402 Z" />
         <path d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" fill="url(#treeG)" />
+        <path class="frost" d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" />
+        <path class="ridge" d="M80 298 L200 92 L320 298" />
         <path class="snowcap" d="M78 300 Q140 318 200 310 Q260 318 322 300 Q310 292 292 296 Q262 304 236 297 Q215 306 190 300 Q160 307 132 297 Q102 304 78 300 Z" />
         <path d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" fill="url(#treeG)" />
-        <path class="snowcap" d="M118 202 Q160 216 200 210 Q240 216 282 202 Q270 195 252 199 Q228 207 205 200 Q182 207 160 199 Q138 205 118 202 Z" />
-
-        <path class="frost" d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" />
-        <path class="frost" d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" />
         <path class="frost" d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" />
-        <path class="ridge" d="M40 400 L200 152 L360 400" />
-        <path class="ridge" d="M80 298 L200 92 L320 298" />
         <path class="ridge" d="M120 200 L200 40 L280 200" />
+        <path class="snowcap" d="M118 202 Q160 216 200 210 Q240 216 282 202 Q270 195 252 199 Q228 207 205 200 Q182 207 160 199 Q138 205 118 202 Z" />
 
         <path id="garl1" d="M140 178 Q200 206 262 172" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
         <path id="garl2" d="M106 272 Q200 304 298 262" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
@@ -406,8 +409,7 @@
         </g>
         <g id="followers"></g>
         <!-- Schneehügel: wandert mit dem Baum, damit er nie in der Luft steht -->
-        <path class="mound-shade" d="M-80 540 Q-50 498 20 500 Q100 484 200 490 Q300 482 380 498 Q450 500 480 540 Z" />
-        <path class="mound" d="M-80 540 Q-48 506 22 508 Q104 494 200 500 Q298 492 378 506 Q448 508 480 540 Z" />
+        <path class="mound" d="M-80 540 Q-48 504 22 506 Q104 492 200 498 Q298 490 378 504 Q448 506 480 540 Z" />
         <g id="giftsBack"></g>
         <g id="giftsFront"></g>
         <text class="counter" id="counter" x="200" y="536" text-anchor="middle"></text>
@@ -473,7 +475,7 @@
         tsize: [num(0.5, 1.5), 1],
         treesnow: [flag, true],
         snow: [flag, true],
-        snowadd: [num(5, 100, true), 35],
+        snowrate: [num(1, 300, true), 20],
         shovel: [num(1, 50, true), 5],
         shakeneed: [num(1, 20, true), 5],
         shakewin: [num(5, 120, true), 20]
@@ -505,14 +507,13 @@
         el('ellipse', { 'class': 'glow lit', cx: 0, cy: 18, rx: 14, ry: 16, opacity: 0.75 }, g);
         el('rect', { 'class': 'socket', x: -5, y: 0, width: 10, height: 9, rx: 2 }, g);
         el('path', { 'class': 'body lit', d: 'M0 8 C9 10 9 24 0 32 C-9 24 -9 10 0 8 Z' }, g);
-        el('ellipse', { 'class': 'bcap', cx: 0, cy: 11, rx: 7, ry: 3.5 }, g);
         bulbIndex++;
       }
 
       function stringAlong(svg, d, cls, step, baseRot) {
         var grp = el('g', { 'class': cls }, svg);
         var path = el('path', { 'class': 'wire', d: d }, grp);
-        el('path', { 'class': 'wire-snow', d: d, transform: 'translate(0 -2)' }, grp);
+        el('path', { 'class': 'wire-snow', d: d }, grp);
         var len = path.getTotalLength();
         for (var s = step / 2; s < len; s += step) {
           var p = path.getPointAtLength(s);
@@ -708,7 +709,8 @@
       function applyState(state) {
         if (!state || !state.ornaments) return;
         snowReset(false);
-        (state.snow_events || []).forEach(function (e) { snowApply(e.k, e.n || '', e.t); });
+        (state.snow_events || []).forEach(function (e) { snowApply(e.k, e.n || '', e.t, e.s); });
+        snowAdvance(serverNow());
         snowShown = SN.snow;
         clearItems();
         state.ornaments.forEach(function (o) { addOrnament(o.name, false); });
@@ -743,20 +745,32 @@
 
       // ── Schnee ──
       // Regeln aus der URL: der Server liefert nur Ereignisse, gerechnet wird hier.
-      var SN = { snow: 0, shakes: [], leaders: {} };
+      // snowing/since/until: Schneefall läuft von since bis until (Infinity = bis snowstop)
+      var SN = { snow: 0, shakes: [], leaders: {}, snowing: false, since: 0, until: Infinity };
       function snowReset(keepLeaders) {
         SN.snow = 0; SN.shakes = [];
-        if (!keepLeaders) SN.leaders = {};
+        if (!keepLeaders) { SN.leaders = {}; SN.snowing = false; }
+      }
+      // Schnee bis Zeitpunkt t wachsen lassen
+      function snowAdvance(t) {
+        if (!SN.snowing) return;
+        var end = Math.min(t, SN.until);
+        if (end > SN.since) SN.snow = Math.min(100, SN.snow + cur.snowrate / 60 * (end - SN.since));
+        SN.since = Math.max(SN.since, end);
+        if (t >= SN.until) SN.snowing = false;
       }
       function leaderList() {
         return Object.keys(SN.leaders).map(function (k) { return [SN.leaders[k].name, SN.leaders[k].n]; })
           .sort(function (a, b) { return b[1] - a[1]; });
       }
       // Ein Ereignis anwenden; Rückgabe beschreibt, was passiert ist (für Animationen)
-      function snowApply(k, name, t) {
+      function snowApply(k, name, t, secs) {
+        snowAdvance(t);
         var r = { k: k, name: name };
-        if (k === 'fall') {
-          SN.snow = Math.min(100, SN.snow + cur.snowadd);
+        if (k === 'start' || k === 'fall') {
+          SN.snowing = true; SN.since = t; SN.until = secs ? t + secs : Infinity;
+        } else if (k === 'stop') {
+          SN.snowing = false;
         } else if (k === 'shovel') {
           r.removed = Math.min(cur.shovel, SN.snow);
           SN.snow -= r.removed;
@@ -779,8 +793,9 @@
         return r;
       }
 
-      // Anzeige läuft der berechneten Menge weich hinterher
-      var snowShown = 0, snowRate = 2.5, lastTick = performance.now();
+      // Anzeige: Zuwachs folgt direkt (er ist ohnehin stetig), Abnahme läuft
+      // weich mit snowDrop %/s hinterher
+      var snowShown = 0, snowDrop = 40, lastTick = performance.now();
       var dynStyle = document.createElement('style');
       document.head.appendChild(dynStyle);
       var clockOff = 0;   // Serverzeit − lokale Zeit, für die Rüttel-Anzeige
@@ -791,9 +806,10 @@
       function snowTick(now) {
         var dt = Math.min(0.1, (now - lastTick) / 1000);
         lastTick = now;
+        snowAdvance(serverNow());
         var target = SN.snow;
-        if (snowShown < target) snowShown = Math.min(target, snowShown + snowRate * dt);
-        else if (snowShown > target) snowShown = Math.max(target, snowShown - snowRate * dt);
+        if (snowShown < target) snowShown = target;
+        else if (snowShown > target) snowShown = Math.max(target, snowShown - snowDrop * dt);
         var s = snowShown / 100;
         var p = 0;
         var live = SN.shakes.filter(function (sh) { return serverNow() - sh.t <= cur.shakewin; });
@@ -878,13 +894,10 @@
         g.addEventListener('animationend', function () { fxSvg.removeChild(outer); });
       }
 
-      function snowEvent(k, name, t, animate) {
-        var r = snowApply(k, name, t);
-        if (!animate) return r;
-        if (k === 'fall') {
-          snowRate = cur.snowadd / 15;             // wächst in ~15 s, passend zum Schneefall-Video
-        } else if (k === 'shovel') {
-          snowRate = 40;
+      function snowEvent(k, name, t, secs) {
+        var r = snowApply(k, name, t, secs);
+        if (k === 'shovel') {
+          snowDrop = 40;
           var sp = snowSpots(), spot = sp[Math.floor(Math.random() * sp.length)];
           if (r.removed > 0) {
             shovelAt(spot[0], spot[1]);
@@ -895,7 +908,7 @@
           }
         } else if (k === 'shake') {
           if (r.success) {
-            snowRate = 90;
+            snowDrop = 90;
             stage.classList.remove('is-shakeoff'); void stage.offsetWidth; stage.classList.add('is-shakeoff');
             setTimeout(function () { stage.classList.remove('is-shakeoff'); }, 1200);
             snowSpots().concat(snowSpots(), snowSpots()).forEach(function (p) { burst(p[0], p[1], 18, 120, false); });
@@ -906,7 +919,7 @@
             if (!r.idle) snowSpots().forEach(function (p) { burst(p[0], p[1], 3, 40, false); });
           }
         } else if (k === 'melt') {
-          snowRate = 12;
+          snowDrop = 12;
         }
         return r;
       }
@@ -930,7 +943,7 @@
         boardTimer = setTimeout(function () { hudBoard.classList.remove('is-on'); }, 10000);
       }
 
-      var SNOW_CMD = { snowfall: 'fall', shovel: 'shovel', shake: 'shake', melt: 'melt' };
+      var SNOW_CMD = { snowfall: 'start', snowstop: 'stop', shovel: 'shovel', shake: 'shake', melt: 'melt' };
 
       function applyCommand(c) {
         var p = c.params || {};
@@ -946,9 +959,11 @@
             break;
           case 'leaders':   showLeaders(); break;
           default:
-            if (SNOW_CMD[c.cmd]) {
-              if (typeof c.ts === 'number') clockOff = c.ts - Date.now() / 1000;
-              snowEvent(SNOW_CMD[c.cmd], p.name || '', typeof c.ts === 'number' ? c.ts : serverNow(), true);
+            var cmd = c.cmd;
+            // ohne Server-DB (oder lokal im Tune-Modus) schaltet das Overlay selbst um
+            if (cmd === 'snowtoggle') cmd = SN.snowing ? 'snowstop' : 'snowfall';
+            if (SNOW_CMD[cmd]) {
+              snowEvent(SNOW_CMD[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : serverNow(), p.secs);
             }
         }
       }
@@ -958,8 +973,8 @@
       var remoteState = 'off (no token URL)';
       function showTune() {
         if (tuneMode) tuneEl.textContent = 'remote: ' + remoteState + ' | ornaments: ' + ornTotal + ' | gifts: ' + giftTotal +
-                                           ' | snow: ' + Math.round(SN.snow) + '% | keys: C celebrate, O ornament, G gift, ' +
-                                           'S snowfall, V shovel, K shake, L leaders';
+                                           ' | snow: ' + Math.round(SN.snow) + '%' + (SN.snowing ? ' (snowing)' : '') +
+                                           ' | keys: C celebrate, O ornament, G gift, S snow on/off, V shovel, K shake, L leaders';
       }
       if (tuneMode) tuneEl.classList.add('is-on');
       var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
@@ -981,6 +996,7 @@
                 return;
               }
               epoch = data.epoch;
+              if (typeof data.now === 'number') clockOff = data.now - Date.now() / 1000;
               if (seq === null) applyState(data.state);
               else (data.commands || []).forEach(applyCommand);
               seq = data.seq;
@@ -1004,7 +1020,7 @@
         document.addEventListener('keydown', function (e) {
           if (e.key === 'c' || e.key === 'C') celebrate();
           else if (e.key === 'o' || e.key === 'O') { applyCommand({ cmd: 'ornament', params: { name: testNames[ornTotal % testNames.length] } }); showTune(); }
-          else if (e.key === 's' || e.key === 'S') { applyCommand({ cmd: 'snowfall', params: {} }); showTune(); }
+          else if (e.key === 's' || e.key === 'S') { applyCommand({ cmd: 'snowtoggle', params: {} }); showTune(); }
           else if (e.key === 'v' || e.key === 'V') { applyCommand({ cmd: 'shovel', params: { name: testNames[Math.floor(Math.random() * 5)] } }); showTune(); }
           else if (e.key === 'k' || e.key === 'K') { applyCommand({ cmd: 'shake', params: { name: testNames[Math.floor(Math.random() * 5)] } }); showTune(); }
           else if (e.key === 'l' || e.key === 'L') showLeaders();

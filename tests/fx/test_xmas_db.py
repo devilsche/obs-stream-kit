@@ -110,17 +110,42 @@ def test_rain_poll_has_no_db_state(conn):
 
 
 def test_snow_events_are_logged_with_time(conn):
-    xmas_db.persist(conn, 1, {"cmd": "snowfall", "params": {}})
+    xmas_db.persist(conn, 1, {"cmd": "snowfall", "params": {"secs": 60}})
     xmas_db.persist(conn, 1, {"cmd": "shovel", "params": {"name": "Hat3"}})
     xmas_db.persist(conn, 1, {"cmd": "shake", "params": {}})
+    xmas_db.persist(conn, 1, {"cmd": "snowstop", "params": {}})
     xmas_db.persist(conn, 1, {"cmd": "melt", "params": {}})
     xmas_db.persist(conn, 1, {"cmd": "leaders", "params": {}})     # nur Anzeige, kein Ereignis
     ev = xmas_db.load_state(conn, 1)["snow_events"]
-    assert [(e["k"], e["n"]) for e in ev] == [("fall", ""), ("shovel", "Hat3"), ("shake", ""), ("melt", "")]
+    assert [(e["k"], e["n"], e["s"]) for e in ev] == [
+        ("start", "", 60), ("shovel", "Hat3", None), ("shake", "", None), ("stop", "", None), ("melt", "", None)]
     assert all(isinstance(e["t"], float) and e["t"] > 1.7e9 for e in ev)
     # Schnee zählt nicht als Kugel/Geschenk
     s = xmas_db.load_state(conn, 1)
     assert (s["ornament_total"], s["gift_total"]) == (0, 0)
+
+
+def test_snowtoggle_alternates_and_becomes_start_or_stop(conn):
+    c1 = {"cmd": "snowtoggle", "params": {}}
+    xmas_db.persist(conn, 1, c1)
+    assert c1["cmd"] == "snowfall"          # ans Overlay geht der aufgelöste Befehl
+    c2 = {"cmd": "snowtoggle", "params": {}}
+    xmas_db.persist(conn, 1, c2)
+    assert c2["cmd"] == "snowstop"
+    xmas_db.persist(conn, 1, {"cmd": "shovel", "params": {"name": "x"}})
+    c3 = {"cmd": "snowtoggle", "params": {}}
+    xmas_db.persist(conn, 1, c3)
+    assert c3["cmd"] == "snowfall"
+    assert [e["k"] for e in xmas_db.load_state(conn, 1)["snow_events"]] == ["start", "stop", "shovel", "start"]
+    # anderer Tenant beginnt bei "aus"
+    c4 = {"cmd": "snowtoggle", "params": {}}
+    xmas_db.persist(conn, 2, c4)
+    assert c4["cmd"] == "snowfall"
+
+
+def test_poll_reports_server_time(conn):
+    body = _app(conn).test_client().get("/s/tok/api/fx/xmas/poll").get_json()
+    assert isinstance(body["now"], float) and body["now"] > 1.7e9
 
 
 def test_clear_snow_keeps_ornaments(conn):
