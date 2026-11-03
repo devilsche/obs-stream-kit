@@ -327,7 +327,7 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 
 > **`?sound=0`:** Stinger ohne eigenen Ton, etwa wenn Streamer.bot den Sound abspielt. Videos (Trap, Kickers) laufen dann stumm und sofort. Ohne Parameter gilt: Hängt die Audio-Ausgabe von OBS, lädt ein Video-Stinger nach spätestens 1,2 s stumm neu und blendet ein.
 
-> **Synthetischer Sound:** `sad`, `you-died` und `motivation` erzeugen ihren Ton per Web Audio im Browser (keine MP3, `js/stinger-kit.js`). `?volume=0.8` (0–1) regelt die Lautstärke, `?sound=0` schaltet stumm, `?tune=1` öffnet das Timing-Panel. Im normalen Browser startet der Ton erst nach einem Klick, OBS spielt ihn direkt.
+> **Synthetischer Sound:** `sad`, `you-died` und `motivation` erzeugen ihren Ton per Web Audio im Browser (keine MP3, `js/stinger-kit.js`). `?volume=0.8` (0–1) regelt die Lautstärke, `?sound=0` schaltet stumm, `?tune=1` öffnet das Timing-Panel. Im normalen Browser startet der Ton erst nach einem Klick, OBS spielt ihn direkt. Derselbe Ton liegt fertig als `assets/stingers/sad.wav`, `you-died.wav` und `motivation.wav` — für Streamer.bot: Stinger mit `?sound=0` (Dashboard: Sound → Off) einbinden und in der Action **Play Sound** mit der WAV direkt neben dem Einblenden der Source starten. Die WAVs beginnen beim Stinger-Start, laufen also synchron.
 
 > **Tipp für `!sad`:** Eine Browser-Source sieht das Spiel dahinter nicht und kann es daher nicht entsättigen. Dafür auf der Game-Capture-Source einen Filter **Farbkorrektur** mit Sättigung −1 anlegen (deaktiviert) und in der Streamer.bot-Action per **OBS Set Source Filter State** für die Dauer des Stingers ein- und wieder ausschalten.
 

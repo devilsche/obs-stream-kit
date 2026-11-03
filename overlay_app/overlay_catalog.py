@@ -150,6 +150,9 @@ STINGER_META = {
         {"key": "volume", "label": "Volume", "type": "select", "default": "0.8",
          "options": [["0.4", "40%"], ["0.6", "60%"], ["0.8", "80%"], ["1", "100%"]],
          "tooltip": "Synthesized sad trombone and rain"},
+        {"key": "sound", "label": "Sound", "type": "select", "default": "1",
+         "options": [["1", "Built-in"], ["0", "Off (Streamer.bot plays the WAV)"]],
+         "tooltip": "Off when Streamer.bot plays assets/stingers/sad.wav at the same moment"},
     ]},
     "you-died.html": {"switches": [
         {"key": "text", "label": "Text", "type": "text", "default": "",
@@ -157,6 +160,9 @@ STINGER_META = {
         {"key": "volume", "label": "Volume", "type": "select", "default": "0.8",
          "options": [["0.4", "40%"], ["0.6", "60%"], ["0.8", "80%"], ["1", "100%"]],
          "tooltip": "Synthesized gong"},
+        {"key": "sound", "label": "Sound", "type": "select", "default": "1",
+         "options": [["1", "Built-in"], ["0", "Off (Streamer.bot plays the WAV)"]],
+         "tooltip": "Off when Streamer.bot plays assets/stingers/you-died.wav at the same moment"},
     ]},
     "motivation.html": {"switches": [
         {"key": "label", "label": "Bar label", "type": "text", "default": "",
@@ -164,6 +170,9 @@ STINGER_META = {
         {"key": "volume", "label": "Volume", "type": "select", "default": "0.8",
          "options": [["0.4", "40%"], ["0.6", "60%"], ["0.8", "80%"], ["1", "100%"]],
          "tooltip": "Synthesized error beeps and stamp"},
+        {"key": "sound", "label": "Sound", "type": "select", "default": "1",
+         "options": [["1", "Built-in"], ["0", "Off (Streamer.bot plays the WAV)"]],
+         "tooltip": "Off when Streamer.bot plays assets/stingers/motivation.wav at the same moment"},
     ]},
 }
 
