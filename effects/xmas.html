@@ -20,6 +20,7 @@
       tree=1|0  treepos=right|left  treex=0..1500 (Abstand zum Rand, px)
       tsize=0.5..1.5              Baumgröße (Faktor)
       treesnow=1|0  snow=1|0      Schnee auf dem Baum / Schneehaufen unten
+      ground=1|0                  Schneedecke über die ganze Breite (wächst ab ~25 % Schnee)
       tune=1                      Statusanzeige; Tasten C = celebrate, O = Kugel
 
     Befehle: cmd=celebrate | cmd=ornament&name=… | cmd=gift&name=…&type=sub|resub|giftsub|bits|raid&amount=…
@@ -223,8 +224,9 @@
 
     /* ── Schnee ──
        --snow 0..1 Gesamtmenge, --cap Kappen auf den hängenden Kugeln (ab ~35 %),
-       --hat Mütze auf dem Stern (ab ~60 %), --dim Lichter gedämpft (ab 70 %) */
-    .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --hudp: 0; }
+       --hat Mütze auf dem Stern (ab ~60 %), --dim Lichter gedämpft (ab 70 %),
+       --ground Schneedecke in der Mitte (ab ~25 %) */
+    .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --ground: 0; --hudp: 0; }
     .wire-snow {
       fill: none;
       stroke: #f4f8ff;
@@ -259,15 +261,24 @@
     .tree .ridge {
       fill: none;
       stroke: #f4f8ff;
-      stroke-linecap: round;
+      stroke-linecap: butt;
       stroke-linejoin: round;
-      stroke-width: calc(7px * var(--snow));
+      /* doppelt so breit, weil die äußere Hälfte weggeschnitten wird */
+      stroke-width: calc(14px * var(--snow));
       opacity: min(1, calc(var(--snow) * 3));
     }
     .tree .starhat { fill: #f4f8ff; opacity: var(--hat); }
     .gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--snow)); }
     .tree .mound { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(1 + 0.6 * var(--snow))); }
     .snow svg { transform-origin: 50% 100%; }
+    .snow__mid {
+      left: 0;
+      width: 1920px !important;
+      height: 60px !important;
+      transform: scaleY(var(--ground));
+      opacity: min(1, calc(var(--ground) * 3));
+    }
+    .stage[data-ground="0"] .snow__mid { display: none; }
     .snow__l { transform: scaleY(calc(1 + 0.6 * var(--snow))); }
     .snow__r { transform: scaleX(-1) scaleY(calc(1 + 0.6 * var(--snow))); }
 
@@ -356,6 +367,10 @@
           <feGaussianBlur stdDeviation="6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
         </filter>
         <linearGradient id="treeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7a4a" /><stop offset="1" stop-color="#14472b" /></linearGradient>
+        <!-- Stufenformen als Zuschnitt für die Schneegrate: Schnee nur innen an der Kante -->
+        <clipPath id="tierClip3"><path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" /></clipPath>
+        <clipPath id="tierClip2"><path d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" /></clipPath>
+        <clipPath id="tierClip1"><path d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" /></clipPath>
         <linearGradient id="moundG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe9f6" /><stop offset=".18" stop-color="#f4f8ff" /><stop offset="1" stop-color="#f4f8ff" /></linearGradient>
         <radialGradient id="ornR" cx=".35" cy=".3"><stop offset="0" stop-color="#ff9a9a" /><stop offset=".5" stop-color="#d42a2a" /><stop offset="1" stop-color="#6e0d0d" /></radialGradient>
         <radialGradient id="ornG" cx=".35" cy=".3"><stop offset="0" stop-color="#fff1a8" /><stop offset=".5" stop-color="#e2ad1c" /><stop offset="1" stop-color="#7a5506" /></radialGradient>
@@ -373,6 +388,10 @@
     </div>
 
     <div class="snow" aria-hidden="true">
+      <svg class="snow__mid" viewBox="0 0 1920 60" preserveAspectRatio="none">
+        <path class="shade" d="M0 60 L0 14 Q120 4 240 12 Q400 22 560 10 Q720 0 880 12 Q1040 24 1200 10 Q1360 0 1520 12 Q1700 24 1920 8 L1920 60 Z" />
+        <path class="pile" d="M0 60 L0 20 Q120 10 240 18 Q400 28 560 16 Q720 6 880 18 Q1040 30 1200 16 Q1360 6 1520 18 Q1700 30 1920 14 L1920 60 Z" />
+      </svg>
       <svg class="snow__l" viewBox="0 0 620 130" preserveAspectRatio="none">
         <path class="shade" d="M0 130 L0 40 Q60 10 130 40 Q200 70 260 55 Q340 35 420 80 Q500 115 620 130 Z" />
         <path class="pile" d="M0 130 L0 52 Q60 22 130 50 Q200 78 260 66 Q340 48 420 90 Q500 122 620 130 Z" />
@@ -390,15 +409,15 @@
              die obere Stufe auch den Schnee der unteren, wie beim Grün -->
         <path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" fill="url(#treeG)" />
         <path class="frost" d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" />
-        <path class="ridge" d="M38 402 L200 150 L362 402" />
+        <path class="ridge" clip-path="url(#tierClip3)" d="M38 402 L200 150 L362 402" />
         <path class="snowcap snowcap--3" d="M38 402 Q120 422 200 412 Q280 422 362 402 Q350 392 330 396 Q300 404 270 398 Q235 408 200 402 Q160 410 130 398 Q95 406 62 396 Q48 394 38 402 Z" />
         <path d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" fill="url(#treeG)" />
         <path class="frost" d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" />
-        <path class="ridge" d="M78 300 L200 90 L322 300" />
+        <path class="ridge" clip-path="url(#tierClip2)" d="M78 300 L200 90 L322 300" />
         <path class="snowcap snowcap--2" d="M78 300 Q140 318 200 310 Q260 318 322 300 Q310 292 292 296 Q262 304 236 297 Q215 306 190 300 Q160 307 132 297 Q102 304 78 300 Z" />
         <path d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" fill="url(#treeG)" />
         <path class="frost" d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" />
-        <path class="ridge" d="M118 202 L200 38 L282 202" />
+        <path class="ridge" clip-path="url(#tierClip1)" d="M118 202 L200 38 L282 202" />
         <path class="snowcap snowcap--1" d="M118 202 Q160 216 200 210 Q240 216 282 202 Q270 195 252 199 Q228 207 205 200 Q182 207 160 199 Q138 205 118 202 Z" />
 
         <path id="garl1" d="M140 178 Q200 206 262 172" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
@@ -480,6 +499,7 @@
         tsize: [num(0.5, 1.5), 1],
         treesnow: [flag, true],
         snow: [flag, true],
+        ground: [flag, true],
         snowrate: [num(1, 300, true), 20],
         shovel: [num(1, 50, true), 5],
         shakeneed: [num(1, 20, true), 5],
@@ -566,7 +586,7 @@
           cur[k] = changed[k];
         }
         ['lights', 'pattern', 'colors', 'baubles', 'treepos'].forEach(function (k) { stage.dataset[k] = cur[k]; });
-        ['tree', 'treesnow', 'snow'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
+        ['tree', 'treesnow', 'snow', 'ground'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
         varStyle.textContent = '.stage{--blen:' + cur.blen + ';--bsize:' + cur.bsize +
                                ';--tsize:' + cur.tsize + ';--treex:' + cur.treex + 'px;--lightsy:' + cur.lightsy + 'px}';
         if (rebuild) buildLights();
@@ -828,6 +848,7 @@
         }
         dynStyle.textContent = '.stage{--snow:' + s.toFixed(3) + ';--cap:' + clamp01((s - 0.3) / 0.3).toFixed(3) +
           ';--hat:' + clamp01((s - 0.6) / 0.25).toFixed(3) + ';--dim:' + clamp01((s - 0.7) / 0.3).toFixed(3) +
+          ';--ground:' + clamp01((s - 0.25) / 0.75).toFixed(3) +
           ';--hudp:' + p.toFixed(3) + '}';
         requestAnimationFrame(snowTick);
       }

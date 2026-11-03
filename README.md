@@ -419,6 +419,7 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 | `tsize` | 0.5–1.5 — Baumgröße (Faktor) | `1` |
 | `treesnow` | `1` / `0` — Schnee auf den Ästen | `1` |
 | `snow` | `1` / `0` — Schneehaufen unten | `1` |
+| `ground` | `1` / `0` — Schneedecke über die ganze Breite unten, wächst ab ~25 % Schnee bis 60 px (aus, wenn sie das Spiel-HUD verdeckt) | `1` |
 
 **Befehle** (`https://stream-overlay.com/s/<token>/api/fx/xmas?cmd=…`, Streamer.bot **Fetch URL**):
 

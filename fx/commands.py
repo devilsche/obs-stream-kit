@@ -143,6 +143,7 @@ EFFECTS = {
             "tsize": _float_range(0.5, 1.5),
             "treesnow": _flag,
             "snow": _flag,
+            "ground": _flag,
             # Schnee-Regeln: % pro Minute Schneefall, % pro Schippe, Rüttler in Sekunden
             "snowrate": _int_range(1, 300),
             "shovel": _int_range(1, 50),
