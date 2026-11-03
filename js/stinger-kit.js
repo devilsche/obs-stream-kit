@@ -9,9 +9,12 @@
     StingerKit.timings(name, DEFAULTS) → Zeitpunkte in Sekunden; Overrides aus
                                          dem Tune-Panel (localStorage), landen
                                          als --<key>: Xs auf :root
-    StingerKit.audio()                 → {ctx, out} oder null bei ?sound=0
+    StingerKit.audio()                 → {ctx, out} oder null bei ?sound=0;
+                                         ctx ist ein OfflineAudioContext
     StingerKit.onStart(fn)             → fn(), sobald stinger-ready die
-                                         Animationen freigibt
+                                         Animationen freigibt; danach wird
+                                         der eingeplante Ton gerendert und
+                                         per <audio> abgespielt
     StingerKit.tune(name, DEFAULTS, LABELS) → Panel bei ?tune=1
 
   Audio und CSS-Animationen nutzen dieselben Zeitpunkte, laufen also
@@ -47,15 +50,25 @@
     return out;
   }
 
+  // Der Ton wird nicht live über Web Audio ausgegeben, sondern vorab in einen
+  // OfflineAudioContext gerendert, als WAV verpackt und über ein normales
+  // <audio>-Element abgespielt — derselbe Weg wie bei den MP3-Stingern, der in
+  // OBS nachweislich funktioniert. Die Stinger merken davon nichts: sie planen
+  // ihre Töne wie gewohnt ab ctx.currentTime (hier 0) ein.
+  var RENDER_SECONDS = 8;
+  var RATE = 44100;
   var audioState;
   function audio() {
     if (audioState !== undefined) return audioState;
     audioState = null;
     if (params.get('sound') === '0') return null;
-    var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OAC) { console.error('[stinger-kit] no OfflineAudioContext, sound disabled'); return null; }
     var ctx;
-    try { ctx = new AC(); } catch (e) { return null; }
+    try { ctx = new OAC(2, RATE * RENDER_SECONDS, RATE); } catch (e) {
+      console.error('[stinger-kit] OfflineAudioContext failed:', e);
+      return null;
+    }
     var comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -10;
     comp.ratio.value = 4;
@@ -64,13 +77,64 @@
     var vol = parseFloat(params.get('volume'));
     out.gain.value = isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 0.8;
     out.connect(comp);
-    // Im normalen Browser blockt die Autoplay-Policy — erster Klick weckt auf.
-    // OBS spielt ohne Klick.
-    var wake = function () { if (ctx.state === 'suspended') ctx.resume(); };
-    document.addEventListener('pointerdown', wake);
-    document.addEventListener('keydown', wake);
     audioState = { ctx: ctx, out: out };
     return audioState;
+  }
+
+  function toWav(buf) {
+    var ch = buf.numberOfChannels, n = buf.length;
+    // Stille am Ende abschneiden
+    var endAt = 0;
+    for (var c = 0; c < ch; c++) {
+      var d = buf.getChannelData(c);
+      for (var i = n - 1; i > endAt; i--) { if (Math.abs(d[i]) > 0.0005) { endAt = i; break; } }
+    }
+    n = Math.min(buf.length, endAt + Math.floor(RATE * 0.1));
+    var bytes = 44 + n * ch * 2;
+    var v = new DataView(new ArrayBuffer(bytes));
+    function str(o, t) { for (var k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); }
+    str(0, 'RIFF'); v.setUint32(4, bytes - 8, true); str(8, 'WAVE');
+    str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true);
+    v.setUint16(22, ch, true); v.setUint32(24, RATE, true);
+    v.setUint32(28, RATE * ch * 2, true); v.setUint16(32, ch * 2, true); v.setUint16(34, 16, true);
+    str(36, 'data'); v.setUint32(40, n * ch * 2, true);
+    var chans = [];
+    for (var c2 = 0; c2 < ch; c2++) chans.push(buf.getChannelData(c2));
+    var o = 44;
+    for (var j = 0; j < n; j++) {
+      for (var c3 = 0; c3 < ch; c3++) {
+        var x = Math.max(-1, Math.min(1, chans[c3][j]));
+        v.setInt16(o, x * 32767, true);
+        o += 2;
+      }
+    }
+    return new Blob([v.buffer], { type: 'audio/wav' });
+  }
+
+  // Rendern dauert einige zehn Millisekunden — das Element startet deshalb
+  // an der Stelle, an der die Animation inzwischen ist.
+  function playRendered(t0) {
+    var a = audioState;
+    if (!a) return;
+    a.ctx.startRendering().then(function (buf) {
+      var el = new Audio(URL.createObjectURL(toWav(buf)));
+      el.preload = 'auto';
+      el.addEventListener('loadedmetadata', function () {
+        var offset = (performance.now() - t0) / 1000;
+        if (offset > 0.05) { try { el.currentTime = offset; } catch (e) {} }
+        var p = el.play();
+        if (p && p.catch) p.catch(function (err) {
+          // Normaler Browser ohne Klick: beim ersten Klick von vorn
+          console.warn('[stinger-kit] autoplay blocked, click to play', err);
+          var retry = function () { el.currentTime = 0; el.play().catch(function () {}); };
+          document.addEventListener('pointerdown', retry, { once: true });
+          document.addEventListener('keydown', retry, { once: true });
+        });
+      }, { once: true });
+      el.addEventListener('error', function () {
+        console.error('[stinger-kit] audio element error', el.error && el.error.code);
+      });
+    }).catch(function (e) { console.error('[stinger-kit] rendering failed:', e); });
   }
 
   // Rauschpuffer werden von mehreren Stingern gebraucht (Regen, Gong, Stempel)
@@ -87,9 +151,9 @@
     function go() {
       if (fired) return;
       fired = true;
-      var a = audioState;
-      if (a && a.ctx.state === 'suspended') a.ctx.resume();
+      var t0 = performance.now();
       fn();
+      playRendered(t0);
     }
     if (!html.classList.contains('stinger-loading')) { go(); return; }
     var mo = new MutationObserver(function () {
@@ -179,7 +243,7 @@
     var hint = document.createElement('p');
     hint.className = 'sk-tune__hint';
     hint.textContent = 'Times in seconds from start. Apply saves and replays. Keys: R replay, S apply. ' +
-                       'Click anywhere once to enable sound in a normal browser.';
+                       'Click once to hear the sound in a normal browser.';
     panel.appendChild(hint);
 
     document.addEventListener('keydown', function (e) {
