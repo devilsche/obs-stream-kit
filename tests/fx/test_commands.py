@@ -19,6 +19,14 @@ def test_parse_simple_commands():
         assert commands.parse("rain", {"cmd": cmd}) == {"cmd": cmd, "params": {}}
 
 
+def test_parse_strike_with_distance():
+    assert commands.parse("rain", {"cmd": "strike", "dist": "NEAR"}) == {
+        "cmd": "strike", "params": {"dist": "near"}}
+    assert commands.parse("rain", {"cmd": "strike", "dist": "far"})["params"] == {"dist": "far"}
+    # unbekannte Entfernung: normaler Blitz mit Zufallsentfernung
+    assert commands.parse("rain", {"cmd": "strike", "dist": "mars"})["params"] == {}
+
+
 def test_parse_set_normalizes_values():
     out = commands.parse("rain", {"cmd": "set", "intensity": "STORM", "wind": "2",
                                   "lightning": "frequent", "color": "#9FC4FF",

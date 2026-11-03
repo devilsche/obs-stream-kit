@@ -221,6 +221,8 @@ EFFECT_META = {
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/rain
     "commands": [
         {"q": "cmd=strike", "label": "Lightning now"},
+        {"q": "cmd=strike&dist=near", "label": "Near lightning (pair with thunder-near WAV)"},
+        {"q": "cmd=strike&dist=far", "label": "Far lightning (pair with thunder-far WAV)"},
         {"q": "cmd=gust", "label": "Wind gust"},
         {"q": "cmd=set&intensity=storm&wind=random&lightning=2", "label": "Thunderstorm"},
         {"q": "cmd=set&intensity=light&wind=0&lightning=0", "label": "Calm drizzle"},

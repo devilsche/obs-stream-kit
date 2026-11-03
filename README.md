@@ -387,7 +387,7 @@ Der Token ist derselbe wie in der Source-URL. Fertige URLs zum Kopieren stehen i
 
 | Befehl | Wirkung |
 |--------|---------|
-| `cmd=strike` | Blitz jetzt |
+| `cmd=strike` | Blitz jetzt (Entfernung zufällig); `&dist=near` naher, dicker Blitz, `&dist=far` ferner, blasser Blitz |
 | `cmd=gust` | kräftige Windböe (~2,5 s) |
 | `cmd=set&…` | Werte live ändern, gleiche Parameter wie in der URL (`intensity`, `wind`, `color`, `lightning`, `splash`, `sound`, `volume`, `thunder`), beliebig kombinierbar |
 | `cmd=stop` | Regen hört auf — Tropfen fallen zu Ende, keine neuen |
@@ -397,6 +397,20 @@ Der Token ist derselbe wie in der Source-URL. Fertige URLs zum Kopieren stehen i
 Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sunny` → `cmd=stop`, `!mute` → `cmd=set&sound=0`.
 
 Funktioniert nur, wenn die Source über die Token-URL (`/s/<token>/effects/rain.html`) geladen wird. Befehle, die geschickt werden, während die Source nicht läuft, werden beim Start nicht nachgeholt. Ungültige Befehle beantwortet der Server mit HTTP 400.
+
+#### Rain-Sound über Streamer.bot (WAV)
+
+Fällt unter Windows das Audiogerät kurz weg, öffnet die OBS-Browser-Source ihre Tonausgabe nicht neu und bleibt stumm. Zuverlässiger: Rain mit `?sound=0` einbinden und den Ton als fertige WAV abspielen. Die Dateien sind mit derselben Synthese erzeugt wie der eingebaute Sound:
+
+| Datei | Inhalt | Einsatz |
+|-------|--------|---------|
+| `assets/effects/rain-loop-light.wav` | 20 s Nieselregen, nahtlos | OBS **Media Source** mit „Loop“ |
+| `assets/effects/rain-loop-medium.wav` | 20 s Regen, nahtlos | OBS **Media Source** mit „Loop“ |
+| `assets/effects/rain-loop-storm.wav` | 20 s Sturmregen mit Wind, nahtlos | OBS **Media Source** mit „Loop“ |
+| `assets/effects/thunder-near-1.wav`, `-2` | naher Einschlag mit Knall, ~0,5 s Verzögerung eingebaut | Streamer.bot **Play Sound** zusammen mit `cmd=strike&dist=near` |
+| `assets/effects/thunder-far-1.wav`, `-2` | fernes Grollen, ~2–2,6 s Verzögerung eingebaut | Streamer.bot **Play Sound** zusammen mit `cmd=strike&dist=far` |
+
+Die Verzögerung zwischen Blitz und Donner steckt schon in der WAV (Stille am Anfang) — Fetch URL und Play Sound also gleichzeitig auslösen. Regen-Loop: eigene Media Source pro Stärke, per Streamer.bot sichtbar/unsichtbar schalten (z. B. `!storm` → Storm-Loop an, Medium aus). Download über `https://stream-overlay.com/s/<token>/assets/effects/<datei>.wav`.
 
 ---
 

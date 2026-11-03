@@ -98,6 +98,12 @@ def parse(effect: str, args) -> dict:
                 params[key] = val
         if not params:
             raise ValueError("set needs at least one valid setting")
+    elif cmd == "strike":
+        # near/far, damit ein von Streamer.bot gespielter Donner (WAV) zum
+        # Blitz passt; ohne Angabe wählt das Overlay die Entfernung zufällig
+        dist = str(args.get("dist") or "").strip().lower()
+        if dist in ("near", "far"):
+            params["dist"] = dist
     return {"cmd": cmd, "params": params}
 
 

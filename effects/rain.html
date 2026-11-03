@@ -343,8 +343,11 @@
                  side: x0 < W * 0.38 ? 'left' : (x0 > W * 0.62 ? 'right' : 'center') };
       }
 
-      function strike() {
-        var dist = Math.random();
+      // dist: 'near' | 'far' | undefined (zufällig)
+      function strike(which) {
+        var dist = which === 'near' ? rand(0, 0.3)
+                 : which === 'far'  ? rand(0.6, 1)
+                 : Math.random();
         bolt = makeBolt(dist);
         if (audio) audio.thunder(dist);
         flashEl.dataset.side = bolt.side;
@@ -556,7 +559,7 @@
 
       function applyCommand(c) {
         switch (c.cmd) {
-          case 'strike': strike(); break;
+          case 'strike': strike(c.params && c.params.dist); break;
           case 'gust':   startGust(); break;
           case 'stop':   running = false; break;
           case 'start':  running = true; break;
