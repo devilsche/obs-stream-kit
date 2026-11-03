@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Christmas Decor Mockup</title>
+  <!--
+    Klickdummy Weihnachtsschmuck — Lichterkette, Baum, hängende Kugeln,
+    Schneehaufen. Nur zum Ansehen und Abstimmen, noch keine OBS-Source.
+    Bühne = 1920×1080 wie im Stream, skaliert aufs Fenster.
+  -->
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+    }
+
+    :root {
+      --bg: #f4f1f8;
+      --panel: #ffffff;
+      --text: #1d1726;
+      --muted: #5f566c;
+      --line: #d9d2e3;
+      --accent: #5e2a79;
+      --focus: #5e2a79;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #121018; --panel: #1c1824; --text: #f1ecf7; --muted: #a79fb3;
+        --line: #342d40; --accent: #f2b705; --focus: #f2b705;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.45 'DM Sans', system-ui, sans-serif;
+    }
+    .skip {
+      position: absolute; left: 12px; top: -60px;
+      background: var(--panel); color: var(--text);
+      padding: 10px 14px; border-radius: 8px; border: 2px solid var(--focus);
+      z-index: 10;
+    }
+    .skip:focus { top: 12px; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+    header { padding: 20px 24px 8px; }
+    header h1 { font-size: 22px; }
+    header p { color: var(--muted); max-width: 900px; }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      gap: 20px;
+      padding: 12px 24px 24px;
+      align-items: start;
+    }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; padding: 12px 16px; } }
+
+    .controls {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+      display: grid;
+      gap: 16px;
+    }
+    fieldset { border: 0; display: grid; gap: 8px; }
+    legend { font-weight: 700; margin-bottom: 6px; }
+    .check { display: flex; align-items: center; gap: 10px; min-height: 28px; cursor: pointer; }
+    .check input { width: 18px; height: 18px; accent-color: var(--accent); }
+    .field { display: grid; gap: 4px; }
+    .field label { font-weight: 600; }
+    select {
+      min-height: 36px; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit;
+    }
+    .btn {
+      min-height: 40px; padding: 8px 12px; border-radius: 8px;
+      border: 2px solid var(--accent); background: transparent; color: var(--text);
+      font: 600 14px 'DM Sans', sans-serif; cursor: pointer; text-align: left;
+    }
+    .btn:hover { background: color-mix(in srgb, var(--accent) 15%, transparent); }
+    .hint { color: var(--muted); font-size: 13px; }
+
+    .stage-col { min-width: 0; }
+    .stage-wrap {
+      --s: 0.5;
+      width: calc(1920px * var(--s));
+      height: calc(1080px * var(--s));
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: repeating-conic-gradient(#2a2a2a 0 25%, #333 0 50%) 0 0 / 40px 40px;
+    }
+
+    /* ═══════════════ Bühne 1920×1080 ═══════════════ */
+    .stage {
+      position: relative;
+      width: 1920px; height: 1080px;
+      transform: scale(var(--s));
+      transform-origin: 0 0;
+      overflow: hidden;
+      font-family: 'DM Sans', sans-serif;
+      --c1: #ff3b3b; --c2: #2ecc71; --c3: #ffd23f; --c4: #3fa9ff; --c5: #ff8a1f;
+    }
+    .stage[data-scheme="warm"]  { --c1: #ffd9a0; --c2: #ffcf87; --c3: #ffe6c2; --c4: #ffc56e; --c5: #fff0d6; }
+    .stage[data-scheme="theme"] { --c1: #f2b705; --c2: #b07ad6; --c3: #ffd75e; --c4: #8e4bb8; --c5: #fff3c4; }
+    .stage[data-scheme="icy"]   { --c1: #bfe9ff; --c2: #ffffff; --c3: #7cc7ff; --c4: #dff5ff; --c5: #a5d8ff; }
+
+    /* Gestellter Gameplay-Hintergrund */
+    .game { position: absolute; inset: 0; background: linear-gradient(#1d2c47 0%, #3d5675 55%, #5b6b58 56%, #3e4a3a 100%); }
+    .stage[data-game="0"] .game { display: none; }
+    .game__mtn { position: absolute; left: 0; right: 0; top: 330px; height: 300px; background: #2b3a52; clip-path: polygon(0 100%, 0 55%, 12% 25%, 24% 60%, 38% 10%, 52% 58%, 66% 20%, 80% 62%, 92% 30%, 100% 50%, 100% 100%); }
+    .game__label { position: absolute; left: 50%; top: 52%; transform: translate(-50%, -50%); color: rgba(255,255,255,.25); font-size: 64px; font-weight: 800; letter-spacing: 8px; }
+    .game__compass { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); width: 640px; height: 34px; border-radius: 6px; background: rgba(0,0,0,.35); color: rgba(255,255,255,.8); font-size: 18px; letter-spacing: 18px; text-align: center; line-height: 34px; }
+    .game__map { position: absolute; right: 30px; top: 70px; width: 250px; height: 250px; border: 2px solid rgba(255,255,255,.5); background: rgba(40,60,40,.75); }
+    .game__hp { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); width: 520px; height: 18px; border-radius: 9px; background: rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.5); }
+    .game__hp::after { content: ''; position: absolute; inset: 2px 30% 2px 2px; border-radius: 6px; background: #e8e8e8; }
+    .game__cam { position: absolute; left: 30px; bottom: 30px; width: 400px; height: 225px; border: 3px solid #f2b705; background: #222 linear-gradient(135deg, #3a2f4a, #1f1a28); color: rgba(255,255,255,.5); display: grid; place-items: center; font-size: 22px; letter-spacing: 4px; }
+
+    /* ── Glühbirnen (Lichterkette + Baum) ── */
+    .bulb .glow { filter: url(#bulbGlow); }
+    .bulb .lit { animation: shimmer 3s ease-in-out infinite; }
+    .k1 .glow, .k1 .body { fill: var(--c1); }
+    .k2 .glow, .k2 .body { fill: var(--c2); }
+    .k3 .glow, .k3 .body { fill: var(--c3); }
+    .k4 .glow, .k4 .body { fill: var(--c4); }
+    .k5 .glow, .k5 .body { fill: var(--c5); }
+    .bulb .socket { fill: #2b2f2a; }
+    .wire { fill: none; stroke: #1f2420; stroke-width: 3; }
+
+    @keyframes shimmer { 0%, 100% { opacity: 1; } 50% { opacity: 0.82; } }
+    @keyframes twinkle { 0%, 100% { opacity: 1; } 40% { opacity: 0.2; } 55% { opacity: 1; } }
+    @keyframes chase   { 0%, 18% { opacity: 1; } 30%, 100% { opacity: 0.22; } }
+    @keyframes wave    { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+    .stage[data-pattern="twinkle"] .bulb .lit { animation: twinkle 2.2s ease-in-out infinite; }
+    .stage[data-pattern="chase"]   .bulb .lit { animation: chase 1.5s linear infinite; }
+    .stage[data-pattern="wave"]    .bulb .lit { animation: wave 4s ease-in-out infinite; }
+
+    /* Verzögerungen: ri-* zufällig (twinkle/steady), ci-* fortlaufend (chase/wave) */
+    .ri-0 .lit { animation-delay: -0.1s; } .ri-1 .lit { animation-delay: -1.3s; }
+    .ri-2 .lit { animation-delay: -0.7s; } .ri-3 .lit { animation-delay: -1.9s; }
+    .ri-4 .lit { animation-delay: -0.4s; } .ri-5 .lit { animation-delay: -1.6s; }
+    .ri-6 .lit { animation-delay: -1.0s; } .ri-7 .lit { animation-delay: -2.1s; }
+    .ri-8 .lit { animation-delay: -0.25s; } .ri-9 .lit { animation-delay: -1.45s; }
+    .stage[data-pattern="chase"] .ci-0 .lit { animation-delay: 0s; }    .stage[data-pattern="chase"] .ci-1 .lit { animation-delay: .15s; }
+    .stage[data-pattern="chase"] .ci-2 .lit { animation-delay: .3s; }   .stage[data-pattern="chase"] .ci-3 .lit { animation-delay: .45s; }
+    .stage[data-pattern="chase"] .ci-4 .lit { animation-delay: .6s; }   .stage[data-pattern="chase"] .ci-5 .lit { animation-delay: .75s; }
+    .stage[data-pattern="chase"] .ci-6 .lit { animation-delay: .9s; }   .stage[data-pattern="chase"] .ci-7 .lit { animation-delay: 1.05s; }
+    .stage[data-pattern="chase"] .ci-8 .lit { animation-delay: 1.2s; }  .stage[data-pattern="chase"] .ci-9 .lit { animation-delay: 1.35s; }
+    .stage[data-pattern="wave"] .ci-0 .lit { animation-delay: 0s; }     .stage[data-pattern="wave"] .ci-1 .lit { animation-delay: -.4s; }
+    .stage[data-pattern="wave"] .ci-2 .lit { animation-delay: -.8s; }   .stage[data-pattern="wave"] .ci-3 .lit { animation-delay: -1.2s; }
+    .stage[data-pattern="wave"] .ci-4 .lit { animation-delay: -1.6s; }  .stage[data-pattern="wave"] .ci-5 .lit { animation-delay: -2s; }
+    .stage[data-pattern="wave"] .ci-6 .lit { animation-delay: -2.4s; }  .stage[data-pattern="wave"] .ci-7 .lit { animation-delay: -2.8s; }
+    .stage[data-pattern="wave"] .ci-8 .lit { animation-delay: -3.2s; }  .stage[data-pattern="wave"] .ci-9 .lit { animation-delay: -3.6s; }
+
+    /* Celebrate: schnelles Lauflicht, alles heller */
+    .stage[data-celebrate="1"] .bulb .lit { animation: chase 0.5s linear infinite !important; }
+    .stage[data-celebrate="1"] .lights,
+    .stage[data-celebrate="1"] .tree { filter: brightness(1.35) saturate(1.2); }
+
+    .lights { position: absolute; inset: 0; pointer-events: none; }
+    .stage[data-lights="off"] .lights { display: none; }
+    .stage[data-lights="top"] .lights .side { display: none; }
+
+    /* ── Baum ── */
+    .tree {
+      position: absolute;
+      bottom: 24px;
+      right: 40px;
+      width: 380px;
+      height: 494px;
+    }
+    .stage[data-tree-pos="left"] .tree { right: auto; left: 460px; }
+    .stage[data-tree="0"] .tree { display: none; }
+    .tree svg { width: 100%; height: 100%; overflow: visible; }
+    .tree .snowcap { fill: #f4f8ff; }
+    .stage[data-treesnow="0"] .tree .snowcap { display: none; }
+    .star-rays { transform-box: fill-box; transform-origin: center; animation: spin 14s linear infinite; }
+    .star { filter: url(#starGlow); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .stage[data-celebrate="1"] .star-rays { animation-duration: 1.5s; }
+
+    .orn { transform-box: fill-box; transform-origin: 50% 0; }
+    .orn--new { animation: ornDrop 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+    @keyframes ornDrop {
+      from { transform: translateY(-60px) scale(0.3); opacity: 0; }
+      to   { transform: none; opacity: 1; }
+    }
+    .stage[data-celebrate="1"] .orn { animation: jiggle 0.35s ease-in-out 4; }
+    @keyframes jiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+    .name-tag { font: 700 15px 'DM Sans', sans-serif; fill: #fff; paint-order: stroke; stroke: rgba(0,0,0,.65); stroke-width: 4px; }
+    .name-tag--fade { animation: tagFade 3.5s ease-in forwards; }
+    @keyframes tagFade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+
+    /* ── Hängende Kugeln ── */
+    .baubles { position: absolute; inset: 0; pointer-events: none; }
+    .stage[data-baubles="0"] .baubles { display: none; }
+    .bauble {
+      position: absolute;
+      top: 0;
+      width: 2px;
+      background: rgba(230, 230, 230, 0.55);
+      transform-origin: 50% 0;
+      animation: sway 5s ease-in-out infinite;
+    }
+    .bauble::before {           /* Kappe */
+      content: '';
+      position: absolute;
+      left: -7px; bottom: -6px;
+      width: 16px; height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(#e9d58a, #a8892c);
+    }
+    .bauble::after {            /* Kugel */
+      content: '';
+      position: absolute;
+      left: -31px; bottom: -66px;
+      width: 64px; height: 64px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.85) 0 7%, transparent 18%),
+                  radial-gradient(circle at 50% 50%, var(--bc) 0 55%, color-mix(in srgb, var(--bc) 55%, #000) 100%);
+      box-shadow: 0 0 22px color-mix(in srgb, var(--bc) 45%, transparent);
+    }
+    .bauble:nth-child(1) { left: 70px;   height: 150px; --bc: var(--c1); animation-delay: -1s; }
+    .bauble:nth-child(2) { left: 170px;  height: 230px; --bc: var(--c3); animation-delay: -2.4s; }
+    .bauble:nth-child(3) { left: 265px;  height: 120px; --bc: var(--c4); animation-delay: -0.3s; }
+    .bauble:nth-child(4) { left: 1660px; height: 300px; --bc: var(--c2); animation-delay: -3s; }
+    .bauble:nth-child(5) { left: 1760px; height: 360px; --bc: var(--c1); animation-delay: -1.7s; }
+    .bauble:nth-child(6) { left: 1855px; height: 330px; --bc: var(--c5); animation-delay: -4.1s; }
+    @keyframes sway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+    .stage[data-celebrate="1"] .bauble { animation: sway 0.5s ease-in-out infinite; }
+
+    /* ── Schneehaufen ── */
+    .snow { position: absolute; inset: 0; pointer-events: none; }
+    .stage[data-snow="0"] .snow { display: none; }
+    .snow svg { position: absolute; bottom: 0; width: 620px; height: 95px; }
+    .snow__l { left: 0; }
+    .snow__r { right: 0; transform: scaleX(-1); }
+    .snow .pile { fill: #f2f6fd; }
+    .snow .shade { fill: #c9d7ec; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage *, .stage *::before, .stage *::after { animation: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <header>
+    <h1>Christmas decor: click dummy</h1>
+    <p>Preview at stream size (1920×1080, scaled to fit). Toggle elements, try light patterns and colors, and fire the gimmicks. The game background is only a placeholder to show what gets covered.</p>
+  </header>
+
+  <main class="layout">
+    <form class="controls" id="controls" aria-label="Decor settings">
+      <fieldset>
+        <legend>Elements</legend>
+        <label class="check"><input type="checkbox" data-key="lights-on" checked> Light string</label>
+        <label class="check"><input type="checkbox" data-key="tree" checked> Christmas tree</label>
+        <label class="check"><input type="checkbox" data-key="baubles" checked> Hanging baubles</label>
+        <label class="check"><input type="checkbox" data-key="snow" checked> Snow piles</label>
+        <label class="check"><input type="checkbox" data-key="treesnow" checked> Snow on tree</label>
+        <label class="check"><input type="checkbox" data-key="game" checked> Game placeholder</label>
+      </fieldset>
+
+      <div class="field">
+        <label for="f-lights">Light string</label>
+        <select id="f-lights" data-key="lights">
+          <option value="top">Top edge</option>
+          <option value="frame">Top and sides</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-pattern">Light pattern</label>
+        <select id="f-pattern" data-key="pattern">
+          <option value="steady">Steady glow</option>
+          <option value="twinkle" selected>Twinkle</option>
+          <option value="chase">Chase</option>
+          <option value="wave">Slow wave</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-scheme">Colors</label>
+        <select id="f-scheme" data-key="scheme">
+          <option value="classic">Classic multicolor</option>
+          <option value="warm">Warm white</option>
+          <option value="theme">Stream theme (purple/gold)</option>
+          <option value="icy">Icy blue</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-treepos">Tree position</label>
+        <select id="f-treepos" data-key="tree-pos">
+          <option value="right">Bottom right</option>
+          <option value="left">Bottom left, next to cam</option>
+        </select>
+      </div>
+
+      <fieldset>
+        <legend>Gimmicks (later via Streamer.bot)</legend>
+        <button type="button" class="btn" id="celebrate">Celebrate (e.g. new sub)</button>
+        <button type="button" class="btn" id="addOrn">Follower hangs an ornament</button>
+        <p class="hint">Ornaments stay on the tree for the whole stream, so it fills up over time.</p>
+      </fieldset>
+    </form>
+
+    <div class="stage-col" id="col">
+    <div class="stage-wrap" id="wrap">
+      <div class="stage" id="stage" data-lights="top" data-pattern="twinkle" data-scheme="classic"
+           data-tree="1" data-tree-pos="right" data-baubles="1" data-snow="1" data-treesnow="1" data-game="1"
+           role="img" aria-label="Stream preview with Christmas decor">
+
+        <div class="game" aria-hidden="true">
+          <div class="game__mtn"></div>
+          <div class="game__label">GAMEPLAY</div>
+          <div class="game__compass">N · 15 · 30 · NE · 60</div>
+          <div class="game__map"></div>
+          <div class="game__hp"></div>
+          <div class="game__cam">CAM</div>
+        </div>
+
+        <svg width="0" height="0" aria-hidden="true">
+          <defs>
+            <filter id="bulbGlow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="7" /></filter>
+            <filter id="starGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="6" result="b" /><feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <linearGradient id="treeG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f7a4a" /><stop offset="1" stop-color="#14472b" /></linearGradient>
+            <radialGradient id="ornR" cx=".35" cy=".3"><stop offset="0" stop-color="#ff9a9a" /><stop offset=".5" stop-color="#d42a2a" /><stop offset="1" stop-color="#6e0d0d" /></radialGradient>
+            <radialGradient id="ornG" cx=".35" cy=".3"><stop offset="0" stop-color="#fff1a8" /><stop offset=".5" stop-color="#e2ad1c" /><stop offset="1" stop-color="#7a5506" /></radialGradient>
+            <radialGradient id="ornB" cx=".35" cy=".3"><stop offset="0" stop-color="#b6dcff" /><stop offset=".5" stop-color="#2a78d4" /><stop offset="1" stop-color="#0d2f6e" /></radialGradient>
+            <radialGradient id="ornP" cx=".35" cy=".3"><stop offset="0" stop-color="#e4c4ff" /><stop offset=".5" stop-color="#8e4bb8" /><stop offset="1" stop-color="#3b1656" /></radialGradient>
+          </defs>
+        </svg>
+
+        <svg class="lights" id="lights" viewBox="0 0 1920 1080" aria-hidden="true"></svg>
+
+        <div class="baubles" aria-hidden="true">
+          <span class="bauble"></span><span class="bauble"></span><span class="bauble"></span>
+          <span class="bauble"></span><span class="bauble"></span><span class="bauble"></span>
+        </div>
+
+        <div class="snow" aria-hidden="true">
+          <svg class="snow__l" viewBox="0 0 620 130" preserveAspectRatio="none">
+            <path class="shade" d="M0 130 L0 40 Q60 10 130 40 Q200 70 260 55 Q340 35 420 80 Q500 115 620 130 Z" />
+            <path class="pile" d="M0 130 L0 52 Q60 22 130 50 Q200 78 260 66 Q340 48 420 90 Q500 122 620 130 Z" />
+          </svg>
+          <svg class="snow__r" viewBox="0 0 620 130" preserveAspectRatio="none">
+            <path class="shade" d="M0 130 L0 30 Q80 0 150 35 Q230 72 300 62 Q380 50 450 92 Q520 122 620 130 Z" />
+            <path class="pile" d="M0 130 L0 42 Q80 12 150 46 Q230 80 300 72 Q380 62 450 100 Q520 126 620 130 Z" />
+          </svg>
+        </div>
+
+        <div class="tree" aria-hidden="true">
+          <svg viewBox="0 0 400 520" id="treeSvg">
+            <rect x="182" y="405" width="36" height="50" fill="#5a3a22" />
+            <path d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" fill="url(#treeG)" />
+            <path class="snowcap" d="M38 402 Q120 422 200 412 Q280 422 362 402 Q350 392 330 396 Q300 404 270 398 Q235 408 200 402 Q160 410 130 398 Q95 406 62 396 Q48 394 38 402 Z" />
+            <path d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" fill="url(#treeG)" />
+            <path class="snowcap" d="M78 300 Q140 318 200 310 Q260 318 322 300 Q310 292 292 296 Q262 304 236 297 Q215 306 190 300 Q160 307 132 297 Q102 304 78 300 Z" />
+            <path d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" fill="url(#treeG)" />
+            <path class="snowcap" d="M118 202 Q160 216 200 210 Q240 216 282 202 Q270 195 252 199 Q228 207 205 200 Q182 207 160 199 Q138 205 118 202 Z" />
+
+            <path id="garl1" d="M140 178 Q200 206 262 172" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
+            <path id="garl2" d="M106 272 Q200 304 298 262" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
+            <path id="garl3" d="M74 372 Q200 410 330 362" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
+            <g id="treeLights"></g>
+
+            <g id="ornaments">
+              <g class="orn"><line x1="160" y1="140" x2="160" y2="148" stroke="#ccc" /><circle cx="160" cy="160" r="13" fill="url(#ornR)" /></g>
+              <g class="orn"><line x1="236" y1="222" x2="236" y2="230" stroke="#ccc" /><circle cx="236" cy="243" r="14" fill="url(#ornG)" /></g>
+              <g class="orn"><line x1="140" y1="312" x2="140" y2="320" stroke="#ccc" /><circle cx="140" cy="334" r="15" fill="url(#ornB)" /></g>
+              <g class="orn"><line x1="272" y1="320" x2="272" y2="328" stroke="#ccc" /><circle cx="272" cy="342" r="15" fill="url(#ornP)" /></g>
+            </g>
+
+            <!-- Geschenke -->
+            <rect x="90" y="430" width="70" height="56" rx="4" fill="#c4302b" />
+            <rect x="120" y="430" width="10" height="56" fill="#f2d16b" />
+            <rect x="90" y="452" width="70" height="10" fill="#f2d16b" />
+            <rect x="240" y="440" width="84" height="46" rx="4" fill="#2a64b8" />
+            <rect x="276" y="440" width="10" height="46" fill="#ffffff" />
+            <rect x="240" y="458" width="84" height="9" fill="#ffffff" />
+            <rect x="168" y="456" width="62" height="30" rx="4" fill="#7d3ca3" />
+            <rect x="194" y="456" width="9" height="30" fill="#f2b705" />
+
+            <!-- Stern -->
+            <g transform="translate(200 34)">
+              <g class="star-rays" opacity=".55">
+                <path d="M0 -62 L5 -8 L62 0 L5 8 L0 62 L-5 8 L-62 0 L-5 -8 Z" fill="#fff3b0" />
+              </g>
+              <path class="star" d="M0 -30 L8.8 -12 L28.5 -9.3 L14.3 4.6 L17.6 24.3 L0 15 L-17.6 24.3 L-14.3 4.6 L-28.5 -9.3 L-8.8 -12 Z" fill="#ffd23f" stroke="#fff6c8" stroke-width="2" />
+            </g>
+          </svg>
+        </div>
+
+      </div>
+    </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var NS = 'http://www.w3.org/2000/svg';
+      var stage = document.getElementById('stage');
+      var col = document.getElementById('col');
+
+      // ── Skalierung (per <style>, kein Inline-Style) ──
+      var scaleStyle = document.createElement('style');
+      document.head.appendChild(scaleStyle);
+      function fit() {
+        var s = Math.min(col.clientWidth / 1920, (window.innerHeight - 40) / 1080);
+        if (window.innerWidth <= 900) s = col.clientWidth / 1920;
+        scaleStyle.textContent = '.stage-wrap{--s:' + Math.max(0.15, s).toFixed(4) + '}';
+      }
+      window.addEventListener('resize', fit);
+      fit();
+
+      function el(name, attrs, parent) {
+        var e = document.createElementNS(NS, name);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      }
+
+      // Pseudozufall mit festem Startwert — Farben/Verzögerungen bleiben stabil
+      var seed = 7;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+
+      var bulbIndex = 0;
+      function bulb(parent, x, y, rot, size) {
+        var g = el('g', {
+          'class': 'bulb k' + (1 + (bulbIndex % 5)) + ' ci-' + (bulbIndex % 10) + ' ri-' + Math.floor(rnd() * 10),
+          transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + rot.toFixed(1) + ') scale(' + size + ')'
+        }, parent);
+        el('ellipse', { 'class': 'glow lit', cx: 0, cy: 18, rx: 14, ry: 16, opacity: 0.75 }, g);
+        el('rect', { 'class': 'socket', x: -5, y: 0, width: 10, height: 9, rx: 2 }, g);
+        el('path', { 'class': 'body lit', d: 'M0 8 C9 10 9 24 0 32 C-9 24 -9 10 0 8 Z' }, g);
+        bulbIndex++;
+      }
+
+      function stringAlong(svg, d, cls, step, baseRot, size) {
+        var grp = el('g', { 'class': cls }, svg);
+        var path = el('path', { 'class': 'wire', d: d }, grp);
+        var len = path.getTotalLength();
+        for (var s = step / 2; s < len; s += step) {
+          var p = path.getPointAtLength(s);
+          var q = path.getPointAtLength(Math.min(len, s + 1));
+          var ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
+          bulb(grp, p.x, p.y, baseRot + ang * 0.6 + (rnd() * 10 - 5), size);
+        }
+      }
+
+      // ── Lichterkette: oben in Bögen, optional an den Seiten ──
+      var lights = document.getElementById('lights');
+      var top = 'M-10 6';
+      for (var i = 0; i < 5; i++) {
+        var x0 = -10 + i * 388, x1 = x0 + 388;
+        top += ' Q' + (x0 + 194) + ' ' + (i % 2 ? 70 : 84) + ' ' + x1 + ' 6';
+      }
+      stringAlong(lights, top, 'top', 52, 0, 1);
+      stringAlong(lights, 'M6 10 Q40 280 8 540 Q40 800 6 1075', 'side', 58, -90, 1);
+      stringAlong(lights, 'M1914 10 Q1880 280 1912 540 Q1880 800 1914 1075', 'side', 58, -90, 1);
+
+      // ── Lichter am Baum entlang der Girlanden ──
+      var treeLights = document.getElementById('treeLights');
+      ['garl1', 'garl2', 'garl3'].forEach(function (id) {
+        var p = document.getElementById(id), len = p.getTotalLength();
+        for (var s = 8; s < len; s += 22) {
+          var pt = p.getPointAtLength(s);
+          bulb(treeLights, pt.x, pt.y - 4, rnd() * 30 - 15, 0.42);
+        }
+      });
+
+      // ── Steuerung ──
+      document.getElementById('controls').addEventListener('change', function (e) {
+        var t = e.target, key = t.dataset.key;
+        if (!key) return;
+        if (key === 'lights-on') {
+          stage.dataset.lights = t.checked ? document.getElementById('f-lights').value : 'off';
+        } else if (t.type === 'checkbox') {
+          stage.dataset[key.replace(/-(\w)/g, function (m, c) { return c.toUpperCase(); })] = t.checked ? '1' : '0';
+        } else if (key === 'lights') {
+          if (stage.dataset.lights !== 'off') stage.dataset.lights = t.value;
+        } else {
+          stage.dataset[key.replace(/-(\w)/g, function (m, c) { return c.toUpperCase(); })] = t.value;
+        }
+      });
+
+      var celebrateTimer;
+      document.getElementById('celebrate').addEventListener('click', function () {
+        stage.dataset.celebrate = '0';
+        void stage.offsetWidth;
+        stage.dataset.celebrate = '1';
+        clearTimeout(celebrateTimer);
+        celebrateTimer = setTimeout(function () { stage.dataset.celebrate = '0'; }, 4000);
+      });
+
+      // Freie Plätze für Follower-Kugeln
+      var SLOTS = [[118, 222], [282, 214], [176, 386], [250, 398], [108, 360], [304, 382],
+                   [204, 328], [226, 168], [182, 262], [258, 290], [152, 232], [320, 352]];
+      var GRADS = ['ornR', 'ornG', 'ornB', 'ornP'];
+      var NAMES = ['Hat3', 'PixelPaul', 'Mia_GG', 'Lunatic', 'xSniperx', 'Kekskrümel', 'Nordlicht', 'Bubu'];
+      var ornaments = document.getElementById('ornaments');
+      var next = 0;
+      document.getElementById('addOrn').addEventListener('click', function () {
+        if (next >= SLOTS.length) { ornaments.querySelectorAll('.orn--follower').forEach(function (n) { n.remove(); }); next = 0; }
+        var s = SLOTS[next], name = NAMES[next % NAMES.length];
+        var g = el('g', { 'class': 'orn orn--follower orn--new' }, ornaments);
+        el('line', { x1: s[0], y1: s[1] - 12, x2: s[0], y2: s[1] - 4, stroke: '#ccc' }, g);
+        el('circle', { cx: s[0], cy: s[1] + 8, r: 12, fill: 'url(#' + GRADS[next % 4] + ')' }, g);
+        var tag = el('text', { 'class': 'name-tag name-tag--fade', x: s[0], y: s[1] - 18, 'text-anchor': 'middle' }, g);
+        tag.textContent = name;
+        next++;
+      });
+    })();
+  </script>
+</body>
+</html>
