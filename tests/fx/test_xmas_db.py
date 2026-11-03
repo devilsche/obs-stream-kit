@@ -107,3 +107,28 @@ def test_endpoint_clear_kind(conn):
 def test_rain_poll_has_no_db_state(conn):
     body = _app(conn).test_client().get("/s/tok/api/fx/rain/poll").get_json()
     assert body["state"] == {}
+
+
+def test_snow_events_are_logged_with_time(conn):
+    xmas_db.persist(conn, 1, {"cmd": "snowfall", "params": {}})
+    xmas_db.persist(conn, 1, {"cmd": "shovel", "params": {"name": "Hat3"}})
+    xmas_db.persist(conn, 1, {"cmd": "shake", "params": {}})
+    xmas_db.persist(conn, 1, {"cmd": "melt", "params": {}})
+    xmas_db.persist(conn, 1, {"cmd": "leaders", "params": {}})     # nur Anzeige, kein Ereignis
+    ev = xmas_db.load_state(conn, 1)["snow_events"]
+    assert [(e["k"], e["n"]) for e in ev] == [("fall", ""), ("shovel", "Hat3"), ("shake", ""), ("melt", "")]
+    assert all(isinstance(e["t"], float) and e["t"] > 1.7e9 for e in ev)
+    # Schnee zählt nicht als Kugel/Geschenk
+    s = xmas_db.load_state(conn, 1)
+    assert (s["ornament_total"], s["gift_total"]) == (0, 0)
+
+
+def test_clear_snow_keeps_ornaments(conn):
+    xmas_db.add_ornament(conn, 1, "a")
+    xmas_db.persist(conn, 1, {"cmd": "snowfall", "params": {}})
+    xmas_db.clear(conn, 1, "snow")
+    s = xmas_db.load_state(conn, 1)
+    assert s["snow_events"] == [] and s["ornament_total"] == 1
+    xmas_db.persist(conn, 1, {"cmd": "snowfall", "params": {}})
+    xmas_db.clear(conn, 1, None)
+    assert xmas_db.load_state(conn, 1)["snow_events"] == []

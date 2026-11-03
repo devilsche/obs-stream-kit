@@ -444,7 +444,27 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 
 **Spotlight:** Alle 8 s leuchtet eine zufällige Kugel oder ein Geschenk auf und zeigt kurz den Namen — so kommt im Lauf des Streams jeder mal dran.
 
-`?tune=1` zeigt Verbindungsstatus; Tasten **C** = Celebrate, **O** = Test-Kugel, **G** = Test-Geschenk (nur lokal, nicht gespeichert).
+**Einschneien, Schippen, Rütteln:** `!snow` lässt den Schmuck einschneien, der Chat muss ihn wieder freiräumen.
+
+| Befehl | Wirkung |
+|--------|---------|
+| `cmd=snowfall` | +`snowadd` % Schnee, wächst über ~15 s (in die `!snow`-Action mit aufnehmen). Ab ~35 % Kappen auf Birnen und Kugeln, ab ~60 % Mütze auf dem Stern, ab 70 % gedämpfte Lichter |
+| `cmd=shovel&name=%user%` | −`shovel` %, Schaufel wirft einen Brocken weg, Name kurz sichtbar; zählt für die Rangliste (nur wenn es etwas zu schippen gab). Cooldown pro User in Streamer.bot setzen, z. B. 10 s |
+| `cmd=shake&name=%user%` | einzeln nur ein Wackeln; `shakeneed` verschiedene Leute innerhalb `shakewin` s schütteln den ganzen Schnee ab. Oben zeigt „Shake it off! 3/5“ mit Zeitbalken den Stand |
+| `cmd=leaders` | Rangliste „Top shovelers“ (Top 5) für 10 s; das Spotlight zeigt den Ersten zwischendurch auch von selbst |
+| `cmd=melt` | Schnee weg, Rangliste bleibt |
+| `cmd=clear&kind=snow` | Schnee **und** Rangliste dauerhaft löschen (`cmd=clear` ohne `kind` löscht alles) |
+
+| Parameter | Werte | Standard |
+|-----------|-------|----------|
+| `snowadd` | 5–100 % pro Schneefall | `35` |
+| `shovel` | 1–50 % pro Schippe | `5` |
+| `shakeneed` | 1–20 verschiedene Chatter | `5` |
+| `shakewin` | 5–120 s Zeitfenster | `20` |
+
+Der Schnee taut nicht von selbst. Der Server speichert nur die Ereignisse (Schneefall, Schippen, Rütteln, Tauen) dauerhaft; Schneehöhe und Rangliste rechnet die Source beim Laden mit ihren Regeln nach — Neuladen und Server-Neustarts verlieren also nichts, und geänderte Regeln gelten rückwirkend.
+
+`?tune=1` zeigt Verbindungsstatus; Tasten **C** = Celebrate, **O** = Test-Kugel, **G** = Test-Geschenk, **S** = Schneefall, **V** = Schippen, **K** = Rütteln, **L** = Rangliste (nur lokal, nicht gespeichert).
 
 #### Rain-Sound über Streamer.bot (WAV)
 

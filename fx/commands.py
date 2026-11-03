@@ -126,7 +126,8 @@ EFFECTS = {
         },
     },
     "xmas": {
-        "commands": ("set", "celebrate", "ornament", "gift", "clear", "reset"),
+        "commands": ("set", "celebrate", "ornament", "gift", "clear", "reset",
+                     "snowfall", "shovel", "shake", "melt", "leaders"),
         "settings": {
             "lights": _choice("top", "frame", "off"),
             "pattern": _choice("steady", "twinkle", "chase", "wave"),
@@ -142,13 +143,20 @@ EFFECTS = {
             "tsize": _float_range(0.5, 1.5),
             "treesnow": _flag,
             "snow": _flag,
+            # Schnee-Regeln: % pro !snow, % pro Schippe, Rüttler in Sekunden
+            "snowadd": _int_range(5, 100),
+            "shovel": _int_range(1, 50),
+            "shakeneed": _int_range(1, 20),
+            "shakewin": _int_range(5, 120),
         },
         "args": {
             "ornament": {"name": _name},
             "gift": {"name": _name,
                      "type": _choice("sub", "resub", "giftsub", "bits", "raid"),
                      "amount": _int_range(1, 100000)},
-            "clear": {"kind": _choice("ornaments", "gifts")},
+            "clear": {"kind": _choice("ornaments", "gifts", "snow")},
+            "shovel": {"name": _name},
+            "shake": {"name": _name},
         },
         # Werte, die ein Befehl immer mitbringt, auch wenn Streamer.bot sie weglässt
         "defaults": {
@@ -217,6 +225,6 @@ def poll(tenant_id: int, effect: str, since) -> dict:
         if since is None or not slot:
             cmds = []
         else:
-            cmds = [{"seq": c["seq"], "cmd": c["cmd"], "params": c["params"]}
+            cmds = [{"seq": c["seq"], "ts": c["ts"], "cmd": c["cmd"], "params": c["params"]}
                     for c in slot["items"] if c["seq"] > since]
     return {"epoch": EPOCH, "seq": seq, "commands": cmds}

@@ -170,3 +170,21 @@ def test_xmas_gift_defaults_and_limits():
     assert out["params"] == {"name": "Bob", "type": "bits", "amount": 100000}
     assert commands.parse("xmas", {"cmd": "gift", "type": "laser"})["params"] == {
         "type": "sub", "amount": 1}
+
+
+def test_xmas_snow_commands():
+    assert commands.parse("xmas", {"cmd": "snowfall"}) == {"cmd": "snowfall", "params": {}}
+    assert commands.parse("xmas", {"cmd": "shovel", "name": "Hat3"})["params"] == {"name": "Hat3"}
+    assert commands.parse("xmas", {"cmd": "shake", "name": "Mia"})["params"] == {"name": "Mia"}
+    for cmd in ("melt", "leaders"):
+        assert commands.parse("xmas", {"cmd": cmd}) == {"cmd": cmd, "params": {}}
+    assert commands.parse("xmas", {"cmd": "clear", "kind": "snow"})["params"] == {"kind": "snow"}
+    out = commands.parse("xmas", {"cmd": "set", "snowadd": "500", "shovel": "0",
+                                  "shakeneed": "3", "shakewin": "30"})
+    assert out["params"] == {"snowadd": 100, "shovel": 1, "shakeneed": 3, "shakewin": 30}
+
+
+def test_poll_commands_carry_server_time():
+    commands.push(1, "xmas", {"cmd": "shake", "params": {}})
+    c = commands.poll(1, "xmas", 0)["commands"][0]
+    assert isinstance(c["ts"], float) and c["ts"] > 1.7e9

@@ -26,6 +26,14 @@
              cmd=clear[&kind=ornaments|gifts] | cmd=reset | cmd=set&…
     Kugeln und Geschenke speichert der Server dauerhaft (fx/xmas_db.py); sichtbar
     sind die neuesten 60 Kugeln und 15 Geschenke, der Zähler zeigt alle.
+
+    Schnee: cmd=snowfall (+snowadd %, z. B. zusammen mit !snow), cmd=shovel&name=…
+    (−shovel %, zählt für die Rangliste), cmd=shake&name=… (shakeneed Leute in
+    shakewin s schütteln alles frei), cmd=melt, cmd=leaders (Rangliste zeigen),
+    cmd=clear&kind=snow (Schnee + Rangliste löschen).
+      snowadd=5..100 (35)  shovel=1..50 (5)  shakeneed=1..20 (5)  shakewin=5..120 (20)
+    Der Server speichert nur die Ereignisse; Schneehöhe und Rangliste rechnet
+    das Overlay beim Laden mit diesen Regeln nach.
   -->
   <style>
     @font-face {
@@ -213,6 +221,111 @@
     .snow .pile { fill: #f2f6fd; }
     .snow .shade { fill: #c9d7ec; }
 
+    /* ── Schnee ──
+       --snow 0..1 Gesamtmenge, --cap Kappen auf Birnen/Kugeln (ab ~35 %),
+       --hat Mütze auf dem Stern (ab ~60 %), --dim Lichter gedämpft (ab 70 %) */
+    .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --hudp: 0; }
+    .wire-snow {
+      fill: none;
+      stroke: #f4f8ff;
+      stroke-linecap: round;
+      stroke-width: calc(1px + 8px * var(--snow));
+      opacity: min(1, calc(var(--snow) * 4));
+    }
+    .bcap { fill: #f4f8ff; opacity: var(--cap); }
+    .lights, .tree #treeLights { filter: brightness(calc(1 - 0.45 * var(--dim))); }
+    .bsnow {
+      position: absolute;
+      z-index: 1;
+      left: calc(1px - 22px * var(--bsize));
+      top: calc(100% - 3px);
+      width: calc(44px * var(--bsize));
+      height: calc(18px * var(--bsize));
+      border-radius: 50% 50% 35% 35%;
+      background: #f4f8ff;
+      box-shadow: inset 0 -3px 0 #d6e2f2;
+      transform-origin: 50% 100%;
+      transform: scaleY(var(--cap));
+      opacity: min(1, calc(var(--snow) * 4));
+    }
+    .tree .snowcap { transform-box: fill-box; transform-origin: 50% 0; transform: scaleY(calc(1 + 1.4 * var(--snow))); }
+    .tree .frost { fill: #ffffff; opacity: calc(0.38 * var(--snow)); }
+    .tree .ridge {
+      fill: none;
+      stroke: #f4f8ff;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: calc(7px * var(--snow));
+      opacity: min(1, calc(var(--snow) * 3));
+    }
+    .tree .starhat { fill: #f4f8ff; opacity: var(--hat); }
+    .gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--snow)); }
+    .tree .mound, .tree .mound-shade { transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(1 + 0.9 * var(--snow))); }
+    .snow svg { transform-origin: 50% 100%; }
+    .snow__l { transform: scaleY(calc(1 + 1.1 * var(--snow))); }
+    .snow__r { transform: scaleX(-1) scaleY(calc(1 + 1.1 * var(--snow))); }
+
+    /* Schippen, Rütteln, Brocken */
+    .fx { position: absolute; inset: 0; pointer-events: none; }
+    .fx svg, .fx canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; }
+    .shovel-anim { transform-box: fill-box; transform-origin: 90% 10%; animation: scoop 0.9s ease-in-out forwards; }
+    @keyframes scoop {
+      0%   { transform: rotate(-35deg) translateY(-20px); opacity: 0; }
+      15%  { opacity: 1; }
+      45%  { transform: rotate(-10deg) translateY(6px); }
+      70%  { transform: rotate(28deg) translateY(-10px); opacity: 1; }
+      100% { transform: rotate(35deg) translateY(-14px); opacity: 0; }
+    }
+    .name-tag--big { font-size: 24px; stroke-width: 5px; }
+    .stage.is-wobble .lights, .stage.is-wobble .baubles, .stage.is-wobble .tree { animation: wobble 0.5s ease-in-out; }
+    .stage.is-shakeoff .lights, .stage.is-shakeoff .baubles, .stage.is-shakeoff .tree { animation: wobbleBig 1.1s ease-in-out; }
+    @keyframes wobble { 0%, 100% { transform: none; } 20% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 80% { transform: translateX(-2px); } }
+    @keyframes wobbleBig {
+      0%, 100% { transform: none; }
+      10% { transform: translateX(-14px) rotate(-0.4deg); } 25% { transform: translateX(14px) rotate(0.4deg); }
+      40% { transform: translateX(-12px); } 55% { transform: translateX(10px); }
+      70% { transform: translateX(-6px); } 85% { transform: translateX(3px); }
+    }
+
+    /* Anzeige oben: Rütteln-Fortschritt und Schipper-Rangliste */
+    .hud {
+      position: absolute;
+      left: 50%;
+      top: calc(150px + var(--lightsy, 0px));
+      transform: translateX(-50%);
+      display: grid;
+      justify-items: center;
+      gap: 10px;
+      font-family: 'DM Sans', sans-serif;
+      color: #fff;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    }
+    .hud__shake, .hud__board {
+      display: none;
+      padding: 10px 22px 12px;
+      border-radius: 14px;
+      background: rgba(18, 28, 46, 0.78);
+      border: 2px solid rgba(220, 235, 255, 0.6);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .hud__shake.is-on, .hud__board.is-on { display: block; animation: hudIn 0.3s ease-out; }
+    @keyframes hudIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+    .hud__shake { font-size: 26px; font-weight: 800; text-align: center; min-width: 300px; }
+    .hud__bar { margin-top: 8px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+    .hud__bar::after {
+      content: '';
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #bfe9ff, #ffffff);
+      transform-origin: 0 50%;
+      transform: scaleX(var(--hudp));
+    }
+    .hud__board { min-width: 340px; }
+    .hud__board h2 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
+    .hud__board ol { list-style: none; font-size: 20px; font-weight: 600; }
+    .hud__board li { display: flex; justify-content: space-between; gap: 30px; padding: 2px 0; }
+    .hud__board li:first-child { color: #ffd23f; font-weight: 800; }
+
     /* ── Statusanzeige (?tune=1) ── */
     .tune {
       position: absolute; left: 50%; top: 200px; transform: translateX(-50%);
@@ -247,8 +360,9 @@
     <svg class="lights" id="lights" viewBox="0 0 1920 1080" aria-hidden="true"></svg>
 
     <div class="baubles" aria-hidden="true">
-      <span class="bauble"></span><span class="bauble"></span><span class="bauble"></span>
-      <span class="bauble"></span><span class="bauble"></span><span class="bauble"></span>
+      <span class="bauble"><i class="bsnow"></i></span><span class="bauble"><i class="bsnow"></i></span>
+      <span class="bauble"><i class="bsnow"></i></span><span class="bauble"><i class="bsnow"></i></span>
+      <span class="bauble"><i class="bsnow"></i></span><span class="bauble"><i class="bsnow"></i></span>
     </div>
 
     <div class="snow" aria-hidden="true">
@@ -271,6 +385,13 @@
         <path class="snowcap" d="M78 300 Q140 318 200 310 Q260 318 322 300 Q310 292 292 296 Q262 304 236 297 Q215 306 190 300 Q160 307 132 297 Q102 304 78 300 Z" />
         <path d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" fill="url(#treeG)" />
         <path class="snowcap" d="M118 202 Q160 216 200 210 Q240 216 282 202 Q270 195 252 199 Q228 207 205 200 Q182 207 160 199 Q138 205 118 202 Z" />
+
+        <path class="frost" d="M200 150 L362 402 Q280 422 200 412 Q120 422 38 402 Z" />
+        <path class="frost" d="M200 90 L322 300 Q260 318 200 310 Q140 318 78 300 Z" />
+        <path class="frost" d="M200 38 L282 202 Q240 216 200 210 Q160 216 118 202 Z" />
+        <path class="ridge" d="M40 400 L200 152 L360 400" />
+        <path class="ridge" d="M80 298 L200 92 L320 298" />
+        <path class="ridge" d="M120 200 L200 40 L280 200" />
 
         <path id="garl1" d="M140 178 Q200 206 262 172" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
         <path id="garl2" d="M106 272 Q200 304 298 262" fill="none" stroke="#e8c45a" stroke-width="3" stroke-dasharray="2 5" stroke-linecap="round" />
@@ -297,8 +418,19 @@
             <path d="M0 -62 L5 -8 L62 0 L5 8 L0 62 L-5 8 L-62 0 L-5 -8 Z" fill="#fff3b0" />
           </g>
           <path class="star" d="M0 -30 L8.8 -12 L28.5 -9.3 L14.3 4.6 L17.6 24.3 L0 15 L-17.6 24.3 L-14.3 4.6 L-28.5 -9.3 L-8.8 -12 Z" fill="#ffd23f" stroke="#fff6c8" stroke-width="2" />
+          <path class="starhat" d="M-15 -20 Q-14 -38 0 -40 Q14 -38 15 -20 Q8 -25 0 -24 Q-8 -25 -15 -20 Z" />
         </g>
       </svg>
+    </div>
+
+    <div class="fx" aria-hidden="true">
+      <canvas id="clumps" width="1920" height="1080"></canvas>
+      <svg id="fxSvg" viewBox="0 0 1920 1080"></svg>
+    </div>
+
+    <div class="hud" aria-hidden="true">
+      <div class="hud__shake" id="hudShake"><span id="hudShakeText"></span><div class="hud__bar"></div></div>
+      <div class="hud__board" id="hudBoard"><h2>Top shovelers</h2><ol id="hudBoardList"></ol></div>
     </div>
 
     <div class="tune" id="tune"></div>
@@ -340,7 +472,11 @@
         treex: [num(0, 1500, true), 40],
         tsize: [num(0.5, 1.5), 1],
         treesnow: [flag, true],
-        snow: [flag, true]
+        snow: [flag, true],
+        snowadd: [num(5, 100, true), 35],
+        shovel: [num(1, 50, true), 5],
+        shakeneed: [num(1, 20, true), 5],
+        shakewin: [num(5, 120, true), 20]
       };
       var base = {};
       Object.keys(SETTINGS).forEach(function (k) {
@@ -369,12 +505,14 @@
         el('ellipse', { 'class': 'glow lit', cx: 0, cy: 18, rx: 14, ry: 16, opacity: 0.75 }, g);
         el('rect', { 'class': 'socket', x: -5, y: 0, width: 10, height: 9, rx: 2 }, g);
         el('path', { 'class': 'body lit', d: 'M0 8 C9 10 9 24 0 32 C-9 24 -9 10 0 8 Z' }, g);
+        el('ellipse', { 'class': 'bcap', cx: 0, cy: 11, rx: 7, ry: 3.5 }, g);
         bulbIndex++;
       }
 
       function stringAlong(svg, d, cls, step, baseRot) {
         var grp = el('g', { 'class': cls }, svg);
         var path = el('path', { 'class': 'wire', d: d }, grp);
+        el('path', { 'class': 'wire-snow', d: d, transform: 'translate(0 -2)' }, grp);
         var len = path.getTotalLength();
         for (var s = step / 2; s < len; s += step) {
           var p = path.getPointAtLength(s);
@@ -424,7 +562,7 @@
         ['lights', 'pattern', 'colors', 'baubles', 'treepos'].forEach(function (k) { stage.dataset[k] = cur[k]; });
         ['tree', 'treesnow', 'snow'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
         varStyle.textContent = '.stage{--blen:' + cur.blen + ';--bsize:' + cur.bsize +
-                               ';--tsize:' + cur.tsize + ';--treex:' + cur.treex + 'px}';
+                               ';--tsize:' + cur.tsize + ';--treex:' + cur.treex + 'px;--lightsy:' + cur.lightsy + 'px}';
         if (rebuild) buildLights();
       }
       applySettings(copy(base));
@@ -545,6 +683,7 @@
         el('rect', { x: (-w / 2).toFixed(1), y: (-h).toFixed(1), width: w.toFixed(1), height: (h * 0.18).toFixed(1), fill: 'rgba(255,255,255,.12)' }, g);
         el('rect', { x: -4 * k, y: (-h).toFixed(1), width: 8 * k, height: h.toFixed(1), fill: look.rib }, g);
         el('rect', { x: (-w / 2).toFixed(1), y: (-h * 0.58).toFixed(1), width: w.toFixed(1), height: 7 * k, fill: look.rib }, g);
+        el('rect', { 'class': 'gsnow', x: (-w / 2 - 1).toFixed(1), y: (-h - 7 * k).toFixed(1), width: (w + 2).toFixed(1), height: (9 * k).toFixed(1), rx: 4 }, g);
         el('ellipse', { cx: -9 * k, cy: -h - 5 * k, rx: 10 * k, ry: 6 * k, fill: look.rib, transform: 'rotate(-25 ' + (-9 * k) + ' ' + (-h - 5 * k) + ')' }, g);
         el('ellipse', { cx: 9 * k, cy: -h - 5 * k, rx: 10 * k, ry: 6 * k, fill: look.rib, transform: 'rotate(25 ' + (9 * k) + ' ' + (-h - 5 * k) + ')' }, g);
         el('circle', { cx: 0, cy: -h - 3 * k, r: 4 * k, fill: look.rib }, g);
@@ -568,6 +707,9 @@
 
       function applyState(state) {
         if (!state || !state.ornaments) return;
+        snowReset(false);
+        (state.snow_events || []).forEach(function (e) { snowApply(e.k, e.n || '', e.t); });
+        snowShown = SN.snow;
         clearItems();
         state.ornaments.forEach(function (o) { addOrnament(o.name, false); });
         (state.gifts || []).forEach(function (gf) { addGift(gf, false); });
@@ -577,9 +719,15 @@
       }
 
       // ── Spotlight: alle 8 s leuchtet ein benanntes Stück auf ──
-      var lastSpot = null;
+      var lastSpot = null, spotRound = 0;
       setInterval(function () {
         if (stage.dataset.tree === '0') return;
+        spotRound++;
+        var top = leaderList()[0];
+        if (top && spotRound % 4 === 0) {
+          showTag('Top shoveler: ' + top[0] + ' · ' + top[1] + '×', 200, -50);
+          return;
+        }
         var pool = ornNodes.concat(giftNodes).filter(function (it) { return it && it.label; });
         if (!pool.length) return;
         var pick = pool[Math.floor(Math.random() * pool.length)];
@@ -593,6 +741,197 @@
         showTag(pick.label, pick.x, pick.y);
       }, 8000);
 
+      // ── Schnee ──
+      // Regeln aus der URL: der Server liefert nur Ereignisse, gerechnet wird hier.
+      var SN = { snow: 0, shakes: [], leaders: {} };
+      function snowReset(keepLeaders) {
+        SN.snow = 0; SN.shakes = [];
+        if (!keepLeaders) SN.leaders = {};
+      }
+      function leaderList() {
+        return Object.keys(SN.leaders).map(function (k) { return [SN.leaders[k].name, SN.leaders[k].n]; })
+          .sort(function (a, b) { return b[1] - a[1]; });
+      }
+      // Ein Ereignis anwenden; Rückgabe beschreibt, was passiert ist (für Animationen)
+      function snowApply(k, name, t) {
+        var r = { k: k, name: name };
+        if (k === 'fall') {
+          SN.snow = Math.min(100, SN.snow + cur.snowadd);
+        } else if (k === 'shovel') {
+          r.removed = Math.min(cur.shovel, SN.snow);
+          SN.snow -= r.removed;
+          if (r.removed > 0 && name) {
+            var key = name.toLowerCase();
+            SN.leaders[key] = SN.leaders[key] || { name: name, n: 0 };
+            SN.leaders[key].name = name;
+            SN.leaders[key].n++;
+          }
+        } else if (k === 'shake') {
+          if (SN.snow <= 0) { r.idle = true; return r; }
+          SN.shakes = SN.shakes.filter(function (sh) { return t - sh.t <= cur.shakewin; });
+          var id = name ? name.toLowerCase() : '#' + t + Math.random();
+          if (!SN.shakes.some(function (sh) { return sh.id === id; })) SN.shakes.push({ id: id, t: t });
+          r.count = SN.shakes.length;
+          if (r.count >= cur.shakeneed) { r.success = true; SN.snow = 0; SN.shakes = []; }
+        } else if (k === 'melt') {
+          snowReset(true);
+        }
+        return r;
+      }
+
+      // Anzeige läuft der berechneten Menge weich hinterher
+      var snowShown = 0, snowRate = 2.5, lastTick = performance.now();
+      var dynStyle = document.createElement('style');
+      document.head.appendChild(dynStyle);
+      var clockOff = 0;   // Serverzeit − lokale Zeit, für die Rüttel-Anzeige
+      function serverNow() { return Date.now() / 1000 + clockOff; }
+      function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+
+      var hudShake = document.getElementById('hudShake'), hudShakeText = document.getElementById('hudShakeText');
+      function snowTick(now) {
+        var dt = Math.min(0.1, (now - lastTick) / 1000);
+        lastTick = now;
+        var target = SN.snow;
+        if (snowShown < target) snowShown = Math.min(target, snowShown + snowRate * dt);
+        else if (snowShown > target) snowShown = Math.max(target, snowShown - snowRate * dt);
+        var s = snowShown / 100;
+        var p = 0;
+        var live = SN.shakes.filter(function (sh) { return serverNow() - sh.t <= cur.shakewin; });
+        if (live.length && SN.snow > 0) {
+          var oldest = Math.min.apply(null, live.map(function (sh) { return sh.t; }));
+          p = clamp01(1 - (serverNow() - oldest) / cur.shakewin);
+          hudShakeText.textContent = 'Shake it off! ' + live.length + '/' + cur.shakeneed;
+          hudShake.classList.add('is-on');
+        } else {
+          hudShake.classList.remove('is-on');
+        }
+        dynStyle.textContent = '.stage{--snow:' + s.toFixed(3) + ';--cap:' + clamp01((s - 0.3) / 0.3).toFixed(3) +
+          ';--hat:' + clamp01((s - 0.6) / 0.25).toFixed(3) + ';--dim:' + clamp01((s - 0.7) / 0.3).toFixed(3) +
+          ';--hudp:' + p.toFixed(3) + '}';
+        requestAnimationFrame(snowTick);
+      }
+      requestAnimationFrame(snowTick);
+
+      // Schneebrocken (Canvas): fliegen beim Schippen weg, fallen beim Abschütteln
+      var cv = document.getElementById('clumps'), cx2 = cv.getContext('2d');
+      var clumps = [], clumpRunning = false;
+      function burst(x, y, n, spreadX, upward) {
+        for (var i = 0; i < n; i++) {
+          clumps.push({
+            x: x + (Math.random() - 0.5) * spreadX, y: y + (Math.random() - 0.5) * 10,
+            vx: (Math.random() - 0.5) * 260 + (upward ? 120 : 0),
+            vy: upward ? -250 - Math.random() * 300 : Math.random() * 80,
+            r: 3 + Math.random() * 7, life: 1.6 + Math.random() * 0.6
+          });
+        }
+        if (!clumpRunning) { clumpRunning = true; lastClump = performance.now(); requestAnimationFrame(drawClumps); }
+      }
+      var lastClump = 0;
+      function drawClumps(now) {
+        var dt = Math.min(0.05, (now - lastClump) / 1000);
+        lastClump = now;
+        cx2.clearRect(0, 0, 1920, 1080);
+        for (var i = clumps.length - 1; i >= 0; i--) {
+          var c = clumps[i];
+          c.vy += 1300 * dt; c.x += c.vx * dt; c.y += c.vy * dt; c.life -= dt;
+          if (c.life <= 0 || c.y > 1100) { clumps.splice(i, 1); continue; }
+          cx2.globalAlpha = Math.min(1, c.life * 2);
+          cx2.fillStyle = '#f4f8ff';
+          cx2.beginPath(); cx2.arc(c.x, c.y, c.r, 0, Math.PI * 2); cx2.fill();
+        }
+        cx2.globalAlpha = 1;
+        if (clumps.length) requestAnimationFrame(drawClumps); else { clumpRunning = false; cx2.clearRect(0, 0, 1920, 1080); }
+      }
+
+      // Stellen, an denen geschippt werden kann (Bühnenkoordinaten)
+      function snowSpots() {
+        var spots = [];
+        var wire = lightsSvg.querySelector('.top .wire');
+        if (stage.dataset.lights !== 'off' && wire) {
+          var len = wire.getTotalLength(), pt = wire.getPointAtLength(len * (0.1 + Math.random() * 0.8));
+          spots.push([pt.x, pt.y - 4]);
+        }
+        if (stage.dataset.tree !== '0') {
+          var tb = document.querySelector('.tree svg').getBoundingClientRect(), k = tb.width / 400;
+          var tier = TIERS[Math.floor(Math.random() * 3)], side = Math.random() < 0.5 ? -1 : 1, f = 0.4 + Math.random() * 0.5;
+          spots.push([tb.left + (200 + side * tier[3] * f) * k, tb.top + (tier[1] + (tier[2] - tier[1]) * f) * k]);
+          spots.push([tb.left + (60 + Math.random() * 280) * k, tb.top + 500 * k]);
+        }
+        if (stage.dataset.snow !== '0') {
+          spots.push(Math.random() < 0.5 ? [80 + Math.random() * 300, 1040] : [1540 + Math.random() * 300, 1040]);
+        }
+        return spots.length ? spots : [[960, 1040]];
+      }
+
+      var fxSvg = document.getElementById('fxSvg');
+      function bigTag(text, x, y) {
+        var tag = el('text', { 'class': 'name-tag name-tag--big', x: x.toFixed(0), y: y.toFixed(0), 'text-anchor': 'middle' }, fxSvg);
+        tag.textContent = text;
+        tag.addEventListener('animationend', function () { if (tag.parentNode) tag.parentNode.removeChild(tag); });
+      }
+      function shovelAt(x, y) {
+        var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, fxSvg);
+        var g = el('g', { 'class': 'shovel-anim' }, outer);
+        el('line', { x1: 34, y1: -70, x2: 8, y2: -12, stroke: '#8a5a2b', 'stroke-width': 6, 'stroke-linecap': 'round' }, g);
+        el('rect', { x: 26, y: -82, width: 18, height: 8, rx: 3, fill: '#5a3a1a', transform: 'rotate(24 35 -78)' }, g);
+        el('path', { d: 'M-12 -18 L18 -6 L12 14 Q-4 20 -18 8 Z', fill: '#9aa7b6', stroke: '#5f6b78', 'stroke-width': 2 }, g);
+        g.addEventListener('animationend', function () { fxSvg.removeChild(outer); });
+      }
+
+      function snowEvent(k, name, t, animate) {
+        var r = snowApply(k, name, t);
+        if (!animate) return r;
+        if (k === 'fall') {
+          snowRate = cur.snowadd / 15;             // wächst in ~15 s, passend zum Schneefall-Video
+        } else if (k === 'shovel') {
+          snowRate = 40;
+          var sp = snowSpots(), spot = sp[Math.floor(Math.random() * sp.length)];
+          if (r.removed > 0) {
+            shovelAt(spot[0], spot[1]);
+            setTimeout(function () { burst(spot[0], spot[1], 14, 30, true); }, 450);
+            bigTag((name || 'Someone') + ' −' + Math.round(r.removed) + '%', spot[0], spot[1] - 70);
+          } else {
+            bigTag('Nothing to shovel' + (name ? ', ' + name : ''), spot[0], spot[1] - 40);
+          }
+        } else if (k === 'shake') {
+          if (r.success) {
+            snowRate = 90;
+            stage.classList.remove('is-shakeoff'); void stage.offsetWidth; stage.classList.add('is-shakeoff');
+            setTimeout(function () { stage.classList.remove('is-shakeoff'); }, 1200);
+            snowSpots().concat(snowSpots(), snowSpots()).forEach(function (p) { burst(p[0], p[1], 18, 120, false); });
+            bigTag('Shaken off! ' + (name ? 'Thanks, ' + name : ''), 960, 260 + cur.lightsy);
+          } else {
+            stage.classList.remove('is-wobble'); void stage.offsetWidth; stage.classList.add('is-wobble');
+            setTimeout(function () { stage.classList.remove('is-wobble'); }, 600);
+            if (!r.idle) snowSpots().forEach(function (p) { burst(p[0], p[1], 3, 40, false); });
+          }
+        } else if (k === 'melt') {
+          snowRate = 12;
+        }
+        return r;
+      }
+
+      var hudBoard = document.getElementById('hudBoard'), hudBoardList = document.getElementById('hudBoardList');
+      var boardTimer;
+      function showLeaders() {
+        while (hudBoardList.firstChild) hudBoardList.removeChild(hudBoardList.firstChild);
+        var list = leaderList().slice(0, 5);
+        if (!list.length) list = [['Nobody yet', 0]];
+        list.forEach(function (e, i) {
+          var li = document.createElement('li');
+          var a = document.createElement('span'), b = document.createElement('span');
+          a.textContent = (i + 1) + '. ' + e[0];
+          b.textContent = e[1] + '×';
+          li.appendChild(a); li.appendChild(b);
+          hudBoardList.appendChild(li);
+        });
+        hudBoard.classList.remove('is-on'); void hudBoard.offsetWidth; hudBoard.classList.add('is-on');
+        clearTimeout(boardTimer);
+        boardTimer = setTimeout(function () { hudBoard.classList.remove('is-on'); }, 10000);
+      }
+
+      var SNOW_CMD = { snowfall: 'fall', shovel: 'shovel', shake: 'shake', melt: 'melt' };
+
       function applyCommand(c) {
         var p = c.params || {};
         switch (c.cmd) {
@@ -601,7 +940,16 @@
           case 'celebrate': celebrate(); break;
           case 'ornament':  addOrnament(p.name || '', true); ornTotal++; updateCounter(); break;
           case 'gift':      addGift({ name: p.name || '', type: p.type, amount: p.amount }, true); giftTotal++; updateCounter(); break;
-          case 'clear':     clearItems(p.kind); break;
+          case 'clear':
+            if (p.kind === 'snow' || !p.kind) { snowReset(false); snowShown = 0; }
+            if (p.kind !== 'snow') clearItems(p.kind);
+            break;
+          case 'leaders':   showLeaders(); break;
+          default:
+            if (SNOW_CMD[c.cmd]) {
+              if (typeof c.ts === 'number') clockOff = c.ts - Date.now() / 1000;
+              snowEvent(SNOW_CMD[c.cmd], p.name || '', typeof c.ts === 'number' ? c.ts : serverNow(), true);
+            }
         }
       }
 
@@ -610,7 +958,8 @@
       var remoteState = 'off (no token URL)';
       function showTune() {
         if (tuneMode) tuneEl.textContent = 'remote: ' + remoteState + ' | ornaments: ' + ornTotal + ' | gifts: ' + giftTotal +
-                                           ' | keys: C celebrate, O ornament, G gift';
+                                           ' | snow: ' + Math.round(SN.snow) + '% | keys: C celebrate, O ornament, G gift, ' +
+                                           'S snowfall, V shovel, K shake, L leaders';
       }
       if (tuneMode) tuneEl.classList.add('is-on');
       var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
@@ -655,6 +1004,10 @@
         document.addEventListener('keydown', function (e) {
           if (e.key === 'c' || e.key === 'C') celebrate();
           else if (e.key === 'o' || e.key === 'O') { applyCommand({ cmd: 'ornament', params: { name: testNames[ornTotal % testNames.length] } }); showTune(); }
+          else if (e.key === 's' || e.key === 'S') { applyCommand({ cmd: 'snowfall', params: {} }); showTune(); }
+          else if (e.key === 'v' || e.key === 'V') { applyCommand({ cmd: 'shovel', params: { name: testNames[Math.floor(Math.random() * 5)] } }); showTune(); }
+          else if (e.key === 'k' || e.key === 'K') { applyCommand({ cmd: 'shake', params: { name: testNames[Math.floor(Math.random() * 5)] } }); showTune(); }
+          else if (e.key === 'l' || e.key === 'L') showLeaders();
           else if (e.key === 'g' || e.key === 'G') {
             var types = ['sub', 'resub', 'giftsub', 'bits', 'raid'], t = types[giftTotal % types.length];
             applyCommand({ cmd: 'gift', params: { name: testNames[giftTotal % testNames.length], type: t,

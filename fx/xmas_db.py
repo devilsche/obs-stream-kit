@@ -1,5 +1,10 @@
 """Dauerhafte Sammlung für den Weihnachtsschmuck (effects/xmas.html):
-Follower-Kugeln am Baum und Geschenke darunter, pro Tenant.
+Follower-Kugeln am Baum, Geschenke darunter und das Schnee-Protokoll
+(Schneefall, Schippen, Rütteln, Tauen), pro Tenant.
+
+Beim Schnee ist der Server bewusst nur Protokoll: das Overlay rechnet
+Schneehöhe und Schipper-Rangliste beim Laden aus den Ereignissen nach,
+mit den Regeln aus seiner URL (snowadd/shovel/shakeneed/shakewin).
 
 DAO im sqlite-Stil ('?'-Platzhalter) — Tests laufen auf sqlite, Prod über
 core.db_compat.SqliteCompatConn auf Postgres. Geleert wird nur per
@@ -9,6 +14,7 @@ import datetime
 
 MAX_VISIBLE_ORNAMENTS = 60
 MAX_VISIBLE_GIFTS = 15
+MAX_SNOW_EVENTS = 5000
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_xmas_item (
@@ -37,7 +43,8 @@ CREATE TABLE IF NOT EXISTS fx_xmas_item (
 CREATE INDEX IF NOT EXISTS ix_fx_xmas_item_tk ON fx_xmas_item(tenant_id, kind, id);
 """
 
-_KINDS = {"ornaments": "ornament", "gifts": "gift"}
+_KINDS = {"ornaments": "ornament", "gifts": "gift", "snow": "snow"}
+_SNOW_EVENTS = {"snowfall": "fall", "shovel": "shovel", "shake": "shake", "melt": "melt"}
 
 
 def init_schema(conn):
@@ -46,7 +53,7 @@ def init_schema(conn):
 
 
 def _now():
-    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
+    return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds")
 
 
 def add_ornament(conn, tenant_id: int, name: str) -> bool:
@@ -73,8 +80,15 @@ def add_gift(conn, tenant_id: int, name: str, gtype: str, amount: int):
     conn.commit()
 
 
+def add_snow_event(conn, tenant_id: int, event: str, name: str = ""):
+    conn.execute(
+        "INSERT INTO fx_xmas_item (tenant_id, kind, name, gtype, created_at) VALUES (?, 'snow', ?, ?, ?)",
+        (tenant_id, name, event, _now()))
+    conn.commit()
+
+
 def clear(conn, tenant_id: int, kind=None):
-    """kind: 'ornaments' | 'gifts' | None (beides)."""
+    """kind: 'ornaments' | 'gifts' | 'snow' | None (alles)."""
     if kind in _KINDS:
         conn.execute("DELETE FROM fx_xmas_item WHERE tenant_id = ? AND kind = ?",
                      (tenant_id, _KINDS[kind]))
@@ -97,7 +111,12 @@ def load_state(conn, tenant_id: int) -> dict:
     gifts = conn.execute(
         "SELECT name, gtype, amount FROM fx_xmas_item WHERE tenant_id = ? AND kind = 'gift' "
         "ORDER BY id DESC LIMIT ?", (tenant_id, MAX_VISIBLE_GIFTS)).fetchall()
+    snow = conn.execute(
+        "SELECT name, gtype, created_at FROM fx_xmas_item WHERE tenant_id = ? AND kind = 'snow' "
+        "ORDER BY id DESC LIMIT ?", (tenant_id, MAX_SNOW_EVENTS)).fetchall()
     return {
+        "snow_events": [{"t": datetime.datetime.fromisoformat(r["created_at"]).timestamp(),
+                         "k": r["gtype"], "n": r["name"]} for r in reversed(snow)],
         "ornaments": [{"name": r["name"]} for r in reversed(orn)],
         "ornament_total": _count(conn, tenant_id, "ornament"),
         "gifts": [{"name": r["name"], "type": r["gtype"], "amount": r["amount"]}
@@ -116,4 +135,6 @@ def persist(conn, tenant_id: int, command: dict) -> bool:
         add_gift(conn, tenant_id, p.get("name", ""), p["type"], p["amount"])
     elif command["cmd"] == "clear":
         clear(conn, tenant_id, p.get("kind"))
+    elif command["cmd"] in _SNOW_EVENTS:
+        add_snow_event(conn, tenant_id, _SNOW_EVENTS[command["cmd"]], p.get("name", ""))
     return True
