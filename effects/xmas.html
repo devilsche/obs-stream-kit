@@ -222,18 +222,20 @@
     .snow .shade { fill: #c9d7ec; }
 
     /* ── Schnee ──
-       --snow 0..1 Gesamtmenge, --cap Kappen auf den hängenden Kugeln (ab ~35 %),
+       --snow 0..1 Gesamtmenge, --light erste Schneeschicht (voll ab ~8 %, damit
+       Neuschnee nach dem Abschütteln sofort sichtbar wird), --cap Kappen auf den
+       hängenden Kugeln (ab ~10 %),
        --hat Mütze auf dem Stern (ab ~60 %), --dim Lichter gedämpft (ab 70 %),
        --ground Schneedecke in der Mitte (ab ~25 %), --drift Wehe vor dem Baum (ab 20 %) */
-    .stage { --snow: 0; --cap: 0; --hat: 0; --dim: 0; --ground: 0; --drift: 0; --hudp: 0; }
+    .stage { --snow: 0; --light: 0; --cap: 0; --hat: 0; --dim: 0; --ground: 0; --drift: 0; --hudp: 0; }
     .wire-snow {
       fill: none;
       stroke: #f4f8ff;
       stroke-linecap: round;
-      stroke-width: calc(1px + 8px * var(--snow));
-      opacity: min(1, calc(var(--snow) * 4));
+      stroke-width: calc(3px + 6px * var(--snow));
+      opacity: var(--light);
       /* halbe Strichbreite nach oben: der Schnee liegt auf dem Draht, nicht darunter */
-      transform: translateY(calc(-1.5px - 4px * var(--snow)));
+      transform: translateY(calc(-2.5px - 3px * var(--snow)));
     }
     .lights, .tree #treeLights { filter: brightness(calc(1 - 0.45 * var(--dim))); }
     .bsnow {
@@ -248,7 +250,7 @@
       box-shadow: inset 0 -3px 0 #d6e2f2;
       transform-origin: 50% 100%;
       transform: scaleY(var(--cap));
-      opacity: min(1, calc(var(--snow) * 4));
+      opacity: var(--light);
     }
     .tree .snowcap { transform-box: fill-box; transform-origin: 50% 32%; transform: scaleY(calc(1 + 1.4 * var(--snow))); }
     /* Drehpunkt = Höhe der Ecken (gemessen: 35 / 30 / 31 % der Kante), damit sie beim Wachsen
@@ -263,8 +265,8 @@
       stroke-linecap: butt;
       stroke-linejoin: round;
       /* doppelt so breit, weil die äußere Hälfte weggeschnitten wird */
-      stroke-width: calc(14px * var(--snow));
-      opacity: min(1, calc(var(--snow) * 3));
+      stroke-width: calc(5px + 10px * var(--snow));
+      opacity: var(--light);
     }
     .tree .starhat { fill: #f4f8ff; opacity: var(--hat); }
     .gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--snow)); }
@@ -874,7 +876,8 @@
         } else {
           hudShake.classList.remove('is-on');
         }
-        dynStyle.textContent = '.stage{--snow:' + s.toFixed(3) + ';--cap:' + clamp01((s - 0.3) / 0.3).toFixed(3) +
+        dynStyle.textContent = '.stage{--snow:' + s.toFixed(3) + ';--light:' + clamp01(s / 0.08).toFixed(3) +
+          ';--cap:' + clamp01((s - 0.08) / 0.35).toFixed(3) +
           ';--hat:' + clamp01((s - 0.6) / 0.25).toFixed(3) + ';--dim:' + clamp01((s - 0.7) / 0.3).toFixed(3) +
           ';--ground:' + clamp01((s - 0.25) / 0.75).toFixed(3) + ';--drift:' + clamp01((s - 0.2) / 0.8).toFixed(3) +
           ';--hudp:' + p.toFixed(3) + '}';
