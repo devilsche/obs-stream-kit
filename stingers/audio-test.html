@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Audio Test</title>
+  <!--
+    Diagnose: welcher Tonweg funktioniert in der OBS-Browser-Source?
+    Spielt in Schleife (alle 9 s) nacheinander:
+      1. MP3-Datei über <audio>          (Weg der MP3-Stinger)
+      2. erzeugte WAV über <audio>       (Weg von sad/you-died/motivation)
+      3. Live-Web-Audio (AudioContext)   (Weg von effects/rain.html)
+    und zeigt den Status jedes Wegs im Bild an.
+  -->
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 1920px; height: 1080px; overflow: hidden;
+      background: #12101a;
+      color: #f4eefc;
+      font: 40px/1.4 'Segoe UI', Arial, sans-serif;
+    }
+    main { padding: 80px 100px; }
+    h1 { font-size: 56px; margin-bottom: 40px; color: #f2b705; }
+    ol { list-style: none; }
+    li {
+      display: grid;
+      grid-template-columns: 560px 1fr;
+      gap: 30px;
+      padding: 18px 26px;
+      margin-bottom: 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 3px solid transparent;
+    }
+    li[data-active="1"] { border-color: #f2b705; background: rgba(242, 183, 5, 0.12); }
+    .state { font-weight: 700; }
+    .state[data-ok="1"] { color: #6fdc8c; }
+    .state[data-ok="0"] { color: #ff6b6b; }
+    .meta { margin-top: 40px; font-size: 26px; color: rgba(244, 238, 252, 0.6); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Audio test: what do you hear?</h1>
+    <ol>
+      <li id="r1"><span>1. MP3 file (Noice)</span><span class="state" id="s1">waiting</span></li>
+      <li id="r2"><span>2. Generated WAV (beep)</span><span class="state" id="s2">waiting</span></li>
+      <li id="r3"><span>3. Live Web Audio (beep)</span><span class="state" id="s3">waiting</span></li>
+    </ol>
+    <p class="meta" id="meta"></p>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var meta = document.getElementById('meta');
+      meta.textContent = navigator.userAgent;
+
+      function setState(n, text, ok) {
+        var el = document.getElementById('s' + n);
+        el.textContent = text;
+        if (ok === undefined) delete el.dataset.ok; else el.dataset.ok = ok ? '1' : '0';
+        console.log('[audio-test] ' + n + ': ' + text);
+      }
+      function setActive(n) {
+        [1, 2, 3].forEach(function (i) {
+          document.getElementById('r' + i).dataset.active = i === n ? '1' : '0';
+        });
+      }
+      function report(n, p, el) {
+        if (!p || !p.then) { setState(n, 'play() returned nothing', false); return; }
+        p.then(function () {
+          setState(n, 'playing (paused=' + el.paused + ')', true);
+        }).catch(function (e) {
+          setState(n, 'FAILED: ' + e.name + ' ' + e.message, false);
+        });
+      }
+
+      function wavBeep(freq, seconds) {
+        var rate = 44100, n = Math.floor(rate * seconds);
+        var v = new DataView(new ArrayBuffer(44 + n * 2));
+        function str(o, t) { for (var k = 0; k < t.length; k++) v.setUint8(o + k, t.charCodeAt(k)); }
+        str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+        str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+        v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true);
+        v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+        for (var i = 0; i < n; i++) {
+          var env = Math.min(1, i / 400, (n - i) / 400);
+          v.setInt16(44 + i * 2, Math.sin(2 * Math.PI * freq * i / rate) * 0.5 * env * 32767, true);
+        }
+        return URL.createObjectURL(new Blob([v.buffer], { type: 'audio/wav' }));
+      }
+
+      var ctx = null;
+      function round() {
+        setActive(1);
+        setState(1, 'starting…');
+        var a = new Audio('../assets/stingers/noice.mp3');
+        a.addEventListener('error', function () { setState(1, 'FAILED: media error ' + (a.error && a.error.code), false); });
+        report(1, a.play(), a);
+
+        setTimeout(function () {
+          setActive(2);
+          setState(2, 'starting…');
+          var b = new Audio(wavBeep(440, 1));
+          b.addEventListener('error', function () { setState(2, 'FAILED: media error ' + (b.error && b.error.code), false); });
+          report(2, b.play(), b);
+        }, 3000);
+
+        setTimeout(function () {
+          setActive(3);
+          try {
+            var AC = window.AudioContext || window.webkitAudioContext;
+            if (!ctx) ctx = new AC();
+            var go = function () {
+              var o = ctx.createOscillator(), g = ctx.createGain();
+              o.frequency.value = 660;
+              g.gain.setValueAtTime(0, ctx.currentTime);
+              g.gain.linearRampToValueAtTime(0.4, ctx.currentTime + 0.02);
+              g.gain.setValueAtTime(0.4, ctx.currentTime + 0.95);
+              g.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
+              o.connect(g); g.connect(ctx.destination);
+              o.start(); o.stop(ctx.currentTime + 1.05);
+              setState(3, 'state=' + ctx.state + ', rate=' + ctx.sampleRate, ctx.state === 'running');
+            };
+            if (ctx.state === 'suspended') {
+              ctx.resume().then(go).catch(function (e) { setState(3, 'FAILED resume: ' + e.name, false); });
+              setTimeout(function () { if (ctx.state !== 'running') setState(3, 'stuck: state=' + ctx.state, false); }, 800);
+            } else go();
+          } catch (e) {
+            setState(3, 'FAILED: ' + e.name + ' ' + e.message, false);
+          }
+        }, 5500);
+
+        setTimeout(function () { setActive(0); }, 7000);
+      }
+
+      round();
+      setInterval(round, 9000);
+    })();
+  </script>
+</body>
+</html>
