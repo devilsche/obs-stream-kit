@@ -166,6 +166,35 @@ EFFECTS = {
             "gift": {"type": "sub", "amount": 1},
         },
     },
+    "autumn": {
+        "commands": ("set", "celebrate", "pumpkin", "clear", "reset",
+                     "leaffall", "leafstop", "leaftoggle", "rake", "jump", "gust", "sweep", "leaders"),
+        "settings": {
+            "garland": _flag,
+            "fairy": _flag,
+            "garlandy": _int_range(0, 400),
+            "branch": _choice("left", "right", "off"),
+            "falling": _flag,
+            "density": _choice("light", "medium", "heavy"),
+            "pile": _flag,
+            "spread": _choice("corners", "full"),
+            "pumpkins": _flag,
+            "faces": _flag,
+            "colors": _choice("classic", "golden", "maple", "theme"),
+            # Laub-Regeln: % pro Minute Laubfall, % pro Rechenzug
+            "leafrate": _int_range(1, 300),
+            "rake": _int_range(1, 50),
+        },
+        "args": {
+            "pumpkin": {"name": _name},
+            "celebrate": {"name": _name},
+            "clear": {"kind": _choice("pumpkins", "leaves")},
+            "rake": {"name": _name},
+            "jump": {"name": _name},
+            # optional: Laubfall stoppt nach secs Sekunden von selbst
+            "leaffall": {"secs": _int_range(5, 86400)},
+        },
+    },
 }
 
 

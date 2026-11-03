@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Autumn Decor</title>
+  <!--
+    Herbstdeko als OBS-Source (1920×1080, transparent):
+    Blätterranke oben, Ast in der Ecke, fallendes Laub, Laubhaufen, Kürbisse.
+
+    URL-Parameter (alle auch live per Streamer.bot: /s/<token>/api/fx/autumn?cmd=set&…):
+      garland=1|0  fairy=1|0      Blätterranke oben / Lichter daran
+      garlandy=0..400             Ranke tiefer setzen (px), z. B. unter eine Kompassleiste
+      branch=left|right|off       Ast in der oberen Ecke
+      falling=1|0                 ständig ein paar fallende Blätter
+      density=light|medium|heavy  Menge der fallenden Blätter
+      pile=1|0  spread=corners|full   Laubhaufen in den Ecken / über die ganze Breite
+      pumpkins=1|0  faces=1|0     Kürbisse / geschnitzte leuchtende Gesichter
+      colors=classic|golden|maple|theme
+      tune=1                      Statusanzeige; Tasten siehe unten
+
+    Befehle: cmd=pumpkin&name=… (Follow) | cmd=celebrate[&name=…] | cmd=gust
+             cmd=clear[&kind=pumpkins|leaves] | cmd=reset | cmd=set&…
+    Kürbisse speichert der Server dauerhaft (fx/autumn_db.py); sichtbar sind die
+    neuesten 30, ein Name bekommt nur einen Kürbis.
+
+    Laub: cmd=leaftoggle (an/aus) bzw. cmd=leaffall[&secs=…] und cmd=leafstop;
+    solange Laub fällt, wächst der Haufen um leafrate % pro Minute.
+    cmd=rake&name=… (−rake %, zählt für die Rangliste), cmd=jump&name=…
+    (reinspringen, nur Show), cmd=sweep (alles wegfegen, Rangliste bleibt),
+    cmd=leaders (Rangliste zeigen), cmd=clear&kind=leaves (Laub + Rangliste löschen).
+      leafrate=1..300 (20)  rake=1..50 (5)
+    Der Server speichert nur die Ereignisse; Laubhöhe und Rangliste rechnet
+    das Overlay beim Laden mit diesen Regeln nach.
+  -->
+  <style>
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      width: 1920px; height: 1080px;
+      overflow: hidden;
+      background: transparent;
+      font-family: 'DM Sans', sans-serif;
+    }
+
+    .stage {
+      position: relative;
+      width: 1920px; height: 1080px;
+      overflow: hidden;
+      --gy: 0px;
+      --l1: #d9480f; --l2: #f08c00; --l3: #c92a2a; --l4: #fab005; --l5: #a0522d;
+    }
+    .stage[data-colors="golden"] { --l1: #f2b705; --l2: #e9a400; --l3: #ffd43b; --l4: #d4a017; --l5: #c98a00; }
+    .stage[data-colors="maple"]  { --l1: #c92a2a; --l2: #e03131; --l3: #a61e4d; --l4: #d9480f; --l5: #b02a1a; }
+    .stage[data-colors="theme"]  { --l1: #f2b705; --l2: #8e4bb8; --l3: #5e2a79; --l4: #ffd75e; --l5: #b07ad6; }
+
+    .layer { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
+    /* ── Blattfarben ── */
+    .c1 { fill: var(--l1); } .c2 { fill: var(--l2); } .c3 { fill: var(--l3); }
+    .c4 { fill: var(--l4); } .c5 { fill: var(--l5); }
+    .vein { fill: none; stroke: rgba(50, 20, 0, 0.45); stroke-width: 1.4; }
+
+    /* ── Blätterranke oben ── */
+    .garland { transform: translateY(var(--gy)); }
+    .stage[data-garland="0"] .garland { display: none; }
+    .vine { fill: none; stroke: #5b3d22; stroke-width: 5; stroke-linecap: round; }
+    .acorn__cap { fill: #6b4423; }
+    .acorn__nut { fill: #b07a3c; }
+    .fl .glow { fill: #ffcf7a; filter: url(#glow); opacity: 0.8; }
+    .fl .dot  { fill: #fff2c9; }
+    .fl { animation: twinkle 2.6s ease-in-out infinite; }
+    .stage[data-fairy="0"] .fl { display: none; }
+    .stage[data-celebrate="1"] .fl { animation-duration: 0.4s; }
+    @keyframes twinkle { 0%, 100% { opacity: 1; } 45% { opacity: 0.25; } 60% { opacity: 1; } }
+    .ri-0 { animation-delay: -0.1s; } .ri-1 { animation-delay: -1.3s; } .ri-2 { animation-delay: -0.7s; }
+    .ri-3 { animation-delay: -1.9s; } .ri-4 { animation-delay: -0.4s; } .ri-5 { animation-delay: -1.6s; }
+    .ri-6 { animation-delay: -1.0s; } .ri-7 { animation-delay: -2.1s; } .ri-8 { animation-delay: -0.25s; }
+    .ri-9 { animation-delay: -1.45s; }
+
+    /* ── Ast ── */
+    .stage[data-branch="off"] .branch { display: none; }
+    .branch__sway { animation: sway 7s ease-in-out infinite; transform-origin: 0 150px; }
+    .branch__wood { fill: none; stroke: #4a3020; stroke-linecap: round; }
+    .bl { transform-box: fill-box; transform-origin: 50% 0; transition: opacity 0.4s; }
+    .bl--gone { opacity: 0; }
+    .bl--grow { animation: grow 1.4s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+    @keyframes grow { from { transform: scale(0); } to { transform: none; } }
+    @keyframes sway { 0%, 100% { transform: rotate(-0.8deg); } 50% { transform: rotate(0.8deg); } }
+
+    /* ── Laubhaufen + Kürbisse ── */
+    .stage[data-pile="0"] #pileCanvas { display: none; }
+    .stage[data-pumpkins="0"] .pumpkins { display: none; }
+
+    .pk__body  { fill: #e8740c; }
+    .pk__lobe  { fill: #f08c1a; }
+    .pk__rib   { fill: none; stroke: #b5520a; stroke-width: 2.5; }
+    .pk__stem  { fill: #5a6b2a; }
+    .pk__face  { fill: #ffd75e; display: none; }
+    .pk__light { fill: #ffb43a; filter: url(#glow); opacity: 0; }
+    .stage[data-faces="1"] .pk__face { display: inline; animation: flicker 2.2s ease-in-out infinite; }
+    .stage[data-faces="1"] .pk__light { opacity: 0.55; animation: flicker 2.2s ease-in-out infinite; }
+    .stage[data-celebrate="1"] .pk__light { opacity: 1; }
+    @keyframes flicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
+    .pk__inner { transform-box: fill-box; transform-origin: 50% 100%; }
+    .pk--new .pk__inner { animation: drop 0.8s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+    @keyframes drop { from { transform: translateY(-260px); } to { transform: none; } }
+    .stage[data-celebrate="1"] .pk__inner { animation: hop 0.35s ease-in-out 4; }
+    @keyframes hop { 0%, 100% { transform: none; } 50% { transform: translateY(-14px); } }
+
+    /* Spotlight: ein Kürbis leuchtet auf und zeigt den Namen */
+    .is-spot { animation: spot 3.2s ease-in-out both; }
+    @keyframes spot {
+      0%, 100% { filter: none; }
+      20%, 80% { filter: drop-shadow(0 0 8px #ffe2a0) drop-shadow(0 0 18px #ff9a1f) brightness(1.25); }
+    }
+
+    .name-tag {
+      font: 700 17px 'DM Sans', sans-serif;
+      fill: #fff;
+      paint-order: stroke;
+      stroke: rgba(0, 0, 0, 0.7);
+      stroke-width: 4px;
+      animation: tagFade 3.4s ease-in-out forwards;
+    }
+    .name-tag--big { font-size: 28px; font-weight: 800; fill: #ffd75e; stroke-width: 6px; }
+    @keyframes tagFade { 0% { opacity: 0; } 12%, 75% { opacity: 1; } 100% { opacity: 0; } }
+
+    /* Rechen */
+    .rake { display: none; }
+    .rake--on { display: inline; }
+    .rake__handle { stroke: #8a5a2b; stroke-width: 9; stroke-linecap: round; }
+    .rake__head { fill: none; stroke: #9aa3ad; stroke-width: 5; stroke-linecap: round; }
+
+    /* ── Anzeige oben: Rechen-Rangliste ── */
+    .hud {
+      position: absolute;
+      left: 50%;
+      top: calc(150px + var(--gy));
+      transform: translateX(-50%);
+      font-family: 'DM Sans', sans-serif;
+      color: #fff;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    }
+    .hud__board {
+      display: none;
+      min-width: 340px;
+      padding: 10px 22px 12px;
+      border-radius: 14px;
+      background: rgba(40, 22, 8, 0.8);
+      border: 2px solid rgba(242, 183, 5, 0.7);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .hud__board.is-on { display: block; animation: hudIn 0.3s ease-out; }
+    @keyframes hudIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+    .hud__board h2 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
+    .hud__board ol { list-style: none; font-size: 20px; font-weight: 600; }
+    .hud__board li { display: flex; justify-content: space-between; gap: 30px; padding: 2px 0; }
+    .hud__board li:first-child { color: #ffd75e; font-weight: 800; }
+
+    /* ── Statusanzeige (?tune=1) ── */
+    .tune {
+      position: absolute; left: 50%; top: 260px; transform: translateX(-50%);
+      display: none;
+      padding: 10px 16px; border-radius: 8px;
+      background: rgba(20, 10, 30, 0.9); border: 2px solid #f2b705;
+      color: #f2b705; font: 14px 'Courier New', monospace;
+    }
+    .tune.is-on { display: block; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage *, .stage *::before, .stage *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage" id="stage" aria-hidden="true">
+    <svg width="0" height="0">
+      <defs id="defs">
+        <filter id="glow" x="-200%" y="-200%" width="500%" height="500%"><feGaussianBlur stdDeviation="6" /></filter>
+      </defs>
+    </svg>
+
+    <canvas class="layer" id="backCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer garland" id="garland" viewBox="0 0 1920 1080"></svg>
+    <svg class="layer branch" viewBox="0 0 1920 1080"><g id="branchFlip"><g class="branch__sway" id="branch"></g></g></svg>
+    <canvas class="layer" id="pileCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer pumpkins" viewBox="0 0 1920 1080"><g id="pumpkins"></g></svg>
+    <canvas class="layer" id="frontCanvas" width="1920" height="1080"></canvas>
+    <svg class="layer" id="fxSvg" viewBox="0 0 1920 1080">
+      <g class="rake" id="rakeTool">
+        <line class="rake__handle" x1="0" y1="0" x2="150" y2="-230" />
+        <path class="rake__head" d="M-46 6 L46 -6 M-40 5 L-44 30 M-20 3 L-23 28 M0 0 L-2 26 M20 -3 L19 23 M40 -5 L40 20" />
+      </g>
+      <g id="tags"></g>
+    </svg>
+
+    <div class="hud">
+      <div class="hud__board" id="hudBoard"><h2>Top rakers</h2><ol id="hudBoardList"></ol></div>
+    </div>
+
+    <div class="tune" id="tune"></div>
+  </div>
+
+  <script>
+    (function () {
+      'use strict';
+      var NS = 'http://www.w3.org/2000/svg';
+      var W = 1920, H = 1080;
+      var stage = document.getElementById('stage');
+      var params = new URLSearchParams(window.location.search);
+      var tuneMode = params.get('tune') === '1';
+      var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ── Einstellungen (gleiche Regeln wie fx/commands.py) ──
+      function choice() {
+        var opts = Array.prototype.slice.call(arguments);
+        return function (v) { v = String(v).toLowerCase(); return opts.indexOf(v) >= 0 ? v : undefined; };
+      }
+      function num(lo, hi) {
+        return function (v) {
+          var f = parseFloat(v);
+          if (!isFinite(f)) return undefined;
+          return Math.round(Math.max(lo, Math.min(hi, f)));
+        };
+      }
+      function flag(v) { return { '1': true, on: true, '0': false, off: false }[String(v).toLowerCase()]; }
+      var SETTINGS = {
+        garland: [flag, true],
+        fairy: [flag, true],
+        garlandy: [num(0, 400), 0],
+        branch: [choice('left', 'right', 'off'), 'left'],
+        falling: [flag, true],
+        density: [choice('light', 'medium', 'heavy'), 'medium'],
+        pile: [flag, true],
+        spread: [choice('corners', 'full'), 'corners'],
+        pumpkins: [flag, true],
+        faces: [flag, false],
+        colors: [choice('classic', 'golden', 'maple', 'theme'), 'classic'],
+        leafrate: [num(1, 300), 20],
+        rake: [num(1, 50), 5]
+      };
+      var DENSITY = { light: 3, medium: 7, heavy: 16 };   // Blätter pro Sekunde
+      var base = {};
+      Object.keys(SETTINGS).forEach(function (k) {
+        var raw = params.get(k), v = raw === null ? undefined : SETTINGS[k][0](raw);
+        base[k] = v === undefined ? SETTINGS[k][1] : v;
+      });
+      var cur = {};
+      function copy(o) { var r = {}; for (var k in o) r[k] = o[k]; return r; }
+
+      function el(name, attrs, parent) {
+        var e = document.createElementNS(NS, name);
+        for (var k in attrs) e.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(e);
+        return e;
+      }
+      // Pseudozufall mit festem Startwert: Ranke, Ast und Haufen sehen bei jedem Laden gleich aus
+      var seed = 11;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+
+      // ── Blattformen: Stiel bei y≈+18, Spitze bei y≈-20 ──
+      var LEAVES = [
+        { body: 'M0 -20 L4 -9 L12 -14 L10 -4 L19 -3 L11 4 L14 10 L4 8 L1 18 L-1 18 L-4 8 L-14 10 L-11 4 L-19 -3 L-10 -4 L-12 -14 L-4 -9 Z',
+          vein: 'M0 24 L0 -14 M0 4 L11 -2 M0 4 L-11 -2' },
+        { body: 'M0 -20 Q6 -17 5 -12 Q10 -10 7 -5 Q12 -2 8 3 Q12 7 6 10 Q6 16 0 18 Q-6 16 -6 10 Q-12 7 -8 3 Q-12 -2 -7 -5 Q-10 -10 -5 -12 Q-6 -17 0 -20 Z',
+          vein: 'M0 24 L0 -16' },
+        { body: 'M0 -18 Q11 -8 8 6 Q4 16 0 18 Q-4 16 -8 6 Q-11 -8 0 -18 Z',
+          vein: 'M0 24 L0 -12' }
+      ];
+      var defs = document.getElementById('defs');
+      LEAVES.forEach(function (l, i) {
+        var g = el('g', { id: 'lf' + i }, defs);
+        el('path', { d: l.body }, g);
+        el('path', { 'class': 'vein', d: l.vein }, g);
+        l.p2body = new Path2D(l.body);
+        l.p2vein = new Path2D(l.vein);
+      });
+      function leafUse(parent, i, x, y, rot, s, cls) {
+        return el('use', {
+          href: '#lf' + i, 'class': cls + ' c' + (1 + Math.floor(rnd() * 5)),
+          transform: 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ') rotate(' + rot.toFixed(1) + ') scale(' + s.toFixed(2) + ')'
+        }, parent);
+      }
+
+      // Farben für die Canvas-Blätter aus den CSS-Tokens
+      var palette = [], dark = [];
+      function shade(hex, f) {
+        var n = parseInt(hex.replace('#', ''), 16);
+        return 'rgb(' + Math.round((n >> 16) * f) + ',' + Math.round(((n >> 8) & 255) * f) + ',' + Math.round((n & 255) * f) + ')';
+      }
+      function readPalette() {
+        var cs = getComputedStyle(stage);
+        palette = []; dark = [];
+        for (var i = 1; i <= 5; i++) {
+          var c = cs.getPropertyValue('--l' + i).trim();
+          palette.push(c); dark.push(shade(c, 0.62));
+        }
+      }
+
+      function drawLeaf(ctx, shape, x, y, rot, sx, s, color, alpha) {
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.scale(s * sx, s);
+        ctx.fillStyle = color;
+        ctx.fill(LEAVES[shape].p2body);
+        ctx.strokeStyle = 'rgba(50,20,0,.45)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke(LEAVES[shape].p2vein);
+        ctx.restore();
+      }
+
+      // ── Blätterranke oben mit Lichtern und Eicheln ──
+      (function () {
+        var garland = document.getElementById('garland');
+        var d = 'M-10 4';
+        for (var i = 0; i < 5; i++) {
+          var x0 = -10 + i * 388;
+          d += ' Q' + (x0 + 194) + ' ' + (i % 2 ? 66 : 80) + ' ' + (x0 + 388) + ' 4';
+        }
+        var vine = el('path', { 'class': 'vine', d: d }, garland);
+        var len = vine.getTotalLength(), n = 0;
+        for (var s = 10; s < len; s += 30, n++) {
+          var p = vine.getPointAtLength(s);
+          var q = vine.getPointAtLength(Math.min(len, s + 1));
+          var ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
+          var side = n % 2 ? 1 : -1;
+          leafUse(garland, n % 3, p.x, p.y, 180 + ang + side * (30 + rnd() * 25), 1.1 + rnd() * 0.5, 'vine-leaf');
+          if (n % 9 === 4) {
+            var a = el('g', { transform: 'translate(' + p.x.toFixed(1) + ' ' + (p.y + 8).toFixed(1) + ')' }, garland);
+            el('ellipse', { 'class': 'acorn__nut', cx: 0, cy: 14, rx: 8, ry: 11 }, a);
+            el('path', { 'class': 'acorn__cap', d: 'M-10 6 Q0 -6 10 6 Q0 10 -10 6 Z' }, a);
+          }
+          if (n % 2 === 0) {
+            var f = el('g', { 'class': 'fl ri-' + Math.floor(rnd() * 10), transform: 'translate(' + p.x.toFixed(1) + ' ' + (p.y + 6).toFixed(1) + ')' }, garland);
+            el('circle', { 'class': 'glow', r: 11 }, f);
+            el('circle', { 'class': 'dot', r: 4 }, f);
+          }
+        }
+      })();
+
+      // ── Ast oben links (rechts: gespiegelt) ──
+      var branchFlip = document.getElementById('branchFlip');
+      var branchLeaves = [];
+      (function () {
+        var branch = document.getElementById('branch');
+        var twigs = [
+          { d: 'M-20 150 Q120 130 260 170 Q360 200 430 190', w: 16 },
+          { d: 'M120 140 Q170 90 240 70', w: 7 },
+          { d: 'M240 165 Q290 230 270 290', w: 6 },
+          { d: 'M330 190 Q380 150 440 140', w: 5 },
+          { d: 'M60 146 Q80 200 60 250', w: 5 }
+        ];
+        twigs.forEach(function (t) {
+          var path = el('path', { 'class': 'branch__wood', d: t.d, 'stroke-width': t.w }, branch);
+          var len = path.getTotalLength();
+          for (var s = len * 0.3; s < len; s += 34) {
+            var p = path.getPointAtLength(s);
+            var u = leafUse(branch, Math.floor(rnd() * 3), p.x, p.y, rnd() * 90 + 135, 1.3 + rnd() * 0.6, 'bl');
+            branchLeaves.push({ node: u, x: p.x, y: p.y, gone: false });
+          }
+        });
+      })();
+
+      // ── Laubhaufen ──
+      var pileCanvas = document.getElementById('pileCanvas');
+      var pctx = pileCanvas.getContext('2d');
+      var MAXH = 190;
+      var BASE = 0.15;     // ein bisschen Laub liegt immer, auch frisch gerecht
+      function prof(x) {
+        var w = 660;
+        function bump(d) { return d < w ? 0.5 + 0.5 * Math.cos(Math.PI * d / w) : 0; }
+        var c = Math.max(bump(x), bump(W - x) * 0.92);
+        if (cur.spread === 'full') c = Math.max(c, 0.34 + 0.05 * Math.sin(x / 85));
+        return c;
+      }
+      // lvl = gezeichnete Höhe 0…1
+      function surface(x, lvl) { return H - prof(x) * MAXH * lvl; }
+      function drawnLevel(pct) { return BASE + (1 - BASE) * pct / 100; }
+
+      // Blätter im Haufen: f = Schichthöhe (0 unten … 1 oben); sichtbar, solange f ≤ Höhe
+      var pileLeaves = [];
+      for (var k = 0; k < 2600; k++) {
+        pileLeaves.push({
+          x: rnd() * W, f: rnd(), shape: Math.floor(rnd() * 3), rot: rnd() * Math.PI * 2,
+          s: 0.9 + rnd() * 0.7, ci: Math.floor(rnd() * 5), dk: rnd() < 0.45, jy: rnd() * 10, thin: rnd()
+        });
+      }
+      pileLeaves.sort(function (a, b) { return a.f - b.f; });
+
+      function drawPile(lvl) {
+        pctx.clearRect(0, 0, W, H);
+        var g = pctx.createLinearGradient(0, H - MAXH, 0, H);
+        g.addColorStop(0, '#7a3e10'); g.addColorStop(1, '#3d1d06');
+        pctx.fillStyle = g;
+        pctx.beginPath();
+        pctx.moveTo(0, H);
+        for (var x = 0; x <= W; x += 16) pctx.lineTo(x, H - prof(x) * MAXH * lvl * 0.88);
+        pctx.lineTo(W, H);
+        pctx.fill();
+        for (var i = 0; i < pileLeaves.length; i++) {
+          var l = pileLeaves[i];
+          if (l.f > lvl) break;
+          var pr = prof(l.x);
+          // flache Stellen dünner belegen
+          if (pr < 0.04 || l.thin > pr * 1.4) continue;
+          var y = H - pr * MAXH * l.f + l.jy - 4;
+          drawLeaf(pctx, l.shape, l.x, y, l.rot, 1, l.s, l.dk && l.f < lvl - 0.08 ? dark[l.ci] : palette[l.ci], 1);
+        }
+      }
+
+      // ── Kürbisse: Ring aus 30 Plätzen ──
+      var pumpkinsLayer = document.getElementById('pumpkins');
+      var tagsLayer = document.getElementById('tags');
+      var MAX_PK = 30;
+      function pkSlots() {
+        var out = [], i;
+        if (cur.spread === 'full') {
+          // über die ganze Breite, gemischt verteilt
+          var xs = [];
+          for (i = 0; i < MAX_PK; i++) xs.push(60 + i * 62);
+          var s = 5;
+          for (i = xs.length - 1; i > 0; i--) {
+            s = (s * 16807) % 2147483647;
+            var j = s % (i + 1), t = xs[i]; xs[i] = xs[j]; xs[j] = t;
+          }
+          return xs;
+        }
+        // Ecken: abwechselnd links/rechts, von der Ecke nach innen
+        for (i = 0; i < MAX_PK / 2; i++) { out.push(60 + i * 46); out.push(W - 60 - i * 46); }
+        return out;
+      }
+      var pkNodes = [], pkNext = 0, pkTotal = 0;
+
+      function buildPumpkin(name, slot, animate) {
+        var scale = 0.68 + ((slot * 7919) % 100) / 100 * 0.3;
+        var g = el('g', { 'class': 'pk' + (animate ? ' pk--new' : '') });
+        var inner = el('g', { 'class': 'pk__inner' }, g);
+        var body = el('g', { transform: 'scale(' + scale.toFixed(2) + ')' }, inner);
+        el('ellipse', { 'class': 'pk__light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
+        el('ellipse', { 'class': 'pk__body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
+        el('ellipse', { 'class': 'pk__body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
+        el('ellipse', { 'class': 'pk__lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
+        el('path', { 'class': 'pk__rib', d: 'M-12 -58 Q-20 -30 -12 -2 M12 -58 Q20 -30 12 -2' }, body);
+        el('path', { 'class': 'pk__stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
+        el('path', { 'class': 'pk__face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
+        return { node: g, inner: inner, label: name, slot: slot, h: 80 * scale };
+      }
+      // Kürbisse auf die Haufenoberfläche setzen; weiter vorne (tiefer) liegt darüber
+      function placePumpkins(lvl) {
+        var xs = pkSlots();
+        pkNodes.forEach(function (pk) {
+          if (!pk) return;
+          pk.x = xs[pk.slot];
+          pk.y = Math.min(H - 6, surface(pk.x, lvl) + 10);
+          pk.node.setAttribute('transform', 'translate(' + pk.x + ' ' + pk.y.toFixed(1) + ')');
+        });
+      }
+      function sortPumpkins() {
+        pkNodes.filter(Boolean).sort(function (a, b) { return a.y - b.y; })
+          .forEach(function (pk) { pumpkinsLayer.appendChild(pk.node); });
+      }
+      function addPumpkin(name, animate) {
+        var i = pkNext % MAX_PK;
+        if (pkNodes[i]) pumpkinsLayer.removeChild(pkNodes[i].node);
+        pkNodes[i] = buildPumpkin(name, i, animate);
+        pumpkinsLayer.appendChild(pkNodes[i].node);
+        pkNext++;
+        placePumpkins(shownLevel());
+        sortPumpkins();
+        if (animate) showTag(name, pkNodes[i].x, pkNodes[i].y - pkNodes[i].h - 12, false);
+      }
+      function clearPumpkins() {
+        while (pumpkinsLayer.firstChild) pumpkinsLayer.removeChild(pumpkinsLayer.firstChild);
+        pkNodes = []; pkNext = 0; pkTotal = 0;
+      }
+
+      function showTag(text, x, y, big) {
+        if (!text) return;
+        x = Math.max(120, Math.min(W - 120, x));
+        var tag = el('text', { 'class': 'name-tag' + (big ? ' name-tag--big' : ''), x: x.toFixed(0), y: y.toFixed(0), 'text-anchor': 'middle' }, tagsLayer);
+        tag.textContent = text;
+        tag.addEventListener('animationend', function () { if (tag.parentNode) tag.parentNode.removeChild(tag); });
+        if (reduced) setTimeout(function () { if (tag.parentNode) tag.parentNode.removeChild(tag); }, 3400);
+      }
+
+      // ── Laub-Protokoll ──
+      // Regeln aus der URL: der Server liefert nur Ereignisse, gerechnet wird hier.
+      var LV = { level: 0, leaders: {}, falling: false, since: 0, until: Infinity };
+      function leafReset(keepLeaders) {
+        LV.level = 0;
+        if (!keepLeaders) { LV.leaders = {}; LV.falling = false; }
+      }
+      function leafAdvance(t) {
+        if (!LV.falling) return;
+        var end = Math.min(t, LV.until);
+        if (end > LV.since) LV.level = Math.min(100, LV.level + cur.leafrate / 60 * (end - LV.since));
+        LV.since = Math.max(LV.since, end);
+        if (t >= LV.until) LV.falling = false;
+      }
+      function leaderList() {
+        return Object.keys(LV.leaders).map(function (k) { return [LV.leaders[k].name, LV.leaders[k].n]; })
+          .sort(function (a, b) { return b[1] - a[1]; });
+      }
+      function leafApply(k, name, t, secs) {
+        leafAdvance(t);
+        var r = { k: k, name: name };
+        if (k === 'start') {
+          LV.falling = true; LV.since = t; LV.until = secs ? t + secs : Infinity;
+        } else if (k === 'stop') {
+          LV.falling = false;
+        } else if (k === 'rake') {
+          r.removed = Math.min(cur.rake, LV.level);
+          LV.level -= r.removed;
+          if (r.removed > 0 && name) {
+            var key = name.toLowerCase();
+            LV.leaders[key] = LV.leaders[key] || { name: name, n: 0 };
+            LV.leaders[key].name = name;
+            LV.leaders[key].n++;
+          }
+        } else if (k === 'sweep') {
+          leafReset(true);
+        }
+        return r;
+      }
+
+      var clockOff = 0;   // Serverzeit − lokale Zeit
+      function serverNow() { return Date.now() / 1000 + clockOff; }
+
+      // Anzeige: Zuwachs folgt direkt, Abnahme läuft weich hinterher
+      var shown = 0;
+      function shownLevel() { return drawnLevel(shown); }
+
+      // ── Partikel: fallendes Laub hinten, aufgewirbeltes vorne ──
+      var bctx = document.getElementById('backCanvas').getContext('2d');
+      var fctx = document.getElementById('frontCanvas').getContext('2d');
+      var parts = [];
+      var wind = 0, windTarget = 0;
+      function spawn(o) {
+        if (reduced || parts.length > 900) return;
+        parts.push({
+          x: o.x, y: o.y, vx: o.vx || 0, vy: o.vy === undefined ? rand(50, 90) : o.vy,
+          rot: rand(0, 6.28), vr: rand(-2, 2), ph: rand(0, 6.28), vph: rand(2, 5),
+          sway: rand(20, 60), shape: Math.floor(Math.random() * 3), ci: Math.floor(Math.random() * 5),
+          s: o.s || rand(0.8, 1.4), front: !!o.front, land: o.land !== false
+        });
+      }
+
+      // ── Gimmicks ──
+      var celebrateTimer;
+      function celebrate(name) {
+        stage.dataset.celebrate = '0';
+        void stage.offsetWidth;   // Animationen neu starten
+        stage.dataset.celebrate = '1';
+        clearTimeout(celebrateTimer);
+        celebrateTimer = setTimeout(function () { stage.dataset.celebrate = '0'; }, 4000);
+        for (var i = 0; i < 90; i++) {
+          var left = i % 2 === 0;
+          spawn({ x: left ? rand(0, 200) : W - rand(0, 200), y: H - rand(20, 120),
+                  vx: (left ? 1 : -1) * rand(250, 650), vy: rand(-1150, -650), front: true });
+        }
+        if (name) showTag('Thank you, ' + name + '!', W / 2, 420 + cur.garlandy, true);
+      }
+
+      function gust(power) {
+        windTarget = power;
+        [[20, 600], [W - 600, W - 20]].forEach(function (r) {
+          for (var i = 0; i < 25; i++) {
+            var x = rand(r[0], r[1]);
+            spawn({ x: x, y: surface(x, shownLevel()) + rand(0, 15), vx: power * rand(0.4, 0.8), vy: rand(-380, -120), front: true });
+          }
+        });
+      }
+
+      var rakeTool = document.getElementById('rakeTool');
+      var rakeSide = 0, raking = false;
+      function rakeAnim(name, removed) {
+        var left = rakeSide++ % 2 === 0;
+        var mid = left ? 330 : W - 330;
+        showTag(removed > 0 ? name + ' raked!' : name + ': nothing left to rake', mid, surface(mid, shownLevel()) - 70, true);
+        if (reduced || raking || removed <= 0) return;
+        raking = true;
+        rakeTool.classList.add('rake--on');
+        var from = left ? 560 : W - 560, to = left ? 70 : W - 70;
+        var t0 = performance.now(), dur = 1400;
+        (function step(now) {
+          var k = Math.min(1, (now - t0) / dur);
+          var stroke = (k * 3) % 1;                       // drei Züge
+          var x = from + (to - from) * (Math.floor(k * 3) / 3 + stroke / 3);
+          var y = surface(x, shownLevel()) + 6 - Math.sin(stroke * Math.PI) * 10;
+          rakeTool.setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')' + (left ? '' : ' scale(-1 1)'));
+          if (Math.random() < 0.6) spawn({ x: x + rand(-30, 30), y: y - 10, vx: (left ? -1 : 1) * rand(120, 320), vy: rand(-420, -200), front: true, land: false });
+          if (k < 1) requestAnimationFrame(step);
+          else { rakeTool.classList.remove('rake--on'); raking = false; }
+        })(t0);
+      }
+
+      function jump(name) {
+        var left = Math.random() < 0.5;
+        var x = left ? rand(120, 380) : W - rand(120, 380);
+        if (cur.spread === 'full') x = rand(120, W - 120);
+        var y = surface(x, shownLevel());
+        for (var i = 0; i < 70; i++) {
+          spawn({ x: x + rand(-50, 50), y: y + rand(0, 20), vx: rand(-380, 380), vy: rand(-1050, -450), front: true, s: rand(0.9, 1.6) });
+        }
+        showTag((name || 'Someone') + ' jumped in!', x, y - 150, true);
+      }
+
+      function leafEvent(k, name, t, secs) {
+        var r = leafApply(k, name, t, secs);
+        if (k === 'rake') rakeAnim(name || 'Someone', r.removed);
+        else if (k === 'sweep') gust(1400);
+        showTune();
+      }
+
+      var hudBoard = document.getElementById('hudBoard'), hudBoardList = document.getElementById('hudBoardList');
+      var boardTimer;
+      function showLeaders() {
+        while (hudBoardList.firstChild) hudBoardList.removeChild(hudBoardList.firstChild);
+        var list = leaderList().slice(0, 5);
+        if (!list.length) list = [['Nobody yet', 0]];
+        list.forEach(function (e, i) {
+          var li = document.createElement('li');
+          var a = document.createElement('span'), b = document.createElement('span');
+          a.textContent = (i + 1) + '. ' + e[0];
+          b.textContent = e[1] + '×';
+          li.appendChild(a); li.appendChild(b);
+          hudBoardList.appendChild(li);
+        });
+        hudBoard.classList.remove('is-on'); void hudBoard.offsetWidth; hudBoard.classList.add('is-on');
+        clearTimeout(boardTimer);
+        boardTimer = setTimeout(function () { hudBoard.classList.remove('is-on'); }, 10000);
+      }
+
+      // ── Spotlight: alle 8 s leuchtet ein benannter Kürbis auf ──
+      var lastSpot = null, spotRound = 0;
+      setInterval(function () {
+        if (!cur.pumpkins) return;
+        spotRound++;
+        var top = leaderList()[0];
+        if (top && spotRound % 4 === 0) {
+          showTag('Top raker: ' + top[0] + ' · ' + top[1] + '×', W / 2, 420 + cur.garlandy, false);
+          return;
+        }
+        var pool = pkNodes.filter(function (pk) { return pk && pk.label; });
+        if (!pool.length) return;
+        var pick = pool[Math.floor(Math.random() * pool.length)];
+        if (pick === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
+        lastSpot = pick;
+        pick.inner.classList.remove('is-spot');
+        void pick.inner.getBoundingClientRect();
+        pick.inner.classList.add('is-spot');
+        setTimeout(function () { pick.inner.classList.remove('is-spot'); }, 3300);
+        showTag(pick.label, pick.x, pick.y - pick.h - 12, false);
+      }, 8000);
+
+      // ── Einstellungen anwenden ──
+      var varStyle = document.createElement('style');
+      document.head.appendChild(varStyle);
+      var lastDrawn = -1;
+      function applySettings(changed) {
+        for (var k in changed) cur[k] = changed[k];
+        ['branch', 'colors'].forEach(function (k) { stage.dataset[k] = cur[k]; });
+        ['garland', 'fairy', 'falling', 'pile', 'pumpkins', 'faces'].forEach(function (k) { stage.dataset[k] = cur[k] ? '1' : '0'; });
+        varStyle.textContent = '.stage{--gy:' + cur.garlandy + 'px}';
+        branchFlip.setAttribute('transform', cur.branch === 'right' ? 'translate(1920 0) scale(-1 1)' : '');
+        readPalette();
+        lastDrawn = -1;           // Haufen neu zeichnen (Farben/Form)
+        placePumpkins(shownLevel());
+        sortPumpkins();
+      }
+      applySettings(copy(base));
+
+      // ── Hauptschleife ──
+      var last = performance.now(), spawnAcc = 0, branchAcc = 0;
+      function frame(now) {
+        var dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+
+        leafAdvance(serverNow());
+        if (shown < LV.level || reduced) shown = LV.level;
+        else if (shown > LV.level) shown = Math.max(LV.level, shown - Math.max(12, (shown - LV.level) * 1.2) * dt);
+        var lvl = shownLevel();
+        if (Math.abs(lvl - lastDrawn) > 0.002) {
+          drawPile(lvl);
+          placePumpkins(lvl);
+          lastDrawn = lvl;
+        }
+
+        wind += (windTarget - wind) * Math.min(1, dt * 3);
+        windTarget *= Math.pow(0.35, dt);
+
+        // Fallendes Laub: ständig ein wenig, beim Laubfall deutlich mehr
+        var rate = cur.falling ? DENSITY[cur.density] : 0;
+        if (LV.falling) rate = Math.max(rate, DENSITY.medium) * 1.8;
+        spawnAcc += rate * dt;
+        while (spawnAcc >= 1) {
+          spawnAcc--;
+          spawn({ x: rand(-200, W + 200), y: -40 });
+        }
+
+        // Ast verliert beim Laubfall Blätter, sie wachsen später nach
+        if (LV.falling && cur.branch !== 'off') {
+          branchAcc += dt;
+          if (branchAcc > 1.2) {
+            branchAcc = 0;
+            var live = branchLeaves.filter(function (b) { return !b.gone; });
+            if (live.length) {
+              var b = live[Math.floor(Math.random() * live.length)];
+              b.gone = true;
+              b.node.classList.remove('bl--grow');
+              b.node.classList.add('bl--gone');
+              spawn({ x: cur.branch === 'right' ? W - b.x : b.x, y: b.y, vy: 30, s: 1.4 });
+              setTimeout(function () {
+                b.gone = false;
+                b.node.classList.remove('bl--gone');
+                b.node.classList.add('bl--grow');
+              }, 9000);
+            }
+          }
+        }
+
+        bctx.clearRect(0, 0, W, H);
+        fctx.clearRect(0, 0, W, H);
+        for (var i = parts.length - 1; i >= 0; i--) {
+          var p = parts[i];
+          p.ph += p.vph * dt;
+          p.rot += p.vr * dt;
+          if (p.vy < 70) p.vy += 900 * dt;                // hochgeworfen: Schwerkraft
+          else p.vy += (rand(60, 100) - p.vy) * dt * 0.8;  // Sinkgeschwindigkeit
+          p.vx += (wind - p.vx) * dt * 0.9;
+          p.x += (p.vx + Math.cos(p.ph) * p.sway) * dt;
+          p.y += p.vy * dt;
+
+          // Rand-Fade: nie hart über Kanten
+          var edge = clamp01(Math.min(p.x + 40, W + 40 - p.x) / 140) * clamp01((p.y + 40) / 90);
+          var floor = cur.pile ? surface(p.x, lvl) + 6 : H + 30;
+          var fade = p.land ? clamp01((floor - p.y) / 30) : clamp01((H + 30 - p.y) / 40);
+          if (fade <= 0 || p.x < -260 || p.x > W + 260) { parts.splice(i, 1); continue; }
+          drawLeaf(p.front ? fctx : bctx, p.shape, p.x, p.y, p.rot, Math.cos(p.ph * 1.3), p.s, palette[p.ci], edge * fade);
+        }
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+
+      function applyState(state) {
+        if (!state || !state.pumpkins) return;
+        leafReset(false);
+        (state.leaf_events || []).forEach(function (e) { leafApply(e.k, e.n || '', e.t, e.s); });
+        leafAdvance(serverNow());
+        shown = LV.level;
+        clearPumpkins();
+        state.pumpkins.forEach(function (p) { addPumpkin(p.name, false); });
+        pkTotal = state.pumpkin_total || 0;
+      }
+
+      var LEAF_CMD = { leaffall: 'start', leafstop: 'stop', rake: 'rake', sweep: 'sweep' };
+
+      function applyCommand(c) {
+        var p = c.params || {};
+        switch (c.cmd) {
+          case 'set':       applySettings(p); break;
+          case 'reset':     applySettings(copy(base)); break;
+          case 'celebrate': celebrate(p.name || ''); break;
+          case 'pumpkin':   addPumpkin(p.name || '', true); pkTotal++; break;
+          case 'gust':      gust(900); break;
+          case 'jump':      jump(p.name || ''); break;
+          case 'leaders':   showLeaders(); break;
+          case 'clear':
+            if (p.kind === 'leaves' || !p.kind) { leafReset(false); shown = 0; }
+            if (p.kind === 'pumpkins' || !p.kind) clearPumpkins();
+            break;
+          default:
+            var cmd = c.cmd;
+            // ohne Server-DB (oder lokal im Tune-Modus) schaltet das Overlay selbst um
+            if (cmd === 'leaftoggle') cmd = LV.falling ? 'leafstop' : 'leaffall';
+            if (LEAF_CMD[cmd]) leafEvent(LEAF_CMD[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : serverNow(), p.secs);
+        }
+        showTune();
+      }
+
+      // ── Remote-Polling: nur wenn per Token-URL ausgeliefert ──
+      var tuneEl = document.getElementById('tune');
+      var remoteState = 'off (no token URL)';
+      function showTune() {
+        if (tuneMode) tuneEl.textContent = 'remote: ' + remoteState + ' | pumpkins: ' + pkTotal +
+                                           ' | leaves: ' + Math.round(LV.level) + '%' + (LV.falling ? ' (falling)' : '') +
+                                           ' | keys: C celebrate, P pumpkin, F leaf fall on/off, R rake, J jump, W gust, X sweep, L leaders';
+      }
+      if (tuneMode) { tuneEl.classList.add('is-on'); setInterval(showTune, 1000); }
+      var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+      if (tokenMatch) {
+        var pollUrl = '/s/' + tokenMatch[1] + '/api/fx/autumn/poll';
+        var seq = null;
+        var epoch = null;
+        remoteState = 'connecting';
+        var pollOnce = function () {
+          var delay = 1000;
+          fetch(pollUrl + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (data) {
+              if (epoch !== null && data.epoch !== epoch) {
+                // Server neu gestartet: Zähler beginnt bei 0, alles ab dort holen
+                epoch = data.epoch;
+                seq = 0;
+                delay = 0;
+                return;
+              }
+              epoch = data.epoch;
+              if (typeof data.now === 'number') clockOff = data.now - Date.now() / 1000;
+              if (seq === null) applyState(data.state);
+              else (data.commands || []).forEach(applyCommand);
+              seq = data.seq;
+              remoteState = 'listening (seq ' + seq + ')';
+            })
+            .catch(function () {
+              remoteState = 'error, retrying';
+              delay = 3000;
+            })
+            .then(function () {
+              showTune();
+              setTimeout(pollOnce, delay);
+            });
+        };
+        pollOnce();
+      }
+      showTune();
+
+      if (tuneMode) {
+        var testNames = ['Hat3', 'PixelPaul', 'Mia_GG', 'Lunatic', 'Nordlicht'];
+        var pick = function () { return testNames[Math.floor(Math.random() * testNames.length)]; };
+        var KEYS = {
+          c: function () { return { cmd: 'celebrate', params: { name: pick() } }; },
+          p: function () { return { cmd: 'pumpkin', params: { name: testNames[pkTotal % testNames.length] + (pkTotal >= 5 ? pkTotal : '') } }; },
+          f: function () { return { cmd: 'leaftoggle', params: {} }; },
+          r: function () { return { cmd: 'rake', params: { name: pick() } }; },
+          j: function () { return { cmd: 'jump', params: { name: pick() } }; },
+          w: function () { return { cmd: 'gust', params: {} }; },
+          x: function () { return { cmd: 'sweep', params: {} }; },
+          l: function () { return { cmd: 'leaders', params: {} }; }
+        };
+        document.addEventListener('keydown', function (e) {
+          var f = KEYS[e.key.toLowerCase()];
+          if (f) applyCommand(f());
+        });
+      }
+    })();
+  </script>
+</body>
+</html>

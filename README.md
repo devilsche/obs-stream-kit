@@ -353,6 +353,7 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 | `effects/snow.html` | Schneefall (Greenscreen-Video) | Loop |
 | `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze — mit synthetischem Regen-/Wind-/Donner-Sound | Loop |
 | `effects/xmas.html` | Weihnachtsschmuck: Lichterkette, Baum mit Stern, hängende Kugeln, Schneehaufen — alles einzeln schalt- und einstellbar; Follower-Kugeln und Geschenke (Sub, Bits, Raid …) per Streamer.bot, dauerhaft gespeichert | Dauerhaft |
+| `effects/autumn.html` | Herbstdeko: Blätterranke mit Lichtern, Ast in der Ecke, fallendes Laub, Laubhaufen, Follower-Kürbisse mit Namen — der Chat recht das Laub weg (Rangliste) oder springt hinein | Dauerhaft |
 | `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
@@ -467,6 +468,46 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 Der Schnee taut nicht von selbst. Der Server speichert nur die Ereignisse (Schneefall an/aus, Schippen, Rütteln, Tauen) dauerhaft und kennt so auch den Stand des Umschalters; Schneehöhe und Rangliste rechnet die Source beim Laden mit ihren Regeln nach — Neuladen (auch mitten im Schneefall) und Server-Neustarts verlieren also nichts, und geänderte Regeln gelten rückwirkend.
 
 `?tune=1` zeigt Verbindungsstatus; Tasten **C** = Celebrate, **O** = Test-Kugel, **G** = Test-Geschenk, **S** = Schneefall an/aus, **V** = Schippen, **K** = Rütteln, **L** = Rangliste (nur lokal, nicht gespeichert).
+
+### Herbstdeko (`autumn.html`)
+
+Gleiches Prinzip wie der Weihnachtsschmuck: eine Source, jedes Element einzeln an/aus, alle Werte im Dashboard unter **Stream → Autumn** und live per Streamer.bot. Ein bisschen Laub liegt immer in den Ecken, damit die Kürbisse nie in der Luft stehen.
+
+| Parameter | Werte | Standard |
+|-----------|-------|----------|
+| `garland` | `1` / `0` — Blätterranke mit Eicheln oben | `1` |
+| `fairy` | `1` / `0` — warme Lichter an der Ranke | `1` |
+| `garlandy` | 0–400 px — Ranke tiefer setzen (z. B. unter einen Kompass) | `0` |
+| `branch` | `left`, `right`, `off` — Ast in der oberen Ecke; verliert beim Laubfall Blätter, die nachwachsen | `left` |
+| `falling` | `1` / `0` — ständig ein paar fallende Blätter (beim Laubfall fallen immer welche) | `1` |
+| `density` | `light`, `medium`, `heavy` — Menge der fallenden Blätter | `medium` |
+| `pile` | `1` / `0` — Laubhaufen | `1` |
+| `spread` | `corners` (Ecken), `full` (ganze Breite) — Form des Haufens, verteilt auch die Kürbisse | `corners` |
+| `pumpkins` | `1` / `0` | `1` |
+| `faces` | `1` / `0` — geschnitzte, flackernd leuchtende Gesichter | `0` |
+| `colors` | `classic`, `golden`, `maple` (Rotahorn), `theme` (Lila/Gold) | `classic` |
+| `leafrate` | 1–300 % pro Minute Laubfall (20 = nach 5 min voll) | `20` |
+| `rake` | 1–50 % pro Rechenzug | `5` |
+
+**Befehle** (`https://stream-overlay.com/s/<token>/api/fx/autumn?cmd=…`, Streamer.bot **Fetch URL**):
+
+| Befehl | Wirkung |
+|--------|---------|
+| `cmd=pumpkin&name=%user%` | Follow: ein Kürbis fällt auf den Haufen, Name kurz sichtbar. Pro Name nur ein Kürbis |
+| `cmd=celebrate&name=%user%` | Laubfontäne aus beiden Ecken, Lichter blinken schnell, Kürbisse hüpfen, „Thank you, …!“ — für Sub, Resub, Gift Sub, Cheer, Raid (`name` optional) |
+| `cmd=leaftoggle` | Laubfall an/aus (`!leaves`). Solange Laub fällt, wächst der Haufen um `leafrate` % pro Minute und deutlich mehr Blätter fallen |
+| `cmd=leaffall` / `cmd=leafstop` | Laubfall gezielt an bzw. aus; `cmd=leaffall&secs=120` hört nach 120 s von selbst auf |
+| `cmd=rake&name=%user%` | `!rake`: −`rake` %, ein Rechen fährt durch den Haufen, zählt für die Rangliste (nur wenn es etwas zu rechen gab). Cooldown pro User in Streamer.bot setzen, z. B. 10 s |
+| `cmd=jump&name=%user%` | `!jump`: jemand springt in den Haufen, das Laub spritzt hoch — nur Show, ändert nichts |
+| `cmd=gust` | Windböe: wirbelt Laub von den Haufen und weht die fallenden Blätter zur Seite (passt zur `wind-gust`-WAV) |
+| `cmd=leaders` | Rangliste „Top rakers“ (Top 5) für 10 s; das Spotlight zeigt den Ersten zwischendurch auch von selbst |
+| `cmd=sweep` | ein Sturm fegt alles Laub weg, Rangliste bleibt |
+| `cmd=clear` | **alles dauerhaft löschen**; `&kind=pumpkins` nur Kürbisse, `&kind=leaves` Laub **und** Rangliste |
+| `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die Source-URL |
+
+**Dauerhaft:** Kürbisse und das Laub-Protokoll liegen in der Tabelle `fx_autumn_item`. Sichtbar sind die neuesten **30 Kürbisse**; alle 8 s leuchtet einer auf und zeigt seinen Namen. Wie beim Schnee rechnet die Source Laubhöhe und Rangliste beim Laden aus den Ereignissen nach — Neuladen und Server-Neustarts verlieren nichts.
+
+`?tune=1` zeigt Verbindungsstatus und Laubstand; Tasten **C** = Celebrate, **P** = Test-Kürbis, **F** = Laubfall an/aus, **R** = Rechen, **J** = Reinspringen, **W** = Böe, **X** = Wegfegen, **L** = Rangliste (nur lokal, nicht gespeichert).
 
 #### Rain-Sound über Streamer.bot (WAV)
 
