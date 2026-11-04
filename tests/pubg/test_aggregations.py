@@ -244,6 +244,12 @@ def test_arcade_rounds_stay_out_of_mates_stats():
     assert cp["matches"] == 1 and cp["wins"] == 0
     assert cp["eventMatches"] == 3
 
+    ph = compute_performance_history(conn, T, "account.A", "day", 10)
+    assert [(g["matches"], g["wins"]) for g in ph["groups"]] == [(1, 0)]
+
+    sc = compute_squad_compare(conn, T, "account.A", ["PEX_LuCKoR", "MateA"], 5)
+    assert [r["matchId"] for r in sc["matchTable"]] == ["br1"]
+
 
 def test_map_distribution_counts_by_range():
     conn = _setup()

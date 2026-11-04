@@ -4646,13 +4646,14 @@ def compute_strongest_opponent(conn, tenant_id: int, my_account_id,
     if match_ids is None:
         cutoff = (_range_filter(conn, tenant_id, range_key)
                   if range_key != "all" else "1970-01-01T00:00:00Z")
-        rows = conn.execute("""
-            SELECT match_id FROM matches
-            WHERE tenant_id = ? AND match_id IN (
+        br_where, br_params = _br_filter("m")   # Arcade-Runden haben NPC-Gegner
+        rows = conn.execute(f"""
+            SELECT m.match_id FROM matches m
+            WHERE m.tenant_id = ? AND m.match_id IN (
                 SELECT match_id FROM participants
                 WHERE tenant_id = ? AND account_id = ?
-            ) AND played_at >= ?
-        """, (tenant_id, tenant_id, my_account_id, cutoff)).fetchall()
+            ) AND m.played_at >= ? AND {br_where}
+        """, (tenant_id, tenant_id, my_account_id, cutoff, *br_params)).fetchall()
         match_ids = [r["match_id"] for r in rows]
     if not match_ids:
         return None
@@ -7047,15 +7048,18 @@ def compute_first_fight_rate(conn, tenant_id: int, my_account_id, range_key="ses
     cluster_radius_cm = cluster_radius_m * 100
     cluster_ms = cluster_secs * 1000
     cutoff = _range_filter(conn, tenant_id, range_key) if range_key != "all" else "1970-01-01T00:00:00Z"
-    matches = conn.execute("""
+    # Nur Battle Royale: in Arcade-Runden (Zombie, Heist …) ist das erste
+    # "Gefecht" meist gegen NPCs
+    br_where, br_params = _br_filter("m")
+    matches = conn.execute(f"""
         SELECT m.match_id, m.duration_secs, m.played_at, m.map_name,
                m.game_mode, pa.place, pa.kills, pa.damage_dealt,
                pa.time_survived
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
-        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ? AND {br_where}
         ORDER BY m.played_at ASC
-    """, (tenant_id, my_account_id, cutoff)).fetchall()
+    """, (tenant_id, my_account_id, cutoff, *br_params)).fetchall()
 
     total = 0
     engaged_total = 0      # Matches mit events_count >= 2 (echter Fight)
@@ -8371,13 +8375,15 @@ def compute_performance_history(conn, tenant_id: int, account_id: str,
     kd, winrate, avgDmg}, ...]} — chronologisch aufsteigend, auf die letzten
     `limit` Gruppen beschnitten.
     """
+    # Nur Battle Royale: Arcade-Runden (Zombie, Heist …) verbiegen K/D und Siege
+    br_where, br_params = _br_filter("m")
     rows = conn.execute(f"""
         SELECT m.played_at, pa.kills, pa.place, pa.damage_dealt
         FROM matches m
         JOIN participants pa ON pa.match_id = m.match_id AND pa.tenant_id = m.tenant_id
-        WHERE m.tenant_id = ? AND pa.account_id = ?
+        WHERE m.tenant_id = ? AND pa.account_id = ? AND {br_where}
         ORDER BY m.played_at DESC LIMIT {int(PERF_HISTORY_MAX_MATCHES)}
-    """, (tenant_id, account_id)).fetchall()
+    """, (tenant_id, account_id, *br_params)).fetchall()
     if not rows:
         return {"groupBy": group_by, "groups": []}
     rows = list(reversed(rows))       # chronologisch aufsteigend gruppieren
@@ -8461,6 +8467,7 @@ def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, las
     # alle in EINEM Squad sind und nicht bloss in derselben Lobby.
     accs = [name_to_acc[n] for n in targets]
     ref, rest = accs[0], accs[1:]
+    br_where, br_params = _br_filter("m")   # Arcade-Runden nicht vergleichen
     exists_sql = "".join(
         """ AND EXISTS (SELECT 1 FROM participants px
                         WHERE px.tenant_id = m.tenant_id AND px.match_id = m.match_id
@@ -8471,9 +8478,9 @@ def compute_squad_compare(conn, tenant_id: int, my_account_id, player_names, las
         FROM matches m
         JOIN participants ref ON ref.match_id = m.match_id
              AND ref.tenant_id = m.tenant_id AND ref.account_id = ?
-        WHERE m.tenant_id = ?{exists_sql}
+        WHERE m.tenant_id = ?{exists_sql} AND {br_where}
         ORDER BY m.played_at DESC LIMIT ?
-    """, [ref, tenant_id] + rest + [last_n]).fetchall()
+    """, [ref, tenant_id] + rest + br_params + [last_n]).fetchall()
 
     table = []
     for mid_row in cutoff_q:
