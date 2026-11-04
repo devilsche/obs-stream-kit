@@ -1034,3 +1034,35 @@ def test_mitfahrer_laut_pubg_schlagen_die_positionen():
     # die Punkte von Auto 2 (y = 55000) beigemischt.
     assert all(p[1] == 50000.0 for p in pfade["Mate1"]), pfade["Mate1"]
     assert all(p[1] == 55000.0 for p in pfade["Mate3"]), pfade["Mate3"]
+
+
+def test_arcade_round_takes_kills_and_damage_from_telemetry():
+    """Zombie-Modus: die PUBG-API meldet 0/0 — das Detail zeigt wie die
+    Session-Übersicht die Kills und den Schaden aus der Telemetrie."""
+    conn = _setup()
+    insert_match(conn, "z1", "Zulu_Main", "zulu_hell-fpp", False, 1200,
+                 "2026-05-15T18:00:00Z", None)
+    insert_participants(conn, "z1", [{
+        "account_id": acc, "name": name, "team_id": 1,
+        "place": 3, "kills": 0, "headshot_kills": 0, "assists": 0,
+        "dbnos": 0, "revives": 0, "damage_dealt": 0.0,
+        "longest_kill": 0.0, "time_survived": 600,
+        "walk_distance": 0, "ride_distance": 0, "swim_distance": 0,
+        "weapons_acquired": 0, "heals": 0, "boosts": 0, "team_kills": 0,
+    } for acc, name in (("account.A", "PEX_LuCKoR"), ("account.B", "Mate1"))])
+    insert_team_mapping(conn, "z1", [
+        {"account_id": a, "team_id": 1, "kills": 0, "place": 3, "time_survived": 600}
+        for a in ("account.A", "account.B")])
+    insert_telemetry_events(conn, "z1", [
+        {"event_type": "Kill", "timestamp_ms": 1000 + i, "actor_account": "account.A",
+         "target_account": f"ai.{i}"} for i in range(3)] + [
+        {"event_type": "TakeDamage", "timestamp_ms": 2000, "actor_account": "account.A",
+         "target_account": "ai.9", "damage": 150.0},
+        {"event_type": "TakeDamage", "timestamp_ms": 2001, "actor_account": "account.B",
+         "target_account": "ai.9", "damage": 40.0}])
+    d = compute_match_detail(conn, T, "account.A", "z1")
+    by = {m["accountId"]: m for m in d["members"]}
+    assert by["account.A"]["kills"] == 3
+    assert by["account.A"]["damageDealt"] == 150.0
+    assert by["account.B"]["kills"] == 0
+    assert by["account.B"]["damageDealt"] == 40.0

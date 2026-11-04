@@ -1686,12 +1686,13 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
       }
     """
     m_row = conn.execute(
-        "SELECT match_id, map_name, played_at FROM matches "
+        "SELECT match_id, map_name, played_at, game_mode FROM matches "
         "WHERE tenant_id = ? AND match_id = ?",
         (tenant_id, match_id,)).fetchone()
     if not m_row:
         return None
     map_name = m_row["map_name"]
+    is_event = not is_br_mode(m_row["game_mode"], map_name)
     match_start_ms = None
     if m_row["played_at"]:
         try:
@@ -1778,6 +1779,26 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             GROUP BY actor_account""",
         (match_id, *squad_accs)).fetchall():
         bot_kills_by[r["actor_account"]] = r["c"]
+
+    # Arcade-/Event-Runden: die PUBG-API meldet dort fuer alle 0 Kills und
+    # 0 Schaden — echte Werte kommen wie in der Session-Uebersicht aus der
+    # Telemetrie (Kill- bzw. TakeDamage-Ereignisse je Spieler)
+    event_kills_by, event_dmg_by = {}, {}
+    if is_event:
+        for r in conn.execute(
+            f"""SELECT actor_account, COUNT(*) AS c FROM telemetry_events
+                WHERE match_id = ? AND event_type='Kill'
+                  AND actor_account IN ({_ph_sq})
+                GROUP BY actor_account""",
+            (match_id, *squad_accs)).fetchall():
+            event_kills_by[r["actor_account"]] = r["c"]
+        for r in conn.execute(
+            f"""SELECT actor_account, COALESCE(SUM(damage), 0) AS d FROM telemetry_events
+                WHERE match_id = ? AND event_type='TakeDamage'
+                  AND actor_account IN ({_ph_sq})
+                GROUP BY actor_account""",
+            (match_id, *squad_accs)).fetchall():
+            event_dmg_by[r["actor_account"]] = float(r["d"] or 0)
 
     # Vehicle-Intervalle fuer ALLE Spieler in der Lobby (nicht nur Squad)
     # — sonst kann victimVehicleLabel fuer Enemy-Knocks/Kills nicht
@@ -2105,11 +2126,13 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
             "lives":           lives,
             "revivePts":       revive_pts,
             # Stat-Fields fuer die Squad-Tabelle im Slide-In Panel
-            "kills":           _pr.get("kills") or 0,
+            "kills":           (event_kills_by.get(acc, 0) if is_event
+                                else _pr.get("kills") or 0),
             "headshotKills":   _pr.get("headshot_kills") or 0,
             "assists":         _pr.get("assists") or 0,
             "dbnos":           _pr.get("dbnos") or 0,
-            "damageDealt":     _pr.get("damage_dealt") or 0,
+            "damageDealt":     (event_dmg_by.get(acc, 0.0) if is_event
+                                else _pr.get("damage_dealt") or 0),
             "timeSurvived":    _pr.get("time_survived") or 0,
             "place":           _pr.get("place"),
             "revivesReceived": revives_received_by.get(acc, 0),
