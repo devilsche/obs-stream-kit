@@ -301,13 +301,13 @@ def compute_top_mates(conn, tenant_id: int, my_account_id: str,
     order = SORT_KEYS.get(sort_by, SORT_KEYS["avgPlace"])
     if worst:
         order = _invert_order(order)
-    if range_key:
-        cutoff = _range_filter(conn, tenant_id, range_key)
-        params = (my_account_id, cutoff, tenant_id, my_account_id, min_matches, limit)
-        match_filter = "JOIN matches m ON m.match_id = mate.match_id AND m.tenant_id = mate.tenant_id AND m.played_at >= ?"
-    else:
-        params = (my_account_id, tenant_id, my_account_id, min_matches, limit)
-        match_filter = ""
+    # Nur Battle Royale: Arcade-/Event-Runden (Heist, Zombie, TDM …) haben
+    # eigene Regeln und verbiegen Platz, K/D und Win-Rate
+    br_where, br_params = _br_filter("m")
+    cutoff = _range_filter(conn, tenant_id, range_key) if range_key else "1970-01-01T00:00:00Z"
+    params = (my_account_id, cutoff, *br_params, tenant_id, my_account_id, min_matches, limit)
+    match_filter = ("JOIN matches m ON m.match_id = mate.match_id AND m.tenant_id = mate.tenant_id"
+                    f" AND m.played_at >= ? AND {br_where}")
     rows = conn.execute(f"""
         WITH co AS (
             SELECT mate.account_id, mate.name, mate.match_id, mate.place,
@@ -1372,16 +1372,27 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
             "careerLifetime": dict(lifetime) if lifetime else None,
         }
 
-    shared = conn.execute("""
+    # Statistik nur aus Battle Royale; Arcade-/Event-Runden (Heist, Zombie,
+    # TDM …) zählen getrennt als eventMatches
+    br_where, br_params = _br_filter("m")
+    shared = conn.execute(f"""
         SELECT m.match_id, m.map_name, m.played_at, mate.place,
                mate.kills AS mate_kills, mate.damage_dealt AS mate_damage,
                me.kills   AS my_kills,   me.damage_dealt   AS my_damage
         FROM matches m
         JOIN participants mate ON mate.match_id = m.match_id AND mate.tenant_id = m.tenant_id
         JOIN participants me ON me.match_id = m.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
-        WHERE m.tenant_id = ? AND mate.account_id = ?
+        WHERE m.tenant_id = ? AND mate.account_id = ? AND {br_where}
         ORDER BY m.played_at DESC
-    """, (my_account_id, tenant_id, mate)).fetchall()
+    """, (my_account_id, tenant_id, mate, *br_params)).fetchall()
+    ev = conn.execute(f"""
+        SELECT COUNT(DISTINCT m.match_id) AS n
+        FROM matches m
+        JOIN participants mate ON mate.match_id = m.match_id AND mate.tenant_id = m.tenant_id
+        JOIN participants me ON me.match_id = m.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
+        WHERE m.tenant_id = ? AND mate.account_id = ? AND NOT {br_where}
+    """, (my_account_id, tenant_id, mate, *br_params)).fetchone()
+    event_matches = (ev["n"] or 0) if ev else 0
 
     # Vehicle-Eviction-Counter ueber die geteilten Matches:
     #   dealt — Kills die DIESER Spieler an Gegnern im Vehicle verursacht hat
@@ -1397,7 +1408,7 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
             evict_dealt = evict_taken = 0
 
     if not shared:
-        history = {"matches": 0}
+        history = {"matches": 0, "eventMatches": event_matches}
     else:
         n = len(shared)
         wins = sum(1 for r in shared if (r["place"] or 99) == 1)
@@ -1420,6 +1431,7 @@ def compute_co_player(conn, tenant_id: int, my_account_id: str, name_or_id: str)
             map_dist[r["map_name"]] = map_dist.get(r["map_name"], 0) + 1
         history = {
             "matches": n,
+            "eventMatches": event_matches,     # Arcade-/Event-Runden, nicht in den Stats
             "kd": my_kills / deaths,           # MEINE K/D in shared matches
             "mateKd": mate_kills / deaths,     # MATE-K/D in shared matches
             "avgDmg": my_avg_dmg,              # MEINER avg dmg
@@ -1483,30 +1495,34 @@ def compute_mates(conn, tenant_id: int, my_account_id: str,
     - min_total:   Mindest-Anzahl Matches LIFETIME (Random-Squad rausfiltern)
     """
     cutoff = _range_filter(conn, tenant_id, range_key)
-    rows = conn.execute("""
+    # Nur Battle Royale, auch bei "gemeinsam gesamt": Arcade-/Event-Runden
+    # (Heist, Zombie, TDM …) verbiegen K/D und Siege
+    br_where, br_params = _br_filter("m")
+    br_where2, _ = _br_filter("m2")
+    with_me = f"""(SELECT COUNT(*) FROM participants p2
+                JOIN participants me2 ON me2.match_id = p2.match_id AND me2.tenant_id = p2.tenant_id
+                JOIN matches m2 ON m2.match_id = p2.match_id AND m2.tenant_id = p2.tenant_id
+                WHERE p2.tenant_id = ? AND p2.account_id = mate.account_id AND me2.account_id = ?
+                  AND {br_where2})"""
+    rows = conn.execute(f"""
         SELECT mate.account_id, mate.name,
                COUNT(*) AS shared,
                AVG(mate.kills) AS kills_avg,
                SUM(mate.kills) AS kills_total,
                SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_total,
                AVG(mate.damage_dealt) AS dmg_avg,
-               (SELECT COUNT(*) FROM participants p2
-                JOIN participants me2 ON me2.match_id = p2.match_id AND me2.tenant_id = p2.tenant_id
-                WHERE p2.tenant_id = ? AND p2.account_id = mate.account_id AND me2.account_id = ?) AS total_with_me
+               {with_me} AS total_with_me
         FROM participants mate
         JOIN participants me ON me.match_id = mate.match_id AND me.tenant_id = mate.tenant_id AND me.account_id = ?
         JOIN matches m ON m.match_id = mate.match_id AND m.tenant_id = mate.tenant_id
-        WHERE mate.tenant_id = ? AND mate.account_id != ? AND m.played_at >= ?
+        WHERE mate.tenant_id = ? AND mate.account_id != ? AND m.played_at >= ? AND {br_where}
         GROUP BY mate.account_id, mate.name
-        HAVING COUNT(*) >= ? AND
-               (SELECT COUNT(*) FROM participants p2
-                JOIN participants me2 ON me2.match_id = p2.match_id AND me2.tenant_id = p2.tenant_id
-                WHERE p2.tenant_id = ? AND p2.account_id = mate.account_id AND me2.account_id = ?) >= ?
+        HAVING COUNT(*) >= ? AND {with_me} >= ?
         ORDER BY shared DESC
-    """, (tenant_id, my_account_id, my_account_id,
-          tenant_id, my_account_id, cutoff,
+    """, (tenant_id, my_account_id, *br_params, my_account_id,
+          tenant_id, my_account_id, cutoff, *br_params,
           min_matches,
-          tenant_id, my_account_id, min_total)).fetchall()
+          tenant_id, my_account_id, *br_params, min_total)).fetchall()
 
     out = []
     for r in rows:
@@ -5737,29 +5753,31 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
         else:
             chicken_streak = 0
 
-    # PAYDAY/Event-Achievements ueber alle Event-Matches in der Range.
-    # Skala deutlich hoeher als BR — typische Heist-Matches gehen
-    # 25-100+ Kills + 5k-20k DMG. Plus Stealth-Milestones.
+    # Arcade-Achievements ueber alle Event-Matches in der Range (Heist,
+    # Zombie & Co. — PUBGs Arcade-Spezialmodi). Skala deutlich hoeher als
+    # BR — typische Runden gehen 25-100+ Kills + 5k-20k DMG. Die IDs heissen
+    # aus historischen Gruenden heist_*. Goldbarren, Geldsack, Stealth und
+    # Fenster gibt es nur im Heist selbst (game_mode heistroyale).
     HEIST_KILL_TIERS = [
         # 25 war zu trivial in PAYDAY — NPC-Mob spawnt staendig nach.
-        (100, "heist_kills_100", "Heist God"),
-        ( 75, "heist_kills_75",  "Heist Annihilation"),
-        ( 50, "heist_kills_50",  "Heist Massacre"),
+        (100, "heist_kills_100", "Arcade God"),
+        ( 75, "heist_kills_75",  "Arcade Annihilation"),
+        ( 50, "heist_kills_50",  "Arcade Massacre"),
     ]
     HEIST_DAMAGE_TIERS = [
         # 5k war zu trivial — schon 30 NPCs auf Body-Shots reichen.
         # Untergrenze auf 8k angehoben, Tiers entsprechend skaliert.
-        (25000, "heist_dmg_25k", "Heist GODLIKE"),
-        (20000, "heist_dmg_20k", "Heist Damage Lord"),
-        (15000, "heist_dmg_15k", "Heist Damage Demon"),
-        ( 8000, "heist_dmg_8k",  "Heist Heavy"),
+        (25000, "heist_dmg_25k", "Arcade GODLIKE"),
+        (20000, "heist_dmg_20k", "Arcade Damage Lord"),
+        (15000, "heist_dmg_15k", "Arcade Damage Demon"),
+        ( 8000, "heist_dmg_8k",  "Arcade Heavy"),
     ]
     HEIST_LOOT_TIERS = [
-        # Thresholds rescaled — 10/25/40 wurden in jedem Heist erreicht.
+        # Thresholds rescaled — 10/25/40 wurden in jeder Runde erreicht.
         # Neue Skala: 25 (solide Mitnahme), 60 (richtig fett), 120 (Beute-Boss).
-        (120, "heist_loot_120", "Mega Heist"),
-        ( 60, "heist_loot_60",  "Big Heist"),
-        ( 25, "heist_loot_25",  "Solid Heist"),
+        (120, "heist_loot_120", "Mega Loot"),
+        ( 60, "heist_loot_60",  "Big Loot"),
+        ( 25, "heist_loot_25",  "Solid Loot"),
     ]
     try:
         payday = compute_payday_stats(
@@ -5801,6 +5819,11 @@ def compute_session_achievements(conn, tenant_id: int, my_account_id, from_iso=N
                     "matchId": mid, "playedAt": played,
                     "suppressPopup": i > 0,
                 })
+
+            # Ab hier nur echte Heist-Runden: im Zombie-Modus oder auf der
+            # Trainingskarte sind 0 Kills kein "stiller Coup"
+            if not (pm.get("gameMode") or "").startswith("heist"):
+                continue
 
             # Spezifische Loot-Items (nur einmal pro Match)
             if pm["loot"].get("Item_GoldBricks_0", 0) >= 1:
@@ -8291,7 +8314,9 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
 def compute_chickens_together(conn, tenant_id: int, my_account_id, min_wins=1, min_matches=1):
     """Pro Co-Player: gemeinsame Wins (place=1), Match-Anzahl, Win-Rate.
     Sortiert: absolute Wins primär, bei Gleichstand höhere Win-Rate vor."""
-    rows = conn.execute("""
+    # Nur Battle Royale: ein Platz 1 im Arcade-/Event-Modus ist kein Chicken
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT mate.account_id, mate.name,
                SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) AS wins_together,
                COUNT(*) AS shared_matches,
@@ -8299,11 +8324,12 @@ def compute_chickens_together(conn, tenant_id: int, my_account_id, min_wins=1, m
                 / COUNT(*)) * 100 AS win_rate
         FROM participants mate
         JOIN participants me ON me.match_id = mate.match_id AND me.tenant_id = mate.tenant_id AND me.account_id = ?
-        WHERE mate.tenant_id = ? AND mate.account_id != ?
+        JOIN matches m ON m.match_id = mate.match_id AND m.tenant_id = mate.tenant_id
+        WHERE mate.tenant_id = ? AND mate.account_id != ? AND {br_where}
         GROUP BY mate.account_id, mate.name
         HAVING SUM(CASE WHEN mate.place = 1 THEN 1 ELSE 0 END) >= ? AND COUNT(*) >= ?
         ORDER BY wins_together DESC, win_rate DESC, shared_matches DESC
-    """, (my_account_id, tenant_id, my_account_id, min_wins, min_matches)).fetchall()
+    """, (my_account_id, tenant_id, my_account_id, *br_params, min_wins, min_matches)).fetchall()
     return [{
         "accountId": r["account_id"],
         "name": r["name"],

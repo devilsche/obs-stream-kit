@@ -8,7 +8,9 @@ unveraendert bleiben konnten.
 import pytest
 
 from pubg import db_pg
-from pubg.aggregations import (compute_session_stats, compute_last_match,
+from pubg.aggregations import (compute_chickens_together,
+                                compute_session_achievements,
+                                compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
                                 compute_mates, compute_map_distribution,
                                 compute_first_fight_rate, compute_squad_compare,
@@ -198,6 +200,49 @@ def test_mates_today_aggregates_per_mate():
     assert len(result) == 1
     assert result[0]["name"] == "MateA"
     assert result[0]["sharedMatchesToday"] == 3
+
+
+def _p(acc, name, place, kills, dmg):
+    return {"account_id": acc, "name": name, "team_id": 1,
+            "place": place, "kills": kills, "headshot_kills": 0, "assists": 0,
+            "dbnos": 0, "revives": 0, "damage_dealt": dmg, "longest_kill": 0.0,
+            "time_survived": 1500, "walk_distance": 0.0, "ride_distance": 0.0,
+            "swim_distance": 0.0, "weapons_acquired": 0, "heals": 0, "boosts": 0,
+            "team_kills": 0}
+
+
+def test_arcade_rounds_stay_out_of_mates_stats():
+    """Zombie-/Heist-Runden (Arcade-Events) verbiegen K/D und Siege — sie
+    zählen in keiner Mates-Statistik, beim Co-Player nur als eventMatches."""
+    conn = _setup()
+    upsert_player(conn, "account.MA", "MateA", "steam", False)
+    set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
+    insert_match(conn, "br1", "Erangel_Main", "squad-fpp", False, 1800,
+                 "2026-05-04T10:00:00Z", None)
+    insert_participants(conn, "br1", [_p("account.A", "PEX_LuCKoR", 5, 4, 400.0),
+                                      _p("account.MA", "MateA", 5, 2, 200.0)])
+    for i in range(3):
+        insert_match(conn, f"z{i}", "Zulu_Main", "zulu_hell-fpp", False, 1200,
+                     f"2026-05-04T1{i + 1}:00:00Z", None)
+        insert_participants(conn, f"z{i}", [_p("account.A", "PEX_LuCKoR", 1, 0, 0.0),
+                                            _p("account.MA", "MateA", 1, 0, 0.0)])
+
+    mates = compute_mates(conn, T, "account.A", range_key="session")
+    assert mates[0]["sharedMatchesToday"] == 1
+    assert mates[0]["totalWithMe"] == 1
+    assert mates[0]["kdToday"] == 2.0
+
+    top = compute_top_mates(conn, T, "account.A", sort_by="mostPlayed", min_matches=1)
+    assert top[0]["sharedMatches"] == 1 and top[0]["winsTogether"] == 0
+    top_s = compute_top_mates(conn, T, "account.A", sort_by="mostPlayed", min_matches=1,
+                              range_key="session")
+    assert top_s[0]["sharedMatches"] == 1
+
+    assert compute_chickens_together(conn, T, "account.A") == []
+
+    cp = compute_co_player(conn, T, "account.A", "MateA")["sharedHistory"]
+    assert cp["matches"] == 1 and cp["wins"] == 0
+    assert cp["eventMatches"] == 3
 
 
 def test_map_distribution_counts_by_range():
@@ -841,3 +886,28 @@ def test_session_stats_hp_healed_zero_without_telemetry():
     set_setting(conn, "sessionStartedAt", "2026-05-04T18:00:00Z")
     _add_match(conn, "s1", "2026-05-04T18:30:00Z", 1, 100.0, 5)
     assert compute_session_stats(conn, T, "account.A")["hpHealed"] == 0
+
+
+def test_arcade_achievements_and_heist_only_ones(monkeypatch):
+    """Kill-/Schaden-/Loot-Stufen heißen Arcade und gelten in jedem
+    Arcade-Modus; Silent Heist & Co. nur im Heist selbst."""
+    import pubg.aggregations as agg
+    conn = _setup()
+    set_setting(conn, "sessionStartedAt", "2026-05-04T00:00:00Z")
+
+    def fake_payday(*a, **kw):
+        def m(mid, mode, kills):
+            return {"matchId": mid, "playedAt": "2026-05-04T12:00:00Z", "gameMode": mode,
+                    "myKills": kills, "myDamage": 0.0, "lootTotal": 30,
+                    "loot": {"Item_GoldBricks_0": 1}, "windows": 40}
+        return {"matches": [m("z1", "zulu_hell-fpp", 0), m("h1", "heistroyale", 0)]}
+    monkeypatch.setattr(agg, "compute_payday_stats", fake_payday)
+
+    got = [(a["id"], a["matchId"], a["label"]) for a in
+           compute_session_achievements(conn, T, "account.A")
+           if a["matchId"] in ("z1", "h1")]
+    assert ("heist_loot_25", "z1", "Solid Loot · 30 Items") in got
+    assert ("heist_loot_25", "h1", "Solid Loot · 30 Items") in got
+    heist_only = {"silent_heist", "gold_brick_grab", "window_smasher"}
+    assert {i for i, mid, _ in got if mid == "z1"} & heist_only == set()
+    assert {i for i, mid, _ in got if mid == "h1"} >= heist_only

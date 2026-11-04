@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>PUBG PAYDAY Stats</title>
+<title>PUBG Arcade Stats</title>
 <link rel="stylesheet" href="_pubg.css">
   <link rel="stylesheet" href="../_theme.css">
 <style>
@@ -221,7 +221,7 @@ function render(d) {
   const avgL = n ? (t.lootTotal / n) : 0;
   root.innerHTML = `
     <div class="head">
-      <span class="title"><span class="material-symbols-outlined" aria-hidden="true">theater_comedy</span> Event / Heist Stats</span>
+      <span class="title"><span class="material-symbols-outlined" aria-hidden="true">theater_comedy</span> Arcade Stats</span>
       <span class="subtitle">${n} match${n > 1 ? "es" : ""} · ${RANGE}
         &nbsp;·&nbsp; Ø <b style="color:var(--theme-accent-2,#e0c8ff)">${avgK.toFixed(1)}</b> K
         &nbsp;·&nbsp; Ø <b style="color:var(--theme-accent-2,#e0c8ff)">${Math.round(avgD)}</b> DMG
