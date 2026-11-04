@@ -49,6 +49,8 @@ CREATE INDEX IF NOT EXISTS ix_fx_season_item_tek ON fx_season_item(tenant_id, ef
 
 # item: Befehl für Follower-Items + wie viele sichtbar sind
 # events: Befehl → gespeichertes Ereignis; toggle: Umschalter → (an, aus)
+# force: Gruppenaktion mit force=1 (Dashboard-Knopf) → Ereignis, das ohne
+#        weitere Mitmacher sofort gelingt
 # clear: kind-Wert → (Zeilenart, Ereignisse oder None = alle)
 SPECS = {
     "winter": {
@@ -57,14 +59,16 @@ SPECS = {
                    "scrape": "scrape", "icicle": "icicle", "melt": "melt",
                    "build": "build", "snowmanreset": "smreset"},
         "toggle": ("snowtoggle", "snowfall", "snowstop"),
+        "force": {"shake": "shakeall"},
         "clear": {"minis": ("item", None),
-                  "snow": ("event", ("start", "stop", "shovel", "shake", "scrape", "icicle", "melt")),
+                  "snow": ("event", ("start", "stop", "shovel", "shake", "shakeall", "scrape", "icicle", "melt")),
                   "snowman": ("event", ("build", "smreset"))},
     },
     "spring": {
         "item": ("flower", 40),
         "events": {"rainfall": "start", "rainstop": "stop", "water": "water", "weed": "weed"},
         "toggle": ("raintoggle", "rainfall", "rainstop"),
+        "force": {"weed": "pullall"},
         "clear": {"flowers": ("item", None),
                   "garden": ("event", None)},
     },
@@ -192,6 +196,8 @@ def persist(effect: str, conn, tenant_id: int, command: dict) -> bool:
         # aufgelösten Befehl
         command["cmd"] = off_cmd if is_on(conn, tenant_id, effect) else on_cmd
     event = spec["events"].get(command["cmd"])
+    if p.get("force"):
+        event = spec.get("force", {}).get(command["cmd"], event)
     if event:
         add_event(conn, tenant_id, effect, event, p.get("name", ""), p.get("secs"))
     return True

@@ -3,7 +3,7 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='') %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='', controls=[], live=[]) %}
 <button type="button" class="url-card" hidden
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
@@ -14,6 +14,7 @@
         {% if chrome_preview %}data-chrome-preview="true"{% endif %}
         {% if preview_size %}data-preview-w="{{ preview_size[0] }}" data-preview-h="{{ preview_size[1] }}"{% endif %}
         {% if commands %}data-commands='{{ commands|tojson }}' data-fx="{{ fx }}"{% endif %}
+        {% if controls or live %}data-controls='{{ controls|tojson }}' data-live='{{ live|tojson }}'{% endif %}
         data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
   <span class="url-card__corner" aria-hidden="true"></span>
   <span class="url-card__top">
@@ -97,7 +98,8 @@ G1R_STEAM_NAME=</code></pre>
         {{ src_card('overlay','Effect',e.label,
                     base_url~'/s/'~token~'/effects/'~e.file,'effects/'~e.file,
                     e.size,e.desc,e.switches or [],e.params or [],False,'','stream',None,
-                    e.commands or [],base_url~'/s/'~token~'/api/fx/'~e.key) }}
+                    e.commands or [],base_url~'/s/'~token~'/api/fx/'~e.key,
+                    e.controls or [],e.live or []) }}
         {% endfor %}
         {% for t in transitions %}
         {{ src_card('overlay','Transition',t.label,
@@ -428,6 +430,26 @@ G1R_STEAM_NAME=</code></pre>
         }).join("")}</ul>
         <span class="url-copied" id="urlCmdStatus" role="status" aria-live="polite"></span>
       </div>` : "";
+    // Live-Steuerung (Effects): Knöpfe lösen Befehle direkt aus, Schalter
+    // gehen bei "live" per cmd=set an die laufende Source
+    const controls = parseJSON(card.dataset.controls, []);
+    const liveKeys = parseJSON(card.dataset.live, []);
+    const controlsHtml = (controls.length || liveKeys.length) ? `
+      <div class="url-dbox url-ctlbox">
+        <h2>Live control <span class="url-dbox__tag">running source</span></h2>
+        <p class="url-dbox__desc">Acts on the source that is running in OBS right now, within about a second.</p>
+        ${controls.length ? `<div class="url-ctl">${controls.map(c => `
+          <button type="button" class="url-act url-ctl__btn" data-q="${escapeAttr(c.q)}" data-label="${escapeAttr(c.label)}">
+            <span class="material-symbols-outlined" aria-hidden="true">${escapeHtml(c.icon || "play_arrow")}</span>${escapeHtml(c.label)}
+          </button>`).join("")}</div>` : ""}
+        ${liveKeys.length ? `
+        <div class="url-live">
+          <label class="url-live__opt"><input type="checkbox" id="urlLive"> Apply setting changes live</label>
+          <button type="button" class="url-act ghost url-ctl__btn" data-q="cmd=reset" data-label="Back to OBS URL"><span class="material-symbols-outlined" aria-hidden="true">undo</span>Back to OBS URL</button>
+          <p class="url-live__note">Live settings last until OBS reloads the source. To keep them, put the new URL into OBS.</p>
+        </div>` : ""}
+        <span class="url-copied" id="urlCtlStatus" role="status" aria-live="polite"></span>
+      </div>` : "";
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
 
     const infoBits = [];
@@ -462,6 +484,7 @@ G1R_STEAM_NAME=</code></pre>
             <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
+        ${controlsHtml}
         ${commandsHtml}
         ${infoBits.length ? `<div class="url-dbox url-infobox">
           <h2>Info</h2>
@@ -474,7 +497,8 @@ G1R_STEAM_NAME=</code></pre>
                        chromePreview: hasChromePreview,
                        path: card.dataset.path,
                        previewW: parseInt(card.dataset.previewW || '0'),
-                       previewH: parseInt(card.dataset.previewH || '0') });
+                       previewH: parseInt(card.dataset.previewH || '0'),
+                       fx: card.dataset.fx || "", liveKeys: liveKeys });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -635,7 +659,66 @@ G1R_STEAM_NAME=</code></pre>
       urlText.textContent = buildUrl(base, scope);
       lsSave();
       if (_chromeUpdate) _chromeUpdate();
+      liveSync();
     }
+
+    // ── Live-Steuerung: Befehl an die laufende Effect-Source ──
+    const ctlStatus = document.getElementById("urlCtlStatus");
+    let ctlTimer;
+    async function sendFx(q, label) {
+      clearTimeout(ctlTimer);
+      ctlStatus.classList.remove("is-error");
+      try {
+        const res = await fetch(meta.fx + "?" + q, { credentials: "same-origin" });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) throw new Error(json.error || ("HTTP " + res.status));
+        ctlStatus.textContent = "Sent: " + label;
+      } catch (e) {
+        ctlStatus.classList.add("is-error");
+        ctlStatus.textContent = "Failed: " + label + " (" + e.message + ")";
+      }
+      ctlTimer = setTimeout(() => { ctlStatus.textContent = ""; }, 3000);
+    }
+    document.querySelectorAll(".url-ctl__btn").forEach(btn => btn.addEventListener("click", () => {
+      // Zurück auf die OBS-URL beendet auch das Live-Setzen, sonst würde die
+      // nächste Schalteränderung den Reset gleich wieder überschreiben
+      if (btn.dataset.q === "cmd=reset" && liveBox) liveBox.checked = false;
+      sendFx(btn.dataset.q, btn.dataset.label);
+    }));
+
+    // Schalterwerte der live setzbaren Keys; gesendet wird nur, was sich seit
+    // dem letzten Senden geändert hat (Texteingaben gebündelt)
+    const liveBox = document.getElementById("urlLive");
+    let liveSent = {}, liveTimer;
+    function liveValues() {
+      const out = {};
+      (meta.liveKeys || []).forEach(key => {
+        const group = scope.querySelector('.sw-group[data-param="' + key + '"]');
+        if (!group) return;
+        let v = "";
+        if (group.dataset.type === "select") {
+          const active = group.querySelector(".sw-btn.active");
+          v = active ? active.dataset.value : "";
+        } else {
+          const inp = group.querySelector(".sw-input");
+          v = inp ? inp.value.trim() : "";
+        }
+        if (v !== "") out[key] = v;
+      });
+      return out;
+    }
+    function liveSend(all) {
+      const now = liveValues(), q = new URLSearchParams({ cmd: "set" });
+      Object.keys(now).forEach(k => { if (all || now[k] !== liveSent[k]) q.set(k, now[k]); });
+      liveSent = now;
+      if ([...q.keys()].length > 1) sendFx(q.toString(), "settings");
+    }
+    function liveSync() {
+      if (!liveBox || !liveBox.checked) return;
+      clearTimeout(liveTimer);
+      liveTimer = setTimeout(() => liveSend(false), 400);
+    }
+    if (liveBox) liveBox.addEventListener("change", () => { if (liveBox.checked) liveSend(true); });
 
     // ── Chrome-Vorschau (Stinger) ─────────────────────────────
     if (meta && meta.chromePreview && document.getElementById("cpWrap")) {

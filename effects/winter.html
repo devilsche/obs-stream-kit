@@ -22,7 +22,7 @@
     schneit, wächst der Schnee um snowrate % pro Minute, der Raureif halb so schnell,
     die Eiszapfen mit dem Schnee. cmd=shovel / cmd=scrape / cmd=icicle (&name=…)
     räumen frei und zählen für „Top helpers“; cmd=shake&name=… — shakeneed Leute
-    in shakewin s schütteln allen Schnee ab; cmd=melt taut alles; cmd=leaders.
+    in shakewin s schütteln allen Schnee ab (&force=1: sofort); cmd=melt taut alles; cmd=leaders.
       snowrate=1..300 (20)  shovel=1..50 (5)  scrape=1..50 (5)  shakeneed=1..20 (5)  shakewin=5..120 (20)
     Der Server speichert nur die Ereignisse (fx/season_db.py); Stände und
     Rangliste rechnet die Source beim Laden mit diesen Regeln nach.
@@ -170,6 +170,8 @@
       // Ein Ereignis anwenden; Rückgabe beschreibt es für die Animation
       function apply(k, name, t, secs) {
         advance(t);
+        var force = k === 'shakeall';
+        if (force) k = 'shake';
         var r = { k: k, name: name };
         if (k === 'start') { ST.snowing = true; ST.since = t; ST.until = secs ? t + secs : Infinity; }
         else if (k === 'stop') ST.snowing = false;
@@ -178,7 +180,7 @@
         else if (k === 'icicle') { r.done = ST.snow >= 10 ? 1 : 0; }
         else if (k === 'shake') {
           if (ST.snow <= 0) { r.idle = true; return r; }
-          var g = shakers.add(name, t);
+          var g = shakers.add(name, t, force);
           r.count = g.count; r.need = g.need;
           if (g.success) { r.success = true; ST.snow = 0; }
         }
@@ -538,7 +540,7 @@
         // ohne Server-DB (oder lokal im Tune-Modus) schaltet das Overlay selbst um
         if (cmd === 'snowtoggle') cmd = ST.snowing ? 'snowstop' : 'snowfall';
         if (!EVENTS[cmd]) return;
-        var r = apply(EVENTS[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : K.serverNow(), p.secs);
+        var r = apply(cmd === 'shake' && p.force ? 'shakeall' : EVENTS[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : K.serverNow(), p.secs);
         if (r.k === 'shovel') shovelAnim(r);
         else if (r.k === 'scrape') scrapeAnim(r);
         else if (r.k === 'icicle') icicleAnim(r);

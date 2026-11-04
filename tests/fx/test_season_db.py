@@ -128,3 +128,21 @@ def test_endpoint_round_trip(conn):
     body = c.get("/s/tok/api/fx/summer/poll?since=1").get_json()
     assert [x["cmd"] for x in body["commands"]] == ["heatwave"]
     assert c.get("/s/tok/api/fx/spring/poll").get_json()["state"]["items"] == []
+
+
+# --- force=1 (Dashboard-Knopf) ---
+
+def test_forced_group_actions_get_their_own_event(conn):
+    for effect, cmd, forced in (("winter", "shake", "shakeall"), ("spring", "weed", "pullall")):
+        season_db.persist(effect, conn, 1, commands.parse(effect, {"cmd": cmd, "force": "1"}))
+        season_db.persist(effect, conn, 1, commands.parse(effect, {"cmd": cmd, "name": "Hat3"}))
+        kinds = [e["k"] for e in season_db.load_state(conn, 1, effect)["events"]]
+        assert kinds == ["begin", forced, cmd]
+
+
+def test_clear_snow_removes_forced_shakes(conn):
+    season_db.persist("winter", conn, 1, commands.parse("winter", {"cmd": "shake", "force": "1"}))
+    season_db.persist("winter", conn, 1, commands.parse("winter", {"cmd": "build", "name": "Hat3"}))
+    season_db.clear(conn, 1, "winter", "snow")
+    kinds = [e["k"] for e in season_db.load_state(conn, 1, "winter")["events"]]
+    assert kinds == ["begin", "build"]

@@ -21,7 +21,7 @@
     dem ersten Ereignis, auch wenn die Source gerade nicht läuft.
     cmd=raintoggle bzw. cmd=rainfall[&secs=…] / cmd=rainstop: Regen gießt mit
     rainrate % pro Minute. cmd=water&name=… (+waterpct %), cmd=weed&name=…
-    (−3 %; pullneed Leute in pullwin s ziehen die Hälfte raus) — beides zählt für
+    (−3 %; pullneed Leute in pullwin s ziehen die Hälfte raus, &force=1 sofort) — beides zählt für
     „Top gardeners“; cmd=leaders zeigt die Rangliste.
       dryrate=0..100 (2)  weedrate=0..100 (1)  waterpct=1..50 (10)  rainrate=1..300 (30)
       pullneed=1..20 (3)  pullwin=5..120 (20)
@@ -175,6 +175,8 @@
       function apply(k, name, t, secs) {
         if (k === 'begin') { ST.began = true; ST.t = t; ST.water = 100; ST.weeds = 0; return { k: k }; }
         advance(t);
+        var force = k === 'pullall';
+        if (force) k = 'weed';
         var r = { k: k, name: name };
         if (k === 'start') { ST.raining = true; ST.since = t; ST.until = secs ? t + secs : Infinity; }
         else if (k === 'stop') ST.raining = false;
@@ -182,7 +184,7 @@
         else if (k === 'weed') {
           r.done = Math.min(3, ST.weeds); ST.weeds -= r.done;
           if (ST.weeds > 0) {
-            var g = pullers.add(name, t);
+            var g = pullers.add(name, t, force);
             r.count = g.count; r.need = g.need;
             if (g.success) { r.success = true; ST.weeds = Math.max(0, ST.weeds - 50); }
           }
@@ -484,7 +486,7 @@
         if (!EVENTS[cmd]) return;
         var t = typeof c.ts === 'number' ? c.ts : K.serverNow();
         if (!ST.began) apply('begin', '', t);     // erstes Ereignis: Garten startet
-        var r = apply(EVENTS[cmd], p.name || '', t, p.secs);
+        var r = apply(cmd === 'weed' && p.force ? 'pullall' : EVENTS[cmd], p.name || '', t, p.secs);
         if (r.k === 'water') waterAnim(r);
         else if (r.k === 'weed') weedAnim(r);
       }

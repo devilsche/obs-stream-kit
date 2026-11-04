@@ -31,7 +31,7 @@
     Schnee: cmd=snowtoggle (an/aus, passend zum !snow-Video) bzw. cmd=snowfall[&secs=…]
     und cmd=snowstop; solange es schneit, wächst der Schnee um snowrate % pro Minute.
     cmd=shovel&name=… (−shovel %, zählt für die Rangliste), cmd=shake&name=…
-    (shakeneed Leute in shakewin s schütteln alles frei), cmd=melt, cmd=leaders
+    (shakeneed Leute in shakewin s schütteln alles frei, &force=1 sofort), cmd=melt, cmd=leaders
     (Rangliste zeigen), cmd=clear&kind=snow (Schnee + Rangliste löschen).
       snowrate=1..300 (20)  shovel=1..50 (5)  shakeneed=1..20 (5)  shakewin=5..120 (20)
     Der Server speichert nur die Ereignisse; Schneehöhe und Rangliste rechnet
@@ -835,8 +835,10 @@
             SN.leaders[key].name = name;
             SN.leaders[key].n++;
           }
-        } else if (k === 'shake') {
+        } else if (k === 'shake' || k === 'shakeall') {
           if (SN.snow <= 0) { r.idle = true; return r; }
+          // shakeall: Dashboard-Knopf, gelingt ohne weitere Mitmacher
+          if (k === 'shakeall') { r.success = true; SN.snow = 0; SN.shakes = []; return r; }
           SN.shakes = SN.shakes.filter(function (sh) { return t - sh.t <= cur.shakewin; });
           var id = name ? name.toLowerCase() : '#' + t + Math.random();
           if (!SN.shakes.some(function (sh) { return sh.id === id; })) SN.shakes.push({ id: id, t: t });
@@ -963,7 +965,7 @@
           } else {
             bigTag('Nothing to shovel' + (name ? ', ' + name : ''), spot[0], spot[1] - 40);
           }
-        } else if (k === 'shake') {
+        } else if (k === 'shake' || k === 'shakeall') {
           if (r.success) {
             snowDrop = 90;
             stage.classList.remove('is-shakeoff'); void stage.offsetWidth; stage.classList.add('is-shakeoff');
@@ -1020,7 +1022,7 @@
             // ohne Server-DB (oder lokal im Tune-Modus) schaltet das Overlay selbst um
             if (cmd === 'snowtoggle') cmd = SN.snowing ? 'snowstop' : 'snowfall';
             if (SNOW_CMD[cmd]) {
-              snowEvent(SNOW_CMD[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : serverNow(), p.secs);
+              snowEvent(cmd === 'shake' && p.force ? 'shakeall' : SNOW_CMD[cmd], p.name || '', typeof c.ts === 'number' ? c.ts : serverNow(), p.secs);
             }
         }
       }

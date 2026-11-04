@@ -403,6 +403,17 @@ Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sun
 
 Funktioniert nur, wenn die Source über die Token-URL (`/s/<token>/effects/rain.html`) geladen wird. Befehle, die geschickt werden, während die Source nicht läuft, werden beim Start nicht nachgeholt. Ungültige Befehle beantwortet der Server mit HTTP 400.
 
+#### Live control im Dashboard (ohne Streamer.bot)
+
+Rain, Xmas, Autumn, Winter, Spring und Summer haben im Dashboard (**Stream → <Effekt>**) eine Box **Live control**. Sie wirkt auf die Source, die gerade in OBS läuft, wie ein Streamer.bot-Befehl innerhalb von etwa einer Sekunde:
+
+- **Knöpfe** für das, was man von Hand auslöst: Wetter an/aus (Schnee, Laub, Regen, Hitze), Shake off, Melt, Gust, Sweep, Water, Pull weeds, Bee, Splash, Ice cream, Cool down, Celebrate, Leaders; bei Rain Start/Stop, Lightning, Gust. Knöpfe schicken keinen Namen und zählen deshalb nicht für Ranglisten. Dauerhaftes Löschen (`cmd=clear`) gibt es bewusst nicht als Knopf.
+- **Shake off** und **Pull weeds** gelingen sofort, ohne auf weitere Chatter zu warten (`&force=1`, auch als Mod-Befehl für Streamer.bot nutzbar).
+- **Apply setting changes live**: jede Änderung an einem Schalter geht sofort per `cmd=set` an die laufende Source. Beim Einschalten wird einmal der komplette Stand der Schalter geschickt.
+- **Back to OBS URL** (`cmd=reset`): die Source nimmt wieder die Werte aus ihrer URL; das Live-Setzen schaltet sich dabei aus.
+
+Live-Einstellungen speichert der Server nicht. Lädt OBS die Source neu (Szenenwechsel mit Refresh, OBS-Neustart), gilt wieder die URL — dauerhaft wird eine Einstellung erst, wenn die neue URL in OBS steht.
+
 ### Weihnachtsschmuck (`xmas.html`)
 
 Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashboard unter **Stream → Xmas** als Schalter und lassen sich live per Streamer.bot ändern.
@@ -456,7 +467,7 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 | `cmd=snowtoggle` | Schneefall an/aus — in die `!snow`-Action, die das Schneefall-Video ein- und ausblendet. Solange es schneit, wächst der Schnee um `snowrate` % pro Minute. Schon nach wenigen Prozent liegt eine sichtbare Schneelinie auf Draht und Baumkanten, ab ~10 % Kappen auf den Kugeln, ab ~60 % Mütze auf dem Stern, ab 70 % gedämpfte Lichter; vor dem Baum steigt eine Schneewehe, die bei 100 % alle Geschenke begräbt und die unterste Baumstufe halb verschluckt |
 | `cmd=snowfall` / `cmd=snowstop` | Schneefall gezielt an bzw. aus; `cmd=snowfall&secs=120` hört nach 120 s von selbst auf |
 | `cmd=shovel&name=%user%` | −`shovel` %, Schaufel wirft einen Brocken weg, Name kurz sichtbar; zählt für die Rangliste (nur wenn es etwas zu schippen gab). Cooldown pro User in Streamer.bot setzen, z. B. 10 s |
-| `cmd=shake&name=%user%` | einzeln nur ein Wackeln; `shakeneed` verschiedene Leute innerhalb `shakewin` s schütteln den ganzen Schnee ab. Oben zeigt „Shake it off! 3/5“ mit Zeitbalken den Stand. Schneit es noch, schneit es danach wieder zu |
+| `cmd=shake&name=%user%` | einzeln nur ein Wackeln; `shakeneed` verschiedene Leute innerhalb `shakewin` s schütteln den ganzen Schnee ab. Oben zeigt „Shake it off! 3/5“ mit Zeitbalken den Stand. Schneit es noch, schneit es danach wieder zu. `cmd=shake&force=1` schüttelt sofort ab (Dashboard-Knopf, Mod-Befehl) |
 | `cmd=leaders` | Rangliste „Top shovelers“ (Top 5) für 10 s; das Spotlight zeigt den Ersten zwischendurch auch von selbst |
 | `cmd=melt` | Schnee weg, Rangliste bleibt (ein laufender Schneefall geht weiter) |
 | `cmd=clear&kind=snow` | Schnee **und** Rangliste dauerhaft löschen (`cmd=clear` ohne `kind` löscht alles) |
@@ -525,7 +536,7 @@ Gleiches Prinzip wie Herbst und Weihnachten: eine Source pro Jahreszeit, alles e
 | `cmd=celebrate&name=%user%` | Schneefontäne, Schneemann winkt, „Thank you, …!“ |
 | `!snow` → `cmd=snowtoggle` | Schneefall an/aus: Schnee wächst um `snowrate` % pro Minute, Raureif halb so schnell, Eiszapfen mit dem Schnee (bei 70 % voll lang) |
 | `!shovel` / `!scrape` / `!icicle` → `cmd=shovel` / `cmd=scrape` / `cmd=icicle` `&name=%user%` | Schnee schippen (−`shovel` %), Raureif freikratzen (−`scrape` %), Eiszapfen abbrechen — alles zählt für „Top helpers“ |
-| `!shake` → `cmd=shake&name=%user%` | `shakeneed` verschiedene Leute in `shakewin` s schütteln allen Schnee ab |
+| `!shake` → `cmd=shake&name=%user%` | `shakeneed` verschiedene Leute in `shakewin` s schütteln allen Schnee ab; `cmd=shake&force=1` sofort (Dashboard-Knopf, Mod-Befehl) |
 | `!snowball` → `cmd=snowball&name=%user%` | Schneeball klatscht an den Bildschirm und rutscht ab (nur Show) |
 | `cmd=leaders` / `cmd=melt` | Rangliste 10 s zeigen / Schnee und Raureif tauen (Rangliste bleibt) |
 | `cmd=clear&kind=snow\|minis\|snowman` | Schnee + Rangliste / Mini-Schneemänner / Schneemann dauerhaft löschen |
@@ -540,7 +551,7 @@ Parameter: `icicles`, `frost`, `cover`, `minis`, `snowman`, `falling` (je `1`/`0
 | `cmd=celebrate&name=%user%` | alle Blumen tanzen, Blütenregen, „Thank you, …!“ |
 | `!rain` → `cmd=raintoggle` | Regen gießt mit `rainrate` % pro Minute — in die bestehende `!rain`-Action mit aufnehmen |
 | `!water` → `cmd=water&name=%user%` | Gießkanne, +`waterpct` %, zählt für „Top gardeners“ |
-| `!weed` → `cmd=weed&name=%user%` | zupft etwas Unkraut (−3 %, zählt); `pullneed` Leute in `pullwin` s ziehen die Hälfte raus |
+| `!weed` → `cmd=weed&name=%user%` | zupft etwas Unkraut (−3 %, zählt); `pullneed` Leute in `pullwin` s ziehen die Hälfte raus; `cmd=weed&force=1` sofort |
 | `!bee` → `cmd=bee&name=%user%` | Biene fliegt eine Blume an (nur Show) |
 | `cmd=leaders` / `cmd=clear&kind=garden\|flowers` | Rangliste / frischer Garten (volles Wasser, kein Unkraut, Rangliste leer) bzw. Blumen dauerhaft löschen |
 

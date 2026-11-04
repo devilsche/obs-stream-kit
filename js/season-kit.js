@@ -119,7 +119,9 @@
     var hits = [];
     return {
       reset: function () { hits = []; },
-      add: function (name, t) {
+      // force: Dashboard-Knopf, gelingt ohne weitere Mitmacher
+      add: function (name, t, force) {
+        if (force) { hits = []; return { count: need(), need: need(), success: true }; }
         hits = hits.filter(function (h) { return t - h.t <= win(); });
         var id = name ? name.toLowerCase() : '#' + t + Math.random();
         if (!hits.some(function (h) { return h.id === id; })) hits.push({ id: id, t: t });

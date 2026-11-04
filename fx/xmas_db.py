@@ -159,5 +159,7 @@ def persist(conn, tenant_id: int, command: dict) -> bool:
             # den aufgelösten Befehl
             command["cmd"] = "snowstop" if is_snowing(conn, tenant_id) else "snowfall"
         if command["cmd"] in _SNOW_EVENTS:
-            add_snow_event(conn, tenant_id, _SNOW_EVENTS[command["cmd"]], p.get("name", ""), p.get("secs"))
+            # force=1 (Dashboard-Knopf): Rütteln gelingt ohne weitere Mitmacher
+            event = "shakeall" if command["cmd"] == "shake" and p.get("force") else _SNOW_EVENTS[command["cmd"]]
+            add_snow_event(conn, tenant_id, event, p.get("name", ""), p.get("secs"))
     return True

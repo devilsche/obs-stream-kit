@@ -247,6 +247,14 @@ EFFECT_META = {
          "tooltip": "Time in which the shakers have to come together (5 to 120 s via URL)"},
     ],
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/xmas
+    # Knöpfe im Dashboard (Live control): lösen den Befehl direkt aus
+    "controls": [
+        {"q": "cmd=snowtoggle", "label": "Snow on/off", "icon": "ac_unit"},
+        {"q": "cmd=shake&force=1", "label": "Shake off", "icon": "vibration"},
+        {"q": "cmd=melt", "label": "Melt", "icon": "water_drop"},
+        {"q": "cmd=celebrate", "label": "Celebrate", "icon": "celebration"},
+        {"q": "cmd=leaders", "label": "Leaders", "icon": "leaderboard"},
+    ],
     "commands": [
         {"q": "cmd=celebrate", "label": "Celebrate (e.g. new sub)"},
         {"q": "cmd=ornament&name=%user%", "label": "Follow: hang an ornament (%user% = Streamer.bot variable)"},
@@ -260,6 +268,7 @@ EFFECT_META = {
         {"q": "cmd=snowstop", "label": "Snowfall off (snow stays)"},
         {"q": "cmd=shovel&name=%user%", "label": "!shovel: remove some snow, counts for the ranking"},
         {"q": "cmd=shake&name=%user%", "label": "!shake: enough different chatters shake all snow off"},
+        {"q": "cmd=shake&force=1", "label": "Shake all snow off at once (e.g. mod command)"},
         {"q": "cmd=leaders", "label": "Show top shovelers for 10 s"},
         {"q": "cmd=melt", "label": "Melt all snow (ranking stays)"},
         {"q": "cmd=clear&kind=snow", "label": "Remove snow and reset ranking (permanent)"},
@@ -318,6 +327,14 @@ EFFECT_META = {
          "tooltip": "How much one !rake removes (1 to 50 via URL)"},
     ],
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/autumn
+    # Knöpfe im Dashboard (Live control): lösen den Befehl direkt aus
+    "controls": [
+        {"q": "cmd=leaftoggle", "label": "Leaves on/off", "icon": "eco"},
+        {"q": "cmd=gust", "label": "Gust", "icon": "air"},
+        {"q": "cmd=sweep", "label": "Sweep", "icon": "cleaning_services"},
+        {"q": "cmd=celebrate", "label": "Celebrate", "icon": "celebration"},
+        {"q": "cmd=leaders", "label": "Leaders", "icon": "leaderboard"},
+    ],
     "commands": [
         {"q": "cmd=pumpkin&name=%user%", "label": "Follow: drop a pumpkin (%user% = Streamer.bot variable)"},
         {"q": "cmd=celebrate&name=%user%", "label": "Sub, resub, gift sub, cheer, raid: leaf fountain and thank you"},
@@ -373,6 +390,15 @@ EFFECT_META = {
          "tooltip": "Time in which the shakers have to come together"},
     ],
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/winter
+    # Knöpfe im Dashboard (Live control): lösen den Befehl direkt aus
+    "controls": [
+        {"q": "cmd=snowtoggle", "label": "Snow on/off", "icon": "ac_unit"},
+        {"q": "cmd=shake&force=1", "label": "Shake off", "icon": "vibration"},
+        {"q": "cmd=snowball", "label": "Snowball", "icon": "sports_baseball"},
+        {"q": "cmd=melt", "label": "Melt", "icon": "water_drop"},
+        {"q": "cmd=celebrate", "label": "Celebrate", "icon": "celebration"},
+        {"q": "cmd=leaders", "label": "Leaders", "icon": "leaderboard"},
+    ],
     "commands": [
         {"q": "cmd=mini&name=%user%", "label": "Follow: build a mini snowman (%user% = Streamer.bot variable)"},
         {"q": "cmd=build&name=%user%", "label": "Sub: add the next piece to the snowman"},
@@ -382,6 +408,7 @@ EFFECT_META = {
         {"q": "cmd=scrape&name=%user%", "label": "!scrape: scrape some frost off, counts for the ranking"},
         {"q": "cmd=icicle&name=%user%", "label": "!icicle: break off an icicle, counts for the ranking"},
         {"q": "cmd=shake&name=%user%", "label": "!shake: enough different chatters shake all snow off"},
+        {"q": "cmd=shake&force=1", "label": "Shake all snow off at once (e.g. mod command)"},
         {"q": "cmd=snowball&name=%user%", "label": "!snowball: throw a snowball at the screen"},
         {"q": "cmd=leaders", "label": "Show top helpers for 10 s"},
         {"q": "cmd=melt", "label": "Melt snow and frost (ranking stays)"},
@@ -420,12 +447,22 @@ EFFECT_META = {
          "tooltip": "Time in which the weed pullers have to come together"},
     ],
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/spring
+    # Knöpfe im Dashboard (Live control): lösen den Befehl direkt aus
+    "controls": [
+        {"q": "cmd=raintoggle", "label": "Rain on/off", "icon": "rainy"},
+        {"q": "cmd=water", "label": "Water", "icon": "water_drop"},
+        {"q": "cmd=weed&force=1", "label": "Pull weeds", "icon": "grass"},
+        {"q": "cmd=bee", "label": "Bee", "icon": "emoji_nature"},
+        {"q": "cmd=celebrate", "label": "Celebrate", "icon": "celebration"},
+        {"q": "cmd=leaders", "label": "Leaders", "icon": "leaderboard"},
+    ],
     "commands": [
         {"q": "cmd=flower&name=%user%", "label": "Follow: plant a flower (%user% = Streamer.bot variable)"},
         {"q": "cmd=celebrate&name=%user%", "label": "Sub, bits, raid: everything blooms, petal shower"},
         {"q": "cmd=raintoggle", "label": "!rain: rain on/off (also put into your !rain action)"},
         {"q": "cmd=water&name=%user%", "label": "!water: water the flowers, counts for the ranking"},
         {"q": "cmd=weed&name=%user%", "label": "!weed: pull weeds; enough chatters together pull half of them"},
+        {"q": "cmd=weed&force=1", "label": "Pull half of the weeds at once (e.g. mod command)"},
         {"q": "cmd=bee&name=%user%", "label": "!bee: send a bee to a flower"},
         {"q": "cmd=leaders", "label": "Show top gardeners for 10 s"},
         {"q": "cmd=clear&kind=garden", "label": "Fresh garden: full water, no weeds, ranking reset (permanent)"},
@@ -452,6 +489,15 @@ EFFECT_META = {
          "options": [["2", "2%"], ["5", "5%"], ["10", "10%"], ["20", "20%"]], "tooltip": "How much one !splash cools"},
     ],
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/summer
+    # Knöpfe im Dashboard (Live control): lösen den Befehl direkt aus
+    "controls": [
+        {"q": "cmd=heattoggle", "label": "Heat on/off", "icon": "sunny"},
+        {"q": "cmd=splash", "label": "Splash", "icon": "waves"},
+        {"q": "cmd=ice", "label": "Ice cream", "icon": "icecream"},
+        {"q": "cmd=cool", "label": "Cool down", "icon": "ac_unit"},
+        {"q": "cmd=celebrate", "label": "Celebrate", "icon": "celebration"},
+        {"q": "cmd=leaders", "label": "Leaders", "icon": "leaderboard"},
+    ],
     "commands": [
         {"q": "cmd=castle&name=%user%", "label": "Follow: build a sandcastle (%user% = Streamer.bot variable)"},
         {"q": "cmd=celebrate&name=%user%", "label": "Sub, bits, raid: beach ball, confetti and thank you"},
@@ -498,6 +544,13 @@ EFFECT_META = {
          "tooltip": "Thunder loudness relative to the rain. Follows every lightning bolt with a distance-based delay."},
     ],
     # Live-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/rain
+    # Knöpfe im Dashboard (Live control): lösen den Befehl direkt aus
+    "controls": [
+        {"q": "cmd=start", "label": "Start rain", "icon": "play_arrow"},
+        {"q": "cmd=stop", "label": "Stop rain", "icon": "stop"},
+        {"q": "cmd=strike", "label": "Lightning", "icon": "bolt"},
+        {"q": "cmd=gust", "label": "Gust", "icon": "air"},
+    ],
     "commands": [
         {"q": "cmd=strike", "label": "Lightning now"},
         {"q": "cmd=strike&dist=near", "label": "Near lightning (pair with thunder-near WAV)"},
@@ -576,6 +629,15 @@ TRANSITIONS = [
 ]
 
 
+def _live_keys(subdir: str, key: str, switches: list) -> list:
+    """Schalter, die eine laufende Effect-Source per cmd=set live übernimmt."""
+    if subdir != "effects":
+        return []
+    from fx.commands import EFFECTS
+    settable = EFFECTS.get(key, {}).get("settings", {})
+    return [sw["key"] for sw in switches if sw["key"] in settable]
+
+
 def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
                      desc: str = "", params: list = None, switches_map: dict = None):
     """All *.html in <root>/<subdir> as source dicts (label auto-derived from filename)."""
@@ -588,5 +650,7 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
                     "file": fn, "size": size, "desc": desc,
                     "params": list(params) if params else [],
                     "switches": meta.get("switches", []),
-                    "commands": meta.get("commands", [])})
+                    "commands": meta.get("commands", []),
+                    "controls": meta.get("controls", []),
+                    "live": _live_keys(subdir, key, meta.get("switches", []))})
     return out

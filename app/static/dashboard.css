@@ -1213,6 +1213,20 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-act.ghost:hover{color:var(--text);border-color:var(--text);box-shadow:none;background:none}
 .url-copied{font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:12px;color:var(--success);margin-left:auto;align-self:center}
 
+/* ── Live-Steuerung (Effects: Knöpfe + Schalter live) ── */
+.url-ctlbox{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.url-ctl{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.url-ctl .url-act{justify-content:flex-start;padding:9px 12px;min-height:40px;color:var(--text)}
+.url-ctl .url-act .material-symbols-outlined{color:var(--brand-ink)}
+.url-ctl .url-act:hover .material-symbols-outlined{color:inherit}
+.url-live{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding-top:12px;border-top:1px solid var(--border)}
+.url-live__opt{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--text);cursor:pointer;min-height:24px}
+.url-live__opt input{width:18px;height:18px;accent-color:var(--brand-ink)}
+.url-live__opt input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.url-live__note{flex-basis:100%;margin:0;font-size:12px;color:var(--text-muted)}
+.url-ctlbox .url-copied{margin-left:0;min-height:1.2em}
+.url-ctlbox .url-copied.is-error{color:var(--danger,#e5484d)}
+
 /* ── Remote-Befehle (Effects → Streamer.bot) ── */
 .url-cmdbox{padding:18px 20px}
 .url-cmdlist{list-style:none;padding:0;margin:12px 0 8px;display:flex;flex-direction:column;gap:8px}

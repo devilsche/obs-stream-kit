@@ -157,3 +157,9 @@ def test_clear_snow_keeps_ornaments(conn):
     xmas_db.persist(conn, 1, {"cmd": "snowfall", "params": {}})
     xmas_db.clear(conn, 1, None)
     assert xmas_db.load_state(conn, 1)["snow_events"] == []
+
+
+def test_forced_shake_is_logged_as_shakeall(conn):
+    xmas_db.persist(conn, 1, commands.parse("xmas", {"cmd": "shake", "force": "1"}))
+    xmas_db.persist(conn, 1, commands.parse("xmas", {"cmd": "shake", "name": "Hat3", "force": "0"}))
+    assert [e["k"] for e in xmas_db.load_state(conn, 1)["snow_events"]] == ["shakeall", "shake"]
