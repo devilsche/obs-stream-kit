@@ -164,3 +164,17 @@ def test_other_matches_are_untouched_by_a_rewrite(pg_compat):
     db_pg.upsert_weapon_stats(conn.raw, t, "mr3", [_rows(weapon="M416")])
     db_pg.upsert_weapon_stats(conn.raw, t, "mr3", [_rows(weapon="Beryl")])
     assert {r["weapon"] for r in db_pg.get_weapon_stats_for_match(conn.raw, t, "mr2")} == {"AKM"}
+
+
+def test_arcade_rounds_are_left_out(pg_compat):
+    """TDM, Zombie und die Trainingskarte zählen nicht in der Waffen-Performance."""
+    conn, t = pg_compat[0], pg_compat[1]
+    _match(conn, t, "br", "2026-08-01T18:00:00Z")
+    for mid, mode, karte in (("tdm1", "tdm", "Kiki_Main"), ("z1", "zulu_hell-fpp", "Zulu_Main"),
+                             ("cj", "solo", "Range_Main")):
+        db_pg.insert_match(conn.raw, t, mid, karte, mode, False, 600, "2026-08-01T19:00:00Z", None)
+        db_pg.upsert_weapon_stats(conn.raw, t, mid, [_rows(shots=1000)])
+    db_pg.upsert_weapon_stats(conn.raw, t, "br", [_rows(shots=100)])
+    out = db_pg.aggregate_weapon_stats(conn.raw, t, since="1970-01-01T00:00:00Z",
+                                       account_id="acc.A", group_by="weapon")
+    assert [(r["weapon"], r["shots"], r["matches"]) for r in out] == [("M416", 100, 1)]

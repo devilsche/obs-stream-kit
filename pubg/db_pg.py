@@ -1993,9 +1993,12 @@ def aggregate_weapon_stats(conn, tenant_id: int, since: str,
     die Prozente rechnet der Aufrufer. So kann ein 5-Schuss-Match nicht
     genauso schwer wiegen wie eines mit 200.
     """
+    from pubg.aggregations import BATTLE_ROYALE_MODES, KEINE_BR_KARTEN
     key = "player_name, account_id" if group_by == "player" else "weapon"
-    where = ["w.tenant_id = %s", "m.played_at >= %s"]
-    params = [tenant_id, since]
+    # Nur Battle Royale: TDM, Zombie, Heist & Co. verzerren Treffer und Kills
+    where = ["w.tenant_id = %s", "m.played_at >= %s",
+             "m.game_mode = ANY(%s)", "NOT (m.map_name = ANY(%s))"]
+    params = [tenant_id, since, list(BATTLE_ROYALE_MODES), list(KEINE_BR_KARTEN)]
     if account_id:
         where.append("w.account_id = %s"); params.append(account_id)
     if player_name:

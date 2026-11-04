@@ -1282,7 +1282,9 @@ def scope_breakdown(conn, tenant_id, account_id, cutoff, to_iso=None):
     Die Zeile "no sight" ist nicht zusammenwerfbar mit fehlenden
     Angaben: erstere heisst Kimme und Korn, letztere keine Daten.
     """
-    rows = conn.execute("""
+    # Nur Battle Royale: im Zombie-Modus waeren es Hunderte NPC-Kills
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT e.attachments, e.distance
         FROM telemetry_events e
         JOIN matches m ON m.match_id = e.match_id
@@ -1291,7 +1293,8 @@ def scope_breakdown(conn, tenant_id, account_id, cutoff, to_iso=None):
           AND e.actor_account = ?
           AND m.played_at >= ?
           AND (? IS NULL OR m.played_at <= ?)
-    """, (tenant_id, account_id, cutoff, to_iso, to_iso)).fetchall()
+          AND {br_where}
+    """, (tenant_id, account_id, cutoff, to_iso, to_iso, *br_params)).fetchall()
 
     eimer = {}
     ohne_angabe = 0

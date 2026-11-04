@@ -116,6 +116,22 @@ def test_kills_werden_je_visier_gezaehlt(sess):
     assert d["kills"] == 3
 
 
+def test_zombie_kills_zaehlen_nicht(sess):
+    """Im Zombie-Modus gehen Hunderte NPC-Kills aufs Konto — die gehören
+    nicht in die Visier-Auswertung."""
+    conn, t1 = sess
+    _match(conn, t1)
+    db_pg.insert_match(conn.raw, t1, "z1", "Zulu_Main", "zulu_hell-fpp",
+                       False, 1200, "2026-09-11T13:00:00Z", None)
+    db_pg.insert_telemetry_events(conn.raw, "m1", [
+        _kill(1000, _att("Upper_DotSight_01_C"), 2500)])
+    db_pg.insert_telemetry_events(conn.raw, "z1", [
+        _kill(1000 + i, _att("Upper_CQBSS_C"), 2000) for i in range(5)])
+    d = scope_breakdown(conn, t1, ME, "1970-01-01")
+    assert d["kills"] == 1
+    assert [r["scope"] for r in d["byScope"]] == ["Red Dot"]
+
+
 def test_distanz_kommt_in_metern(sess):
     # Die Telemetrie rechnet in Zentimetern; 30.000 sind 300 m.
     conn, t1 = sess

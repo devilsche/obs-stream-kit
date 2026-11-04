@@ -937,7 +937,7 @@ class EndpointRegistry:
         Die Tabelle wird beim Telemetrie-Verarbeiten gefuellt; fehlende
         Matches meldet `matchesPending`, nachzuholen per Backfill-CLI.
         """
-        from pubg.aggregations import _range_filter
+        from pubg.aggregations import _br_filter, _range_filter
         from pubg.weapon_performance import (db_rows_to_display,
                                              weapon_categories,
                                              weapons_in_category)
@@ -976,13 +976,14 @@ class EndpointRegistry:
             weapon=weapon or None, weapons=weapon_list, group_by=group_by,
             include_bots=include_bots)
 
-        pending = conn.execute("""
+        br_where, br_params = _br_filter("m")
+        pending = conn.execute(f"""
             SELECT COUNT(*) AS n FROM matches m
-            WHERE m.tenant_id = ? AND m.played_at >= ?
+            WHERE m.tenant_id = ? AND m.played_at >= ? AND {br_where}
               AND NOT EXISTS (SELECT 1 FROM match_weapon_stats w
                               WHERE w.tenant_id = m.tenant_id
                                 AND w.match_id = m.match_id)
-        """, (self.tenant_id, cutoff)).fetchone()
+        """, (self.tenant_id, cutoff, *br_params)).fetchone()
 
         return _ok({
             "rows": db_rows_to_display(rows, group_by),
@@ -3832,12 +3833,17 @@ class EndpointRegistry:
         cutoff = (from_iso or (_range_filter(conn, self.tenant_id, range_key)
                                if range_key != "all"
                                else "1970-01-01T00:00:00Z"))
-        params = [self.tenant_id, self.my_account_id, cutoff]
-        sql = """
+        # Nur Battle Royale: Arcade-Runden (Zombie, Heist, TDM …) haben
+        # eigene Regeln und verbiegen die Spielstil-Quoten
+        from pubg.aggregations import _br_filter
+        br_where, br_params = _br_filter("m")
+        params = [self.tenant_id, self.my_account_id, cutoff, *br_params]
+        sql = f"""
             SELECT m.match_id FROM matches m
             JOIN participants pa ON pa.match_id = m.match_id
                                 AND pa.tenant_id = m.tenant_id
             WHERE m.tenant_id = ? AND pa.account_id = ? AND m.played_at >= ?
+              AND {br_where}
         """
         if to_iso:
             sql += " AND m.played_at <= ?"

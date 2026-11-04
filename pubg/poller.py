@@ -1105,17 +1105,19 @@ def _db_weapon_extras(conn, tenant_id: int, account_id: str) -> dict:
     Mastery-API fuehrt diese Waffen ebenfalls nicht.
     """
     from pubg.weapon_milestones import THROWABLES
-    rows = conn.execute("""
+    from pubg.aggregations import _br_filter
+    # Nur Battle Royale — die Trainingskarte laeuft als "solo" und fiel
+    # durch den frueheren LIKE-Filter
+    br_where, br_params = _br_filter("m")
+    rows = conn.execute(f"""
         SELECT w.weapon, MAX(w.damage) AS best_damage,
                SUM(w.shots) AS shots
         FROM match_weapon_stats w
         JOIN matches m ON m.tenant_id = w.tenant_id
                       AND m.match_id = w.match_id
-        WHERE w.tenant_id = ? AND w.account_id = ?
-          AND (m.game_mode LIKE 'solo%' OR m.game_mode LIKE 'duo%'
-               OR m.game_mode LIKE 'squad%')
+        WHERE w.tenant_id = ? AND w.account_id = ? AND {br_where}
         GROUP BY w.weapon
-    """, (tenant_id, account_id)).fetchall()
+    """, (tenant_id, account_id, *br_params)).fetchall()
     out = {}
     for r in rows:
         name = r["weapon"]
@@ -1155,17 +1157,17 @@ def hardest_lobby(conn, tenant_id: int, account_id: str, bekannt=0.0):
     Arcade-Runde mit vier Spielern und K/D 8,3.
     """
     from pubg import lobby_kd as L
+    from pubg.aggregations import _br_filter
 
     grenze = "" if not bekannt else f"LIMIT {LOBBY_RECORD_WINDOW}"
+    br_where, br_params = _br_filter("m")
     rows = conn.execute(f"""
         SELECT m.match_id FROM matches m
         JOIN participants p ON p.tenant_id = m.tenant_id
                            AND p.match_id = m.match_id
-        WHERE m.tenant_id = ? AND p.account_id = ?
-          AND (m.game_mode LIKE 'solo%' OR m.game_mode LIKE 'duo%'
-               OR m.game_mode LIKE 'squad%')
+        WHERE m.tenant_id = ? AND p.account_id = ? AND {br_where}
         ORDER BY m.played_at DESC {grenze}
-    """, (tenant_id, account_id)).fetchall()
+    """, (tenant_id, account_id, *br_params)).fetchall()
     mids = [r["match_id"] for r in rows]
     if not mids:
         return float(bekannt or 0.0), None
