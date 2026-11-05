@@ -97,6 +97,16 @@ def test_kill_ursache_kommt_vom_finish():
     assert r["dbno_id"] == 4711
 
 
+def test_trefferzone_kommt_vom_killer():
+    """Headshot zaehlt beim Killer — die Zone des Finish waere die des
+    Nachlegens."""
+    e = _kill_v2()
+    e["killerDamageInfo"]["damageReason"] = "HeadShot"
+    e["finishDamageInfo"]["damageReason"] = "TorsoShot"
+    assert _normalize(e)["hit_zone"] == "HeadShot"
+    assert _normalize(_kill_v2())["hit_zone"] is None
+
+
 def test_aufsaetze_gehoeren_zur_killer_waffe():
     """weapon ist die M24 — die Visiere der nachlegenden HK416 passen nicht."""
     r = _normalize(_kill_v2())

@@ -292,6 +292,7 @@ CREATE TABLE IF NOT EXISTS telemetry_events (
     dbno_id         BIGINT,
     max_speed       DOUBLE PRECISION,
     fellow_passengers TEXT,
+    hit_zone        TEXT,
     payload_json    TEXT
 );
 -- Additive: damage_reason + seat_index + attachments kamen nach Schema-
@@ -318,6 +319,9 @@ ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS vehicle_id TEXT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS dbno_id BIGINT;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS max_speed DOUBLE PRECISION;
 ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS fellow_passengers TEXT;
+-- hit_zone: Trefferzone des Killers bei Kills (HeadShot, TorsoShot …) —
+-- Headshot-Kills fuer Arcade-Runden, in denen die API 0 meldet.
+ALTER TABLE telemetry_events ADD COLUMN IF NOT EXISTS hit_zone TEXT;
 -- Kein Einzel-Index auf match_id bzw. actor_account: beide sind der Anfang
 -- eines der kombinierten Indizes und wuerden nur doppelt Platz kosten
 -- (auf prod ~170 MB, 2026-10-28).
@@ -992,7 +996,7 @@ _TEL_FELDER = (
     "target_account", "actor_x", "actor_y", "actor_z", "actor_health",
     "victim_x", "victim_y", "weapon", "distance", "damage",
     "damage_reason", "seat_index", "attachments", "velocity", "vehicle_id",
-    "dbno_id", "max_speed", "fellow_passengers",
+    "dbno_id", "max_speed", "fellow_passengers", "hit_zone",
 )
 
 
@@ -1073,6 +1077,7 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
         e.get("dbno_id"),
         e.get("max_speed"),
         e.get("fellow_passengers"),
+        e.get("hit_zone"),
         e.get("payload_json", "{}"),
     ) for e in events]
     rows = _ohne_dubletten(rows)
@@ -1084,7 +1089,7 @@ def insert_telemetry_events(conn, match_id: str, events: list) -> None:
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
             "seat_index, attachments, velocity, vehicle_id, dbno_id, "
-            "max_speed, fellow_passengers, payload_json) "
+            "max_speed, fellow_passengers, hit_zone, payload_json) "
             "VALUES %s",
             rows,
         )
@@ -1193,7 +1198,8 @@ def update_telemetrie_felder(conn, match_id: str, werte: list) -> int:
     """Die Felder vom 26.10. in vorhandene Zeilen schreiben.
 
     `werte`: (timestamp_ms, event_type, actor, target, dbno_id, max_speed,
-    fellow_passengers, damage_reason). damage_reason nur fuer Kills —
+    fellow_passengers, damage_reason, hit_zone). damage_reason und hit_zone
+    nur fuer Kills —
     vorher kam sie vom Knock statt vom Finish. Zugeordnet ueber Zeit, Typ
     und beide Accounts.
     """
@@ -1202,7 +1208,7 @@ def update_telemetrie_felder(conn, match_id: str, werte: list) -> int:
     with conn.cursor() as cur:
         cur.execute("CREATE TEMP TABLE IF NOT EXISTS _felder ("
                     "ts BIGINT, et TEXT, acc TEXT, tgt TEXT, dbno BIGINT, "
-                    "maxs DOUBLE PRECISION, fp TEXT, grund TEXT) "
+                    "maxs DOUBLE PRECISION, fp TEXT, grund TEXT, zone TEXT) "
                     "ON COMMIT DROP")
         cur.execute("TRUNCATE _felder")
         execute_values(cur, "INSERT INTO _felder VALUES %s", werte)
@@ -1212,7 +1218,8 @@ def update_telemetrie_felder(conn, match_id: str, werte: list) -> int:
                    max_speed = COALESCE(f.maxs, e.max_speed),
                    fellow_passengers = COALESCE(f.fp, e.fellow_passengers),
                    damage_reason = COALESCE(NULLIF(f.grund, ''),
-                                            e.damage_reason)
+                                            e.damage_reason),
+                   hit_zone = COALESCE(NULLIF(f.zone, ''), e.hit_zone)
               FROM _felder f
              WHERE e.match_id = %s
                AND e.timestamp_ms = f.ts
@@ -1250,6 +1257,7 @@ def append_telemetry_events(conn, match_id: str, events: list) -> int:
         e.get("dbno_id"),
         e.get("max_speed"),
         e.get("fellow_passengers"),
+        e.get("hit_zone"),
         e.get("payload_json", "{}"),
     ) for e in events]
     with conn.cursor() as cur:
@@ -1260,7 +1268,7 @@ def append_telemetry_events(conn, match_id: str, events: list) -> int:
             "target_account, actor_x, actor_y, actor_z, actor_health, "
             "victim_x, victim_y, weapon, distance, damage, damage_reason, "
             "seat_index, attachments, velocity, vehicle_id, dbno_id, "
-            "max_speed, fellow_passengers, payload_json) "
+            "max_speed, fellow_passengers, hit_zone, payload_json) "
             "VALUES %s",
             rows,
         )

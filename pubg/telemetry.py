@@ -55,6 +55,7 @@ def _normalize(event):
             "dbno_id": None,
             "max_speed": None,
             "fellow_passengers": None,
+            "hit_zone": None,
             "payload_json": None}
     # PUBG haengt den Fahrzeug-Zustand an fast jedes Event des Spielers,
     # der gerade drin sitzt — auch an Position. Damit haben wir Tempo und
@@ -127,6 +128,12 @@ def _normalize(event):
         # Bewusst NICHT vom Finish: `weapon` ist die Waffe des Killers, und
         # die Aufsaetze muessen zu ihr gehoeren — sonst haette die M24 die
         # Visiere der M4, mit der nur nachgelegt wurde.
+        # Trefferzone des Killers (HeadShot, TorsoShot …). Die PUBG-API
+        # meldet Headshot-Kills nur fuer BR; fuer Arcade-Runden ist das
+        # die einzige Quelle. Vom Killer, nicht vom Finish — wie die
+        # Kill-Wertung selbst.
+        base["hit_zone"] = (info.get("damageReason")
+                            or event.get("damageReason") or None)
         attach_list = info.get("additionalInfo") or []
         if attach_list:
             import json as _json

@@ -1732,8 +1732,8 @@ def airdrop_backfill(root: str, args=None) -> int:
 
 
 def telemetrie_felder_nachtragen(raw_conn, match_id: str, roh: list) -> int:
-    """dbno_id, Finish-Ursache, Spitzentempo und Mitfahrer in vorhandene
-    Zeilen schreiben. Kein Einfuegen, kein Loeschen; wiederholbar."""
+    """dbno_id, Finish-Ursache, Trefferzone, Spitzentempo und Mitfahrer in
+    vorhandene Zeilen schreiben. Kein Einfuegen, kein Loeschen; wiederholbar."""
     from pubg.telemetry import _normalize
     from pubg.db_pg import update_telemetrie_felder
     werte = []
@@ -1750,6 +1750,8 @@ def telemetrie_felder_nachtragen(raw_conn, match_id: str, roh: list) -> int:
                       n.get("dbno_id"), n.get("max_speed"),
                       n.get("fellow_passengers"),
                       n.get("damage_reason") if n["event_type"] == "Kill"
+                      else None,
+                      n.get("hit_zone") if n["event_type"] == "Kill"
                       else None))
     return update_telemetrie_felder(raw_conn, match_id, werte)
 
@@ -1760,7 +1762,10 @@ def felder_backfill(root: str, args=None) -> int:
 
     Nutzung:
         python -m pubg.cli felder-backfill [--matches N] [--pace 0.2]
-                                           [--dry-run]
+                                           [--events] [--dry-run]
+
+    `--events` nimmt nur Arcade-/Event-Runden (Zombie, Heist, TDM …) —
+    dort braucht das Match-Detail die Trefferzone fuer Headshot-Kills.
     """
     return _rohdaten_lauf("felder-backfill", args, telemetrie_felder_nachtragen)
 
@@ -1783,6 +1788,7 @@ def _rohdaten_lauf(titel, args, verarbeite) -> int:
     n_max = int(_opt("--matches", "0"))
     pace = float(_opt("--pace", "0.2"))
     trocken = "--dry-run" in args
+    nur_events = "--events" in args
 
     raw = connect()
     cdn = PubgClient(api_key="", platform="steam")
@@ -1793,13 +1799,17 @@ def _rohdaten_lauf(titel, args, verarbeite) -> int:
         # Telemetrie ist global.
         cur.execute("""
             SELECT DISTINCT ON (match_id) match_id, tenant_id, played_at,
-                   telemetry_url
+                   telemetry_url, game_mode, map_name
             FROM matches
             WHERE match_id IN (SELECT DISTINCT match_id FROM telemetry_events)
             ORDER BY match_id, tenant_id
         """)
         offen = sorted(cur.fetchall(), key=lambda r: r["played_at"] or "",
                        reverse=True)
+    if nur_events:
+        from pubg.aggregations import is_br_mode
+        offen = [r for r in offen
+                 if not is_br_mode(r["game_mode"], r["map_name"])]
     if n_max:
         offen = offen[:n_max]
     print(f"=== {titel}: {len(offen)} Matches ===")

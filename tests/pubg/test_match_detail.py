@@ -1037,8 +1037,9 @@ def test_mitfahrer_laut_pubg_schlagen_die_positionen():
 
 
 def test_arcade_round_takes_kills_and_damage_from_telemetry():
-    """Zombie-Modus: die PUBG-API meldet 0/0 — das Detail zeigt wie die
-    Session-Übersicht die Kills und den Schaden aus der Telemetrie."""
+    """Zombie-Modus: die PUBG-API meldet überall 0 — das Detail zeigt wie
+    die Session-Übersicht Kills, Schaden, Headshots und Knocks aus der
+    Telemetrie."""
     conn = _setup()
     insert_match(conn, "z1", "Zulu_Main", "zulu_hell-fpp", False, 1200,
                  "2026-05-15T18:00:00Z", None)
@@ -1055,7 +1056,10 @@ def test_arcade_round_takes_kills_and_damage_from_telemetry():
         for a in ("account.A", "account.B")])
     insert_telemetry_events(conn, "z1", [
         {"event_type": "Kill", "timestamp_ms": 1000 + i, "actor_account": "account.A",
-         "target_account": f"ai.{i}"} for i in range(3)] + [
+         "target_account": f"ai.{i}", "hit_zone": "HeadShot" if i < 2 else "TorsoShot"}
+        for i in range(3)] + [
+        {"event_type": "Knock", "timestamp_ms": 1500, "actor_account": "account.B",
+         "target_account": "account.X"}] + [
         {"event_type": "TakeDamage", "timestamp_ms": 2000, "actor_account": "account.A",
          "target_account": "ai.9", "damage": 150.0},
         {"event_type": "TakeDamage", "timestamp_ms": 2001, "actor_account": "account.B",
@@ -1066,3 +1070,6 @@ def test_arcade_round_takes_kills_and_damage_from_telemetry():
     assert by["account.A"]["damageDealt"] == 150.0
     assert by["account.B"]["kills"] == 0
     assert by["account.B"]["damageDealt"] == 40.0
+    assert by["account.A"]["headshotKills"] == 2
+    assert by["account.A"]["dbnos"] == 0
+    assert by["account.B"]["dbnos"] == 1

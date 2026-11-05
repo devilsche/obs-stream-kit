@@ -164,7 +164,8 @@ def test_felder_nachtrag_fuellt_vorhandene_zeilen():
         {"_T": "LogPlayerKillV2", "_D": "1970-01-01T00:00:01.0Z",
          "killer": {"accountId": ME}, "victim": {"accountId": "account.E"},
          "killerDamageInfo": {"damageTypeCategory": "Damage_Gun",
-                              "damageCauserName": "WeapHK416_C"},
+                              "damageCauserName": "WeapHK416_C",
+                              "damageReason": "HeadShot"},
          "finishDamageInfo": {"damageTypeCategory": "Damage_DBNO"},
          "dBNOId": 77},
         {"_T": "LogVehicleLeave", "_D": "1970-01-01T00:00:02.0Z",
@@ -178,11 +179,12 @@ def test_felder_nachtrag_fuellt_vorhandene_zeilen():
     ]
     assert telemetrie_felder_nachtragen(CONN.raw, "bf8", roh) == 2
     zeilen = {r["event_type"]: r for r in CONN.execute(
-        "SELECT event_type, dbno_id, damage_reason, max_speed, "
+        "SELECT event_type, dbno_id, damage_reason, hit_zone, max_speed, "
         "fellow_passengers FROM telemetry_events WHERE match_id = ?",
         ("bf8",)).fetchall()}
     assert len(zeilen) == 2
     assert zeilen["Kill"]["dbno_id"] == 77
     assert zeilen["Kill"]["damage_reason"] == "Damage_DBNO"
+    assert zeilen["Kill"]["hit_zone"] == "HeadShot"
     assert zeilen["VehicleLeave"]["max_speed"] == 133.0
     assert zeilen["VehicleLeave"]["fellow_passengers"] == '["account.B"]'
