@@ -143,17 +143,23 @@ def apply_mood(state: dict, mood: float, strength: float, precip) -> dict:
     e = _clamp(mood * strength, -1, 1)
     wet = s["precip"] != "none"
     if e > 0:
+        # Gewitter und Schneesturm bleiben dunkel, sonst Sonnenregen
+        heavy = s["kind"] in ("storm", "blizzard")
         s["clouds"] = _clamp(s["clouds"] * (1 - 0.7 * e))
-        s["sun"] = max(s["sun"], 0.6 * e if wet else e)
+        s["sun"] = max(s["sun"], (0.25 if heavy else 0.6 if wet else 1) * e)
+        s["fog"] = _clamp(s["fog"] * (1 - 0.5 * e))
         s["gloom"] = round(s.get("gloom", 0) * (1 - 0.7 * e), 3)
     elif e < 0:
         a = -e
         s["clouds"] = _clamp(s["clouds"] + 0.6 * a)
         s["fog"] = _clamp(s["fog"] + 0.4 * a)
         s["sun"] = s["sun"] * (1 - a)
+        s["heat"] = _clamp(s.get("heat", 0) * (1 - 0.6 * a))
         s["gloom"] = max(s.get("gloom", 0), a)
     if precip and not wet:
+        # Regen aus der Stimmung kühlt eine Hitzewelle fast ganz ab
         p = PROFILES[precip]
         s.update(kind=precip, precip="rain", rain=p["rain"], drizzle=p["drizzle"],
-                 clouds=max(s["clouds"], p["clouds"]), sun=0, lightning=0)
+                 clouds=max(s["clouds"], p["clouds"]), sun=0, lightning=0,
+                 heat=round(s.get("heat", 0) * 0.2, 3))
     return apply_daylight(s)

@@ -120,3 +120,20 @@ def test_wet_kinds_bring_their_own_gloom_and_mood_scales_it():
     assert profile("storm")["gloom"] > profile("rain")["gloom"] > profile("clear")["gloom"] == 0
     assert apply_mood(profile("rain"), 1, 1.0, None)["gloom"] < profile("rain")["gloom"]
     assert apply_mood(profile("storm"), -0.2, 1.0, None)["gloom"] == profile("storm")["gloom"]
+
+
+def test_bad_mood_rain_cools_a_heatwave():
+    s = apply_mood(profile("heat"), -1, 1.0, "rain")
+    assert s["kind"] == "rain" and s["heat"] <= 0.2
+    assert apply_mood(profile("heat"), -0.5, 1.0, None)["heat"] < 1
+
+
+def test_good_mood_thins_fog():
+    assert apply_mood(profile("fog"), 1, 1.0, None)["fog"] < profile("fog")["fog"] * 0.6
+
+
+def test_good_mood_barely_brightens_storm_or_blizzard():
+    for k in ("storm", "blizzard"):
+        s = apply_mood(profile(k), 1, 1.0, None)
+        assert s["sun"] <= 0.25 and s["lightning"] == profile(k)["lightning"]
+    assert apply_mood(profile("rain"), 1, 1.0, None)["sun"] >= 0.5      # Sonnenregen bleibt
