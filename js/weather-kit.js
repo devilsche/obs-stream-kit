@@ -1062,8 +1062,11 @@
           var a0 = Math.PI + 0.12, a1 = a0 + (Math.PI - 0.24) * reveal;
           var COLORS = ['255,70,70', '255,150,50', '255,230,80', '90,210,110', '80,160,255', '150,100,230'];
           sctx.lineWidth = 16;
+          // nachts ein Mondregenbogen: blass, fast farblos, schwächer
+          var nt = clamp(cur.night || 0, 0, 1);
           COLORS.forEach(function (col, i) {
-            sctx.strokeStyle = 'rgba(' + col + ',' + (0.32 * env) + ')';
+            var rgb = col.split(',').map(Number);
+            sctx.strokeStyle = 'rgba(' + mixRgb(rgb, [222, 228, 238], 0.8 * nt) + ',' + (0.32 * env * (1 - 0.45 * nt)) + ')';
             sctx.beginPath();
             sctx.arc(cx, cy, R - i * 15, a0, a1);
             sctx.stroke();
