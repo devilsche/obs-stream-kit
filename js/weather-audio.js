@@ -6,6 +6,7 @@
  *   var audio = WeatherAudio.create('../assets/effects/');
  *   audio.set({ on, volume, thunder });  audio.update(kit.state());
  *   audio.thunder(dist);  audio.gust();
+ * Donner aus opts.thunderFile (ohne eingebaute Pause), Verzögerung je Entfernung.
  */
 (function (root) {
   'use strict';
@@ -17,6 +18,7 @@
 
   function create(base, opts) {
     opts = opts || {};
+    var thunderFile = opts.thunderFile || (base + 'thunder-near-1.wav');
     var on = false, volume = 0.6, thunderLevel = 1, blocked = false;
     var loops = {}, targets = {}, lastThunder = -10;
 
@@ -87,14 +89,24 @@
         targets['wind-loop-strong'] = strong;
         targets['wind-loop-light'] = w > 0.15 ? (w * (1 - strong)) : 0;
       },
-      // Donner: nah oder fern je nach Einschlag, höchstens einer je 0,7 s
+      // Donner (assets/stingers/thunder-124463.mp3, setzt fast sofort ein):
+      // naher Blitz sofort, ferner verzögert, leiser und etwas tiefer;
+      // höchstens einer pro Sekunde, sonst stapeln sich die langen Donner
       thunder: function (dist) {
         var now = Date.now() / 1000;
-        if (now - lastThunder < 0.7) return;
+        if (now - lastThunder < 1) return;
         lastThunder = now;
-        var near = typeof dist === 'number' ? dist < 0.4 : Math.random() < 0.4;
-        var file = 'thunder-' + (near ? 'near' : 'far') + '-' + (Math.random() < 0.5 ? 1 : 2) + '.wav';
-        oneShot(file, volume * thunderLevel * (near ? 1 : 0.8));
+        var d = typeof dist === 'number' ? clamp(dist, 0, 1) : Math.random();
+        var delay = d < 0.4 ? 0 : 400 + d * 800;
+        var vol = volume * thunderLevel * (1 - 0.45 * d);
+        setTimeout(function () {
+          if (!on || vol <= 0.01) return;
+          var a = new Audio(thunderFile);
+          a.volume = clamp(vol, 0, 1);
+          a.preservesPitch = false;
+          a.playbackRate = (1 - 0.15 * d) * (0.94 + Math.random() * 0.12);
+          play(a);
+        }, delay);
       },
       gust: function () { oneShot('wind-gust.wav', volume * 0.9); }
     };

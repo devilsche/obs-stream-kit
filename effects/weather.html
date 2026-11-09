@@ -142,6 +142,7 @@
       // Ton (optional): Regen/Wind folgen der Lage, Donner je Blitz, Rauschen je Böe
       var soundBtn = document.getElementById('soundUnlock');
       var audio = window.WeatherAudio.create('../assets/effects/', {
+        thunderFile: '../assets/stingers/thunder-124463.mp3',
         // nur im Browser-Tab: Hinweis, dass ein Klick den Ton freigibt
         onBlocked: function (isBlocked) { soundBtn.hidden = !isBlocked || !!window.obsstudio; }
       });
