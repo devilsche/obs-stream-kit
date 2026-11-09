@@ -39,7 +39,9 @@ def test_weather_has_controls_and_live_keys():
         "cmd=spectacle&type=ballbolt", "cmd=spectacle&type=avalanche",
         "cmd=spectacle&type=aurora", "cmd=spectacle&type=rainbow", "cmd=spectacle&type=hail",
         "cmd=spectacle&type=meteors", "cmd=spectacle&type=tornado", "cmd=spectacle&type=fogwall",
-        "cmd=scrape", "cmd=warm", "cmd=frostclear", "cmd=leaders"]
+        "cmd=scrape", "cmd=warm", "cmd=frostclear", "cmd=leaders",
+        "cmd=setup", "cmd=farewell", "cmd=celebrate", "cmd=shovel", "cmd=shake&force=1",
+        "cmd=icicle", "cmd=snowball", "cmd=snowboard"]
     assert {"mood", "kdlow", "kdhigh", "kdtest", "fallback", "lock", "veil"} <= set(src["live"])
     for c in src["commands"]:
         commands.parse("weather", dict(parse_qsl(c["q"])))

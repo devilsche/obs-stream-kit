@@ -389,6 +389,20 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 
 **Frost:** Bei echter Temperatur ≤ 0 °C oder im Schneesturm wachsen Eisblumen von den Ecken über die Ränder ins Bild (Mitte bleibt frei): (2 + Kältegrade) % pro Minute, im Schneesturm mindestens 10 %; über 0 °C taut es langsam ((1 + Temperatur/2) % pro Minute), bei Hitze – auch eingestellt – schmilzt er mit 25 % pro Minute. Der Stand liegt auf dem Server und überlebt Reload und Neustart. `!scrape` kratzt 6 % frei (Kratzer fährt eine Bahn), `!warm` haucht 10 % frei (Atemwolke, Dampf); beides wirkt nur an der Stelle, die übrige Scheibe bleibt; freie Stellen frieren in etwa 90 s wieder zu. Beide zählen für die Rangliste „Top frost fighters“; ist die Scheibe ganz frei, funkelt es. Schalter `frost` (`1`/`0`) und `frostrate` (`0.25`–`4`).
 
+**Deko-Thema Winter mit Xmas-Zeit:** Schalter `theme` (`auto` = Winter von Dezember bis Februar und während der Xmas-Zeit, `winter`, `none`). Winter: Schneedecke (wächst, solange es schneit, bis 6 %/min × `snowrate`; Hitze und Tauwetter lassen sie schmelzen), Eiszapfen, Schneemann (ein Teil pro Sub, in der Xmas-Zeit mit Mütze und Lichterkette) und Mini-Schneemänner der Follower. Xmas-Zeit von `xmasfrom` (`advent` = 1. Advent oder `MM-DD`) bis `xmasto` (`MM-DD`, Standard `12-26`): Lichterkette, Baum mit Follower-Kugeln, hängende Kugeln, Geschenke. Der **Aufbau** ist ab dem Beginn fällig und spielt beim ersten Stream, sobald die Source 2 min live im Programm ist; der **Abschied** ebenso nach dem Ende (Kugeln fallen nacheinander ab, Baum geht, Geschenke-Rangliste ein letztes Mal). `cmd=setup` / `cmd=farewell` (Knöpfe „Set up Christmas“ / „Christmas farewell“) lösen jederzeit sofort aus und machen den automatischen Schritt der Saison hinfällig. Einzelteile per Schalter `lights`, `tree`, `baubles`, `gifts`, `snowman`, `minis`, `icicles`, `cover`. Kugeln, Geschenke, Mini-Schneemänner und Schneemann aus `xmas.html`/`winter.html` werden übernommen.
+
+| Befehl | Wirkung |
+|--------|---------|
+| `cmd=follow&name=%user%` | Follow: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann |
+| `cmd=build&name=%user%` | Sub: nächstes Schneemann-Teil (8 Teile) |
+| `cmd=gift&name=%user%&type=sub\|resub\|giftsub\|bits\|raid&amount=…` | Geschenk unter dem Baum |
+| `cmd=shovel&name=%user%` | 5 % Schnee schippen (Rangliste „Top snow shovelers“) |
+| `cmd=shake&name=%user%` | Schnee abschütteln, gelingt bei 5 Leuten in 20 s (`&force=1` sofort) |
+| `cmd=icicle&name=%user%` / `cmd=snowball&name=%user%` | Eiszapfen abbrechen (zählt) / Schneeball werfen |
+| `cmd=celebrate[&name=…]`, `cmd=snowboard` | Feiern / Rangliste zeigen |
+| `cmd=setup` / `cmd=farewell` | Xmas-Aufbau / -Abschied sofort |
+| `cmd=clear&kind=ornaments\|gifts\|minis\|snow\|snowman` | Mods: dauerhaft löschen |
+
 **Befehle** an `https://stream-overlay.com/s/<token>/api/fx/weather?cmd=…` (Streamer.bot **Fetch URL**):
 
 | Befehl | Wirkung |
