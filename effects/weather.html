@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="../js/stinger-ready.js"></script>
   <link rel="stylesheet" href="../js/season-kit.css" />
+  <link rel="stylesheet" href="../js/theme-winter.css" />
   <title>Weather Overlay</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -126,6 +127,7 @@
   <script src="../js/weather-kit.js"></script>
   <script src="../js/weather-frost.js"></script>
   <script src="../js/weather-audio.js"></script>
+  <script src="../js/theme-winter.js"></script>
   <script>
     (function () {
       'use strict';
@@ -136,6 +138,9 @@
       var K = window.WeatherKit;
       var params = new URLSearchParams(window.location.search);
       var kit = K.create(document.getElementById('stage'));
+      // Deko-Thema vor dem Frost anlegen: der Frost liegt als „Scheibe“ darüber
+      var theme = window.ThemeWinter.create(document.getElementById('stage'), {
+        tags: document.getElementById('tags'), hud: document.querySelector('.hud') });
       var frost = window.WeatherFrost.create(document.getElementById('stage'), {
         tags: document.getElementById('tags'), board: document.getElementById('frostBoard') });
       var lastFrostTop = [];
@@ -153,7 +158,11 @@
       var rootEl = document.documentElement;
 
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
-                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder'];
+                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder',
+                  'theme', 'xmasfrom', 'xmasto', 'snowrate', 'shakeneed', 'shakewin',
+                  'lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover'];
+      // Deko-Teile, die einzeln abschaltbar sind (fehlt = an)
+      var PARTS = ['lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover'];
       function fromUrl() {
         var out = {};
         KEYS.forEach(function (k) {
@@ -175,7 +184,8 @@
       var lastSig = null;
       // Felder, die sich ändern, ohne dass das Bild anders aussieht
       var SIG_SKIP = { until: 1, transition: 1, source: 1, temp: 1, freezing: 1,
-                       frost: 1, frostTop: 1, frostOn: 1 };
+                       frost: 1, frostTop: 1, frostOn: 1,
+                       theme: 1, xmas: 1, snowCover: 1, snowTop: 1 };
       // Wind aus dem Schalter: auto = Wind der Lage (live: echter Wind),
       // random = wechselt von selbst, Zahl = fest
       function withWind(state) {
@@ -200,10 +210,62 @@
         }
         // Grauschleier folgt nur der schlechten K/D, nicht der Grundtrübung bei Regen
         rootEl.style.setProperty('--wk-gloom', String(Math.max(0, -(state.mood || 0))));
+        applyTheme(state);
         if (sig === lastSig) return;
         lastSig = sig;
         kit.setState(state, secs);
       }
+      // ── Deko-Thema (Winter mit Xmas-Zeit) ──
+      function partOn(v) { return v === undefined || !(v === false || v === '0' || v === 'off' || v === 'false'); }
+      function applyTheme(state) {
+        var parts = {};
+        PARTS.forEach(function (k) { parts[k] = partOn(settings[k]); });
+        theme.update({ theme: state.theme || 'none', xmas: state.xmas || 'off',
+                       snowCover: typeof state.snowCover === 'number' ? state.snowCover : 0,
+                       snowTop: state.snowTop || [], heat: state.heat || 0, night: state.night || 0,
+                       parts: parts });
+        lastTheme = state.theme || 'none';
+        wantStep(lastTheme === 'winter' ? state.xmas : null);
+      }
+
+      // Fälliger Aufbau/Abschied: in OBS erst, wenn die Source 2 min live im
+      // Programm ist, im Browser-Tab sofort; danach meldet xmasdone den Schritt
+      var lastTheme = 'none';
+      var played = {}, pending = null, readySince = null;
+      var obsActive = true;   // ohne Auskunft von OBS: als live annehmen
+      window.addEventListener('obsSourceActiveChanged', function (e) {
+        obsActive = !!(e.detail && e.detail.active);
+        readySince = null;
+        checkPending();
+      });
+      function wantStep(xmas) {
+        var step = (xmas === 'setup' || xmas === 'farewell') && !played[xmas] ? xmas : null;
+        if (step !== pending) { pending = step; readySince = null; }
+        checkPending();
+      }
+      function checkPending() {
+        if (!pending || theme.busy()) return;
+        if (window.obsstudio) {
+          if (!obsActive) { readySince = null; return; }
+          if (readySince === null) readySince = Date.now();
+          if (Date.now() - readySince < 120000) return;
+        }
+        var step = pending;
+        pending = null;
+        playStep(step, true);
+      }
+      setInterval(checkPending, 1000);
+      function playStep(step, auto) {
+        played[step] = true;
+        if (pending === step) pending = null;
+        var fn = step === 'setup' ? theme.playSetup : theme.playFarewell;
+        fn(function () {
+          if (!apiBase) return;
+          var done = auto ? fetch(apiBase + 'weather?cmd=xmasdone&step=' + step, { cache: 'no-store' }) : Promise.resolve();
+          done.catch(function () {}).then(function () { fetchState(); });
+        });
+      }
+
       function applyVeil() {
         rootEl.dataset.veil = flag(settings.veil) ? 'on' : 'off';
         audio.set({ on: flag(settings.sound),
@@ -242,7 +304,8 @@
           return;
         }
         var q = new URLSearchParams();
-        ['place', 'lock', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'aurorakd', 'frost', 'frostrate'].forEach(function (k) {
+        ['place', 'lock', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'aurorakd', 'frost', 'frostrate',
+         'theme', 'xmasfrom', 'xmasto', 'snowrate'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
@@ -299,6 +362,27 @@
           case 'spectacle':
             kit.spectacle(p.type || randomShow());
             break;
+          // Winter-Thema
+          case 'ornament':
+          case 'gift':
+          case 'mini':
+          case 'build':
+          case 'snowmanreset':
+          case 'shovel':
+          case 'icicle':
+          case 'snowball':
+          case 'celebrate':
+          case 'snowboard':
+          case 'clear':
+            theme.command(c.cmd, p);
+            break;
+          case 'shake':
+            theme.command('shake', Object.assign({ win: settings.shakewin }, p));
+            break;
+          case 'setup':
+          case 'farewell':
+            playStep(c.cmd, false);
+            break;
           case 'set':
             Object.keys(p).forEach(function (k) { settings[k] = String(p[k]); });
             fastNext = true;
@@ -341,7 +425,8 @@
         }
       }
 
-      function listen(effect, handler) {
+      // onState: Deko-Stand aus dem ersten Poll (ohne since)
+      function listen(effect, handler, onState) {
         var seq = null, epoch = null;
         function pollOnce() {
           var delay = 1000;
@@ -356,7 +441,8 @@
                 return;
               }
               epoch = data.epoch;
-              if (seq !== null) (data.commands || []).forEach(handler);
+              if (seq === null) { if (onState && data.state) onState(data.state); }
+              else (data.commands || []).forEach(handler);
               seq = data.seq;
             })
             .catch(function () { delay = 3000; })
@@ -369,7 +455,7 @@
       applyTestBg();
       fetchState();
       if (apiBase) {
-        listen('weather', applyCommand);
+        listen('weather', applyCommand, function (st) { theme.load(st); });
         if (params.get('chan') === 'rain') listen('rain', applyRainCommand);
       }
     })();

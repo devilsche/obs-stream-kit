@@ -1,0 +1,198 @@
+/* Winter-Thema der Weather-Source (js/theme-winter.js): Schneedecke,
+   Eiszapfen, Schneemann, Mini-Schneemänner – in der Xmas-Zeit zusätzlich
+   Lichterkette, Baum mit Kugeln, hängende Kugeln und Geschenke.
+   Zustände kommen als data-* am Wurzel-Element, Mengen als CSS-Variablen
+   (--tw-snow, --tw-light, --tw-cap, --tw-hat, --tw-drift, --tw-melt). */
+
+.tw {
+  position: absolute; inset: 0; pointer-events: none;
+  --tw-snow: 0; --tw-light: 0; --tw-cap: 0; --tw-hat: 0; --tw-drift: 0; --tw-melt: 0;
+  --c1: #ff3b3b; --c2: #2ecc71; --c3: #ffd23f; --c4: #3fa9ff; --c5: #ff8a1f;
+  opacity: 1;
+  transition: opacity 2s ease;
+}
+.tw[data-on="0"] { opacity: 0; visibility: hidden; transition: opacity 2s ease, visibility 0s linear 2s; }
+.tw-layer { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; pointer-events: none; }
+.tw-defs { position: absolute; width: 0; height: 0; }
+
+/* Teile einzeln abschaltbar (Schalter lights, tree, baubles, gifts, …) */
+.tw[data-lights="0"] .tw-lights,
+.tw[data-tree="0"] .tw-treebox,
+.tw[data-baubles="0"] .tw-baubles,
+.tw[data-gifts="0"] .tw-gifts,
+.tw[data-snowman="0"] .tw-sm,
+.tw[data-minis="0"] .tw-minis,
+.tw[data-icicles="0"] .tw-ice,
+.tw[data-cover="0"] .tw-cover { display: none; }
+.tw[data-tree="0"][data-gifts="0"] .tw-counter { display: none; }
+
+/* Xmas-Teile blenden weich ein und aus */
+.tw-x { opacity: 1; transition: opacity 1.5s ease; }
+.tw[data-xmas="0"] .tw-x { opacity: 0; visibility: hidden; transition: opacity 1.5s ease, visibility 0s linear 1.5s; }
+
+/* Nacht: Deko etwas dunkler, Lichter bleiben hell */
+.tw[data-night="1"] .tw-dim { filter: brightness(calc(1 - 0.35 * var(--tw-night, 0))); }
+
+/* ── Glühbirnen ── */
+.tw-bulb .glow { filter: url(#tw-bulbGlow); }
+.tw-bulb .lit { animation: twTwinkle 2.2s ease-in-out infinite; }
+.tw-bulb.k1 .glow, .tw-bulb.k1 .body { fill: var(--c1); }
+.tw-bulb.k2 .glow, .tw-bulb.k2 .body { fill: var(--c2); }
+.tw-bulb.k3 .glow, .tw-bulb.k3 .body { fill: var(--c3); }
+.tw-bulb.k4 .glow, .tw-bulb.k4 .body { fill: var(--c4); }
+.tw-bulb.k5 .glow, .tw-bulb.k5 .body { fill: var(--c5); }
+.tw-bulb .socket { fill: #2b2f2a; }
+.tw-bulb.is-off .glow { display: none; }
+.tw-bulb.is-off .body { fill: #59606a; opacity: 0.85; animation: none; }
+.tw-wire { fill: none; stroke: #1f2420; stroke-width: 3; }
+.tw-wire--small { stroke-width: 2; }
+.tw-wire-snow {
+  fill: none; stroke: #f4f8ff; stroke-linecap: round;
+  stroke-width: calc(3px + 6px * var(--tw-snow));
+  opacity: var(--tw-light);
+  transform: translateY(calc(-2.5px - 3px * var(--tw-snow)));
+}
+@keyframes twTwinkle { 0%, 100% { opacity: 1; } 40% { opacity: 0.2; } 55% { opacity: 1; } }
+@keyframes twChase { 0%, 18% { opacity: 1; } 30%, 100% { opacity: 0.22; } }
+.tw-bulb.ri-0 .lit { animation-delay: -0.1s; } .tw-bulb.ri-1 .lit { animation-delay: -1.3s; }
+.tw-bulb.ri-2 .lit { animation-delay: -0.7s; } .tw-bulb.ri-3 .lit { animation-delay: -1.9s; }
+.tw-bulb.ri-4 .lit { animation-delay: -0.4s; } .tw-bulb.ri-5 .lit { animation-delay: -1.6s; }
+.tw-bulb.ri-6 .lit { animation-delay: -1.0s; } .tw-bulb.ri-7 .lit { animation-delay: -2.1s; }
+.tw-bulb.ri-8 .lit { animation-delay: -0.25s; } .tw-bulb.ri-9 .lit { animation-delay: -1.45s; }
+
+/* ── Celebrate: Lauflicht, Kugeln wackeln, Minis hüpfen, Schneemann winkt ── */
+.tw[data-celebrate="1"] .tw-bulb:not(.is-off) .lit { animation: twChase 0.5s linear infinite; }
+.tw[data-celebrate="1"] .tw-bulb.ci-1 .lit { animation-delay: .05s; } .tw[data-celebrate="1"] .tw-bulb.ci-2 .lit { animation-delay: .1s; }
+.tw[data-celebrate="1"] .tw-bulb.ci-3 .lit { animation-delay: .15s; } .tw[data-celebrate="1"] .tw-bulb.ci-4 .lit { animation-delay: .2s; }
+.tw[data-celebrate="1"] .tw-bulb.ci-5 .lit { animation-delay: .25s; } .tw[data-celebrate="1"] .tw-bulb.ci-6 .lit { animation-delay: .3s; }
+.tw[data-celebrate="1"] .tw-bulb.ci-7 .lit { animation-delay: .35s; } .tw[data-celebrate="1"] .tw-bulb.ci-8 .lit { animation-delay: .4s; }
+.tw[data-celebrate="1"] .tw-bulb.ci-9 .lit { animation-delay: .45s; }
+.tw[data-celebrate="1"] .tw-orn { animation: twJiggle 0.35s ease-in-out 4; }
+.tw[data-celebrate="1"] .tw-gift { animation: twJiggle 0.35s ease-in-out 4; transform-origin: 50% 100%; }
+.tw[data-celebrate="1"] .tw-star-rays { animation-duration: 1.5s; }
+.tw[data-celebrate="1"] .tw-bauble { animation: twSway 0.5s ease-in-out infinite; }
+.tw[data-celebrate="1"] .tw-mini { animation: twHop 0.35s ease-in-out 4; }
+.tw[data-celebrate="1"] .tw-sm-armr { animation: twWave 0.4s ease-in-out 5; }
+.tw[data-celebrate="1"] .tw-sm-hatg { animation: twTip 1.2s ease-in-out; }
+@keyframes twJiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg); } 75% { transform: rotate(8deg); } }
+@keyframes twHop { 0%, 100% { transform: none; } 50% { transform: translateY(-12px); } }
+@keyframes twWave { 0%, 100% { transform: rotate(0); } 50% { transform: rotate(-28deg); } }
+@keyframes twTip { 0%, 100% { transform: none; } 40%, 60% { transform: translate(-6px, -18px) rotate(-18deg); } }
+
+/* ── Baum ── */
+.tw-tree-g { fill: url(#tw-treeG); }
+.tw-trunk { fill: #5a3a22; }
+.tw-garland { fill: none; stroke: #e8c45a; stroke-width: 3; stroke-dasharray: 2 5; stroke-linecap: round; }
+.tw-star { fill: #ffd23f; stroke: #fff6c8; stroke-width: 2; filter: url(#tw-starGlow); }
+.tw-star-rays { fill: #fff3b0; transform-box: fill-box; transform-origin: center; animation: twSpin 14s linear infinite; }
+@keyframes twSpin { to { transform: rotate(360deg); } }
+.tw-mound { fill: url(#tw-moundG); transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(calc(1 + 0.6 * var(--tw-snow))); }
+.tw-drift { fill: url(#tw-moundG); transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--tw-drift)); }
+/* Schnee auf den Ästen folgt der Schneedecke */
+.tw-snowcap { fill: #f4f8ff; transform-box: fill-box; transform: scaleY(calc(1 + 1.4 * var(--tw-snow))); }
+.tw-snowcap--3 { transform-origin: 50% 35%; }
+.tw-snowcap--2 { transform-origin: 50% 30%; }
+.tw-snowcap--1 { transform-origin: 50% 31%; }
+.tw-frost { fill: #ffffff; opacity: calc(0.38 * var(--tw-snow)); }
+.tw-ridge-snow { fill: none; stroke: #f4f8ff; stroke-linejoin: round; stroke-width: calc(5px + 10px * var(--tw-snow)); opacity: var(--tw-light); }
+.tw-starhat { fill: #f4f8ff; opacity: var(--tw-hat); }
+.tw-gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--tw-snow)); }
+.tw-counter {
+  font: 700 14px 'DM Sans', sans-serif; letter-spacing: 1px;
+  fill: rgba(255, 255, 255, 0.92); paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 4px;
+}
+.tw-orn, .tw-gift { transform-box: fill-box; transform-origin: 50% 0; }
+.tw-orn--new { animation: twOrnDrop 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes twOrnDrop { from { transform: translateY(-60px) scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+.tw-gift--new { animation: twGiftDrop 0.8s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+@keyframes twGiftDrop { from { transform: translateY(-160px); opacity: 0; } 40% { opacity: 1; } to { transform: none; opacity: 1; } }
+
+/* ── Hängende Kugeln ── */
+.tw-bauble { transform-box: fill-box; transform-origin: 50% 0; animation: twSway 5s ease-in-out infinite; }
+.tw-bauble:nth-child(1) { animation-delay: -1s; }   .tw-bauble:nth-child(2) { animation-delay: -2.4s; }
+.tw-bauble:nth-child(3) { animation-delay: -0.3s; } .tw-bauble:nth-child(4) { animation-delay: -3s; }
+.tw-bauble:nth-child(5) { animation-delay: -1.7s; } .tw-bauble:nth-child(6) { animation-delay: -4.1s; }
+@keyframes twSway { 0%, 100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+.tw-thread { stroke: rgba(230, 230, 230, 0.55); stroke-width: 2; }
+.tw-bcap { fill: url(#tw-capG); }
+.tw-bsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--tw-cap)); opacity: var(--tw-light); }
+
+/* ── Eiszapfen und Schneedecke ── */
+.tw-ice-i { fill: url(#tw-iceG); stroke: rgba(255, 255, 255, 0.7); stroke-width: 1; }
+.tw-ridge { fill: #f4f9ff; }
+.tw-ridge-shade { fill: #cfe0f2; }
+.tw-cover-snow { fill: #f2f7fd; }
+.tw-cover-shade { fill: #c9d9ec; }
+
+/* ── Schneemann ── */
+.tw-sm-ball { fill: url(#tw-ballG); }
+.tw-sm-coal { fill: #23262b; }
+.tw-sm-nose { fill: #f07c1e; }
+.tw-sm-arm { fill: none; stroke: #5a3a22; stroke-width: 5; stroke-linecap: round; }
+.tw-sm-scarf { fill: #c4302b; }
+.tw-sm-scarf2 { fill: #f2b705; }
+.tw-sm-hat { fill: #1f1f26; }
+.tw-sm-band { fill: #5e2a79; }
+.tw-sm-part { display: none; transform-box: fill-box; transform-origin: 50% 100%; }
+.tw-sm-part.is-on { display: inline; }
+.tw-sm-part.is-new { animation: twPop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes twPop { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+.tw-sm-armr { transform-box: fill-box; transform-origin: 0% 100%; }
+.tw-sm-hatg { transform-box: fill-box; transform-origin: 20% 100%; }
+.tw-sm.is-done .tw-sm-hatg { animation: twTip 1.2s ease-in-out; }
+/* Hitze: schrumpft leicht und sackt zusammen */
+.tw-sm-body {
+  transform-box: fill-box; transform-origin: 50% 100%;
+  transform: scale(calc(1 - 0.07 * var(--tw-melt)), calc(1 - 0.14 * var(--tw-melt)));
+}
+/* Xmas: Weihnachtsmütze statt Zylinder, Lichterkette um den Bauch */
+.tw-sm-xmas { opacity: 0; transition: opacity 1.5s ease; }
+.tw[data-xmas="1"] .tw-sm-xmas { opacity: 1; }
+.tw-sm-tophat { transition: opacity 1.5s ease; }
+.tw[data-xmas="1"] .tw-sm-tophat { opacity: 0; }
+.tw-sm[data-head="0"] .tw-sm-santa, .tw-sm[data-belly="0"] .tw-sm-lights { display: none; }
+.tw-santa-red { fill: #c4302b; }
+.tw-santa-white { fill: #f7fbff; }
+
+/* ── Mini-Schneemänner ── */
+.tw-mini { transform-box: fill-box; transform-origin: 50% 100%; }
+.tw-mini--new { animation: twPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+.tw-mini__ball { fill: url(#tw-ballG); }
+.tw-mini__hat1 { fill: #c4302b; } .tw-mini__hat2 { fill: #2a64b8; } .tw-mini__hat3 { fill: #2e9e5b; } .tw-mini__hat4 { fill: #8e4bb8; }
+.tw-mini__pom { fill: #ffffff; }
+
+/* ── Effekte: Schaufel, Schneeball ── */
+.tw-shovel { transform-box: fill-box; transform-origin: 90% 10%; animation: twScoop 0.9s ease-in-out forwards; }
+@keyframes twScoop {
+  0%   { transform: rotate(-35deg) translateY(-20px); opacity: 0; }
+  15%  { opacity: 1; }
+  45%  { transform: rotate(-10deg) translateY(6px); }
+  70%  { transform: rotate(28deg) translateY(-10px); opacity: 1; }
+  100% { transform: rotate(35deg) translateY(-14px); opacity: 0; }
+}
+.tw-shovel__stick { stroke: #8a5a2b; stroke-width: 6; stroke-linecap: round; }
+.tw-shovel__grip { fill: #5a3a1a; }
+.tw-shovel__blade { fill: #9aa7b6; stroke: #5f6b78; stroke-width: 2; }
+.tw-splat { fill: #f7fbff; stroke: #c9d9ec; stroke-width: 2; }
+.tw-splat-g { animation: twSplat 5s ease-in forwards; transform-box: fill-box; transform-origin: 50% 0; }
+@keyframes twSplat {
+  0% { transform: scale(0.4); opacity: 1; }
+  6% { transform: scale(1.08); }
+  10%, 70% { transform: none; opacity: 1; }
+  100% { transform: translateY(60px) scaleY(1.2); opacity: 0; }
+}
+.tw-ball { fill: #f7fbff; stroke: #b8cde4; stroke-width: 2; }
+
+/* Schütteln: alles wackelt, ohne Erfolg nur kurz */
+.tw.is-shakeoff .tw-shk { animation: twShake 1.1s ease-in-out; }
+.tw.is-wobble .tw-shk { animation: twWobble 0.5s ease-in-out; }
+@keyframes twShake {
+  0%, 100% { transform: none; } 10% { transform: translateX(-14px); } 25% { transform: translateX(14px); }
+  40% { transform: translateX(-12px); } 55% { transform: translateX(10px); } 70% { transform: translateX(-6px); } 85% { transform: translateX(3px); }
+}
+@keyframes twWobble { 0%, 100% { transform: none; } 20% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 80% { transform: translateX(-2px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tw *, .tw *::before, .tw *::after { animation: none !important; }
+  .tw, .tw-x, .tw-sm-xmas, .tw-sm-tophat { transition-duration: 0.4s; }
+}
