@@ -253,3 +253,10 @@ def test_aurora_rewards_a_very_good_night(conn, monkeypatch):
     assert _state(c, "?place=F&kdtest=3.5&aurorakd=4")["aurora"] == 0
     assert _state(c, "?place=F&kdtest=3.5&aurorakd=0")["aurora"] == 0      # 0 = aus
     assert _state(c, "?place=F&kdtest=3.5&mood=0")["aurora"] == 0          # Stimmung aus
+
+
+def test_fixed_night_shows_a_moon_even_at_new_moon(conn, monkeypatch):
+    q = _with_location(conn, monkeypatch)
+    st = _state(_client(conn), q + "&lock=night&kdtest=3.5")
+    assert st["night"] == 1 and st["sunUp"] == 0
+    assert st["moonUp"] == 1 and st["moonLit"] >= 0.8 and st["aurora"] > 0.9

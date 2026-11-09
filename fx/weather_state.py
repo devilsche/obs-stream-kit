@@ -86,6 +86,12 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     state = weather.apply_daylight(state)
     if loc:
         state.update(_sky(now, loc["lat"], loc["lon"]))
+    # Feste Nacht/Dämmerung zum Testen: feste Szene statt echtem Himmel
+    # (sonst wäre bei Neumond oder tagsüber kein Mond zu sehen)
+    if lock == "night":
+        state.update(sunUp=0, sunX=0.1, sunY=1, moonUp=1, moonX=0.78, moonY=0.2, moonLit=0.9, moonWax=1)
+    elif lock == "dusk":
+        state.update(sunUp=1, sunX=0.88, sunY=0.92, moonUp=0, moonX=0.2, moonY=1, moonLit=0.5, moonWax=1)
     # Polarlicht als Belohnung: sehr gute K/D bei Nacht (aurorakd 0 = aus)
     thr = opts.get("aurorakd", AURORA_KD)
     aurora = 0.0
