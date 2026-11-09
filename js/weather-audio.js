@@ -96,10 +96,11 @@
         targets['rain-loop-storm'] = storm;
         targets['rain-loop-medium'] = clamp(rain * 1.2, 0, 1) * (1 - storm);
         targets['rain-loop-light'] = clamp(drizzle * 1.1, 0, 1) * (1 - clamp(rain * 1.5, 0, 1));
-        var w = Math.max(Math.abs(cur.wind || 0), cur.windMin || 0, cur.windRandom ? 0.5 : 0);
-        var strong = smooth((w - 0.5) / 0.4);
+        // leichtes Lüftchen bleibt still; hörbar ab mittlerem Wind, laut im Sturm
+        var w = Math.max(Math.abs(cur.wind || 0), cur.windMin || 0, cur.windRandom ? 0.4 : 0);
+        var strong = smooth((w - 0.55) / 0.35);
         targets['wind-loop-strong'] = strong;
-        targets['wind-loop-light'] = w > 0.15 ? (w * (1 - strong)) : 0;
+        targets['wind-loop-light'] = smooth((w - 0.3) / 0.25) * 0.7 * (1 - strong);
       },
       // Donner: vorab dekodiert und aus dem Speicher gespielt (keine Ladezeit),
       // setzt mit dem Blitz ein; fern nur leiser und tiefer. Jeder Blitz
