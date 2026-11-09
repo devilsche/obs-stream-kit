@@ -21,7 +21,7 @@
     var thunderFile = opts.thunderFile || (base + 'thunder-near-1.wav');
     // Donner einmal laden und dekodieren
     var AC = root.AudioContext || root.webkitAudioContext;
-    var actx = AC ? new AC() : null, thunderBuf = null;
+    var actx = AC ? new AC() : null, thunderBuf = null, voices = 0;
     if (actx) {
       fetch(thunderFile).then(function (r) { return r.arrayBuffer(); })
         .then(function (ab) { return new Promise(function (ok, no) { actx.decodeAudioData(ab, ok, no); }); })
@@ -102,11 +102,13 @@
         targets['wind-loop-light'] = w > 0.15 ? (w * (1 - strong)) : 0;
       },
       // Donner: vorab dekodiert und aus dem Speicher gespielt (keine Ladezeit),
-      // setzt mit dem Blitz ein; fern nur leiser und tiefer, ohne Pause;
-      // höchstens einer pro Sekunde, sonst stapeln sich die langen Donner
+      // setzt mit dem Blitz ein; fern nur leiser und tiefer. Donner dürfen
+      // überlappen (bis zu 6), je mehr gleichzeitig, desto leiser jeder;
+      // dicht aufeinander folgende setzen versetzt im Grollen ein
       thunder: function (dist) {
         var now = Date.now() / 1000;
-        if (!on || now - lastThunder < 1) return;
+        if (!on || now - lastThunder < 0.12 || voices >= 6) return;
+        var dense = now - lastThunder < 1.5;
         lastThunder = now;
         var d = typeof dist === 'number' ? clamp(dist, 0, 1) : Math.random();
         var vol = volume * thunderLevel * (1 - 0.45 * d);
@@ -116,9 +118,11 @@
           var src = actx.createBufferSource(), g = actx.createGain();
           src.buffer = thunderBuf;
           src.playbackRate.value = rate;
-          g.gain.value = clamp(vol, 0, 1);
+          g.gain.value = clamp(vol / Math.sqrt(voices + 1), 0, 1);
           src.connect(g).connect(actx.destination);
-          src.start();
+          voices++;
+          src.onended = function () { voices = Math.max(0, voices - 1); };
+          src.start(0, dense ? Math.random() * 1.2 : 0);
           return;
         }
         // Rückfall ohne Web Audio
