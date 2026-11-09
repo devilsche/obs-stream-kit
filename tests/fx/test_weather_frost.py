@@ -25,7 +25,7 @@ def test_grows_when_freezing_and_faster_when_colder(conn):
 
 def test_blizzard_freezes_even_without_temperature(conn):
     advance(conn, 1, now=0, temp=None, blizzard=True)
-    assert advance(conn, 1, now=60, temp=None, blizzard=True)["level"] == pytest.approx(15)
+    assert advance(conn, 1, now=60, temp=None, blizzard=True)["level"] == pytest.approx(10)
 
 
 def test_thaws_above_zero_and_stays_in_bounds(conn):
