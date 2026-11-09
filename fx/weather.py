@@ -25,6 +25,7 @@ PROFILES = {
     "heat":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0,    "sun": 1,    "fog": 0,    "heat": 1, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
     # nur als feste Lage / Chat-Befehl; live kommen Nacht und Dämmerung aus daylight()
     "night":    {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.05, "sun": 0,    "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 1, "dusk": 0},
+    "dawn":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.15, "sun": 0.35, "fog": 0.1,  "heat": 0, "lightning": 0, "windMin": 0, "night": 0.2, "dusk": 1},
     "dusk":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.15, "sun": 0.35, "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 0.2, "dusk": 1},
 }
 KINDS = tuple(PROFILES)

@@ -35,6 +35,7 @@
     heat:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0,    sun: 1,    fog: 0,    heat: 1, lightning: 0, windMin: 0, night: 0, dusk: 0 },
     // nur als feste Lage / Chat-Befehl; live kommen Nacht und Dämmerung vom Server
     night:    { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.05, sun: 0,    fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 1, dusk: 0 },
+    dawn:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.15, sun: 0.35, fog: 0.1,  heat: 0, lightning: 0, windMin: 0, night: 0.2, dusk: 1 },
     dusk:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.15, sun: 0.35, fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 0.2, dusk: 1 }
   };
   var KINDS = Object.keys(PROFILES);
@@ -263,8 +264,8 @@
         var gone;
         if (p.type === 'snow') {
           var sl = SNOW_LAYERS[p.layer];
-          // Schneesturm: Flocken jagen fast waagerecht
-          p.y += p.v * (1 + 0.4 * bz) * dt;
+          // Schneesturm: Flocken jagen fast waagerecht; nasser Schnee fällt schneller
+          p.y += p.v * (1 + 0.4 * bz + 1.1 * wetS) * dt;
           p.x += (wind * (160 + p.layer * 90) * sl.drift * (1 + 2.2 * bz) +
                   Math.sin(p.phase + time * p.freq) * sl.sway) * dt;
           gone = p.y - p.r > H || p.x < -1000 || p.x > W + 1000;
@@ -319,9 +320,27 @@
           }
         });
       });
-      // Schnee: Flocken glitzern, wenn die Sonne durchkommt
-      var sparkle = cur.sun > 0.25;
+      // Schnee: Flocken glitzern, wenn die Sonne durchkommt. Bei Schneeregen
+      // (wetS) sind sie nass: größer, matt grau-weiß, in Fallrichtung
+      // gestreckt und tauen nach unten hin zu Tropfen weg
+      var sparkle = cur.sun > 0.25 && wetS < 0.3;
       SNOW_LAYERS.forEach(function (sl, li) {
+        if (wetS > 0.05) {
+          var tilt = Math.atan2(wind * 0.6, 1);
+          pctx.fillStyle = 'rgba(' + Math.round(248 - 30 * wetS) + ',' + Math.round(251 - 24 * wetS) + ',' + Math.round(255 - 18 * wetS) + ',1)';
+          for (var j = 0; j < parts.length; j++) {
+            var w = parts[j];
+            if (w.type !== 'snow' || w.layer !== li) continue;
+            var melt = 1 - 0.65 * wetS * clamp(w.y / H, 0, 1);
+            var rr = w.r * (1 + 0.5 * wetS) * (0.6 + 0.4 * melt);
+            pctx.globalAlpha = sl.alpha * (1 - 0.2 * wetS) * melt;
+            pctx.beginPath();
+            pctx.ellipse(w.x, w.y, rr, rr * (1 + 0.9 * wetS), -tilt, 0, Math.PI * 2);
+            pctx.fill();
+          }
+          pctx.globalAlpha = 1;
+          return;
+        }
         pctx.beginPath();
         var any = false;
         for (var i = 0; i < parts.length; i++) {
@@ -1556,7 +1575,7 @@
 
     // ── Haupt-Schleife ──
     var dtFrame = 0;
-    var bz = 0;
+    var bz = 0, wetS = 0;
     var paused = false;
     function frame(now) {
       var dt = last === null ? 0 : Math.min((now - last) / 1000, 0.05);
@@ -1579,6 +1598,8 @@
       var wind = updateWind(dt);
       // Schneesturm-Grad: viel Schnee und starker Wind
       bz = smooth(((cur.snow || 0) - 0.7) / 0.3) * smooth((Math.abs(wind) - 0.45) / 0.4);
+      // Schneeregen-Grad: Schnee und Regen gleichzeitig = nasser Schnee
+      wetS = (cur.snow || 0) > 0.02 ? smooth(((cur.rain || 0) + (cur.drizzle || 0)) / 0.3) : 0;
       var counts = manageParts(dt, wind);
       stepParts(dt, wind, counts);
       drawSky(wind);

@@ -302,3 +302,9 @@ def test_frost_commands_parse():
         assert commands.parse("weather", {"cmd": c})["cmd"] == c
     assert commands.parse("weather", {"cmd": "set", "frostrate": "9", "frost": "off"})["params"] == {
         "frostrate": 4.0, "frost": False}
+
+
+def test_fixed_dawn_puts_the_sun_low_in_the_east(conn, monkeypatch):
+    q = _with_location(conn, monkeypatch)
+    st = _state(_client(conn), q + "&lock=dawn")
+    assert st["kind"] == "dawn" and st["dusk"] == 1 and st["sunUp"] == 1 and st["sunX"] < 0.3

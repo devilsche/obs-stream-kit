@@ -186,7 +186,7 @@ _PET_FONTS = [
     ["Cinzel Decorative", "Cinzel Decorative"],
 ]
 
-_WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"], ["night", "Clear night"], ["dusk", "Dusk"]]
+_WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"], ["night", "Clear night"], ["dawn", "Dawn"], ["dusk", "Dusk"]]
 
 EFFECT_META = {
     "snow.html": {"hidden": True},

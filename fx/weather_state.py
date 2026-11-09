@@ -55,7 +55,7 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     lock = opts.get("lock")
     if lock and lock != "off":
         fixed = weather.profile(lock)
-        if lock not in ("night", "dusk"):
+        if lock not in ("night", "dawn", "dusk"):
             fixed.update(night=base.get("night", 0), dusk=base.get("dusk", 0))
         base, source = fixed, "lock"
 
@@ -79,7 +79,7 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     if ov:
         # Übersteuerung ersetzt Lage und Stimmung, der echte Wind bleibt
         state = {**weather.profile(ov["kind"]), "wind": base.get("wind", 0)}
-        if ov["kind"] not in ("night", "dusk"):
+        if ov["kind"] not in ("night", "dawn", "dusk"):
             state.update(night=base.get("night", 0), dusk=base.get("dusk", 0))
         source, until, transition = "override", ov["until"], TRANSITION_FAST
 
@@ -90,6 +90,8 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     # (sonst wäre bei Neumond oder tagsüber kein Mond zu sehen)
     if lock == "night":
         state.update(sunUp=0, sunX=0.1, sunY=1, moonUp=1, moonX=0.78, moonY=0.2, moonLit=0.9, moonWax=1)
+    elif lock == "dawn":
+        state.update(sunUp=1, sunX=0.12, sunY=0.92, moonUp=0, moonX=0.8, moonY=1, moonLit=0.5, moonWax=1)
     elif lock == "dusk":
         state.update(sunUp=1, sunX=0.88, sunY=0.92, moonUp=0, moonX=0.2, moonY=1, moonLit=0.5, moonWax=1)
     # Polarlicht als Belohnung: sehr gute K/D bei Nacht (aurorakd 0 = aus)
