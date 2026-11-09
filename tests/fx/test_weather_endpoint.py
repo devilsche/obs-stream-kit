@@ -153,3 +153,9 @@ def test_settings_parse():
 def test_tenants_are_separate(conn):
     _client(conn, 1).get("/s/t/api/fx/weather?cmd=weather&to=storm&hold=0")
     assert _state(_client(conn, 2))["source"] == "fallback"
+
+
+def test_kdtest_off_means_real_kd(conn, monkeypatch):
+    monkeypatch.setattr(weather_state, "kd_snapshot",
+                        lambda conn, tid: {"kd": 1.0, "matches": 5, "live": True})
+    assert _state(_client(conn), "?kdtest=off")["mood"] == -1

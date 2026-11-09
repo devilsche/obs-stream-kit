@@ -49,9 +49,7 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     kdtest = opts.get("kdtest")
     if isinstance(kdtest, float):
         snap = {"kd": kdtest, "matches": weather.MIN_MATCHES, "live": True}
-    elif kdtest == "off":
-        snap = {"kd": 0.0, "matches": 0, "live": False}
-    else:
+    else:  # kein Test oder "off" → echte K/D
         try:
             snap = kd_snapshot(conn, tenant_id)
         except Exception:

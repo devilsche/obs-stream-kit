@@ -62,3 +62,10 @@ def test_pending_after_expired_current_starts_on_time(conn):
 def test_tenants_are_separate(conn):
     set_override(conn, 1, "storm", 0, now=1000)
     assert current_override(conn, 2, 1001) is None
+
+
+def test_pending_survives_short_hold(conn):
+    set_override(conn, 1, "storm", 5, now=0)
+    set_override(conn, 1, "snow", 0, now=3)
+    o = current_override(conn, 1, 10)
+    assert o is not None and o["kind"] == "snow" and o["until"] is None

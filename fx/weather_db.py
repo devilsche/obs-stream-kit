@@ -86,7 +86,11 @@ def current_override(conn, tenant_id, now: float):
     changed = False
     pend = data.get("pending")
     if pend:
+        # startet nach der Mindestdauer — oder schon früher, wenn die laufende
+        # Übersteuerung vorher abläuft (sonst ginge der wartende Befehl verloren)
         due = data["since"] + MIN_HOLD
+        if data["until"] is not None:
+            due = min(due, data["until"])
         if now >= due:
             data = _start(pend["kind"], pend["hold"], due)
             changed = True

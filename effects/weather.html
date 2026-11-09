@@ -153,23 +153,38 @@
       var apiBase = tokenMatch ? '/s/' + tokenMatch[1] + '/api/fx/' : null;
 
       // ── Server-Zustand alle 15 s, sofort nach weather/auto/set ──
-      var stateTimer = null;
+      // Eine Chat-Übersteuerung gewinnt auch gegen eine feste Lage (lock).
+      // Nur die jüngste Antwort zählt, eine verspätete ältere wird verworfen.
+      var stateTimer = null, stateReq = 0;
       function fetchState() {
         clearTimeout(stateTimer);
-        if (locked()) { applyLock(); return; }
-        if (!apiBase) { apply(K.profile(settings.fallback || 'clear'), 0); return; }
+        var req = ++stateReq;
+        if (!apiBase) {
+          if (locked()) applyLock(); else apply(K.profile(settings.fallback || 'clear'), 0);
+          return;
+        }
+        if (locked() && lastSig === null) applyLock();
         var q = new URLSearchParams();
         ['mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
           .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
-          .then(function (data) { apply(data.state, lastSig === null ? 0 : data.state.transition); })
-          .catch(function () {
-            // ohne Server: Ersatz-Lage, nie einfrieren
-            if (lastSig === null) apply(K.profile(settings.fallback || 'clear'), 0);
+          .then(function (data) {
+            if (req !== stateReq) return;
+            var st = data.state;
+            if (locked() && st.source !== 'override') applyLock();
+            else apply(st, lastSig === null ? 0 : st.transition);
           })
-          .then(function () { stateTimer = setTimeout(fetchState, 15000); });
+          .catch(function () {
+            if (req !== stateReq) return;
+            // ohne Server: feste Lage bzw. Ersatz-Lage, nie einfrieren
+            if (locked()) applyLock();
+            else if (lastSig === null) apply(K.profile(settings.fallback || 'clear'), 0);
+          })
+          .then(function () {
+            if (req === stateReq) stateTimer = setTimeout(fetchState, 15000);
+          });
       }
 
       function randomShow() { return K.SPECTACLES[Math.floor(Math.random() * K.SPECTACLES.length)]; }
