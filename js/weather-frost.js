@@ -18,41 +18,57 @@
   function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
   function lerpN(a, b, t) { return a + (b - a) * clamp(t, 0, 1); }
 
-  // ── Eisblumen-Äste: Startpunkt am Rand, Richtung nach innen, Schwelle,
-  //    ab welchem Frost-Stand der Ast zu wachsen beginnt ──
+  // ── Eisblumen wie am Fenster: geschwungene Federn/Farne, Seitenäste im
+  //    60°-Winkel (sechseckiges Eis) in zwei Ordnungen, zur Spitze hin kürzer.
+  //    Keime sitzen an Ecken und Rändern; je weiter innen, desto später
+  //    (Schwelle thr = Frost-Stand, ab dem die Feder erscheint) ──
+  function feather(x, y, ang, len, depth, out) {
+    var step = 6, n = Math.max(2, Math.round(len / step));
+    var curve = rand(-0.012, 0.012), px = x, py = y, a = ang;
+    var stem = [[x, y]];
+    for (var i = 1; i <= n; i++) {
+      a += curve + rand(-0.02, 0.02);
+      px += Math.cos(a) * step;
+      py += Math.sin(a) * step;
+      stem.push([px, py]);
+      // Seitenäste beidseitig, zur Spitze hin kürzer (Federform)
+      if (i % 2 === 0 && i < n - 1) {
+        var side = len * (depth > 1 ? 0.42 : 0.3) * Math.pow(1 - i / n, 0.75);
+        [1.047, -1.047].forEach(function (off) {
+          var sl = side * rand(0.7, 1.05);
+          if (sl < 4) return;
+          if (depth > 1) feather(px, py, a + off, sl, depth - 1, out);
+          else out.push({ pts: [[px, py], [px + Math.cos(a + off) * sl, py + Math.sin(a + off) * sl]], w: 0.8 });
+        });
+      }
+    }
+    out.push({ pts: stem, w: depth > 1 ? 1.6 : 1.1 });
+  }
+
   function makeBranches() {
     var out = [];
-    function add(x, y, ang, len, thr) {
-      var segs = [], px = x, py = y, a = ang;
-      var n = Math.round(len / 14);
-      for (var i = 0; i < n; i++) {
-        a += rand(-0.18, 0.18);
-        var nx = px + Math.cos(a) * 14, ny = py + Math.sin(a) * 14;
-        // Farnblätter: kurze Seitenzweige im 60°-Winkel
-        var twigs = [];
-        if (i > 1 && i % 2 === 0) {
-          var tl = rand(10, 34) * (1 - i / n * 0.6);
-          twigs.push([a + 1.05, tl], [a - 1.05, tl * rand(0.6, 1)]);
-        }
-        segs.push({ x0: px, y0: py, x1: nx, y1: ny, twigs: twigs });
-        px = nx; py = ny;
-      }
-      out.push({ segs: segs, thr: thr, w: rand(1.1, 2.2) });
+    function seed(x, y, ang, len, depth, thr) {
+      var lines = [];
+      feather(x, y, ang, len, depth, lines);
+      out.push({ lines: lines, thr: thr });
     }
-    // Ecken: viele lange Äste, früh
+    // Ecken: große Farne, früh
     [[0, 0, 0.785], [W, 0, 2.356], [0, H, -0.785], [W, H, -2.356]].forEach(function (c) {
-      for (var i = 0; i < 24; i++) {
-        add(c[0] + rand(-10, 10), c[1] + rand(-10, 10), c[2] + rand(-0.8, 0.8), rand(180, 640), rand(0, 30));
+      for (var i = 0; i < 14; i++) {
+        seed(c[0] + rand(-20, 20), c[1] + rand(-20, 20), c[2] + rand(-0.85, 0.85), rand(160, 420), 3, rand(0, 25));
       }
     });
-    // Ränder: kürzere Äste, später
-    for (var k = 0; k < 110; k++) {
-      var side = k % 4, t = rand(0.12, 0.88);
-      var x = side === 0 ? t * W : side === 1 ? t * W : side === 2 ? 0 : W;
-      var y = side === 0 ? 0 : side === 1 ? H : t * H;
-      var ang = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : side === 2 ? 0 : Math.PI;
-      add(x, y, ang + rand(-0.6, 0.6), rand(80, 300), rand(12, 70));
+    // Ränder und nach innen: Keim je Abstand zum Rand später
+    for (var k = 0; k < 170; k++) {
+      var side = k % 4, t = rand(0.04, 0.96), d = Math.pow(Math.random(), 1.6) * 330;
+      var x = side === 0 || side === 1 ? t * W : side === 2 ? d : W - d;
+      var y = side === 0 ? d : side === 1 ? H - d : t * H;
+      var inward = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : side === 2 ? 0 : Math.PI;
+      var edgeDist = Math.min(x, W - x, y, H - y);
+      var thr = clamp(8 + edgeDist / 330 * 70 + rand(-6, 6), 0, 95);
+      seed(x, y, inward + rand(-1.2, 1.2), rand(50, 210), Math.random() < 0.6 ? 2 : 3, thr);
     }
+    out.sort(function (p, q) { return p.thr - q.thr; });
     return out;
   }
 
@@ -86,8 +102,41 @@
       if (root.SeasonKit && tags) root.SeasonKit.tag(tags, text, x, y, true);
     }
 
+    // Federn liegen auf einer Sammel-Ebene: steigt der Stand, kommen nur die
+    // neuen dazu; sinkt er (Kratzen), wird neu aufgebaut
+    var acc = document.createElement('canvas');
+    acc.width = W; acc.height = H;
+    var actx = acc.getContext('2d');
+    var accLevel = 0;
+    function drawFeathers(from, to) {
+      actx.lineCap = 'round';
+      actx.lineJoin = 'round';
+      branches.forEach(function (b) {
+        if (b.thr <= from || b.thr > to) return;
+        b.lines.forEach(function (ln) {
+          actx.strokeStyle = 'rgba(238,247,255,' + (ln.w > 1.2 ? 0.55 : 0.38) + ')';
+          actx.lineWidth = ln.w;
+          actx.beginPath();
+          actx.moveTo(ln.pts[0][0], ln.pts[0][1]);
+          for (var i = 1; i < ln.pts.length; i++) actx.lineTo(ln.pts[i][0], ln.pts[i][1]);
+          actx.stroke();
+        });
+      });
+    }
+    function syncFeathers(L) {
+      if (L < accLevel - 0.5) {
+        actx.clearRect(0, 0, W, H);
+        accLevel = 0;
+      }
+      if (L > accLevel) {
+        drawFeathers(accLevel, L);
+        accLevel = L;
+      }
+    }
+
     function drawCrystals() {
       ctx.clearRect(0, 0, W, H);
+      syncFeathers(shown);
       if (shown < 0.3) return;
       var L = shown;
       // Raureif-Schleier an den Rändern, Mitte frei
@@ -116,28 +165,12 @@
         if (p.thr > L) return;
         ctx.fillRect(p.x, p.y, p.r, p.r);
       });
-      ctx.lineCap = 'round';
-      ctx.shadowColor = 'rgba(200,230,255,0.8)';
-      ctx.shadowBlur = 4;
-      branches.forEach(function (b) {
-        var grow = clamp((L - b.thr) / 18, 0, 1);
-        if (grow <= 0) return;
-        var n = Math.max(1, Math.round(b.segs.length * grow));
-        ctx.strokeStyle = 'rgba(240,248,255,' + (0.5 + 0.4 * grow) + ')';
-        ctx.lineWidth = b.w * 1.3;
-        ctx.beginPath();
-        for (var i = 0; i < n; i++) {
-          var s = b.segs[i];
-          ctx.moveTo(s.x0, s.y0);
-          ctx.lineTo(s.x1, s.y1);
-          s.twigs.forEach(function (tw) {
-            ctx.moveTo(s.x1, s.y1);
-            ctx.lineTo(s.x1 + Math.cos(tw[0]) * tw[1] * grow, s.y1 + Math.sin(tw[0]) * tw[1] * grow);
-          });
-        }
-        ctx.stroke();
-      });
-      ctx.shadowBlur = 0;
+      // Federn mit leichtem Schimmer
+      ctx.save();
+      ctx.shadowColor = 'rgba(200,230,255,0.7)';
+      ctx.shadowBlur = 3;
+      ctx.drawImage(acc, 0, 0);
+      ctx.restore();
     }
 
     // freie Stellen ausstanzen; sie frieren in ~60 s wieder zu
