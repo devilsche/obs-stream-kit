@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from flask import Flask, g
 
-from fx import commands, weather_api, weather_db, weather_frost, weather_state
+from fx import commands, season_db, weather_api, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
 from fx.endpoints import bp_fx
 
 LOC = {"lat": 50.1109, "lon": 8.6821, "label": "Frankfurt am Main, Hessen, Deutschland"}
@@ -16,6 +16,10 @@ def conn():
     c.row_factory = sqlite3.Row
     weather_db.init_schema(c)
     weather_frost.init_schema(c)
+    weather_snow.init_schema(c)
+    weather_theme.init_schema(c)
+    xmas_db.init_schema(c)
+    season_db.init_schema(c)
     yield c
     c.close()
 
@@ -313,3 +317,56 @@ def test_fixed_dawn_puts_the_sun_low_in_the_east(conn, monkeypatch):
 def test_sound_settings_parse():
     assert commands.parse("weather", {"cmd": "set", "sound": "1", "volume": "0.4", "thunder": "2"})["params"] == {
         "sound": True, "volume": 0.4, "thunder": 1.0}
+
+
+# --- Winter-Thema ---
+
+def test_winter_items_are_stored_and_listed_in_first_poll(conn):
+    c = _client(conn)
+    assert c.get("/s/t/api/fx/weather?cmd=ornament&name=Mia").json["ok"]
+    assert c.get("/s/t/api/fx/weather?cmd=ornament&name=mia").json.get("duplicate")   # Refollow
+    c.get("/s/t/api/fx/weather?cmd=gift&name=Tom&type=bits&amount=500")
+    c.get("/s/t/api/fx/weather?cmd=mini&name=Lea")
+    c.get("/s/t/api/fx/weather?cmd=build&name=Sub1")
+    c.get("/s/t/api/fx/weather?cmd=build&name=Sub2")
+    st = c.get("/s/t/api/fx/weather/poll").json["state"]
+    assert [o["name"] for o in st["ornaments"]] == ["Mia"] and st["ornament_total"] == 1
+    assert st["gifts"] == [{"name": "Tom", "type": "bits", "amount": 500}]
+    assert [m["name"] for m in st["minis"]] == ["Lea"] and st["snowman"] == 2
+    c.get("/s/t/api/fx/weather?cmd=snowmanreset")
+    assert c.get("/s/t/api/fx/weather/poll").json["state"]["snowman"] == 0
+
+
+def test_state_reports_theme_and_xmas(conn):
+    c = _client(conn)
+    st = _state(c, "?theme=winter")
+    assert st["theme"] == "winter" and st["xmas"] in ("off", "setup", "on", "farewell")
+    c.get("/s/t/api/fx/weather?cmd=setup")
+    assert _state(c, "?theme=winter")["xmas"] == "on"
+    c.get("/s/t/api/fx/weather?cmd=farewell")
+    assert _state(c, "?theme=winter")["xmas"] == "off"
+    assert _state(c, "?theme=none")["theme"] == "none"
+
+
+def test_shovel_and_shake_report_results(conn, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(weather_state.time, "time", lambda: clock[0])
+    import fx.endpoints as ep
+    monkeypatch.setattr(ep.time, "time", lambda: clock[0])
+    c = _client(conn)
+    _state(c, "?lock=snow")
+    clock[0] += 600
+    assert _state(c, "?lock=snow")["snowCover"] == 36                     # 0,6 × 6 %/min × 10 min
+    c.get("/s/t/api/fx/weather?cmd=shovel&name=Mia")
+    c.get("/s/t/api/fx/weather?cmd=shake&name=Mod&force=1")
+    cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
+    assert cmds[0]["params"]["done"] == 5 and cmds[1]["params"]["success"] is True
+
+
+def test_winter_commands_parse():
+    assert commands.parse("weather", {"cmd": "gift", "name": "A"})["params"] == {"name": "A", "type": "sub", "amount": 1}
+    assert commands.parse("weather", {"cmd": "xmasdone", "step": "setup"})["params"] == {"step": "setup"}
+    assert commands.parse("weather", {"cmd": "set", "theme": "WINTER", "xmasfrom": "11-15", "xmasto": "01-06",
+                                      "tree": "0"})["params"] == {
+        "theme": "winter", "xmasfrom": "11-15", "xmasto": "01-06", "tree": False}
+    assert commands.parse("weather", {"cmd": "set", "xmasfrom": "advent"})["params"] == {"xmasfrom": "advent"}

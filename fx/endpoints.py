@@ -16,7 +16,10 @@ import time
 from flask import Blueprint, current_app, g, jsonify, abort, request
 
 from core.db_compat import SqliteCompatConn
-from fx import autumn_db, commands, season_db, weather_db, weather_frost, weather_state, xmas_db
+import datetime
+
+from fx import (autumn_db, commands, season_db, weather_db, weather_frost, weather_snow,
+                weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
 log = logging.getLogger(__name__)
@@ -46,10 +49,69 @@ def _weather_persist(conn, tenant_id, cmd):
         weather_frost.clear(conn, tenant_id, time.time())
     elif cmd["cmd"] == "frostreset":
         weather_frost.reset_leaders(conn, tenant_id)
+    else:
+        return _winter_persist(conn, tenant_id, cmd)
     return True
 
 
-_PERSISTENT["weather"] = (_weather_persist, lambda conn, tenant_id: {})
+def _winter_persist(conn, tenant_id, cmd):
+    """Winter-Thema: Kugeln/Geschenke (xmas_db), Mini-Schneemänner und
+    Schneemann (season_db, effect winter), Schneedecke und Xmas-Ablauf."""
+    c, p, now = cmd["cmd"], cmd["params"], time.time()
+    today = datetime.date.today()
+    if c == "ornament":
+        return xmas_db.add_ornament(conn, tenant_id, p.get("name", ""))
+    if c == "gift":
+        xmas_db.add_gift(conn, tenant_id, p.get("name", ""), p["type"], p["amount"])
+    elif c == "mini":
+        return season_db.add_item(conn, tenant_id, "winter", p.get("name", ""))
+    elif c == "build":
+        season_db.add_event(conn, tenant_id, "winter", "build", p.get("name", ""))
+    elif c == "snowmanreset":
+        season_db.add_event(conn, tenant_id, "winter", "smreset")
+    elif c == "shovel":
+        p.update(weather_snow.shovel(conn, tenant_id, p.get("name", ""), now))
+    elif c == "icicle":
+        p.update(weather_snow.icicle(conn, tenant_id, p.get("name", ""), now))
+    elif c == "shake":
+        p.update(weather_snow.shake(conn, tenant_id, p.get("name", ""), now,
+                                    need=5, win=20, force=bool(p.get("force"))))
+    elif c in ("setup", "farewell"):
+        weather_theme.mark(conn, tenant_id, today, {}, c)
+    elif c == "xmasdone":
+        if p.get("step"):
+            weather_theme.mark(conn, tenant_id, today, {}, p["step"])
+        return False
+    elif c == "clear":
+        kind = p.get("kind")
+        if kind in ("ornaments", "gifts"):
+            xmas_db.clear(conn, tenant_id, kind)
+        elif kind == "minis":
+            season_db.clear(conn, tenant_id, "winter", "minis")
+        elif kind == "snowman":
+            season_db.clear(conn, tenant_id, "winter", "snowman")
+        elif kind == "snow":
+            weather_snow.clear(conn, tenant_id, now)
+    return True
+
+
+def _weather_state(conn, tenant_id):
+    """Deko-Stand fürs Winter-Thema beim ersten Poll: Kugeln, Geschenke,
+    Mini-Schneemänner, Schneemann-Stufe (Subs seit dem letzten Reset, max 8)."""
+    x = xmas_db.load_state(conn, tenant_id)
+    w = season_db.load_state(conn, tenant_id, "winter")
+    stage = 0
+    for e in w["events"]:
+        if e["k"] == "build":
+            stage = min(8, stage + 1)
+        elif e["k"] == "smreset":
+            stage = 0
+    return {"ornaments": x["ornaments"], "ornament_total": x["ornament_total"],
+            "gifts": x["gifts"], "gift_total": x["gift_total"],
+            "minis": w["items"], "mini_total": w["item_total"], "snowman": stage}
+
+
+_PERSISTENT["weather"] = (_weather_persist, _weather_state)
 for _season in season_db.SPECS:
     _PERSISTENT[_season] = (functools.partial(season_db.persist, _season),
                             lambda conn, tenant_id, _e=_season: season_db.load_state(conn, tenant_id, _e))
@@ -120,7 +182,7 @@ def weather_state_route(token):
     settings = commands.EFFECTS["weather"]["settings"]
     opts = {}
     for key in ("place", "lock", "mood", "kdlow", "kdhigh", "kdtest", "fallback", "aurorakd",
-                "frost", "frostrate"):
+                "frost", "frostrate", "theme", "xmasfrom", "xmasto", "snowrate"):
         raw = (request.args.get(key) or "").strip()
         if raw:
             val = settings[key](raw)

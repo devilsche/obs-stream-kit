@@ -131,6 +131,20 @@ def _test_bg(v):
     return v if _TEST_BG_RE.match(v) and "'" not in v else None
 
 
+_MMDD_RE = re.compile(r"^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$")
+
+
+def _mmdd(v):
+    """Datum ohne Jahr (MM-DD)."""
+    v = v.strip()
+    return v if _MMDD_RE.match(v) else None
+
+
+def _xmas_from(v):
+    """Beginn der Xmas-Zeit: advent (1. Advent) oder MM-DD."""
+    return "advent" if v.strip().lower() == "advent" else _mmdd(v)
+
+
 def _kd_test(v):
     """Test-K/D aus dem Dashboard: Zahl oder off."""
     if v.lower() == "off":
@@ -141,7 +155,11 @@ def _kd_test(v):
 EFFECTS = {
     "weather": {
         "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset",
-                     "scrape", "warm", "frostclear", "frostreset", "leaders"),
+                     "scrape", "warm", "frostclear", "frostreset", "leaders",
+                     # Winter-Thema
+                     "ornament", "gift", "mini", "build", "snowmanreset", "shovel", "shake",
+                     "icicle", "snowball", "celebrate", "setup", "farewell", "xmasdone",
+                     "snowboard", "clear"),
         "settings": {
             "place": _place,
             "mood": _float_range(0, 1),
@@ -158,6 +176,21 @@ EFFECTS = {
             "sound": _flag,
             "volume": _level,
             "thunder": _level,
+            # Deko-Thema (Teil 3: Winter mit Xmas-Zeit)
+            "theme": _choice("auto", "winter", "none"),
+            "xmasfrom": _xmas_from,
+            "xmasto": _mmdd,
+            "snowrate": _float_range(0.25, 4),
+            "shakeneed": _int_range(1, 20),
+            "shakewin": _int_range(5, 120),
+            "lights": _flag,
+            "tree": _flag,
+            "baubles": _flag,
+            "gifts": _flag,
+            "snowman": _flag,
+            "minis": _flag,
+            "icicles": _flag,
+            "cover": _flag,
             "testbg": _test_bg,
         },
         "args": {
@@ -166,9 +199,23 @@ EFFECTS = {
             "spectacle": {"type": _choice(*weather.SPECTACLES)},
             "scrape": {"name": _name},
             "warm": {"name": _name},
+            "ornament": {"name": _name},
+            "gift": {"name": _name,
+                     "type": _choice("sub", "resub", "giftsub", "bits", "raid"),
+                     "amount": _int_range(1, 100000)},
+            "mini": {"name": _name},
+            "build": {"name": _name},
+            "shovel": {"name": _name},
+            "shake": {"name": _name, "force": _flag},
+            "icicle": {"name": _name},
+            "snowball": {"name": _name},
+            "celebrate": {"name": _name},
+            "xmasdone": {"step": _choice("setup", "farewell")},
+            "clear": {"kind": _choice("ornaments", "gifts", "minis", "snow", "snowman")},
         },
         "defaults": {
             "weather": {"hold": 150},
+            "gift": {"type": "sub", "amount": 1},
         },
         # ohne gültigen Wert wird der Befehl abgelehnt
         "required": {

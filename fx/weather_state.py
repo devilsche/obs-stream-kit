@@ -7,7 +7,9 @@ Die Antwort enthält nie den Ort.
 import logging
 import time
 
-from fx import astro, weather, weather_frost
+import datetime
+
+from fx import astro, weather, weather_frost, weather_snow, weather_theme
 from fx.weather_api import current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
@@ -118,4 +120,17 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     except Exception:
         log.exception("weather: frost failed for tenant %s", tenant_id)
     state.update(frost=frost["level"], frostTop=frost["top"], frostOn=opts.get("frost", True))
+    # Deko-Thema und Xmas-Ablauf; Schneedecke wächst mit dem wirksamen Schneefall
+    today = datetime.date.fromtimestamp(now)
+    try:
+        start, end, _ = weather_theme.xmas_window(today, opts.get("xmasfrom"), opts.get("xmasto"))
+        theme = weather_theme.theme_for(today, opts.get("theme", "auto"), start <= today <= end)
+        xmas = weather_theme.status(conn, tenant_id, today, opts, theme) if theme == "winter" else "off"
+        snow = weather_snow.advance(conn, tenant_id, now, state.get("snow", 0) if state.get("precip") != "rain" else 0,
+                                    state.get("heat", 0) > 0.5, base.get("temp") if source == "api" else None,
+                                    opts.get("snowrate", 1.0))
+    except Exception:
+        log.exception("weather: theme failed for tenant %s", tenant_id)
+        theme, xmas, snow = "none", "off", {"level": 0, "top": []}
+    state.update(theme=theme, xmas=xmas, snowCover=snow["level"], snowTop=snow["top"])
     return state
