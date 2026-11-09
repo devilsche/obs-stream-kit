@@ -145,8 +145,11 @@ def apply_mood(state: dict, mood: float, strength: float, precip) -> dict:
     if e > 0:
         # Gewitter und Schneesturm bleiben dunkel, sonst Sonnenregen
         heavy = s["kind"] in ("storm", "blizzard")
-        s["clouds"] = _clamp(s["clouds"] * (1 - 0.7 * e))
-        s["sun"] = max(s["sun"], (0.25 if heavy else 0.6 if wet else 1) * e)
+        # bedeckt bleibt bedeckt: die Sonne blitzt nur durch Lücken
+        overcast = s["kind"] in ("cloudy", "fog")
+        s["clouds"] = _clamp(s["clouds"] * (1 - (0.35 if overcast else 0.7) * e))
+        cap = 0.25 if heavy else 0.4 if overcast else 0.6 if wet else 1
+        s["sun"] = max(s["sun"], cap * e)
         s["fog"] = _clamp(s["fog"] * (1 - 0.5 * e))
         s["gloom"] = round(s.get("gloom", 0) * (1 - 0.7 * e), 3)
     elif e < 0:

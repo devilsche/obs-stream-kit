@@ -137,3 +137,9 @@ def test_good_mood_barely_brightens_storm_or_blizzard():
         s = apply_mood(profile(k), 1, 1.0, None)
         assert s["sun"] <= 0.25 and s["lightning"] == profile(k)["lightning"]
     assert apply_mood(profile("rain"), 1, 1.0, None)["sun"] >= 0.5      # Sonnenregen bleibt
+
+
+def test_good_mood_does_not_turn_overcast_into_full_sun():
+    s = apply_mood(profile("cloudy"), 1, 1.0, None)
+    assert s["sun"] <= 0.4 and s["clouds"] >= 0.45
+    assert apply_mood(profile("clear"), 1, 1.0, None)["sun"] == 1
