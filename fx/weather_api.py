@@ -20,13 +20,18 @@ STALE = 3600
 _FORECAST = "https://api.open-meteo.com/v1/forecast"
 _GEOCODE = "https://geocoding-api.open-meteo.com/v1/search"
 
+GEO_FOUND = 86400
+GEO_MISSING = 600
+
 _lock = threading.Lock()
 _cache = {}   # tenant_id → {"at", "loc", "value"}
+_geo = {}     # Suchtext → {"at", "value"} — jede Overlay-Abfrage bringt den Ort mit
 
 
 def reset_cache():
     with _lock:
         _cache.clear()
+        _geo.clear()
 
 
 def _fetch_json(url: str) -> dict:
@@ -34,11 +39,25 @@ def _fetch_json(url: str) -> dict:
         return json.loads(resp.read().decode("utf-8"))
 
 
-def geocode(query: str):
-    """Ortsname → {"lat", "lon", "label"} oder None."""
+def geocode(query: str, now=None):
+    """Ortsname → {"lat", "lon", "label"} oder None. Treffer 24 h im Cache,
+    Fehlanzeigen 10 min."""
     query = (query or "").strip()
     if not query:
         return None
+    now = time.time() if now is None else now
+    key = query.lower()
+    with _lock:
+        hit = _geo.get(key)
+    if hit and now - hit["at"] < (GEO_FOUND if hit["value"] else GEO_MISSING):
+        return hit["value"]
+    value = _geocode(query)
+    with _lock:
+        _geo[key] = {"at": now, "value": value}
+    return value
+
+
+def _geocode(query):
     url = _GEOCODE + "?" + urllib.parse.urlencode(
         {"name": query, "count": 1, "language": "de", "format": "json"})
     try:

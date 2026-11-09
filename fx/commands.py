@@ -107,6 +107,20 @@ def _name(v):
     return v or None
 
 
+_PLACE_DROP_RE = re.compile(r"[^\w .,'\-]")
+
+
+def _place(v):
+    """Ortsname fürs Live-Wetter: Buchstaben, Ziffern, Leerzeichen, .,'-"""
+    v = " ".join(_PLACE_DROP_RE.sub("", v).split())[:60].strip()
+    return v or None
+
+
+def _weather_wind(v):
+    """auto = Wind der Lage, random = wechselt von selbst, sonst -1..1"""
+    return "auto" if v.lower() == "auto" else _wind(v)
+
+
 def _kd_test(v):
     """Test-K/D aus dem Dashboard: Zahl oder off."""
     if v.lower() == "off":
@@ -118,13 +132,14 @@ EFFECTS = {
     "weather": {
         "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset"),
         "settings": {
+            "place": _place,
             "mood": _float_range(0, 1),
             "kdlow": _float_range(0, 20),
             "kdhigh": _float_range(0, 20),
             "kdtest": _kd_test,
             "fallback": _choice(*weather.KINDS),
             "lock": _choice("off", *weather.KINDS),
-            "wind": _wind,
+            "wind": _weather_wind,
             "veil": _flag,
         },
         "args": {

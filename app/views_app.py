@@ -241,7 +241,6 @@ def settings():
             "stinger_font": get_setting(conn, g.tenant_id, "stinger_font", default=""),
             "highlight_source": get_setting(conn, g.tenant_id, "highlight_source",
                                             default="clips"),
-            "weather_label": weather_location_label(conn, g.tenant_id),
         }
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
@@ -270,51 +269,7 @@ def settings():
                            archive_msg=request.args.get("archive"),
                            pubg_err=request.args.get("pubg_err"),
                            steam_err=request.args.get("steam_err"),
-                           weather_err=request.args.get("weather_err"),
                            api_token=api_token, base_url=base_url)
-
-
-def save_weather_location(conn, tenant_id, place, clear):
-    """Ort fürs Live-Wetter speichern (per Open-Meteo gesucht) oder löschen.
-    → Fehlercode oder None."""
-    from fx import weather_api
-    from pubg.db_pg import set_setting
-    if clear:
-        with conn.cursor() as cur:
-            cur.execute("DELETE FROM settings WHERE tenant_id=%s AND key=%s",
-                        (tenant_id, "weather.location"))
-        conn.commit()
-        return None
-    found = weather_api.geocode(place)
-    if not found:
-        return "not_found"
-    set_setting(conn, tenant_id, "weather.location", json.dumps(found))
-    return None
-
-
-def weather_location_label(conn, tenant_id):
-    from pubg.db_pg import get_setting
-    raw = get_setting(conn, tenant_id, "weather.location")
-    try:
-        return json.loads(raw)["label"] if raw else None
-    except (TypeError, ValueError, KeyError):
-        return None
-
-
-@bp_app.route("/app/settings/weather", methods=["POST"])
-@require_session
-def settings_weather():
-    conn = _get_conn()
-    try:
-        err = save_weather_location(conn, g.tenant_id,
-                                    (request.form.get("weather_place") or "").strip(),
-                                    request.form.get("weather_clear") == "1")
-    finally:
-        if "_PG_CONN_FACTORY" not in current_app.config:
-            conn.close()
-    if err:
-        return redirect("/app/settings?" + urlencode({"weather_err": err}) + "#weather-head")
-    return redirect("/app/settings?saved=1#weather-head")
 
 
 @bp_app.route("/app/settings/accounts", methods=["POST"])

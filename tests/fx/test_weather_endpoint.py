@@ -1,5 +1,4 @@
 """Weather-Source: Befehle, Übersteuerung und Zustands-Endpoint."""
-import json
 import sqlite3
 
 import pytest
@@ -16,8 +15,6 @@ def conn():
     c = sqlite3.connect(":memory:", check_same_thread=False)
     c.row_factory = sqlite3.Row
     weather_db.init_schema(c)
-    c.execute("CREATE TABLE settings (tenant_id INT, key TEXT, value TEXT, updated_at TEXT,"
-              " PRIMARY KEY (tenant_id, key))")
     yield c
     c.close()
 
@@ -46,10 +43,13 @@ def _client(conn, tenant_id=1):
 
 
 def _with_location(conn, monkeypatch, kind_code=0):
-    conn.execute("INSERT INTO settings VALUES (1, 'weather.location', ?, 'x')", (json.dumps(LOC),))
+    """Ort kommt als ?place= aus der Overlay-URL; Suche und Wetter gefälscht."""
     from fx.weather import from_api
+    monkeypatch.setattr(weather_state, "geocode",
+                        lambda q: LOC if q == "Frankfurt" else None)
     monkeypatch.setattr(weather_state, "current",
                         lambda tid, lat, lon: from_api(kind_code, 12, 10, 270))
+    return "?place=Frankfurt"
 
 
 def _state(client, q=""):
@@ -65,14 +65,20 @@ def test_no_location_uses_fallback(conn):
 
 
 def test_location_uses_api(conn, monkeypatch):
-    _with_location(conn, monkeypatch, kind_code=63)
-    st = _state(_client(conn))
+    q = _with_location(conn, monkeypatch, kind_code=63)
+    st = _state(_client(conn), q)
     assert st["kind"] == "rain" and st["source"] == "api" and st["wind"] == 0.2
 
 
 def test_api_down_uses_fallback(conn, monkeypatch):
-    conn.execute("INSERT INTO settings VALUES (1, 'weather.location', ?, 'x')", (json.dumps(LOC),))
-    assert _state(_client(conn), "?fallback=fog")["source"] == "fallback"
+    _with_location(conn, monkeypatch)
+    monkeypatch.setattr(weather_state, "current", lambda tid, lat, lon: None)
+    assert _state(_client(conn), "?place=Frankfurt&fallback=fog")["source"] == "fallback"
+
+
+def test_unknown_place_uses_fallback(conn, monkeypatch):
+    _with_location(conn, monkeypatch)
+    assert _state(_client(conn), "?place=Xyzzy")["source"] == "fallback"
 
 
 def test_weather_command_sets_override_and_state_reports_it(conn):
@@ -86,12 +92,12 @@ def test_weather_command_sets_override_and_state_reports_it(conn):
 
 
 def test_forced_and_auto(conn, monkeypatch):
-    _with_location(conn, monkeypatch)
+    q = _with_location(conn, monkeypatch)
     c = _client(conn)
     c.get("/s/t/api/fx/weather?cmd=weather&to=blizzard&hold=0")
-    assert _state(c)["until"] is None
+    assert _state(c, q)["until"] is None
     c.get("/s/t/api/fx/weather?cmd=auto")
-    assert _state(c)["source"] == "api"
+    assert _state(c, q)["source"] == "api"
 
 
 def test_unknown_weather_kind_is_rejected(conn):
@@ -100,8 +106,9 @@ def test_unknown_weather_kind_is_rejected(conn):
 
 
 def test_state_never_contains_location(conn, monkeypatch):
-    _with_location(conn, monkeypatch)
-    body = _client(conn).get("/s/t/api/fx/weather/state").get_data(as_text=True)
+    q = _with_location(conn, monkeypatch)
+    body = _client(conn).get("/s/t/api/fx/weather/state" + q).get_data(as_text=True)
+    assert '"source":"api"' in body.replace(" ", "")
     for leak in ("50.11", "8.68", "Frankfurt", "lat", "lon", "label"):
         assert leak not in body
 
@@ -159,3 +166,14 @@ def test_kdtest_off_means_real_kd(conn, monkeypatch):
     monkeypatch.setattr(weather_state, "kd_snapshot",
                         lambda conn, tid: {"kd": 1.0, "matches": 5, "live": True})
     assert _state(_client(conn), "?kdtest=off")["mood"] == -1
+
+
+def test_place_setting_parses():
+    assert commands.parse("weather", {"cmd": "set", "place": "  Bad   Homburg "})["params"] == {
+        "place": "Bad Homburg"}
+
+
+def test_wind_setting_accepts_auto_and_random():
+    for v in ("auto", "random"):
+        assert commands.parse("weather", {"cmd": "set", "wind": v})["params"] == {"wind": v}
+    assert commands.parse("weather", {"cmd": "set", "wind": "-3"})["params"] == {"wind": -1.0}

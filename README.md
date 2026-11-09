@@ -366,7 +366,7 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 
 Drei Schichten, die oberste gewinnt:
 
-1. **Echtes Wetter** am Ort aus **Settings → Weather** (Open-Meteo, ohne Key, alle 10 min). Der Ort bleibt auf dem Server, er steht weder in der URL noch in einer Antwort an das Overlay. Ohne Ort oder wenn der Dienst nicht antwortet, gilt die **Fallback-Lage**; die letzte gute Antwort gilt bis zu 60 min weiter.
+1. **Echtes Wetter** am Ort aus `place` (Open-Meteo, ohne Key, alle 10 min, Ortssuche 24 h im Cache). Der Server schickt den Ort nie ans Overlay zurück — er steht aber in der OBS-URL, wer die Source-Einstellungen sieht, sieht ihn also auch. Ein größerer Nachbarort reicht. Ohne Ort oder wenn der Dienst nicht antwortet, gilt die **Fallback-Lage**; die letzte gute Antwort gilt bis zu 60 min weiter.
 2. **K/D-Stimmung** der laufenden Session (nur BR-Runden, alle verfolgten Accounts, ab 3 Runden, Session = letzte Runde < 4 h her). Unter der unteren Grenze (Standard 1,5) wird es trüb mit Niesel, ab drei Vierteln davon (≈ 1,1) Regen — nie Gewitter. Über der oberen Grenze (Standard 2,5) kommt Sonne durch, auch bei Regen oder Schnee. Dazwischen verläuft es stufenlos, bei 2,0 neutral. Abdunklung und Nebel liegen nur am Rand, die Bildmitte bleibt frei; mit `veil=1` kommt ein leichter Grauschleier (höchstens 10 %) übers ganze Bild.
 3. **Chat-Übersteuerung** per `cmd=weather&to=<lage>` für 2,5 min (`hold` in Sekunden, `0` = bis `cmd=auto`). Mehrere Befehle innerhalb von 15 s: der jüngste wartet, bis die 15 s um sind — kein Flackern. Erzwungenes Wetter überlebt einen Server-Neustart.
 
@@ -376,13 +376,14 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 
 | Parameter | Werte | Standard |
 |-----------|-------|----------|
+| `place` | Ort fürs Live-Wetter, z. B. `Hamburg` | — |
 | `lock` | feste Lage statt Live-Wetter, `off` = live | `off` |
 | `fallback` | Lage ohne Ort oder bei Ausfall | `clear` |
 | `mood` | `0` … `1`, Stärke der K/D-Stimmung | `1` |
 | `kdlow` / `kdhigh` | Grenzen schlechte/gute K/D | `1.5` / `2.5` |
 | `kdtest` | Test-K/D statt der echten, `off` = echt — zum Ausprobieren im Dashboard, nicht in OBS stehen lassen | `off` |
 | `veil` | `1` Grauschleier übers ganze Bild bei mieser Stimmung | `0` |
-| `wind` | `-1` … `1`, nur für `lock` | `0` |
+| `wind` | `auto` = Wind der Lage (live: echter Wind), `random` = wechselt alle 6–15 s weich, mal von links, mal von rechts, oder fest `-1` … `1` | `auto` |
 
 **Befehle** an `https://stream-overlay.com/s/<token>/api/fx/weather?cmd=…` (Streamer.bot **Fetch URL**):
 
@@ -399,7 +400,7 @@ Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneestu
 
 **Testen:** im Dashboard **Stream → Weather** „Apply setting changes live“ einschalten, dann `Fixed weather`, `Test K/D` und `Grey veil` durchschalten und die Knöpfe (Thunderstorm, Tsunami, …) drücken — wirkt sofort auf die Source in OBS.
 
-**Alte Rain-/Snow-URLs:** `rain.html?intensity=…&wind=…` leitet auf `weather.html` mit fester Lage um (`light` → Niesel, `medium`/`heavy` → Regen, `storm` → Gewitter) und hört weiter auf `/api/fx/rain` (`strike`, `gust`, `start`, `stop`, `set&intensity=…`, `reset`). `snow.html` zeigt festen Schnee. Farbe, Spritzer und Browser-Ton der alten Rain-Source gibt es nicht mehr.
+**Alte Rain-/Snow-URLs:** `rain.html?intensity=…&wind=…` (auch `wind=random`) leitet auf `weather.html` mit fester Lage um (`light` → Niesel, `medium`/`heavy` → Regen, `storm` → Gewitter) und hört weiter auf `/api/fx/rain` (`strike`, `gust`, `start`, `stop`, `set&intensity=…`, `reset`). `snow.html` zeigt festen Schnee. Farbe, Spritzer und Browser-Ton der alten Rain-Source gibt es nicht mehr.
 
 #### Live control im Dashboard (ohne Streamer.bot)
 

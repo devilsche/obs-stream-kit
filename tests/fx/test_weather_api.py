@@ -84,3 +84,17 @@ def test_geocode_nothing_found(monkeypatch):
     monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {})
     assert geocode("xyzzy") is None
     assert geocode("   ") is None
+
+
+def test_geocode_is_cached(monkeypatch):
+    calls = []
+
+    def fake(url):
+        calls.append(url)
+        return {"results": [{"latitude": 1, "longitude": 2, "name": "A"}]}
+    monkeypatch.setattr(weather_api, "_fetch_json", fake)
+    geocode("Hamburg", now=0)
+    geocode("hamburg", now=3600)
+    assert len(calls) == 1
+    geocode("Hamburg", now=90000)
+    assert len(calls) == 2

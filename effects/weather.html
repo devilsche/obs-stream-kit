@@ -108,7 +108,7 @@
       var kit = K.create(document.getElementById('stage'));
       var rootEl = document.documentElement;
 
-      var KEYS = ['mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil'];
+      var KEYS = ['place', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil'];
       function fromUrl() {
         var out = {};
         KEYS.forEach(function (k) {
@@ -128,8 +128,20 @@
       // ── Zustand anwenden (nur bei echter Änderung, sonst würde jeder Abruf
       //    den Übergang und den Blitz-Takt neu starten) ──
       var lastSig = null;
-      var SIG_KEYS = ['kind', 'rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind'];
+      var SIG_KEYS = ['kind', 'rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind', 'windRandom'];
+      // Wind aus dem Schalter: auto = Wind der Lage (live: echter Wind),
+      // random = wechselt von selbst, Zahl = fest
+      function withWind(state) {
+        var st = {};
+        for (var k in state) st[k] = state[k];
+        var w = settings.wind;
+        st.windRandom = w === 'random';
+        var n = parseFloat(w);
+        if (!isNaN(n)) st.wind = Math.max(-1, Math.min(1, n));
+        return st;
+      }
       function apply(state, secs) {
+        state = withWind(state);
         var sig = SIG_KEYS.map(function (k) {
           return typeof state[k] === 'number' ? state[k].toFixed(2) : String(state[k]);
         }).join('|');
@@ -143,10 +155,7 @@
       }
 
       function applyLock() {
-        var st = K.profile(locked());
-        var w = parseFloat(settings.wind);
-        if (!isNaN(w)) st.wind = Math.max(-1, Math.min(1, w));
-        apply(st, lastSig === null ? 0 : 4);
+        apply(K.profile(locked()), lastSig === null ? 0 : 4);
       }
 
       var tokenMatch = window.location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
@@ -165,7 +174,7 @@
         }
         if (locked() && lastSig === null) applyLock();
         var q = new URLSearchParams();
-        ['mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback'].forEach(function (k) {
+        ['place', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
@@ -234,7 +243,7 @@
             break;
           case 'set':
             if (p.intensity && RAIN_KIND[p.intensity]) settings.lock = RAIN_KIND[p.intensity];
-            if (typeof p.wind === 'number') settings.wind = String(p.wind);
+            if (p.wind !== undefined) settings.wind = String(p.wind);
             fetchState();
             break;
           case 'reset':

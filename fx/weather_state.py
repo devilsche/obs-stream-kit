@@ -1,15 +1,14 @@
 """Wirksamer Wetterzustand eines Tenants für effects/weather.html.
 
-Schicht 1: echtes Wetter am hinterlegten Ort (sonst Ersatz-Lage),
+Schicht 1: echtes Wetter am Ort aus der Overlay-URL (place, sonst Ersatz-Lage),
 Schicht 2: Stimmung aus der Session-K/D, Schicht 3: Chat-Übersteuerung.
 Die Antwort enthält nie den Ort.
 """
-import json
 import logging
 import time
 
 from fx import weather
-from fx.weather_api import current
+from fx.weather_api import current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
 
@@ -19,26 +18,14 @@ TRANSITION_SLOW = 25
 TRANSITION_FAST = 4
 
 
-def _location(conn, tenant_id):
-    row = conn.execute("SELECT value FROM settings WHERE tenant_id = ? AND key = ?",
-                       (tenant_id, "weather.location")).fetchone()
-    if not row:
-        return None
-    try:
-        loc = json.loads(row["value"])
-        return float(loc["lat"]), float(loc["lon"])
-    except (TypeError, ValueError, KeyError):
-        return None
-
-
 def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
-    """opts: geparste Settings (mood, kdlow, kdhigh, kdtest, fallback)."""
+    """opts: geparste Settings (place, mood, kdlow, kdhigh, kdtest, fallback)."""
     now = time.time() if now is None else now
     base, source = None, "fallback"
     try:
-        loc = _location(conn, tenant_id)
+        loc = geocode(opts["place"]) if opts.get("place") else None
         if loc:
-            base = current(tenant_id, *loc)
+            base = current(tenant_id, loc["lat"], loc["lon"])
     except Exception:
         log.exception("weather: live weather failed for tenant %s", tenant_id)
     if base:

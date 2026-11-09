@@ -54,37 +54,6 @@
     </form>
   </section>
 
-  <section class="dn-simple" aria-labelledby="weather-head">
-    <p class="sec" id="weather-head">// Weather</p>
-    <p class="dn-note">The Weather effect shows the real weather at this location. Only used on the server to fetch the weather. Never shown on stream.</p>
-    <p class="archive-state" role="status">
-      {% if prefs.weather_label %}
-        Location: <b>{{ prefs.weather_label }}</b>
-      {% else %}
-        No location set. The Weather effect shows its fallback weather.
-      {% endif %}
-    </p>
-    <form method="POST" action="/app/settings/weather" class="dn-accadd">
-      <div class="dn-field">
-        <label for="weather_place">Location for live weather</label>
-        <input id="weather_place" name="weather_place" type="text" autocomplete="off" required
-               aria-describedby="weather_place_hint{% if weather_err %} weather_place_err{% endif %}"
-               {% if weather_err %}aria-invalid="true"{% endif %}>
-        <p class="dn-note" id="weather_place_hint">City or town, e.g. Hamburg. A nearby town is accurate enough.</p>
-        {% if weather_err %}
-        <p class="dn-key-err" id="weather_place_err" role="alert"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span> Location not found. Nothing was saved.</p>
-        {% endif %}
-      </div>
-      <button type="submit" class="dn-btn accent">Save location</button>
-    </form>
-    {% if prefs.weather_label %}
-    <form method="POST" action="/app/settings/weather" class="dn-accform">
-      <input type="hidden" name="weather_clear" value="1">
-      <button type="submit" class="dn-btn danger">Remove location</button>
-    </form>
-    {% endif %}
-  </section>
-
   {% set KEY_ERRORS = {
     "pubg_is_steam": "This looks like a Steam key (32 characters). Enter it under Steam Web API key below.",
     "pubg_format":   "This is not a PUBG API key — PUBG keys are long and start with eyJ.",

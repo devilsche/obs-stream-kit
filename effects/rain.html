@@ -12,8 +12,9 @@
       var KIND = { light: 'drizzle', medium: 'rain', heavy: 'rain', storm: 'storm' };
       var q = new URLSearchParams();
       q.set('lock', KIND[(p.get('intensity') || 'medium').toLowerCase()] || 'rain');
-      var w = parseFloat(p.get('wind'));
-      if (!isNaN(w)) q.set('wind', String(Math.max(-1, Math.min(1, w))));
+      var w = (p.get('wind') || '').toLowerCase();
+      if (w === 'random') q.set('wind', 'random');
+      else if (!isNaN(parseFloat(w))) q.set('wind', String(Math.max(-1, Math.min(1, parseFloat(w)))));
       q.set('mood', '0');
       q.set('chan', 'rain');
       window.location.replace('weather.html?' + q.toString());
