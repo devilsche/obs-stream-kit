@@ -195,7 +195,9 @@
 
     function target(type, li) {
       var amount = type === 'rain' ? cur.rain : type === 'drizzle' ? cur.drizzle : cur.snow;
-      return Math.round(COUNT[type][li] * clamp(amount, 0, 1) * motionScale);
+      // im Schneesturm deutlich mehr Flocken
+      var storm = type === 'snow' ? 1 + 1.4 * bz : 1;
+      return Math.round(COUNT[type][li] * clamp(amount, 0, 1) * motionScale * storm);
     }
 
     function spawn(p, initial, wind) {
@@ -211,6 +213,11 @@
         var span = Math.abs(wind) * 900 + 120;
         p.x = wind > 0 ? rand(-span, W) : rand(0, W + span);
         p.y = initial ? rand(-H * 0.1, H) : rand(-60, -10);
+        // im Schneesturm kommt ein Teil seitlich herein (Rand blendet weich)
+        if (!initial && Math.random() < 0.75 * bz) {
+          p.x = wind > 0 ? rand(-60, -10) : rand(W + 10, W + 60);
+          p.y = rand(-20, H * 0.9);
+        }
       } else {
         var L = (p.type === 'rain' ? RAIN_LAYERS : DRIZZLE_LAYERS)[p.layer];
         p.v = L.speed * rand(0.85, 1.15);
@@ -256,8 +263,9 @@
         var gone;
         if (p.type === 'snow') {
           var sl = SNOW_LAYERS[p.layer];
-          p.y += p.v * dt;
-          p.x += (wind * (160 + p.layer * 90) * sl.drift +
+          // Schneesturm: Flocken jagen fast waagerecht
+          p.y += p.v * (1 + 0.4 * bz) * dt;
+          p.x += (wind * (160 + p.layer * 90) * sl.drift * (1 + 2.2 * bz) +
                   Math.sin(p.phase + time * p.freq) * sl.sway) * dt;
           gone = p.y - p.r > H || p.x < -1000 || p.x > W + 1000;
         } else {
@@ -696,6 +704,51 @@
           sctx.fillRect(m.x - m.r - 20, m.y - m.r, m.r * 2 + 40, m.r * 2);
         });
       }
+    }
+
+    // ── Schneesturm: Whiteout (Ränder kräftig, Mitte leicht) und Ground
+    //    Blizzard (aufgewirbelter Schnee fegt über den unteren Rand) ──
+    var drifts = [];
+    function drawBlizzard(wind, dt) {
+      if (bz < 0.02 && !drifts.length) return;
+      var cold = nightRgb([228, 238, 252], [120, 134, 162]);
+      var gustPulse = 0.85 + 0.15 * Math.sin(time * 1.7) + 0.2 * Math.max(0, Math.abs(wind) - Math.abs(cur.wind || 0));
+      sctx.save();
+      sctx.translate(W / 2, H / 2);
+      sctx.scale(1, H / W);
+      var wo = sctx.createRadialGradient(0, 0, W * 0.12, 0, 0, W * 0.7);
+      wo.addColorStop(0, 'rgba(' + cold + ',' + (0.14 * bz * gustPulse) + ')');
+      wo.addColorStop(1, 'rgba(' + cold + ',' + (0.62 * bz * gustPulse) + ')');
+      sctx.fillStyle = wo;
+      sctx.fillRect(-W, -W, W * 2, W * 2);
+      sctx.restore();
+      // Bodenschleier
+      var gb = sctx.createLinearGradient(0, H, 0, H * 0.68);
+      gb.addColorStop(0, 'rgba(' + cold + ',' + (0.55 * bz) + ')');
+      gb.addColorStop(1, 'rgba(' + cold + ',0)');
+      sctx.fillStyle = gb;
+      sctx.fillRect(0, H * 0.68, W, H * 0.32);
+      // Treibschnee-Schlieren am Boden (Partikel-Ebene, weicher Rand)
+      var dirW = wind >= 0 ? 1 : -1;
+      var want = 90 * bz;
+      if (drifts.length < want && Math.random() < 0.9) {
+        drifts.push({ x: dirW > 0 ? rand(-300, W * 0.6) : rand(W * 0.4, W + 300), y: H - rand(0, H * 0.28),
+                      len: rand(80, 260), v: rand(700, 1300), ph: rand(0, 6.3), age: 0, life: rand(0.8, 1.8) });
+      }
+      pctx.lineCap = 'round';
+      drifts = drifts.filter(function (d) {
+        d.age += dt;
+        if (d.age >= d.life) return false;
+        d.x += dirW * d.v * dt;
+        var a = 0.6 * smooth(d.age / 0.25) * (1 - smooth((d.age - d.life * 0.6) / (d.life * 0.4)));
+        pctx.strokeStyle = 'rgba(' + cold + ',' + a + ')';
+        pctx.lineWidth = 3 + 2 * Math.sin(d.ph);
+        pctx.beginPath();
+        pctx.moveTo(d.x, d.y);
+        pctx.quadraticCurveTo(d.x - dirW * d.len * 0.5, d.y - 6 * Math.sin(time * 3 + d.ph), d.x - dirW * d.len, d.y + 3);
+        pctx.stroke();
+        return true;
+      });
     }
 
     // ── Blitze ──
@@ -1502,6 +1555,7 @@
 
     // ── Haupt-Schleife ──
     var dtFrame = 0;
+    var bz = 0;
     var paused = false;
     function frame(now) {
       var dt = last === null ? 0 : Math.min((now - last) / 1000, 0.05);
@@ -1522,10 +1576,13 @@
       }
 
       var wind = updateWind(dt);
+      // Schneesturm-Grad: viel Schnee und starker Wind
+      bz = smooth(((cur.snow || 0) - 0.7) / 0.3) * smooth((Math.abs(wind) - 0.45) / 0.4);
       var counts = manageParts(dt, wind);
       stepParts(dt, wind, counts);
       drawSky(wind);
       drawParts(wind);
+      drawBlizzard(wind, dt);
       drawBolts(dt);
       drawShow(dt);
       root.requestAnimationFrame(frame);
