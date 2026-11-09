@@ -1301,10 +1301,11 @@
       },
       avalanche: {
         // Staublawine nach echtem Aufbau: Abriss oben in der Ecke, Druckwelle
-        // (Schneestaub fegt waagerecht, Böe), dann rollt unten ein Kopf herein,
-        // der zu einer turmhohen, brodelnden Wolke wächst (Ballen quellen oben
-        // nach, Schattenseite unten), am Fuß dichter Schnee mit springenden
-        // Brocken; Durchzug fast weiß, danach rieselt feiner Schnee herab
+        // (Schneestaub fegt schräg, Böe), dann rauscht der Kopf schräg aus der
+        // Ecke den Hang hinunter und wächst zu einer brodelnden Wolke (Ballen
+        // quellen bergseitig nach, Schattenseite unten), darunter dichter
+        // Schnee mit springenden Brocken; Durchzug fast weiß, danach sinkt
+        // feiner Schnee aus der übrigen Wolke
         init: function () {
           var dir = Math.random() < 0.5 ? 1 : -1;
           var crack = [];
@@ -1342,16 +1343,22 @@
             }
           }
 
-          // Kopf-Position: läuft beschleunigend über den unteren Rand
+          // Kopf läuft schräg aus der oberen Ecke den Hang hinunter (beschleunigend);
+          // d = Laufrichtung, nv = senkrecht dazu nach oben (dort quillt die Wolke)
           var run = clamp((t - ARRIVE) / (PASS - ARRIVE), 0, 1);
-          var front = lerp(-260, W + 900, Math.pow(run, 0.8));
-          var headH = H * lerp(0.18, 0.72, smooth(run / 0.55));
+          var sx0 = xs(-160), sy0 = -160, ex = xs(W + 420), ey = H + 360;
+          var dl = Math.hypot(ex - sx0, ey - sy0), dx = (ex - sx0) / dl, dy = (ey - sy0) / dl;
+          var nvx = dy, nvy = -dx;
+          if (nvy > 0) { nvx = -nvx; nvy = -nvy; }
+          var along = (dl + 700) * Math.pow(run, 0.8);
+          var fX = sx0 + dx * along, fY = sy0 + dy * along;
+          var headH = H * lerp(0.12, 0.42, smooth(run / 0.5));
 
           // 2) Druckwelle: kurz vor dem Kopf fegt Schneestaub waagerecht durch
           if (t > ARRIVE - 0.5 && t < ARRIVE + 2.2) {
             if (!s.gusted) { s.gusted = true; gust(); }
             for (var n = 0; n < 6; n++) {
-              s.streaks.push({ x: xs(rand(-200, W * 0.3)), y: rand(H * 0.25, H), len: rand(60, 180),
+              s.streaks.push({ x: rand(-100, W + 100), y: rand(-100, H), len: rand(60, 180),
                                v: rand(1600, 2400), life: rand(0.5, 0.9) });
             }
           }
@@ -1359,12 +1366,12 @@
           s.streaks = s.streaks.filter(function (st) {
             st.life -= dt;
             if (st.life <= 0) return false;
-            st.x += dir * st.v * dt;
+            st.x += dx * st.v * dt; st.y += dy * st.v * dt;
             fctx.strokeStyle = 'rgba(' + snow + ',' + (0.5 * Math.min(1, st.life * 2)) + ')';
             fctx.lineWidth = 1.6;
             fctx.beginPath();
             fctx.moveTo(st.x, st.y);
-            fctx.lineTo(st.x - dir * st.len, st.y + 4);
+            fctx.lineTo(st.x - dx * st.len, st.y - dy * st.len);
             fctx.stroke();
             return true;
           });
@@ -1374,15 +1381,18 @@
             s.acc += 34 * dt;
             while (s.acc >= 1) {
               s.acc -= 1;
-              var hf = Math.pow(Math.random(), 0.8);                   // 0 = Boden, 1 = Kopfspitze
-              s.billows.push({ x: xs(front - rand(0, 180)), y: H - hf * headH + rand(-20, 20),
-                               r: lerp(70, 170, hf) * rand(0.8, 1.2), vx: dir * rand(250, 520) * (1 - 0.5 * hf),
-                               vy: -rand(15, 70) * hf, grow: rand(40, 80), life: rand(3.4, 5.2), age: 0, a: 1 });
+              var hf = Math.pow(Math.random(), 0.8);                   // 0 = Hang, 1 = Kopfspitze
+              var back = rand(0, 200), sp = rand(250, 520) * (1 - 0.5 * hf), rise = rand(15, 70) * hf;
+              s.billows.push({ x: fX - dx * back + nvx * hf * headH + rand(-20, 20),
+                               y: fY - dy * back + nvy * hf * headH + rand(-20, 20),
+                               r: lerp(70, 170, hf) * rand(0.8, 1.2), vx: dx * sp + nvx * rise,
+                               vy: dy * sp + nvy * rise, grow: rand(40, 80), life: rand(3.4, 5.2), age: 0, a: 1 });
             }
             // springende Brocken am Fuß
             if (Math.random() < dt * 30) {
-              s.chunks.push({ x: xs(front + rand(-40, 60)), y: H - rand(10, 60), vx: dir * rand(300, 700),
-                              vy: -rand(250, 560), r: rand(3, 9), life: rand(0.8, 1.4) });
+              var cs = rand(400, 800), cu = rand(150, 380);
+              s.chunks.push({ x: fX + rand(-40, 40), y: fY + rand(-40, 40), vx: dx * cs + nvx * cu,
+                              vy: dy * cs + nvy * cu, r: rand(3, 9), life: rand(0.8, 1.4) });
             }
           }
           // Ballen: erst Schattenseite (versetzt nach unten), dann helle Seite
@@ -1408,23 +1418,20 @@
               fctx.fillRect(b.x - b.r, cy - b.r, b.r * 2, b.r * 2);
             });
           });
-          // dichter Schnee am Fuß, hinter der Front; läuft nach hinten und oben weich aus
+          // dichte Schneemasse am Hang hinter der Front, nach hinten weich auslaufend
           if (t >= ARRIVE && t < PASS + 2) {
-            var baseA = 0.85 * fade * (1 - smooth((t - PASS) / 2));
-            var x0 = xs(front - 1400), x1 = xs(front + 40);
-            var hg;
-            for (var b2 = 0; b2 < 8; b2++) {
-              var kb = b2 / 7;
-              // ganze Pixel ohne Lücken zwischen den Streifen
-              var yb = Math.round(H - 160 + b2 * 20), yb2 = Math.round(H - 160 + (b2 + 1) * 20);
-              var va = baseA * smooth(kb * 1.4);
-              hg = fctx.createLinearGradient(x0, 0, x1, 0);
-              hg.addColorStop(0, 'rgba(' + snow + ',0)');
-              hg.addColorStop(0.55, 'rgba(' + snow + ',' + (va * 0.8) + ')');
-              hg.addColorStop(0.96, 'rgba(' + snow + ',' + va + ')');
-              hg.addColorStop(1, 'rgba(' + snow + ',0)');
-              fctx.fillStyle = hg;
-              fctx.fillRect(Math.min(x0, x1), yb, Math.abs(x1 - x0), yb2 - yb);
+            var baseA = 0.8 * fade * (1 - smooth((t - PASS) / 2));
+            for (var bi = 0; bi < 16; bi++) {
+              var kb = bi / 15, bk = kb * 1300;
+              var bxp = fX - dx * bk, byp = fY - dy * bk, br = lerp(130, 90, kb);
+              var ba = baseA * (1 - kb) * smooth(along / 300);
+              if (ba < 0.01) continue;
+              var bgr = fctx.createRadialGradient(bxp, byp, 0, bxp, byp, br);
+              bgr.addColorStop(0, 'rgba(' + snow + ',' + ba + ')');
+              bgr.addColorStop(0.6, 'rgba(' + shade + ',' + (ba * 0.7) + ')');
+              bgr.addColorStop(1, 'rgba(' + shade + ',0)');
+              fctx.fillStyle = bgr;
+              fctx.fillRect(bxp - br, byp - br, br * 2, br * 2);
             }
           }
           fctx.fillStyle = 'rgba(' + snow + ',1)';
@@ -1432,7 +1439,6 @@
             ch.life -= dt;
             if (ch.life <= 0) return false;
             ch.vy += 1100 * dt; ch.x += ch.vx * dt; ch.y += ch.vy * dt;
-            if (ch.y > H - 8 && ch.vy > 0) ch.vy *= -0.35;
             fctx.globalAlpha = Math.min(1, ch.life * 2) * fade;
             fctx.beginPath();
             fctx.arc(ch.x, ch.y, ch.r, 0, Math.PI * 2);

@@ -634,9 +634,31 @@ G1R_STEAM_NAME=</code></pre>
                  "Now: " + (KIND[d.kind] || d.kind) + ", " + d.temp + " °C, clouds " + d.cloud + " %" +
                  (d.isDay ? "" : " (night)"));
             line("air", "Wind " + d.windKmh + " km/h from " + d.windFrom);
+            if (d.localTime) line("schedule", "Local time " + d.localTime + (d.tz ? " (" + d.tz + ")" : ""));
             if (d.sunrise && d.sunset) line("wb_twilight", "Sunrise " + d.sunrise + ", sunset " + d.sunset + " (local time)");
           } else {
             line("cloud_off", "Weather service not reachable right now.");
+          }
+          // mehrere Treffer: Alternativen zum Anklicken (übernimmt den eindeutigen Ort)
+          if (d.alternatives && d.alternatives.length) {
+            const hint = document.createElement("div");
+            hint.className = "url-weather-info__row";
+            hint.textContent = "Not the right place? Pick one:";
+            box.appendChild(hint);
+            const list = document.createElement("div");
+            list.className = "url-weather-info__alts";
+            d.alternatives.forEach(a => {
+              const b = document.createElement("button");
+              b.type = "button";
+              b.className = "sw-btn";
+              b.textContent = a.label;
+              b.addEventListener("click", () => {
+                placeInp.value = a.value;
+                placeInp.dispatchEvent(new Event("input", { bubbles: true }));
+              });
+              list.appendChild(b);
+            });
+            box.appendChild(list);
           }
         } catch (e) {
           if (req === weatherReq) {

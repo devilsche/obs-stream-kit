@@ -523,7 +523,7 @@ EFFECT_META = {
     "weather.html": {"switches": [
         {"key": "place", "label": "Location", "type": "text", "default": "",
          "placeholder": "e.g. Hamburg",
-         "tooltip": "Town for the live weather. The server only looks it up, it never appears on stream — but it is part of the OBS URL, so anyone who sees your OBS source settings sees it too. A nearby bigger town is accurate enough."},
+         "tooltip": "Town for the live weather. Narrow it down with a comma: 'St. Helena, ZA' or 'Jamestown, SH' (country code, country or region), or enter coordinates like '-15.93, -5.72'. The server only looks it up, it never appears on stream — but it is part of the OBS URL, so anyone who sees your OBS source settings sees it too."},
         {"key": "lock", "label": "Fixed weather", "type": "select", "default": "off",
          "options": [["off", "Off (live)"]] + _WEATHER_KINDS,
          "tooltip": "Shows this weather instead of the live weather. K/D mood, time of day and chat commands still apply on top."},

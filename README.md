@@ -376,7 +376,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 
 | Parameter | Werte | Standard |
 |-----------|-------|----------|
-| `place` | Ort fürs Live-Wetter, z. B. `Hamburg` | — |
+| `place` | Ort fürs Live-Wetter, z. B. `Hamburg`; eingrenzen mit Komma (`St. Helena, ZA`, `Jamestown, SH` – Ländercode, Land oder Region) oder Koordinaten (`-15.93, -5.72`). Die Karte zeigt den gefundenen Ort, Wetter, Ortszeit, Sonnenzeiten und bei mehreren Treffern die Alternativen zum Anklicken | — |
 | `lock` | feste Lage statt Live-Wetter (ersetzt nur das echte Wetter, K/D-Stimmung, Tageszeit und Chat wirken weiter), `off` = live | `off` |
 | `fallback` | Lage ohne Ort oder bei Ausfall | `clear` |
 | `mood` | `0` … `1`, Stärke der K/D-Stimmung | `1` |
@@ -393,7 +393,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 |--------|---------|
 | `cmd=weather&to=storm` | Gewitter für 2,5 min, danach zurück; `&hold=60` = 60 s, `&hold=0` = bis `auto` |
 | `cmd=auto` | zurück zum Live-Wetter |
-| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami` (erst zieht sich das Wasser zurück, dann rollt eine schäumende Flutwand heran, das Land steht unter Wasser, es läuft wieder ab), `megabolt` (Gewitterwand mit vielen Blitzen), `ballbolt` (nach einem Einschlag glimmt eine gelb-orange Kugel auf, schwebt taumelnd und erlischt lautlos oder platzt — Event für ein Knall-WAV), `avalanche` (Staublawine: Abriss oben in der Ecke, Druckwelle mit Schneestaub und Böe, ein brodelnder Wolkenkopf rollt unten herein und wächst bis etwa 70 % der Bildhöhe, kurz fast weiß, danach rieselt feiner Schnee), `aurora` (Polarlicht), `rainbow` (Regenbogen), `hail` (Hagelschauer), `meteors` (Sternschnuppenregen), `tornado` (Windhose), `fogwall` (Nebelwand); ohne `type` zufällig. Spektakel reichen bis an die Bildränder und passen sich nachts an (dunkleres Wasser, mondbeschienener Schnee, Mondregenbogen, Blitze in der Windhose), Regen, Schnee und Blitze blenden am Rand weich aus. Ein zweites wartet, bis das erste fertig ist |
+| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami` (erst zieht sich das Wasser zurück, dann rollt eine schäumende Flutwand heran, das Land steht unter Wasser, es läuft wieder ab), `megabolt` (Gewitterwand mit vielen Blitzen), `ballbolt` (nach einem Einschlag glimmt eine gelb-orange Kugel auf, schwebt taumelnd und erlischt lautlos oder platzt — Event für ein Knall-WAV), `avalanche` (Staublawine: Abriss oben in der Ecke, Druckwelle mit Schneestaub und Böe, die brodelnde Wolke rauscht schräg aus der Ecke den Hang hinunter, kurz fast weiß, danach sinkt feiner Schnee aus der Wolke), `aurora` (Polarlicht), `rainbow` (Regenbogen), `hail` (Hagelschauer), `meteors` (Sternschnuppenregen), `tornado` (Windhose), `fogwall` (Nebelwand); ohne `type` zufällig. Spektakel reichen bis an die Bildränder und passen sich nachts an (dunkleres Wasser, mondbeschienener Schnee, Mondregenbogen, Blitze in der Windhose), Regen, Schnee und Blitze blenden am Rand weich aus. Ein zweites wartet, bis das erste fertig ist |
 | `cmd=strike` | Blitz (`&dist=near` / `&dist=far`, passend zum Donner-WAV) |
 | `cmd=gust` | Windböe |
 | `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die URL |

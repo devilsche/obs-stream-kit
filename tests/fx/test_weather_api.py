@@ -107,12 +107,16 @@ def test_lookup_reports_place_weather_and_sun(monkeypatch):
                                  "admin1": "Land Berlin", "country": "Deutschland"}]}
         return {"current": {"weather_code": 3, "temperature_2m": 3.5, "wind_speed_10m": 6.7,
                             "wind_direction_10m": 106, "cloud_cover": 70, "is_day": 1},
-                "daily": {"sunrise": ["2026-11-09T07:21"], "sunset": ["2026-11-09T16:14"]}}
+                "daily": {"sunrise": ["2026-11-09T07:21"], "sunset": ["2026-11-09T16:14"]},
+                "utc_offset_seconds": 3600, "timezone_abbreviation": "GMT+1"}
     monkeypatch.setattr(weather_api, "_fetch_json", fake)
+    import calendar
+    utc13 = calendar.timegm((2026, 11, 9, 13, 0, 0))
+    monkeypatch.setattr(weather_api.time, "time", lambda: float(utc13))
     assert weather_api.lookup("Berlin") == {
-        "found": True, "label": "Berlin, Land Berlin, Deutschland", "kind": "cloudy",
+        "found": True, "label": "Berlin, Land Berlin, Deutschland", "alternatives": [], "kind": "cloudy",
         "temp": 3.5, "windKmh": 6.7, "windFrom": "E", "cloud": 70, "isDay": True,
-        "sunrise": "07:21", "sunset": "16:14"}
+        "sunrise": "07:21", "sunset": "16:14", "localTime": "14:00", "tz": "GMT+1"}
 
 
 def test_lookup_unknown_place(monkeypatch):
@@ -128,3 +132,40 @@ def test_current_reads_cloud_cover_and_sun_times(monkeypatch):
     s = current(1, 1, 1, now=0)
     assert s["kind"] == "clear" and s["clouds"] > 0.3
     assert s["_sunrise"] == 1000 and s["_sunset"] == 5000
+
+
+JAMESTOWN = [
+    {"latitude": 46.9, "longitude": -98.7, "name": "Jamestown", "admin1": "North Dakota",
+     "country": "Vereinigte Staaten", "country_code": "US"},
+    {"latitude": -15.93, "longitude": -5.72, "name": "Jamestown", "admin1": "Sankt Helena",
+     "country_code": "SH"},
+]
+
+
+def test_geocode_filters_by_country_code_or_region(monkeypatch):
+    monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {"results": JAMESTOWN})
+    g = geocode("Jamestown, SH")
+    assert g["lat"] == -15.93 and g["label"] == "Jamestown, Sankt Helena, SH"
+    assert geocode("Jamestown, north dakota")["lat"] == 46.9
+    assert geocode("Jamestown, Frankreich") is None
+
+
+def test_geocode_accepts_coordinates(monkeypatch):
+    def boom(url):
+        raise AssertionError("no lookup for coordinates")
+    monkeypatch.setattr(weather_api, "_fetch_json", boom)
+    assert geocode("-15.93, -5.72") == {"lat": -15.93, "lon": -5.72, "label": "-15.93, -5.72"}
+    assert geocode("95, 10") is None                                  # ungültige Breite
+
+
+def test_lookup_offers_alternatives(monkeypatch):
+    def fake(url):
+        if "geocoding" in url:
+            return {"results": JAMESTOWN}
+        return {"current": {"weather_code": 0, "temperature_2m": 20, "wind_speed_10m": 5,
+                            "wind_direction_10m": 90, "cloud_cover": 10, "is_day": 1}}
+    monkeypatch.setattr(weather_api, "_fetch_json", fake)
+    out = weather_api.lookup("Jamestown")
+    assert out["label"] == "Jamestown, North Dakota, Vereinigte Staaten"
+    assert [a["value"] for a in out["alternatives"]] == ["Jamestown, North Dakota, US", "Jamestown, Sankt Helena, SH"]
+    assert weather_api.lookup("Jamestown, SH")["alternatives"] == []
