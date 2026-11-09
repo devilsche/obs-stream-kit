@@ -354,6 +354,9 @@
     }
     var meteor = null, nextMeteor = rand(8, 20);
 
+    // Tagesfarbe → Nachtfarbe (mondbeschienen), nach aktueller Nacht
+    function nightRgb(day, nite) { return mixRgb(day, nite, 0.8 * clamp(cur.night || 0, 0, 1)); }
+
     function mixRgb(a, b, t) {
       return Math.round(lerp(a[0], b[0], t)) + ',' + Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t));
     }
@@ -810,92 +813,111 @@
 
     var SHOWS = {
       tsunami: {
-        // Welle läuft beschleunigend von einer Seite durch, rollt sich vorne
-        // rund ein (Röhre), Schaumteppich dahinter, Gischt von der Lippe
+        // Tsunami wie in echt: erst zieht sich das Wasser am unteren Rand
+        // zurück, dann rollt eine steile, schäumende Flutwand von der Seite
+        // heran und türmt sich auf, das Land steht unter Wasser, danach läuft
+        // es wieder ab. Trübes Wasser mit Treibgut, keine Surferwelle.
         init: function () {
-          return { dur: 6.5, dir: Math.random() < 0.5 ? 1 : -1, spray: [] };
+          var debris = [];
+          for (var i = 0; i < 40; i++) debris.push({ off: rand(0, W * 1.2), dy: rand(0.1, 0.9), r: rand(3, 9), ph: rand(0, 6.3) });
+          return { dur: 10, dir: Math.random() < 0.5 ? 1 : -1, spray: [], debris: debris };
         },
         draw: function (s, dt) {
-          var p = s.t / s.dur;
-          var env = smooth(p / 0.1) * (1 - smooth((p - 0.86) / 0.14));
-          var run = Math.pow(p, 1.35);
-          var crest = s.dir > 0 ? lerp(-W * 0.25, W * 1.4, run) : lerp(W * 1.25, -W * 0.4, run);
-          var dir = s.dir;
-          var top = H * 0.62 * env;
-          var L = W * 0.9;
-          var level = function (x) {
-            var d = (crest - x) * dir;                // > 0 hinter dem Kamm
-            if (d < 0) return 0;
-            // am Kamm volle Höhe, nach hinten flacher auslaufend
-            var h = top * (1 - 0.62 * smooth(d / L)) * (0.92 + 0.08 * smooth(d / 160));
-            return h + Math.sin(x * 0.018 + s.t * 4) * 12 * env;
+          var t = s.t, dir = s.dir;
+          var RETREAT = 1.8, SURGE = 4.6, DRAIN_AT = RETREAT + SURGE;
+          var murkTop = nightRgb([96, 150, 150], [40, 70, 82]);
+          var murkMid = nightRgb([52, 98, 104], [22, 44, 56]);
+          var murkLow = nightRgb([30, 58, 62], [10, 22, 30]);
+          var foamRgb = nightRgb([240, 246, 242], [170, 188, 196]);
+          var fade = 1 - smooth((t - (s.dur - 0.8)) / 0.8);
+          var waterPath = function (levelAt, x0, x1) {
+            var grad = fctx.createLinearGradient(0, H * 0.3, 0, H);
+            grad.addColorStop(0, 'rgba(' + murkTop + ',' + (0.9 * fade) + ')');
+            grad.addColorStop(0.45, 'rgba(' + murkMid + ',' + (0.92 * fade) + ')');
+            grad.addColorStop(1, 'rgba(' + murkLow + ',' + (0.95 * fade) + ')');
+            fctx.fillStyle = grad;
+            fctx.beginPath();
+            fctx.moveTo(x0, H + 10);
+            var step = (x1 > x0 ? 16 : -16), x;
+            for (x = x0; (x1 - x) * Math.sign(step) >= 0; x += step) fctx.lineTo(x, H - levelAt(x));
+            fctx.lineTo(x1, H + 10);
+            fctx.closePath();
+            fctx.fill();
           };
-          var fx = function (dx) { return crest + dir * dx; };
-          var x0 = crest - dir * (L + 240);
+          var chop = function (x) {
+            return Math.sin(x * 0.013 + t * 3.1) * 9 + Math.sin(x * 0.031 - t * 4.7) * 5 + Math.sin(x * 0.0047 + t * 1.3) * 12;
+          };
 
-          // Wasserkörper mit Lippe
-          var grad = fctx.createLinearGradient(0, H - top * 1.15, 0, H);
-          grad.addColorStop(0, 'rgba(150,225,245,' + (0.92 * env) + ')');
-          grad.addColorStop(0.3, 'rgba(40,140,200,' + (0.92 * env) + ')');
-          grad.addColorStop(1, 'rgba(10,50,100,' + (0.95 * env) + ')');
-          fctx.fillStyle = grad;
-          fctx.beginPath();
-          fctx.moveTo(x0, H + 10);
-          var x;
-          for (x = x0; (crest - x) * dir >= 0; x += 20 * dir) fctx.lineTo(x, H - level(x));
-          // Lippe: steigt über den Kamm, rollt rund nach vorn und unten ein
-          fctx.bezierCurveTo(fx(40), H - top * 1.16, fx(170), H - top * 1.14, fx(205), H - top * 0.86);
-          fctx.bezierCurveTo(fx(220), H - top * 0.72, fx(165), H - top * 0.62, fx(120), H - top * 0.7);
-          // Unterseite der Lippe zurück, dann die Wand hinunter
-          fctx.bezierCurveTo(fx(70), H - top * 0.6, fx(50), H - top * 0.3, fx(150), H + 10);
-          fctx.closePath();
-          fctx.fill();
-
-          // Röhre: dunkler Hohlraum unter der Lippe
-          var tube = fctx.createRadialGradient(fx(105), H - top * 0.5, 0, fx(105), H - top * 0.5, top * 0.32);
-          tube.addColorStop(0, 'rgba(5,30,60,' + (0.55 * env) + ')');
-          tube.addColorStop(1, 'rgba(5,30,60,0)');
-          fctx.fillStyle = tube;
-          fctx.beginPath();
-          fctx.moveTo(fx(120), H - top * 0.7);
-          fctx.bezierCurveTo(fx(70), H - top * 0.6, fx(50), H - top * 0.3, fx(150), H + 10);
-          fctx.lineTo(fx(40), H + 10);
-          fctx.lineTo(fx(40), H - top * 0.8);
-          fctx.closePath();
-          fctx.fill();
-
-          // Schaumkante auf der Lippe und Schaumteppich dahinter
-          fctx.fillStyle = 'rgba(245,252,255,' + (0.9 * env) + ')';
-          for (var k = 0; k < 26; k++) {
-            var t = k / 25;
-            var lx = lerp(crest, fx(200), t), ly = H - top * (1.0 + 0.14 * Math.sin(Math.PI * t * 0.9));
-            fctx.beginPath();
-            fctx.arc(lx + rand(-5, 5), ly + rand(-6, 6), rand(2, 6), 0, Math.PI * 2);
-            fctx.fill();
-          }
-          for (x = crest - dir * 700; (crest - x) * dir >= 0; x += 8 * dir) {
-            var near = 1 - Math.abs(crest - x) / 700;
-            if (Math.random() > 0.3 + near * 0.6) continue;
-            fctx.beginPath();
-            fctx.arc(x + rand(-4, 4), H - level(x) + rand(-8, 10), rand(1.5, 2.5 + near * 4.5), 0, Math.PI * 2);
-            fctx.fill();
+          // 1) Rückzug: ein Wasserstreifen am unteren Rand sinkt weg
+          if (t < RETREAT + 0.4) {
+            var k = smooth(t / RETREAT);
+            var lvl = (1 - k) * 70 * smooth(t / 0.3);
+            if (lvl > 1) waterPath(function (x) { return lvl + Math.sin(x * 0.02 + t * 2) * 3; }, -20, W + 20);
           }
 
-          // Gischt von der Lippe und am Fuß der Wand
-          if (env > 0.25) {
-            for (var n = 0; n < 12; n++) {
-              var fromLip = n < 8;
-              s.spray.push({ x: fromLip ? fx(rand(120, 210)) : fx(rand(120, 200)),
-                             y: fromLip ? H - top * rand(0.85, 1.1) : H - rand(0, 40),
-                             vx: dir * rand(120, 480), vy: fromLip ? rand(-520, -200) : rand(-700, -300),
-                             life: rand(0.6, 1.2), r: rand(1.5, 3.5) });
+          // 2) Flutwand rollt heran und türmt sich auf; dahinter steht das Land unter Wasser
+          var flood = 0;
+          if (t >= RETREAT) {
+            var p = Math.min(1, (t - RETREAT) / SURGE);
+            var run = Math.pow(p, 0.85);
+            var front = dir > 0 ? lerp(-80, W + 260, run) : lerp(W + 80, -260, run);
+            var wall = H * lerp(0.18, 0.66, Math.pow(p, 0.7));   // Auflaufen: die Wand wächst
+            flood = H * lerp(0.08, 0.34, p);                      // Flutstand hinter der Wand
+            var drain = smooth((t - DRAIN_AT) / (s.dur - DRAIN_AT - 0.6));
+            wall *= 1 - drain; flood *= 1 - drain;
+            var levelAt = function (x) {
+              var d = (front - x) * dir;                          // > 0: hinter der Front
+              if (d < 0) return 0;
+              var face = 1 - smooth(d / 520);                     // Wand fällt nach hinten zum Flutstand ab
+              return flood + (wall - flood) * face + chop(x) * (0.6 + 0.4 * face);
+            };
+            var back = dir > 0 ? -40 : W + 40;
+            waterPath(levelAt, back, front + dir * 2);
+
+            // steile Front: schäumende, brodelnde Kante
+            if (wall > 20 && drain < 0.9) {
+              fctx.fillStyle = 'rgba(' + foamRgb + ',' + (0.85 * fade * (1 - drain)) + ')';
+              for (var i = 0; i < 70; i++) {
+                var fy = H - rand(0, wall * 1.05);
+                var fx2 = front - dir * rand(0, 60) + Math.sin(fy * 0.05 + t * 9) * 10;
+                fctx.beginPath();
+                fctx.arc(fx2, fy, rand(3, 10), 0, Math.PI * 2);
+                fctx.fill();
+              }
+              // Schaumkrone oben auf der Wand
+              for (var j = 0; j < 60; j++) {
+                var cx = front - dir * rand(0, 480);
+                fctx.beginPath();
+                fctx.arc(cx, H - levelAt(cx) + rand(-6, 8), rand(2, 7), 0, Math.PI * 2);
+                fctx.fill();
+              }
+              for (var n = 0; n < 10; n++) {
+                s.spray.push({ x: front + dir * rand(-20, 40), y: H - wall * rand(0.7, 1.05),
+                               vx: dir * rand(150, 520), vy: rand(-560, -180), life: rand(0.5, 1.1), r: rand(2, 4.5) });
+              }
             }
+
+            // Treibgut im Flutwasser
+            fctx.fillStyle = 'rgba(' + nightRgb([62, 48, 34], [30, 26, 22]) + ',' + (0.85 * fade) + ')';
+            s.debris.forEach(function (d) {
+              var x = front - dir * d.off;
+              if ((front - x) * dir < 40 || x < -20 || x > W + 20) return;
+              var lv = levelAt(x);
+              if (lv < 12) return;
+              var y = H - lv * d.dy + Math.sin(t * 2 + d.ph) * 4;
+              fctx.save();
+              fctx.translate(x, y);
+              fctx.rotate(Math.sin(t * 1.5 + d.ph) * 0.6);
+              fctx.fillRect(-d.r * 1.6, -d.r * 0.4, d.r * 3.2, d.r * 0.8);
+              fctx.restore();
+            });
           }
+
           s.spray = s.spray.filter(function (d) { return (d.life -= dt) > 0; });
-          fctx.fillStyle = 'rgba(240,250,255,1)';
+          fctx.fillStyle = 'rgba(' + foamRgb + ',1)';
           s.spray.forEach(function (d) {
             d.vy += 1000 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
-            fctx.globalAlpha = Math.min(1, d.life) * env * 0.9;
+            fctx.globalAlpha = Math.min(1, d.life) * 0.9 * fade;
             fctx.beginPath();
             fctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
             fctx.fill();
@@ -956,7 +978,8 @@
               // Wolkenunterseite leuchtet beim Einschlag in der Nähe auf
               if (!back && s.glow > 0.02) {
                 var near = Math.max(0, 1 - Math.abs(c.x - s.glowX) / 700);
-                var la = 0.55 * s.glow * near * env;
+                // nachts leuchten die Wolken beim Einschlag stärker auf
+                var la = 0.55 * s.glow * near * env * (1 + 0.6 * clamp(cur.night || 0, 0, 1));
                 if (la > 0.01) {
                   var lg = sctx.createRadialGradient(c.x, y + r * 0.35, 0, c.x, y + r * 0.35, r * 0.8);
                   lg.addColorStop(0, 'rgba(190,200,255,' + la + ')');
@@ -1201,11 +1224,12 @@
             // oben weich in die Wolkenbasis übergehen, keine harte Kante
             var a = env * (0.92 - 0.2 * k) * smooth(i / 8);
             var g = fctx.createLinearGradient(cx - w, 0, cx + w, 0);
-            g.addColorStop(0, 'rgba(60,57,54,0)');
-            g.addColorStop(0.22, 'rgba(60,57,54,' + (a * 0.85) + ')');
-            g.addColorStop(0.5, 'rgba(46,44,42,' + a + ')');
-            g.addColorStop(0.78, 'rgba(60,57,54,' + (a * 0.85) + ')');
-            g.addColorStop(1, 'rgba(60,57,54,0)');
+            var edgeRgb = nightRgb([60, 57, 54], [62, 66, 82]), coreRgb = nightRgb([46, 44, 42], [44, 47, 60]);
+            g.addColorStop(0, 'rgba(' + edgeRgb + ',0)');
+            g.addColorStop(0.22, 'rgba(' + edgeRgb + ',' + (a * 0.85) + ')');
+            g.addColorStop(0.5, 'rgba(' + coreRgb + ',' + a + ')');
+            g.addColorStop(0.78, 'rgba(' + edgeRgb + ',' + (a * 0.85) + ')');
+            g.addColorStop(1, 'rgba(' + edgeRgb + ',0)');
             fctx.fillStyle = g;
             fctx.fillRect(cx - w, y, w * 2, y2 - y);
           }
@@ -1215,11 +1239,24 @@
             var kk = ((s.t * 0.22 + j / 9) % 1);
             var yy = lerp(H, topY, kk), cx2 = x + swayAt(kk), w2 = widthAt(kk) * 0.75;
             var off = Math.sin(s.t * 6 + j) * w2 * 0.5;
-            fctx.strokeStyle = 'rgba(150,145,138,' + (0.5 * env * Math.sin(Math.PI * kk)) + ')';
+            fctx.strokeStyle = 'rgba(' + nightRgb([150, 145, 138], [95, 102, 122]) + ',' + (0.5 * env * Math.sin(Math.PI * kk)) + ')';
             fctx.beginPath();
             fctx.moveTo(cx2 - w2, yy + 6);
             fctx.quadraticCurveTo(cx2 + off, yy - 10, cx2 + w2, yy + 4);
             fctx.stroke();
+          }
+          // nachts zucken Blitze in der Wolkenbasis und zeigen den Trichter
+          if ((cur.night || 0) > 0.3 && env > 0.5 && Math.random() < 0.012) {
+            s.flashT = 0.25;
+            flash(x < W * 0.38 ? 'left' : (x > W * 0.62 ? 'right' : 'center'));
+          }
+          if (s.flashT > 0) {
+            s.flashT -= 0.016;
+            var fl = sctx.createRadialGradient(x, topY - 40, 0, x, topY - 40, 520);
+            fl.addColorStop(0, 'rgba(200,210,255,' + (0.5 * s.flashT / 0.25) + ')');
+            fl.addColorStop(1, 'rgba(200,210,255,0)');
+            sctx.fillStyle = fl;
+            sctx.fillRect(x - 520, topY - 560, 1040, 1040);
           }
           // Staubwolke am Fuß
           var dust = fctx.createRadialGradient(x, H, 0, x, H, 240);
@@ -1254,80 +1291,135 @@
             var x = front - s.dir * f.off + Math.sin(s.t * 0.8 + f.wob) * 30;
             var y = f.y + Math.sin(s.t * 0.5 + f.wob) * 20;
             var g = fctx.createRadialGradient(x, y, 0, x, y, f.r);
-            g.addColorStop(0, 'rgba(228,232,238,' + (0.34 * env) + ')');
-            g.addColorStop(1, 'rgba(228,232,238,0)');
+            var fogRgb = nightRgb([228, 232, 238], [95, 105, 128]);
+            g.addColorStop(0, 'rgba(' + fogRgb + ',' + (0.34 * env) + ')');
+            g.addColorStop(1, 'rgba(' + fogRgb + ',0)');
             fctx.fillStyle = g;
             fctx.fillRect(x - f.r, y - f.r, f.r * 2, f.r * 2);
           });
         }
       },
       avalanche: {
+        // Lawine wie in echt, in drei Stufen: in der oberen Ecke reißt ein
+        // Schneebrett an einer Bruchkante ab, rutscht den Hang hinunter,
+        // zerbricht und reißt immer mehr Schnee mit (Lockerschnee); vorneweg
+        // rast eine Staublawine, deren Druckwelle eine Böe auslöst
         init: function () {
           var flip = Math.random() < 0.5;
-          var chunks = [];
-          for (var i = 0; i < 70; i++) {
-            chunks.push({ back: rand(0, 520), side: rand(-260, 260), r: rand(26, 105),
-                          spin: rand(0, Math.PI * 2), bob: rand(2, 5) });
+          // Bruchkante quer über die Ecke, gezackt
+          var crack = [], n = 14;
+          for (var i = 0; i <= n; i++) {
+            var k = i / n;
+            crack.push([lerp(W - 640, W - 40, k) + rand(-14, 14), lerp(40, 470, k) + rand(-14, 14)]);
           }
-          return { dur: 9.5, flip: flip, chunks: chunks, powder: [], debris: [] };
+          return { dur: 10, flip: flip, crack: crack, chunks: [], powder: [], gusted: false, born: false };
         },
         draw: function (s, dt) {
-          var p = s.t / s.dur;
-          var env = 1 - smooth((p - 0.82) / 0.18);
-          // Front läuft von oben rechts nach unten links
-          var sx = W + 260, sy = -200, ex = -420, ey = H + 220;
-          var f = Math.min(1.2, p * 1.35);
-          var dx = ex - sx, dy = ey - sy, len = Math.sqrt(dx * dx + dy * dy);
-          var ux = dx / len, uy = dy / len, nx = -uy, ny = ux;
-          var fx = sx + dx * f, fy = sy + dy * f;
-          function at(back, side) {
-            var X = fx - ux * back + nx * side, Y = fy - uy * back + ny * side;
-            return s.flip ? [W - X, Y] : [X, Y];
-          }
-          if (f < 1.15) {
-            for (var n = 0; n < 4; n++) {
-              var q = at(rand(0, 380), rand(-300, 300));
-              s.powder.push({ x: q[0], y: q[1], r: rand(60, 140), grow: rand(40, 90), life: rand(2, 3.2), max: 3.2 });
-            }
-            for (var d = 0; d < 3; d++) {
-              var q2 = at(rand(-20, 60), rand(-260, 260));
-              s.debris.push({ x: q2[0], y: q2[1], vx: (s.flip ? -1 : 1) * ux * rand(200, 500) + rand(-80, 80),
-                              vy: uy * rand(200, 500) - rand(100, 300), life: rand(0.6, 1.2) });
-            }
-          }
-          s.powder = s.powder.filter(function (o) { return (o.life -= dt) > 0; });
-          s.powder.forEach(function (o) {
-            o.r += o.grow * dt;
-            var a = (o.life / o.max) * 0.32 * env;
-            var g = fctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r);
-            g.addColorStop(0, 'rgba(240,245,252,' + a + ')');
-            g.addColorStop(1, 'rgba(240,245,252,0)');
-            fctx.fillStyle = g;
-            fctx.fillRect(o.x - o.r, o.y - o.r, o.r * 2, o.r * 2);
-          });
-          if (f < 1.2) {
-            s.chunks.forEach(function (c) {
-              var q = at(c.back, c.side + Math.sin(s.t * c.bob + c.spin) * 14);
-              var g = fctx.createRadialGradient(q[0] - c.r * 0.25, q[1] - c.r * 0.3, c.r * 0.1, q[0], q[1], c.r);
-              g.addColorStop(0, 'rgba(255,255,255,' + (0.95 * env) + ')');
-              g.addColorStop(0.6, 'rgba(226,234,246,' + (0.85 * env) + ')');
-              g.addColorStop(1, 'rgba(200,214,232,0)');
-              fctx.fillStyle = g;
-              fctx.beginPath();
-              fctx.arc(q[0], q[1], c.r, 0, Math.PI * 2);
-              fctx.fill();
-            });
-          }
-          s.debris = s.debris.filter(function (o) { return (o.life -= dt) > 0; });
-          fctx.fillStyle = 'rgba(250,252,255,1)';
-          s.debris.forEach(function (o) {
-            o.vy += 900 * dt; o.x += o.vx * dt; o.y += o.vy * dt;
-            fctx.globalAlpha = Math.min(1, o.life * 1.5) * env;
+          var t = s.t;
+          var fx = function (x) { return s.flip ? W - x : x; };
+          var snow = nightRgb([246, 249, 255], [168, 180, 204]);
+          var shade = nightRgb([205, 216, 234], [118, 130, 158]);
+          var fade = 1 - smooth((t - (s.dur - 2.2)) / 2.2);
+          var ux = -W, uy = H, ul = Math.hypot(ux, uy);
+          ux /= ul; uy /= ul;                                  // Hang: oben rechts → unten links
+
+          // 1) Schneebrett liegt in der Ecke, Bruchkante reißt auf
+          var BREAK = 1.3;
+          if (t < BREAK + 0.3) {
+            var slab = (1 - smooth((t - BREAK) / 0.3)) * smooth(t / 0.4);
+            var sg = fctx.createLinearGradient(fx(W), 0, fx(W - 520), 420);
+            sg.addColorStop(0, 'rgba(' + snow + ',' + (0.88 * slab) + ')');
+            sg.addColorStop(1, 'rgba(' + shade + ',' + (0.8 * slab) + ')');
+            fctx.save();
+            fctx.shadowColor = 'rgba(' + snow + ',' + (0.8 * slab) + ')';
+            fctx.shadowBlur = 28;
+            fctx.fillStyle = sg;
             fctx.beginPath();
-            fctx.arc(o.x, o.y, 4, 0, Math.PI * 2);
+            fctx.moveTo(fx(W + 10), -10);
+            s.crack.forEach(function (c) { fctx.lineTo(fx(c[0]), c[1]); });
+            fctx.lineTo(fx(W + 10), 480);
+            fctx.closePath();
             fctx.fill();
-          });
-          fctx.globalAlpha = 1;
+            fctx.restore();
+            var shown = Math.floor(smooth(t / BREAK) * s.crack.length);
+            fctx.strokeStyle = 'rgba(' + nightRgb([90, 104, 128], [40, 48, 66]) + ',' + (0.9 * slab) + ')';
+            fctx.lineWidth = 4;
+            fctx.beginPath();
+            for (var c = 0; c < shown; c++) {
+              var pt = s.crack[c];
+              if (c === 0) fctx.moveTo(fx(pt[0]), pt[1]); else fctx.lineTo(fx(pt[0]), pt[1]);
+            }
+            fctx.stroke();
+          }
+          // beim Abriss zerfällt das Brett in Schollen
+          if (t >= BREAK && !s.born) {
+            s.born = true;
+            for (var i = 0; i < 46; i++) {
+              var kk = Math.random(), cpt = s.crack[Math.floor(kk * (s.crack.length - 1))];
+              var px = lerp(cpt[0], W, rand(0.1, 0.9)), py = lerp(cpt[1], 0, rand(0.1, 0.9));
+              s.chunks.push({ x: px, y: py, r: rand(28, 70), v: rand(60, 140), side: rand(-40, 40),
+                              spin: rand(-2, 2), a: rand(0, 6.3) });
+            }
+          }
+
+          // 2) Schollen rutschen, beschleunigen, wachsen; vorne kommt Schnee dazu
+          if (t >= BREAK) {
+            var mt = t - BREAK;
+            var frontX = W, frontY = 0;
+            s.chunks.forEach(function (ch) {
+              ch.v = Math.min(1500, ch.v + 520 * dt);
+              ch.x += (ux * ch.v + uy * ch.side * 0.3) * dt;
+              ch.y += (uy * ch.v - ux * ch.side * 0.3) * dt;
+              ch.r = Math.min(150, ch.r + 9 * dt);
+              ch.a += ch.spin * dt;
+              if (ch.y > frontY) { frontY = ch.y; frontX = ch.x; }
+            });
+            if (mt < 4.2 && Math.random() < dt * 22) {
+              s.chunks.push({ x: frontX + rand(-60, 60), y: frontY + rand(-40, 40), r: rand(30, 80),
+                              v: rand(600, 1100), side: rand(-120, 120), spin: rand(-2, 2), a: rand(0, 6.3) });
+            }
+            // Schneemasse: weiche Klumpen, erst die Schattenseite versetzt
+            // darunter, dann der helle Klumpen darüber; überlappend zu einer Masse
+            [['shade', 0.35], ['snow', 0]].forEach(function (pass) {
+              var rgb = pass[0] === 'snow' ? snow : shade, off = pass[1];
+              s.chunks.forEach(function (ch) {
+                var cx = fx(ch.x), cy = ch.y + ch.r * off;
+                var g = fctx.createRadialGradient(cx, cy, 0, cx, cy, ch.r);
+                g.addColorStop(0, 'rgba(' + rgb + ',' + (0.9 * fade) + ')');
+                g.addColorStop(0.55, 'rgba(' + rgb + ',' + (0.75 * fade) + ')');
+                g.addColorStop(1, 'rgba(' + rgb + ',0)');
+                fctx.fillStyle = g;
+                fctx.fillRect(cx - ch.r, cy - ch.r, ch.r * 2, ch.r * 2);
+              });
+            });
+
+            // 3) Staublawine: Pulverwolke rast voraus und wächst
+            if (mt < 5 && Math.random() < dt * 40) {
+              s.powder.push({ x: frontX + rand(-40, 40), y: frontY + rand(-60, 20), r: rand(130, 210),
+                              v: rand(1300, 1900), side: rand(-200, 200), life: rand(2.2, 3.4), age: 0 });
+            }
+            s.powder.forEach(function (pw) {
+              pw.age += dt;
+              pw.v *= 1 - 0.35 * dt;
+              pw.x += (ux * pw.v + uy * pw.side * 0.4) * dt;
+              pw.y += (uy * pw.v - ux * pw.side * 0.4) * dt;
+              pw.r += 230 * dt;
+              var a = 0.24 * fade * smooth(pw.age / 0.3) * (1 - pw.age / pw.life);
+              if (a <= 0) return;
+              var g = fctx.createRadialGradient(fx(pw.x), pw.y, 0, fx(pw.x), pw.y, pw.r);
+              g.addColorStop(0, 'rgba(' + snow + ',' + a + ')');
+              g.addColorStop(0.5, 'rgba(' + snow + ',' + (a * 0.65) + ')');
+              g.addColorStop(1, 'rgba(' + snow + ',0)');
+              fctx.fillStyle = g;
+              fctx.fillRect(fx(pw.x) - pw.r, pw.y - pw.r, pw.r * 2, pw.r * 2);
+            });
+            s.powder = s.powder.filter(function (pw) { return pw.age < pw.life; });
+            // Druckwelle: wenn die Staubwolke unten ankommt, kräftige Böe
+            if (!s.gusted && frontY > H * 0.7) {
+              s.gusted = true;
+              gust();
+            }
+          }
         }
       }
     };
