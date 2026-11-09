@@ -6,9 +6,8 @@
  *   kit.setState(WeatherKit.profile('rain'), 25);   // Übergang in s
  *   kit.strike(); kit.gust(); kit.spectacle('tsunami');
  *
- * Reine Hilfsfunktionen (profile, mix, moodValue, moodPrecip, applyMood)
- * spiegeln die Server-Logik in fx/weather.py, damit die Vorschau ohne
- * Server dasselbe zeigt.
+ * Die Lagen (PROFILES) spiegeln fx/weather.py 1:1 — der Server rechnet
+ * Stimmung und Übersteuerung aus und liefert den fertigen Zustand.
  *
  * Grundregel Stimmung: Himmel, Nebel und Abdunklung liegen nur an den
  * Rändern — die Bildmitte (Gameplay) bleibt immer frei.
@@ -57,60 +56,6 @@
       else out[k] = t >= 0.5 ? to[k] : (k in from ? from[k] : to[k]);
     }
     return out;
-  }
-
-  // ── Stimmung aus der K/D (gleiche Regeln wie fx/weather.py) ──
-  function bounds(ref, low, high) {
-    return {
-      low: low != null ? low : ref * 0.75,
-      high: high != null ? high : ref * 1.25
-    };
-  }
-
-  function moodValue(kd, ref, matches, live, low, high) {
-    if (!live || matches < 3) return 0;
-    if ((low == null || high == null) && !(ref > 0)) return 0;
-    var b = bounds(ref, low, high);
-    if (b.high <= b.low) return 0;
-    if (kd <= b.low) return -1;
-    if (kd >= b.high) return 1;
-    var mid = (b.low + b.high) / 2;
-    return kd < mid ? -(mid - kd) / (mid - b.low) : (kd - mid) / (b.high - mid);
-  }
-
-  function moodPrecip(kd, low) {
-    if (low == null || kd > low) return null;
-    return kd <= low * 0.75 ? 'rain' : 'drizzle';
-  }
-
-  function applyMood(state, mood, strength, precip) {
-    if (!strength) return state;
-    var s = {};
-    for (var k in state) s[k] = state[k];
-    var e = clamp(mood * strength, -1, 1);
-    var wet = s.precip !== 'none';
-    if (e > 0) {
-      s.clouds = clamp(s.clouds * (1 - 0.7 * e), 0, 1);
-      s.sun = Math.max(s.sun, wet ? 0.6 * e : e);
-    } else if (e < 0) {
-      var a = -e;
-      s.clouds = clamp(s.clouds + 0.6 * a, 0, 1);
-      s.fog = clamp(s.fog + 0.4 * a, 0, 1);
-      s.sun = s.sun * (1 - a);
-      s.gloom = a;
-    }
-    // Stimmung holt höchstens Niesel oder Regen — nie Gewitter
-    if (precip && strength > 0 && !wet) {
-      var p = profile(precip);
-      s.kind = precip;
-      s.precip = 'rain';
-      s.rain = p.rain;
-      s.drizzle = p.drizzle;
-      s.clouds = Math.max(s.clouds, p.clouds);
-      s.sun = 0;
-      s.lightning = 0;
-    }
-    return s;
   }
 
   // ── Partikel ──
@@ -178,8 +123,26 @@
       to = target;
       transSecs = Math.max(0, secs || 0);
       transT = transSecs > 0 ? 0 : 1;
-      if (transT === 1) cur = mix(from, to, 1);
+      if (transT === 1) {
+        cur = mix(from, to, 1);
+        prefill();
+      }
       scheduleStrike();
+    }
+
+    // Fehlende Partikel gleich übers ganze Bild verteilen (Start, Sofortwechsel)
+    function prefill() {
+      ['rain', 'drizzle', 'snow'].forEach(function (type) {
+        COUNT[type].forEach(function (_, li) {
+          var have = 0;
+          parts.forEach(function (q) { if (q.type === type && q.layer === li) have++; });
+          for (var i = have, n = target(type, li); i < n; i++) {
+            var p = { type: type, layer: li };
+            spawn(p, true, 0);
+            parts.push(p);
+          }
+        });
+      });
     }
 
     // ── Wind ──
@@ -854,16 +817,7 @@
       root.requestAnimationFrame(frame);
     }
 
-    // Erste Partikel gleich im Bild verteilen
-    ['rain', 'drizzle', 'snow'].forEach(function (type) {
-      COUNT[type].forEach(function (_, li) {
-        for (var i = 0, n = target(type, li); i < n; i++) {
-          var p = { type: type, layer: li };
-          spawn(p, true, 0);
-          parts.push(p);
-        }
-      });
-    });
+    prefill();
     scheduleStrike();
     root.requestAnimationFrame(frame);
 
@@ -890,10 +844,6 @@
     SPECTACLES: SPECTACLES,
     profile: profile,
     mix: mix,
-    moodValue: moodValue,
-    moodPrecip: moodPrecip,
-    applyMood: applyMood,
-    bounds: bounds,
     create: create
   };
 })(typeof window !== 'undefined' ? window : this);
