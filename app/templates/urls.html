@@ -299,6 +299,34 @@ G1R_STEAM_NAME=</code></pre>
     }, true);
   }
 
+  // ── Reiter der Detailseite (Setup / Live control / Chat commands) ──
+  function wireDetailTabs() {
+    const tabs = [...document.querySelectorAll(".url-dtab")];
+    function show(id, focus) {
+      tabs.forEach(t => {
+        const on = t.dataset.tab === id;
+        t.setAttribute("aria-selected", on ? "true" : "false");
+        t.tabIndex = on ? 0 : -1;
+        const panel = document.getElementById("dpanel-" + t.dataset.tab);
+        if (panel) panel.hidden = !on;
+        if (on && focus) t.focus();
+      });
+      try { localStorage.setItem("urlDetailTab", id); } catch (_) {}
+    }
+    tabs.forEach((t, i) => {
+      t.addEventListener("click", () => show(t.dataset.tab, false));
+      t.addEventListener("keydown", e => {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+        show(n.dataset.tab, true);
+      });
+    });
+    let start = "setup";
+    try { start = localStorage.getItem("urlDetailTab") || "setup"; } catch (_) {}
+    show(tabs.some(t => t.dataset.tab === start) ? start : "setup", false);
+  }
+
   // ── Switch-Controls-HTML aus switches-Array ───────────────
   function renderSwitches(switches) {
     if (!switches || !switches.length) return "";
@@ -416,18 +444,46 @@ G1R_STEAM_NAME=</code></pre>
       </div>` : "";
     // Live-Befehle (Effects): eine kopierbare URL pro Befehl fuer Streamer.bot
     const commands = parseJSON(card.dataset.commands, []);
+    // Chat-Befehle gegliedert: Gruppe je Abschnitt, Chat-Name aus "chat"
+    // oder aus einem Label der Form "!name: Beschreibung"
+    const WHO_LABEL = { viewers: "viewers", mods: "mods only", tech: "for sound sync" };
+    const cmdRows = commands.map(c => {
+      const m = !c.chat && /^(![\w-]+)\s*:\s*(.*)$/.exec(c.label || "");
+      return { q: c.q, chat: c.chat || (m ? m[1] : ""), text: m ? m[2] : c.label,
+               group: c.group || (c.who === "mods" ? "Mods" : "Commands"), who: c.who || "" };
+    });
+    const cmdGroups = [];
+    cmdRows.forEach(r => {
+      let g = cmdGroups.find(x => x.name === r.group);
+      if (!g) { g = { name: r.group, who: r.who, rows: [] }; cmdGroups.push(g); }
+      g.rows.push(r);
+    });
+    const cheat = cmdGroups.filter(g => g.who !== "mods" && g.who !== "tech")
+      .map(g => ({ name: g.name, chats: g.rows.map(r => r.chat).filter(Boolean) }))
+      .filter(g => g.chats.length)
+      .map(g => g.name + ": " + g.chats.join(" ")).join("\n");
     const commandsHtml = commands.length ? `
       <div class="url-dbox url-cmdbox">
-        <h2>Remote commands <span class="url-dbox__tag">Streamer.bot</span></h2>
-        <p class="url-dbox__desc">Use a <b>Fetch URL</b> sub-action with one of these URLs. The running source reacts within about a second, without reloading.</p>
-        <ul class="url-cmdlist">${commands.map(c => {
-          const u = card.dataset.fx + "?" + c.q;
-          return `<li class="url-cmd">
-            <span class="url-cmd__label">${escapeHtml(c.label)}</span>
-            <code class="url-cmd__url">${escapeHtml(u)}</code>
-            <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(u)}" aria-label="Copy URL: ${escapeAttr(c.label)}"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span></button>
-          </li>`;
-        }).join("")}</ul>
+        <h2>Chat commands <span class="url-dbox__tag">Streamer.bot</span></h2>
+        <p class="url-dbox__desc">In Streamer.bot add a chat command (e.g. <code>!thunderstorm</code>) with a <b>Fetch URL</b> sub-action and paste the copied URL. The running source reacts within about a second.</p>
+        ${cheat ? `<div class="url-cheat">
+          <div class="url-cheat__head"><b>Cheat sheet for viewers</b>
+            <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(cheat)}" aria-label="Copy cheat sheet"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy</button></div>
+          <pre class="url-cheat__text">${escapeHtml(cheat)}</pre>
+        </div>` : ""}
+        ${cmdGroups.map((g, gi) => `
+        <details class="url-cmdgroup"${gi === 0 ? " open" : ""}>
+          <summary><span class="url-cmdgroup__name">${escapeHtml(g.name)}</span>
+            <span class="url-cmdgroup__meta">${g.rows.length} ${g.rows.length === 1 ? "command" : "commands"}${WHO_LABEL[g.who] ? " · " + WHO_LABEL[g.who] : ""}</span></summary>
+          <ul class="url-cmdlist">${g.rows.map(r => {
+            const u = card.dataset.fx + "?" + r.q;
+            return `<li class="url-cmd">
+              <code class="url-cmd__chat">${escapeHtml(r.chat || "–")}</code>
+              <span class="url-cmd__label">${escapeHtml(r.text)}</span>
+              <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(u)}" title="${escapeAttr(u)}" aria-label="Copy URL: ${escapeAttr(r.text)}"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>URL</button>
+            </li>`;
+          }).join("")}</ul>
+        </details>`).join("")}
         <span class="url-copied" id="urlCmdStatus" role="status" aria-live="polite"></span>
       </div>` : "";
     // Live-Steuerung (Effects): Knöpfe lösen Befehle direkt aus, Schalter
@@ -445,7 +501,16 @@ G1R_STEAM_NAME=</code></pre>
       });
       return out;
     }
-    const controlsHtml = (controls.length || liveKeys.length) ? `
+    const liveHtml = liveKeys.length ? `
+      <div class="url-dbox url-ctlbox">
+        <div class="url-live">
+          <label class="url-live__opt"><input type="checkbox" id="urlLive"> Apply setting changes live</label>
+          <button type="button" class="url-act ghost url-ctl__btn" data-q="cmd=reset" data-label="Back to OBS URL"><span class="material-symbols-outlined" aria-hidden="true">undo</span>Back to OBS URL</button>
+          <p class="url-live__note">Every switch change goes straight to the source running in OBS. Live settings last until OBS reloads the source. To keep them, put the new URL into OBS.</p>
+          <span class="url-copied" id="urlLiveStatus" role="status" aria-live="polite"></span>
+        </div>
+      </div>` : "";
+    const controlsHtml = controls.length ? `
       <div class="url-dbox url-ctlbox">
         <h2>Live control <span class="url-dbox__tag">running source</span></h2>
         <p class="url-dbox__desc">Acts on the source that is running in OBS right now, within about a second.</p>
@@ -455,12 +520,7 @@ G1R_STEAM_NAME=</code></pre>
           <button type="button" class="url-act url-ctl__btn" data-q="${escapeAttr(c.q)}" data-label="${escapeAttr(c.label)}">
             <span class="material-symbols-outlined" aria-hidden="true">${escapeHtml(c.icon || "play_arrow")}</span>${escapeHtml(c.label)}
           </button>`).join("")}</div>`).join("") : ""}
-        ${liveKeys.length ? `
-        <div class="url-live">
-          <label class="url-live__opt"><input type="checkbox" id="urlLive"> Apply setting changes live</label>
-          <button type="button" class="url-act ghost url-ctl__btn" data-q="cmd=reset" data-label="Back to OBS URL"><span class="material-symbols-outlined" aria-hidden="true">undo</span>Back to OBS URL</button>
-          <p class="url-live__note">Live settings last until OBS reloads the source. To keep them, put the new URL into OBS.</p>
-        </div>` : ""}
+
         <span class="url-copied" id="urlCtlStatus" role="status" aria-live="polite"></span>
       </div>` : "";
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
@@ -484,7 +544,17 @@ G1R_STEAM_NAME=</code></pre>
     }
     infoBits.push("Paste the URL into OBS → Properties → URL — set size to match above");
 
+    const hasTabs = !!(controlsHtml || commandsHtml);
+    const tabBtn2 = (id, icon, text) => `<button type="button" role="tab" class="url-dtab" id="dtab-${id}"
+        aria-controls="dpanel-${id}" aria-selected="false" tabindex="-1" data-tab="${id}">
+        <span class="material-symbols-outlined" aria-hidden="true">${icon}</span>${text}</button>`;
     detailContent.innerHTML = `
+      ${hasTabs ? `<div class="url-dtabs" role="tablist" aria-label="Source sections">
+        ${tabBtn2("setup", "tune", "Setup")}
+        ${controlsHtml ? tabBtn2("live", "touch_app", "Live control") : ""}
+        ${commandsHtml ? tabBtn2("chat", "forum", "Chat commands") : ""}
+      </div>` : ""}
+      <div class="url-dpanel" id="dpanel-setup" role="${hasTabs ? "tabpanel" : "region"}" aria-labelledby="dtab-setup">
       <div class="url-detail-col">${configCol}</div>
       <div class="url-detail-col">
         <div class="url-dbox url-urlbox">
@@ -497,13 +567,16 @@ G1R_STEAM_NAME=</code></pre>
             <span class="url-copied" id="urlCopyStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
-        ${controlsHtml}
-        ${commandsHtml}
+        ${liveHtml}
         ${infoBits.length ? `<div class="url-dbox url-infobox">
           <h2>Info</h2>
           <div class="url-param url-param--info" id="urlSizeInfo">${infoBits.join("<br>")}</div>
         </div>` : ""}
-      </div>`;
+      </div>
+      </div>
+      ${controlsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-live" role="tabpanel" aria-labelledby="dtab-live" hidden>${controlsHtml}</div>` : ""}
+      ${commandsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-chat" role="tabpanel" aria-labelledby="dtab-chat" hidden>${commandsHtml}</div>` : ""}`;
+    if (hasTabs) wireDetailTabs();
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -765,9 +838,11 @@ G1R_STEAM_NAME=</code></pre>
     }
 
     // ── Live-Steuerung: Befehl an die laufende Effect-Source ──
-    const ctlStatus = document.getElementById("urlCtlStatus");
     let ctlTimer;
-    async function sendFx(q, label) {
+    // Rückmeldung dort, wo geklickt wurde (Knopf-Reiter oder Live-Schalter in Setup)
+    async function sendFx(q, label, statusId) {
+      const ctlStatus = document.getElementById(statusId || "urlCtlStatus") || document.getElementById("urlLiveStatus");
+      if (!ctlStatus) return;
       clearTimeout(ctlTimer);
       ctlStatus.classList.remove("is-error");
       try {
@@ -785,7 +860,7 @@ G1R_STEAM_NAME=</code></pre>
       // Zurück auf die OBS-URL beendet auch das Live-Setzen, sonst würde die
       // nächste Schalteränderung den Reset gleich wieder überschreiben
       if (btn.dataset.q === "cmd=reset" && liveBox) liveBox.checked = false;
-      sendFx(btn.dataset.q, btn.dataset.label);
+      sendFx(btn.dataset.q, btn.dataset.label, btn.closest(".url-live") ? "urlLiveStatus" : "urlCtlStatus");
     }));
 
     // Schalterwerte der live setzbaren Keys; gesendet wird nur, was sich seit
@@ -813,7 +888,7 @@ G1R_STEAM_NAME=</code></pre>
       const now = liveValues(), q = new URLSearchParams({ cmd: "set" });
       Object.keys(now).forEach(k => { if (all || now[k] !== liveSent[k]) q.set(k, now[k]); });
       liveSent = now;
-      if ([...q.keys()].length > 1) sendFx(q.toString(), "settings");
+      if ([...q.keys()].length > 1) sendFx(q.toString(), "settings", "urlLiveStatus");
     }
     function liveSync() {
       if (!liveBox || !liveBox.checked) return;

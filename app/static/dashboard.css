@@ -1233,7 +1233,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 /* ── Remote-Befehle (Effects → Streamer.bot) ── */
 .url-cmdbox{padding:18px 20px}
 .url-cmdlist{list-style:none;padding:0;margin:12px 0 8px;display:flex;flex-direction:column;gap:8px}
-.url-cmd{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"label copy" "url copy";
+.url-cmd{display:grid;grid-template-columns:minmax(110px,auto) minmax(0,1fr) auto;grid-template-areas:"chat label copy";
   gap:4px 10px;align-items:center;background:var(--bg-deeper);border:1px solid var(--border);
   border-left:2px solid var(--brand-ink);padding:9px 10px 9px 14px;border-radius:var(--r-ctrl)}
 .url-cmd__label{grid-area:label;font-size:13px;font-weight:600;color:var(--text)}
@@ -1241,6 +1241,31 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   color:var(--brand-ink);word-break:break-all;line-height:1.5}
 .url-cmd__copy{grid-area:copy;min-width:36px;min-height:36px;justify-content:center;padding:6px}
 .url-copy-helper{position:fixed;opacity:0;pointer-events:none}
+.url-cmd__chat{grid-area:chat;font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:13px;color:var(--brand-ink)}
+.url-cmd__copy{gap:4px;padding:6px 10px}
+.url-cmdgroup{border-top:1px solid var(--border);padding:4px 0}
+.url-cmdgroup:first-of-type{border-top:0}
+.url-cmdgroup summary{cursor:pointer;display:flex;align-items:baseline;gap:10px;padding:10px 2px;min-height:24px;
+  font-weight:600;font-size:14px;color:var(--text)}
+.url-cmdgroup summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.url-cmdgroup__meta{font-size:12px;font-weight:400;color:var(--text-muted)}
+.url-cheat{margin:12px 0 14px;padding:12px 14px;background:var(--bg-deeper);border:1px solid var(--border);border-radius:var(--r-ctrl)}
+.url-cheat__head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+.url-cheat__text{margin:0;white-space:pre-wrap;font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:12.5px;
+  line-height:1.6;color:var(--text)}
+/* ── Reiter der Detailseite ── */
+.url-detail-grid > .url-dtabs, .url-detail-grid > .url-dpanel{grid-column:1 / -1}
+.url-dtabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:4px}
+.url-dtab{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;background:none;border:0;
+  border-bottom:2px solid transparent;color:var(--text-muted);font:inherit;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:-1px}
+.url-dtab:hover{color:var(--text)}
+.url-dtab[aria-selected="true"]{color:var(--brand-ink);border-bottom-color:var(--brand-ink)}
+.url-dtab:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.url-dtab .material-symbols-outlined{font-size:18px}
+.url-dpanel{display:grid;grid-template-columns:1.3fr .9fr;gap:16px;align-items:start}
+.url-dpanel--single{grid-template-columns:minmax(0,1fr)}
+.url-dpanel[hidden]{display:none}
+@media (max-width:900px){.url-dpanel{grid-template-columns:minmax(0,1fr)}}
 
 /* ── Parameter-Switches im Detail (param-Zeilen-Look) ── */
 .url-switches{display:flex;flex-direction:column;gap:0}
