@@ -204,3 +204,20 @@ def test_test_background_accepts_only_plain_http_urls():
             raise AssertionError(bad)
         except ValueError:
             pass
+
+
+def test_fixed_weather_replaces_only_the_real_weather(conn, monkeypatch):
+    q = _with_location(conn, monkeypatch, kind_code=63)      # live: Regen
+    c = _client(conn)
+    st = _state(c, q + "&lock=clear")
+    assert st["kind"] == "clear" and st["source"] == "lock"
+    st = _state(c, q + "&lock=clear&kdtest=0.8")             # Stimmung wirkt auf die feste Lage
+    assert st["kind"] == "rain" and st["mood"] == -1
+    assert _state(c, q + "&lock=clear&kdtest=3.5")["sun"] > 0.9
+    c.get("/s/t/api/fx/weather?cmd=weather&to=snow")         # Chat schlägt feste Lage
+    assert _state(c, q + "&lock=clear")["kind"] == "snow"
+
+
+def test_fixed_weather_off_uses_live(conn, monkeypatch):
+    q = _with_location(conn, monkeypatch, kind_code=63)
+    assert _state(_client(conn), q + "&lock=off")["source"] == "api"

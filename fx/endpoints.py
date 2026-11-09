@@ -111,7 +111,7 @@ def weather_state_route(token):
         abort(404)
     settings = commands.EFFECTS["weather"]["settings"]
     opts = {}
-    for key in ("place", "mood", "kdlow", "kdhigh", "kdtest", "fallback"):
+    for key in ("place", "lock", "mood", "kdlow", "kdhigh", "kdtest", "fallback"):
         raw = (request.args.get(key) or "").strip()
         if raw:
             val = settings[key](raw)

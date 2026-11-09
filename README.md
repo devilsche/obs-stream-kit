@@ -377,7 +377,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 | Parameter | Werte | Standard |
 |-----------|-------|----------|
 | `place` | Ort fürs Live-Wetter, z. B. `Hamburg` | — |
-| `lock` | feste Lage statt Live-Wetter, `off` = live | `off` |
+| `lock` | feste Lage statt Live-Wetter (ersetzt nur das echte Wetter, K/D-Stimmung, Tageszeit und Chat wirken weiter), `off` = live | `off` |
 | `fallback` | Lage ohne Ort oder bei Ausfall | `clear` |
 | `mood` | `0` … `1`, Stärke der K/D-Stimmung | `1` |
 | `kdlow` / `kdhigh` | Grenzen schlechte/gute K/D | `1.5` / `2.5` |

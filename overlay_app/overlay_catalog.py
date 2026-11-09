@@ -526,7 +526,7 @@ EFFECT_META = {
          "tooltip": "Town for the live weather. The server only looks it up, it never appears on stream — but it is part of the OBS URL, so anyone who sees your OBS source settings sees it too. A nearby bigger town is accurate enough."},
         {"key": "lock", "label": "Fixed weather", "type": "select", "default": "off",
          "options": [["off", "Off (live)"]] + _WEATHER_KINDS,
-         "tooltip": "Shows this weather all the time instead of the live weather. Chat commands still work."},
+         "tooltip": "Shows this weather instead of the live weather. K/D mood, time of day and chat commands still apply on top."},
         {"key": "fallback", "label": "Fallback weather", "type": "select", "default": "clear",
          "options": _WEATHER_KINDS,
          "tooltip": "Shown when no location is set or the weather service is unreachable"},

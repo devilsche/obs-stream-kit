@@ -19,7 +19,7 @@ TRANSITION_FAST = 4
 
 
 def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
-    """opts: geparste Settings (place, mood, kdlow, kdhigh, kdtest, fallback)."""
+    """opts: geparste Settings (place, lock, mood, kdlow, kdhigh, kdtest, fallback)."""
     now = time.time() if now is None else now
     base, source = None, "fallback"
     try:
@@ -36,6 +36,15 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
             base.update(weather.daylight(now, rise, set_))
     else:
         base = weather.profile(opts.get("fallback") or "clear")
+
+    # Feste Lage ersetzt nur das echte Wetter; Tageszeit vom Ort bleibt,
+    # Stimmung und Chat wirken weiter darüber
+    lock = opts.get("lock")
+    if lock and lock != "off":
+        fixed = weather.profile(lock)
+        if lock not in ("night", "dusk"):
+            fixed.update(night=base.get("night", 0), dusk=base.get("dusk", 0))
+        base, source = fixed, "lock"
 
     kdtest = opts.get("kdtest")
     if isinstance(kdtest, float):

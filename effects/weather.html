@@ -178,7 +178,8 @@
       var apiBase = tokenMatch ? '/s/' + tokenMatch[1] + '/api/fx/' : null;
 
       // ── Server-Zustand alle 15 s, sofort nach weather/auto/set ──
-      // Eine Chat-Übersteuerung gewinnt auch gegen eine feste Lage (lock).
+      // Die feste Lage (lock) rechnet der Server: sie ersetzt nur das echte
+      // Wetter, Stimmung, Tageszeit und Chat wirken weiter darüber.
       // Nur die jüngste Antwort zählt, eine verspätete ältere wird verworfen.
       var stateTimer = null, stateReq = 0;
       // nach einer Änderung aus dem Dashboard schnell überblenden (sonst 25 s)
@@ -190,9 +191,8 @@
           if (locked()) applyLock(); else apply(K.profile(settings.fallback || 'clear'), 0);
           return;
         }
-        if (locked() && lastSig === null) applyLock();
         var q = new URLSearchParams();
-        ['place', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback'].forEach(function (k) {
+        ['place', 'lock', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
@@ -200,8 +200,7 @@
           .then(function (data) {
             if (req !== stateReq) return;
             var st = data.state;
-            if (locked() && st.source !== 'override') applyLock();
-            else apply(st, lastSig === null ? 0 : (fastNext ? 4 : st.transition));
+            apply(st, lastSig === null ? 0 : (fastNext ? 4 : st.transition));
             fastNext = false;
           })
           .catch(function () {
