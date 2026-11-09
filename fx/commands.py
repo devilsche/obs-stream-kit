@@ -177,7 +177,8 @@ EFFECTS = {
             "volume": _level,
             "thunder": _level,
             # Deko-Thema (Teil 3: Winter mit Xmas-Zeit)
-            "theme": _choice("auto", "winter", "none"),
+            "theme": _choice("auto", "winter", "spring", "summer", "autumn", "none"),
+            "leafrate": _float_range(0.25, 4),
             "xmasfrom": _xmas_from,
             "xmasto": _mmdd,
             "snowrate": _float_range(0.25, 4),

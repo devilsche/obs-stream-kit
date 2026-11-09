@@ -31,7 +31,10 @@ def test_window_and_season():
 def test_theme_by_date():
     assert theme_for(date(2026, 1, 10), "auto", False) == "winter"
     assert theme_for(date(2026, 11, 30), "auto", True) == "winter"       # Xmas-Zeit im November
-    assert theme_for(date(2026, 11, 10), "auto", False) == "none"
+    assert theme_for(date(2026, 11, 10), "auto", False) == "autumn"
+    assert theme_for(date(2026, 4, 10), "auto", False) == "spring"
+    assert theme_for(date(2026, 7, 10), "auto", False) == "summer"
+    assert theme_for(date(2026, 7, 10), "spring", False) == "spring"
     assert theme_for(date(2026, 7, 1), "winter", False) == "winter"
     assert theme_for(date(2026, 12, 24), "none", True) == "none"
 

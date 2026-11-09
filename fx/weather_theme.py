@@ -1,8 +1,8 @@
 """Deko-Thema der Weather-Source und Ablauf der Xmas-Zeit.
 
-Thema: `auto` wählt Winter von Dezember bis Februar und während der
-Xmas-Zeit (die im November beginnen kann), sonst `none` – Teil 4 ergänzt
-Frühling, Sommer und Herbst.
+Thema: `auto` wählt nach Monat (März–Mai Frühling, Juni–August Sommer,
+September–November Herbst, Dezember–Februar Winter); die Xmas-Zeit, die im
+November beginnen kann, ist immer Winter.
 
 Xmas-Zeit: von `xmasfrom` (`advent` = 1. Advent oder `MM-DD`) bis `xmasto`
 (`MM-DD`). Die Saison ist das Jahr des Beginns; Januar und Februar gehören
@@ -58,9 +58,12 @@ def xmas_window(today: date, xfrom: str, xto: str):
 
 
 def theme_for(today: date, setting: str, xmas_active: bool) -> str:
-    if setting in ("winter", "none"):
+    """Fest gewähltes Thema oder nach Monat; die Xmas-Zeit ist immer Winter."""
+    if setting in ("winter", "spring", "summer", "autumn", "none"):
         return setting
-    return "winter" if today.month in (12, 1, 2) or xmas_active else "none"
+    if xmas_active or today.month in (12, 1, 2):
+        return "winter"
+    return {3: "spring", 4: "spring", 5: "spring", 6: "summer", 7: "summer", 8: "summer"}.get(today.month, "autumn")
 
 
 def _load(conn, tenant_id):
