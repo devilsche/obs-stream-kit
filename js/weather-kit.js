@@ -1143,18 +1143,19 @@
         // Nebelwand rollt von einer Seite quer durch und verzieht sich
         init: function () {
           var dir = Math.random() < 0.5 ? 1 : -1, puffs = [];
-          for (var i = 0; i < 34; i++) puffs.push({ off: rand(0, 900), y: rand(-80, H + 80), r: rand(200, 380), wob: rand(0, 6.3) });
-          return { dur: 10, dir: dir, puffs: puffs };
+          // Wand etwa 90 % der Bildbreite tief, fegt einmal komplett durch
+          for (var i = 0; i < 70; i++) puffs.push({ off: rand(0, W * 0.9), y: rand(-80, H + 80), r: rand(220, 400), wob: rand(0, 6.3) });
+          return { dur: 11, dir: dir, puffs: puffs };
         },
         draw: function (s) {
           var p = s.t / s.dur;
-          var env = smooth(p / 0.1) * (1 - smooth((p - 0.75) / 0.25));
-          var front = s.dir > 0 ? lerp(-500, W + 1300, p) : lerp(W + 500, -1300, p);
+          var env = smooth(p / 0.06) * (1 - smooth((p - 0.9) / 0.1));
+          var front = s.dir > 0 ? lerp(-400, W * 1.9 + 400, p) : lerp(W + 400, -W * 0.9 - 400, p);
           s.puffs.forEach(function (f) {
             var x = front - s.dir * f.off + Math.sin(s.t * 0.8 + f.wob) * 30;
             var y = f.y + Math.sin(s.t * 0.5 + f.wob) * 20;
             var g = fctx.createRadialGradient(x, y, 0, x, y, f.r);
-            g.addColorStop(0, 'rgba(228,232,238,' + (0.42 * env) + ')');
+            g.addColorStop(0, 'rgba(228,232,238,' + (0.34 * env) + ')');
             g.addColorStop(1, 'rgba(228,232,238,0)');
             fctx.fillStyle = g;
             fctx.fillRect(x - f.r, y - f.r, f.r * 2, f.r * 2);
