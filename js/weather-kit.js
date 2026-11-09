@@ -426,7 +426,8 @@
       var my = lerp(10, 300, hasSky ? cur.moonY : 0.15);
       var lit = hasSky ? cur.moonLit : 1, wax = hasSky ? cur.moonWax : 1;
       var glow = sctx.createRadialGradient(mx, my, 0, mx, my, 280);
-      glow.addColorStop(0, 'rgba(210,222,255,' + (0.28 * mv * (0.4 + 0.6 * lit)) + ')');
+      // Neumond: kein Schein ohne sichtbare Scheibe
+      glow.addColorStop(0, 'rgba(210,222,255,' + (0.28 * mv * Math.pow(lit, 0.7)) + ')');
       glow.addColorStop(1, 'rgba(210,222,255,0)');
       sctx.fillStyle = glow;
       sctx.fillRect(mx - 280, my - 280, 560, 560);
