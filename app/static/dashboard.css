@@ -1269,7 +1269,8 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
   text-shadow:0 0 18px color-mix(in srgb,var(--theme-accent) 60%,transparent),0 0 40px color-mix(in srgb,var(--theme-accent-2,var(--theme-accent)) 30%,transparent);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)}
-.url-weather-info{display:flex;flex-direction:column;gap:6px;padding:10px 0 14px;font-size:13px}
+.url-weather-info{display:flex;flex-direction:column;gap:6px;padding:14px 20px 16px;font-size:13px;
+  background:rgba(0,0,0,.15);border-bottom:1px solid var(--border)}
 .url-weather-info__row{display:flex;align-items:center;gap:8px}
 .url-weather-info__row .material-symbols-outlined{color:var(--theme-accent);flex-shrink:0}
 .url-weather-info__alts{display:flex;flex-wrap:wrap;gap:6px}
