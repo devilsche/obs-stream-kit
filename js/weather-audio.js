@@ -15,8 +15,9 @@
 
   var LOOPS = ['rain-loop-light', 'rain-loop-medium', 'rain-loop-storm', 'wind-loop-light', 'wind-loop-strong'];
 
-  function create(base) {
-    var on = false, volume = 0.6, thunderLevel = 1;
+  function create(base, opts) {
+    opts = opts || {};
+    var on = false, volume = 0.6, thunderLevel = 1, blocked = false;
     var loops = {}, targets = {}, lastThunder = -10;
 
     LOOPS.forEach(function (name) {
@@ -28,10 +29,17 @@
       targets[name] = 0;
     });
 
+    // Autoplay-Sperre (nur im Browser-Tab, OBS erlaubt Ton): nicht ständig
+    // neu versuchen, sondern melden und beim ersten Klick nachholen
     function play(a) {
+      if (blocked) return;
       var p = a.play();
-      // Autoplay-Sperre im Browser-Tab: beim ersten Klick nachholen
-      if (p && p.catch) p.catch(function () {});
+      if (p && p.catch) p.catch(function (e) {
+        if (e && e.name === 'NotAllowedError' && !blocked) {
+          blocked = true;
+          if (opts.onBlocked) opts.onBlocked(true);
+        }
+      });
     }
 
     // Lautstärken weich nachführen; stumme Schleifen anhalten
@@ -45,9 +53,14 @@
       });
     }, 100);
 
-    document.addEventListener('click', function () {
+    function unlock() {
+      if (!blocked) return;
+      blocked = false;
+      if (opts.onBlocked) opts.onBlocked(false);
       LOOPS.forEach(function (name) { if (loops[name].volume > 0.005) play(loops[name]); });
-    });
+    }
+    document.addEventListener('click', unlock);
+    document.addEventListener('keydown', unlock);
 
     function oneShot(file, vol) {
       if (!on || vol <= 0.01) return;

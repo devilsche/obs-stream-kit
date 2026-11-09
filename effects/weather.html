@@ -80,6 +80,16 @@
     .stage { --tag-big: #dff3ff; --hud-bg: rgba(16, 30, 48, 0.82); --hud-line: rgba(200, 235, 255, 0.7); }
     .wk-tags { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; }
 
+    /* Hinweis nur im Browser-Tab, wenn der Ton noch blockiert ist */
+    .wk-sound-unlock {
+      position: absolute; right: 24px; bottom: 24px; z-index: 10;
+      min-height: 40px; padding: 10px 18px; border-radius: 10px;
+      border: 2px solid rgba(255, 255, 255, 0.8); background: rgba(16, 24, 40, 0.85);
+      color: #fff; font: 600 16px 'DM Sans', sans-serif; cursor: pointer;
+    }
+    .wk-sound-unlock:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+    .wk-sound-unlock[hidden] { display: none; }
+
     /* Grauschleier über das ganze Bild bei mieser Stimmung (Schalter veil) */
     .wk-veil {
       position: absolute;
@@ -107,6 +117,7 @@
     <div class="wk-veil" aria-hidden="true"></div>
   </div>
   <svg class="wk-tags" viewBox="0 0 1920 1080" aria-hidden="true"><g id="tags"></g></svg>
+  <button type="button" class="wk-sound-unlock" id="soundUnlock" hidden>Click to enable sound</button>
   <div class="hud">
     <div class="hud__box" id="frostBoard"><h2>Top frost fighters</h2><ol></ol></div>
   </div>
@@ -129,7 +140,11 @@
         tags: document.getElementById('tags'), board: document.getElementById('frostBoard') });
       var lastFrostTop = [];
       // Ton (optional): Regen/Wind folgen der Lage, Donner je Blitz, Rauschen je Böe
-      var audio = window.WeatherAudio.create('../assets/effects/');
+      var soundBtn = document.getElementById('soundUnlock');
+      var audio = window.WeatherAudio.create('../assets/effects/', {
+        // nur im Browser-Tab: Hinweis, dass ein Klick den Ton freigibt
+        onBlocked: function (isBlocked) { soundBtn.hidden = !isBlocked || !!window.obsstudio; }
+      });
       kit.on('strike', function (dist) { audio.thunder(dist); });
       kit.on('gust', function () { audio.gust(); });
       kit.on('pop', function () { audio.thunder(0.1); });
