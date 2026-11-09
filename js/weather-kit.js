@@ -37,7 +37,8 @@
     dusk:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.15, sun: 0.35, fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 0.2, dusk: 1 }
   };
   var KINDS = Object.keys(PROFILES);
-  var SPECTACLES = ['tsunami', 'megabolt', 'ballbolt', 'avalanche'];
+  var SPECTACLES = ['tsunami', 'megabolt', 'ballbolt', 'avalanche',
+                    'aurora', 'rainbow', 'hail', 'meteors', 'tornado', 'fogwall'];
   // windRandom (true/false) ist kein Zahlenwert und springt bei der Hälfte des Übergangs
   var NUM_KEYS = ['rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind', 'night', 'dusk'];
 
@@ -67,7 +68,7 @@
   // Anzahl pro Ebene [hinten, mitte, vorne] bei Menge 1
   var COUNT = {
     rain:    [420, 260, 120],
-    drizzle: [320, 160, 0],
+    drizzle: [420, 240, 70],
     snow:    [300, 180, 80]
   };
   var RAIN_LAYERS = [
@@ -76,8 +77,9 @@
     { speed: 1850, len: [30, 52], width: 1.8, alpha: [0.42, 0.56, 0.70], drift: 1.0 }
   ];
   var DRIZZLE_LAYERS = [
-    { speed: 520, len: [5, 9],   width: 0.9, alpha: [0.14, 0.2, 0.26], drift: 1.1 },
-    { speed: 700, len: [8, 13],  width: 1.1, alpha: [0.22, 0.3, 0.36], drift: 1.2 }
+    { speed: 520, len: [7, 12],  width: 1.1, alpha: [0.3, 0.4, 0.5], drift: 1.1 },
+    { speed: 700, len: [10, 16], width: 1.4, alpha: [0.4, 0.52, 0.64], drift: 1.2 },
+    { speed: 900, len: [14, 22], width: 1.7, alpha: [0.5, 0.62, 0.74], drift: 1.3 }
   ];
   var SNOW_LAYERS = [
     { speed: 55,  r: [1.1, 2.0], alpha: 0.55, drift: 0.7, sway: 18 },
@@ -297,7 +299,13 @@
               any = true;
             }
             if (!any) continue;
-            pctx.strokeStyle = 'rgba(174,203,235,' + L.alpha[bk] + ')';
+            // dunkler Schatten unter dem hellen Strich: sichtbar auch vor
+            // hellem Himmel oder Sand im Spiel
+            pctx.lineWidth = L.width + 1.4;
+            pctx.strokeStyle = 'rgba(30,40,60,' + (L.alpha[bk] * 0.45) + ')';
+            pctx.stroke();
+            pctx.lineWidth = L.width;
+            pctx.strokeStyle = 'rgba(190,215,240,' + L.alpha[bk] + ')';
             pctx.stroke();
           }
         });
@@ -414,6 +422,12 @@
       });
     }
 
+    var heatMotes = [];
+    for (var hm = 0; hm < 18; hm++) {
+      heatMotes.push({ x: Math.random() < 0.5 ? rand(0, W * 0.25) : rand(W * 0.75, W),
+                       y: rand(H * 0.45, H + 20), r: rand(30, 70), v: rand(25, 60), ph: rand(0, 6.3) });
+    }
+
     var puffs = [];
     for (var pi = 0; pi < 9; pi++) {
       puffs.push({ x: rand(0, W + 600), y: rand(-60, 110), r: rand(170, 320), s: rand(8, 22) });
@@ -468,7 +482,7 @@
       if (c > 0.01) {
         var shade = Math.round(lerp(118, 62, g));
         var band = sctx.createLinearGradient(0, 0, 0, H * 0.34);
-        var ta = 0.42 * c + 0.18 * g;
+        var ta = 0.55 * c + 0.18 * g;
         band.addColorStop(0, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',' + ta + ')');
         band.addColorStop(0.55, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',' + (ta * 0.3) + ')');
         band.addColorStop(1, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',0)');
@@ -530,23 +544,44 @@
 
       // Hitze: warmer Saum unten, flimmernde Linien steigen auf
       if (h > 0.01) {
-        var hb = sctx.createLinearGradient(0, H, 0, H - 240);
-        hb.addColorStop(0, 'rgba(255,150,60,' + (0.2 * h) + ')');
-        hb.addColorStop(1, 'rgba(255,150,60,0)');
+        // warmer Rand (Mitte frei), Glut von unten, aufsteigendes Flimmern
+        sctx.save();
+        sctx.translate(W / 2, H / 2);
+        sctx.scale(1, H / W);
+        var hv = sctx.createRadialGradient(0, 0, W * 0.4, 0, 0, W * 0.75);
+        hv.addColorStop(0, 'rgba(255,140,40,0)');
+        hv.addColorStop(1, 'rgba(255,140,40,' + (0.3 * h) + ')');
+        sctx.fillStyle = hv;
+        sctx.fillRect(-W, -W, W * 2, W * 2);
+        sctx.restore();
+        var hb = sctx.createLinearGradient(0, H, 0, H - 320);
+        hb.addColorStop(0, 'rgba(255,130,40,' + (0.38 * h) + ')');
+        hb.addColorStop(1, 'rgba(255,130,40,0)');
         sctx.fillStyle = hb;
-        sctx.fillRect(0, H - 240, W, 240);
-        sctx.lineWidth = 2;
-        for (var l = 0; l < 12; l++) {
-          var y0 = H - ((time * 22 + l * 17) % 200);
-          var la = 0.07 * h * (1 - (H - y0) / 200);
-          sctx.strokeStyle = 'rgba(255,240,215,' + la + ')';
+        sctx.fillRect(0, H - 320, W, 320);
+        sctx.lineWidth = 3;
+        for (var l = 0; l < 14; l++) {
+          var y0 = H - ((time * 26 + l * 19) % 260);
+          var la = 0.16 * h * (1 - (H - y0) / 260);
+          sctx.strokeStyle = 'rgba(255,236,200,' + la + ')';
           sctx.beginPath();
-          for (var x = 0; x <= W; x += 40) {
-            var yy = y0 + Math.sin(x * 0.012 + time * 2.2 + l) * 4;
+          for (var x = 0; x <= W; x += 30) {
+            var yy = y0 + Math.sin(x * 0.011 + time * 2.4 + l) * 6;
             if (x === 0) sctx.moveTo(x, yy); else sctx.lineTo(x, yy);
           }
           sctx.stroke();
         }
+        // Hitzeblasen steigen an den Seiten auf
+        heatMotes.forEach(function (m) {
+          m.y -= m.v * dtFrame;
+          if (m.y < H * 0.45) { m.y = H + 20; m.x = Math.random() < 0.5 ? rand(0, W * 0.25) : rand(W * 0.75, W); }
+          var ma = 0.22 * h * clamp((m.y - H * 0.45) / (H * 0.25), 0, 1);
+          var mg = sctx.createRadialGradient(m.x + Math.sin(time * 1.7 + m.ph) * 14, m.y, 0, m.x, m.y, m.r);
+          mg.addColorStop(0, 'rgba(255,225,170,' + ma + ')');
+          mg.addColorStop(1, 'rgba(255,225,170,0)');
+          sctx.fillStyle = mg;
+          sctx.fillRect(m.x - m.r - 20, m.y - m.r, m.r * 2 + 40, m.r * 2);
+        });
       }
     }
 
@@ -659,63 +694,101 @@
       emit('spectacle', type);
     }
 
-    var TINT = { tsunami: '40,120,190', megabolt: '200,215,255', ballbolt: '255,170,80', avalanche: '235,242,250' };
+    var TINT = { tsunami: '40,120,190', megabolt: '200,215,255', ballbolt: '255,170,80', avalanche: '235,242,250',
+                 aurora: '90,230,160', rainbow: '255,210,140', hail: '220,228,240', meteors: '200,215,255',
+                 tornado: '150,140,120', fogwall: '225,230,235' };
 
     var SHOWS = {
       tsunami: {
+        // Welle läuft beschleunigend von einer Seite durch, rollt sich vorne
+        // rund ein (Röhre), Schaumteppich dahinter, Gischt von der Lippe
         init: function () {
-          return { dur: 8.5, dir: Math.random() < 0.5 ? 1 : -1, spray: [] };
+          return { dur: 6.5, dir: Math.random() < 0.5 ? 1 : -1, spray: [] };
         },
         draw: function (s, dt) {
           var p = s.t / s.dur;
-          var env = smooth(p / 0.12) * (1 - smooth((p - 0.8) / 0.2));
-          var crest = s.dir > 0 ? lerp(-W * 0.35, W * 1.45, p) : lerp(W * 1.35, -W * 0.45, p);
-          var L = W * 0.95;
-          var top = H * 0.44 * env;
+          var env = smooth(p / 0.1) * (1 - smooth((p - 0.86) / 0.14));
+          var run = Math.pow(p, 1.35);
+          var crest = s.dir > 0 ? lerp(-W * 0.25, W * 1.4, run) : lerp(W * 1.25, -W * 0.4, run);
+          var dir = s.dir;
+          var top = H * 0.62 * env;
+          var L = W * 0.9;
           var level = function (x) {
-            var d = (crest - x) * s.dir;               // > 0 hinter dem Kamm
+            var d = (crest - x) * dir;                // > 0 hinter dem Kamm
             if (d < 0) return 0;
-            var k = d / L;
-            var h = k < 0.08 ? top * (0.6 + 5 * k) : top * Math.max(0.12, 1 - (k - 0.08) * 0.95);
-            return h + Math.sin(x * 0.02 + s.t * 3) * 10 * env;
+            // am Kamm volle Höhe, nach hinten flacher auslaufend
+            var h = top * (1 - 0.62 * smooth(d / L)) * (0.92 + 0.08 * smooth(d / 160));
+            return h + Math.sin(x * 0.018 + s.t * 4) * 12 * env;
           };
-          var x0 = crest - s.dir * (L + 200);
-          var grad = fctx.createLinearGradient(0, H - top - 40, 0, H);
-          grad.addColorStop(0, 'rgba(120,205,235,' + (0.85 * env) + ')');
-          grad.addColorStop(0.35, 'rgba(40,130,190,' + (0.85 * env) + ')');
-          grad.addColorStop(1, 'rgba(12,58,110,' + (0.9 * env) + ')');
+          var fx = function (dx) { return crest + dir * dx; };
+          var x0 = crest - dir * (L + 240);
+
+          // Wasserkörper mit Lippe
+          var grad = fctx.createLinearGradient(0, H - top * 1.15, 0, H);
+          grad.addColorStop(0, 'rgba(150,225,245,' + (0.92 * env) + ')');
+          grad.addColorStop(0.3, 'rgba(40,140,200,' + (0.92 * env) + ')');
+          grad.addColorStop(1, 'rgba(10,50,100,' + (0.95 * env) + ')');
           fctx.fillStyle = grad;
           fctx.beginPath();
           fctx.moveTo(x0, H + 10);
-          var step = 24 * s.dir;
           var x;
-          for (x = x0; (crest - x) * s.dir >= 0; x += step) fctx.lineTo(x, H - level(x));
-          // Überschlagende Front
-          fctx.quadraticCurveTo(crest + s.dir * 90, H - top * 1.02, crest + s.dir * 70, H - top * 0.55);
-          fctx.quadraticCurveTo(crest + s.dir * 30, H - top * 0.35, crest + s.dir * 150, H + 10);
+          for (x = x0; (crest - x) * dir >= 0; x += 20 * dir) fctx.lineTo(x, H - level(x));
+          // Lippe: steigt über den Kamm, rollt rund nach vorn und unten ein
+          fctx.bezierCurveTo(fx(40), H - top * 1.16, fx(170), H - top * 1.14, fx(205), H - top * 0.86);
+          fctx.bezierCurveTo(fx(220), H - top * 0.72, fx(165), H - top * 0.62, fx(120), H - top * 0.7);
+          // Unterseite der Lippe zurück, dann die Wand hinunter
+          fctx.bezierCurveTo(fx(70), H - top * 0.6, fx(50), H - top * 0.3, fx(150), H + 10);
           fctx.closePath();
           fctx.fill();
-          // Schaumkrone
-          fctx.fillStyle = 'rgba(245,252,255,' + (0.85 * env) + ')';
-          for (x = crest - s.dir * 420; (crest - x) * s.dir >= 0; x += 9 * s.dir) {
-            var near = 1 - Math.abs(crest - x) / 420;
-            if (Math.random() > 0.35 + near * 0.5) continue;
+
+          // Röhre: dunkler Hohlraum unter der Lippe
+          var tube = fctx.createRadialGradient(fx(105), H - top * 0.5, 0, fx(105), H - top * 0.5, top * 0.32);
+          tube.addColorStop(0, 'rgba(5,30,60,' + (0.55 * env) + ')');
+          tube.addColorStop(1, 'rgba(5,30,60,0)');
+          fctx.fillStyle = tube;
+          fctx.beginPath();
+          fctx.moveTo(fx(120), H - top * 0.7);
+          fctx.bezierCurveTo(fx(70), H - top * 0.6, fx(50), H - top * 0.3, fx(150), H + 10);
+          fctx.lineTo(fx(40), H + 10);
+          fctx.lineTo(fx(40), H - top * 0.8);
+          fctx.closePath();
+          fctx.fill();
+
+          // Schaumkante auf der Lippe und Schaumteppich dahinter
+          fctx.fillStyle = 'rgba(245,252,255,' + (0.9 * env) + ')';
+          for (var k = 0; k < 26; k++) {
+            var t = k / 25;
+            var lx = lerp(crest, fx(200), t), ly = H - top * (1.0 + 0.14 * Math.sin(Math.PI * t * 0.9));
             fctx.beginPath();
-            fctx.arc(x + rand(-4, 4), H - level(x) + rand(-6, 6), rand(1.5, 2.5 + near * 4), 0, Math.PI * 2);
+            fctx.arc(lx + rand(-5, 5), ly + rand(-6, 6), rand(2, 6), 0, Math.PI * 2);
             fctx.fill();
           }
-          // Gischt
-          if (env > 0.3) {
-            for (var n = 0; n < 6; n++) {
-              s.spray.push({ x: crest + s.dir * rand(0, 80), y: H - top * rand(0.85, 1.05),
-                             vx: s.dir * rand(60, 260), vy: rand(-420, -160), life: rand(0.6, 1.1) });
+          for (x = crest - dir * 700; (crest - x) * dir >= 0; x += 8 * dir) {
+            var near = 1 - Math.abs(crest - x) / 700;
+            if (Math.random() > 0.3 + near * 0.6) continue;
+            fctx.beginPath();
+            fctx.arc(x + rand(-4, 4), H - level(x) + rand(-8, 10), rand(1.5, 2.5 + near * 4.5), 0, Math.PI * 2);
+            fctx.fill();
+          }
+
+          // Gischt von der Lippe und am Fuß der Wand
+          if (env > 0.25) {
+            for (var n = 0; n < 12; n++) {
+              var fromLip = n < 8;
+              s.spray.push({ x: fromLip ? fx(rand(120, 210)) : fx(rand(120, 200)),
+                             y: fromLip ? H - top * rand(0.85, 1.1) : H - rand(0, 40),
+                             vx: dir * rand(120, 480), vy: fromLip ? rand(-520, -200) : rand(-700, -300),
+                             life: rand(0.6, 1.2), r: rand(1.5, 3.5) });
             }
           }
           s.spray = s.spray.filter(function (d) { return (d.life -= dt) > 0; });
+          fctx.fillStyle = 'rgba(240,250,255,1)';
           s.spray.forEach(function (d) {
-            d.vy += 900 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
-            fctx.globalAlpha = Math.min(1, d.life) * env;
-            fctx.fillRect(d.x, d.y, 2.5, 2.5);
+            d.vy += 1000 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+            fctx.globalAlpha = Math.min(1, d.life) * env * 0.9;
+            fctx.beginPath();
+            fctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+            fctx.fill();
           });
           fctx.globalAlpha = 1;
         }
@@ -851,6 +924,240 @@
             d.vy += 380 * dt; d.vx *= 1 - 1.2 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
             fctx.fillStyle = 'rgba(255,' + Math.round(170 + 80 * d.life / d.max) + ',90,' + Math.min(1, d.life * 2) + ')';
             fctx.fillRect(d.x - 1.2, d.y - 1.2, 2.4, 2.4);
+          });
+        }
+      },
+      aurora: {
+        // Polarlicht: grün-violette Vorhänge wabern oben am Rand (Himmels-Ebene)
+        init: function () {
+          var c = [];
+          for (var i = 0; i < 3; i++) c.push({ ph: rand(0, 6.3), sp: rand(0.25, 0.5), y: rand(70, 150), h: rand(150, 260) });
+          return { dur: 12, curtains: c };
+        },
+        draw: function (s) {
+          var env = smooth(s.t / 2.5) * (1 - smooth((s.t - (s.dur - 2.5)) / 2.5));
+          var sky = sctx.createLinearGradient(0, 0, 0, H * 0.45);
+          sky.addColorStop(0, 'rgba(6,10,28,' + (0.82 * env) + ')');
+          sky.addColorStop(0.6, 'rgba(6,10,28,' + (0.45 * env) + ')');
+          sky.addColorStop(1, 'rgba(6,10,28,0)');
+          sctx.fillStyle = sky;
+          sctx.fillRect(0, 0, W, H * 0.45);
+          s.curtains.forEach(function (c, ci) {
+            for (var x = 0; x < W; x += 10) {
+              var base = c.y + 45 * Math.sin(x * 0.0035 + s.t * c.sp + c.ph) + 18 * Math.sin(x * 0.011 - s.t * 0.9 + ci);
+              var hgt = c.h * (0.6 + 0.4 * Math.sin(x * 0.007 + s.t * 0.7 + c.ph));
+              var a = env * (0.32 + 0.18 * Math.sin(x * 0.02 + s.t * 2.1 + ci * 2));
+              var g = sctx.createLinearGradient(0, base - hgt, 0, base + 30);
+              g.addColorStop(0, 'rgba(150,90,220,0)');
+              g.addColorStop(0.55, 'rgba(120,120,230,' + (a * 0.6) + ')');
+              g.addColorStop(0.9, 'rgba(90,255,170,' + a + ')');
+              g.addColorStop(1, 'rgba(90,255,170,0)');
+              sctx.fillStyle = g;
+              sctx.fillRect(x, base - hgt, 11, hgt + 30);
+            }
+          });
+        }
+      },
+      rainbow: {
+        // Regenbogen spannt sich von links nach rechts über den oberen Rand auf
+        init: function () { return { dur: 10 }; },
+        draw: function (s) {
+          var env = 1 - smooth((s.t - (s.dur - 2.5)) / 2.5);
+          var reveal = smooth(s.t / 3);
+          var cx = W / 2, cy = H * 1.3, R = H * 1.18;
+          var a0 = Math.PI + 0.12, a1 = a0 + (Math.PI - 0.24) * reveal;
+          var COLORS = ['255,70,70', '255,150,50', '255,230,80', '90,210,110', '80,160,255', '150,100,230'];
+          sctx.lineWidth = 16;
+          COLORS.forEach(function (col, i) {
+            sctx.strokeStyle = 'rgba(' + col + ',' + (0.32 * env) + ')';
+            sctx.beginPath();
+            sctx.arc(cx, cy, R - i * 15, a0, a1);
+            sctx.stroke();
+          });
+          var halo = sctx.createRadialGradient(cx, cy, R - 120, cx, cy, R + 40);
+          halo.addColorStop(0, 'rgba(255,255,255,0)');
+          halo.addColorStop(0.7, 'rgba(255,255,255,' + (0.06 * env * reveal) + ')');
+          halo.addColorStop(1, 'rgba(255,255,255,0)');
+          sctx.fillStyle = halo;
+          sctx.fillRect(0, 0, W, H * 0.5);
+        }
+      },
+      hail: {
+        // Hagelschauer: Körner prasseln schräg, springen am Boden auf
+        init: function () { return { dur: 6, stones: [], acc: 0 }; },
+        draw: function (s, dt) {
+          var env = smooth(s.t / 0.5) * (1 - smooth((s.t - 4.6) / 0.8));
+          var dg = sctx.createLinearGradient(0, 0, 0, H * 0.35);
+          dg.addColorStop(0, 'rgba(40,46,60,' + (0.45 * env) + ')');
+          dg.addColorStop(1, 'rgba(40,46,60,0)');
+          sctx.fillStyle = dg;
+          sctx.fillRect(0, 0, W, H * 0.35);
+          s.acc += 160 * env * dt;
+          while (s.acc >= 1) {
+            s.acc -= 1;
+            s.stones.push({ x: rand(-100, W), y: rand(-60, -10), vx: rand(140, 260), vy: rand(1200, 1600),
+                            r: rand(2, 4.5), ground: H - rand(5, 70), bounced: 0, life: 1 });
+          }
+          fctx.fillStyle = 'rgba(235,242,250,1)';
+          s.stones = s.stones.filter(function (h) {
+            h.vy += 1400 * dt; h.x += h.vx * dt; h.y += h.vy * dt;
+            if (h.y >= h.ground && h.vy > 0) {
+              if (h.bounced >= 2) return false;
+              h.y = h.ground; h.vy *= -rand(0.25, 0.4); h.vx *= 0.6; h.bounced++;
+            }
+            if (h.bounced) h.life -= dt * 0.9;
+            if (h.life <= 0) return false;
+            fctx.globalAlpha = h.life * 0.95;
+            fctx.beginPath();
+            fctx.arc(h.x, h.y, h.r, 0, Math.PI * 2);
+            fctx.fill();
+            return true;
+          });
+          fctx.globalAlpha = 1;
+        }
+      },
+      meteors: {
+        // Sternschnuppenregen: kurz Nachthimmel oben, viele Schnuppen
+        init: function () {
+          var at = [];
+          for (var i = 0; i < 26; i++) at.push(rand(0.8, 7.2));
+          at.sort(function (a, b) { return a - b; });
+          return { dur: 9, at: at, list: [] };
+        },
+        draw: function (s, dt) {
+          var env = smooth(s.t / 1.2) * (1 - smooth((s.t - 7.6) / 1.4));
+          var sky = sctx.createLinearGradient(0, 0, 0, H * 0.42);
+          sky.addColorStop(0, 'rgba(8,12,34,' + (0.82 * env) + ')');
+          sky.addColorStop(0.6, 'rgba(8,12,34,' + (0.45 * env) + ')');
+          sky.addColorStop(1, 'rgba(8,12,34,0)');
+          sctx.fillStyle = sky;
+          sctx.fillRect(0, 0, W, H * 0.42);
+          while (s.at.length && s.at[0] <= s.t) {
+            s.at.shift();
+            var left = Math.random() < 0.5;
+            s.list.push({ x: left ? rand(0, W * 0.6) : rand(W * 0.4, W), y: rand(10, H * 0.22),
+                          vx: (left ? 1 : -1) * rand(800, 1300), vy: rand(250, 450), t: 0, dur: rand(0.6, 1.1),
+                          w: rand(2.5, 4.5) });
+          }
+          sctx.lineCap = 'round';
+          s.list = s.list.filter(function (m) {
+            m.t += dt;
+            var k = m.t / m.dur;
+            if (k >= 1) return false;
+            var mx = m.x + m.vx * m.t, my = m.y + m.vy * m.t, a = env * Math.sin(Math.PI * k);
+            var glowR = m.w * 3;
+            var head = sctx.createRadialGradient(mx, my, 0, mx, my, glowR);
+            head.addColorStop(0, 'rgba(255,255,255,' + a + ')');
+            head.addColorStop(1, 'rgba(255,255,255,0)');
+            sctx.fillStyle = head;
+            sctx.fillRect(mx - glowR, my - glowR, glowR * 2, glowR * 2);
+            var tail = sctx.createLinearGradient(mx, my, mx - m.vx * 0.2, my - m.vy * 0.2);
+            tail.addColorStop(0, 'rgba(255,255,255,' + a + ')');
+            tail.addColorStop(0.3, 'rgba(200,220,255,' + (a * 0.5) + ')');
+            tail.addColorStop(1, 'rgba(200,220,255,0)');
+            sctx.strokeStyle = tail;
+            sctx.lineWidth = m.w;
+            sctx.beginPath();
+            sctx.moveTo(mx, my);
+            sctx.lineTo(mx - m.vx * 0.2, my - m.vy * 0.2);
+            sctx.stroke();
+            return true;
+          });
+        }
+      },
+      tornado: {
+        // Windhose: dunkler Trichter unter einer Wolkenbasis, unten schmal,
+        // oben breit, dreht sich (Wirbelstreifen), Staub und Trümmer am Fuß
+        init: function () {
+          var dir = Math.random() < 0.5 ? 1 : -1;
+          var debris = [];
+          for (var i = 0; i < 120; i++) debris.push({ h: Math.pow(Math.random(), 1.8), a: rand(0, 6.3), sp: rand(3, 7), r: rand(2, 5) });
+          return { dur: 9, dir: dir, debris: debris };
+        },
+        draw: function (s) {
+          var p = s.t / s.dur;
+          var env = smooth(p / 0.12) * (1 - smooth((p - 0.85) / 0.15));
+          var x = s.dir > 0 ? lerp(-200, W + 200, p) : lerp(W + 200, -200, p);
+          var topY = H * 0.2;
+          var swayAt = function (k) { return Math.sin(s.t * 1.8 + k * 2.6) * 55 * k + Math.sin(s.t * 4.5 + k * 8) * 7; };
+          var widthAt = function (k) { return lerp(16, 250, Math.pow(k, 1.9)); };
+
+          // Wolkenbasis oben (Himmels-Ebene)
+          var cb = sctx.createRadialGradient(x, topY - 40, 0, x, topY - 40, 620);
+          cb.addColorStop(0, 'rgba(40,40,46,' + (0.75 * env) + ')');
+          cb.addColorStop(1, 'rgba(40,40,46,0)');
+          sctx.save();
+          sctx.translate(x, topY - 40); sctx.scale(1, 0.35); sctx.translate(-x, -(topY - 40));
+          sctx.fillStyle = cb;
+          sctx.fillRect(x - 620, topY - 660, 1240, 1240);
+          sctx.restore();
+
+          // Trichter in Streifen, Mitte dunkel, Ränder weich
+          var n = 48, bandH = (H + 10 - topY) / n;
+          for (var i = 0; i < n; i++) {
+            var k = 1 - i / (n - 1);                  // 1 = oben, 0 = Boden
+            // ganze Pixel, ohne Überlappung: sonst zeigen sich Nahtlinien
+            var y = Math.round(topY + i * bandH), y2 = Math.round(topY + (i + 1) * bandH);
+            var cx = x + swayAt(k), w = widthAt(k);
+            // oben weich in die Wolkenbasis übergehen, keine harte Kante
+            var a = env * (0.92 - 0.2 * k) * smooth(i / 8);
+            var g = fctx.createLinearGradient(cx - w, 0, cx + w, 0);
+            g.addColorStop(0, 'rgba(60,57,54,0)');
+            g.addColorStop(0.22, 'rgba(60,57,54,' + (a * 0.85) + ')');
+            g.addColorStop(0.5, 'rgba(46,44,42,' + a + ')');
+            g.addColorStop(0.78, 'rgba(60,57,54,' + (a * 0.85) + ')');
+            g.addColorStop(1, 'rgba(60,57,54,0)');
+            fctx.fillStyle = g;
+            fctx.fillRect(cx - w, y, w * 2, y2 - y);
+          }
+          // Wirbelstreifen wandern nach oben und zeigen die Drehung
+          fctx.lineWidth = 2;
+          for (var j = 0; j < 9; j++) {
+            var kk = ((s.t * 0.22 + j / 9) % 1);
+            var yy = lerp(H, topY, kk), cx2 = x + swayAt(kk), w2 = widthAt(kk) * 0.75;
+            var off = Math.sin(s.t * 6 + j) * w2 * 0.5;
+            fctx.strokeStyle = 'rgba(150,145,138,' + (0.5 * env * Math.sin(Math.PI * kk)) + ')';
+            fctx.beginPath();
+            fctx.moveTo(cx2 - w2, yy + 6);
+            fctx.quadraticCurveTo(cx2 + off, yy - 10, cx2 + w2, yy + 4);
+            fctx.stroke();
+          }
+          // Staubwolke am Fuß
+          var dust = fctx.createRadialGradient(x, H, 0, x, H, 240);
+          dust.addColorStop(0, 'rgba(160,138,108,' + (0.75 * env) + ')');
+          dust.addColorStop(1, 'rgba(160,138,108,0)');
+          fctx.fillStyle = dust;
+          fctx.fillRect(x - 240, H - 240, 480, 240);
+          fctx.fillStyle = 'rgba(55,48,40,1)';
+          s.debris.forEach(function (d) {
+            d.a += d.sp * 0.016;
+            var y = lerp(H - 10, topY + 60, d.h);
+            var rw = widthAt(d.h) * 1.15;
+            fctx.globalAlpha = env * (0.55 + 0.45 * Math.sin(d.a));
+            fctx.fillRect(x + swayAt(d.h) + Math.cos(d.a) * rw - d.r / 2, y + Math.sin(d.a) * rw * 0.25, d.r, d.r);
+          });
+          fctx.globalAlpha = 1;
+        }
+      },
+      fogwall: {
+        // Nebelwand rollt von einer Seite quer durch und verzieht sich
+        init: function () {
+          var dir = Math.random() < 0.5 ? 1 : -1, puffs = [];
+          for (var i = 0; i < 34; i++) puffs.push({ off: rand(0, 900), y: rand(-80, H + 80), r: rand(200, 380), wob: rand(0, 6.3) });
+          return { dur: 10, dir: dir, puffs: puffs };
+        },
+        draw: function (s) {
+          var p = s.t / s.dur;
+          var env = smooth(p / 0.1) * (1 - smooth((p - 0.75) / 0.25));
+          var front = s.dir > 0 ? lerp(-500, W + 1300, p) : lerp(W + 500, -1300, p);
+          s.puffs.forEach(function (f) {
+            var x = front - s.dir * f.off + Math.sin(s.t * 0.8 + f.wob) * 30;
+            var y = f.y + Math.sin(s.t * 0.5 + f.wob) * 20;
+            var g = fctx.createRadialGradient(x, y, 0, x, y, f.r);
+            g.addColorStop(0, 'rgba(228,232,238,' + (0.42 * env) + ')');
+            g.addColorStop(1, 'rgba(228,232,238,0)');
+            fctx.fillStyle = g;
+            fctx.fillRect(x - f.r, y - f.r, f.r * 2, f.r * 2);
           });
         }
       },

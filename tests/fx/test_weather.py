@@ -5,7 +5,8 @@ from fx.weather import KINDS, SPECTACLES, apply_mood, from_api, mood_precip, moo
 def test_profiles_cover_all_kinds():
     assert KINDS == ("clear", "cloudy", "fog", "drizzle", "rain", "storm",
                      "sleet", "snow", "blizzard", "heat", "night", "dusk")
-    assert SPECTACLES == ("tsunami", "megabolt", "ballbolt", "avalanche")
+    assert SPECTACLES == ("tsunami", "megabolt", "ballbolt", "avalanche",
+                          "aurora", "rainbow", "hail", "meteors", "tornado", "fogwall")
     for k in KINDS:
         p = profile(k)
         assert p["kind"] == k and p["gloom"] == 0 and p["wind"] == 0

@@ -28,14 +28,16 @@
       overflow: hidden;
     }
 
-    /* Partikel und Spektakel mit weichem Rand-Fade (-webkit- für OBS-CEF) */
+    /* Partikel und Blitze mit weichem Rand-Fade (-webkit- für OBS-CEF).
+       Spektakel (wk-fx) bewusst ohne: Lawine, Welle, Nebelwand kommen von
+       jenseits der Bildkante und müssen bis an den Rand reichen. */
     .wk-layer {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
     }
-    .wk-particles, .wk-fx, .wk-bolt {
+    .wk-particles, .wk-bolt {
       -webkit-mask-image:
         linear-gradient(to right, transparent, #000 var(--edge-x), #000 calc(100% - var(--edge-x)), transparent),
         linear-gradient(to bottom, transparent, #000 var(--edge-top), #000 calc(100% - var(--edge-bottom)), transparent);

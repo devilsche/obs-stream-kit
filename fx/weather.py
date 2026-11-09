@@ -27,7 +27,8 @@ PROFILES = {
     "dusk":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.15, "sun": 0.35, "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 0.2, "dusk": 1},
 }
 KINDS = tuple(PROFILES)
-SPECTACLES = ("tsunami", "megabolt", "ballbolt", "avalanche")
+SPECTACLES = ("tsunami", "megabolt", "ballbolt", "avalanche",
+              "aurora", "rainbow", "hail", "meteors", "tornado", "fogwall")
 
 # Stimmungsgrenzen ab Werk: unter 1,5 schlecht, über 2,5 gut
 KD_LOW = 1.5

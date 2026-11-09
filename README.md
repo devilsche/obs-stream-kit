@@ -391,7 +391,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 |--------|---------|
 | `cmd=weather&to=storm` | Gewitter für 2,5 min, danach zurück; `&hold=60` = 60 s, `&hold=0` = bis `auto` |
 | `cmd=auto` | zurück zum Live-Wetter |
-| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami` (Welle), `megabolt` (Gewitterwand mit vielen Blitzen), `ballbolt` (nach einem Einschlag glimmt eine gelb-orange Kugel auf, schwebt taumelnd und erlischt lautlos oder platzt — Event für ein Knall-WAV), `avalanche` (Lawine); ohne `type` zufällig. Ein zweites wartet, bis das erste fertig ist |
+| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami` (Welle), `megabolt` (Gewitterwand mit vielen Blitzen), `ballbolt` (nach einem Einschlag glimmt eine gelb-orange Kugel auf, schwebt taumelnd und erlischt lautlos oder platzt — Event für ein Knall-WAV), `avalanche` (Lawine), `aurora` (Polarlicht), `rainbow` (Regenbogen), `hail` (Hagelschauer), `meteors` (Sternschnuppenregen), `tornado` (Windhose), `fogwall` (Nebelwand); ohne `type` zufällig. Spektakel reichen bis an die Bildränder, Regen, Schnee und Blitze blenden am Rand weich aus. Ein zweites wartet, bis das erste fertig ist |
 | `cmd=strike` | Blitz (`&dist=near` / `&dist=far`, passend zum Donner-WAV) |
 | `cmd=gust` | Windböe |
 | `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die URL |
