@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <script src="../js/stinger-ready.js"></script>
+  <title>Weather Overlay</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    :root {
+      --edge-x: 70px;
+      --edge-top: 60px;
+      --edge-bottom: 24px;
+      --flash: 205, 220, 255;
+    }
+
+    .stage {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    /* Partikel und Spektakel mit weichem Rand-Fade (-webkit- für OBS-CEF) */
+    .wk-layer {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .wk-particles, .wk-fx, .wk-bolt {
+      -webkit-mask-image:
+        linear-gradient(to right, transparent, #000 var(--edge-x), #000 calc(100% - var(--edge-x)), transparent),
+        linear-gradient(to bottom, transparent, #000 var(--edge-top), #000 calc(100% - var(--edge-bottom)), transparent);
+      -webkit-mask-composite: source-in;
+      mask-image:
+        linear-gradient(to right, transparent, #000 var(--edge-x), #000 calc(100% - var(--edge-x)), transparent),
+        linear-gradient(to bottom, transparent, #000 var(--edge-top), #000 calc(100% - var(--edge-bottom)), transparent);
+      mask-composite: intersect;
+    }
+
+    /* Blitz-Aufhellung: höchstens 2 Flashes pro Einschlag, nur oben */
+    .wk-flash {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse 70% 90% at 50% 0%,
+        rgba(var(--flash), 0.9), rgba(var(--flash), 0.25) 55%, transparent 85%);
+    }
+    .wk-flash[data-side="left"] {
+      background: radial-gradient(ellipse 70% 90% at 25% 0%,
+        rgba(var(--flash), 0.9), rgba(var(--flash), 0.25) 55%, transparent 85%);
+    }
+    .wk-flash[data-side="right"] {
+      background: radial-gradient(ellipse 70% 90% at 75% 0%,
+        rgba(var(--flash), 0.9), rgba(var(--flash), 0.25) 55%, transparent 85%);
+    }
+    .wk-flash.is-flashing { animation: wkFlash 700ms ease-out forwards; }
+    @keyframes wkFlash {
+      0%   { opacity: 0; }
+      5%   { opacity: 0.34; }
+      12%  { opacity: 0.05; }
+      20%  { opacity: 0.24; }
+      100% { opacity: 0; }
+    }
+
+    /* ── Vorschau (?tune=1): Bühne skaliert neben dem Regler-Panel ── */
+    .tune-panel { display: none; }
+
+    body.is-tune {
+      width: auto;
+      height: auto;
+      min-height: 100vh;
+      overflow: auto;
+      background: #0d0a14;
+      color: #f4ead2;
+      font-family: 'DM Sans', system-ui, sans-serif;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 400px;
+      gap: 16px;
+      padding: 16px;
+    }
+    html:has(body.is-tune) { width: auto; height: auto; overflow: auto; }
+    .is-tune .stage {
+      position: relative;
+      inset: auto;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      align-self: start;
+      border: 1px solid #3a2a4d;
+      border-radius: 8px;
+    }
+    .is-tune .stage[data-bg="dark"] {
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 100%, #2f3a26, transparent 70%),
+        linear-gradient(#1b2433 0%, #2a3540 55%, #26301f 56%, #1d2518 100%);
+    }
+    .is-tune .stage[data-bg="bright"] {
+      background:
+        radial-gradient(ellipse 50% 30% at 50% 100%, #b9a26f, transparent 70%),
+        linear-gradient(#7fb2dd 0%, #b7d3e6 55%, #8fa36a 56%, #6f8452 100%);
+    }
+    .is-tune .stage[data-bg="none"] {
+      background: repeating-conic-gradient(#2a2433 0 25%, #1f1a27 0 50%) 0 0 / 40px 40px;
+    }
+    /* Markiert die Bildmitte, die bei jeder Stimmung frei bleiben soll */
+    .center-guide {
+      display: none;
+      position: absolute;
+      inset: 20%;
+      border: 1px dashed rgba(242, 183, 5, 0.6);
+      pointer-events: none;
+    }
+    .stage[data-guide="on"] .center-guide { display: block; }
+
+    .is-tune .tune-panel {
+      display: block;
+      align-self: start;
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      background: #1a1324;
+      border: 1px solid #f2b705;
+      border-radius: 10px;
+      padding: 16px;
+      font-size: 14px;
+    }
+    .tune-panel h1 { font-size: 18px; margin-bottom: 4px; color: #f2b705; }
+    .tune-panel .lede { font-size: 12px; color: #c9bda4; margin-bottom: 8px; }
+    .tune-panel fieldset {
+      border: 1px solid #3a2a4d;
+      border-radius: 8px;
+      padding: 10px 12px 12px;
+      margin-top: 12px;
+    }
+    .tune-panel legend { padding: 0 6px; color: #f2b705; font-weight: 700; }
+    .field { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; margin-top: 8px; align-items: center; }
+    .field label { font-size: 13px; }
+    .field output { font-variant-numeric: tabular-nums; color: #fff3d0; font-size: 13px; }
+    .field input[type="range"], .field select { grid-column: 1 / -1; width: 100%; min-height: 28px; }
+    .field select {
+      background: #0d0a14; color: #f4ead2; border: 1px solid #5b4775; border-radius: 4px; padding: 4px;
+    }
+    .check { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; }
+    .check input { width: 18px; height: 18px; }
+    .btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .btn {
+      min-height: 32px;
+      padding: 6px 10px;
+      background: rgba(242, 183, 5, 0.12);
+      border: 1px solid #f2b705;
+      border-radius: 6px;
+      color: #f4ead2;
+      font: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .btn:hover { background: rgba(242, 183, 5, 0.28); }
+    .btn:focus-visible, .field input:focus-visible, .field select:focus-visible, .check input:focus-visible {
+      outline: 2px solid #fff3d0;
+      outline-offset: 2px;
+    }
+    .readout {
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #e8dcc0;
+      font-variant-numeric: tabular-nums;
+    }
+    .readout strong { color: #f2b705; font-weight: 700; }
+    .hint { margin-top: 6px; font-size: 11px; color: #a99c82; }
+
+    @media (max-width: 1000px) {
+      body.is-tune { grid-template-columns: 1fr; }
+      .is-tune .tune-panel { position: static; max-height: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .wk-flash.is-flashing { animation: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="stage" id="stage" data-bg="dark" data-guide="off">
+    <div class="center-guide" aria-hidden="true"></div>
+  </div>
+
+  <aside class="tune-panel" id="tunePanel" aria-label="Weather preview controls">
+    <h1>Weather preview</h1>
+    <p class="lede">Try out how real weather, your K/D and chat commands play together. Nothing here is sent anywhere.</p>
+
+    <fieldset>
+      <legend>Real weather (from the API later)</legend>
+      <div class="field">
+        <label for="inKind">Weather outside</label>
+        <select id="inKind"></select>
+      </div>
+      <div class="field">
+        <label for="inWind">Wind</label>
+        <output id="outWind" for="inWind"></output>
+        <input type="range" id="inWind" min="-1" max="1" step="0.05" value="0">
+      </div>
+      <label class="check"><input type="checkbox" id="inFast" checked> Fast transitions (5 s instead of 25 s)</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Mood from your K/D</legend>
+      <div class="field">
+        <label for="inKd">K/D tonight</label>
+        <output id="outKd" for="inKd"></output>
+        <input type="range" id="inKd" min="0" max="5" step="0.05" value="1.2">
+      </div>
+      <div class="field">
+        <label for="inRef">Your average K/D</label>
+        <output id="outRef" for="inRef"></output>
+        <input type="range" id="inRef" min="0.2" max="4" step="0.05" value="1.2">
+      </div>
+      <div class="field">
+        <label for="inRounds">Rounds tonight</label>
+        <output id="outRounds" for="inRounds"></output>
+        <input type="range" id="inRounds" min="0" max="12" step="1" value="5">
+      </div>
+      <label class="check"><input type="checkbox" id="inLive" checked> Session running (last round under 4 h ago)</label>
+      <label class="check"><input type="checkbox" id="inCustom"> Own limits instead of relative to the average</label>
+      <div class="field">
+        <label for="inLow">Gloomy below</label>
+        <output id="outLow" for="inLow"></output>
+        <input type="range" id="inLow" min="0.2" max="4" step="0.05" value="1">
+      </div>
+      <div class="field">
+        <label for="inHigh">Sunny above</label>
+        <output id="outHigh" for="inHigh"></output>
+        <input type="range" id="inHigh" min="0.2" max="5" step="0.05" value="2">
+      </div>
+      <div class="field">
+        <label for="inStrength">Mood strength</label>
+        <output id="outStrength" for="inStrength"></output>
+        <input type="range" id="inStrength" min="0" max="1" step="0.05" value="0.5">
+      </div>
+      <p class="readout" id="moodReadout" aria-live="polite"></p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Chat commands (temporary)</legend>
+      <div class="field">
+        <label for="inHold">Duration</label>
+        <select id="inHold">
+          <option value="20">20 s (preview)</option>
+          <option value="150" selected>2.5 min</option>
+          <option value="0">Forced (until Auto)</option>
+        </select>
+      </div>
+      <div class="btns" id="overrideBtns"></div>
+      <div class="btns">
+        <button type="button" class="btn" id="btnAuto">Auto</button>
+      </div>
+      <p class="readout" id="overrideReadout" aria-live="polite"></p>
+      <p class="hint">A new command within 15 s of the last one waits for the rest of those 15 s; only the latest one waits.</p>
+    </fieldset>
+
+    <fieldset>
+      <legend>Spectacles and accents</legend>
+      <div class="btns" id="spectacleBtns"></div>
+      <div class="btns">
+        <button type="button" class="btn" id="btnStrike">Lightning</button>
+        <button type="button" class="btn" id="btnGust">Gust</button>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Preview</legend>
+      <div class="field">
+        <label for="inBg">Background</label>
+        <select id="inBg">
+          <option value="dark">Dark scene</option>
+          <option value="bright">Bright scene</option>
+          <option value="none">Transparent (checkerboard)</option>
+        </select>
+      </div>
+      <label class="check"><input type="checkbox" id="inGuide"> Show the centre that must stay clear</label>
+      <p class="readout" id="stateReadout" aria-live="off"></p>
+    </fieldset>
+  </aside>
+
+  <script src="../js/weather-kit.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      var K = window.WeatherKit;
+      var params = new URLSearchParams(window.location.search);
+      var tuneMode = params.get('tune') === '1';
+      var stage = document.getElementById('stage');
+      var kit = K.create(stage);
+
+      var LABELS = {
+        clear: 'Clear', cloudy: 'Cloudy', fog: 'Fog', drizzle: 'Drizzle', rain: 'Rain',
+        storm: 'Thunderstorm', sleet: 'Sleet', snow: 'Snow', blizzard: 'Blizzard', heat: 'Heat'
+      };
+      var SHOW_LABELS = { tsunami: 'Tsunami', megabolt: 'Mega lightning', ballbolt: 'Ball lightning', avalanche: 'Avalanche' };
+
+      // Ohne Vorschau: feste Lage aus der URL (Server-Anbindung folgt)
+      if (!tuneMode) {
+        var lock = params.get('lock') || params.get('fallback') || 'clear';
+        var st = K.profile(lock);
+        var w = parseFloat(params.get('wind'));
+        if (!isNaN(w)) st.wind = Math.max(-1, Math.min(1, w));
+        kit.setState(st, 0);
+        return;
+      }
+
+      document.body.classList.add('is-tune');
+
+      function $(id) { return document.getElementById(id); }
+      var inKind = $('inKind');
+      K.KINDS.forEach(function (k) {
+        var o = document.createElement('option');
+        o.value = k;
+        o.textContent = LABELS[k];
+        inKind.appendChild(o);
+      });
+
+      var STORE = 'weather-preview';
+      var saved = {};
+      try { saved = JSON.parse(localStorage.getItem(STORE) || '{}') || {}; } catch (e) { saved = {}; }
+      var FIELDS = ['inKind', 'inWind', 'inFast', 'inKd', 'inRef', 'inRounds', 'inLive', 'inCustom',
+                    'inLow', 'inHigh', 'inStrength', 'inHold', 'inBg', 'inGuide'];
+      FIELDS.forEach(function (id) {
+        if (!(id in saved)) return;
+        var el = $(id);
+        if (el.type === 'checkbox') el.checked = !!saved[id]; else el.value = saved[id];
+      });
+      function save() {
+        var out = {};
+        FIELDS.forEach(function (id) { var el = $(id); out[id] = el.type === 'checkbox' ? el.checked : el.value; });
+        try { localStorage.setItem(STORE, JSON.stringify(out)); } catch (e) { /* egal */ }
+      }
+
+      function num(id) { return parseFloat($(id).value); }
+
+      // ── Chat-Übersteuerung (gleiche Regeln wie der Server) ──
+      var MIN_HOLD = 15;
+      var override = null, pending = null;
+      function now() { return performance.now() / 1000; }
+
+      function command(kind) {
+        var hold = parseInt($('inHold').value, 10);
+        var t = now();
+        if (override && t - override.since < MIN_HOLD) {
+          pending = { kind: kind, hold: hold };
+        } else {
+          override = { kind: kind, since: t, until: hold ? t + hold : null };
+          pending = null;
+          apply(4);
+        }
+        tickOverride();
+      }
+      function auto() {
+        override = null;
+        pending = null;
+        apply(transition());
+        tickOverride();
+      }
+      function tickOverride() {
+        var t = now();
+        if (pending && override && t - override.since >= MIN_HOLD) {
+          override = { kind: pending.kind, since: t, until: pending.hold ? t + pending.hold : null };
+          pending = null;
+          apply(4);
+        }
+        if (override && override.until && t >= override.until) {
+          override = null;
+          apply(transition());
+        }
+        var txt;
+        if (!override) txt = 'No command active, showing real weather and mood.';
+        else {
+          txt = '<strong>' + LABELS[override.kind] + '</strong> ' +
+                (override.until ? Math.ceil(override.until - t) + ' s left' : 'forced until Auto');
+          if (pending) txt += ' · next: ' + LABELS[pending.kind] + ' in ' +
+                              Math.ceil(MIN_HOLD - (t - override.since)) + ' s';
+        }
+        $('overrideReadout').innerHTML = txt;
+      }
+      setInterval(tickOverride, 250);
+
+      function transition() { return $('inFast').checked ? 5 : 25; }
+
+      // ── Zustand aus Reglern ──
+      var lastSource = '';
+      function compute() {
+        var base = K.profile(inKind.value);
+        base.wind = num('inWind');
+        if (override) {
+          var o = K.profile(override.kind);
+          o.wind = base.wind;
+          lastSource = 'chat command';
+          return { state: o, mood: null };
+        }
+        var custom = $('inCustom').checked;
+        var low = custom ? num('inLow') : null;
+        var high = custom ? num('inHigh') : null;
+        var kd = num('inKd'), ref = num('inRef');
+        var rounds = parseInt($('inRounds').value, 10), live = $('inLive').checked;
+        var mood = K.moodValue(kd, ref, rounds, live, low, high);
+        var b = K.bounds(ref, low, high);
+        var precip = (live && rounds >= 3) ? K.moodPrecip(kd, b.low) : null;
+        var strength = num('inStrength');
+        lastSource = 'real weather + mood';
+        return { state: K.applyMood(base, mood, strength, precip), mood: mood, precip: precip, b: b, strength: strength };
+      }
+
+      function apply(secs) {
+        var r = compute();
+        kit.setState(r.state, secs);
+        renderMood(r);
+      }
+
+      function renderMood(r) {
+        var el = $('moodReadout');
+        if (r.mood === null) { el.textContent = 'Mood is paused while a chat command runs.'; return; }
+        var rounds = parseInt($('inRounds').value, 10);
+        var lines = [];
+        if (!$('inLive').checked) lines.push('No session running, mood is neutral.');
+        else if (rounds < 3) lines.push('Fewer than 3 rounds tonight, mood is neutral.');
+        var e = r.mood * r.strength;
+        var word = e > 0.05 ? 'brighter' : e < -0.05 ? 'gloomier' : 'neutral';
+        lines.push('Mood <strong>' + (r.mood >= 0 ? '+' : '') + r.mood.toFixed(2) + '</strong> × strength ' +
+                   r.strength.toFixed(2) + ' = ' + (e >= 0 ? '+' : '') + e.toFixed(2) + ' (' + word + ')');
+        lines.push('Limits: gloomy at ' + r.b.low.toFixed(2) + ', sunny at ' + r.b.high.toFixed(2));
+        if (r.precip && r.strength > 0) lines.push('Bad evening brings <strong>' + LABELS[r.precip] + '</strong> if it is dry outside.');
+        el.innerHTML = lines.join('<br>');
+      }
+
+      // ── Ausgaben neben den Reglern ──
+      function fmt(id, outId, digits) {
+        $(outId).textContent = parseFloat($(id).value).toFixed(digits);
+      }
+      function outputs() {
+        fmt('inWind', 'outWind', 2);
+        fmt('inKd', 'outKd', 2);
+        fmt('inRef', 'outRef', 2);
+        $('outRounds').textContent = $('inRounds').value;
+        fmt('inLow', 'outLow', 2);
+        fmt('inHigh', 'outHigh', 2);
+        fmt('inStrength', 'outStrength', 2);
+        var custom = $('inCustom').checked;
+        $('inLow').disabled = !custom;
+        $('inHigh').disabled = !custom;
+        stage.dataset.bg = $('inBg').value;
+        stage.dataset.guide = $('inGuide').checked ? 'on' : 'off';
+      }
+
+      var debounce = null;
+      FIELDS.forEach(function (id) {
+        $(id).addEventListener('input', function () {
+          outputs();
+          save();
+          if (id === 'inBg' || id === 'inGuide' || id === 'inHold') return;
+          clearTimeout(debounce);
+          debounce = setTimeout(function () { apply(transition()); }, 250);
+        });
+      });
+
+      // ── Knöpfe ──
+      ['storm', 'blizzard', 'snow', 'rain', 'sleet', 'fog', 'clear', 'heat'].forEach(function (k) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn';
+        b.textContent = LABELS[k];
+        b.addEventListener('click', function () { command(k); });
+        $('overrideBtns').appendChild(b);
+      });
+      K.SPECTACLES.forEach(function (s) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn';
+        b.textContent = SHOW_LABELS[s];
+        b.addEventListener('click', function () { kit.spectacle(s); });
+        $('spectacleBtns').appendChild(b);
+      });
+      $('btnAuto').addEventListener('click', auto);
+      $('btnStrike').addEventListener('click', function () { kit.strike(); });
+      $('btnGust').addEventListener('click', function () { kit.gust(); });
+
+      setInterval(function () {
+        var s = kit.state(), c = kit.counts();
+        $('stateReadout').innerHTML =
+          'Showing <strong>' + (LABELS[s.kind] || s.kind) + '</strong> (' + lastSource + ')' +
+          '<br>Transition ' + Math.round(kit.progress() * 100) + '%' +
+          '<br>Clouds ' + s.clouds.toFixed(2) + ' · sun ' + s.sun.toFixed(2) + ' · fog ' + s.fog.toFixed(2) +
+          ' · gloom ' + (s.gloom || 0).toFixed(2) +
+          '<br>Drops ' + c.rain + ' · drizzle ' + c.drizzle + ' · flakes ' + c.snow +
+          (kit.busy() ? '<br>Spectacle: ' + SHOW_LABELS[kit.busy()] : '');
+      }, 400);
+
+      outputs();
+      apply(0);
+    })();
+  </script>
+</body>
+</html>
