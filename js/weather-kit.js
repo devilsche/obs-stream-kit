@@ -1043,8 +1043,9 @@
         draw: function (s) {
           var env = smooth(s.t / 2.5) * (1 - smooth((s.t - (s.dur - 2.5)) / 2.5));
           var sky = sctx.createLinearGradient(0, 0, 0, H * 0.45);
-          sky.addColorStop(0, 'rgba(6,10,28,' + (0.82 * env) + ')');
-          sky.addColorStop(0.6, 'rgba(6,10,28,' + (0.45 * env) + ')');
+          var dim = env * (1 - 0.9 * clamp(cur.night || 0, 0, 1));
+          sky.addColorStop(0, 'rgba(6,10,28,' + (0.82 * dim) + ')');
+          sky.addColorStop(0.6, 'rgba(6,10,28,' + (0.45 * dim) + ')');
           sky.addColorStop(1, 'rgba(6,10,28,0)');
           sctx.fillStyle = sky;
           sctx.fillRect(0, 0, W, H * 0.45);
@@ -1120,8 +1121,10 @@
         draw: function (s, dt) {
           var env = smooth(s.t / 1.2) * (1 - smooth((s.t - 7.6) / 1.4));
           var sky = sctx.createLinearGradient(0, 0, 0, H * 0.42);
-          sky.addColorStop(0, 'rgba(8,12,34,' + (0.82 * env) + ')');
-          sky.addColorStop(0.6, 'rgba(8,12,34,' + (0.45 * env) + ')');
+          // nachts ist der Himmel schon dunkel: nicht über Mond und Sterne legen
+          var dim = env * (1 - 0.9 * clamp(cur.night || 0, 0, 1));
+          sky.addColorStop(0, 'rgba(8,12,34,' + (0.82 * dim) + ')');
+          sky.addColorStop(0.6, 'rgba(8,12,34,' + (0.45 * dim) + ')');
           sky.addColorStop(1, 'rgba(8,12,34,0)');
           sctx.fillStyle = sky;
           sctx.fillRect(0, 0, W, H * 0.42);
