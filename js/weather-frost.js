@@ -237,12 +237,21 @@
       }
     }
 
-    // Stelle am Rand, wo gerade Frost ist (Ecken bevorzugt)
+    // Stelle, an der gerade wirklich Frost ist: Punkt auf einer sichtbaren
+    // Eisblume, möglichst nicht in einer schon freien Stelle
     function frostySpot() {
-      var c = [[200, 170], [W - 200, 170], [200, H - 170], [W - 200, H - 170],
-               [W / 2, 90], [W / 2, H - 90], [110, H / 2], [W - 110, H / 2]];
-      var pick = shown > 60 ? c[(Math.random() * c.length) | 0] : c[(Math.random() * 4) | 0];
-      return [pick[0] + rand(-60, 60), pick[1] + rand(-40, 40)];
+      var vis = branches.filter(function (b) { return b.thr <= shown; });
+      var best = null;
+      for (var tries = 0; tries < 24 && vis.length; tries++) {
+        var b = vis[(Math.random() * vis.length) | 0];
+        var ln = b.lines[b.lines.length - 1];                       // Hauptstamm
+        var pt = ln.pts[(Math.random() * ln.pts.length) | 0];
+        var x = clamp(pt[0], 140, W - 140), y = clamp(pt[1], 110, H - 110);
+        var free = holes.every(function (h) { return Math.hypot(h.x - x, h.y - y) > h.r * 0.9; });
+        best = [x, y];
+        if (free) break;
+      }
+      return best || [200, 170];
     }
 
     function celebrate(name) {
