@@ -159,7 +159,7 @@ EFFECTS = {
                      # Winter-Thema
                      "ornament", "gift", "mini", "build", "snowmanreset", "shovel", "shake",
                      "icicle", "snowball", "celebrate", "setup", "farewell", "xmasdone",
-                     "snowboard", "clear"),
+                     "snowboard", "clear", "follow"),
         "settings": {
             "place": _place,
             "mood": _float_range(0, 1),
@@ -204,6 +204,7 @@ EFFECTS = {
                      "type": _choice("sub", "resub", "giftsub", "bits", "raid"),
                      "amount": _int_range(1, 100000)},
             "mini": {"name": _name},
+            "follow": {"name": _name},
             "build": {"name": _name},
             "shovel": {"name": _name},
             "shake": {"name": _name, "force": _flag},

@@ -370,3 +370,15 @@ def test_winter_commands_parse():
                                       "tree": "0"})["params"] == {
         "theme": "winter", "xmasfrom": "11-15", "xmasto": "01-06", "tree": False}
     assert commands.parse("weather", {"cmd": "set", "xmasfrom": "advent"})["params"] == {"xmasfrom": "advent"}
+
+
+def test_follow_becomes_ornament_in_xmas_and_mini_otherwise(conn):
+    c = _client(conn)
+    c.get("/s/t/api/fx/weather?cmd=follow&name=Lea")
+    assert [m["name"] for m in c.get("/s/t/api/fx/weather/poll").json["state"]["minis"]] == ["Lea"]
+    c.get("/s/t/api/fx/weather?cmd=setup")
+    c.get("/s/t/api/fx/weather?cmd=follow&name=Ben")
+    st = c.get("/s/t/api/fx/weather/poll").json["state"]
+    assert [o["name"] for o in st["ornaments"]] == ["Ben"]
+    cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
+    assert [x["cmd"] for x in cmds if x["params"].get("name") in ("Lea", "Ben")] == ["mini", "ornament"]

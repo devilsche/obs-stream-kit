@@ -59,6 +59,10 @@ def _winter_persist(conn, tenant_id, cmd):
     Schneemann (season_db, effect winter), Schneedecke und Xmas-Ablauf."""
     c, p, now = cmd["cmd"], cmd["params"], time.time()
     today = datetime.date.today()
+    if c == "follow":
+        # ein Follow-Befehl für alles: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann
+        on = weather_theme.status(conn, tenant_id, today, {}, "winter") in ("on", "farewell")
+        c = cmd["cmd"] = "ornament" if on else "mini"
     if c == "ornament":
         return xmas_db.add_ornament(conn, tenant_id, p.get("name", ""))
     if c == "gift":
