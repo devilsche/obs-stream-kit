@@ -34,6 +34,7 @@
   };
   var KINDS = Object.keys(PROFILES);
   var SPECTACLES = ['tsunami', 'megabolt', 'ballbolt', 'avalanche'];
+  // windRandom (true/false) ist kein Zahlenwert und springt bei der Hälfte des Übergangs
   var NUM_KEYS = ['rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind'];
 
   function rand(a, b) { return a + Math.random() * (b - a); }
@@ -152,8 +153,18 @@
       gustDir = windNow > 0.05 ? 1 : (windNow < -0.05 ? -1 : (Math.random() < 0.5 ? -1 : 1));
       emit('gust');
     }
+    // windRandom: Richtung und Stärke wechseln alle 6–15 s weich, mal links, mal rechts
+    var wander = 0, wanderAt = 0;
     function windTarget() {
       var w = cur.wind || 0;
+      if (cur.windRandom) {
+        if (time >= wanderAt) {
+          var side = wander > 0 ? -1 : (wander < 0 ? 1 : (Math.random() < 0.5 ? -1 : 1));
+          wander = Math.random() < 0.7 ? side * rand(0.25, 1) : rand(-0.3, 0.3);
+          wanderAt = time + rand(6, 15);
+        }
+        w = wander;
+      }
       var min = cur.windMin || 0;
       if (Math.abs(w) < min) w = (w < 0 ? -1 : 1) * min;
       return clamp(w, -1, 1);
@@ -618,24 +629,69 @@
         }
       },
       megabolt: {
+        // Gewitterwand: große dunkle Wolken rollen von oben herein (Himmels-
+        // Ebene ohne Rand-Fade, damit sie bis an die Bildkante reicht), dann
+        // schlagen die Blitze ein und erhellen die Wolken von innen
         init: function () {
           var at = [];
-          for (var i = 0; i < 18; i++) at.push(rand(0, 5));
+          for (var i = 0; i < 18; i++) at.push(rand(1.2, 6.2));
           at.sort(function (a, b) { return a - b; });
-          return { dur: 6, at: at };
+          var clouds = [];
+          for (var c = 0; c < 16; c++) {
+            clouds.push({ x: -200 + c * ((W + 400) / 15) + rand(-60, 60), y: rand(-90, 120),
+                          r: rand(200, 340), back: c % 2 === 0, s: rand(-10, 10) });
+          }
+          return { dur: 7.6, at: at, clouds: clouds, glow: 0, glowX: W / 2 };
         },
-        draw: function (s) {
+        draw: function (s, dt) {
           while (s.at.length && s.at[0] <= s.t) {
             s.at.shift();
             strike(Math.random() < 0.4 ? 'near' : undefined);
+            var b = bolts[bolts.length - 1];
+            s.glow = 1;
+            s.glowX = b.paths[0].pts[0][0];
           }
-          // Himmel dunkelt oben kurz nach (nur der Rand)
-          var env = smooth(s.t / 0.6) * (1 - smooth((s.t - 5) / 1));
-          var dg = fctx.createLinearGradient(0, 0, 0, H * 0.3);
-          dg.addColorStop(0, 'rgba(20,24,40,' + (0.35 * env) + ')');
-          dg.addColorStop(1, 'rgba(20,24,40,0)');
-          fctx.fillStyle = dg;
-          fctx.fillRect(0, 0, W, H * 0.3);
+          s.glow = Math.max(0, s.glow - dt * 3.2);
+          var env = smooth(s.t / 1.2) * (1 - smooth((s.t - (s.dur - 1.4)) / 1.4));
+          if (env <= 0.001) return;
+          var drop = (1 - env) * 300;
+
+          // dunkler Himmel hinter den Wolken
+          var dg = sctx.createLinearGradient(0, 0, 0, H * 0.42);
+          dg.addColorStop(0, 'rgba(14,16,26,' + (0.72 * env) + ')');
+          dg.addColorStop(0.6, 'rgba(14,16,26,' + (0.3 * env) + ')');
+          dg.addColorStop(1, 'rgba(14,16,26,0)');
+          sctx.fillStyle = dg;
+          sctx.fillRect(0, 0, W, H * 0.42);
+
+          [true, false].forEach(function (back) {
+            s.clouds.forEach(function (c) {
+              if (c.back !== back) return;
+              c.x += c.s * dt;
+              var y = c.y - drop * (back ? 0.7 : 1);
+              var r = back ? c.r * 1.15 : c.r;
+              var base = back ? 22 : 34;
+              var a = (back ? 0.85 : 0.78) * env;
+              var g = sctx.createRadialGradient(c.x, y, 0, c.x, y, r);
+              g.addColorStop(0, 'rgba(' + base + ',' + (base + 3) + ',' + (base + 12) + ',' + a + ')');
+              g.addColorStop(0.55, 'rgba(' + base + ',' + (base + 3) + ',' + (base + 12) + ',' + (a * 0.75) + ')');
+              g.addColorStop(1, 'rgba(' + base + ',' + (base + 3) + ',' + (base + 12) + ',0)');
+              sctx.fillStyle = g;
+              sctx.fillRect(c.x - r, y - r, r * 2, r * 2);
+              // Wolkenunterseite leuchtet beim Einschlag in der Nähe auf
+              if (!back && s.glow > 0.02) {
+                var near = Math.max(0, 1 - Math.abs(c.x - s.glowX) / 700);
+                var la = 0.55 * s.glow * near * env;
+                if (la > 0.01) {
+                  var lg = sctx.createRadialGradient(c.x, y + r * 0.35, 0, c.x, y + r * 0.35, r * 0.8);
+                  lg.addColorStop(0, 'rgba(190,200,255,' + la + ')');
+                  lg.addColorStop(1, 'rgba(190,200,255,0)');
+                  sctx.fillStyle = lg;
+                  sctx.fillRect(c.x - r, y - r * 0.5, r * 2, r * 1.7);
+                }
+              }
+            });
+          });
         }
       },
       ballbolt: {
