@@ -134,7 +134,8 @@
       // ── Zustand anwenden (nur bei echter Änderung, sonst würde jeder Abruf
       //    den Übergang und den Blitz-Takt neu starten) ──
       var lastSig = null;
-      var SIG_KEYS = ['kind', 'rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind', 'windRandom'];
+      // Felder, die sich ändern, ohne dass das Bild anders aussieht
+      var SIG_SKIP = { until: 1, transition: 1, source: 1, temp: 1, frost: 1 };
       // Wind aus dem Schalter: auto = Wind der Lage (live: echter Wind),
       // random = wechselt von selbst, Zahl = fest
       function withWind(state) {
@@ -148,8 +149,9 @@
       }
       function apply(state, secs) {
         state = withWind(state);
-        var sig = SIG_KEYS.map(function (k) {
-          return typeof state[k] === 'number' ? state[k].toFixed(2) : String(state[k]);
+        // alle sichtbaren Felder vergleichen (auch Polarlicht, Mond, Sonnenstand)
+        var sig = Object.keys(state).sort().filter(function (k) { return !SIG_SKIP[k]; }).map(function (k) {
+          return k + '=' + (typeof state[k] === 'number' ? state[k].toFixed(2) : String(state[k]));
         }).join('|');
         // Grauschleier folgt nur der schlechten K/D, nicht der Grundtrübung bei Regen
         rootEl.style.setProperty('--wk-gloom', String(Math.max(0, -(state.mood || 0))));
