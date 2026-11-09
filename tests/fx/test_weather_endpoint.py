@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from flask import Flask, g
 
-from fx import commands, season_db, weather_api, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
+from fx import autumn_db, commands, season_db, weather_api, weather_season, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
 from fx.endpoints import bp_fx
 
 LOC = {"lat": 50.1109, "lon": 8.6821, "label": "Frankfurt am Main, Hessen, Deutschland"}
@@ -20,6 +20,9 @@ def conn():
     weather_theme.init_schema(c)
     xmas_db.init_schema(c)
     season_db.init_schema(c)
+    autumn_db.init_schema(c)
+    weather_season.init_schema(c)
+    weather_state.LAST_THEME.clear()
     yield c
     c.close()
 
@@ -374,6 +377,7 @@ def test_winter_commands_parse():
 
 def test_follow_becomes_ornament_in_xmas_and_mini_otherwise(conn):
     c = _client(conn)
+    _state(c, "?theme=winter")
     c.get("/s/t/api/fx/weather?cmd=follow&name=Lea")
     assert [m["name"] for m in c.get("/s/t/api/fx/weather/poll").json["state"]["minis"]] == ["Lea"]
     c.get("/s/t/api/fx/weather?cmd=setup")
@@ -382,3 +386,43 @@ def test_follow_becomes_ornament_in_xmas_and_mini_otherwise(conn):
     assert [o["name"] for o in st["ornaments"]] == ["Ben"]
     cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
     assert [x["cmd"] for x in cmds if x["params"].get("name") in ("Lea", "Ben")] == ["mini", "ornament"]
+
+
+# --- Herbst, Frühling, Sommer ---
+
+def test_season_items_and_follow_per_theme(conn):
+    c = _client(conn)
+    _state(c, "?theme=autumn")
+    c.get("/s/t/api/fx/weather?cmd=follow&name=Ann")
+    _state(c, "?theme=spring")
+    c.get("/s/t/api/fx/weather?cmd=follow&name=Bo")
+    _state(c, "?theme=summer")
+    c.get("/s/t/api/fx/weather?cmd=follow&name=Cy")
+    st = c.get("/s/t/api/fx/weather/poll").json["state"]
+    assert [x["name"] for x in st["pumpkins"]] == ["Ann"] and st["pumpkin_total"] == 1
+    assert [x["name"] for x in st["flowers"]] == ["Bo"]
+    assert [x["name"] for x in st["castles"]] == ["Cy"]
+
+
+def test_season_actions_report_results_and_levels(conn, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(weather_state.time, "time", lambda: clock[0])
+    import fx.endpoints as ep
+    monkeypatch.setattr(ep.time, "time", lambda: clock[0])
+    c = _client(conn)
+    _state(c, "?theme=autumn&lock=clear")
+    clock[0] += 600
+    st = _state(c, "?theme=autumn&lock=clear")
+    assert st["seasonLevels"]["leaves"] == 10
+    c.get("/s/t/api/fx/weather?cmd=rake&name=Mia")
+    cmd = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"][-1]
+    assert cmd["params"]["done"] == 5
+    assert _state(c, "?theme=autumn&lock=clear")["seasonTop"]["autumn"] == [["Mia", 1]]
+
+
+def test_season_commands_parse():
+    for cmd in ("pumpkin", "rake", "jump", "flower", "water", "weed", "bee", "castle", "splash", "ice"):
+        assert commands.parse("weather", {"cmd": cmd, "name": "X"})["params"] == {"name": "X"}
+    for cmd in ("sweep", "cool", "seasonboard"):
+        assert commands.parse("weather", {"cmd": cmd})["cmd"] == cmd
+    assert commands.parse("weather", {"cmd": "clear", "kind": "castles"})["params"] == {"kind": "castles"}

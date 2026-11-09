@@ -18,8 +18,8 @@ from flask import Blueprint, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, season_db, weather_db, weather_frost, weather_snow,
-                weather_state, weather_theme, xmas_db)
+from fx import (autumn_db, commands, season_db, weather_db, weather_frost, weather_season,
+                weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
 log = logging.getLogger(__name__)
@@ -60,9 +60,15 @@ def _winter_persist(conn, tenant_id, cmd):
     c, p, now = cmd["cmd"], cmd["params"], time.time()
     today = datetime.date.today()
     if c == "follow":
-        # ein Follow-Befehl für alles: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann
-        on = weather_theme.status(conn, tenant_id, today, {}, "winter") in ("on", "farewell")
-        c = cmd["cmd"] = "ornament" if on else "mini"
+        # ein Follow-Befehl für alles, je nach aktivem Thema: Kürbis, Blume,
+        # Sandburg; im Winter Kugel (Xmas-Zeit) oder Mini-Schneemann
+        theme = weather_state.LAST_THEME.get(tenant_id) or weather_theme.theme_for(today, "auto", False)
+        if theme == "winter":
+            on = weather_theme.status(conn, tenant_id, today, {}, "winter") in ("on", "farewell")
+            c = "ornament" if on else "mini"
+        else:
+            c = {"autumn": "pumpkin", "spring": "flower", "summer": "castle"}.get(theme, "mini")
+        cmd["cmd"] = c
     if c == "ornament":
         return xmas_db.add_ornament(conn, tenant_id, p.get("name", ""))
     if c == "gift":
@@ -86,6 +92,21 @@ def _winter_persist(conn, tenant_id, cmd):
         if p.get("step"):
             weather_theme.mark(conn, tenant_id, today, {}, p["step"])
         return False
+    elif c == "pumpkin":
+        return autumn_db.add_pumpkin(conn, tenant_id, p.get("name", ""))
+    elif c == "flower":
+        return season_db.add_item(conn, tenant_id, "spring", p.get("name", ""))
+    elif c == "castle":
+        return season_db.add_item(conn, tenant_id, "summer", p.get("name", ""))
+    elif c in weather_season.THEME_OF:
+        p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force"))))
+    elif c == "clear" and p.get("kind") in ("pumpkins", "flowers", "castles"):
+        if p["kind"] == "pumpkins":
+            autumn_db.clear(conn, tenant_id, "pumpkins")
+        else:
+            season_db.clear(conn, tenant_id, "spring" if p["kind"] == "flowers" else "summer", p["kind"])
+    elif c == "clear" and p.get("kind") in ("leaves", "garden", "heat"):
+        weather_season.clear(conn, tenant_id, now, p["kind"])
     elif c == "clear":
         kind = p.get("kind")
         if kind in ("ornaments", "gifts"):
@@ -110,9 +131,15 @@ def _weather_state(conn, tenant_id):
             stage = min(8, stage + 1)
         elif e["k"] == "smreset":
             stage = 0
+    a = autumn_db.load_state(conn, tenant_id)
+    sp = season_db.load_state(conn, tenant_id, "spring")
+    su = season_db.load_state(conn, tenant_id, "summer")
     return {"ornaments": x["ornaments"], "ornament_total": x["ornament_total"],
             "gifts": x["gifts"], "gift_total": x["gift_total"],
-            "minis": w["items"], "mini_total": w["item_total"], "snowman": stage}
+            "minis": w["items"], "mini_total": w["item_total"], "snowman": stage,
+            "pumpkins": a["pumpkins"], "pumpkin_total": a["pumpkin_total"],
+            "flowers": sp["items"], "flower_total": sp["item_total"],
+            "castles": su["items"], "castle_total": su["item_total"]}
 
 
 _PERSISTENT["weather"] = (_weather_persist, _weather_state)
@@ -186,7 +213,7 @@ def weather_state_route(token):
     settings = commands.EFFECTS["weather"]["settings"]
     opts = {}
     for key in ("place", "lock", "mood", "kdlow", "kdhigh", "kdtest", "fallback", "aurorakd",
-                "frost", "frostrate", "theme", "xmasfrom", "xmasto", "snowrate"):
+                "frost", "frostrate", "theme", "xmasfrom", "xmasto", "snowrate", "leafrate"):
         raw = (request.args.get(key) or "").strip()
         if raw:
             val = settings[key](raw)

@@ -9,7 +9,7 @@ import time
 
 import datetime
 
-from fx import astro, weather, weather_frost, weather_snow, weather_theme
+from fx import astro, weather, weather_frost, weather_season, weather_snow, weather_theme
 from fx.weather_api import current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
@@ -17,6 +17,8 @@ from fx.weather_mood import kd_snapshot
 log = logging.getLogger(__name__)
 
 TRANSITION_SLOW = 25
+# zuletzt gemeldetes Thema je Tenant (für cmd=follow, das keine Einstellungen kennt)
+LAST_THEME = {}
 AURORA_KD = 3.0
 
 
@@ -133,4 +135,16 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
         log.exception("weather: theme failed for tenant %s", tenant_id)
         theme, xmas, snow = "none", "off", {"level": 0, "top": []}
     state.update(theme=theme, xmas=xmas, snowCover=snow["level"], snowTop=snow["top"])
+    LAST_THEME[tenant_id] = theme
+    # Herbst, Frühling, Sommer: Laub, Garten, Hitze nach dem wirksamen Wetter
+    try:
+        season = weather_season.advance(
+            conn, tenant_id, now, theme,
+            {"wind": abs(state.get("wind", 0)), "rain": state.get("rain", 0) + state.get("drizzle", 0) * 0.5,
+             "heat": state.get("heat", 0), "sun": state.get("sun", 0), "night": state.get("night", 0)},
+            opts.get("leafrate", 1.0) if theme == "autumn" else 1.0)
+    except Exception:
+        log.exception("weather: season failed for tenant %s", tenant_id)
+        season = {"levels": {}, "top": {}}
+    state.update(seasonLevels=season["levels"], seasonTop=season["top"])
     return state

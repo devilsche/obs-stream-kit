@@ -159,7 +159,10 @@ EFFECTS = {
                      # Winter-Thema
                      "ornament", "gift", "mini", "build", "snowmanreset", "shovel", "shake",
                      "icicle", "snowball", "celebrate", "setup", "farewell", "xmasdone",
-                     "snowboard", "clear", "follow"),
+                     "snowboard", "clear", "follow",
+                     # Herbst, Frühling, Sommer
+                     "pumpkin", "rake", "jump", "sweep", "flower", "water", "weed", "bee",
+                     "castle", "splash", "ice", "cool", "seasonboard"),
         "settings": {
             "place": _place,
             "mood": _float_range(0, 1),
@@ -213,7 +216,18 @@ EFFECTS = {
             "snowball": {"name": _name},
             "celebrate": {"name": _name},
             "xmasdone": {"step": _choice("setup", "farewell")},
-            "clear": {"kind": _choice("ornaments", "gifts", "minis", "snow", "snowman")},
+            "clear": {"kind": _choice("ornaments", "gifts", "minis", "snow", "snowman",
+                                      "pumpkins", "leaves", "flowers", "garden", "castles", "heat")},
+            "pumpkin": {"name": _name},
+            "rake": {"name": _name},
+            "jump": {"name": _name},
+            "flower": {"name": _name},
+            "water": {"name": _name},
+            "weed": {"name": _name, "force": _flag},
+            "bee": {"name": _name},
+            "castle": {"name": _name},
+            "splash": {"name": _name},
+            "ice": {"name": _name},
         },
         "defaults": {
             "weather": {"hold": 150},
