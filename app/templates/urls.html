@@ -585,6 +585,73 @@ G1R_STEAM_NAME=</code></pre>
 
     lsLoad();
 
+    // ── Weather: gefundener Ort + Wetter dort jetzt, direkt unter "Location" ──
+    const placeGroup = switchesRoot && switchesRoot.querySelector('[data-param="place"]');
+    if (placeGroup) {
+      const box = document.createElement("div");
+      box.className = "url-weather-info";
+      box.setAttribute("role", "status");
+      box.setAttribute("aria-live", "polite");
+      placeGroup.insertAdjacentElement("afterend", box);
+      const placeInp = placeGroup.querySelector(".sw-input");
+      const KIND = { clear: "Clear", cloudy: "Cloudy", fog: "Fog", drizzle: "Drizzle", rain: "Rain",
+                     storm: "Thunderstorm", sleet: "Sleet", snow: "Snow", blizzard: "Blizzard", heat: "Heat" };
+      function line(icon, text, strong) {
+        const row = document.createElement("div");
+        row.className = "url-weather-info__row";
+        const ic = document.createElement("span");
+        ic.className = "material-symbols-outlined icon-sm";
+        ic.setAttribute("aria-hidden", "true");
+        ic.textContent = icon;
+        const tx = document.createElement(strong ? "b" : "span");
+        tx.textContent = text;
+        row.append(ic, tx);
+        box.appendChild(row);
+      }
+      let weatherTimer, weatherReq = 0;
+      async function updateWeatherInfo() {
+        const place = placeInp ? placeInp.value.trim() : "";
+        const req = ++weatherReq;
+        box.replaceChildren();
+        if (!place) {
+          line("location_off", "No location: the fallback weather is shown.");
+          return;
+        }
+        line("progress_activity", "Looking up " + place + " …");
+        try {
+          const res = await fetch("/app/api/weather/lookup?" + new URLSearchParams({ place }),
+                                  { credentials: "same-origin" });
+          const d = await res.json();
+          if (req !== weatherReq) return;
+          box.replaceChildren();
+          if (!d.found) {
+            line("error", "Location not found: the fallback weather is shown.");
+            return;
+          }
+          line("location_on", d.label, true);
+          if (d.kind) {
+            line(d.isDay ? "partly_cloudy_day" : "partly_cloudy_night",
+                 "Now: " + (KIND[d.kind] || d.kind) + ", " + d.temp + " °C, clouds " + d.cloud + " %" +
+                 (d.isDay ? "" : " (night)"));
+            line("air", "Wind " + d.windKmh + " km/h from " + d.windFrom);
+            if (d.sunrise && d.sunset) line("wb_twilight", "Sunrise " + d.sunrise + ", sunset " + d.sunset + " (local time)");
+          } else {
+            line("cloud_off", "Weather service not reachable right now.");
+          }
+        } catch (e) {
+          if (req === weatherReq) {
+            box.replaceChildren();
+            line("cloud_off", "Lookup failed.");
+          }
+        }
+      }
+      if (placeInp) placeInp.addEventListener("input", () => {
+        clearTimeout(weatherTimer);
+        weatherTimer = setTimeout(updateWeatherInfo, 700);
+      });
+      updateWeatherInfo();
+    }
+
     // ── Font-Preview direkt nach dem font-Switch (Pet-Script-Fonts) ──────────────
     // NICHT bei Stinger-Karten (chrome_preview) — die haben ihre eigene url-chrome-
     // Vorschau mit den Display-Fonts; die Pet-Font-Vorschau lädt die falschen Fonts.

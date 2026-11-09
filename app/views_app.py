@@ -272,6 +272,20 @@ def settings():
                            api_token=api_token, base_url=base_url)
 
 
+@bp_app.route("/app/api/weather/lookup")
+@require_session
+def weather_lookup():
+    """Weather-Karte: welchen Ort der Server zu `place` findet und welches
+    Wetter dort ist — nur fürs Dashboard, das Overlay bekommt das nie."""
+    from fx import weather_api
+    place = (request.args.get("place") or "").strip()[:60]
+    if not place:
+        return jsonify({"found": False})
+    resp = jsonify(weather_api.lookup(place))
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp_app.route("/app/settings/accounts", methods=["POST"])
 @require_session
 def settings_accounts():

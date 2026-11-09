@@ -96,3 +96,32 @@ def current(tenant_id: int, lat: float, lon: float, now=None):
     with _lock:
         _cache[tenant_id] = {"at": now, "loc": loc, "value": value}
     return value
+
+
+_COMPASS = ("N", "NE", "E", "SE", "S", "SW", "W", "NW")
+
+
+def lookup(place: str) -> dict:
+    """Für die Dashboard-Karte: gefundener Ort, Wetter dort jetzt und
+    Sonnenzeiten (Ortszeit). Nie für das Overlay."""
+    loc = geocode(place)
+    if not loc:
+        return {"found": False}
+    url = _FORECAST + "?" + urllib.parse.urlencode({
+        "latitude": loc["lat"], "longitude": loc["lon"], "timezone": "auto", "forecast_days": 1,
+        "current": "temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover,is_day",
+        "daily": "sunrise,sunset"})
+    out = {"found": True, "label": loc["label"]}
+    try:
+        data = _fetch_json(url)
+        c, d = data["current"], data.get("daily") or {}
+        state = from_api(int(c["weather_code"]), float(c["temperature_2m"]),
+                         float(c["wind_speed_10m"]), float(c["wind_direction_10m"]))
+        out.update(kind=state["kind"], temp=c["temperature_2m"], windKmh=c["wind_speed_10m"],
+                   windFrom=_COMPASS[int((c["wind_direction_10m"] % 360) / 45 + 0.5) % 8],
+                   cloud=c.get("cloud_cover"), isDay=bool(c.get("is_day")),
+                   sunrise=(d.get("sunrise") or [""])[0][11:16] or None,
+                   sunset=(d.get("sunset") or [""])[0][11:16] or None)
+    except Exception as e:
+        log.warning("weather: lookup failed (%s)", type(e).__name__)
+    return out

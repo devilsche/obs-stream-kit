@@ -98,3 +98,23 @@ def test_geocode_is_cached(monkeypatch):
     assert len(calls) == 1
     geocode("Hamburg", now=90000)
     assert len(calls) == 2
+
+
+def test_lookup_reports_place_weather_and_sun(monkeypatch):
+    def fake(url):
+        if "geocoding" in url:
+            return {"results": [{"latitude": 52.5, "longitude": 13.4, "name": "Berlin",
+                                 "admin1": "Land Berlin", "country": "Deutschland"}]}
+        return {"current": {"weather_code": 3, "temperature_2m": 3.5, "wind_speed_10m": 6.7,
+                            "wind_direction_10m": 106, "cloud_cover": 70, "is_day": 1},
+                "daily": {"sunrise": ["2026-11-09T07:21"], "sunset": ["2026-11-09T16:14"]}}
+    monkeypatch.setattr(weather_api, "_fetch_json", fake)
+    assert weather_api.lookup("Berlin") == {
+        "found": True, "label": "Berlin, Land Berlin, Deutschland", "kind": "cloudy",
+        "temp": 3.5, "windKmh": 6.7, "windFrom": "E", "cloud": 70, "isDay": True,
+        "sunrise": "07:21", "sunset": "16:14"}
+
+
+def test_lookup_unknown_place(monkeypatch):
+    monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {})
+    assert weather_api.lookup("Xyzzy") == {"found": False}
