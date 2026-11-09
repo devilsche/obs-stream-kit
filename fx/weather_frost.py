@@ -3,7 +3,7 @@
 Der Stand hängt an der echten Temperatur, die nur der Server kennt; er wird
 bei jeder Zustandsabfrage fortgeschrieben (`advance`). Friert es (≤ 0 °C
 oder wirksamer Schneesturm), wächst er mit (2 + |Temp|) % pro Minute, im
-Schneesturm mindestens 10 %; sonst taut er mit (5 + Temp) % pro Minute.
+Schneesturm mindestens 10 %; sonst taut er langsam mit (1 + Temp/2) % pro Minute.
 `!scrape` und `!warm` nehmen Frost weg und zählen für eine gemeinsame
 Rangliste. DAO im sqlite-Stil ('?'-Platzhalter).
 """
@@ -78,7 +78,7 @@ def advance(conn, tenant_id, now: float, temp, blizzard: bool, rate: float = 1.0
         if blizzard:
             per_min = max(per_min, 10 * rate)
     elif temp is not None:
-        per_min = -(5 + temp)
+        per_min = -(1 + 0.5 * temp)
     else:
         per_min = 0
     level = min(100.0, max(0.0, data["level"] + per_min * minutes))

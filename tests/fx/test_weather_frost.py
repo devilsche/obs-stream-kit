@@ -31,7 +31,8 @@ def test_blizzard_freezes_even_without_temperature(conn):
 def test_thaws_above_zero_and_stays_in_bounds(conn):
     advance(conn, 1, now=0, temp=-10, blizzard=False)
     assert advance(conn, 1, now=3600, temp=-10, blizzard=False)["level"] == 100
-    assert advance(conn, 1, now=3600 + 600, temp=5, blizzard=False)["level"] == 0
+    assert advance(conn, 1, now=3600 + 600, temp=5, blizzard=False)["level"] == pytest.approx(65)   # 3,5 %/min
+    assert advance(conn, 1, now=3600 + 3600, temp=5, blizzard=False)["level"] == 0
 
 
 def test_rate_setting_scales_growth(conn):
