@@ -21,7 +21,7 @@
     var thunderFile = opts.thunderFile || (base + 'thunder-near-1.wav');
     // Donner einmal laden und dekodieren
     var AC = root.AudioContext || root.webkitAudioContext;
-    var actx = AC ? new AC() : null, thunderBuf = null, voices = 0;
+    var actx = AC ? new AC() : null, thunderBuf = null, voices = [];
     if (actx) {
       fetch(thunderFile).then(function (r) { return r.arrayBuffer(); })
         .then(function (ab) { return new Promise(function (ok, no) { actx.decodeAudioData(ab, ok, no); }); })
@@ -103,10 +103,10 @@
       },
       // Donner: vorab dekodiert und aus dem Speicher gespielt (keine Ladezeit),
       // setzt mit dem Blitz ein; fern nur leiser und tiefer. Jeder Blitz
-      // bekommt seinen eigenen Donner von Anfang an, sie dürfen überlappen
-      // (bis zu 8); je mehr gleichzeitig, desto etwas leiser jeder
+      // bekommt garantiert seinen eigenen Donner von Anfang an; laufen schon
+      // sechs, blendet der älteste schnell aus und macht Platz
       thunder: function (dist) {
-        if (!on || voices >= 8) return;
+        if (!on) return;
         var d = typeof dist === 'number' ? clamp(dist, 0, 1) : Math.random();
         var vol = volume * thunderLevel * (1 - 0.45 * d);
         if (vol <= 0.01) return;
@@ -115,10 +115,21 @@
           var src = actx.createBufferSource(), g = actx.createGain();
           src.buffer = thunderBuf;
           src.playbackRate.value = rate;
-          g.gain.value = clamp(vol / Math.pow(voices + 1, 0.35), 0, 1);
+          while (voices.length >= 6) {
+            var old = voices.shift(), t = actx.currentTime;
+            old.g.gain.cancelScheduledValues(t);
+            old.g.gain.setValueAtTime(old.g.gain.value, t);
+            old.g.gain.linearRampToValueAtTime(0, t + 0.4);
+            try { old.src.stop(t + 0.45); } catch (e) { /* schon beendet */ }
+          }
+          g.gain.value = clamp(vol / Math.pow(voices.length + 1, 0.35), 0, 1);
           src.connect(g).connect(actx.destination);
-          voices++;
-          src.onended = function () { voices = Math.max(0, voices - 1); };
+          var voice = { src: src, g: g };
+          voices.push(voice);
+          src.onended = function () {
+            var i = voices.indexOf(voice);
+            if (i >= 0) voices.splice(i, 1);
+          };
           src.start();
           return;
         }
