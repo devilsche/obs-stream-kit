@@ -434,14 +434,27 @@ G1R_STEAM_NAME=</code></pre>
     // gehen bei "live" per cmd=set an die laufende Source
     const controls = parseJSON(card.dataset.controls, []);
     const liveKeys = parseJSON(card.dataset.live, []);
+    // Knöpfe nach "group" gruppieren (Reihenfolge des ersten Auftretens)
+    function ctlGroups(list) {
+      const out = [];
+      list.forEach(c => {
+        const name = c.group || "";
+        let g = out.find(x => x.name === name);
+        if (!g) { g = { name, items: [] }; out.push(g); }
+        g.items.push(c);
+      });
+      return out;
+    }
     const controlsHtml = (controls.length || liveKeys.length) ? `
       <div class="url-dbox url-ctlbox">
         <h2>Live control <span class="url-dbox__tag">running source</span></h2>
         <p class="url-dbox__desc">Acts on the source that is running in OBS right now, within about a second.</p>
-        ${controls.length ? `<div class="url-ctl">${controls.map(c => `
+        ${controls.length ? ctlGroups(controls).map(g => `
+          ${g.name ? `<h3 class="url-ctl__group">${escapeHtml(g.name)}</h3>` : ""}
+          <div class="url-ctl">${g.items.map(c => `
           <button type="button" class="url-act url-ctl__btn" data-q="${escapeAttr(c.q)}" data-label="${escapeAttr(c.label)}">
             <span class="material-symbols-outlined" aria-hidden="true">${escapeHtml(c.icon || "play_arrow")}</span>${escapeHtml(c.label)}
-          </button>`).join("")}</div>` : ""}
+          </button>`).join("")}</div>`).join("") : ""}
         ${liveKeys.length ? `
         <div class="url-live">
           <label class="url-live__opt"><input type="checkbox" id="urlLive"> Apply setting changes live</label>
