@@ -489,8 +489,9 @@
     var nextStrike = Infinity;
     var lastFlash = -10;
 
+    // Takt richtet sich nach der Ziel-Lage, nicht nach der gerade sichtbaren
     function scheduleStrike() {
-      var range = reduceMotion ? null : LIGHTNING_RANGES[Math.round(clamp(cur.lightning, 0, 2))];
+      var range = reduceMotion ? null : LIGHTNING_RANGES[Math.round(clamp(to.lightning || 0, 0, 2))];
       nextStrike = range ? time + rand(range[0], range[1]) : Infinity;
     }
 
@@ -837,8 +838,9 @@
         cur = mix(from, to, smooth(transT));
       }
 
+      // Erst schlagen, wenn das Gewitter halb aufgezogen ist
       if (time >= nextStrike) {
-        strike();
+        if (cur.lightning >= 0.5) strike();
         scheduleStrike();
       }
 
