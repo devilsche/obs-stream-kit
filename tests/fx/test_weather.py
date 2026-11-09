@@ -1,0 +1,79 @@
+"""Wetterlogik: Lagen, Open-Meteo-Codes, K/D-Stimmung."""
+from fx.weather import KINDS, SPECTACLES, apply_mood, from_api, mood_precip, mood_value, profile
+
+
+def test_profiles_cover_all_kinds():
+    assert KINDS == ("clear", "cloudy", "fog", "drizzle", "rain", "storm",
+                     "sleet", "snow", "blizzard", "heat")
+    assert SPECTACLES == ("tsunami", "megabolt", "ballbolt", "avalanche")
+    for k in KINDS:
+        p = profile(k)
+        assert p["kind"] == k and p["gloom"] == 0 and p["wind"] == 0
+    assert profile("hail")["kind"] == "clear"
+
+
+def test_wmo_codes_map_to_kinds():
+    assert from_api(0, 12, 5, 270)["kind"] == "clear"
+    assert from_api(3, 12, 5, 270)["kind"] == "cloudy"
+    assert from_api(45, 5, 5, 270)["kind"] == "fog"
+    assert from_api(53, 8, 5, 270)["kind"] == "drizzle"
+    assert from_api(63, 8, 5, 270)["kind"] == "rain"
+    assert from_api(81, 8, 5, 270)["kind"] == "rain"
+    assert from_api(67, 0, 5, 270)["kind"] == "sleet"
+    assert from_api(73, -3, 10, 270)["kind"] == "snow"
+    assert from_api(75, -3, 45, 270)["kind"] == "blizzard"   # starker Schnee + Wind ≥ 40
+    assert from_api(75, -3, 20, 270)["kind"] == "snow"
+    assert from_api(95, 20, 30, 270)["kind"] == "storm"
+    assert from_api(1, 31, 5, 270)["kind"] == "heat"         # klar + ≥ 30 °C
+    assert from_api(1234, 10, 5, 270)["kind"] == "clear"     # unbekannter Code
+
+
+def test_heavy_rain_is_denser():
+    assert from_api(65, 8, 5, 270)["rain"] > from_api(63, 8, 5, 270)["rain"]
+
+
+def test_frost_and_wind():
+    s = from_api(0, -0.5, 25, 270)            # Westwind weht nach rechts
+    assert s["frost"] is True and s["wind"] == 0.5 and s["temp"] == -0.5
+    assert from_api(0, 3, 50, 90)["wind"] == -1.0
+    assert from_api(0, 3, 50, 90)["frost"] is False
+
+
+def test_mood_neutral_without_live_session_or_few_rounds():
+    assert mood_value(3.0, 10, live=False) == 0
+    assert mood_value(3.0, 2, live=True) == 0
+
+
+def test_mood_fixed_default_bounds():
+    assert mood_value(1.4, 5, True) == -1                    # unter 1,5 schlecht
+    assert mood_value(2.6, 5, True) == 1                     # über 2,5 gut
+    assert mood_value(2.0, 5, True) == 0
+    assert mood_value(1.75, 5, True) == -0.5
+    assert mood_value(2.0, 5, True, low=1.0, high=2.0) == 1
+    assert mood_value(2.0, 5, True, low=3.0, high=2.0) == 0  # kaputte Grenzen → neutral
+
+
+def test_mood_brings_rain_but_never_storm():
+    assert mood_precip(1.4, 1.5) == "drizzle"
+    assert mood_precip(1.1, 1.5) == "rain"                   # ≤ 0,75 × untere Grenze
+    assert mood_precip(1.6, 1.5) is None
+    s = apply_mood(from_api(0, 15, 5, 270), -1, 1.0, "rain")
+    assert s["kind"] == "rain" and s["lightning"] == 0 and s["gloom"] == 1
+
+
+def test_bad_mood_keeps_real_precipitation():
+    base = from_api(73, -3, 10, 270)
+    s = apply_mood(base, -1, 1.0, "rain")
+    assert s["kind"] == "snow" and s["rain"] == 0
+
+
+def test_good_mood_keeps_snow_but_adds_sun():
+    base = from_api(73, -3, 10, 270)
+    s = apply_mood(base, 1, 1.0, None)
+    assert s["kind"] == "snow" and s["precip"] == "snow"
+    assert s["sun"] > base["sun"] and s["clouds"] < base["clouds"]
+
+
+def test_strength_zero_is_pure_weather():
+    base = from_api(3, 12, 5, 270)
+    assert apply_mood(base, -1, 0, "rain") == base
