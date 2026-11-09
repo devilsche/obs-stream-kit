@@ -186,7 +186,10 @@ _PET_FONTS = [
     ["Cinzel Decorative", "Cinzel Decorative"],
 ]
 
+_WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"]]
+
 EFFECT_META = {
+    "snow.html": {"hidden": True},
     "xmas.html": {"switches": [
         {"key": "lights", "label": "Light string", "type": "select", "default": "top",
          "options": [["top", "Top edge"], ["frame", "Top and sides"], ["off", "Off"]],
@@ -517,7 +520,71 @@ EFFECT_META = {
          "options": [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]],
          "tooltip": "Seven different lens flare videos"},
     ]},
-    "rain.html": {"switches": [
+    "weather.html": {"switches": [
+        {"key": "lock", "label": "Fixed weather", "type": "select", "default": "off",
+         "options": [["off", "Off (live)"]] + _WEATHER_KINDS,
+         "tooltip": "Shows this weather all the time instead of the live weather. Chat commands still work."},
+        {"key": "fallback", "label": "Fallback weather", "type": "select", "default": "clear",
+         "options": _WEATHER_KINDS,
+         "tooltip": "Shown when no location is set (Settings) or the weather service is unreachable"},
+        {"key": "mood", "label": "K/D mood", "type": "select", "default": "1",
+         "options": [["0", "Off"], ["0.5", "Half"], ["1", "Full"]],
+         "tooltip": "How much tonight's K/D colours the weather: bad K/D clouds over and brings drizzle or rain (never a thunderstorm), good K/D brings sun. Starts after 3 BR rounds."},
+        {"key": "kdlow", "label": "Bad K/D below", "type": "select", "default": "1.5",
+         "options": [["1", "1.0"], ["1.25", "1.25"], ["1.5", "1.5"], ["1.75", "1.75"], ["2", "2.0"]],
+         "tooltip": "At or below this K/D the mood is fully bad (drizzle). At 3/4 of it, rain. Any value via URL."},
+        {"key": "kdhigh", "label": "Good K/D above", "type": "select", "default": "2.5",
+         "options": [["2", "2.0"], ["2.25", "2.25"], ["2.5", "2.5"], ["3", "3.0"], ["3.5", "3.5"]],
+         "tooltip": "At or above this K/D the mood is fully good (sun). Any value via URL."},
+        {"key": "kdtest", "label": "Test K/D", "type": "select", "default": "off",
+         "options": [["off", "Off (real K/D)"], ["0.8", "0.8"], ["1.2", "1.2"], ["1.4", "1.4"],
+                     ["1.8", "1.8"], ["2", "2.0"], ["2.3", "2.3"], ["2.8", "2.8"], ["3.5", "3.5"]],
+         "tooltip": "For trying it out: pretends tonight's K/D is this value. Use with 'Apply setting changes live' and leave it off in OBS."},
+        {"key": "veil", "label": "Grey veil", "type": "select", "default": "0",
+         "options": [["0", "Off"], ["1", "On"]],
+         "tooltip": "With a bad K/D, a light grey veil (up to 10 %) over the whole picture. Off: only the edges darken."},
+        {"key": "wind", "label": "Wind (fixed weather)", "type": "select", "default": "0",
+         "options": [["-1", "Strong left"], ["-0.5", "Left"], ["0", "None"], ["0.5", "Right"], ["1", "Strong right"]],
+         "tooltip": "Wind for the fixed weather. Live weather brings its own wind."},
+    ],
+    # Knöpfe im Dashboard: Wetter bis "Auto" erzwingen, Blitz, Böe, Spektakel
+    "controls": [
+        {"q": "cmd=auto", "label": "Auto (live weather)", "icon": "auto_mode"},
+        {"q": "cmd=weather&to=clear&hold=0", "label": "Clear", "icon": "sunny"},
+        {"q": "cmd=weather&to=rain&hold=0", "label": "Rain", "icon": "rainy"},
+        {"q": "cmd=weather&to=storm&hold=0", "label": "Thunderstorm", "icon": "thunderstorm"},
+        {"q": "cmd=weather&to=snow&hold=0", "label": "Snow", "icon": "ac_unit"},
+        {"q": "cmd=weather&to=blizzard&hold=0", "label": "Blizzard", "icon": "severe_cold"},
+        {"q": "cmd=weather&to=fog&hold=0", "label": "Fog", "icon": "foggy"},
+        {"q": "cmd=strike", "label": "Lightning", "icon": "bolt"},
+        {"q": "cmd=gust", "label": "Gust", "icon": "air"},
+        {"q": "cmd=spectacle&type=tsunami", "label": "Tsunami", "icon": "tsunami"},
+        {"q": "cmd=spectacle&type=megabolt", "label": "Mega lightning", "icon": "flash_on"},
+        {"q": "cmd=spectacle&type=ballbolt", "label": "Ball lightning", "icon": "blur_circular"},
+        {"q": "cmd=spectacle&type=avalanche", "label": "Avalanche", "icon": "landslide"},
+    ],
+    # Chat-Befehle per Streamer.bot "Fetch URL" an /s/<token>/api/fx/weather
+    "commands": [
+        {"q": "cmd=weather&to=storm", "label": "!thunderstorm: thunderstorm for 2.5 min, then back to live weather"},
+        {"q": "cmd=weather&to=blizzard", "label": "!blizzard: blizzard for 2.5 min"},
+        {"q": "cmd=weather&to=snow", "label": "!snow: snow for 2.5 min"},
+        {"q": "cmd=weather&to=rain", "label": "!rain: rain for 2.5 min"},
+        {"q": "cmd=weather&to=fog", "label": "!fog: fog for 2.5 min"},
+        {"q": "cmd=weather&to=heat", "label": "!heatwave: heat for 2.5 min"},
+        {"q": "cmd=weather&to=storm&hold=60", "label": "Thunderstorm for 60 s (hold = seconds, 0 = until Auto)"},
+        {"q": "cmd=auto", "label": "Back to live weather"},
+        {"q": "cmd=spectacle&type=tsunami", "label": "!tsunami: wave rolls through"},
+        {"q": "cmd=spectacle&type=megabolt", "label": "!megabolt: lots of lightning"},
+        {"q": "cmd=spectacle&type=ballbolt", "label": "!ballbolt: ball lightning sweeps across"},
+        {"q": "cmd=spectacle&type=avalanche", "label": "!avalanche: snow avalanche"},
+        {"q": "cmd=spectacle", "label": "Random spectacle"},
+        {"q": "cmd=strike&dist=near", "label": "Near lightning (pair with thunder-near WAV)"},
+        {"q": "cmd=strike&dist=far", "label": "Far lightning (pair with thunder-far WAV)"},
+        {"q": "cmd=gust", "label": "Wind gust (pair with wind-gust WAV)"},
+        {"q": "cmd=reset", "label": "Back to URL settings"},
+    ]},
+    # Ersetzt durch weather.html (Umleitung), im Dashboard ausgeblendet
+    "rain.html": {"hidden": True, "switches": [
         {"key": "intensity", "label": "Intensity", "type": "select", "default": "medium",
          "options": [["light","Light"],["medium","Medium"],["heavy","Heavy"],["storm","Storm"]],
          "tooltip": "Amount and speed of rain drops"},
@@ -646,6 +713,8 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
         fn = os.path.basename(path)
         key = fn[:-5]
         meta = (switches_map or {}).get(fn, {})
+        if meta.get("hidden"):
+            continue
         out.append({"key": key, "label": key.replace("-", " ").title(),
                     "file": fn, "size": size, "desc": desc,
                     "params": list(params) if params else [],

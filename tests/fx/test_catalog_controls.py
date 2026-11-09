@@ -15,7 +15,7 @@ def test_every_control_is_a_valid_command_without_placeholders():
 
 def test_live_keys_are_settable_switches():
     effects = {e["key"]: e for e in list_dir_sources(".", "effects", switches_map=EFFECT_META)}
-    for key in ("xmas", "autumn", "winter", "spring", "summer", "rain"):
+    for key in ("xmas", "autumn", "winter", "spring", "summer", "weather"):
         e = effects[key]
         assert e["controls"] and e["live"]
         for k in e["live"]:
@@ -26,3 +26,22 @@ def test_live_keys_are_settable_switches():
 
 def test_non_effect_sources_have_no_live_keys():
     assert all(not s["live"] for s in list_dir_sources(".", "stingers"))
+
+
+def test_weather_has_controls_and_live_keys():
+    src = {e["key"]: e for e in list_dir_sources(".", "effects", switches_map=EFFECT_META)}["weather"]
+    assert [c["q"] for c in src["controls"]] == [
+        "cmd=auto", "cmd=weather&to=clear&hold=0", "cmd=weather&to=rain&hold=0",
+        "cmd=weather&to=storm&hold=0", "cmd=weather&to=snow&hold=0",
+        "cmd=weather&to=blizzard&hold=0", "cmd=weather&to=fog&hold=0",
+        "cmd=strike", "cmd=gust",
+        "cmd=spectacle&type=tsunami", "cmd=spectacle&type=megabolt",
+        "cmd=spectacle&type=ballbolt", "cmd=spectacle&type=avalanche"]
+    assert {"mood", "kdlow", "kdhigh", "kdtest", "fallback", "lock", "veil"} <= set(src["live"])
+    for c in src["commands"]:
+        commands.parse("weather", dict(parse_qsl(c["q"])))
+
+
+def test_rain_and_snow_are_hidden():
+    keys = {s["key"] for s in list_dir_sources(".", "effects", switches_map=EFFECT_META)}
+    assert "rain" not in keys and "snow" not in keys and "weather" in keys
