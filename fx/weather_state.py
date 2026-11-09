@@ -113,7 +113,8 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     frost = {"level": 0, "top": []}
     try:
         frost = weather_frost.advance(conn, tenant_id, now, base.get("temp") if source == "api" else None,
-                                      state.get("kind") == "blizzard", opts.get("frostrate", 1.0))
+                                      state.get("kind") == "blizzard", opts.get("frostrate", 1.0),
+                                      heat=state.get("heat", 0) > 0.5)
     except Exception:
         log.exception("weather: frost failed for tenant %s", tenant_id)
     state.update(frost=frost["level"], frostTop=frost["top"], frostOn=opts.get("frost", True))

@@ -69,3 +69,9 @@ def test_tenants_are_separate(conn):
     advance(conn, 1, now=0, temp=-10, blizzard=False)
     advance(conn, 1, now=600, temp=-10, blizzard=False)
     assert load(conn, 2)["level"] == 0
+
+
+def test_heat_melts_fast_regardless_of_temperature(conn):
+    advance(conn, 1, now=0, temp=-10, blizzard=False)
+    advance(conn, 1, now=600, temp=-10, blizzard=False)                    # 100
+    assert advance(conn, 1, now=660, temp=-10, blizzard=False, heat=True)["level"] == pytest.approx(75)

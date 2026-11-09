@@ -3,7 +3,8 @@
 Der Stand hängt an der echten Temperatur, die nur der Server kennt; er wird
 bei jeder Zustandsabfrage fortgeschrieben (`advance`). Friert es (≤ 0 °C
 oder wirksamer Schneesturm), wächst er mit (2 + |Temp|) % pro Minute, im
-Schneesturm mindestens 10 %; sonst taut er langsam mit (1 + Temp/2) % pro Minute.
+Schneesturm mindestens 10 %; sonst taut er langsam mit (1 + Temp/2) % pro Minute; eine
+Hitzewelle (auch eingestellt) schmilzt ihn mit 25 % pro Minute.
 `!scrape` und `!warm` nehmen Frost weg und zählen für eine gemeinsame
 Rangliste. DAO im sqlite-Stil ('?'-Platzhalter).
 """
@@ -61,7 +62,7 @@ def load(conn, tenant_id) -> dict:
     return {"level": round(data["level"], 1), "top": _top(data)}
 
 
-def advance(conn, tenant_id, now: float, temp, blizzard: bool, rate: float = 1.0) -> dict:
+def advance(conn, tenant_id, now: float, temp, blizzard: bool, rate: float = 1.0, heat: bool = False) -> dict:
     """Stand bis `now` fortschreiben. Gespeichert wird nur bei spürbarer
     Änderung oder nach 60 s, damit nicht jede Abfrage schreibt."""
     data = _get(conn, tenant_id)
@@ -73,7 +74,10 @@ def advance(conn, tenant_id, now: float, temp, blizzard: bool, rate: float = 1.0
     last = now if last is None else last
     minutes = max(0.0, now - last) / 60
     freezing = blizzard or (temp is not None and temp <= 0)
-    if freezing:
+    if heat:
+        # Hitzewelle (auch eingestellt) schmilzt schnell, egal wie kalt es draußen ist
+        per_min = -25
+    elif freezing:
         per_min = (2 + abs(min(temp or 0, 0))) * rate
         if blizzard:
             per_min = max(per_min, 10 * rate)
