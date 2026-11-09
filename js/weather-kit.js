@@ -932,11 +932,16 @@
         }
       },
       aurora: {
-        // Polarlicht: grün-violette Vorhänge wabern oben am Rand (Himmels-Ebene)
+        // Polarlicht: grün-violette Vorhänge wabern oben am Rand. Gezeichnet in
+        // 1/8 Auflösung und weich hochskaliert, damit keine Säulen-Streifen
+        // entstehen; feine Strahlen schimmern nur leicht durch
         init: function () {
           var c = [];
           for (var i = 0; i < 3; i++) c.push({ ph: rand(0, 6.3), sp: rand(0.25, 0.5), y: rand(70, 150), h: rand(150, 260) });
-          return { dur: 12, curtains: c };
+          var off = document.createElement('canvas');
+          off.width = W / 8;
+          off.height = Math.round(H * 0.5 / 8);
+          return { dur: 12, curtains: c, off: off, octx: off.getContext('2d') };
         },
         draw: function (s) {
           var env = smooth(s.t / 2.5) * (1 - smooth((s.t - (s.dur - 2.5)) / 2.5));
@@ -946,20 +951,29 @@
           sky.addColorStop(1, 'rgba(6,10,28,0)');
           sctx.fillStyle = sky;
           sctx.fillRect(0, 0, W, H * 0.45);
+          var o = s.octx, S = 8, ow = s.off.width;
+          o.clearRect(0, 0, ow, s.off.height);
           s.curtains.forEach(function (c, ci) {
-            for (var x = 0; x < W; x += 10) {
+            for (var px = 0; px < ow; px++) {
+              var x = px * S;
               var base = c.y + 45 * Math.sin(x * 0.0035 + s.t * c.sp + c.ph) + 18 * Math.sin(x * 0.011 - s.t * 0.9 + ci);
               var hgt = c.h * (0.6 + 0.4 * Math.sin(x * 0.007 + s.t * 0.7 + c.ph));
-              var a = env * (0.32 + 0.18 * Math.sin(x * 0.02 + s.t * 2.1 + ci * 2));
-              var g = sctx.createLinearGradient(0, base - hgt, 0, base + 30);
+              // weiche Helligkeitswellen statt Zufall pro Säule
+              var a = env * (0.34 + 0.16 * Math.sin(x * 0.006 + s.t * 1.3 + ci * 2) + 0.06 * Math.sin(x * 0.05 + s.t * 3));
+              var g = o.createLinearGradient(0, (base - hgt) / S, 0, (base + 30) / S);
               g.addColorStop(0, 'rgba(150,90,220,0)');
               g.addColorStop(0.55, 'rgba(120,120,230,' + (a * 0.6) + ')');
               g.addColorStop(0.9, 'rgba(90,255,170,' + a + ')');
               g.addColorStop(1, 'rgba(90,255,170,0)');
-              sctx.fillStyle = g;
-              sctx.fillRect(x, base - hgt, 11, hgt + 30);
+              o.fillStyle = g;
+              o.fillRect(px, (base - hgt) / S, 1, (hgt + 30) / S);
             }
           });
+          sctx.save();
+          sctx.imageSmoothingEnabled = true;
+          sctx.imageSmoothingQuality = 'high';
+          sctx.drawImage(s.off, 0, 0, W, s.off.height * S);
+          sctx.restore();
         }
       },
       rainbow: {
