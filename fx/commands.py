@@ -12,6 +12,8 @@ import threading
 import time
 from collections import deque
 
+from fx import weather
+
 MAX_KEEP = 20
 MAX_NAME = 20
 EPOCH = format(int(time.time() * 1000), "x")
@@ -105,7 +107,39 @@ def _name(v):
     return v or None
 
 
+def _kd_test(v):
+    """Test-K/D aus dem Dashboard: Zahl oder off."""
+    if v.lower() == "off":
+        return "off"
+    return _float_range(0, 20)(v)
+
+
 EFFECTS = {
+    "weather": {
+        "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset"),
+        "settings": {
+            "mood": _float_range(0, 1),
+            "kdlow": _float_range(0, 20),
+            "kdhigh": _float_range(0, 20),
+            "kdtest": _kd_test,
+            "fallback": _choice(*weather.KINDS),
+            "lock": _choice("off", *weather.KINDS),
+            "wind": _wind,
+            "veil": _flag,
+        },
+        "args": {
+            "weather": {"to": _choice(*weather.KINDS), "hold": _int_range(0, 3600)},
+            "strike": {"dist": _choice("near", "far")},
+            "spectacle": {"type": _choice(*weather.SPECTACLES)},
+        },
+        "defaults": {
+            "weather": {"hold": 150},
+        },
+        # ohne gültigen Wert wird der Befehl abgelehnt
+        "required": {
+            "weather": ("to",),
+        },
+    },
     "rain": {
         "commands": ("strike", "gust", "set", "stop", "start", "reset"),
         "settings": {
@@ -312,6 +346,9 @@ def parse(effect: str, args) -> dict:
                 params[key] = val
         for key, val in spec.get("defaults", {}).get(cmd, {}).items():
             params.setdefault(key, val)
+        for key in spec.get("required", {}).get(cmd, ()):
+            if key not in params:
+                raise ValueError(f"{cmd} needs a valid '{key}'")
     return {"cmd": cmd, "params": params}
 
 

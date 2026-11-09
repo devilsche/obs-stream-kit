@@ -16,7 +16,7 @@ import time
 from flask import Blueprint, current_app, g, jsonify, abort, request
 
 from core.db_compat import SqliteCompatConn
-from fx import autumn_db, commands, season_db, xmas_db
+from fx import autumn_db, commands, season_db, weather_db, weather_state, xmas_db
 from webcore.middleware import _get_conn
 
 log = logging.getLogger(__name__)
@@ -28,6 +28,20 @@ _PERSISTENT = {
     "xmas": (xmas_db.persist, xmas_db.load_state),
     "autumn": (autumn_db.persist, autumn_db.load_state),
 }
+
+
+def _weather_persist(conn, tenant_id, cmd):
+    """Übersteuerung speichern; der Befehl geht trotzdem in die Warteschlange,
+    damit das Overlay den Zustand sofort neu holt."""
+    if cmd["cmd"] == "weather":
+        weather_db.set_override(conn, tenant_id, cmd["params"]["to"],
+                                cmd["params"]["hold"], time.time())
+    elif cmd["cmd"] == "auto":
+        weather_db.clear_override(conn, tenant_id)
+    return True
+
+
+_PERSISTENT["weather"] = (_weather_persist, lambda conn, tenant_id: {})
 for _season in season_db.SPECS:
     _PERSISTENT[_season] = (functools.partial(season_db.persist, _season),
                             lambda conn, tenant_id, _e=_season: season_db.load_state(conn, tenant_id, _e))
@@ -88,3 +102,20 @@ def poll(token, effect):
         except Exception:
             log.exception("fx %s: load_state failed", effect)
     return _no_store(jsonify(out))
+
+
+@bp_fx.route("/s/<token>/api/fx/weather/state")
+def weather_state_route(token):
+    """Wirksamer Wetterzustand; Settings wie in der Overlay-URL."""
+    if g.tenant_id is None:
+        abort(404)
+    settings = commands.EFFECTS["weather"]["settings"]
+    opts = {}
+    for key in ("mood", "kdlow", "kdhigh", "kdtest", "fallback"):
+        raw = (request.args.get(key) or "").strip()
+        if raw:
+            val = settings[key](raw)
+            if val is not None:
+                opts[key] = val
+    state = _with_conn(lambda conn: weather_state.resolve(conn, g.tenant_id, opts))
+    return _no_store(jsonify({"state": state, "now": time.time()}))
