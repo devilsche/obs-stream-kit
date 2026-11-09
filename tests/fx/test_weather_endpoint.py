@@ -193,3 +193,14 @@ def test_night_from_api_reaches_override_and_never_leaks_sun_times(conn, monkeyp
     c.get("/s/t/api/fx/weather?cmd=weather&to=clear")
     st = _state(c, "?place=Frankfurt")
     assert st["source"] == "override" and st["night"] == 1 and st["sun"] == 0
+
+
+def test_test_background_accepts_only_plain_http_urls():
+    ok = "https://example.com/shots/game_1.jpg"
+    assert commands.parse("weather", {"cmd": "set", "testbg": ok})["params"] == {"testbg": ok}
+    for bad in ("javascript:alert(1)", "https://x.com/a.jpg) ; color:red", 'https://x.com/"a.jpg', "ftp://x/a.jpg"):
+        try:
+            commands.parse("weather", {"cmd": "set", "testbg": bad})
+            raise AssertionError(bad)
+        except ValueError:
+            pass

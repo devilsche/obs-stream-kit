@@ -383,6 +383,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 | `kdlow` / `kdhigh` | Grenzen schlechte/gute K/D | `1.5` / `2.5` |
 | `kdtest` | Test-K/D statt der echten, `off` = echt — zum Ausprobieren im Dashboard, nicht in OBS stehen lassen | `off` |
 | `veil` | `1` Grauschleier übers ganze Bild bei mieser Stimmung | `0` |
+| `testbg` | Bild-URL als Testhintergrund (z. B. ein Gameplay-Screenshot), nur in Vorschau und Browser-Tab — in OBS ignoriert | — |
 | `wind` | `auto` = Wind der Lage (live: echter Wind), `random` = wechselt alle 6–15 s weich, mal von links, mal von rechts, oder fest `-1` … `1` | `auto` |
 
 **Befehle** an `https://stream-overlay.com/s/<token>/api/fx/weather?cmd=…` (Streamer.bot **Fetch URL**):

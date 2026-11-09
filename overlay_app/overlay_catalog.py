@@ -550,6 +550,9 @@ EFFECT_META = {
          "options": [["auto", "Auto"], ["random", "Random"], ["-1", "Strong left"], ["-0.5", "Left"],
                      ["0", "None"], ["0.5", "Right"], ["1", "Strong right"]],
          "tooltip": "Auto: the real wind (none for fixed weather). Random: changes on its own every 6–15 s, sometimes from the left, sometimes from the right. Any value from -1 to 1 via URL."},
+        {"key": "testbg", "label": "Test background", "type": "text", "default": "",
+         "placeholder": "https://…/gameplay.jpg",
+         "tooltip": "Image URL shown behind the weather in the preview and in a browser tab, to judge it over gameplay. Ignored in OBS, so it never covers your game. The dashboard remembers it."},
     ],
     # Knöpfe im Dashboard: Wetter für 2,5 min wie ein Chat-Befehl (dauerhaft: Fixed weather)
     "controls": [

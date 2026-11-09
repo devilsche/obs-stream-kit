@@ -83,6 +83,10 @@
       opacity: 0;
       transition: opacity 6s ease;
     }
+    :root[data-testbg="on"] body {
+      background: var(--wk-testbg) center / cover no-repeat;
+    }
+
     :root[data-veil="on"] .wk-veil { opacity: calc(var(--wk-gloom, 0) * 0.1); }
 
     @media (prefers-reduced-motion: reduce) {
@@ -110,7 +114,7 @@
       var kit = K.create(document.getElementById('stage'));
       var rootEl = document.documentElement;
 
-      var KEYS = ['place', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil'];
+      var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil'];
       function fromUrl() {
         var out = {};
         KEYS.forEach(function (k) {
@@ -154,6 +158,15 @@
       }
       function applyVeil() {
         rootEl.dataset.veil = flag(settings.veil) ? 'on' : 'off';
+      }
+
+      // Testhintergrund nur außerhalb von OBS (dort liegt das echte Spiel dahinter)
+      function applyTestBg() {
+        var url = settings.testbg;
+        var ok = !window.obsstudio && typeof url === 'string' && /^https?:\/\/[^\s"'()\\]+$/.test(url);
+        rootEl.dataset.testbg = ok ? 'on' : 'off';
+        if (ok) rootEl.style.setProperty('--wk-testbg', 'url("' + url + '")');
+        else rootEl.style.removeProperty('--wk-testbg');
       }
 
       function applyLock() {
@@ -220,11 +233,13 @@
           case 'set':
             Object.keys(p).forEach(function (k) { settings[k] = String(p[k]); });
             applyVeil();
+            applyTestBg();
             fetchState();
             break;
           case 'reset':
             settings = fromUrl();
             applyVeil();
+            applyTestBg();
             fetchState();
             break;
         }
@@ -280,6 +295,7 @@
       }
 
       applyVeil();
+      applyTestBg();
       fetchState();
       if (apiBase) {
         listen('weather', applyCommand);

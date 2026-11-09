@@ -121,6 +121,16 @@ def _weather_wind(v):
     return "auto" if v.lower() == "auto" else _wind(v)
 
 
+_TEST_BG_RE = re.compile(r"^https?://[A-Za-z0-9._~:/?#\[\]@!$&*+,;=%-]{1,480}$")
+
+
+def _test_bg(v):
+    """Bild-URL als Testhintergrund (nur Browser-Vorschau). Ohne Klammern,
+    Anführungszeichen und Leerraum, damit sie sicher in url() steht."""
+    v = v.strip()
+    return v if _TEST_BG_RE.match(v) and "'" not in v else None
+
+
 def _kd_test(v):
     """Test-K/D aus dem Dashboard: Zahl oder off."""
     if v.lower() == "off":
@@ -141,6 +151,7 @@ EFFECTS = {
             "lock": _choice("off", *weather.KINDS),
             "wind": _weather_wind,
             "veil": _flag,
+            "testbg": _test_bg,
         },
         "args": {
             "weather": {"to": _choice(*weather.KINDS), "hold": _int_range(0, 3600)},
