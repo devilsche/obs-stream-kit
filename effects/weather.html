@@ -114,6 +114,7 @@
   <script src="../js/season-kit.js"></script>
   <script src="../js/weather-kit.js"></script>
   <script src="../js/weather-frost.js"></script>
+  <script src="../js/weather-audio.js"></script>
   <script>
     (function () {
       'use strict';
@@ -127,10 +128,16 @@
       var frost = window.WeatherFrost.create(document.getElementById('stage'), {
         tags: document.getElementById('tags'), board: document.getElementById('frostBoard') });
       var lastFrostTop = [];
+      // Ton (optional): Regen/Wind folgen der Lage, Donner je Blitz, Rauschen je Böe
+      var audio = window.WeatherAudio.create('../assets/effects/');
+      kit.on('strike', function (dist) { audio.thunder(dist); });
+      kit.on('gust', function () { audio.gust(); });
+      kit.on('pop', function () { audio.thunder(0.1); });
+      setInterval(function () { audio.update(kit.state()); }, 250);
       var rootEl = document.documentElement;
 
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
-                  'aurorakd', 'frost', 'frostrate'];
+                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder'];
       function fromUrl() {
         var out = {};
         KEYS.forEach(function (k) {
@@ -183,6 +190,9 @@
       }
       function applyVeil() {
         rootEl.dataset.veil = flag(settings.veil) ? 'on' : 'off';
+        audio.set({ on: flag(settings.sound),
+                    volume: settings.volume !== undefined ? parseFloat(settings.volume) : 0.6,
+                    thunder: settings.thunder !== undefined ? parseFloat(settings.thunder) : 1 });
       }
 
       // Testhintergrund nur außerhalb von OBS (dort liegt das echte Spiel dahinter)

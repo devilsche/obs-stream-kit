@@ -403,7 +403,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 | `cmd=frostclear` / `cmd=frostreset` | Mods: allen Frost entfernen / Rangliste leeren |
 | `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die URL |
 
-Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneesturm` → `cmd=weather&to=blizzard`, `!tsunami` → `cmd=spectacle&type=tsunami`. Abklingzeiten und Ton (Donner, Wind, Wellenrauschen) laufen über Streamer.bot — Browser-Ton in OBS ist zu unzuverlässig.
+Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneesturm` → `cmd=weather&to=blizzard`, `!tsunami` → `cmd=spectacle&type=tsunami`. Abklingzeiten laufen über Streamer.bot. **Ton** gibt es optional direkt in der Source (`sound=1`, Standard aus): Regen und Wind folgen der Lage und blenden weich über, jeder Blitz bekommt einen Donner (nah/fern), Böen rauschen; `volume` (0–1, Standard 0,6) und `thunder` (0–1). In OBS „Audio über OBS steuern“ aktivieren. Wer den Ton lieber über Streamer.bot abspielt, lässt `sound` aus und nutzt die WAVs unten.
 
 **Testen:** Die Knöpfe auf der Karte wirken wie Chat-Befehle 2,5 min lang, dauerhaft geht über `Fixed weather`. Unter **Location** zeigt die Karte den gefundenen Ort, das Wetter dort und die Sonnenzeiten. Im Dashboard **Stream → Weather** „Apply setting changes live“ einschalten, dann `Fixed weather`, `Test K/D` und `Grey veil` durchschalten und die Knöpfe (Thunderstorm, Tsunami, …) drücken — wirkt sofort auf die Source in OBS.
 

@@ -155,6 +155,9 @@ EFFECTS = {
             "aurorakd": _float_range(0, 20),
             "frost": _flag,
             "frostrate": _float_range(0.25, 4),
+            "sound": _flag,
+            "volume": _level,
+            "thunder": _level,
             "testbg": _test_bg,
         },
         "args": {
