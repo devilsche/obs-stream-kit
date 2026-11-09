@@ -169,3 +169,9 @@ def test_lookup_offers_alternatives(monkeypatch):
     assert out["label"] == "Jamestown, North Dakota, Vereinigte Staaten"
     assert [a["value"] for a in out["alternatives"]] == ["Jamestown, North Dakota, US", "Jamestown, Sankt Helena, SH"]
     assert weather_api.lookup("Jamestown, SH")["alternatives"] == []
+
+
+def test_country_label_is_not_doubled(monkeypatch):
+    monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {"results": [
+        {"latitude": 60, "longitude": -95, "name": "Kanada", "country": "Kanada", "country_code": "CA"}]})
+    assert geocode("Kanada")["label"] == "Kanada"

@@ -96,7 +96,13 @@ def _search(name, qualifiers):
         if not _fits(r, qualifiers):
             continue
         land = r.get("country") or r.get("country_code")
-        label = ", ".join(p for p in (r.get("name"), r.get("admin1"), land) if p)
+        # Teile nicht doppelt nennen ("Kanada, Kanada")
+        seen, bits = set(), []
+        for p in (r.get("name"), r.get("admin1"), land):
+            if p and p not in seen:
+                seen.add(p)
+                bits.append(p)
+        label = ", ".join(bits)
         value = ", ".join(p for p in (r.get("name"), r.get("admin1"), r.get("country_code")) if p)
         out.append({"loc": {"lat": r["latitude"], "lon": r["longitude"], "label": label}, "value": value})
     return out[:8]

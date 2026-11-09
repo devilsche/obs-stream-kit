@@ -260,3 +260,14 @@ def test_fixed_night_shows_a_moon_even_at_new_moon(conn, monkeypatch):
     st = _state(_client(conn), q + "&lock=night&kdtest=3.5")
     assert st["night"] == 1 and st["sunUp"] == 0
     assert st["moonUp"] == 1 and st["moonLit"] >= 0.8 and st["aurora"] > 0.9
+
+
+def test_no_aurora_behind_full_clouds(conn, monkeypatch):
+    import time as _t
+    from fx.weather import from_api
+    now = _t.time()
+    monkeypatch.setattr(weather_state, "geocode", lambda q: LOC)
+    monkeypatch.setattr(weather_state, "current", lambda tid, lat, lon: {
+        **from_api(3, 1, 5, 270, cloud=100), "_sunrise": now - 20 * 3600, "_sunset": now - 4 * 3600})
+    st = _state(_client(conn), "?place=F&kdtest=3.5")
+    assert st["night"] == 1 and st["aurora"] < 0.2

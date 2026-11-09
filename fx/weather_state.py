@@ -97,6 +97,11 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     aurora = 0.0
     if thr and strength and snap["live"] and snap["matches"] >= weather.MIN_MATCHES:
         aurora = state.get("night", 0) * min(1.0, max(0.0, (snap["kd"] - thr + 0.2) / 0.4))
+        # hinter Wolken und bei Niederschlag sieht man kein Polarlicht; zählt das
+        # echte Wetter, die gute K/D reißt keine geschlossene Decke auf
+        # (Schleier bis 0,1 zählt nicht, 0,7 = bedeckt)
+        wet = min(1.0, state.get("rain", 0) + state.get("drizzle", 0) + state.get("snow", 0))
+        aurora *= min(1.0, max(0.0, 1 - (base.get("clouds", 0) - 0.1) / 0.6)) * (1 - wet)
     state["aurora"] = round(aurora, 2)
     state.update(source=source, until=until, transition=transition,
                  mood=round(mood * strength, 2))
