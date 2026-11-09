@@ -35,9 +35,9 @@ def test_heavy_rain_is_denser():
 
 def test_frost_and_wind():
     s = from_api(0, -0.5, 25, 270)            # Westwind weht nach rechts
-    assert s["frost"] is True and s["wind"] == 0.5 and s["temp"] == -0.5
+    assert s["freezing"] is True and s["wind"] == 0.5 and s["temp"] == -0.5
     assert from_api(0, 3, 50, 90)["wind"] == -1.0
-    assert from_api(0, 3, 50, 90)["frost"] is False
+    assert from_api(0, 3, 50, 90)["freezing"] is False
 
 
 def test_mood_neutral_without_live_session_or_few_rounds():

@@ -140,7 +140,8 @@ def _kd_test(v):
 
 EFFECTS = {
     "weather": {
-        "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset"),
+        "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset",
+                     "scrape", "warm", "frostclear", "frostreset", "leaders"),
         "settings": {
             "place": _place,
             "mood": _float_range(0, 1),
@@ -152,12 +153,16 @@ EFFECTS = {
             "wind": _weather_wind,
             "veil": _flag,
             "aurorakd": _float_range(0, 20),
+            "frost": _flag,
+            "frostrate": _float_range(0.25, 4),
             "testbg": _test_bg,
         },
         "args": {
             "weather": {"to": _choice(*weather.KINDS), "hold": _int_range(0, 3600)},
             "strike": {"dist": _choice("near", "far")},
             "spectacle": {"type": _choice(*weather.SPECTACLES)},
+            "scrape": {"name": _name},
+            "warm": {"name": _name},
         },
         "defaults": {
             "weather": {"hold": 150},

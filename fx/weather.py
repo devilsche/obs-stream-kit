@@ -82,7 +82,7 @@ def from_api(code: int, temp_c: float, wind_kmh: float, wind_dir: float, cloud=N
     sign = 1 if 180 <= (wind_dir % 360) <= 360 else -1
     s["wind"] = round(sign * strength, 2)
     s["temp"] = temp_c
-    s["frost"] = temp_c <= 0
+    s["freezing"] = temp_c <= 0
     return s
 
 

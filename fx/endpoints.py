@@ -16,7 +16,7 @@ import time
 from flask import Blueprint, current_app, g, jsonify, abort, request
 
 from core.db_compat import SqliteCompatConn
-from fx import autumn_db, commands, season_db, weather_db, weather_state, xmas_db
+from fx import autumn_db, commands, season_db, weather_db, weather_frost, weather_state, xmas_db
 from webcore.middleware import _get_conn
 
 log = logging.getLogger(__name__)
@@ -38,6 +38,14 @@ def _weather_persist(conn, tenant_id, cmd):
                                 cmd["params"]["hold"], time.time())
     elif cmd["cmd"] == "auto":
         weather_db.clear_override(conn, tenant_id)
+    elif cmd["cmd"] in ("scrape", "warm"):
+        # Ergebnis mitschicken, damit das Overlay passend animiert
+        cmd["params"].update(weather_frost.use(conn, tenant_id, cmd["cmd"],
+                                               cmd["params"].get("name", ""), time.time()))
+    elif cmd["cmd"] == "frostclear":
+        weather_frost.clear(conn, tenant_id, time.time())
+    elif cmd["cmd"] == "frostreset":
+        weather_frost.reset_leaders(conn, tenant_id)
     return True
 
 
@@ -111,7 +119,8 @@ def weather_state_route(token):
         abort(404)
     settings = commands.EFFECTS["weather"]["settings"]
     opts = {}
-    for key in ("place", "lock", "mood", "kdlow", "kdhigh", "kdtest", "fallback", "aurorakd"):
+    for key in ("place", "lock", "mood", "kdlow", "kdhigh", "kdtest", "fallback", "aurorakd",
+                "frost", "frostrate"):
         raw = (request.args.get(key) or "").strip()
         if raw:
             val = settings[key](raw)

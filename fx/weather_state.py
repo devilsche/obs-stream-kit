@@ -7,7 +7,7 @@ Die Antwort enthält nie den Ort.
 import logging
 import time
 
-from fx import astro, weather
+from fx import astro, weather, weather_frost
 from fx.weather_api import current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
@@ -106,5 +106,13 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     state.update(source=source, until=until, transition=transition,
                  mood=round(mood * strength, 2))
     state.setdefault("temp", None)
-    state.setdefault("frost", False)
+    state.setdefault("freezing", False)
+    # Frost-Ebene: wächst bei echter Temperatur ≤ 0 °C oder im Schneesturm
+    frost = {"level": 0, "top": []}
+    try:
+        frost = weather_frost.advance(conn, tenant_id, now, base.get("temp") if source == "api" else None,
+                                      state.get("kind") == "blizzard", opts.get("frostrate", 1.0))
+    except Exception:
+        log.exception("weather: frost failed for tenant %s", tenant_id)
+    state.update(frost=frost["level"], frostTop=frost["top"], frostOn=opts.get("frost", True))
     return state

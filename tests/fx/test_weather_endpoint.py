@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from flask import Flask, g
 
-from fx import commands, weather_api, weather_db, weather_state
+from fx import commands, weather_api, weather_db, weather_frost, weather_state
 from fx.endpoints import bp_fx
 
 LOC = {"lat": 50.1109, "lon": 8.6821, "label": "Frankfurt am Main, Hessen, Deutschland"}
@@ -15,6 +15,7 @@ def conn():
     c = sqlite3.connect(":memory:", check_same_thread=False)
     c.row_factory = sqlite3.Row
     weather_db.init_schema(c)
+    weather_frost.init_schema(c)
     yield c
     c.close()
 
@@ -271,3 +272,33 @@ def test_no_aurora_behind_full_clouds(conn, monkeypatch):
         **from_api(3, 1, 5, 270, cloud=100), "_sunrise": now - 20 * 3600, "_sunset": now - 4 * 3600})
     st = _state(_client(conn), "?place=F&kdtest=3.5")
     assert st["night"] == 1 and st["aurora"] < 0.2
+
+
+def test_frost_grows_in_blizzard_and_chat_scrapes(conn, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(weather_state.time, "time", lambda: clock[0])
+    import fx.endpoints as ep
+    monkeypatch.setattr(ep.time, "time", lambda: clock[0])
+    c = _client(conn)
+    assert _state(c, "?lock=blizzard")["frost"] == 0
+    clock[0] += 600                                              # 10 min Schneesturm
+    st = _state(c, "?lock=blizzard")
+    assert st["frost"] == 80 and st["frostTop"] == []
+    r = c.get("/s/t/api/fx/weather?cmd=scrape&name=Mia").json
+    assert r["ok"]
+    cmd = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"][-1]
+    assert cmd["cmd"] == "scrape" and cmd["params"] == {"name": "Mia", "done": 6, "level": 74}
+    assert _state(c, "?lock=blizzard")["frostTop"] == [["Mia", 1]]
+
+
+def test_frost_off_setting_hides_but_keeps_state(conn):
+    assert "frost" in _state(_client(conn), "?frost=0")
+    assert _state(_client(conn), "?frost=0")["frostOn"] is False
+
+
+def test_frost_commands_parse():
+    assert commands.parse("weather", {"cmd": "warm", "name": "Tom"})["params"] == {"name": "Tom"}
+    for c in ("frostclear", "frostreset", "leaders"):
+        assert commands.parse("weather", {"cmd": c})["cmd"] == c
+    assert commands.parse("weather", {"cmd": "set", "frostrate": "9", "frost": "off"})["params"] == {
+        "frostrate": 4.0, "frost": False}
