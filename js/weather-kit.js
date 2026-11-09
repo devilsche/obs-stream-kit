@@ -1448,18 +1448,24 @@
             fctx.fillRect(0, 0, W, H);
           }
 
-          // 5) Nachrieseln: feiner Schnee sinkt langsam herab
-          if (t > 5.8 && t < s.dur - 1.2) {
-            for (var f = 0; f < 5; f++) s.flakes.push({ x: rand(0, W), y: rand(-20, H * 0.5), vy: rand(30, 80),
-                                                       sw: rand(0, 6.3), r: rand(1, 2.4), life: rand(3, 5) });
+          // 5) Nachrieseln: der aufgewirbelte Schnee sinkt aus der übrigen Wolke
+          // ab (nur dort, wo noch Wolke ist), Flocken blenden weich ein
+          if (t > 5.8 && t < s.dur - 1.2 && s.billows.length) {
+            for (var f = 0; f < 6; f++) {
+              var src = s.billows[Math.floor(Math.random() * s.billows.length)];
+              var ang = rand(0, 6.3), rr = Math.sqrt(Math.random()) * src.r * 0.8;
+              s.flakes.push({ x: src.x + Math.cos(ang) * rr, y: src.y + Math.sin(ang) * rr, vy: rand(30, 80),
+                              sw: rand(0, 6.3), r: rand(1, 2.4), life: rand(3, 5), age: 0 });
+            }
           }
           fctx.fillStyle = 'rgba(' + snow + ',1)';
           s.flakes = s.flakes.filter(function (fl) {
             fl.life -= dt;
+            fl.age += dt;
             if (fl.life <= 0) return false;
             fl.y += fl.vy * dt;
             fl.x += Math.sin(t * 1.5 + fl.sw) * 12 * dt;
-            fctx.globalAlpha = 0.85 * Math.min(1, fl.life) * fade;
+            fctx.globalAlpha = 0.85 * smooth(fl.age / 0.5) * Math.min(1, fl.life) * fade;
             fctx.beginPath();
             fctx.arc(fl.x, fl.y, fl.r, 0, Math.PI * 2);
             fctx.fill();
