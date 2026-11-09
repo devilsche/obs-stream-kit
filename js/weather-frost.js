@@ -1,7 +1,8 @@
 /* Frost-Ebene der Weather-Source: Eisblumen wachsen von Ecken und Rändern
  * ins Bild (Stand 0..100 kommt vom Server), die Mitte bleibt frei.
  * !scrape fährt mit einem Kratzer eine Bahn frei, !warm haucht eine Stelle
- * frei (Atemwolke, Dampf); freie Stellen frieren in ~60 s wieder zu.
+ * frei (Atemwolke, Dampf) – jeweils nur an der Stelle; freie Stellen
+ * frieren in ~90 s wieder zu.
  *
  *   var frost = WeatherFrost.create(stageEl, { tags: svgGroup });
  *   frost.update(level, on);  frost.scrape(name, done, level);
@@ -93,7 +94,7 @@
     var ctx = cv.getContext('2d');
     var branches = makeBranches();
     var speckles = makeSpeckles();
-    var level = 0, shown = 0, on = true, drawnAt = -1, first = true;
+    var level = 0, shown = 0, on = true, drawnAt = -1, first = true, debt = 0;
     var holes = [], steam = [], sparks = [], tool = null;
     var tags = opts.tags || null;
     var board = opts.board || null;
@@ -175,12 +176,12 @@
 
     // freie Stellen ausstanzen; sie frieren in ~60 s wieder zu
     function drawHoles(now) {
-      holes = holes.filter(function (h) { return now - h.t0 < 60; });
+      holes = holes.filter(function (h) { return now - h.t0 < 90; });
       if (!holes.length) return;
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
       holes.forEach(function (h) {
-        var k = 1 - smooth((now - h.t0 - 15) / 45);
+        var k = 1 - smooth((now - h.t0 - 25) / 65);
         var g = ctx.createRadialGradient(h.x, h.y, 0, h.x, h.y, h.r);
         g.addColorStop(0, 'rgba(0,0,0,' + (0.95 * k) + ')');
         g.addColorStop(0.7, 'rgba(0,0,0,' + (0.8 * k) + ')');
@@ -257,8 +258,15 @@
       last = ts;
       time += dt;
       // sichtbarer Stand: wächst langsam nach, sinkt nach Kratzen schnell
-      if (shown < level) shown = Math.min(level, shown + Math.max(0.6, (level - shown) * 0.25) * dt);
-      else if (shown > level) shown = Math.max(level, shown - Math.max(8, (shown - level) * 2) * dt);
+      // Kratzen/Hauchen wirken nur an der Stelle (Loch). Der weggekratzte
+      // Anteil ist eine Schuld: neues Zufrieren füllt erst die Lücke, der
+      // Rest der Scheibe bleibt stehen. Tauwetter und „alles frei“ wirken
+      // auf die ganze Scheibe.
+      var target = level <= 0 ? 0 : Math.min(100, level + debt);
+      if (shown < target) shown = Math.min(target, shown + Math.max(0.6, (target - shown) * 0.25) * dt);
+      else if (shown > target) {
+        shown = Math.max(target, shown - Math.max(target <= 0 ? 40 : 1.5, (shown - target) * (target <= 0 ? 3 : 0.4)) * dt);
+      }
       if (!on) { if (drawnAt !== -2) { ctx.clearRect(0, 0, W, H); drawnAt = -2; } }
       else if (Math.abs(shown - drawnAt) > 0.3 || holes.length || steam.length || sparks.length || tool) {
         drawCrystals();
@@ -272,7 +280,11 @@
 
     return {
       update: function (lv, isOn) {
-        level = clamp(lv || 0, 0, 100);
+        var nl = clamp(lv || 0, 0, 100);
+        // Zufrieren tilgt zuerst die Schuld (die Lücken frieren zu)
+        if (nl > level) debt = Math.max(0, debt - (nl - level));
+        if (nl <= 0) debt = 0;
+        level = nl;
         on = isOn !== false;
         // beim Laden sofort auf dem Stand, danach wächst er sichtbar nach
         if (reduceMotion || first) shown = level;
@@ -281,7 +293,9 @@
       scrape: function (name, done, lv) {
         var p = frostySpot();
         if (!done) { tag((name || 'Someone') + ': no frost yet', p[0], p[1] - 60); return; }
+        debt += Math.max(0, level - clamp(lv, 0, 100));
         level = clamp(lv, 0, 100);
+        if (level <= 0) debt = 0;
         var dir = p[0] < W / 2 ? 1 : -1;
         if (reduceMotion) holes.push({ x: p[0], y: p[1], r: 120, t0: time });
         else tool = { x0: p[0] - dir * 160, y0: p[1], x1: p[0] + dir * 160, y1: p[1] + rand(-30, 30),
@@ -292,7 +306,9 @@
       warm: function (name, done, lv) {
         var p = frostySpot();
         if (!done) { tag((name || 'Someone') + ': no frost yet', p[0], p[1] - 60); return; }
+        debt += Math.max(0, level - clamp(lv, 0, 100));
         level = clamp(lv, 0, 100);
+        if (level <= 0) debt = 0;
         holes.push({ x: p[0], y: p[1], r: 150, t0: time });
         if (!reduceMotion) {
           for (var i = 0; i < 18; i++) {
@@ -303,7 +319,7 @@
         tag((name || 'Someone') + ' breathed on the glass!', p[0], p[1] - 90);
         if (level <= 0) celebrate(name);
       },
-      clearAll: function () { level = 0; },
+      clearAll: function () { level = 0; debt = 0; },
       leaders: function (top) {
         if (!board) return;
         var list = board.querySelector('ol');
