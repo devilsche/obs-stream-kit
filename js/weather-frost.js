@@ -42,7 +42,7 @@
     // Ecken: viele lange Äste, früh
     [[0, 0, 0.785], [W, 0, 2.356], [0, H, -0.785], [W, H, -2.356]].forEach(function (c) {
       for (var i = 0; i < 24; i++) {
-        add(c[0] + rand(-10, 10), c[1] + rand(-10, 10), c[2] + rand(-0.8, 0.8), rand(180, 640), rand(0, 50));
+        add(c[0] + rand(-10, 10), c[1] + rand(-10, 10), c[2] + rand(-0.8, 0.8), rand(180, 640), rand(0, 30));
       }
     });
     // Ränder: kürzere Äste, später
@@ -51,7 +51,7 @@
       var x = side === 0 ? t * W : side === 1 ? t * W : side === 2 ? 0 : W;
       var y = side === 0 ? 0 : side === 1 ? H : t * H;
       var ang = side === 0 ? Math.PI / 2 : side === 1 ? -Math.PI / 2 : side === 2 ? 0 : Math.PI;
-      add(x, y, ang + rand(-0.6, 0.6), rand(80, 300), rand(20, 85));
+      add(x, y, ang + rand(-0.6, 0.6), rand(80, 300), rand(12, 70));
     }
     return out;
   }
@@ -63,7 +63,7 @@
       var x = Math.random() * W, y = Math.random() * H;
       var edge = Math.min(x / W, 1 - x / W, y / H * 1.6, (1 - y / H) * 1.6);   // 0 am Rand, ~0,5 innen
       var cornerBoost = Math.min(x, W - x) < 300 && Math.min(y, H - y) < 300 ? 0.08 : 0;
-      out.push({ x: x, y: y, r: Math.random() < 0.85 ? 1 : 1.8, thr: clamp((edge - cornerBoost) * 210, 0, 100) });
+      out.push({ x: x, y: y, r: Math.random() < 0.85 ? 1 : 1.8, thr: clamp((edge - cornerBoost) * 180 - 4, 0, 100) });
     }
     return out;
   }
@@ -88,7 +88,7 @@
 
     function drawCrystals() {
       ctx.clearRect(0, 0, W, H);
-      if (shown < 0.5) return;
+      if (shown < 0.3) return;
       var L = shown;
       // Raureif-Schleier an den Rändern, Mitte frei
       ctx.save();
@@ -96,10 +96,20 @@
       ctx.scale(1, H / W);
       var haze = ctx.createRadialGradient(0, 0, W * lerpN(0.62, 0.3, L / 100), 0, 0, W * 0.72);
       haze.addColorStop(0, 'rgba(225,240,255,0)');
-      haze.addColorStop(1, 'rgba(228,242,255,' + (0.6 * L / 100) + ')');
+      haze.addColorStop(1, 'rgba(228,242,255,' + (0.6 * Math.sqrt(L / 100)) + ')');
       ctx.fillStyle = haze;
       ctx.fillRect(-W, -W, W * 2, W * 2);
       ctx.restore();
+      // beschlagene Ecken: schon bei wenigen Prozent sichtbar, wachsen mit
+      var cr = 200 + 7 * L, ca = 0.42 * Math.min(1, (L + 4) / 22);
+      [[0, 0], [W, 0], [0, H], [W, H]].forEach(function (c) {
+        var cg = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], cr);
+        cg.addColorStop(0, 'rgba(232,244,255,' + ca + ')');
+        cg.addColorStop(0.6, 'rgba(232,244,255,' + (ca * 0.45) + ')');
+        cg.addColorStop(1, 'rgba(232,244,255,0)');
+        ctx.fillStyle = cg;
+        ctx.fillRect(c[0] - cr, c[1] - cr, cr * 2, cr * 2);
+      });
       // Raureif-Körnung
       ctx.fillStyle = 'rgba(240,248,255,0.55)';
       speckles.forEach(function (p) {
@@ -110,7 +120,7 @@
       ctx.shadowColor = 'rgba(200,230,255,0.8)';
       ctx.shadowBlur = 4;
       branches.forEach(function (b) {
-        var grow = clamp((L - b.thr) / 30, 0, 1);
+        var grow = clamp((L - b.thr) / 18, 0, 1);
         if (grow <= 0) return;
         var n = Math.max(1, Math.round(b.segs.length * grow));
         ctx.strokeStyle = 'rgba(240,248,255,' + (0.5 + 0.4 * grow) + ')';

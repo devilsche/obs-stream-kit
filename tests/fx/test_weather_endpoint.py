@@ -281,13 +281,13 @@ def test_frost_grows_in_blizzard_and_chat_scrapes(conn, monkeypatch):
     monkeypatch.setattr(ep.time, "time", lambda: clock[0])
     c = _client(conn)
     assert _state(c, "?lock=blizzard")["frost"] == 0
-    clock[0] += 600                                              # 10 min Schneesturm
+    clock[0] += 300                                              # 5 min Schneesturm
     st = _state(c, "?lock=blizzard")
-    assert st["frost"] == 80 and st["frostTop"] == []
+    assert st["frost"] == 75 and st["frostTop"] == []
     r = c.get("/s/t/api/fx/weather?cmd=scrape&name=Mia").json
     assert r["ok"]
     cmd = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"][-1]
-    assert cmd["cmd"] == "scrape" and cmd["params"] == {"name": "Mia", "done": 6, "level": 74}
+    assert cmd["cmd"] == "scrape" and cmd["params"] == {"name": "Mia", "done": 6, "level": 69}
     assert _state(c, "?lock=blizzard")["frostTop"] == [["Mia", 1]]
 
 
