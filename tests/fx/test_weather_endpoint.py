@@ -221,3 +221,35 @@ def test_fixed_weather_replaces_only_the_real_weather(conn, monkeypatch):
 def test_fixed_weather_off_uses_live(conn, monkeypatch):
     q = _with_location(conn, monkeypatch, kind_code=63)
     assert _state(_client(conn), q + "&lock=off")["source"] == "api"
+
+
+def test_sun_and_moon_positions_are_coarse_and_leak_nothing(conn, monkeypatch):
+    q = _with_location(conn, monkeypatch)
+    r = _client(conn).get("/s/t/api/fx/weather/state" + q)
+    st = r.json["state"]
+    for k in ("sunUp", "sunX", "sunY", "moonUp", "moonX", "moonY", "moonLit", "moonWax"):
+        assert k in st
+    assert 0 <= st["sunX"] <= 1 and 0 <= st["moonLit"] <= 1
+    assert round(st["sunX"] / 0.02, 6) == round(st["sunX"] / 0.02)
+    body = r.get_data(as_text=True)
+    assert "50.11" not in body and "8.68" not in body
+
+
+def test_no_location_means_no_sky_positions(conn):
+    st = _state(_client(conn))
+    assert "sunX" not in st and "moonX" not in st
+
+
+def test_aurora_rewards_a_very_good_night(conn, monkeypatch):
+    import time as _t
+    from fx.weather import from_api
+    now = _t.time()
+    monkeypatch.setattr(weather_state, "geocode", lambda q: LOC)
+    monkeypatch.setattr(weather_state, "current", lambda tid, lat, lon: {
+        **from_api(0, 5, 5, 270), "_sunrise": now - 20 * 3600, "_sunset": now - 4 * 3600})
+    c = _client(conn)
+    assert _state(c, "?place=F&kdtest=3.5")["aurora"] > 0.9
+    assert _state(c, "?place=F&kdtest=2.6")["aurora"] == 0
+    assert _state(c, "?place=F&kdtest=3.5&aurorakd=4")["aurora"] == 0
+    assert _state(c, "?place=F&kdtest=3.5&aurorakd=0")["aurora"] == 0      # 0 = aus
+    assert _state(c, "?place=F&kdtest=3.5&mood=0")["aurora"] == 0          # Stimmung aus

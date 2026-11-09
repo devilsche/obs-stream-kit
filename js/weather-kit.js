@@ -41,7 +41,7 @@
   var SPECTACLES = ['tsunami', 'megabolt', 'ballbolt', 'avalanche',
                     'aurora', 'rainbow', 'hail', 'meteors', 'tornado', 'fogwall'];
   // windRandom (true/false) ist kein Zahlenwert und springt bei der Hälfte des Übergangs
-  var NUM_KEYS = ['rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind', 'night', 'dusk'];
+  var NUM_KEYS = ['rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind', 'night', 'dusk', 'mood', 'aurora'];
 
   function rand(a, b) { return a + Math.random() * (b - a); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -366,7 +366,9 @@
       sctx.fillStyle = top;
       sctx.fillRect(0, 0, W, H * 0.4);
       var wet = clamp((cur.rain || 0) + (cur.drizzle || 0) + (cur.snow || 0), 0, 1);
-      var vis = n * (1 - 0.9 * c) * (1 - wet);
+      // gute K/D: klarer, hellere Sterne, mehr Sternschnuppen
+      var boost = Math.max(0, cur.mood || 0);
+      var vis = n * (1 - 0.9 * c) * (1 - wet) * (0.7 + 0.3 * boost);
       if (vis < 0.02) { meteor = null; return; }
       sctx.fillStyle = '#fff';
       stars.forEach(function (st) {
@@ -383,7 +385,7 @@
         var fromLeft = Math.random() < 0.5;
         meteor = { x: fromLeft ? rand(150, W * 0.45) : rand(W * 0.55, W - 150), y: rand(20, STAR_BAND * 0.5),
                    vx: (fromLeft ? 1 : -1) * rand(700, 1000), vy: rand(220, 360), t: 0, dur: rand(0.7, 1.1) };
-        nextMeteor = time + rand(20, 50);
+        nextMeteor = time + rand(20, 50) / (1 + 2 * boost);
       }
       if (meteor) {
         meteor.t += dtFrame;
@@ -403,6 +405,95 @@
         sctx.stroke();
       }
     }
+
+    // ── Mond: wandert wie die Sonne, mit Phase; Wolken verdecken ihn ──
+    var moonCanvas = document.createElement('canvas');
+    var MOON_R = 30;
+    moonCanvas.width = moonCanvas.height = MOON_R * 2 + 4;
+    var mctx = moonCanvas.getContext('2d');
+    var moonDrawn = null;
+
+    function drawMoon(n, c) {
+      var hasSky = typeof cur.moonX === 'number';
+      var up = hasSky ? cur.moonUp : (n > 0.3 ? 1 : 0);
+      if (!up) return;
+      var wet = clamp((cur.rain || 0) + (cur.drizzle || 0) + (cur.snow || 0), 0, 1);
+      var boost = Math.max(0, cur.mood || 0);
+      // tagsüber nur blass, nachts voll; gute K/D macht ihn heller
+      var mv = (0.22 + 0.78 * n) * (1 - 0.85 * c) * (1 - wet) * (0.75 + 0.25 * boost);
+      if (mv < 0.02) return;
+      var mx = (hasSky ? cur.moonX : 0.85) * W;
+      var my = lerp(10, 300, hasSky ? cur.moonY : 0.15);
+      var lit = hasSky ? cur.moonLit : 1, wax = hasSky ? cur.moonWax : 1;
+      var glow = sctx.createRadialGradient(mx, my, 0, mx, my, 280);
+      glow.addColorStop(0, 'rgba(210,222,255,' + (0.28 * mv * (0.4 + 0.6 * lit)) + ')');
+      glow.addColorStop(1, 'rgba(210,222,255,0)');
+      sctx.fillStyle = glow;
+      sctx.fillRect(mx - 280, my - 280, 560, 560);
+      // Phase: helle Scheibe, die Nachtseite wird mit versetztem Kreis
+      // ausgestanzt (zunehmend = rechts hell)
+      var key = lit.toFixed(2) + wax;
+      if (moonDrawn !== key) {
+        moonDrawn = key;
+        var cx = MOON_R + 2;
+        mctx.clearRect(0, 0, moonCanvas.width, moonCanvas.height);
+        mctx.globalCompositeOperation = 'source-over';
+        mctx.fillStyle = 'rgb(236,240,248)';
+        mctx.beginPath();
+        mctx.arc(cx, cx, MOON_R, 0, Math.PI * 2);
+        mctx.fill();
+        mctx.fillStyle = 'rgba(190,198,215,0.55)';
+        [[-8, -6, 7], [9, 4, 5], [-2, 11, 4], [6, -12, 3]].forEach(function (cr) {
+          mctx.beginPath();
+          mctx.arc(cx + cr[0], cx + cr[1], cr[2], 0, Math.PI * 2);
+          mctx.fill();
+        });
+        mctx.globalCompositeOperation = 'destination-out';
+        mctx.beginPath();
+        mctx.arc(cx + (wax ? -1 : 1) * 2 * MOON_R * lit, cx, MOON_R + 1, 0, Math.PI * 2);
+        mctx.fill();
+        mctx.globalCompositeOperation = 'source-over';
+      }
+      sctx.globalAlpha = Math.min(1, mv * 1.1);
+      sctx.drawImage(moonCanvas, mx - MOON_R - 2, my - MOON_R - 2);
+      sctx.globalAlpha = 1;
+    }
+
+    // Polarlicht-Feld: Vorhänge in 1/8 Auflösung, weich hochskaliert (keine
+    // Säulen-Streifen); für das Spektakel und als ruhige Belohnung bei Nacht
+    function auroraField() {
+      var curtains = [];
+      for (var i = 0; i < 3; i++) curtains.push({ ph: rand(0, 6.3), sp: rand(0.25, 0.5), y: rand(70, 150), h: rand(150, 260) });
+      var off = document.createElement('canvas');
+      off.width = W / 8;
+      off.height = Math.round(H * 0.5 / 8);
+      var o = off.getContext('2d');
+      return function (alpha, t) {
+        var S = 8, ow = off.width;
+        o.clearRect(0, 0, ow, off.height);
+        curtains.forEach(function (c, ci) {
+          for (var px = 0; px < ow; px++) {
+            var x = px * S;
+            var base = c.y + 45 * Math.sin(x * 0.0035 + t * c.sp + c.ph) + 18 * Math.sin(x * 0.011 - t * 0.9 + ci);
+            var hgt = c.h * (0.6 + 0.4 * Math.sin(x * 0.007 + t * 0.7 + c.ph));
+            var a = alpha * (0.34 + 0.16 * Math.sin(x * 0.006 + t * 1.3 + ci * 2) + 0.06 * Math.sin(x * 0.05 + t * 3));
+            var g = o.createLinearGradient(0, (base - hgt) / S, 0, (base + 30) / S);
+            g.addColorStop(0, 'rgba(150,90,220,0)');
+            g.addColorStop(0.55, 'rgba(120,120,230,' + (a * 0.6) + ')');
+            g.addColorStop(0.9, 'rgba(90,255,170,' + a + ')');
+            g.addColorStop(1, 'rgba(90,255,170,0)');
+            o.fillStyle = g;
+            o.fillRect(px, (base - hgt) / S, 1, (hgt + 30) / S);
+          }
+        });
+        sctx.save();
+        sctx.imageSmoothingEnabled = true;
+        sctx.imageSmoothingQuality = 'high';
+        sctx.drawImage(off, 0, 0, W, off.height * S);
+        sctx.restore();
+      };
+    }
+    var ambientAurora = auroraField();
 
     // Dämmerung: warmes orange-rosa Band oben und in den oberen Ecken
     function drawDusk(d, c, n) {
@@ -448,36 +539,50 @@
       drawNight(n, c);
       drawDusk(d, c, n);
 
-      // Sonne: warmer Schein und Strahlen aus der oberen linken Ecke,
-      // in der Dämmerung orange-rosa
+      // Sonne wandert oben über den Himmel (Stand vom Server, ohne Ort:
+      // oben links), Strahlen fächern zur Bildmitte hin auf und verlaufen
+      // vorher; in der Dämmerung orange-rosa
       var sunCore = mixRgb([255, 226, 160], [255, 150, 95], d);
       var sunMid = mixRgb([255, 214, 140], [255, 128, 110], d);
       var rayRgb = mixRgb([255, 236, 190], [255, 175, 125], d);
+      var hasSky = typeof cur.sunX === 'number';
+      if (hasSky && !cur.sunUp) s = 0;
       if (s > 0.01) {
-        var glow = sctx.createRadialGradient(0, 0, 0, 0, 0, 760);
+        var sx = (hasSky ? cur.sunX : 0.03) * W;
+        var sy = lerp(-10, 300, hasSky ? cur.sunY : 0);
+        var glow = sctx.createRadialGradient(sx, sy, 0, sx, sy, 760);
         glow.addColorStop(0, 'rgba(' + sunCore + ',' + (0.5 * s) + ')');
         glow.addColorStop(0.45, 'rgba(' + sunMid + ',' + (0.16 * s) + ')');
         glow.addColorStop(1, 'rgba(' + sunMid + ',0)');
         sctx.fillStyle = glow;
-        sctx.fillRect(0, 0, 900, 900);
+        sctx.fillRect(sx - 760, sy - 760, 1520, 1520);
+        var disc = sctx.createRadialGradient(sx, sy, 0, sx, sy, 75);
+        disc.addColorStop(0, 'rgba(255,252,236,' + (0.95 * s) + ')');
+        disc.addColorStop(0.45, 'rgba(' + sunCore + ',' + (0.75 * s) + ')');
+        disc.addColorStop(1, 'rgba(' + sunCore + ',0)');
+        sctx.fillStyle = disc;
+        sctx.fillRect(sx - 75, sy - 75, 150, 150);
+        var toward = Math.atan2(H * 0.55 - sy, W / 2 - sx);
         for (var r = 0; r < 7; r++) {
-          var a0 = (0.12 + r * 0.17) + 0.03 * Math.sin(time * 0.21 + r * 1.7);
+          var a0 = toward + (r - 3) * 0.24 + 0.03 * Math.sin(time * 0.21 + r * 1.7);
           var width = 0.045 + 0.02 * Math.sin(time * 0.33 + r);
-          var len = 1150;
-          var ray = sctx.createLinearGradient(0, 0, Math.cos(a0) * len, Math.sin(a0) * len);
+          var len = 1000;
+          var ray = sctx.createLinearGradient(sx, sy, sx + Math.cos(a0) * len, sy + Math.sin(a0) * len);
           var ra = (0.13 + 0.06 * Math.sin(time * 0.5 + r * 2.1)) * s;
           ray.addColorStop(0, 'rgba(' + rayRgb + ',' + ra + ')');
-          ray.addColorStop(0.55, 'rgba(' + rayRgb + ',' + (ra * 0.25) + ')');
-          ray.addColorStop(0.8, 'rgba(' + rayRgb + ',0)');
+          ray.addColorStop(0.45, 'rgba(' + rayRgb + ',' + (ra * 0.25) + ')');
+          ray.addColorStop(0.7, 'rgba(' + rayRgb + ',0)');
           sctx.fillStyle = ray;
           sctx.beginPath();
-          sctx.moveTo(-30, -30);
-          sctx.lineTo(Math.cos(a0 - width) * len, Math.sin(a0 - width) * len);
-          sctx.lineTo(Math.cos(a0 + width) * len, Math.sin(a0 + width) * len);
+          sctx.moveTo(sx, sy);
+          sctx.lineTo(sx + Math.cos(a0 - width) * len, sy + Math.sin(a0 - width) * len);
+          sctx.lineTo(sx + Math.cos(a0 + width) * len, sy + Math.sin(a0 + width) * len);
           sctx.closePath();
           sctx.fill();
         }
       }
+      drawMoon(n, c);
+      if ((cur.aurora || 0) > 0.02) ambientAurora(cur.aurora * 0.6, time);
 
       // Wolkenband oben, wandert mit dem Wind
       if (c > 0.01) {
@@ -932,17 +1037,8 @@
         }
       },
       aurora: {
-        // Polarlicht: grün-violette Vorhänge wabern oben am Rand. Gezeichnet in
-        // 1/8 Auflösung und weich hochskaliert, damit keine Säulen-Streifen
-        // entstehen; feine Strahlen schimmern nur leicht durch
-        init: function () {
-          var c = [];
-          for (var i = 0; i < 3; i++) c.push({ ph: rand(0, 6.3), sp: rand(0.25, 0.5), y: rand(70, 150), h: rand(150, 260) });
-          var off = document.createElement('canvas');
-          off.width = W / 8;
-          off.height = Math.round(H * 0.5 / 8);
-          return { dur: 12, curtains: c, off: off, octx: off.getContext('2d') };
-        },
+        // Polarlicht-Spektakel: Himmel dunkelt ab, kräftige Vorhänge
+        init: function () { return { dur: 12, field: auroraField() }; },
         draw: function (s) {
           var env = smooth(s.t / 2.5) * (1 - smooth((s.t - (s.dur - 2.5)) / 2.5));
           var sky = sctx.createLinearGradient(0, 0, 0, H * 0.45);
@@ -951,29 +1047,7 @@
           sky.addColorStop(1, 'rgba(6,10,28,0)');
           sctx.fillStyle = sky;
           sctx.fillRect(0, 0, W, H * 0.45);
-          var o = s.octx, S = 8, ow = s.off.width;
-          o.clearRect(0, 0, ow, s.off.height);
-          s.curtains.forEach(function (c, ci) {
-            for (var px = 0; px < ow; px++) {
-              var x = px * S;
-              var base = c.y + 45 * Math.sin(x * 0.0035 + s.t * c.sp + c.ph) + 18 * Math.sin(x * 0.011 - s.t * 0.9 + ci);
-              var hgt = c.h * (0.6 + 0.4 * Math.sin(x * 0.007 + s.t * 0.7 + c.ph));
-              // weiche Helligkeitswellen statt Zufall pro Säule
-              var a = env * (0.34 + 0.16 * Math.sin(x * 0.006 + s.t * 1.3 + ci * 2) + 0.06 * Math.sin(x * 0.05 + s.t * 3));
-              var g = o.createLinearGradient(0, (base - hgt) / S, 0, (base + 30) / S);
-              g.addColorStop(0, 'rgba(150,90,220,0)');
-              g.addColorStop(0.55, 'rgba(120,120,230,' + (a * 0.6) + ')');
-              g.addColorStop(0.9, 'rgba(90,255,170,' + a + ')');
-              g.addColorStop(1, 'rgba(90,255,170,0)');
-              o.fillStyle = g;
-              o.fillRect(px, (base - hgt) / S, 1, (hgt + 30) / S);
-            }
-          });
-          sctx.save();
-          sctx.imageSmoothingEnabled = true;
-          sctx.imageSmoothingQuality = 'high';
-          sctx.drawImage(s.off, 0, 0, W, s.off.height * S);
-          sctx.restore();
+          s.field(env, s.t);
         }
       },
       rainbow: {

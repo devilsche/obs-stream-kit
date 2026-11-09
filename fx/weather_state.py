@@ -7,7 +7,7 @@ Die Antwort enthält nie den Ort.
 import logging
 import time
 
-from fx import weather
+from fx import astro, weather
 from fx.weather_api import current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
@@ -15,13 +15,26 @@ from fx.weather_mood import kd_snapshot
 log = logging.getLogger(__name__)
 
 TRANSITION_SLOW = 25
+AURORA_KD = 3.0
+
+
+def _sky(now, lat, lon) -> dict:
+    """Sonne und Mond als grobe Bildposition (verrät den Ort nicht)."""
+    s_az, s_alt = astro.sun_position(now, lat, lon)
+    m_az, m_alt = astro.moon_position(now, lat, lon)
+    lit, phase = astro.moon_illumination(now)
+    sx, sy = astro.sky_xy(s_az, s_alt, lat)
+    mx, my = astro.sky_xy(m_az, m_alt, lat)
+    return {"sunUp": 1 if s_alt > 0 else 0, "sunX": sx, "sunY": sy,
+            "moonUp": 1 if m_alt > 0 else 0, "moonX": mx, "moonY": my,
+            "moonLit": round(lit, 2), "moonWax": 1 if phase < 0.5 else 0}
 TRANSITION_FAST = 4
 
 
 def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     """opts: geparste Settings (place, lock, mood, kdlow, kdhigh, kdtest, fallback)."""
     now = time.time() if now is None else now
-    base, source = None, "fallback"
+    base, source, loc = None, "fallback", None
     try:
         loc = geocode(opts["place"]) if opts.get("place") else None
         if loc:
@@ -71,6 +84,14 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
         source, until, transition = "override", ov["until"], TRANSITION_FAST
 
     state = weather.apply_daylight(state)
+    if loc:
+        state.update(_sky(now, loc["lat"], loc["lon"]))
+    # Polarlicht als Belohnung: sehr gute K/D bei Nacht (aurorakd 0 = aus)
+    thr = opts.get("aurorakd", AURORA_KD)
+    aurora = 0.0
+    if thr and strength and snap["live"] and snap["matches"] >= weather.MIN_MATCHES:
+        aurora = state.get("night", 0) * min(1.0, max(0.0, (snap["kd"] - thr + 0.2) / 0.4))
+    state["aurora"] = round(aurora, 2)
     state.update(source=source, until=until, transition=transition,
                  mood=round(mood * strength, 2))
     state.setdefault("temp", None)

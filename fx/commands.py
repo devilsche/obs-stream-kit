@@ -151,6 +151,7 @@ EFFECTS = {
             "lock": _choice("off", *weather.KINDS),
             "wind": _weather_wind,
             "veil": _flag,
+            "aurorakd": _float_range(0, 20),
             "testbg": _test_bg,
         },
         "args": {
