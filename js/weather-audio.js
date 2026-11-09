@@ -6,7 +6,7 @@
  *   var audio = WeatherAudio.create('../assets/effects/');
  *   audio.set({ on, volume, thunder });  audio.update(kit.state());
  *   audio.thunder(dist);  audio.gust();
- * Donner aus opts.thunderFile (ohne eingebaute Pause), Verzögerung je Entfernung.
+ * Donner aus opts.thunderFile, vorab dekodiert (Web Audio), setzt mit dem Blitz ein.
  */
 (function (root) {
   'use strict';
@@ -19,6 +19,15 @@
   function create(base, opts) {
     opts = opts || {};
     var thunderFile = opts.thunderFile || (base + 'thunder-near-1.wav');
+    // Donner einmal laden und dekodieren
+    var AC = root.AudioContext || root.webkitAudioContext;
+    var actx = AC ? new AC() : null, thunderBuf = null;
+    if (actx) {
+      fetch(thunderFile).then(function (r) { return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, no) { actx.decodeAudioData(ab, ok, no); }); })
+        .then(function (buf) { thunderBuf = buf; })
+        .catch(function () { thunderBuf = null; });
+    }
     var on = false, volume = 0.6, thunderLevel = 1, blocked = false;
     var loops = {}, targets = {}, lastThunder = -10;
 
@@ -56,6 +65,7 @@
     }, 100);
 
     function unlock() {
+      if (actx && actx.state === 'suspended') actx.resume();
       if (!blocked) return;
       blocked = false;
       if (opts.onBlocked) opts.onBlocked(false);
@@ -74,6 +84,8 @@
     return {
       set: function (o) {
         if (o.on !== undefined) on = !!o.on;
+        // in OBS läuft Ton ohne Klick: Web Audio gleich starten
+        if (on && actx && actx.state === 'suspended') actx.resume().catch(function () {});
         if (typeof o.volume === 'number' && isFinite(o.volume)) volume = clamp(o.volume, 0, 1);
         if (typeof o.thunder === 'number' && isFinite(o.thunder)) thunderLevel = clamp(o.thunder, 0, 1);
       },
@@ -89,24 +101,32 @@
         targets['wind-loop-strong'] = strong;
         targets['wind-loop-light'] = w > 0.15 ? (w * (1 - strong)) : 0;
       },
-      // Donner (assets/stingers/thunder-124463.mp3, setzt fast sofort ein):
-      // naher Blitz sofort, ferner verzögert, leiser und etwas tiefer;
+      // Donner: vorab dekodiert und aus dem Speicher gespielt (keine Ladezeit),
+      // setzt mit dem Blitz ein; fern nur leiser und tiefer, ohne Pause;
       // höchstens einer pro Sekunde, sonst stapeln sich die langen Donner
       thunder: function (dist) {
         var now = Date.now() / 1000;
-        if (now - lastThunder < 1) return;
+        if (!on || now - lastThunder < 1) return;
         lastThunder = now;
         var d = typeof dist === 'number' ? clamp(dist, 0, 1) : Math.random();
-        var delay = d < 0.4 ? 0 : 400 + d * 800;
         var vol = volume * thunderLevel * (1 - 0.45 * d);
-        setTimeout(function () {
-          if (!on || vol <= 0.01) return;
-          var a = new Audio(thunderFile);
-          a.volume = clamp(vol, 0, 1);
-          a.preservesPitch = false;
-          a.playbackRate = (1 - 0.15 * d) * (0.94 + Math.random() * 0.12);
-          play(a);
-        }, delay);
+        if (vol <= 0.01) return;
+        var rate = (1 - 0.15 * d) * (0.94 + Math.random() * 0.12);
+        if (actx && thunderBuf && actx.state === 'running') {
+          var src = actx.createBufferSource(), g = actx.createGain();
+          src.buffer = thunderBuf;
+          src.playbackRate.value = rate;
+          g.gain.value = clamp(vol, 0, 1);
+          src.connect(g).connect(actx.destination);
+          src.start();
+          return;
+        }
+        // Rückfall ohne Web Audio
+        var a = new Audio(thunderFile);
+        a.volume = clamp(vol, 0, 1);
+        a.preservesPitch = false;
+        a.playbackRate = rate;
+        play(a);
       },
       gust: function () { oneShot('wind-gust.wav', volume * 0.9); }
     };
