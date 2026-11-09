@@ -1300,126 +1300,172 @@
         }
       },
       avalanche: {
-        // Lawine wie in echt, in drei Stufen: in der oberen Ecke reißt ein
-        // Schneebrett an einer Bruchkante ab, rutscht den Hang hinunter,
-        // zerbricht und reißt immer mehr Schnee mit (Lockerschnee); vorneweg
-        // rast eine Staublawine, deren Druckwelle eine Böe auslöst
+        // Staublawine nach echtem Aufbau: Abriss oben in der Ecke, Druckwelle
+        // (Schneestaub fegt waagerecht, Böe), dann rollt unten ein Kopf herein,
+        // der zu einer turmhohen, brodelnden Wolke wächst (Ballen quellen oben
+        // nach, Schattenseite unten), am Fuß dichter Schnee mit springenden
+        // Brocken; Durchzug fast weiß, danach rieselt feiner Schnee herab
         init: function () {
-          var flip = Math.random() < 0.5;
-          // Bruchkante quer über die Ecke, gezackt
-          var crack = [], n = 14;
-          for (var i = 0; i <= n; i++) {
-            var k = i / n;
-            crack.push([lerp(W - 640, W - 40, k) + rand(-14, 14), lerp(40, 470, k) + rand(-14, 14)]);
+          var dir = Math.random() < 0.5 ? 1 : -1;
+          var crack = [];
+          for (var i = 0; i <= 12; i++) {
+            var k = i / 12;
+            crack.push([lerp(40, 560, k) + rand(-12, 12), lerp(300, 30, k) + rand(-12, 12)]);
           }
-          return { dur: 10, flip: flip, crack: crack, chunks: [], powder: [], gusted: false, born: false };
+          return { dur: 12, dir: dir, crack: crack, billows: [], chunks: [], streaks: [], flakes: [],
+                   acc: 0, gusted: false };
         },
         draw: function (s, dt) {
-          var t = s.t;
-          var fx = function (x) { return s.flip ? W - x : x; };
-          var snow = nightRgb([246, 249, 255], [168, 180, 204]);
-          var shade = nightRgb([205, 216, 234], [118, 130, 158]);
-          var fade = 1 - smooth((t - (s.dur - 2.2)) / 2.2);
-          var ux = -W, uy = H, ul = Math.hypot(ux, uy);
-          ux /= ul; uy /= ul;                                  // Hang: oben rechts → unten links
+          var t = s.t, dir = s.dir;
+          var xs = function (x) { return dir > 0 ? x : W - x; };       // Herkunftsseite links/rechts
+          var snow = nightRgb([248, 250, 255], [170, 182, 206]);
+          var shade = nightRgb([168, 182, 208], [88, 100, 130]);
+          var fade = 1 - smooth((t - (s.dur - 1.5)) / 1.5);
+          var ARRIVE = 1.4, PASS = 7.2;
 
-          // 1) Schneebrett liegt in der Ecke, Bruchkante reißt auf
-          var BREAK = 1.3;
-          if (t < BREAK + 0.3) {
-            var slab = (1 - smooth((t - BREAK) / 0.3)) * smooth(t / 0.4);
-            var sg = fctx.createLinearGradient(fx(W), 0, fx(W - 520), 420);
-            sg.addColorStop(0, 'rgba(' + snow + ',' + (0.88 * slab) + ')');
-            sg.addColorStop(1, 'rgba(' + shade + ',' + (0.8 * slab) + ')');
-            fctx.save();
-            fctx.shadowColor = 'rgba(' + snow + ',' + (0.8 * slab) + ')';
-            fctx.shadowBlur = 28;
-            fctx.fillStyle = sg;
-            fctx.beginPath();
-            fctx.moveTo(fx(W + 10), -10);
-            s.crack.forEach(function (c) { fctx.lineTo(fx(c[0]), c[1]); });
-            fctx.lineTo(fx(W + 10), 480);
-            fctx.closePath();
-            fctx.fill();
-            fctx.restore();
-            var shown = Math.floor(smooth(t / BREAK) * s.crack.length);
-            fctx.strokeStyle = 'rgba(' + nightRgb([90, 104, 128], [40, 48, 66]) + ',' + (0.9 * slab) + ')';
+          // 1) Abriss: gezackte Bruchkante oben in der Ecke, Staubschleier
+          if (t < 1.6) {
+            var ca = smooth(t / 0.25) * (1 - smooth((t - 1.1) / 0.5));
+            var shown = Math.ceil(smooth(t / 0.5) * s.crack.length);
             fctx.lineWidth = 4;
+            fctx.strokeStyle = 'rgba(' + nightRgb([70, 84, 110], [30, 38, 56]) + ',' + (0.9 * ca) + ')';
             fctx.beginPath();
             for (var c = 0; c < shown; c++) {
-              var pt = s.crack[c];
-              if (c === 0) fctx.moveTo(fx(pt[0]), pt[1]); else fctx.lineTo(fx(pt[0]), pt[1]);
+              var cp = s.crack[c];
+              if (c === 0) fctx.moveTo(xs(cp[0]), cp[1]); else fctx.lineTo(xs(cp[0]), cp[1]);
             }
             fctx.stroke();
-          }
-          // beim Abriss zerfällt das Brett in Schollen
-          if (t >= BREAK && !s.born) {
-            s.born = true;
-            for (var i = 0; i < 46; i++) {
-              var kk = Math.random(), cpt = s.crack[Math.floor(kk * (s.crack.length - 1))];
-              var px = lerp(cpt[0], W, rand(0.1, 0.9)), py = lerp(cpt[1], 0, rand(0.1, 0.9));
-              s.chunks.push({ x: px, y: py, r: rand(28, 70), v: rand(60, 140), side: rand(-40, 40),
-                              spin: rand(-2, 2), a: rand(0, 6.3) });
+            if (Math.random() < dt * 25) {
+              var src = s.crack[Math.floor(Math.random() * s.crack.length)];
+              s.billows.push({ x: xs(src[0]), y: src[1], r: rand(30, 60), vx: dir * rand(40, 120), vy: rand(10, 60),
+                               grow: 40, life: rand(1, 1.6), age: 0, a: 0.5 });
             }
           }
 
-          // 2) Schollen rutschen, beschleunigen, wachsen; vorne kommt Schnee dazu
-          if (t >= BREAK) {
-            var mt = t - BREAK;
-            var frontX = W, frontY = 0;
-            s.chunks.forEach(function (ch) {
-              ch.v = Math.min(1500, ch.v + 520 * dt);
-              ch.x += (ux * ch.v + uy * ch.side * 0.3) * dt;
-              ch.y += (uy * ch.v - ux * ch.side * 0.3) * dt;
-              ch.r = Math.min(150, ch.r + 9 * dt);
-              ch.a += ch.spin * dt;
-              if (ch.y > frontY) { frontY = ch.y; frontX = ch.x; }
-            });
-            if (mt < 4.2 && Math.random() < dt * 22) {
-              s.chunks.push({ x: frontX + rand(-60, 60), y: frontY + rand(-40, 40), r: rand(30, 80),
-                              v: rand(600, 1100), side: rand(-120, 120), spin: rand(-2, 2), a: rand(0, 6.3) });
-            }
-            // Schneemasse: weiche Klumpen, erst die Schattenseite versetzt
-            // darunter, dann der helle Klumpen darüber; überlappend zu einer Masse
-            [['shade', 0.35], ['snow', 0]].forEach(function (pass) {
-              var rgb = pass[0] === 'snow' ? snow : shade, off = pass[1];
-              s.chunks.forEach(function (ch) {
-                var cx = fx(ch.x), cy = ch.y + ch.r * off;
-                var g = fctx.createRadialGradient(cx, cy, 0, cx, cy, ch.r);
-                g.addColorStop(0, 'rgba(' + rgb + ',' + (0.9 * fade) + ')');
-                g.addColorStop(0.55, 'rgba(' + rgb + ',' + (0.75 * fade) + ')');
-                g.addColorStop(1, 'rgba(' + rgb + ',0)');
-                fctx.fillStyle = g;
-                fctx.fillRect(cx - ch.r, cy - ch.r, ch.r * 2, ch.r * 2);
-              });
-            });
+          // Kopf-Position: läuft beschleunigend über den unteren Rand
+          var run = clamp((t - ARRIVE) / (PASS - ARRIVE), 0, 1);
+          var front = lerp(-260, W + 900, Math.pow(run, 0.8));
+          var headH = H * lerp(0.18, 0.72, smooth(run / 0.55));
 
-            // 3) Staublawine: Pulverwolke rast voraus und wächst
-            if (mt < 5 && Math.random() < dt * 40) {
-              s.powder.push({ x: frontX + rand(-40, 40), y: frontY + rand(-60, 20), r: rand(130, 210),
-                              v: rand(1300, 1900), side: rand(-200, 200), life: rand(2.2, 3.4), age: 0 });
+          // 2) Druckwelle: kurz vor dem Kopf fegt Schneestaub waagerecht durch
+          if (t > ARRIVE - 0.5 && t < ARRIVE + 2.2) {
+            if (!s.gusted) { s.gusted = true; gust(); }
+            for (var n = 0; n < 6; n++) {
+              s.streaks.push({ x: xs(rand(-200, W * 0.3)), y: rand(H * 0.25, H), len: rand(60, 180),
+                               v: rand(1600, 2400), life: rand(0.5, 0.9) });
             }
-            s.powder.forEach(function (pw) {
-              pw.age += dt;
-              pw.v *= 1 - 0.35 * dt;
-              pw.x += (ux * pw.v + uy * pw.side * 0.4) * dt;
-              pw.y += (uy * pw.v - ux * pw.side * 0.4) * dt;
-              pw.r += 230 * dt;
-              var a = 0.24 * fade * smooth(pw.age / 0.3) * (1 - pw.age / pw.life);
-              if (a <= 0) return;
-              var g = fctx.createRadialGradient(fx(pw.x), pw.y, 0, fx(pw.x), pw.y, pw.r);
-              g.addColorStop(0, 'rgba(' + snow + ',' + a + ')');
-              g.addColorStop(0.5, 'rgba(' + snow + ',' + (a * 0.65) + ')');
-              g.addColorStop(1, 'rgba(' + snow + ',0)');
+          }
+          fctx.lineCap = 'round';
+          s.streaks = s.streaks.filter(function (st) {
+            st.life -= dt;
+            if (st.life <= 0) return false;
+            st.x += dir * st.v * dt;
+            fctx.strokeStyle = 'rgba(' + snow + ',' + (0.5 * Math.min(1, st.life * 2)) + ')';
+            fctx.lineWidth = 1.6;
+            fctx.beginPath();
+            fctx.moveTo(st.x, st.y);
+            fctx.lineTo(st.x - dir * st.len, st.y + 4);
+            fctx.stroke();
+            return true;
+          });
+
+          // 3) Kopf: neue Ballen quellen an der Front, oben größer und steigend
+          if (t >= ARRIVE && t < PASS + 0.4) {
+            s.acc += 34 * dt;
+            while (s.acc >= 1) {
+              s.acc -= 1;
+              var hf = Math.pow(Math.random(), 0.8);                   // 0 = Boden, 1 = Kopfspitze
+              s.billows.push({ x: xs(front - rand(0, 180)), y: H - hf * headH + rand(-20, 20),
+                               r: lerp(70, 170, hf) * rand(0.8, 1.2), vx: dir * rand(250, 520) * (1 - 0.5 * hf),
+                               vy: -rand(15, 70) * hf, grow: rand(40, 80), life: rand(3.4, 5.2), age: 0, a: 1 });
+            }
+            // springende Brocken am Fuß
+            if (Math.random() < dt * 30) {
+              s.chunks.push({ x: xs(front + rand(-40, 60)), y: H - rand(10, 60), vx: dir * rand(300, 700),
+                              vy: -rand(250, 560), r: rand(3, 9), life: rand(0.8, 1.4) });
+            }
+          }
+          // Ballen: erst Schattenseite (versetzt nach unten), dann helle Seite
+          s.billows.forEach(function (b) {
+            b.age += dt;
+            b.x += b.vx * dt; b.y += b.vy * dt; b.vx *= 1 - 0.25 * dt;
+            b.r += b.grow * dt;
+          });
+          s.billows = s.billows.filter(function (b) { return b.age < b.life; });
+          // jeder Ballen mit eigener Schattenseite, ältere hinten, neuere vorne:
+          // so zeichnen sich die Wülste gegeneinander ab
+          s.billows.forEach(function (b) {
+            var a = 0.36 * b.a * fade * smooth(b.age / 0.35) * (1 - smooth((b.age - b.life * 0.55) / (b.life * 0.45)));
+            if (a < 0.01) return;
+            [[shade, b.r * 0.3, 1.0], [snow, 0, 1.0]].forEach(function (pass) {
+              var cy = b.y + pass[1];
+              var g = fctx.createRadialGradient(b.x - b.r * 0.25, cy - b.r * 0.25, 0, b.x, cy, b.r);
+              g.addColorStop(0, 'rgba(' + pass[0] + ',' + Math.min(1, a * 1.6) + ')');
+              g.addColorStop(0.72, 'rgba(' + pass[0] + ',' + a + ')');
+              g.addColorStop(0.88, 'rgba(' + pass[0] + ',' + (a * 0.55) + ')');
+              g.addColorStop(1, 'rgba(' + pass[0] + ',0)');
               fctx.fillStyle = g;
-              fctx.fillRect(fx(pw.x) - pw.r, pw.y - pw.r, pw.r * 2, pw.r * 2);
+              fctx.fillRect(b.x - b.r, cy - b.r, b.r * 2, b.r * 2);
             });
-            s.powder = s.powder.filter(function (pw) { return pw.age < pw.life; });
-            // Druckwelle: wenn die Staubwolke unten ankommt, kräftige Böe
-            if (!s.gusted && frontY > H * 0.7) {
-              s.gusted = true;
-              gust();
+          });
+          // dichter Schnee am Fuß, hinter der Front; läuft nach hinten und oben weich aus
+          if (t >= ARRIVE && t < PASS + 2) {
+            var baseA = 0.85 * fade * (1 - smooth((t - PASS) / 2));
+            var x0 = xs(front - 1400), x1 = xs(front + 40);
+            var hg;
+            for (var b2 = 0; b2 < 8; b2++) {
+              var kb = b2 / 7;
+              // ganze Pixel ohne Lücken zwischen den Streifen
+              var yb = Math.round(H - 160 + b2 * 20), yb2 = Math.round(H - 160 + (b2 + 1) * 20);
+              var va = baseA * smooth(kb * 1.4);
+              hg = fctx.createLinearGradient(x0, 0, x1, 0);
+              hg.addColorStop(0, 'rgba(' + snow + ',0)');
+              hg.addColorStop(0.55, 'rgba(' + snow + ',' + (va * 0.8) + ')');
+              hg.addColorStop(0.96, 'rgba(' + snow + ',' + va + ')');
+              hg.addColorStop(1, 'rgba(' + snow + ',0)');
+              fctx.fillStyle = hg;
+              fctx.fillRect(Math.min(x0, x1), yb, Math.abs(x1 - x0), yb2 - yb);
             }
           }
+          fctx.fillStyle = 'rgba(' + snow + ',1)';
+          s.chunks = s.chunks.filter(function (ch) {
+            ch.life -= dt;
+            if (ch.life <= 0) return false;
+            ch.vy += 1100 * dt; ch.x += ch.vx * dt; ch.y += ch.vy * dt;
+            if (ch.y > H - 8 && ch.vy > 0) ch.vy *= -0.35;
+            fctx.globalAlpha = Math.min(1, ch.life * 2) * fade;
+            fctx.beginPath();
+            fctx.arc(ch.x, ch.y, ch.r, 0, Math.PI * 2);
+            fctx.fill();
+            return true;
+          });
+          fctx.globalAlpha = 1;
+
+          // 4) Durchzug: kurz fast weiß, die Mitte bleibt durchscheinend
+          var white = smooth((t - 4.2) / 1.2) * (1 - smooth((t - 6.6) / 2.2));
+          if (white > 0.01) {
+            fctx.fillStyle = 'rgba(' + snow + ',' + (0.3 * white * fade) + ')';
+            fctx.fillRect(0, 0, W, H);
+          }
+
+          // 5) Nachrieseln: feiner Schnee sinkt langsam herab
+          if (t > 5.8 && t < s.dur - 1.2) {
+            for (var f = 0; f < 5; f++) s.flakes.push({ x: rand(0, W), y: rand(-20, H * 0.5), vy: rand(30, 80),
+                                                       sw: rand(0, 6.3), r: rand(1, 2.4), life: rand(3, 5) });
+          }
+          fctx.fillStyle = 'rgba(' + snow + ',1)';
+          s.flakes = s.flakes.filter(function (fl) {
+            fl.life -= dt;
+            if (fl.life <= 0) return false;
+            fl.y += fl.vy * dt;
+            fl.x += Math.sin(t * 1.5 + fl.sw) * 12 * dt;
+            fctx.globalAlpha = 0.85 * Math.min(1, fl.life) * fade;
+            fctx.beginPath();
+            fctx.arc(fl.x, fl.y, fl.r, 0, Math.PI * 2);
+            fctx.fill();
+            return true;
+          });
+          fctx.globalAlpha = 1;
         }
       }
     };
