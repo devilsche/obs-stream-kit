@@ -56,7 +56,8 @@ def _put(conn, tenant_id, data):
 
 
 def _fresh(now):
-    return {"levels": {k: 0.0 for k in LEVELS}, "at": now, "top": {}, "pull": []}
+    # ein frischer Garten ist feucht, sonst hingen die Blumen gleich die Köpfe
+    return {"levels": {"leaves": 0.0, "water": 60.0, "weeds": 0.0, "heat": 0.0}, "at": now, "top": {}, "pull": []}
 
 
 def _clamp(v):
@@ -162,6 +163,6 @@ def clear(conn, tenant_id, now, kind: str) -> None:
     data = _get(conn, tenant_id) or _fresh(now)
     theme = {"leaves": "autumn", "garden": "spring", "heat": "summer"}[kind]
     for k in {"leaves": ("leaves",), "garden": ("water", "weeds"), "heat": ("heat",)}[kind]:
-        data["levels"][k] = 0.0
+        data["levels"][k] = 60.0 if k == "water" else 0.0
     data.get("top", {}).pop(theme, None)
     _put(conn, tenant_id, data)

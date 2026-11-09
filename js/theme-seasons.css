@@ -1,0 +1,193 @@
+/* Jahreszeiten-Themen Herbst (ta-), Frühling (tsp-), Sommer (tss-) der
+   Weather-Source (js/theme-autumn.js, theme-spring.js, theme-summer.js).
+   Zustände als data-* an den Wurzeln (.ts), Mengen als CSS-Variablen:
+   --ts-night, --tsp-wilt, --tsp-dry, --tss-heat, --tss-sun, --tss-halo. */
+
+.ts {
+  position: absolute; inset: 0; pointer-events: none;
+  --ts-night: 0;
+  opacity: 1;
+  transition: opacity 2s ease;
+}
+.ts[data-on="0"] { opacity: 0; visibility: hidden; transition: opacity 2s ease, visibility 0s linear 2s; }
+.ts-layer { position: absolute; inset: 0; width: 1920px; height: 1080px; overflow: visible; pointer-events: none; }
+.ts-defs { position: absolute; width: 0; height: 0; }
+
+/* Nacht: Deko dunkler, Lichter bleiben hell */
+.ta-dim, .tsp-dim, .tss-dim { filter: brightness(calc(1 - 0.4 * var(--ts-night))); }
+
+/* ═════ Herbst ═════ */
+.ts[data-garland="0"] .ta-garland,
+.ts[data-branch="0"] .ta-branch,
+.ts[data-pile="0"] .ta-pile,
+.ts[data-pumpkins="0"] .ta-pumpkins { display: none; }
+
+.ta-c1 { fill: #d9480f; } .ta-c2 { fill: #f08c00; } .ta-c3 { fill: #c92a2a; }
+.ta-c4 { fill: #fab005; } .ta-c5 { fill: #a0522d; }
+.ta-vein { fill: none; stroke: rgba(50, 20, 0, 0.45); stroke-width: 1.4; }
+
+/* Blätterranke mit Lichterkette */
+.ta-vine { fill: none; stroke: #5b3d22; stroke-width: 5; stroke-linecap: round; }
+.ta-acorn-cap { fill: #6b4423; }
+.ta-acorn-nut { fill: #b07a3c; }
+.ta-fl-glow { fill: #ffcf7a; filter: url(#ta-glow); opacity: calc(0.6 + 0.4 * var(--ts-night)); }
+.ta-fl-dot { fill: #fff2c9; }
+.ta-fl { animation: taTwinkle 2.6s ease-in-out infinite; }
+.ts[data-celebrate="1"] .ta-fl { animation-duration: 0.4s; }
+@keyframes taTwinkle { 0%, 100% { opacity: 1; } 45% { opacity: 0.25; } 60% { opacity: 1; } }
+.ta-fl.ri-0 { animation-delay: -0.1s; } .ta-fl.ri-1 { animation-delay: -1.3s; } .ta-fl.ri-2 { animation-delay: -0.7s; }
+.ta-fl.ri-3 { animation-delay: -1.9s; } .ta-fl.ri-4 { animation-delay: -0.4s; } .ta-fl.ri-5 { animation-delay: -1.6s; }
+.ta-fl.ri-6 { animation-delay: -1.0s; } .ta-fl.ri-7 { animation-delay: -2.1s; } .ta-fl.ri-8 { animation-delay: -0.25s; }
+.ta-fl.ri-9 { animation-delay: -1.45s; }
+
+/* Ast */
+.ta-sway { animation: tsSway 7s ease-in-out infinite; transform-origin: 0 150px; }
+.ta-wood { fill: none; stroke: #4a3020; stroke-linecap: round; }
+.ta-bl { transform-box: fill-box; transform-origin: 50% 0; transition: opacity 0.4s; }
+.ta-bl--gone { opacity: 0; }
+.ta-bl--grow { animation: taGrow 1.4s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+@keyframes taGrow { from { transform: scale(0); } to { transform: none; } }
+@keyframes tsSway { 0%, 100% { transform: rotate(-0.8deg); } 50% { transform: rotate(0.8deg); } }
+
+/* Kürbisse: nachts leuchten die geschnitzten Gesichter */
+.ta-pk-body { fill: #e8740c; }
+.ta-pk-lobe { fill: #f08c1a; }
+.ta-pk-rib { fill: none; stroke: #b5520a; stroke-width: 2.5; }
+.ta-pk-stem { fill: #5a6b2a; }
+.ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 3s ease; }
+.ta-pk-light { fill: #ffb43a; filter: url(#ta-glow); opacity: 0; transition: opacity 3s ease; }
+.ts[data-night="1"] .ta-pk-face { opacity: 1; animation: taFlicker 2.2s ease-in-out infinite; }
+.ts[data-night="1"] .ta-pk-light { opacity: 0.6; animation: taFlicker 2.2s ease-in-out infinite; }
+.ts[data-celebrate="1"] .ta-pk-light { opacity: 1; }
+@keyframes taFlicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
+.ta-pk-inner { transform-box: fill-box; transform-origin: 50% 100%; }
+.ta-pk--new .ta-pk-inner { animation: taDrop 0.8s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes taDrop { from { transform: translateY(-260px); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+.ts[data-celebrate="1"] .ta-pk-inner { animation: tsHop 0.35s ease-in-out 4; }
+@keyframes tsHop { 0%, 100% { transform: none; } 50% { transform: translateY(-14px); } }
+
+/* Rechen */
+.ta-rake { display: none; }
+.ta-rake.is-on { display: inline; }
+.ta-rake-handle { stroke: #8a5a2b; stroke-width: 9; stroke-linecap: round; }
+.ta-rake-head { fill: none; stroke: #9aa3ad; stroke-width: 5; stroke-linecap: round; }
+
+/* ═════ Frühling ═════ */
+.ts--spring { --tsp-wilt: 0; --tsp-dry: 0; }
+.ts[data-meadow="0"] .tsp-meadow,
+.ts[data-branch="0"] .tsp-branch,
+.ts[data-bugs="0"] .tsp-bugs { display: none; }
+
+.tsp-p1 { fill: #ff5d8f; } .tsp-p2 { fill: #ffd23f; } .tsp-p3 { fill: #8e6cff; }
+.tsp-p4 { fill: #ff8a3d; } .tsp-p5 { fill: #ffffff; }
+
+/* Kirschzweig */
+.tsp-sway { animation: tsSway 8s ease-in-out infinite; transform-origin: 0 150px; }
+.tsp-wood { fill: none; stroke: #4b2e2a; stroke-linecap: round; }
+.tsp-bpetal { fill: #ffd0e0; stroke: #f59ab9; stroke-width: 0.8; }
+.tsp-bcore { fill: #e0457b; }
+
+/* Wiese: Trockenheit legt eine gelbe Schicht darüber, Regen macht satter */
+.tsp-grass { fill: #4f9a3a; }
+.tsp-grass--dry { fill: #b4a14a; opacity: var(--tsp-dry); }
+.tsp-blade { fill: none; stroke: #3d8a2e; stroke-width: 3; stroke-linecap: round; }
+.tsp-blades { filter: saturate(calc(1 - 0.6 * var(--tsp-dry))) brightness(calc(1 + 0.15 * var(--tsp-dry))); }
+.ts[data-wet="1"] .tsp-meadow { filter: brightness(calc(0.92 - 0.4 * var(--ts-night))) saturate(1.25); }
+.tsp-weed { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1); transform: scale(0); }
+.tsp-weed.is-on { transform: none; }
+.tsp-weed-leaf { fill: #2f5e22; }
+.tsp-weed-seed { fill: #e8e2a0; }
+
+/* Blumen: unter 30 % Wasser hängen die Köpfe */
+.tsp-stem { fill: none; stroke: #3d8a2e; stroke-width: 4; stroke-linecap: round; }
+.tsp-leaf { fill: #4fa23c; }
+.tsp-grow { transform-box: fill-box; transform-origin: 50% 100%; }
+.tsp-grow--new { animation: tspGrow 1.6s cubic-bezier(0.3, 1.2, 0.5, 1) both; }
+@keyframes tspGrow { from { transform: scaleY(0); } to { transform: none; } }
+.tsp-head {
+  --side: 1;
+  transform-box: fill-box; transform-origin: 50% 100%;
+  transform: rotate(calc(var(--tsp-wilt) * var(--side) * 110deg)) scale(calc(1 - var(--tsp-wilt) * 0.2));
+}
+.tsp-head--l { --side: -1; }
+.tsp-bloom { transform-box: fill-box; transform-origin: 50% 50%; }
+.tsp-grow--new .tsp-bloom { animation: tspOpen 1.2s 1.1s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes tspOpen { from { transform: scale(0.15) rotate(-40deg); } to { transform: none; } }
+.ts[data-celebrate="1"] .tsp-bloom { animation: tspParty 0.5s ease-in-out 6; }
+@keyframes tspParty { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3) rotate(15deg); } }
+.tsp-center { fill: #f5b800; }
+.tsp-center--dark { fill: #2a1b12; }
+
+/* Biene + Schmetterling */
+.tsp-bee { fill: #ffcc1f; stroke: #2a1b12; stroke-width: 2; }
+.tsp-bee-stripe { fill: #2a1b12; }
+.tsp-wing { fill: rgba(235, 248, 255, 0.85); stroke: rgba(120, 160, 190, 0.8); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 100%; animation: tspFlap 0.08s linear infinite alternate; }
+@keyframes tspFlap { from { transform: scaleY(1); } to { transform: scaleY(0.3); } }
+.tsp-bfly-wing { transform-box: fill-box; transform-origin: 100% 50%; animation: tspBflap 0.35s ease-in-out infinite alternate; }
+.tsp-bfly-wing--r { transform-origin: 0% 50%; }
+@keyframes tspBflap { from { transform: scaleX(1); } to { transform: scaleX(0.25); } }
+.tsp-bfly-a { fill: #ff8a3d; stroke: #3a2010; stroke-width: 2; }
+.tsp-bfly-b { fill: #6fb7ff; stroke: #1a2f50; stroke-width: 2; }
+.tsp-bfly-body { fill: #2a1b12; }
+
+/* Gießkanne */
+.tsp-can { display: none; }
+.tsp-can.is-on { display: inline; }
+.tsp-can-body { fill: #3fa9a0; stroke: #1f6660; stroke-width: 3; }
+.tsp-can-handle { fill: none; stroke: #1f6660; stroke-width: 6; }
+
+/* ═════ Sommer ═════ */
+.ts--summer { --tss-heat: 0; --tss-sun: 0; --tss-halo: 0; }
+.ts[data-beach="0"] .tss-beach,
+.ts[data-beach="0"] .tss-shimmer,
+.ts[data-umbrella="0"] .tss-umbrella { display: none; }
+
+/* Abendstimmung nur an Ober- und Unterrand */
+.tss-evening {
+  position: absolute; inset: 0; pointer-events: none;
+  opacity: calc(0.55 * var(--ts-night));
+  background:
+    linear-gradient(rgba(20, 20, 70, 0.55), rgba(20, 20, 70, 0) 22%),
+    linear-gradient(to top, rgba(255, 120, 60, 0.28), rgba(60, 30, 80, 0.3) 18%, rgba(60, 30, 80, 0) 38%);
+}
+
+/* Sonnenbrille auf der Sonne der Weather-Kit, Hof wächst mit der Hitze */
+.tss-halo { fill: url(#tss-haloG); opacity: var(--tss-halo); }
+.tss-shades { opacity: var(--tss-sun); }
+.tss-shades-glass { fill: #1d1d24; }
+.tss-shades-glint { fill: rgba(255, 255, 255, 0.35); }
+.tss-smile { fill: none; stroke: #c96a00; stroke-width: 5; stroke-linecap: round; }
+
+/* Strand: heißer Sand wird orange */
+.tss-sand { fill: url(#tss-sandG); }
+.tss-sand--hot { fill: url(#tss-hotG); opacity: calc(0.45 * var(--tss-heat)); }
+.tss-dot { fill: #b8955a; opacity: 0.5; }
+.tss-shell { fill: #ffe0d0; stroke: #d9a08a; stroke-width: 1.5; }
+.tss-castle { fill: #e2c27f; stroke: #b8955a; stroke-width: 2; }
+.tss-door { fill: #9b7a45; }
+.tss-flagpole { stroke: #6b4a2b; stroke-width: 2.5; }
+.tss-flag { transform-box: fill-box; transform-origin: 0% 50%; animation: tssFlutter 1.6s ease-in-out infinite; }
+.ts[data-celebrate="1"] .tss-flag { animation-duration: 0.3s; }
+@keyframes tssFlutter { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(8deg) scaleX(0.85); } }
+.tss-f1 { fill: #e84a5f; } .tss-f2 { fill: #2a9df4; } .tss-f3 { fill: #f2b705; } .tss-f4 { fill: #8e4bb8; } .tss-f5 { fill: #2ec27e; }
+.tss-castle-g { transform-box: fill-box; transform-origin: 50% 100%; }
+.tss-castle-g--new { animation: tssRise 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes tssRise { from { transform: scaleY(0); } to { transform: none; } }
+.ts[data-celebrate="1"] .tss-castle-g { animation: tsHop 0.35s ease-in-out 4; }
+.tss-utop { fill: #e84a5f; }
+.tss-ustripe { fill: #ffffff; }
+.tss-pole { stroke: #e8e2d0; stroke-width: 5; }
+
+/* Eis */
+.tss-cone { fill: #d9a35a; stroke: #a8742e; stroke-width: 2; }
+.tss-cone-grid { fill: none; stroke: #a8742e; stroke-width: 1.2; }
+.tss-scoop1 { fill: #ffb3c8; } .tss-scoop2 { fill: #fff3d6; } .tss-scoop3 { fill: #8b5a3c; } .tss-scoop4 { fill: #b9f0c0; }
+
+/* Wasserball */
+.tss-ball-w { fill: #ffffff; stroke: #2a64b8; stroke-width: 2; }
+.tss-ball-r { fill: #e84a5f; } .tss-ball-b { fill: #2a9df4; } .tss-ball-y { fill: #f2b705; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ts *, .ts *::before, .ts *::after { animation: none !important; }
+  .ts, .ta-pk-face, .ta-pk-light, .tsp-weed { transition-duration: 0.4s; }
+}

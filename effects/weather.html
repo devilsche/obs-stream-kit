@@ -6,6 +6,7 @@
   <script src="../js/stinger-ready.js"></script>
   <link rel="stylesheet" href="../js/season-kit.css" />
   <link rel="stylesheet" href="../js/theme-winter.css" />
+  <link rel="stylesheet" href="../js/theme-seasons.css" />
   <title>Weather Overlay</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -128,6 +129,10 @@
   <script src="../js/weather-frost.js"></script>
   <script src="../js/weather-audio.js"></script>
   <script src="../js/theme-winter.js"></script>
+  <script src="../js/theme-seasons.js"></script>
+  <script src="../js/theme-autumn.js"></script>
+  <script src="../js/theme-spring.js"></script>
+  <script src="../js/theme-summer.js"></script>
   <script>
     (function () {
       'use strict';
@@ -141,6 +146,14 @@
       // Deko-Thema vor dem Frost anlegen: der Frost liegt als „Scheibe“ darüber
       var theme = window.ThemeWinter.create(document.getElementById('stage'), {
         tags: document.getElementById('tags'), hud: document.querySelector('.hud') });
+      // Herbst, Frühling, Sommer: je ein Baustein, sichtbar nur im eigenen Thema
+      var seasonOpts = { tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
+                         sky: function () { return kit.state(); } };
+      var seasons = {
+        autumn: window.ThemeAutumn.create(document.getElementById('stage'), seasonOpts),
+        spring: window.ThemeSpring.create(document.getElementById('stage'), seasonOpts),
+        summer: window.ThemeSummer.create(document.getElementById('stage'), seasonOpts)
+      };
       var frost = window.WeatherFrost.create(document.getElementById('stage'), {
         tags: document.getElementById('tags'), board: document.getElementById('frostBoard') });
       var lastFrostTop = [];
@@ -159,10 +172,13 @@
 
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
                   'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder',
-                  'theme', 'xmasfrom', 'xmasto', 'snowrate', 'shakeneed', 'shakewin',
-                  'lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover'];
-      // Deko-Teile, die einzeln abschaltbar sind (fehlt = an)
-      var PARTS = ['lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover'];
+                  'theme', 'xmasfrom', 'xmasto', 'snowrate', 'leafrate', 'shakeneed', 'shakewin',
+                  'lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover',
+                  'garland', 'branch', 'pile', 'pumpkins', 'meadow', 'bugs', 'beach', 'umbrella'];
+      // Deko-Teile, die einzeln abschaltbar sind (fehlt = an); branch gilt
+      // für den Herbst-Ast und den Kirschzweig im Frühling
+      var PARTS = ['lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover',
+                   'garland', 'branch', 'pile', 'pumpkins', 'meadow', 'bugs', 'beach', 'umbrella'];
       function fromUrl() {
         var out = {};
         KEYS.forEach(function (k) {
@@ -185,7 +201,7 @@
       // Felder, die sich ändern, ohne dass das Bild anders aussieht
       var SIG_SKIP = { until: 1, transition: 1, source: 1, temp: 1, freezing: 1,
                        frost: 1, frostTop: 1, frostOn: 1,
-                       theme: 1, xmas: 1, snowCover: 1, snowTop: 1 };
+                       theme: 1, xmas: 1, snowCover: 1, snowTop: 1, seasonLevels: 1, seasonTop: 1 };
       // Wind aus dem Schalter: auto = Wind der Lage (live: echter Wind),
       // random = wechselt von selbst, Zahl = fest
       function withWind(state) {
@@ -224,6 +240,11 @@
                        snowCover: typeof state.snowCover === 'number' ? state.snowCover : 0,
                        snowTop: state.snowTop || [], heat: state.heat || 0, night: state.night || 0,
                        parts: parts });
+        var ss = {};
+        for (var k in state) ss[k] = state[k];
+        ss.theme = state.theme || 'none';
+        ss.parts = parts;
+        Object.keys(seasons).forEach(function (n) { seasons[n].update(ss); });
         lastTheme = state.theme || 'none';
         wantStep(lastTheme === 'winter' ? state.xmas : null);
       }
@@ -305,7 +326,7 @@
         }
         var q = new URLSearchParams();
         ['place', 'lock', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'aurorakd', 'frost', 'frostrate',
-         'theme', 'xmasfrom', 'xmasto', 'snowrate'].forEach(function (k) {
+         'theme', 'xmasfrom', 'xmasto', 'snowrate', 'leafrate'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
@@ -330,6 +351,12 @@
       function randomShow() { return K.SPECTACLES[Math.floor(Math.random() * K.SPECTACLES.length)]; }
 
       // ── Befehle ──
+      var SEASON_OF = { pumpkins: 'autumn', leaves: 'autumn', flowers: 'spring', garden: 'spring',
+                        castles: 'summer', heat: 'summer' };
+      var LEVEL_KINDS = { leaves: 1, garden: 1, heat: 1 };
+      var SEASON_OF_CMD = { pumpkin: 'autumn', rake: 'autumn', jump: 'autumn', sweep: 'autumn',
+                            flower: 'spring', water: 'spring', weed: 'spring', bee: 'spring',
+                            castle: 'summer', splash: 'summer', ice: 'summer', cool: 'summer' };
       function applyCommand(c) {
         var p = c.params || {};
         switch (c.cmd) {
@@ -342,6 +369,7 @@
             break;
           case 'gust':
             kit.gust();
+            if (seasons[lastTheme]) seasons[lastTheme].command('gust', p);
             break;
           case 'scrape':
             frost.scrape(p.name, p.done, p.level);
@@ -371,10 +399,41 @@
           case 'shovel':
           case 'icicle':
           case 'snowball':
-          case 'celebrate':
           case 'snowboard':
-          case 'clear':
             theme.command(c.cmd, p);
+            break;
+          // gemeinsam: an das aktive Thema
+          case 'celebrate':
+            (seasons[lastTheme] || theme).command('celebrate', p);
+            break;
+          case 'seasonboard':
+            if (seasons[lastTheme]) seasons[lastTheme].command('seasonboard', p);
+            else if (lastTheme === 'winter') theme.command('snowboard', p);
+            break;
+          case 'clear':
+            // Art bestimmt das Thema; Stände holt der nächste Abruf vom Server
+            if (SEASON_OF[p.kind]) {
+              seasons[SEASON_OF[p.kind]].command('clear', p);
+              if (LEVEL_KINDS[p.kind]) fetchState();
+            } else theme.command('clear', p);
+            break;
+          // Herbst, Frühling, Sommer: Follower-Items immer (Stand bleibt
+          // aktuell), Aktionen nur im aktiven Thema
+          case 'pumpkin':
+          case 'flower':
+          case 'castle':
+            seasons[SEASON_OF_CMD[c.cmd]].command(c.cmd, p);
+            break;
+          case 'rake':
+          case 'jump':
+          case 'sweep':
+          case 'water':
+          case 'weed':
+          case 'bee':
+          case 'splash':
+          case 'ice':
+          case 'cool':
+            if (SEASON_OF_CMD[c.cmd] === lastTheme) seasons[lastTheme].command(c.cmd, p);
             break;
           case 'shake':
             theme.command('shake', Object.assign({ win: settings.shakewin }, p));
@@ -455,7 +514,10 @@
       applyTestBg();
       fetchState();
       if (apiBase) {
-        listen('weather', applyCommand, function (st) { theme.load(st); });
+        listen('weather', applyCommand, function (st) {
+          theme.load(st);
+          Object.keys(seasons).forEach(function (n) { seasons[n].load(st); });
+        });
         if (params.get('chan') === 'rain') listen('rain', applyRainCommand);
       }
     })();

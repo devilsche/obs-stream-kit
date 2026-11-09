@@ -30,12 +30,13 @@ def test_leaves_fall_faster_with_wind_and_rake_counts(conn):
 
 
 def test_garden_dries_rain_waters_weeds_grow(conn):
-    advance(conn, 1, 0, "spring", W)
-    use(conn, 1, "water", "Ben", 0)                               # Feuchte 10
-    lv = advance(conn, 1, 120, "spring", {**W, "rain": 1})["levels"]
-    assert lv["water"] == pytest.approx(66) and lv["weeds"] == pytest.approx(2)
-    assert advance(conn, 1, 720, "spring", W)["levels"]["water"] == pytest.approx(46)
-    assert advance(conn, 1, 780, "spring", {**W, "heat": 1})["levels"]["water"] == pytest.approx(40)
+    assert advance(conn, 1, 0, "spring", W)["levels"]["water"] == 60   # frischer Garten ist feucht
+    assert advance(conn, 1, 1500, "spring", W)["levels"]["water"] == pytest.approx(10)
+    use(conn, 1, "water", "Ben", 1500)                            # Feuchte 20
+    lv = advance(conn, 1, 1620, "spring", {**W, "rain": 1})["levels"]
+    assert lv["water"] == pytest.approx(76) and lv["weeds"] == pytest.approx(27)
+    assert advance(conn, 1, 2220, "spring", W)["levels"]["water"] == pytest.approx(56)
+    assert advance(conn, 1, 2280, "spring", {**W, "heat": 1})["levels"]["water"] == pytest.approx(50)
 
 
 def test_weed_group_halves_and_force(conn):
