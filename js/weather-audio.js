@@ -102,14 +102,11 @@
         targets['wind-loop-light'] = w > 0.15 ? (w * (1 - strong)) : 0;
       },
       // Donner: vorab dekodiert und aus dem Speicher gespielt (keine Ladezeit),
-      // setzt mit dem Blitz ein; fern nur leiser und tiefer. Donner dürfen
-      // überlappen (bis zu 6), je mehr gleichzeitig, desto leiser jeder;
-      // dicht aufeinander folgende setzen versetzt im Grollen ein
+      // setzt mit dem Blitz ein; fern nur leiser und tiefer. Jeder Blitz
+      // bekommt seinen eigenen Donner von Anfang an, sie dürfen überlappen
+      // (bis zu 8); je mehr gleichzeitig, desto etwas leiser jeder
       thunder: function (dist) {
-        var now = Date.now() / 1000;
-        if (!on || now - lastThunder < 0.12 || voices >= 6) return;
-        var dense = now - lastThunder < 1.5;
-        lastThunder = now;
+        if (!on || voices >= 8) return;
         var d = typeof dist === 'number' ? clamp(dist, 0, 1) : Math.random();
         var vol = volume * thunderLevel * (1 - 0.45 * d);
         if (vol <= 0.01) return;
@@ -118,11 +115,11 @@
           var src = actx.createBufferSource(), g = actx.createGain();
           src.buffer = thunderBuf;
           src.playbackRate.value = rate;
-          g.gain.value = clamp(vol / Math.sqrt(voices + 1), 0, 1);
+          g.gain.value = clamp(vol / Math.pow(voices + 1, 0.35), 0, 1);
           src.connect(g).connect(actx.destination);
           voices++;
           src.onended = function () { voices = Math.max(0, voices - 1); };
-          src.start(0, dense ? Math.random() * 1.2 : 0);
+          src.start();
           return;
         }
         // Rückfall ohne Web Audio
