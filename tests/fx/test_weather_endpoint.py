@@ -177,3 +177,19 @@ def test_wind_setting_accepts_auto_and_random():
     for v in ("auto", "random"):
         assert commands.parse("weather", {"cmd": "set", "wind": v})["params"] == {"wind": v}
     assert commands.parse("weather", {"cmd": "set", "wind": "-3"})["params"] == {"wind": -1.0}
+
+
+def test_night_from_api_reaches_override_and_never_leaks_sun_times(conn, monkeypatch):
+    import time as _t
+    from fx.weather import from_api
+    now = _t.time()
+    monkeypatch.setattr(weather_state, "geocode", lambda q: LOC)
+    monkeypatch.setattr(weather_state, "current", lambda tid, lat, lon: {
+        **from_api(0, 5, 5, 270), "_sunrise": now - 20 * 3600, "_sunset": now - 4 * 3600})
+    c = _client(conn)
+    st = _state(c, "?place=Frankfurt")
+    assert st["night"] == 1 and st["sun"] == 0
+    assert "_sunrise" not in st and "_sunset" not in st
+    c.get("/s/t/api/fx/weather?cmd=weather&to=clear")
+    st = _state(c, "?place=Frankfurt")
+    assert st["source"] == "override" and st["night"] == 1 and st["sun"] == 0

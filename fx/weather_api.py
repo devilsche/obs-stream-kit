@@ -82,12 +82,21 @@ def current(tenant_id: int, lat: float, lon: float, now=None):
     if hit and hit["loc"] == loc and now - hit["at"] < FRESH:
         return hit["value"]
     url = _FORECAST + "?" + urllib.parse.urlencode({
-        "latitude": lat, "longitude": lon,
-        "current": "temperature_2m,weather_code,wind_speed_10m,wind_direction_10m"})
+        "latitude": lat, "longitude": lon, "timezone": "auto", "timeformat": "unixtime",
+        "forecast_days": 1, "daily": "sunrise,sunset",
+        "current": "temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,cloud_cover"})
     try:
-        c = _fetch_json(url)["current"]
+        data = _fetch_json(url)
+        c = data["current"]
+        cloud = c.get("cloud_cover")
         value = from_api(int(c["weather_code"]), float(c["temperature_2m"]),
-                         float(c["wind_speed_10m"]), float(c["wind_direction_10m"]))
+                         float(c["wind_speed_10m"]), float(c["wind_direction_10m"]),
+                         cloud=float(cloud) if cloud is not None else None)
+        # Sonnenzeiten nur intern: verraten ungefähr den Ort, gehen nie ans Overlay
+        daily = data.get("daily") or {}
+        if daily.get("sunrise") and daily.get("sunset"):
+            value["_sunrise"] = float(daily["sunrise"][0])
+            value["_sunset"] = float(daily["sunset"][0])
     except Exception as e:
         log.warning("weather: fetch failed for tenant %s (%s)", tenant_id, type(e).__name__)
         if hit and hit["loc"] == loc and now - hit["at"] < STALE:

@@ -30,6 +30,10 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
         log.exception("weather: live weather failed for tenant %s", tenant_id)
     if base:
         source = "api"
+        base = dict(base)
+        rise, set_ = base.pop("_sunrise", None), base.pop("_sunset", None)
+        if rise and set_:
+            base.update(weather.daylight(now, rise, set_))
     else:
         base = weather.profile(opts.get("fallback") or "clear")
 
@@ -53,8 +57,11 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     if ov:
         # Übersteuerung ersetzt Lage und Stimmung, der echte Wind bleibt
         state = {**weather.profile(ov["kind"]), "wind": base.get("wind", 0)}
+        if ov["kind"] not in ("night", "dusk"):
+            state.update(night=base.get("night", 0), dusk=base.get("dusk", 0))
         source, until, transition = "override", ov["until"], TRANSITION_FAST
 
+    state = weather.apply_daylight(state)
     state.update(source=source, until=until, transition=transition,
                  mood=round(mood * strength, 2))
     state.setdefault("temp", None)

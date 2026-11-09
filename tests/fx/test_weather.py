@@ -4,7 +4,7 @@ from fx.weather import KINDS, SPECTACLES, apply_mood, from_api, mood_precip, moo
 
 def test_profiles_cover_all_kinds():
     assert KINDS == ("clear", "cloudy", "fog", "drizzle", "rain", "storm",
-                     "sleet", "snow", "blizzard", "heat")
+                     "sleet", "snow", "blizzard", "heat", "night", "dusk")
     assert SPECTACLES == ("tsunami", "megabolt", "ballbolt", "avalanche")
     for k in KINDS:
         p = profile(k)
@@ -77,3 +77,39 @@ def test_good_mood_keeps_snow_but_adds_sun():
 def test_strength_zero_is_pure_weather():
     base = from_api(3, 12, 5, 270)
     assert apply_mood(base, -1, 0, "rain") == base
+
+
+from fx.weather import daylight
+
+
+def test_night_and_dusk_profiles_exist():
+    assert profile("night")["night"] == 1 and profile("night")["sun"] == 0
+    assert profile("dusk")["dusk"] == 1
+    assert profile("clear")["night"] == 0 and profile("clear")["dusk"] == 0
+
+
+def test_partly_cloudy_is_clear_with_clouds_from_cover():
+    few = from_api(2, 12, 5, 270, cloud=20)
+    many = from_api(2, 12, 5, 270, cloud=60)
+    assert few["kind"] == many["kind"] == "clear"
+    assert many["clouds"] > few["clouds"] and many["sun"] < few["sun"]
+    assert from_api(0, 12, 5, 270, cloud=0)["sun"] == profile("clear")["sun"]
+    assert from_api(3, 12, 5, 270, cloud=90)["kind"] == "cloudy"
+
+
+SUNRISE, SUNSET = 1_000_000, 1_000_000 + 9 * 3600
+
+
+def test_daylight_day_night_and_twilight():
+    assert daylight(SUNRISE + 4 * 3600, SUNRISE, SUNSET) == {"night": 0, "dusk": 0}
+    assert daylight(SUNSET + 3 * 3600, SUNRISE, SUNSET) == {"night": 1, "dusk": 0}
+    assert daylight(SUNRISE - 3 * 3600, SUNRISE, SUNSET) == {"night": 1, "dusk": 0}
+    at_set = daylight(SUNSET, SUNRISE, SUNSET)
+    assert at_set["dusk"] == 1 and 0 < at_set["night"] < 1
+    later = daylight(SUNSET + 30 * 60, SUNRISE, SUNSET)
+    assert later["night"] > at_set["night"] and 0 < later["dusk"] < 1
+
+
+def test_night_puts_out_the_sun_even_with_good_mood():
+    s = apply_mood({**profile("clear"), "night": 1}, 1, 1.0, None)
+    assert s["sun"] == 0

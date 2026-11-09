@@ -186,7 +186,7 @@ _PET_FONTS = [
     ["Cinzel Decorative", "Cinzel Decorative"],
 ]
 
-_WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"]]
+_WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"], ["night", "Clear night"], ["dusk", "Dusk"]]
 
 EFFECT_META = {
     "snow.html": {"hidden": True},
@@ -551,15 +551,16 @@ EFFECT_META = {
                      ["0", "None"], ["0.5", "Right"], ["1", "Strong right"]],
          "tooltip": "Auto: the real wind (none for fixed weather). Random: changes on its own every 6–15 s, sometimes from the left, sometimes from the right. Any value from -1 to 1 via URL."},
     ],
-    # Knöpfe im Dashboard: Wetter bis "Auto" erzwingen, Blitz, Böe, Spektakel
+    # Knöpfe im Dashboard: Wetter für 2,5 min wie ein Chat-Befehl (dauerhaft: Fixed weather)
     "controls": [
         {"q": "cmd=auto", "label": "Auto (live weather)", "icon": "auto_mode"},
-        {"q": "cmd=weather&to=clear&hold=0", "label": "Clear", "icon": "sunny"},
-        {"q": "cmd=weather&to=rain&hold=0", "label": "Rain", "icon": "rainy"},
-        {"q": "cmd=weather&to=storm&hold=0", "label": "Thunderstorm", "icon": "thunderstorm"},
-        {"q": "cmd=weather&to=snow&hold=0", "label": "Snow", "icon": "ac_unit"},
-        {"q": "cmd=weather&to=blizzard&hold=0", "label": "Blizzard", "icon": "severe_cold"},
-        {"q": "cmd=weather&to=fog&hold=0", "label": "Fog", "icon": "foggy"},
+        {"q": "cmd=weather&to=night", "label": "Night", "icon": "bedtime"},
+        {"q": "cmd=weather&to=clear", "label": "Clear", "icon": "sunny"},
+        {"q": "cmd=weather&to=rain", "label": "Rain", "icon": "rainy"},
+        {"q": "cmd=weather&to=storm", "label": "Thunderstorm", "icon": "thunderstorm"},
+        {"q": "cmd=weather&to=snow", "label": "Snow", "icon": "ac_unit"},
+        {"q": "cmd=weather&to=blizzard", "label": "Blizzard", "icon": "severe_cold"},
+        {"q": "cmd=weather&to=fog", "label": "Fog", "icon": "foggy"},
         {"q": "cmd=strike", "label": "Lightning", "icon": "bolt"},
         {"q": "cmd=gust", "label": "Gust", "icon": "air"},
         {"q": "cmd=spectacle&type=tsunami", "label": "Tsunami", "icon": "tsunami"},

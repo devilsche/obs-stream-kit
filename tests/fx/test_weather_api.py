@@ -118,3 +118,13 @@ def test_lookup_reports_place_weather_and_sun(monkeypatch):
 def test_lookup_unknown_place(monkeypatch):
     monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {})
     assert weather_api.lookup("Xyzzy") == {"found": False}
+
+
+def test_current_reads_cloud_cover_and_sun_times(monkeypatch):
+    monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {
+        "current": {"weather_code": 2, "temperature_2m": 10, "wind_speed_10m": 0,
+                    "wind_direction_10m": 0, "cloud_cover": 60},
+        "daily": {"sunrise": [1000], "sunset": [5000]}})
+    s = current(1, 1, 1, now=0)
+    assert s["kind"] == "clear" and s["clouds"] > 0.3
+    assert s["_sunrise"] == 1000 and s["_sunset"] == 5000

@@ -370,7 +370,7 @@ Drei Schichten, die oberste gewinnt:
 2. **K/D-Stimmung** der laufenden Session (nur BR-Runden, alle verfolgten Accounts, ab 3 Runden, Session = letzte Runde < 4 h her). Unter der unteren Grenze (Standard 1,5) wird es trüb mit Niesel, ab drei Vierteln davon (≈ 1,1) Regen — nie Gewitter. Über der oberen Grenze (Standard 2,5) kommt Sonne durch, auch bei Regen oder Schnee. Dazwischen verläuft es stufenlos, bei 2,0 neutral. Abdunklung und Nebel liegen nur am Rand, die Bildmitte bleibt frei; mit `veil=1` kommt ein leichter Grauschleier (höchstens 10 %) übers ganze Bild.
 3. **Chat-Übersteuerung** per `cmd=weather&to=<lage>` für 2,5 min (`hold` in Sekunden, `0` = bis `cmd=auto`). Mehrere Befehle innerhalb von 15 s: der jüngste wartet, bis die 15 s um sind — kein Flackern. Erzwungenes Wetter überlebt einen Server-Neustart.
 
-Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `blizzard`, `heat`. Übergänge: echtes Wetter/Stimmung 25 s, Übersteuerung 4 s, Regen geht über Schneeregen in Schnee über.
+Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `blizzard`, `heat`, dazu `night` (Sternenhimmel) und `dusk` (Dämmerung) für feste Lage und Chat. Live kommen Nacht und Dämmerung aus Sonnenauf- und -untergang am Ort: ±45 min um Auf-/Untergang färbt sich der Rand orange-rosa, nachts gibt es statt Sonne Sterne oben am Rand und ab und zu eine Sternschnuppe (bei Wolken weniger, bei Niederschlag keine). Teilweise bewölkt zählt als klar; der Wolkenanteil bestimmt, wie viel Sonne durchkommt. Die Sonnenzeiten bleiben auf dem Server. Übergänge: echtes Wetter/Stimmung 25 s, Übersteuerung 4 s, Regen geht über Schneeregen in Schnee über.
 
 **Parameter (URL und `cmd=set`):**
 
@@ -391,14 +391,14 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 |--------|---------|
 | `cmd=weather&to=storm` | Gewitter für 2,5 min, danach zurück; `&hold=60` = 60 s, `&hold=0` = bis `auto` |
 | `cmd=auto` | zurück zum Live-Wetter |
-| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami`, `megabolt`, `ballbolt`, `avalanche`; ohne `type` zufällig. Ein zweites wartet, bis das erste fertig ist |
+| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami` (Welle), `megabolt` (Gewitterwand mit vielen Blitzen), `ballbolt` (nach einem Einschlag glimmt eine gelb-orange Kugel auf, schwebt taumelnd und erlischt lautlos oder platzt — Event für ein Knall-WAV), `avalanche` (Lawine); ohne `type` zufällig. Ein zweites wartet, bis das erste fertig ist |
 | `cmd=strike` | Blitz (`&dist=near` / `&dist=far`, passend zum Donner-WAV) |
 | `cmd=gust` | Windböe |
 | `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die URL |
 
 Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneesturm` → `cmd=weather&to=blizzard`, `!tsunami` → `cmd=spectacle&type=tsunami`. Abklingzeiten und Ton (Donner, Wind, Wellenrauschen) laufen über Streamer.bot — Browser-Ton in OBS ist zu unzuverlässig.
 
-**Testen:** im Dashboard **Stream → Weather** „Apply setting changes live“ einschalten, dann `Fixed weather`, `Test K/D` und `Grey veil` durchschalten und die Knöpfe (Thunderstorm, Tsunami, …) drücken — wirkt sofort auf die Source in OBS.
+**Testen:** Die Knöpfe auf der Karte wirken wie Chat-Befehle 2,5 min lang, dauerhaft geht über `Fixed weather`. Unter **Location** zeigt die Karte den gefundenen Ort, das Wetter dort und die Sonnenzeiten. Im Dashboard **Stream → Weather** „Apply setting changes live“ einschalten, dann `Fixed weather`, `Test K/D` und `Grey veil` durchschalten und die Knöpfe (Thunderstorm, Tsunami, …) drücken — wirkt sofort auf die Source in OBS.
 
 **Alte Rain-/Snow-URLs:** `rain.html?intensity=…&wind=…` (auch `wind=random`) leitet auf `weather.html` mit fester Lage um (`light` → Niesel, `medium`/`heavy` → Regen, `storm` → Gewitter) und hört weiter auf `/api/fx/rain` (`strike`, `gust`, `start`, `stop`, `set&intensity=…`, `reset`). `snow.html` zeigt festen Schnee. Farbe, Spritzer und Browser-Ton der alten Rain-Source gibt es nicht mehr.
 
@@ -406,7 +406,7 @@ Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneestu
 
 Weather, Xmas, Autumn, Winter, Spring und Summer haben im Dashboard (**Stream → <Effekt>**) eine Box **Live control**. Sie wirkt auf die Source, die gerade in OBS läuft, wie ein Streamer.bot-Befehl innerhalb von etwa einer Sekunde:
 
-- **Knöpfe** für das, was man von Hand auslöst: Wetter an/aus (Schnee, Laub, Regen, Hitze), Shake off, Melt, Gust, Sweep, Water, Pull weeds, Bee, Splash, Ice cream, Cool down, Celebrate, Leaders; bei Weather Auto, feste Lagen bis Auto, Lightning, Gust und die vier Spektakel. Knöpfe schicken keinen Namen und zählen deshalb nicht für Ranglisten. Dauerhaftes Löschen (`cmd=clear`) gibt es bewusst nicht als Knopf.
+- **Knöpfe** für das, was man von Hand auslöst: Wetter an/aus (Schnee, Laub, Regen, Hitze), Shake off, Melt, Gust, Sweep, Water, Pull weeds, Bee, Splash, Ice cream, Cool down, Celebrate, Leaders; bei Weather Auto, Lagen für 2,5 min, Lightning, Gust und die vier Spektakel. Knöpfe schicken keinen Namen und zählen deshalb nicht für Ranglisten. Dauerhaftes Löschen (`cmd=clear`) gibt es bewusst nicht als Knopf.
 - **Shake off** und **Pull weeds** gelingen sofort, ohne auf weitere Chatter zu warten (`&force=1`, auch als Mod-Befehl für Streamer.bot nutzbar).
 - **Apply setting changes live**: jede Änderung an einem Schalter geht sofort per `cmd=set` an die laufende Source. Beim Einschalten wird einmal der komplette Stand der Schalter geschickt.
 - **Back to OBS URL** (`cmd=reset`): die Source nimmt wieder die Werte aus ihrer URL; das Live-Setzen schaltet sich dabei aus.

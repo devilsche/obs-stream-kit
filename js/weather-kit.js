@@ -19,23 +19,27 @@
 
   // ── Wetterlagen ──
   // rain/drizzle/snow = Niederschlagsmenge 0..1, clouds/sun/fog/heat 0..1,
-  // lightning 0..2 (aus, selten, oft), windMin = Mindestwind der Lage
+  // lightning 0..2 (aus, selten, oft), windMin = Mindestwind der Lage,
+  // night 0..1 (Sterne statt Sonne), dusk 0..1 (Dämmerungsfarben)
   var PROFILES = {
-    clear:    { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.08, sun: 0.55, fog: 0,    heat: 0, lightning: 0, windMin: 0 },
-    cloudy:   { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.7,  sun: 0.05, fog: 0.05, heat: 0, lightning: 0, windMin: 0 },
-    fog:      { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.45, sun: 0,    fog: 0.85, heat: 0, lightning: 0, windMin: 0 },
-    drizzle:  { precip: 'rain', rain: 0,    drizzle: 0.7, snow: 0,    clouds: 0.6,  sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0 },
-    rain:     { precip: 'rain', rain: 0.6,  drizzle: 0.2, snow: 0,    clouds: 0.75, sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0 },
-    storm:    { precip: 'rain', rain: 1,    drizzle: 0.3, snow: 0,    clouds: 0.95, sun: 0,    fog: 0.15, heat: 0, lightning: 2, windMin: 0.6 },
-    sleet:    { precip: 'mix',  rain: 0.35, drizzle: 0.1, snow: 0.45, clouds: 0.75, sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0.2 },
-    snow:     { precip: 'snow', rain: 0,    drizzle: 0,   snow: 0.6,  clouds: 0.6,  sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0 },
-    blizzard: { precip: 'snow', rain: 0,    drizzle: 0,   snow: 1,    clouds: 0.85, sun: 0,    fog: 0.4,  heat: 0, lightning: 0, windMin: 0.85 },
-    heat:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0,    sun: 1,    fog: 0,    heat: 1, lightning: 0, windMin: 0 }
+    clear:    { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.08, sun: 0.55, fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    cloudy:   { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.7,  sun: 0.05, fog: 0.05, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    fog:      { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.45, sun: 0,    fog: 0.85, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    drizzle:  { precip: 'rain', rain: 0,    drizzle: 0.7, snow: 0,    clouds: 0.6,  sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    rain:     { precip: 'rain', rain: 0.6,  drizzle: 0.2, snow: 0,    clouds: 0.75, sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    storm:    { precip: 'rain', rain: 1,    drizzle: 0.3, snow: 0,    clouds: 0.95, sun: 0,    fog: 0.15, heat: 0, lightning: 2, windMin: 0.6, night: 0, dusk: 0 },
+    sleet:    { precip: 'mix',  rain: 0.35, drizzle: 0.1, snow: 0.45, clouds: 0.75, sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0.2, night: 0, dusk: 0 },
+    snow:     { precip: 'snow', rain: 0,    drizzle: 0,   snow: 0.6,  clouds: 0.6,  sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    blizzard: { precip: 'snow', rain: 0,    drizzle: 0,   snow: 1,    clouds: 0.85, sun: 0,    fog: 0.4,  heat: 0, lightning: 0, windMin: 0.85, night: 0, dusk: 0 },
+    heat:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0,    sun: 1,    fog: 0,    heat: 1, lightning: 0, windMin: 0, night: 0, dusk: 0 },
+    // nur als feste Lage / Chat-Befehl; live kommen Nacht und Dämmerung vom Server
+    night:    { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.05, sun: 0,    fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 1, dusk: 0 },
+    dusk:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.15, sun: 0.35, fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 0.2, dusk: 1 }
   };
   var KINDS = Object.keys(PROFILES);
   var SPECTACLES = ['tsunami', 'megabolt', 'ballbolt', 'avalanche'];
   // windRandom (true/false) ist kein Zahlenwert und springt bei der Hälfte des Übergangs
-  var NUM_KEYS = ['rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind'];
+  var NUM_KEYS = ['rain', 'drizzle', 'snow', 'clouds', 'sun', 'fog', 'heat', 'gloom', 'lightning', 'wind', 'night', 'dusk'];
 
   function rand(a, b) { return a + Math.random() * (b - a); }
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
@@ -330,6 +334,86 @@
     }
 
     // ── Himmel: nur Ränder ──
+    // ── Nacht: Sterne oben am Rand, ab und zu eine Sternschnuppe ──
+    var STAR_BAND = H * 0.36;
+    var stars = [];
+    for (var si = 0; si < 170; si++) {
+      // dichter an der Oberkante, an den Seiten etwas tiefer
+      var sx = rand(0, W), edge = Math.min(sx, W - sx) / (W / 2);
+      stars.push({ x: sx, y: Math.pow(Math.random(), 1.6) * STAR_BAND * (1.35 - 0.5 * edge),
+                   r: rand(0.6, 1.8), tw: rand(0.6, 2.2), ph: rand(0, 6.3) });
+    }
+    var meteor = null, nextMeteor = rand(8, 20);
+
+    function mixRgb(a, b, t) {
+      return Math.round(lerp(a[0], b[0], t)) + ',' + Math.round(lerp(a[1], b[1], t)) + ',' + Math.round(lerp(a[2], b[2], t));
+    }
+
+    function drawNight(n, c) {
+      if (n < 0.01) return;
+      var top = sctx.createLinearGradient(0, 0, 0, H * 0.4);
+      top.addColorStop(0, 'rgba(8,12,32,' + (0.42 * n) + ')');
+      top.addColorStop(1, 'rgba(8,12,32,0)');
+      sctx.fillStyle = top;
+      sctx.fillRect(0, 0, W, H * 0.4);
+      var wet = clamp((cur.rain || 0) + (cur.drizzle || 0) + (cur.snow || 0), 0, 1);
+      var vis = n * (1 - 0.9 * c) * (1 - wet);
+      if (vis < 0.02) { meteor = null; return; }
+      sctx.fillStyle = '#fff';
+      stars.forEach(function (st) {
+        var fade = Math.pow(clamp(1 - st.y / (STAR_BAND * 1.35), 0, 1), 0.8);
+        var tw = reduceMotion ? 0.8 : 0.55 + 0.45 * Math.sin(time * st.tw + st.ph);
+        sctx.globalAlpha = vis * fade * tw;
+        sctx.beginPath();
+        sctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+        sctx.fill();
+      });
+      sctx.globalAlpha = 1;
+      if (reduceMotion || vis < 0.4) return;
+      if (!meteor && time >= nextMeteor) {
+        var fromLeft = Math.random() < 0.5;
+        meteor = { x: fromLeft ? rand(150, W * 0.45) : rand(W * 0.55, W - 150), y: rand(20, STAR_BAND * 0.5),
+                   vx: (fromLeft ? 1 : -1) * rand(700, 1000), vy: rand(220, 360), t: 0, dur: rand(0.7, 1.1) };
+        nextMeteor = time + rand(20, 50);
+      }
+      if (meteor) {
+        meteor.t += dtFrame;
+        var k = meteor.t / meteor.dur;
+        if (k >= 1) { meteor = null; return; }
+        var mx = meteor.x + meteor.vx * meteor.t, my = meteor.y + meteor.vy * meteor.t;
+        var ma = vis * Math.sin(Math.PI * k);
+        var tail = sctx.createLinearGradient(mx, my, mx - meteor.vx * 0.16, my - meteor.vy * 0.16);
+        tail.addColorStop(0, 'rgba(255,255,255,' + ma + ')');
+        tail.addColorStop(1, 'rgba(255,255,255,0)');
+        sctx.strokeStyle = tail;
+        sctx.lineWidth = 2;
+        sctx.lineCap = 'round';
+        sctx.beginPath();
+        sctx.moveTo(mx, my);
+        sctx.lineTo(mx - meteor.vx * 0.16, my - meteor.vy * 0.16);
+        sctx.stroke();
+      }
+    }
+
+    // Dämmerung: warmes orange-rosa Band oben und in den oberen Ecken
+    function drawDusk(d, c, n) {
+      if (d < 0.01) return;
+      var a = d * (1 - 0.55 * c);
+      var band = sctx.createLinearGradient(0, 0, 0, H * 0.34);
+      band.addColorStop(0, 'rgba(255,128,96,' + (0.3 * a) + ')');
+      band.addColorStop(0.5, 'rgba(214,96,140,' + (0.12 * a) + ')');
+      band.addColorStop(1, 'rgba(120,70,150,0)');
+      sctx.fillStyle = band;
+      sctx.fillRect(0, 0, W, H * 0.34);
+      [0, W].forEach(function (cx) {
+        var cg = sctx.createRadialGradient(cx, 0, 0, cx, 0, 620);
+        cg.addColorStop(0, 'rgba(255,150,90,' + (0.26 * a * (1 - 0.5 * n)) + ')');
+        cg.addColorStop(1, 'rgba(255,150,90,0)');
+        sctx.fillStyle = cg;
+        sctx.fillRect(cx - 620, 0, 1240, 620);
+      });
+    }
+
     var puffs = [];
     for (var pi = 0; pi < 9; pi++) {
       puffs.push({ x: rand(0, W + 600), y: rand(-60, 110), r: rand(170, 320), s: rand(8, 22) });
@@ -345,12 +429,20 @@
       var f = clamp(cur.fog, 0, 1), s = clamp(cur.sun, 0, 1), h = clamp(cur.heat, 0, 1);
       var dir = wind >= 0 ? 1 : -1;
 
-      // Sonne: warmer Schein und Strahlen aus der oberen linken Ecke
+      var n = clamp(cur.night || 0, 0, 1), d = clamp(cur.dusk || 0, 0, 1);
+      drawNight(n, c);
+      drawDusk(d, c, n);
+
+      // Sonne: warmer Schein und Strahlen aus der oberen linken Ecke,
+      // in der Dämmerung orange-rosa
+      var sunCore = mixRgb([255, 226, 160], [255, 150, 95], d);
+      var sunMid = mixRgb([255, 214, 140], [255, 128, 110], d);
+      var rayRgb = mixRgb([255, 236, 190], [255, 175, 125], d);
       if (s > 0.01) {
         var glow = sctx.createRadialGradient(0, 0, 0, 0, 0, 760);
-        glow.addColorStop(0, 'rgba(255,226,160,' + (0.5 * s) + ')');
-        glow.addColorStop(0.45, 'rgba(255,214,140,' + (0.16 * s) + ')');
-        glow.addColorStop(1, 'rgba(255,214,140,0)');
+        glow.addColorStop(0, 'rgba(' + sunCore + ',' + (0.5 * s) + ')');
+        glow.addColorStop(0.45, 'rgba(' + sunMid + ',' + (0.16 * s) + ')');
+        glow.addColorStop(1, 'rgba(' + sunMid + ',0)');
         sctx.fillStyle = glow;
         sctx.fillRect(0, 0, 900, 900);
         for (var r = 0; r < 7; r++) {
@@ -359,9 +451,9 @@
           var len = 1150;
           var ray = sctx.createLinearGradient(0, 0, Math.cos(a0) * len, Math.sin(a0) * len);
           var ra = (0.13 + 0.06 * Math.sin(time * 0.5 + r * 2.1)) * s;
-          ray.addColorStop(0, 'rgba(255,236,190,' + ra + ')');
-          ray.addColorStop(0.55, 'rgba(255,236,190,' + (ra * 0.25) + ')');
-          ray.addColorStop(0.8, 'rgba(255,236,190,0)');
+          ray.addColorStop(0, 'rgba(' + rayRgb + ',' + ra + ')');
+          ray.addColorStop(0.55, 'rgba(' + rayRgb + ',' + (ra * 0.25) + ')');
+          ray.addColorStop(0.8, 'rgba(' + rayRgb + ',0)');
           sctx.fillStyle = ray;
           sctx.beginPath();
           sctx.moveTo(-30, -30);
@@ -567,7 +659,7 @@
       emit('spectacle', type);
     }
 
-    var TINT = { tsunami: '40,120,190', megabolt: '200,215,255', ballbolt: '150,210,255', avalanche: '235,242,250' };
+    var TINT = { tsunami: '40,120,190', megabolt: '200,215,255', ballbolt: '255,170,80', avalanche: '235,242,250' };
 
     var SHOWS = {
       tsunami: {
@@ -695,62 +787,71 @@
         }
       },
       ballbolt: {
+        // Kugelblitz wie beschrieben: erst ein Einschlag, dort glimmt eine
+        // gelb-orange Kugel auf, schwebt langsam taumelnd ein Stück und
+        // erlischt lautlos oder platzt mit Lichtblitz und Funken
         init: function () {
-          var flip = Math.random() < 0.5;
-          var pts = [[-140, rand(H * 0.2, H * 0.55)], [W * 0.33, rand(H * 0.05, H * 0.95)],
-                     [W * 0.66, rand(H * 0.05, H * 0.95)], [W + 140, rand(H * 0.25, H * 0.7)]];
-          if (flip) pts = pts.map(function (q) { return [W - q[0], q[1]]; });
-          return { dur: 7, pts: pts, trail: [], sparks: [] };
+          var life = rand(4, 6);
+          return { dur: 0.7 + life + 1.2, born: 0.7, life: life, pop: Math.random() < 0.5,
+                   x: 0, y: 0, vx: rand(-70, 70), vy: rand(-18, 10), seed: rand(0, 100),
+                   sparks: [], struck: false, popped: false };
         },
         draw: function (s, dt) {
-          var t = smooth(s.t / s.dur) * 0.15 + (s.t / s.dur) * 0.85;
-          var u = 1 - t, P = s.pts;
-          var x = u * u * u * P[0][0] + 3 * u * u * t * P[1][0] + 3 * u * t * t * P[2][0] + t * t * t * P[3][0];
-          var y = u * u * u * P[0][1] + 3 * u * u * t * P[1][1] + 3 * u * t * t * P[2][1] + t * t * t * P[3][1];
-          x += Math.sin(s.t * 9) * 6;
-          y += Math.cos(s.t * 7) * 6;
-          s.trail.push([x, y]);
-          if (s.trail.length > 26) s.trail.shift();
-          fctx.lineCap = 'round';
-          for (var i = 1; i < s.trail.length; i++) {
-            fctx.strokeStyle = 'rgba(170,220,255,' + (i / s.trail.length * 0.35) + ')';
-            fctx.lineWidth = i / s.trail.length * 16;
-            fctx.beginPath();
-            fctx.moveTo(s.trail[i - 1][0], s.trail[i - 1][1]);
-            fctx.lineTo(s.trail[i][0], s.trail[i][1]);
-            fctx.stroke();
+          if (!s.struck) {
+            s.struck = true;
+            strike('near');
+            var trunk = bolts[bolts.length - 1].paths[0].pts;
+            var end = trunk[trunk.length - 1];
+            s.x = clamp(end[0], 160, W - 160);
+            s.y = clamp(end[1] - 60, 140, H - 160);
           }
-          var pulse = 1 + 0.12 * Math.sin(s.t * 23);
-          var glow = fctx.createRadialGradient(x, y, 0, x, y, 90 * pulse);
-          glow.addColorStop(0, 'rgba(255,255,255,0.95)');
-          glow.addColorStop(0.18, 'rgba(190,230,255,0.85)');
-          glow.addColorStop(0.45, 'rgba(120,190,255,0.25)');
-          glow.addColorStop(1, 'rgba(120,190,255,0)');
-          fctx.fillStyle = glow;
-          fctx.fillRect(x - 100, y - 100, 200, 200);
-          // Knistern rund um die Kugel
-          fctx.strokeStyle = 'rgba(220,240,255,0.8)';
-          fctx.lineWidth = 1.4;
-          for (var k = 0; k < 3; k++) {
-            var ang = rand(0, Math.PI * 2), r0 = 18, r1 = rand(40, 75);
-            var arc = [[x + Math.cos(ang) * r0, y + Math.sin(ang) * r0]];
-            zigzag(arc[0][0], arc[0][1], x + Math.cos(ang) * r1, y + Math.sin(ang) * r1, 14, 3, arc);
-            fctx.beginPath();
-            fctx.moveTo(arc[0][0], arc[0][1]);
-            for (var a = 1; a < arc.length; a++) fctx.lineTo(arc[a][0], arc[a][1]);
-            fctx.stroke();
+          var age = s.t - s.born;
+          if (age >= 0 && age < s.life) {
+            // taumeln: zwei überlagerte Schwingungen statt gerader Bahn
+            s.x += (s.vx + 34 * Math.sin(s.t * 1.3 + s.seed)) * dt;
+            s.y += (s.vy + 22 * Math.sin(s.t * 1.9 + s.seed * 2)) * dt;
+            var grow = smooth(age / 0.5);
+            var shrink = s.pop ? 1 : 1 - smooth((age - (s.life - 0.9)) / 0.9);
+            var flick = 0.82 + 0.18 * Math.sin(s.t * 29 + Math.sin(s.t * 7) * 3);
+            var k = grow * shrink * flick;
+            var R = 46 * (0.4 + 0.6 * grow * (s.pop ? 1 : shrink));
+            var g = fctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, R * 2.4);
+            g.addColorStop(0, 'rgba(255,252,225,' + (0.95 * k) + ')');
+            g.addColorStop(0.14, 'rgba(255,214,110,' + (0.9 * k) + ')');
+            g.addColorStop(0.32, 'rgba(255,140,50,' + (0.45 * k) + ')');
+            g.addColorStop(0.6, 'rgba(220,70,30,' + (0.14 * k) + ')');
+            g.addColorStop(1, 'rgba(220,70,30,0)');
+            fctx.fillStyle = g;
+            fctx.fillRect(s.x - R * 2.4, s.y - R * 2.4, R * 4.8, R * 4.8);
+            if (Math.random() < dt * 5) {
+              s.sparks.push({ x: s.x, y: s.y, vx: rand(-90, 90), vy: rand(-90, 40), life: rand(0.3, 0.6), max: 0.6 });
+            }
+          } else if (age >= s.life && s.pop && !s.popped) {
+            // Knall: kurzer Lichtblitz und Funkenregen
+            s.popped = true;
+            flash(s.x < W * 0.38 ? 'left' : (s.x > W * 0.62 ? 'right' : 'center'));
+            emit('pop', s.x);
+            for (var i = 0; i < 46; i++) {
+              var ang = rand(0, Math.PI * 2), sp = rand(160, 520);
+              s.sparks.push({ x: s.x, y: s.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+                              life: rand(0.5, 1.1), max: 1.1 });
+            }
           }
-          for (var n = 0; n < 3; n++) {
-            s.sparks.push({ x: x, y: y, vx: rand(-220, 220), vy: rand(-220, 120), life: rand(0.3, 0.7) });
+          if (s.popped && age - s.life < 0.3) {
+            var pk = 1 - (age - s.life) / 0.3;
+            var pr = 60 + 260 * (1 - pk);
+            var pg = fctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, pr);
+            pg.addColorStop(0, 'rgba(255,245,210,' + (0.8 * pk) + ')');
+            pg.addColorStop(1, 'rgba(255,170,80,0)');
+            fctx.fillStyle = pg;
+            fctx.fillRect(s.x - pr, s.y - pr, pr * 2, pr * 2);
           }
           s.sparks = s.sparks.filter(function (d) { return (d.life -= dt) > 0; });
-          fctx.fillStyle = 'rgba(230,245,255,1)';
           s.sparks.forEach(function (d) {
-            d.vy += 500 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
-            fctx.globalAlpha = Math.min(1, d.life * 2);
-            fctx.fillRect(d.x, d.y, 2, 2);
+            d.vy += 380 * dt; d.vx *= 1 - 1.2 * dt; d.x += d.vx * dt; d.y += d.vy * dt;
+            fctx.fillStyle = 'rgba(255,' + Math.round(170 + 80 * d.life / d.max) + ',90,' + Math.min(1, d.life * 2) + ')';
+            fctx.fillRect(d.x - 1.2, d.y - 1.2, 2.4, 2.4);
           });
-          fctx.globalAlpha = 1;
         }
       },
       avalanche: {
