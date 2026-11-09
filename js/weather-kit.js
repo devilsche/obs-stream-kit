@@ -20,17 +20,18 @@
   // ── Wetterlagen ──
   // rain/drizzle/snow = Niederschlagsmenge 0..1, clouds/sun/fog/heat 0..1,
   // lightning 0..2 (aus, selten, oft), windMin = Mindestwind der Lage,
-  // night 0..1 (Sterne statt Sonne), dusk 0..1 (Dämmerungsfarben)
+  // night 0..1 (Sterne statt Sonne), dusk 0..1 (Dämmerungsfarben),
+  // gloom 0..1 = Grundtrübung am Rand bei nassem Wetter (fehlt = 0)
   var PROFILES = {
     clear:    { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.08, sun: 0.55, fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
     cloudy:   { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.7,  sun: 0.05, fog: 0.05, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
     fog:      { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.45, sun: 0,    fog: 0.85, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
-    drizzle:  { precip: 'rain', rain: 0,    drizzle: 0.7, snow: 0,    clouds: 0.6,  sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
-    rain:     { precip: 'rain', rain: 0.6,  drizzle: 0.2, snow: 0,    clouds: 0.75, sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
-    storm:    { precip: 'rain', rain: 1,    drizzle: 0.3, snow: 0,    clouds: 0.95, sun: 0,    fog: 0.15, heat: 0, lightning: 2, windMin: 0.6, night: 0, dusk: 0 },
-    sleet:    { precip: 'mix',  rain: 0.35, drizzle: 0.1, snow: 0.45, clouds: 0.75, sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0.2, night: 0, dusk: 0 },
+    drizzle:  { precip: 'rain', rain: 0,    drizzle: 0.7, snow: 0,    clouds: 0.6,  sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0, gloom: 0.15 },
+    rain:     { precip: 'rain', rain: 0.75, drizzle: 0.2, snow: 0,    clouds: 0.75, sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0, gloom: 0.3 },
+    storm:    { precip: 'rain', rain: 1,    drizzle: 0.3, snow: 0,    clouds: 0.95, sun: 0,    fog: 0.15, heat: 0, lightning: 2, windMin: 0.6, night: 0, dusk: 0, gloom: 0.6 },
+    sleet:    { precip: 'mix',  rain: 0.35, drizzle: 0.1, snow: 0.45, clouds: 0.75, sun: 0,    fog: 0.15, heat: 0, lightning: 0, windMin: 0.2, night: 0, dusk: 0, gloom: 0.25 },
     snow:     { precip: 'snow', rain: 0,    drizzle: 0,   snow: 0.6,  clouds: 0.6,  sun: 0,    fog: 0.1,  heat: 0, lightning: 0, windMin: 0, night: 0, dusk: 0 },
-    blizzard: { precip: 'snow', rain: 0,    drizzle: 0,   snow: 1,    clouds: 0.85, sun: 0,    fog: 0.4,  heat: 0, lightning: 0, windMin: 0.85, night: 0, dusk: 0 },
+    blizzard: { precip: 'snow', rain: 0,    drizzle: 0,   snow: 1,    clouds: 0.85, sun: 0,    fog: 0.4,  heat: 0, lightning: 0, windMin: 0.85, night: 0, dusk: 0, gloom: 0.4 },
     heat:     { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0,    sun: 1,    fog: 0,    heat: 1, lightning: 0, windMin: 0, night: 0, dusk: 0 },
     // nur als feste Lage / Chat-Befehl; live kommen Nacht und Dämmerung vom Server
     night:    { precip: 'none', rain: 0,    drizzle: 0,   snow: 0,    clouds: 0.05, sun: 0,    fog: 0,    heat: 0, lightning: 0, windMin: 0, night: 1, dusk: 0 },
@@ -67,14 +68,14 @@
   // ── Partikel ──
   // Anzahl pro Ebene [hinten, mitte, vorne] bei Menge 1
   var COUNT = {
-    rain:    [420, 260, 120],
+    rain:    [460, 300, 160],
     drizzle: [420, 240, 70],
     snow:    [300, 180, 80]
   };
   var RAIN_LAYERS = [
-    { speed: 950,  len: [10, 18], width: 1.0, alpha: [0.16, 0.24, 0.32], drift: 0.8 },
-    { speed: 1350, len: [18, 30], width: 1.3, alpha: [0.28, 0.38, 0.48], drift: 0.9 },
-    { speed: 1850, len: [30, 52], width: 1.8, alpha: [0.42, 0.56, 0.70], drift: 1.0 }
+    { speed: 950,  len: [12, 20], width: 1.2, alpha: [0.26, 0.34, 0.42], drift: 0.8 },
+    { speed: 1350, len: [20, 34], width: 1.6, alpha: [0.38, 0.48, 0.58], drift: 0.9 },
+    { speed: 1850, len: [34, 58], width: 2.1, alpha: [0.52, 0.66, 0.8], drift: 1.0 }
   ];
   var DRIZZLE_LAYERS = [
     { speed: 520, len: [7, 12],  width: 1.1, alpha: [0.3, 0.4, 0.5], drift: 1.1 },
@@ -480,14 +481,17 @@
 
       // Wolkenband oben, wandert mit dem Wind
       if (c > 0.01) {
-        var shade = Math.round(lerp(118, 62, g));
-        var band = sctx.createLinearGradient(0, 0, 0, H * 0.34);
-        var ta = 0.55 * c + 0.18 * g;
+        // Regenwolken sind dunkler und tiefer als Schönwetterwolken
+        var wetAmt = clamp((cur.rain || 0) + 0.6 * (cur.drizzle || 0) + 0.4 * (cur.snow || 0), 0, 1);
+        var shade = Math.round(lerp(118, 52, Math.max(g, 0.85 * wetAmt)));
+        var bandH = H * (0.34 + 0.12 * wetAmt);
+        var band = sctx.createLinearGradient(0, 0, 0, bandH);
+        var ta = Math.min(0.92, 0.55 * c + 0.18 * g + 0.25 * wetAmt);
         band.addColorStop(0, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',' + ta + ')');
-        band.addColorStop(0.55, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',' + (ta * 0.3) + ')');
+        band.addColorStop(0.55, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',' + (ta * (0.3 + 0.35 * wetAmt)) + ')');
         band.addColorStop(1, 'rgba(' + shade + ',' + (shade + 8) + ',' + (shade + 22) + ',0)');
         sctx.fillStyle = band;
-        sctx.fillRect(0, 0, W, H * 0.34);
+        sctx.fillRect(0, 0, W, bandH);
         puffs.forEach(function (p) {
           p.x += p.s * (0.4 + Math.abs(wind)) * dir * dtFrame;
           var span = W + 700;
@@ -507,9 +511,9 @@
         sctx.save();
         sctx.translate(W / 2, H / 2);
         sctx.scale(1, H / W);
-        var vg = sctx.createRadialGradient(0, 0, W * 0.42, 0, 0, W * 0.78);
+        var vg = sctx.createRadialGradient(0, 0, W * 0.34, 0, 0, W * 0.66);
         vg.addColorStop(0, 'rgba(18,22,32,0)');
-        vg.addColorStop(1, 'rgba(18,22,32,' + (0.55 * g) + ')');
+        vg.addColorStop(1, 'rgba(18,22,32,' + (0.7 * g) + ')');
         sctx.fillStyle = vg;
         sctx.fillRect(-W, -W, W * 2, W * 2);
         sctx.restore();

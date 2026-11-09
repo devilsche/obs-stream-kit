@@ -9,7 +9,7 @@ def test_profiles_cover_all_kinds():
                           "aurora", "rainbow", "hail", "meteors", "tornado", "fogwall")
     for k in KINDS:
         p = profile(k)
-        assert p["kind"] == k and p["gloom"] == 0 and p["wind"] == 0
+        assert p["kind"] == k and p["wind"] == 0 and 0 <= p["gloom"] <= 1
     assert profile("hail")["kind"] == "clear"
 
 
@@ -114,3 +114,9 @@ def test_daylight_day_night_and_twilight():
 def test_night_puts_out_the_sun_even_with_good_mood():
     s = apply_mood({**profile("clear"), "night": 1}, 1, 1.0, None)
     assert s["sun"] == 0
+
+
+def test_wet_kinds_bring_their_own_gloom_and_mood_scales_it():
+    assert profile("storm")["gloom"] > profile("rain")["gloom"] > profile("clear")["gloom"] == 0
+    assert apply_mood(profile("rain"), 1, 1.0, None)["gloom"] < profile("rain")["gloom"]
+    assert apply_mood(profile("storm"), -0.2, 1.0, None)["gloom"] == profile("storm")["gloom"]

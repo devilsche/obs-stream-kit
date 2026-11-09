@@ -151,7 +151,8 @@
         var sig = SIG_KEYS.map(function (k) {
           return typeof state[k] === 'number' ? state[k].toFixed(2) : String(state[k]);
         }).join('|');
-        rootEl.style.setProperty('--wk-gloom', String(state.gloom || 0));
+        // Grauschleier folgt nur der schlechten K/D, nicht der Grundtrübung bei Regen
+        rootEl.style.setProperty('--wk-gloom', String(Math.max(0, -(state.mood || 0))));
         if (sig === lastSig) return;
         lastSig = sig;
         kit.setState(state, secs);
@@ -180,6 +181,8 @@
       // Eine Chat-Übersteuerung gewinnt auch gegen eine feste Lage (lock).
       // Nur die jüngste Antwort zählt, eine verspätete ältere wird verworfen.
       var stateTimer = null, stateReq = 0;
+      // nach einer Änderung aus dem Dashboard schnell überblenden (sonst 25 s)
+      var fastNext = false;
       function fetchState() {
         clearTimeout(stateTimer);
         var req = ++stateReq;
@@ -198,7 +201,8 @@
             if (req !== stateReq) return;
             var st = data.state;
             if (locked() && st.source !== 'override') applyLock();
-            else apply(st, lastSig === null ? 0 : st.transition);
+            else apply(st, lastSig === null ? 0 : (fastNext ? 4 : st.transition));
+            fastNext = false;
           })
           .catch(function () {
             if (req !== stateReq) return;
@@ -232,12 +236,14 @@
             break;
           case 'set':
             Object.keys(p).forEach(function (k) { settings[k] = String(p[k]); });
+            fastNext = true;
             applyVeil();
             applyTestBg();
             fetchState();
             break;
           case 'reset':
             settings = fromUrl();
+            fastNext = true;
             applyVeil();
             applyTestBg();
             fetchState();

@@ -10,17 +10,18 @@ den fertigen Zustand, das Overlay blendet nur noch über.
 
 # rain/drizzle/snow = Niederschlagsmenge 0..1, clouds/sun/fog/heat 0..1,
 # lightning 0..2 (aus, selten, oft), windMin = Mindestwind der Lage,
-# night 0..1 (Sterne statt Sonne), dusk 0..1 (Dämmerungsfarben)
+# night 0..1 (Sterne statt Sonne), dusk 0..1 (Dämmerungsfarben),
+# gloom 0..1 = Grundtrübung am Rand bei nassem Wetter (fehlt = 0)
 PROFILES = {
     "clear":    {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.08, "sun": 0.55, "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
     "cloudy":   {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.7,  "sun": 0.05, "fog": 0.05, "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
     "fog":      {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.45, "sun": 0,    "fog": 0.85, "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
-    "drizzle":  {"precip": "rain", "rain": 0,    "drizzle": 0.7, "snow": 0,    "clouds": 0.6,  "sun": 0,    "fog": 0.15, "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
-    "rain":     {"precip": "rain", "rain": 0.6,  "drizzle": 0.2, "snow": 0,    "clouds": 0.75, "sun": 0,    "fog": 0.1,  "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
-    "storm":    {"precip": "rain", "rain": 1,    "drizzle": 0.3, "snow": 0,    "clouds": 0.95, "sun": 0,    "fog": 0.15, "heat": 0, "lightning": 2, "windMin": 0.6, "night": 0, "dusk": 0},
-    "sleet":    {"precip": "mix",  "rain": 0.35, "drizzle": 0.1, "snow": 0.45, "clouds": 0.75, "sun": 0,    "fog": 0.15, "heat": 0, "lightning": 0, "windMin": 0.2, "night": 0, "dusk": 0},
+    "drizzle":  {"precip": "rain", "rain": 0,    "drizzle": 0.7, "snow": 0,    "clouds": 0.6,  "sun": 0,    "fog": 0.15, "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0, "gloom": 0.15},
+    "rain":     {"precip": "rain", "rain": 0.75,  "drizzle": 0.2, "snow": 0,    "clouds": 0.75, "sun": 0,    "fog": 0.1,  "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0, "gloom": 0.3},
+    "storm":    {"precip": "rain", "rain": 1,    "drizzle": 0.3, "snow": 0,    "clouds": 0.95, "sun": 0,    "fog": 0.15, "heat": 0, "lightning": 2, "windMin": 0.6, "night": 0, "dusk": 0, "gloom": 0.6},
+    "sleet":    {"precip": "mix",  "rain": 0.35, "drizzle": 0.1, "snow": 0.45, "clouds": 0.75, "sun": 0,    "fog": 0.15, "heat": 0, "lightning": 0, "windMin": 0.2, "night": 0, "dusk": 0, "gloom": 0.25},
     "snow":     {"precip": "snow", "rain": 0,    "drizzle": 0,   "snow": 0.6,  "clouds": 0.6,  "sun": 0,    "fog": 0.1,  "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
-    "blizzard": {"precip": "snow", "rain": 0,    "drizzle": 0,   "snow": 1,    "clouds": 0.85, "sun": 0,    "fog": 0.4,  "heat": 0, "lightning": 0, "windMin": 0.85, "night": 0, "dusk": 0},
+    "blizzard": {"precip": "snow", "rain": 0,    "drizzle": 0,   "snow": 1,    "clouds": 0.85, "sun": 0,    "fog": 0.4,  "heat": 0, "lightning": 0, "windMin": 0.85, "night": 0, "dusk": 0, "gloom": 0.4},
     "heat":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0,    "sun": 1,    "fog": 0,    "heat": 1, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
     # nur als feste Lage / Chat-Befehl; live kommen Nacht und Dämmerung aus daylight()
     "night":    {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.05, "sun": 0,    "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 1, "dusk": 0},
@@ -144,12 +145,13 @@ def apply_mood(state: dict, mood: float, strength: float, precip) -> dict:
     if e > 0:
         s["clouds"] = _clamp(s["clouds"] * (1 - 0.7 * e))
         s["sun"] = max(s["sun"], 0.6 * e if wet else e)
+        s["gloom"] = round(s.get("gloom", 0) * (1 - 0.7 * e), 3)
     elif e < 0:
         a = -e
         s["clouds"] = _clamp(s["clouds"] + 0.6 * a)
         s["fog"] = _clamp(s["fog"] + 0.4 * a)
         s["sun"] = s["sun"] * (1 - a)
-        s["gloom"] = a
+        s["gloom"] = max(s.get("gloom", 0), a)
     if precip and not wet:
         p = PROFILES[precip]
         s.update(kind=precip, precip="rain", rain=p["rain"], drizzle=p["drizzle"],
