@@ -346,12 +346,12 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 
 ## Effects
 
-Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle stumm außer Rain.
+Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle stumm — Ton kommt über Streamer.bot.
 
 | Datei | Beschreibung | Dauer |
 |-------|-------------|-------|
-| `effects/snow.html` | Schneefall (Greenscreen-Video) | Loop |
-| `effects/rain.html` | Regen per Canvas, drei Tiefenebenen, Böen, Spritzer, optional Blitze — mit synthetischem Regen-/Wind-/Donner-Sound | Loop |
+| `effects/weather.html` | Wetter: echtes Wetter am eigenen Ort, gefärbt von der K/D der laufenden Session, per Chat zeitweise übersteuerbar, dazu Spektakel (Tsunami, Mega-Blitze, Kugelblitz, Lawine) | Dauerhaft |
+| `effects/rain.html`, `effects/snow.html` | alte URLs, leiten auf `weather.html` um (Regen bzw. Schnee fest) — im Dashboard ausgeblendet | — |
 | `effects/xmas.html` | Weihnachtsschmuck: Lichterkette, Baum mit Stern, hängende Kugeln, Schneehaufen — alles einzeln schalt- und einstellbar; Follower-Kugeln und Geschenke (Sub, Bits, Raid …) per Streamer.bot, dauerhaft gespeichert | Dauerhaft |
 | `effects/autumn.html` | Herbstdeko: Blätterranke mit Lichtern, Ast in der Ecke, fallendes Laub, Laubhaufen, Follower-Kürbisse mit Namen — der Chat recht das Laub weg (Rangliste) oder springt hinein | Dauerhaft |
 | `effects/winter.html` | Winterdeko ohne Weihnachten: Eiszapfen, Raureif, Schneedecke, Schneemann (wächst mit Subs), Follower-Mini-Schneemänner — schippen, kratzen, Eiszapfen abbrechen, Schneebälle | Dauerhaft |
@@ -362,52 +362,50 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
 | `effects/lens-flare.html` | Lens Flare — `?n=1…7` wählt die Variante | Videolänge |
 
-**Parameter für `rain.html`:**
+### Wetter (`weather.html`)
+
+Drei Schichten, die oberste gewinnt:
+
+1. **Echtes Wetter** am Ort aus **Settings → Weather** (Open-Meteo, ohne Key, alle 10 min). Der Ort bleibt auf dem Server, er steht weder in der URL noch in einer Antwort an das Overlay. Ohne Ort oder wenn der Dienst nicht antwortet, gilt die **Fallback-Lage**; die letzte gute Antwort gilt bis zu 60 min weiter.
+2. **K/D-Stimmung** der laufenden Session (nur BR-Runden, alle verfolgten Accounts, ab 3 Runden, Session = letzte Runde < 4 h her). Unter der unteren Grenze (Standard 1,5) wird es trüb mit Niesel, ab drei Vierteln davon (≈ 1,1) Regen — nie Gewitter. Über der oberen Grenze (Standard 2,5) kommt Sonne durch, auch bei Regen oder Schnee. Dazwischen verläuft es stufenlos, bei 2,0 neutral. Abdunklung und Nebel liegen nur am Rand, die Bildmitte bleibt frei; mit `veil=1` kommt ein leichter Grauschleier (höchstens 10 %) übers ganze Bild.
+3. **Chat-Übersteuerung** per `cmd=weather&to=<lage>` für 2,5 min (`hold` in Sekunden, `0` = bis `cmd=auto`). Mehrere Befehle innerhalb von 15 s: der jüngste wartet, bis die 15 s um sind — kein Flackern. Erzwungenes Wetter überlebt einen Server-Neustart.
+
+Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `blizzard`, `heat`. Übergänge: echtes Wetter/Stimmung 25 s, Übersteuerung 4 s, Regen geht über Schneeregen in Schnee über.
+
+**Parameter (URL und `cmd=set`):**
 
 | Parameter | Werte | Standard |
 |-----------|-------|----------|
-| `intensity` | `light`, `medium`, `heavy`, `storm` | `medium` |
-| `wind` | `-1` (stark links) … `0` … `1` (stark rechts), Kommawerte erlaubt — oder `random`: wechselt alle 6–15 s weich Richtung und Stärke | `0` |
-| `color` | Hex ohne `#`, z.B. `9fc4ff` | `aecbeb` |
-| `lightning` | `0` aus, `1` selten (14–32 s), `2` oft (5–12 s) | `0` |
-| `splash` | `1` an, `0` aus | `1` |
-| `sound` | `1` an, `0` aus | `1` |
-| `volume` | `0` … `1`, Gesamtlautstärke | `0.6` |
-| `thunder` | `0` … `1`, Donner relativ zum Regen (`0` = kein Donner) | `1` |
-| `tune` | `1` blendet das Tune-Panel ein (`L` = Blitz, `G` = Böe, `S` = Stop/Start, Leertaste = Pause) | — |
+| `lock` | feste Lage statt Live-Wetter, `off` = live | `off` |
+| `fallback` | Lage ohne Ort oder bei Ausfall | `clear` |
+| `mood` | `0` … `1`, Stärke der K/D-Stimmung | `1` |
+| `kdlow` / `kdhigh` | Grenzen schlechte/gute K/D | `1.5` / `2.5` |
+| `kdtest` | Test-K/D statt der echten, `off` = echt — zum Ausprobieren im Dashboard, nicht in OBS stehen lassen | `off` |
+| `veil` | `1` Grauschleier übers ganze Bild bei mieser Stimmung | `0` |
+| `wind` | `-1` … `1`, nur für `lock` | `0` |
 
-Beispiel Gewitter: `effects/rain.html?intensity=storm&wind=random&lightning=2`
-
-**Sound:** komplett im Browser erzeugt (Web Audio), keine Audiodateien. Regenrauschen und Prasseln folgen der Tropfenmenge, Wind rauscht mit Stärke und Böen, jeder Blitz bekommt Donner — nah: Knall nach ~0,3 s, fern: tiefes Grollen nach bis zu ~3 s. In OBS bei der Source **„Audio über OBS steuern"** aktivieren, dann erscheint Rain im Audio-Mixer. Im normalen Browser-Tab startet der Ton erst nach einem Klick (Autoplay-Sperre).
-
-#### Rain live steuern (Streamer.bot)
-
-Die laufende Source fragt jede Sekunde beim Server nach neuen Befehlen — kein Reload, kein Flackern. Befehle schickt Streamer.bot per Sub-Action **Core → Network → Fetch URL** an:
-
-```
-https://stream-overlay.com/s/<token>/api/fx/rain?cmd=…
-```
-
-Der Token ist derselbe wie in der Source-URL. Fertige URLs zum Kopieren stehen im Dashboard unter **Stream → Rain → Remote commands**.
+**Befehle** an `https://stream-overlay.com/s/<token>/api/fx/weather?cmd=…` (Streamer.bot **Fetch URL**):
 
 | Befehl | Wirkung |
 |--------|---------|
-| `cmd=strike` | Blitz jetzt (Entfernung zufällig); `&dist=near` naher, dicker Blitz, `&dist=far` ferner, blasser Blitz |
-| `cmd=gust` | kräftige Windböe (~2,5 s) |
-| `cmd=set&…` | Werte live ändern, gleiche Parameter wie in der URL (`intensity`, `wind`, `color`, `lightning`, `splash`, `sound`, `volume`, `thunder`), beliebig kombinierbar |
-| `cmd=stop` | Regen hört auf — Tropfen fallen zu Ende, keine neuen |
-| `cmd=start` | Regen setzt wieder ein |
-| `cmd=reset` | zurück auf die Werte aus der Source-URL |
+| `cmd=weather&to=storm` | Gewitter für 2,5 min, danach zurück; `&hold=60` = 60 s, `&hold=0` = bis `auto` |
+| `cmd=auto` | zurück zum Live-Wetter |
+| `cmd=spectacle&type=tsunami` | Spektakel: `tsunami`, `megabolt`, `ballbolt`, `avalanche`; ohne `type` zufällig. Ein zweites wartet, bis das erste fertig ist |
+| `cmd=strike` | Blitz (`&dist=near` / `&dist=far`, passend zum Donner-WAV) |
+| `cmd=gust` | Windböe |
+| `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die URL |
 
-Beispiele: `!storm` → `cmd=set&intensity=storm&wind=random&lightning=2`, `!sunny` → `cmd=stop`, `!mute` → `cmd=set&sound=0`.
+Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneesturm` → `cmd=weather&to=blizzard`, `!tsunami` → `cmd=spectacle&type=tsunami`. Abklingzeiten und Ton (Donner, Wind, Wellenrauschen) laufen über Streamer.bot — Browser-Ton in OBS ist zu unzuverlässig.
 
-Funktioniert nur, wenn die Source über die Token-URL (`/s/<token>/effects/rain.html`) geladen wird. Befehle, die geschickt werden, während die Source nicht läuft, werden beim Start nicht nachgeholt. Ungültige Befehle beantwortet der Server mit HTTP 400.
+**Testen:** im Dashboard **Stream → Weather** „Apply setting changes live“ einschalten, dann `Fixed weather`, `Test K/D` und `Grey veil` durchschalten und die Knöpfe (Thunderstorm, Tsunami, …) drücken — wirkt sofort auf die Source in OBS.
+
+**Alte Rain-/Snow-URLs:** `rain.html?intensity=…&wind=…` leitet auf `weather.html` mit fester Lage um (`light` → Niesel, `medium`/`heavy` → Regen, `storm` → Gewitter) und hört weiter auf `/api/fx/rain` (`strike`, `gust`, `start`, `stop`, `set&intensity=…`, `reset`). `snow.html` zeigt festen Schnee. Farbe, Spritzer und Browser-Ton der alten Rain-Source gibt es nicht mehr.
 
 #### Live control im Dashboard (ohne Streamer.bot)
 
-Rain, Xmas, Autumn, Winter, Spring und Summer haben im Dashboard (**Stream → <Effekt>**) eine Box **Live control**. Sie wirkt auf die Source, die gerade in OBS läuft, wie ein Streamer.bot-Befehl innerhalb von etwa einer Sekunde:
+Weather, Xmas, Autumn, Winter, Spring und Summer haben im Dashboard (**Stream → <Effekt>**) eine Box **Live control**. Sie wirkt auf die Source, die gerade in OBS läuft, wie ein Streamer.bot-Befehl innerhalb von etwa einer Sekunde:
 
-- **Knöpfe** für das, was man von Hand auslöst: Wetter an/aus (Schnee, Laub, Regen, Hitze), Shake off, Melt, Gust, Sweep, Water, Pull weeds, Bee, Splash, Ice cream, Cool down, Celebrate, Leaders; bei Rain Start/Stop, Lightning, Gust. Knöpfe schicken keinen Namen und zählen deshalb nicht für Ranglisten. Dauerhaftes Löschen (`cmd=clear`) gibt es bewusst nicht als Knopf.
+- **Knöpfe** für das, was man von Hand auslöst: Wetter an/aus (Schnee, Laub, Regen, Hitze), Shake off, Melt, Gust, Sweep, Water, Pull weeds, Bee, Splash, Ice cream, Cool down, Celebrate, Leaders; bei Weather Auto, feste Lagen bis Auto, Lightning, Gust und die vier Spektakel. Knöpfe schicken keinen Namen und zählen deshalb nicht für Ranglisten. Dauerhaftes Löschen (`cmd=clear`) gibt es bewusst nicht als Knopf.
 - **Shake off** und **Pull weeds** gelingen sofort, ohne auf weitere Chatter zu warten (`&force=1`, auch als Mod-Befehl für Streamer.bot nutzbar).
 - **Apply setting changes live**: jede Änderung an einem Schalter geht sofort per `cmd=set` an die laufende Source. Beim Einschalten wird einmal der komplette Stand der Schalter geschickt.
 - **Back to OBS URL** (`cmd=reset`): die Source nimmt wieder die Werte aus ihrer URL; das Live-Setzen schaltet sich dabei aus.
@@ -570,9 +568,9 @@ Die Erde trocknet mit `dryrate` % pro Minute aus (Standard 2 = in 50 min leer), 
 
 Parameter: `sun`, `beach`, `umbrella`, `shimmer` (`1`/`0`), `sunpos` (`left`/`right`), `evening` (`1` = Abend mit Glühwürmchen), `heatrate` (20), `splash` (5). Testtasten: **C** **B** **H** **S** **I** **L**.
 
-#### Rain-Sound über Streamer.bot (WAV)
+#### Wetter-Sound über Streamer.bot (WAV)
 
-Fällt unter Windows das Audiogerät kurz weg, öffnet die OBS-Browser-Source ihre Tonausgabe nicht neu und bleibt stumm. Zuverlässiger: Rain mit `?sound=0` einbinden und den Ton als fertige WAV abspielen. Die Dateien sind mit derselben Synthese erzeugt wie der eingebaute Sound:
+Fällt unter Windows das Audiogerät kurz weg, öffnet die OBS-Browser-Source ihre Tonausgabe nicht neu und bleibt stumm. Deshalb hat die Weather-Source keinen eigenen Ton; Streamer.bot spielt fertige WAVs:
 
 | Datei | Inhalt | Einsatz |
 |-------|--------|---------|
