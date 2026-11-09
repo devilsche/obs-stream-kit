@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="stylesheet" href="../js/season-kit.css" />
   <title>Weather Overlay</title>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -74,6 +75,11 @@
       100% { opacity: 0; }
     }
 
+    /* Frost-Ebene liegt auf der „Scheibe“ über allem; frost=0 blendet sie aus */
+    .wk-frost { pointer-events: none; }
+    .stage { --tag-big: #dff3ff; --hud-bg: rgba(16, 30, 48, 0.82); --hud-line: rgba(200, 235, 255, 0.7); }
+    .wk-tags { position: absolute; inset: 0; width: 1920px; height: 1080px; pointer-events: none; }
+
     /* Grauschleier über das ganze Bild bei mieser Stimmung (Schalter veil) */
     .wk-veil {
       position: absolute;
@@ -100,8 +106,14 @@
   <div class="stage" id="stage">
     <div class="wk-veil" aria-hidden="true"></div>
   </div>
+  <svg class="wk-tags" viewBox="0 0 1920 1080" aria-hidden="true"><g id="tags"></g></svg>
+  <div class="hud">
+    <div class="hud__box" id="frostBoard"><h2>Top frost fighters</h2><ol></ol></div>
+  </div>
 
+  <script src="../js/season-kit.js"></script>
   <script src="../js/weather-kit.js"></script>
+  <script src="../js/weather-frost.js"></script>
   <script>
     (function () {
       'use strict';
@@ -112,9 +124,13 @@
       var K = window.WeatherKit;
       var params = new URLSearchParams(window.location.search);
       var kit = K.create(document.getElementById('stage'));
+      var frost = window.WeatherFrost.create(document.getElementById('stage'), {
+        tags: document.getElementById('tags'), board: document.getElementById('frostBoard') });
+      var lastFrostTop = [];
       var rootEl = document.documentElement;
 
-      var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil'];
+      var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
+                  'aurorakd', 'frost', 'frostrate'];
       function fromUrl() {
         var out = {};
         KEYS.forEach(function (k) {
@@ -135,7 +151,8 @@
       //    den Übergang und den Blitz-Takt neu starten) ──
       var lastSig = null;
       // Felder, die sich ändern, ohne dass das Bild anders aussieht
-      var SIG_SKIP = { until: 1, transition: 1, source: 1, temp: 1, frost: 1 };
+      var SIG_SKIP = { until: 1, transition: 1, source: 1, temp: 1, freezing: 1,
+                       frost: 1, frostTop: 1, frostOn: 1 };
       // Wind aus dem Schalter: auto = Wind der Lage (live: echter Wind),
       // random = wechselt von selbst, Zahl = fest
       function withWind(state) {
@@ -153,6 +170,11 @@
         var sig = Object.keys(state).sort().filter(function (k) { return !SIG_SKIP[k]; }).map(function (k) {
           return k + '=' + (typeof state[k] === 'number' ? state[k].toFixed(2) : String(state[k]));
         }).join('|');
+        // Frost läuft getrennt vom Wetter-Übergang
+        if (typeof state.frost === 'number') {
+          frost.update(state.frost, state.frostOn !== false && settings.frost !== '0' && settings.frost !== 'off');
+          lastFrostTop = state.frostTop || [];
+        }
         // Grauschleier folgt nur der schlechten K/D, nicht der Grundtrübung bei Regen
         rootEl.style.setProperty('--wk-gloom', String(Math.max(0, -(state.mood || 0))));
         if (sig === lastSig) return;
@@ -194,7 +216,7 @@
           return;
         }
         var q = new URLSearchParams();
-        ['place', 'lock', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback'].forEach(function (k) {
+        ['place', 'lock', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'aurorakd', 'frost', 'frostrate'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
@@ -231,6 +253,22 @@
             break;
           case 'gust':
             kit.gust();
+            break;
+          case 'scrape':
+            frost.scrape(p.name, p.done, p.level);
+            break;
+          case 'warm':
+            frost.warm(p.name, p.done, p.level);
+            break;
+          case 'frostclear':
+            frost.clearAll();
+            fetchState();
+            break;
+          case 'frostreset':
+            lastFrostTop = [];
+            break;
+          case 'leaders':
+            frost.leaders(lastFrostTop);
             break;
           case 'spectacle':
             kit.spectacle(p.type || randomShow());

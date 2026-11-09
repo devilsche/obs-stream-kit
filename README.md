@@ -387,6 +387,8 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 | `testbg` | Bild-URL als Testhintergrund (z. B. ein Gameplay-Screenshot), nur in Vorschau und Browser-Tab — in OBS ignoriert | — |
 | `wind` | `auto` = Wind der Lage (live: echter Wind), `random` = wechselt alle 6–15 s weich, mal von links, mal von rechts, oder fest `-1` … `1` | `auto` |
 
+**Frost:** Bei echter Temperatur ≤ 0 °C oder im Schneesturm wachsen Eisblumen von den Ecken über die Ränder ins Bild (Mitte bleibt frei): (2 + Kältegrade) % pro Minute, im Schneesturm mindestens 8 %; über 0 °C taut es. Der Stand liegt auf dem Server und überlebt Reload und Neustart. `!scrape` kratzt 6 % frei (Kratzer fährt eine Bahn), `!warm` haucht 10 % frei (Atemwolke, Dampf); freie Stellen frieren in etwa 60 s wieder zu. Beide zählen für die Rangliste „Top frost fighters“; ist die Scheibe ganz frei, funkelt es. Schalter `frost` (`1`/`0`) und `frostrate` (`0.25`–`4`).
+
 **Befehle** an `https://stream-overlay.com/s/<token>/api/fx/weather?cmd=…` (Streamer.bot **Fetch URL**):
 
 | Befehl | Wirkung |
@@ -396,6 +398,9 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `b
 | `cmd=spectacle&type=tsunami` | Spektakel: `tsunami` (erst zieht sich das Wasser zurück, dann rollt eine schäumende Flutwand heran, das Land steht unter Wasser, es läuft wieder ab), `megabolt` (Gewitterwand mit vielen Blitzen), `ballbolt` (nach einem Einschlag glimmt eine gelb-orange Kugel auf, schwebt taumelnd und erlischt lautlos oder platzt — Event für ein Knall-WAV), `avalanche` (Staublawine: Abriss oben in der Ecke, Druckwelle mit Schneestaub und Böe, die brodelnde Wolke rauscht schräg aus der Ecke den Hang hinunter, kurz fast weiß, danach sinkt feiner Schnee aus der Wolke), `aurora` (Polarlicht), `rainbow` (Regenbogen), `hail` (Hagelschauer), `meteors` (Sternschnuppenregen), `tornado` (Windhose), `fogwall` (Nebelwand, 2,5 Bildbreiten tief, zieht etwa 19 s durchs Bild); ohne `type` zufällig. Spektakel reichen bis an die Bildränder und passen sich nachts an (dunkleres Wasser, mondbeschienener Schnee, Mondregenbogen, Blitze in der Windhose), Regen, Schnee und Blitze blenden am Rand weich aus. Ein zweites wartet, bis das erste fertig ist |
 | `cmd=strike` | Blitz (`&dist=near` / `&dist=far`, passend zum Donner-WAV) |
 | `cmd=gust` | Windböe |
+| `cmd=scrape&name=%user%` / `cmd=warm&name=%user%` | Frost kratzen / warm anhauchen, zählt für die Rangliste |
+| `cmd=leaders` | Rangliste „Top frost fighters“ zeigen (10 s) |
+| `cmd=frostclear` / `cmd=frostreset` | Mods: allen Frost entfernen / Rangliste leeren |
 | `cmd=set&…` / `cmd=reset` | Parameter live ändern / zurück auf die URL |
 
 Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneesturm` → `cmd=weather&to=blizzard`, `!tsunami` → `cmd=spectacle&type=tsunami`. Abklingzeiten und Ton (Donner, Wind, Wellenrauschen) laufen über Streamer.bot — Browser-Ton in OBS ist zu unzuverlässig.
