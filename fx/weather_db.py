@@ -39,7 +39,7 @@ def _load(conn, tenant_id):
     if not row:
         return None
     try:
-        return json.loads(row[0])
+        return json.loads(row["data"])
     except (TypeError, ValueError):
         return None
 
