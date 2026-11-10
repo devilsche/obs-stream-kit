@@ -133,3 +133,17 @@ def test_badge_variant_floats_and_does_not_push_content():
     assert "position: fixed" in out
     assert 'href="/s/t/widgets/x.html"' in out
     assert 'aria-label="Back to my own view"' in out
+
+
+def test_js_and_css_are_revalidated(tmp_path):
+    # Nach einem Deploy soll OBS sofort die neue Datei holen
+    d = tmp_path / "js"
+    d.mkdir()
+    (d / "a.js").write_text("x")
+    app = Flask(__name__)
+    with app.test_request_context():
+        for fn in (lambda: serve_asset(str(tmp_path), "js", "a.js"),
+                   lambda: serve_html_or_asset(str(tmp_path), "js", "a.js", {})):
+            resp = fn()
+            assert "no-cache" in resp.headers["Cache-Control"]
+            resp.close()
