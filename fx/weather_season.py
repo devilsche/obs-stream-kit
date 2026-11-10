@@ -87,7 +87,8 @@ def load(conn, tenant_id) -> dict:
 
 
 def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dict:
-    """w: wirksames Wetter {wind, rain, snow, heat, sun, night, blizzard} (je 0..1)."""
+    """w: wirksames Wetter {wind, rain, snow, heat, sun, night, blizzard} (je 0..1),
+    optional temp (°C, nur bei echtem Wetter)."""
     data = _get(conn, tenant_id)
     if data is None:
         _put(conn, tenant_id, _fresh(now))
@@ -114,12 +115,14 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dic
             per = -10
         elif w.get("heat", 0) > 0.5:
             per = 20
+        elif w.get("temp") is not None and w["temp"] < 15:
+            per = -8        # kalter Ort: kühlt auch bei Sonne
         elif w.get("night", 0) > 0.5:
             per = -3
         elif w.get("sun", 0) > 0.4:
             per = 2
         else:
-            per = 0
+            per = -4        # bewölkt, ohne Sonne: kühlt langsam ab
         lv["heat"] = _clamp(lv["heat"] + per * rate * m)
     changed = any(abs(lv[k] - before[k]) >= 0.5 for k in LEVELS)
     if changed or now - last >= 60:

@@ -101,3 +101,12 @@ def test_snow_cools_the_beach(conn):
     advance(conn, 1, 0, "summer", W)
     advance(conn, 1, 300, "summer", {**W, "heat": 1})                       # 20 %/min × 5 = 100
     assert advance(conn, 1, 420, "summer", {**W, "heat": 1, "snow": 0.6})["levels"]["heat"] == pytest.approx(50)
+
+
+def test_heat_fades_without_sun_faster_when_cold(conn):
+    advance(conn, 1, 0, "summer", W)
+    advance(conn, 1, 300, "summer", {**W, "heat": 1})                       # 100
+    assert advance(conn, 1, 600, "summer", W)["levels"]["heat"] == pytest.approx(80)            # −4 %/min
+    assert advance(conn, 1, 900, "summer", {**W, "temp": 5})["levels"]["heat"] == pytest.approx(40)   # −8 %/min
+    # Sonne hält den Strand warm, auch wenn es kühl ist? Nein: unter 15 °C kühlt er trotzdem
+    assert advance(conn, 1, 1020, "summer", {**W, "sun": 1, "temp": 5})["levels"]["heat"] == pytest.approx(24)
