@@ -49,9 +49,15 @@ def _weather_persist(conn, tenant_id, cmd):
         weather_frost.clear(conn, tenant_id, time.time())
     elif cmd["cmd"] == "frostreset":
         weather_frost.reset_leaders(conn, tenant_id)
+    elif cmd["cmd"] == "spectacle" and cmd["params"].get("type") == "avalanche":
+        # die Lawine bleibt als Schnee liegen (sichtbar im Winter-Thema)
+        weather_snow.drift(conn, tenant_id, AVALANCHE_SNOW, time.time())
     else:
         return _winter_persist(conn, tenant_id, cmd)
     return True
+
+
+AVALANCHE_SNOW = 20
 
 
 def _winter_persist(conn, tenant_id, cmd):

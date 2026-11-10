@@ -361,8 +361,8 @@ def test_shovel_and_shake_report_results(conn, monkeypatch):
     monkeypatch.setattr(ep.time, "time", lambda: clock[0])
     c = _client(conn)
     _state(c, "?lock=snow")
-    clock[0] += 600
-    assert _state(c, "?lock=snow")["snowCover"] == 36                     # 0,6 × 6 %/min × 10 min
+    clock[0] += 240
+    assert _state(c, "?lock=snow")["snowCover"] == pytest.approx(39.9, abs=0.1)   # 25 × 0,6^1,8 %/min × 4 min
     c.get("/s/t/api/fx/weather?cmd=shovel&name=Mia")
     c.get("/s/t/api/fx/weather?cmd=shake&name=Mod&force=1")
     cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
@@ -484,3 +484,10 @@ def test_start_next_season_early(conn, monkeypatch):
     assert _state(c)["theme"] == "winter"
     c.get("/s/t/api/fx/weather?cmd=season&to=auto")
     assert _state(c)["theme"] == "autumn"
+
+
+def test_avalanche_leaves_snow(conn):
+    c = _client(conn)
+    before = _state(c, "?theme=winter")["snowCover"]
+    c.get("/s/t/api/fx/weather?cmd=spectacle&type=avalanche")
+    assert _state(c, "?theme=winter")["snowCover"] >= before + 19.5

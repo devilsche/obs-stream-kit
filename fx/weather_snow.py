@@ -1,6 +1,7 @@
 """Schneedecke des Winter-Themas (0..100) je Tenant, wie der Frost auf dem
-Server: wächst, solange die wirksame Lage schneit (6 % pro Minute bei
-voller Schneemenge × snowrate), schmilzt bei Hitze schnell (20 %/min) und
+Server: wächst, solange die wirksame Lage schneit (25 × Menge^1,8 % pro
+Minute × snowrate: Blizzard 25, Schnee 10, Schneeregen 6), eine Lawine legt
+20 % drauf, schmilzt bei Hitze schnell (20 %/min) und
 über 0 °C langsam (0,5 + 0,3 × Temp %/min). `!shovel` räumt 5 % weg,
 `!shake` braucht eine Gruppe (need Namen in win Sekunden) oder force,
 `!icicle` bricht einen Eiszapfen ab (ab 10 % Schnee). Schippen und
@@ -78,7 +79,7 @@ def advance(conn, tenant_id, now, snow: float, heat: bool, temp, rate: float = 1
     if heat:
         per_min = -20
     elif snow > 0.02:
-        per_min = 6 * min(1.0, snow) * rate
+        per_min = 25 * min(1.0, snow) ** 1.8 * rate
     elif temp is not None and temp > 0:
         per_min = -(0.5 + 0.3 * temp)
     else:
@@ -88,6 +89,14 @@ def advance(conn, tenant_id, now, snow: float, heat: bool, temp, rate: float = 1
         data.update(level=level, at=now)
         _put(conn, tenant_id, data)
     return {"level": round(level, 1), "top": _top(data)}
+
+
+def drift(conn, tenant_id, amount, now) -> float:
+    """Lawine: Schnee auf einen Schlag dazu (bis 100) → neuer Stand."""
+    data = _get(conn, tenant_id) or _fresh(now)
+    data["level"] = min(100.0, data["level"] + amount)
+    _put(conn, tenant_id, data)
+    return round(data["level"], 1)
 
 
 def shovel(conn, tenant_id, name, now) -> dict:
