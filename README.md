@@ -394,6 +394,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 - **Herbst:** Blätterranke, Ast, fallendes Laub, Laubhaufen (wächst stetig, bei Wind schneller, `leafrate`), Follower-Kürbisse (leuchten nachts). `!rake` (−5, „Top rakers“), `!jump`, Mods `sweep`.
 - **Frühling:** Blumenwiese mit Follower-Blumen, Kirschblütenzweig, Bienen, Schmetterlinge. Die Erde trocknet (2 %/min, bei Hitze 6), Regen gießt (30 %/min), unter 30 % lassen die Blumen die Köpfe hängen; Unkraut wächst 1 %/min. `!water` (+10), `!weed` (−3, 3 Leute in 20 s ziehen die Hälfte; „Top gardeners“), `!bee`.
 - **Sommer:** Strand mit Follower-Sandburgen, Sonnenschirm, abends Glühwürmchen. Die Hitze steigt bei Hitzewelle (20 %/min) und Sonne (2 %/min), sinkt bei Regen und nachts. `!splash` (−5, „Top coolers“), `!ice` (Eis schmilzt mit der Hitze), Mods `cool`.
+- **`!fries` und die Möwe:** `!ice` steckt schräg (10–25°) mit der Waffel im Sand; etwa jedes dritte Eis klaut nach ein paar Sekunden eine Möwe („A seagull stole …'s ice cream!“), die leere Waffel verblasst. `!fries` (`cmd=fries&name=%user%`) stellt eine rot-weiße Pommesschale an den Rand („… got fries!“); nach 15–40 s holt die Möwe die Pommes in 2–4 Flügen oder einem großen Griff, dann verblasst die Schale.
 - **Winter:** siehe unten.
 
 **Deko reagiert auf Wetter und Spektakel** (nur das sichtbare Thema, alles vorübergehend, kein Follower verschwindet):
@@ -402,7 +403,11 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 - **Schnee/Schneesturm (jedes Thema):** Im Sommer bekommen Sandburgen, Sandpalast und Sonnenschirm Schneehauben, im Herbst Kürbisse und der Hut der Vogelscheuche; im Schneesturm dicker, nach dem Schnee in etwa 1 min weggeschmolzen. Im Frühling lassen die Blumen und die Sonnenblume die Köpfe hängen. Im Winter schneien die Mini-Schneemänner im Schneesturm bis zum Hut ein und graben sich danach in etwa 1 min frei.
 - **Tsunami:** Im Sommer spült die Welle die Sandburgen flach, sobald sie sie erreicht; danach Wiederaufbau. Im Herbst schwimmen die Kürbisse auf dem Wasser auf und setzen sich wieder.
 - **Schneesturm (Herbst):** pustet den Laubhaufen weg (25 %/min), die Blätter fliegen mit dem Wind seitlich aus dem Bild.
-- **Windhose:** Im Herbst wirbelt sie Laub auf und reißt 2–4 Kürbisse mit, die zurückfallen; im Frühling zerrt sie an den Blumen, Blütenblätter fliegen.
+- **Windhose:** Im Herbst wirbelt sie Laub auf und reißt 2–4 Kürbisse mit, die zurückfallen; im Frühling zerrt sie an den Blumen, Blütenblätter fliegen; im Sommer reißt sie die Sandburgen auf ihrem Weg ein (Sand und Fahnen fliegen, flacher Haufen bleibt; Wiederaufbau 0–60 s danach in je ~25 s), der Sandpalast verliert nur seine Fahnen und etwas Höhe.
+- **Blitzfeuer im Laub (Herbst):** Etwa jeder 8. nahe Blitz, der in den Laubhaufen fährt (Laub über 5 %), zündet ihn: Flammen, Funken, Rauch und warmer Schein brennen ein Loch in den Haufen (Server: −10 %), trocken ~30 s, bei Regen nur Zischen, Dampf und ~8 s Glut. `!extinguish` löscht mit Wasser und Dampf („… put out the fire!“) und zählt für die Herbst-Rangliste; ohne Feuer nur ein kleiner Spritzer.
+- **Sonnenschirm (Sommer):** Ein naher Blitz in den Schirm setzt die Bespannung in Brand, sie brennt in ~6 s bis auf Speichen und Stange ab, die Stange qualmt, nach ~60 s steht ein neuer. Sturm (Wind ≥ 0,8), Gewitter, Schneesturm oder eine nahe Windhose wehen ihn weg; ist es ~20 s ruhig, fällt er zurück und steckt sich in den Sand. Solange der Weihnachtsbaum am Strand davor steht, passiert beides nicht.
+- **Nasses Laub (Herbst):** Bei Regen werden Haufen, Ranke, Ast und fallende Blätter dunkler und glänzen leicht, Wind löst nur noch ~30 % so viel Laub; danach trocknet es in ~2 min.
+- **Mega-Blitz (jedes Thema):** Während des Spektakels dunkelt eine Gewitter-Trübung das Bild ab und die Deko wird gedimmt; die Blitze hellen weiter auf.
 - **Lawine (Winter):** Die Minis in der Ecke, in der sie aufschlägt, sind kurz begraben.
 - **Hagel (Frühling):** Ein paar Blumen knicken um und richten sich nach 20–30 s wieder auf.
 

@@ -151,7 +151,12 @@
       // Herbst, Frühling, Sommer: je ein Baustein, sichtbar nur im eigenen Thema
       var seasonOpts = { tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
                          sky: function () { return kit.state(); },
-                         blizzard: function () { return kit.blizzard(); } };
+                         blizzard: function () { return kit.blizzard(); },
+                         // Blitz hat das Laub entzündet: der Server verbrennt 10 % und
+                         // hält das Feuer für !extinguish offen (nass kürzer)
+                         ignite: function (wet) {
+                           if (apiBase) fetch(apiBase + 'weather?cmd=ignite' + (wet ? '&wet=1' : ''), { cache: 'no-store' }).catch(function () {});
+                         } };
       var seasons = {
         autumn: window.ThemeAutumn.create(document.getElementById('stage'), seasonOpts),
         spring: window.ThemeSpring.create(document.getElementById('stage'), seasonOpts),
@@ -170,7 +175,11 @@
         // nur im Browser-Tab: Hinweis, dass ein Klick den Ton freigibt
         onBlocked: function (isBlocked) { soundBtn.hidden = !isBlocked || !!window.obsstudio; }
       });
-      kit.on('strike', function (dist) { audio.thunder(dist); });
+      // Einschlag mit Position an das sichtbare Jahreszeiten-Thema (Laubfeuer, Schirm)
+      kit.on('strike', function (dist, hit) {
+        audio.thunder(dist);
+        if (hit && seasons[lastTheme]) seasons[lastTheme].command('bolt', hit);
+      });
       kit.on('gust', function () { audio.gust(); });
       kit.on('pop', function () { audio.thunder(0.1); });
       // Spektakel-Start (Art schon aufgelöst, auch bei Zufall) an das
@@ -386,7 +395,7 @@
       var LEVEL_KINDS = { leaves: 1, garden: 1, heat: 1 };
       var SEASON_OF_CMD = { rake: 'autumn', jump: 'autumn', sweep: 'autumn',
                             water: 'spring', weed: 'spring', bee: 'spring',
-                            splash: 'summer', ice: 'summer', cool: 'summer' };
+                            splash: 'summer', ice: 'summer', cool: 'summer', fries: 'summer' };
       function allThemes(fn) {
         fn(theme);
         Object.keys(seasons).forEach(function (n) { fn(seasons[n]); });
@@ -478,8 +487,13 @@
           case 'bee':
           case 'splash':
           case 'ice':
+          case 'fries':
           case 'cool':
             if (SEASON_OF_CMD[c.cmd] === lastTheme) seasons[lastTheme].command(c.cmd, p);
+            break;
+          // Laubfeuer löschen: nur das Herbst-Modul zeigt es (sichtbar)
+          case 'extinguish':
+            seasons.autumn.command('extinguish', p);
             break;
           case 'shake':
             theme.command('shake', Object.assign({ win: settings.shakewin }, p));

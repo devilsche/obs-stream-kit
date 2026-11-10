@@ -96,7 +96,7 @@
     var anchor = stage.querySelector('.wk-flash') || stage.querySelector('.wk-particles');
     if (anchor) stage.insertBefore(rootEl, anchor); else stage.appendChild(rootEl);
     var fxEl = document.createElement('div');
-    fxEl.className = 'tw';
+    fxEl.className = 'tw tw--fx';
     fxEl.setAttribute('aria-hidden', 'true');
     fxEl.dataset.on = '0';
     stage.appendChild(fxEl);

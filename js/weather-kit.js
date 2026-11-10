@@ -6,6 +6,8 @@
  *   kit.setState(WeatherKit.profile('rain'), 25);   // Übergang in s
  *   kit.strike(); kit.gust(); kit.spectacle('tsunami');
  *   kit.on('spectacle', function (info) { … });   // Art, Dauer, Live-Abfragen
+ *   kit.on('strike', function (dist, hit) { … });  // hit.x/y = Blitz-Ende, hit.ground(x, y) verlängert bis dorthin
+ *   kit.dark();                                     // Abdunklung durch den Mega-Blitz 0..1
  *   kit.blizzard();                                 // Schneesturm-Grad 0..1
  *
  * Die Lagen (PROFILES) spiegeln fx/weather.py 1:1 — der Server rechnet
@@ -123,7 +125,7 @@
     var time = 0, last = null;
     var listeners = {};
 
-    function emit(ev, arg) { (listeners[ev] || []).forEach(function (fn) { fn(arg); }); }
+    function emit(ev, arg, arg2) { (listeners[ev] || []).forEach(function (fn) { fn(arg, arg2); }); }
 
     function setState(state, secs) {
       var target = {};
@@ -644,6 +646,12 @@
         });
       }
 
+      // Mega-Blitz: Gewitter-Trübung kräftig, dazu ein Hauch über der Mitte
+      if (darkNow > 0.01) {
+        g = Math.max(g, darkNow);
+        sctx.fillStyle = 'rgba(14,16,26,' + (0.12 * darkNow) + ')';
+        sctx.fillRect(0, 0, W, H);
+      }
       // Trübe Stimmung: Ecken-Vignette, Mitte bleibt frei
       if (g > 0.01) {
         sctx.save();
@@ -819,12 +827,23 @@
       flashEl.classList.add('is-flashing');
     }
 
+    // Zweites Argument an die Zuhörer: Ende des Hauptstrangs (x/y) und
+    // ground(x, y), das den Blitz bis zu einem Einschlagpunkt verlängert
+    // (Deko-Themen: Blitz trifft Laubhaufen oder Schirm); dist bleibt erstes Argument
     function strike(which) {
       var dist = which === 'near' ? rand(0, 0.3) : which === 'far' ? rand(0.6, 1) : Math.random();
       var b = makeBolt(dist);
       bolts.push(b);
       flash(b.side);
-      emit('strike', dist);
+      var trunk = b.paths[0].pts, end = trunk[trunk.length - 1];
+      emit('strike', dist, {
+        x: end[0], y: end[1], near: dist <= 0.3,
+        ground: function (gx, gy) {
+          var e = trunk[trunk.length - 1];
+          if (gy <= e[1]) return;
+          zigzag(e[0], e[1], gx, gy, 60, 4, trunk);
+        }
+      });
     }
 
     function boltAlpha(t) {
@@ -1044,6 +1063,8 @@
           }
           s.glow = Math.max(0, s.glow - dt * 3.2);
           var env = smooth(s.t / 1.2) * (1 - smooth((s.t - (s.dur - 1.4)) / 1.4));
+          // Bild abdunkeln wie bei schwerem Gewitter, jeder Einschlag hellt kurz auf
+          s.dark = env * (1 - 0.7 * s.glow);
           if (env <= 0.001) return;
           var drop = (1 - env) * 300;
 
@@ -1585,8 +1606,19 @@
       }
     };
 
+    // Abdunklung 0..1 (Mega-Blitz) für Himmel und Deko (--wk-dark an der Bühne)
+    var darkNow = 0, darkShown = -1;
+    function setDark() {
+      darkNow = show && show.type === 'megabolt' ? clamp(show.dark || 0, 0, 1) : 0;
+      if (Math.abs(darkNow - darkShown) < 0.01 && !(darkNow === 0 && darkShown > 0)) return;
+      darkShown = darkNow;
+      stage.style.setProperty('--wk-dark', darkNow.toFixed(3));
+      stage.dataset.wkDark = darkNow > 0.005 ? '1' : '0';
+    }
+
     function drawShow(dt) {
       fctx.clearRect(0, 0, W, H);
+      setDark();
       if (!show) return;
       show.t += dt;
       if (show.type === 'tint') {
@@ -1656,6 +1688,8 @@
       busy: function () { return show ? show.type : null; },
       // Schneesturm-Grad 0..1 (viel Schnee und starker Wind), live
       blizzard: function () { return bz; },
+      // Abdunklung durch den Mega-Blitz 0..1, live
+      dark: function () { return darkNow; },
       counts: function () {
         var c = { rain: 0, drizzle: 0, snow: 0 };
         parts.forEach(function (p) { c[p.type]++; });

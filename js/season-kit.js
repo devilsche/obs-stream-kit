@@ -175,6 +175,7 @@
           var fl = p.floor ? p.floor(p.x) : H + 30;
           a *= clamp01((fl - p.y) / 30);
           if (p.life) a *= clamp01((p.life - p.age) / 0.6);
+          if (p.life && p.age >= p.life) { list.splice(i, 1); continue; }
           // weg erst beim Fallen (hochgeworfene starten am Boden)
           if (a <= 0 && p.vy > 0 && (p.y > 0 || p.age > 3)) { list.splice(i, 1); continue; }
           if (p.x < -300 || p.x > W + 300 || p.age > 60) { list.splice(i, 1); continue; }

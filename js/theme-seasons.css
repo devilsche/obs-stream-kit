@@ -1,7 +1,8 @@
 /* Jahreszeiten-Themen Herbst (ta-), Frühling (tsp-), Sommer (tss-) der
    Weather-Source (js/theme-autumn.js, theme-spring.js, theme-summer.js).
    Zustände als data-* an den Wurzeln (.ts), Mengen als CSS-Variablen:
-   --ts-night, --ts-snow, --tsp-wilt, --tsp-dry, --tss-heat, --tss-sun, --tss-halo. */
+   --ts-night, --ts-snow, --ta-wet, --tsp-wilt, --tsp-dry, --tss-heat, --tss-sun, --tss-halo;
+   --wk-dark (Mega-Blitz) setzt die Weather-Kit an der Bühne. */
 
 .ts {
   position: absolute; inset: 0; pointer-events: none;
@@ -24,6 +25,23 @@
 /* Nacht: Deko dunkler, Lichter bleiben hell */
 .ta-dim, .tsp-dim, .tss-dim { filter: brightness(calc(1 - 0.4 * var(--ts-night))); }
 
+/* Mega-Blitz: Deko aller Themen abgedunkelt (Effekt-Ebene mit Feuer nicht),
+   die Blitz-Aufhellung liegt darüber und hellt weiter auf */
+[data-wk-dark="1"] > .ts:not(.ts--fx),
+[data-wk-dark="1"] > .tw:not(.tw--fx) { filter: brightness(calc(1 - 0.5 * var(--wk-dark, 0))); }
+
+/* Feuer-Ebene: Flammen und Lichthof mit weichem Rand-Fade */
+.ts-fire {
+  -webkit-mask-image:
+    linear-gradient(to right, transparent, #000 90px, #000 calc(100% - 90px), transparent),
+    linear-gradient(to bottom, transparent, #000 60px, #000 calc(100% - 20px), transparent);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to right, transparent, #000 90px, #000 calc(100% - 90px), transparent),
+    linear-gradient(to bottom, transparent, #000 60px, #000 calc(100% - 20px), transparent);
+  mask-composite: intersect;
+}
+
 /* Gemeinsames Sub-Projekt: Teile erscheinen einzeln mit Pop, Reset blendet aus */
 .ts-proj { opacity: 1; transition: opacity 0.6s ease; }
 .ts-proj.is-clearing { opacity: 0; }
@@ -36,6 +54,15 @@
 @keyframes tsDone { 0%, 100% { transform: none; } 30% { transform: scale(1.06, 0.95); } 60% { transform: scale(0.97, 1.04); } }
 
 /* ═════ Herbst ═════ */
+.ts--autumn { --ta-wet: 0; }
+/* Nasses Laub: dunkler, satter, leicht glänzend (nur solange nass) */
+.ts[data-leafwet="1"] .ta-vleaf,
+.ts[data-leafwet="1"] .ta-bl {
+  filter: brightness(calc(1 - 0.32 * var(--ta-wet))) saturate(calc(1 + 0.3 * var(--ta-wet))) contrast(calc(1 + 0.15 * var(--ta-wet)));
+}
+.ts[data-leafwet="1"] .ta-pile {
+  filter: brightness(calc((1 - 0.4 * var(--ts-night)) * (1 - 0.3 * var(--ta-wet)))) saturate(calc(1 + 0.3 * var(--ta-wet))) contrast(calc(1 + 0.15 * var(--ta-wet)));
+}
 .ts[data-garland="0"] .ta-garland,
 .ts[data-branch="0"] .ta-branch,
 .ts[data-pile="0"] .ta-pile,
@@ -244,6 +271,34 @@
 .tss-ustripe { fill: #ffffff; }
 .tss-pole { stroke: #e8e2d0; stroke-width: 5; }
 .tss-utip { fill: #e8e2d0; }
+
+/* Schirm: Speichen unter der Bespannung, Brandkante, verkohlt; neuer Schirm poppt aus dem Sand */
+.tss-urib { fill: none; stroke: #cfc8b8; stroke-width: 3; stroke-linecap: round; transition: stroke 2s ease; }
+.tss-urib.is-burnt { stroke: #2e2622; }
+.tss-pole { transition: stroke 3s ease; }
+.tss-pole.is-burnt { stroke: #5a4a40; }
+.tss-uchar { fill: #2a1406; }
+.tss-uedge { fill: none; stroke: #2a1406; stroke-width: 10; }
+.tss-uedge-glow { fill: none; stroke: #ff9a3a; stroke-width: 3; }
+.tss-upop { transform-box: fill-box; transform-origin: 50% 100%; }
+.tss-upop.is-pop { animation: tssUmbPop 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes tssUmbPop { from { transform: scaleY(0); } to { transform: none; } }
+
+/* Windhose: Palast verliert die Fahnen, bis er wieder steht */
+.tss-palace .tss-flag, .tss-palace .tss-flagpole { transition: opacity 0.4s ease; }
+.tss-palace[data-blown="1"] .tss-flag,
+.tss-palace[data-blown="1"] .tss-flagpole { opacity: 0; }
+
+/* Pommes und Möwe */
+.tss-tray { fill: #e8333f; stroke: #a8202a; stroke-width: 2; }
+.tss-tray-stripe { fill: #ffffff; }
+.tss-fry { fill: #f6c84a; stroke: #c8922a; stroke-width: 1; }
+.tss-gull-body { fill: #f7f7f4; stroke: #9aa2aa; stroke-width: 1.5; }
+.tss-gull-wing { fill: #a9b3bd; stroke: #6c7782; stroke-width: 1.5; }
+.tss-gull-tail { fill: #3a3f45; }
+.tss-gull-eye { fill: #1b1b1f; }
+.tss-gull-beak { fill: #f2b705; }
+.tss-gull-leg { fill: none; stroke: #e8a040; stroke-width: 2.5; stroke-linecap: round; }
 
 /* Sandpalast (Sub-Projekt) */
 .tss-pal-line { fill: none; stroke: #c9a865; stroke-width: 2; opacity: 0.7; }

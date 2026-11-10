@@ -267,6 +267,109 @@
         node: pos
       };
     };
+    // ── Feuer (Blitz im Laub, brennender Schirm): Flammen und Glut auf einer
+    // eigenen Ebene über dem Wetter (Rand-Fade per CSS-Maske), Rauch, Funken,
+    // Dampf und Wasser als Partikel auf der vorderen Ebene ──
+    var fireCtx = null;
+    B.fireCtx = function () {
+      if (!fireCtx) {
+        var c = canvas(fxEl);
+        c.classList.add('ts-fire');
+        fireCtx = c.getContext('2d');
+      }
+      return fireCtx;
+    };
+    // eine Flammenzunge: Fuß bei x/y, Breite w, Höhe h, flackert über t;
+    // bauchig unten, schlanke, pendelnde Spitze, heller Kern
+    function tongue(ctx, x, y, w, h, t, seed) {
+      var fl = 0.72 + 0.18 * Math.sin(t * 9 + seed * 3.1) + 0.1 * Math.sin(t * 21 + seed * 7.7);
+      h *= fl;
+      var lean = Math.sin(t * 4.3 + seed * 2.3) * w * 0.45 + Math.sin(t * 11 + seed) * w * 0.12;
+      [[1, 1, 'rgba(255,110,25,', 0.8, 'rgba(190,30,10,'], [0.6, 0.66, 'rgba(255,214,110,', 0.95, 'rgba(255,140,30,'],
+       [0.3, 0.36, 'rgba(255,250,215,', 1, 'rgba(255,220,140,']].forEach(function (L) {
+        var ww = w * L[0], hh = h * L[1];
+        var g = ctx.createLinearGradient(0, y, 0, y - hh);
+        g.addColorStop(0, L[2] + L[3] + ')');
+        g.addColorStop(0.5, L[4] + (L[3] * 0.75) + ')');
+        g.addColorStop(1, L[4] + '0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.moveTo(x - ww * 0.35, y + ww * 0.08);
+        ctx.bezierCurveTo(x - ww * 0.75, y - hh * 0.22, x + lean * 0.4 - ww * 0.3, y - hh * 0.62, x + lean, y - hh);
+        ctx.bezierCurveTo(x + lean * 0.4 + ww * 0.3, y - hh * 0.62, x + ww * 0.75, y - hh * 0.22, x + ww * 0.35, y + ww * 0.08);
+        ctx.closePath();
+        ctx.fill();
+      });
+    }
+    // Flammenreihe über pts ([x, y, Höhenfaktor]), k = Stärke 0..1
+    B.flames = function (ctx, pts, w, h, k, t) {
+      if (k <= 0.01) return;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowColor = 'rgba(255,120,30,0.8)';
+      ctx.shadowBlur = 18;
+      pts.forEach(function (p, i) {
+        var hv = 0.75 + 0.25 * Math.sin(t * 1.7 + i * 2.9);
+        tongue(ctx, p[0], p[1], w * (0.7 + 0.3 * k), h * k * (p[2] || 1) * hv, t, i + 1);
+      });
+      ctx.restore();
+    };
+    // warmer Lichthof (Feuer, Glut)
+    B.glow = function (ctx, x, y, r, a, rgb) {
+      if (a <= 0.005) return;
+      var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(' + (rgb || '255,150,60') + ',' + a.toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(' + (rgb || '255,150,60') + ',0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    };
+    function puffDraw(ctx, p, a) {
+      var k = p.age / (p.life || 4), r = p.r + p.gr * p.age;
+      var al = a * p.o * (1 - k);
+      if (al <= 0.004) return;
+      var g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r);
+      g.addColorStop(0, 'rgba(' + p.c + ',' + al.toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(' + p.c + ',0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+    }
+    function sparkDraw(ctx, p, a) {
+      var k = 1 - p.age / p.life;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = 'rgb(255,' + Math.round(110 + 130 * k) + ',' + Math.round(40 + 80 * k) + ')';
+      ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+      ctx.globalAlpha = 1;
+    }
+    function dropDraw(ctx, p, a) {
+      ctx.globalAlpha = a * 0.85;
+      ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    // Rauch (dunkel) bzw. Dampf (hell) steigt auf und treibt mit dem Wind
+    B.smoke = function (x, y, o) {
+      o = o || {};
+      if (!front) return;
+      front.add({ x: x + rand(-8, 8), y: y, vx: rand(-15, 15), vy: -(o.up || rand(50, 90)), g: 0, term: 80, sway: rand(6, 18), vph: rand(0.6, 1.4),
+                  vr: 0, wf: o.wf === undefined ? 0.45 : o.wf, drag: 0.5, r: o.r || rand(14, 24), gr: o.gr || rand(14, 26),
+                  o: o.o || 0.4, c: o.steam ? '236,240,246' : (o.c || '78,72,70'), life: o.life || rand(3, 5), draw: puffDraw });
+    };
+    B.sparks = function (x, y, n, spread) {
+      if (!front) return;
+      for (var i = 0; i < n; i++) {
+        front.add({ x: x + rand(-(spread || 20), spread || 20), y: y, vx: rand(-80, 80), vy: -rand(180, 420), g: 320, term: 160,
+                    sway: rand(10, 40), vph: rand(4, 9), vr: 0, wf: 0.3, life: rand(0.8, 1.6), draw: sparkDraw });
+      }
+    };
+    // Wasser: Tropfen fliegen im Bogen auf das Ziel bzw. spritzen dort auf
+    B.water = function (x, y, n, floor) {
+      if (!front) return;
+      for (var i = 0; i < n; i++) {
+        var a = rand(-Math.PI * 0.95, -Math.PI * 0.05), sp = rand(150, 560);
+        front.add({ x: x + rand(-25, 25), y: y - rand(0, 15), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 1400, term: 900,
+                    sway: 0, vr: 0, wf: 0, r: rand(2.5, 6), c: i % 4 ? '#7cc8ff' : '#e6f6ff', life: 1.4, floor: floor || null, draw: dropDraw });
+      }
+    };
     return B;
   }
 
