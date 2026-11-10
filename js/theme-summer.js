@@ -302,7 +302,22 @@
 
     // ── Hitze ──
     var S = { heat: 0, heatT: 0, first: true, top: [] };
-    function heatK() { return Math.max(S.heat / 100, B.heat); }
+    // Schnee auf heißem Sand dampft, bis der Strand abgekühlt ist
+    var steamAcc = 0;
+    function stepSteam(dt) {
+      var sky = opts.sky ? opts.sky() : null, sn = sky ? sky.snow || 0 : 0;
+      var hot = S.heat / 100;
+      if (!B.on || B.reduceMotion || sn < 0.1 || hot < 0.25 || !B.partOn('beach')) { steamAcc = 0; return; }
+      steamAcc += dt * 24 * hot * Math.min(1, sn * 1.5);
+      while (steamAcc >= 1) {
+        steamAcc--;
+        var x = Math.random() < 0.5 ? rand(40, 690) : rand(1230, W - 40);
+        B.smoke(x, sandY(x) + 4, { steam: true, o: 0.4 + 0.3 * hot, up: rand(35, 70), r: rand(12, 20), gr: rand(30, 45), life: rand(2.2, 3.4) });
+      }
+    }
+    // liegt Schnee, glüht der Sand nicht mehr (der Server kühlt die Hitze nach)
+    function snowCool() { return 1 - clamp01(B.snow * 3); }
+    function heatK() { return Math.max(S.heat / 100, B.heat) * snowCool(); }
 
     // ── Eis: Waffel steckt mit der Spitze im Sand (gut ein Drittel), Kugel
     // oben, 10–25° schräg; schmilzt in 40 s (kühl) bis 12 s (volle Hitze),
@@ -740,7 +755,7 @@
     // selbst, dann tritt dieses zurück
     var shimmerT = 0, shimmerDrawn = false;
     function drawShimmer() {
-      var h = S.heat / 100 * (1 - B.heat) * (1 - B.night);
+      var h = S.heat / 100 * (1 - B.heat) * (1 - B.night) * snowCool();
       if (h < 0.12 || !B.partOn('beach')) {
         if (shimmerDrawn) { shctx.clearRect(0, 0, W, H); shimmerDrawn = false; }
         return;
@@ -1155,6 +1170,7 @@
       B.vars({ '--tss-heat': hk, '--ts-night': B.night });
       placeSun();
       B.stepSnow(dt);
+      stepSteam(dt);
       stepIces(dt);
       if (B.on) { stepGulls(dt); stepFries(dt); } else if (gulls.length || fries.length) clearSnacks();
       stepCastles(dt);

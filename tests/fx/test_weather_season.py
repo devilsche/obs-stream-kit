@@ -95,3 +95,9 @@ def test_wet_fire_only_smoulders_and_goes_out_by_itself(conn):
     advance(conn, 1, 0, "autumn", W)
     assert ignite(conn, 1, 100, wet=True)["secs"] == 8
     assert use(conn, 1, "extinguish", "Mia", 120)["done"] == 0             # schon von selbst aus
+
+
+def test_snow_cools_the_beach(conn):
+    advance(conn, 1, 0, "summer", W)
+    advance(conn, 1, 300, "summer", {**W, "heat": 1})                       # 20 %/min × 5 = 100
+    assert advance(conn, 1, 420, "summer", {**W, "heat": 1, "snow": 0.6})["levels"]["heat"] == pytest.approx(50)
