@@ -567,9 +567,11 @@
       if (!B.partOn('pile') || S.shown <= 5) return;
       var x = Math.max(140, Math.min(W - 140, p.x));
       // zum nächsten Rand hin bis zur ersten Stelle mit genug Laub (Mitte ist frei)
+      // genug Laub: 45 px, bei dünnem Haufen 60 % seiner höchsten Stelle
+      var need = Math.min(45, 0.6 * MAXH * lvl());
       var dir = x < W / 2 ? -1 : 1, moved = 0;
-      while (H - surface(x) < 45 && moved < REACH) { x += dir * 10; moved += 10; }
-      if (H - surface(x) < 45) return;                 // zu weit daneben
+      while (H - surface(x) < need && moved < REACH) { x += dir * 10; moved += 10; }
+      if (H - surface(x) < need) return;               // zu weit daneben
       x = Math.max(140, Math.min(W - 140, x + dir * Math.random() * 60));
       if (Date.now() < pauseUntil) return;
       if (p.ground) p.ground(x, surface(x) + 6);
