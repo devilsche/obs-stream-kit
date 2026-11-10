@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from flask import Flask, g
 
-from fx import autumn_db, commands, season_db, weather_api, weather_season, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
+from fx import autumn_db, commands, season_db, weather_api, weather_followers, weather_season, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
 from fx.endpoints import bp_fx
 
 LOC = {"lat": 50.1109, "lon": 8.6821, "label": "Frankfurt am Main, Hessen, Deutschland"}
@@ -22,6 +22,7 @@ def conn():
     season_db.init_schema(c)
     autumn_db.init_schema(c)
     weather_season.init_schema(c)
+    weather_followers.init_schema(c)
     weather_state.LAST_THEME.clear()
     yield c
     c.close()
@@ -333,9 +334,11 @@ def test_winter_items_are_stored_and_listed_in_first_poll(conn):
     c.get("/s/t/api/fx/weather?cmd=build&name=Sub1")
     c.get("/s/t/api/fx/weather?cmd=build&name=Sub2")
     st = c.get("/s/t/api/fx/weather/poll").json["state"]
-    assert [o["name"] for o in st["ornaments"]] == ["Mia"] and st["ornament_total"] == 1
+    # gemeinsame Follower-Liste: Kugel und Mini sind dieselben Leute
+    assert [o["name"] for o in st["ornaments"]] == ["Mia", "Lea"] and st["ornament_total"] == 2
+    assert [m["name"] for m in st["minis"]] == ["Mia", "Lea"] and st["follower_total"] == 2
     assert st["gifts"] == [{"name": "Tom", "type": "bits", "amount": 500}]
-    assert [m["name"] for m in st["minis"]] == ["Lea"] and st["snowman"] == 2
+    assert st["snowman"] == 2 and st["project"] == 2
     c.get("/s/t/api/fx/weather?cmd=snowmanreset")
     assert c.get("/s/t/api/fx/weather/poll").json["state"]["snowman"] == 0
 
@@ -383,9 +386,11 @@ def test_follow_becomes_ornament_in_xmas_and_mini_otherwise(conn):
     c.get("/s/t/api/fx/weather?cmd=setup")
     c.get("/s/t/api/fx/weather?cmd=follow&name=Ben")
     st = c.get("/s/t/api/fx/weather/poll").json["state"]
-    assert [o["name"] for o in st["ornaments"]] == ["Ben"]
+    assert [o["name"] for o in st["ornaments"]] == ["Lea", "Ben"]
     cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
-    assert [x["cmd"] for x in cmds if x["params"].get("name") in ("Lea", "Ben")] == ["mini", "ornament"]
+    # jeder Follow geht als "follow" ans Overlay, das alle Jahreszeiten nachführt
+    assert [x["cmd"] for x in cmds if x["params"].get("name") in ("Lea", "Ben")] == ["follow", "follow"]
+    assert c.get("/s/t/api/fx/weather?cmd=follow&name=ben").json.get("duplicate")
 
 
 # --- Herbst, Frühling, Sommer ---
@@ -399,9 +404,10 @@ def test_season_items_and_follow_per_theme(conn):
     _state(c, "?theme=summer")
     c.get("/s/t/api/fx/weather?cmd=follow&name=Cy")
     st = c.get("/s/t/api/fx/weather/poll").json["state"]
-    assert [x["name"] for x in st["pumpkins"]] == ["Ann"] and st["pumpkin_total"] == 1
-    assert [x["name"] for x in st["flowers"]] == ["Bo"]
-    assert [x["name"] for x in st["castles"]] == ["Cy"]
+    # jede Jahreszeit zeigt alle Follower in ihrer Gestalt
+    for key in ("pumpkins", "flowers", "castles", "minis", "ornaments"):
+        assert [x["name"] for x in st[key]] == ["Ann", "Bo", "Cy"]
+    assert st["pumpkin_total"] == st["flower_total"] == 3
 
 
 def test_season_actions_report_results_and_levels(conn, monkeypatch):

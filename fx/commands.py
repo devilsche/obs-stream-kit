@@ -224,7 +224,7 @@ EFFECTS = {
             "snowball": {"name": _name},
             "celebrate": {"name": _name},
             "xmasdone": {"step": _choice("setup", "farewell")},
-            "clear": {"kind": _choice("ornaments", "gifts", "minis", "snow", "snowman",
+            "clear": {"kind": _choice("followers", "ornaments", "gifts", "minis", "snow", "snowman",
                                       "pumpkins", "leaves", "flowers", "garden", "castles", "heat")},
             "pumpkin": {"name": _name},
             "rake": {"name": _name},

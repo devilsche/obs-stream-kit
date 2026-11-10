@@ -18,8 +18,8 @@ from flask import Blueprint, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, season_db, weather_db, weather_frost, weather_season,
-                weather_snow, weather_state, weather_theme, xmas_db)
+from fx import (autumn_db, commands, season_db, weather_db, weather_followers, weather_frost,
+                weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
 log = logging.getLogger(__name__)
@@ -59,22 +59,13 @@ def _winter_persist(conn, tenant_id, cmd):
     Schneemann (season_db, effect winter), Schneedecke und Xmas-Ablauf."""
     c, p, now = cmd["cmd"], cmd["params"], time.time()
     today = datetime.date.today()
-    if c == "follow":
-        # ein Follow-Befehl für alles, je nach aktivem Thema: Kürbis, Blume,
-        # Sandburg; im Winter Kugel (Xmas-Zeit) oder Mini-Schneemann
-        theme = weather_state.LAST_THEME.get(tenant_id) or weather_theme.theme_for(today, "auto", False)
-        if theme == "winter":
-            on = weather_theme.status(conn, tenant_id, today, {}, "winter") in ("on", "farewell")
-            c = "ornament" if on else "mini"
-        else:
-            c = {"autumn": "pumpkin", "spring": "flower", "summer": "castle"}.get(theme, "mini")
-        cmd["cmd"] = c
-    if c == "ornament":
-        return xmas_db.add_ornament(conn, tenant_id, p.get("name", ""))
+    if c in ("follow", "ornament", "mini", "pumpkin", "flower", "castle"):
+        # gemeinsame Follower-Liste: jeder Follower erscheint in jeder Jahreszeit
+        # in deren Gestalt; das Overlay führt alle Themen nach
+        cmd["cmd"] = "follow"
+        return weather_followers.add(conn, tenant_id, p.get("name", ""))
     if c == "gift":
         xmas_db.add_gift(conn, tenant_id, p.get("name", ""), p["type"], p["amount"])
-    elif c == "mini":
-        return season_db.add_item(conn, tenant_id, "winter", p.get("name", ""))
     elif c == "build":
         season_db.add_event(conn, tenant_id, "winter", "build", p.get("name", ""))
     elif c == "snowmanreset":
@@ -92,27 +83,16 @@ def _winter_persist(conn, tenant_id, cmd):
         if p.get("step"):
             weather_theme.mark(conn, tenant_id, today, {}, p["step"])
         return False
-    elif c == "pumpkin":
-        return autumn_db.add_pumpkin(conn, tenant_id, p.get("name", ""))
-    elif c == "flower":
-        return season_db.add_item(conn, tenant_id, "spring", p.get("name", ""))
-    elif c == "castle":
-        return season_db.add_item(conn, tenant_id, "summer", p.get("name", ""))
     elif c in weather_season.THEME_OF:
         p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force"))))
-    elif c == "clear" and p.get("kind") in ("pumpkins", "flowers", "castles"):
-        if p["kind"] == "pumpkins":
-            autumn_db.clear(conn, tenant_id, "pumpkins")
-        else:
-            season_db.clear(conn, tenant_id, "spring" if p["kind"] == "flowers" else "summer", p["kind"])
+    elif c == "clear" and p.get("kind") in ("followers", "ornaments", "minis", "pumpkins", "flowers", "castles"):
+        weather_followers.clear(conn, tenant_id)
     elif c == "clear" and p.get("kind") in ("leaves", "garden", "heat"):
         weather_season.clear(conn, tenant_id, now, p["kind"])
     elif c == "clear":
         kind = p.get("kind")
-        if kind in ("ornaments", "gifts"):
+        if kind == "gifts":
             xmas_db.clear(conn, tenant_id, kind)
-        elif kind == "minis":
-            season_db.clear(conn, tenant_id, "winter", "minis")
         elif kind == "snowman":
             season_db.clear(conn, tenant_id, "winter", "snowman")
         elif kind == "snow":
@@ -131,15 +111,21 @@ def _weather_state(conn, tenant_id):
             stage = min(8, stage + 1)
         elif e["k"] == "smreset":
             stage = 0
-    a = autumn_db.load_state(conn, tenant_id)
-    sp = season_db.load_state(conn, tenant_id, "spring")
-    su = season_db.load_state(conn, tenant_id, "summer")
-    return {"ornaments": x["ornaments"], "ornament_total": x["ornament_total"],
+    # gemeinsame Follower-Liste, je Gestalt so viele neueste, wie Platz ist
+    f = weather_followers.load(conn, tenant_id, limit=60)
+    names, total = f["names"], f["total"]
+
+    def newest(n):
+        return [{"name": nm} for nm in names[-n:]]
+    return {"followers": names, "follower_total": total,
+            "ornaments": newest(60), "ornament_total": total,
             "gifts": x["gifts"], "gift_total": x["gift_total"],
-            "minis": w["items"], "mini_total": w["item_total"], "snowman": stage,
-            "pumpkins": a["pumpkins"], "pumpkin_total": a["pumpkin_total"],
-            "flowers": sp["items"], "flower_total": sp["item_total"],
-            "castles": su["items"], "castle_total": su["item_total"]}
+            "minis": newest(30), "mini_total": total,
+            "pumpkins": newest(30), "pumpkin_total": total,
+            "flowers": newest(40), "flower_total": total,
+            "castles": newest(24), "castle_total": total,
+            # Sub-Projekt aller Jahreszeiten (Schneemann, Vogelscheuche, Sonnenblume, Palast)
+            "snowman": stage, "project": stage}
 
 
 _PERSISTENT["weather"] = (_weather_persist, _weather_state)
