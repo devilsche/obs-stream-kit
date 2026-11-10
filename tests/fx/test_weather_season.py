@@ -18,6 +18,14 @@ def conn():
 W = {"wind": 0, "rain": 0, "heat": 0, "sun": 0, "night": 0}
 
 
+def test_blizzard_blows_leaves_away(conn):
+    advance(conn, 1, 0, "autumn", W)
+    advance(conn, 1, 1800, "autumn", {**W, "wind": 1})                     # 3 %/min × 30 min = 90
+    # Blizzard: 25 %/min weg, statt dazu
+    assert advance(conn, 1, 1920, "autumn", {**W, "wind": 1, "blizzard": 1})["levels"]["leaves"] == pytest.approx(40)
+    assert advance(conn, 1, 2400, "autumn", {**W, "wind": 1, "blizzard": 1})["levels"]["leaves"] == 0
+
+
 def test_leaves_fall_faster_with_wind_and_rake_counts(conn):
     advance(conn, 1, 0, "autumn", W)
     assert advance(conn, 1, 600, "autumn", W)["levels"]["leaves"] == pytest.approx(10)

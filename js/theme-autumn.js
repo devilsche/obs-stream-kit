@@ -446,7 +446,7 @@
     }
 
     // ── Hauptschleife ──
-    var spawnAcc = 0, branchAcc = 0, drawn = -1, offFor = 99;
+    var spawnAcc = 0, branchAcc = 0, blowAcc = 0, drawn = -1, offFor = 99;
     TS.loop(function (dt) {
       // Laubhöhe folgt dem Server: Zuwachs weich, Rechen sichtbar schneller
       if (B.reduceMotion) S.shown = S.target;
@@ -462,6 +462,19 @@
       var l = lvl();
       if (Math.abs(l - drawn) > 0.002) { drawPile(l); placePumpkins(); drawn = l; }
       if (B.on) {
+        // Schneesturm pustet den Laubhaufen weg: Blätter fliegen vom Haufen
+        // mit dem Wind seitlich aus dem Bild (der Server senkt den Stand mit)
+        var bz = opts.blizzard ? clamp01(opts.blizzard()) : 0;
+        if (bz > 0.3 && S.shown > 1 && !B.reduceMotion) {
+          var dir = B.windBase < 0 ? -1 : 1;
+          blowAcc += dt * 40 * bz;
+          while (blowAcc >= 1) {
+            blowAcc--;
+            var bx = rand(0, W);
+            spawn({ x: bx, y: surface(bx) + rand(-6, 6), vx: dir * rand(650, 1200), vy: rand(-380, -60), g: 120,
+                    sway: rand(40, 90), vph: rand(6, 10), front: true, s: rand(0.8, 1.3), life: rand(1.8, 3), land: false });
+          }
+        }
         // Laub fällt stetig, mit Wind deutlich mehr
         var w = Math.abs(B.windBase);
         spawnAcc += (2.5 + 9 * w) * dt;

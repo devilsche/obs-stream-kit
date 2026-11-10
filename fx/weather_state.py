@@ -150,7 +150,8 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
         season = weather_season.advance(
             conn, tenant_id, now, theme,
             {"wind": abs(state.get("wind", 0)), "rain": state.get("rain", 0) + state.get("drizzle", 0) * 0.5,
-             "heat": state.get("heat", 0), "sun": state.get("sun", 0), "night": state.get("night", 0)},
+             "heat": state.get("heat", 0), "sun": state.get("sun", 0), "night": state.get("night", 0),
+             "blizzard": 1 if state.get("kind") == "blizzard" else 0},
             opts.get("leafrate", 1.0) if theme == "autumn" else 1.0)
     except Exception:
         log.exception("weather: season failed for tenant %s", tenant_id)

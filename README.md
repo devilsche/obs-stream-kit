@@ -401,6 +401,7 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 - **Regen/Gewitter (Sommer):** Sandburgen sacken je nach Regenmenge zusammen (Türme flacher, Fahnen hängen, Sand rutscht vor den Fuß), der Sandpalast etwas; nach dem Regen bauen sie sich in 1–2 min nach und nach wieder auf.
 - **Schnee/Schneesturm (jedes Thema):** Im Sommer bekommen Sandburgen, Sandpalast und Sonnenschirm Schneehauben, im Herbst Kürbisse und der Hut der Vogelscheuche; im Schneesturm dicker, nach dem Schnee in etwa 1 min weggeschmolzen. Im Frühling lassen die Blumen und die Sonnenblume die Köpfe hängen. Im Winter schneien die Mini-Schneemänner im Schneesturm bis zum Hut ein und graben sich danach in etwa 1 min frei.
 - **Tsunami:** Im Sommer spült die Welle die Sandburgen flach, sobald sie sie erreicht; danach Wiederaufbau. Im Herbst schwimmen die Kürbisse auf dem Wasser auf und setzen sich wieder.
+- **Schneesturm (Herbst):** pustet den Laubhaufen weg (25 %/min), die Blätter fliegen mit dem Wind seitlich aus dem Bild.
 - **Windhose:** Im Herbst wirbelt sie Laub auf und reißt 2–4 Kürbisse mit, die zurückfallen; im Frühling zerrt sie an den Blumen, Blütenblätter fliegen.
 - **Lawine (Winter):** Die Minis in der Ecke, in der sie aufschlägt, sind kurz begraben.
 - **Hagel (Frühling):** Ein paar Blumen knicken um und richten sich nach 20–30 s wieder auf.

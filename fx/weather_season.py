@@ -84,7 +84,7 @@ def load(conn, tenant_id) -> dict:
 
 
 def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dict:
-    """w: wirksames Wetter {wind, rain, heat, sun, night} (je 0..1)."""
+    """w: wirksames Wetter {wind, rain, heat, sun, night, blizzard} (je 0..1)."""
     data = _get(conn, tenant_id)
     if data is None:
         _put(conn, tenant_id, _fresh(now))
@@ -95,7 +95,11 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dic
     lv = data["levels"]
     before = dict(lv)
     if theme == "autumn":
-        lv["leaves"] = _clamp(lv["leaves"] + (1 + 2 * min(1, abs(w.get("wind", 0)))) * rate * m)
+        if w.get("blizzard", 0) > 0.5:
+            # Schneesturm pustet den Laubhaufen weg
+            lv["leaves"] = _clamp(lv["leaves"] - 25 * m)
+        else:
+            lv["leaves"] = _clamp(lv["leaves"] + (1 + 2 * min(1, abs(w.get("wind", 0)))) * rate * m)
     elif theme == "spring":
         dry = 6 if w.get("heat", 0) > 0.5 else 2
         lv["water"] = _clamp(lv["water"] + (30 * w.get("rain", 0) - dry) * m)
