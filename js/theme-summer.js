@@ -77,8 +77,15 @@
       var ux = 1500, uy = sandY(1500) + 20;
       el('line', { 'class': 'tss-pole', x1: ux, y1: uy, x2: ux - 30, y2: uy - 260 }, gUmbrella);
       var top = el('g', { transform: 'translate(' + (ux - 30) + ' ' + (uy - 260) + ') rotate(-7)' }, gUmbrella);
-      el('path', { 'class': 'tss-utop', d: 'M-150 30 Q0 -70 150 30 Q120 18 100 30 Q75 16 50 30 Q25 16 0 30 Q-25 16 -50 30 Q-75 16 -100 30 Q-120 18 -150 30 Z' }, top);
-      el('path', { 'class': 'tss-ustripe', d: 'M-50 30 Q-30 -30 0 -40 Q-14 -10 0 30 Q-25 16 -50 30 Z M50 30 Q30 -30 0 -40 Q14 -10 0 30 Q25 16 50 30 Z' }, top);
+      // Kuppel mit gewelltem Saum; die weißen Bahnen laufen von der Spitze
+      // zum Saum und werden auf die Kuppel beschnitten (nichts ragt heraus)
+      var DOME = 'M-150 30 C-140 -46 140 -46 150 30 Q125 18 100 30 Q75 16 50 30 Q25 16 0 30 Q-25 16 -50 30 Q-75 16 -100 30 Q-125 18 -150 30 Z';
+      var clip = el('clipPath', { id: 'tss-uclip' }, top);
+      el('path', { d: DOME }, clip);
+      el('path', { 'class': 'tss-utop', d: DOME }, top);
+      el('path', { 'class': 'tss-ustripe', 'clip-path': 'url(#tss-uclip)',
+                   d: 'M0 -27 Q-62 -14 -100 40 L-50 40 Q-24 -2 0 -27 Z M0 -27 Q24 -2 50 40 L100 40 Q62 -14 0 -27 Z' }, top);
+      el('circle', { 'class': 'tss-utip', cx: 0, cy: -29, r: 5 }, top);
     })();
 
     // ── Sandburgen der Follower: 24 Plätze links und rechts, die Mitte
@@ -175,18 +182,23 @@
     var S = { heat: 0, heatT: 0, first: true, top: [] };
     function heatK() { return Math.max(S.heat / 100, B.heat); }
 
-    // ── Eis: schmilzt in 40 s (kühl) bis 12 s (volle Hitze), nur Show ──
+    // ── Eis: steckt kopfüber schräg im Sand, schmilzt in 40 s (kühl) bis
+    // 12 s (volle Hitze), nur Show; links oder rechts, die Mitte bleibt frei ──
     var ices = [];
     function addIce(name) {
-      var x = rand(200, W - 200), y = sandY(x) + 30, flavor = 1 + Math.floor(Math.random() * 4);
-      var g = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gIces);
-      var puddle = el('ellipse', { 'class': 'tss-scoop' + flavor, cx: 0, cy: 2, rx: 0, ry: 0 }, g);
-      el('path', { 'class': 'tss-cone', d: 'M-20 -70 L20 -70 L0 0 Z' }, g);
-      el('path', { 'class': 'tss-cone-grid', d: 'M-14 -62 L8 -24 M-6 -70 L13 -40 M14 -62 L-8 -24 M6 -70 L-13 -40' }, g);
-      var drip = el('path', { 'class': 'tss-scoop' + flavor }, g);
-      var scoop = el('circle', { 'class': 'tss-scoop' + flavor, cx: 0, cy: -84, r: 26 }, g);
+      var x = Math.random() < 0.5 ? rand(120, 680) : rand(1240, W - 120), y = sandY(x) + 6;
+      var flavor = 1 + Math.floor(Math.random() * 4), tilt = (Math.random() < 0.5 ? -1 : 1) * rand(150, 168);
+      var g = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ') scale(0.6)' }, gIces);
+      // Kugel unten im Sand, Waffel ragt schräg nach oben
+      var body = el('g', { transform: 'rotate(' + tilt.toFixed(0) + ' 0 -84)' }, el('g', { transform: 'translate(0 84)' }, g));
+      el('path', { 'class': 'tss-cone', d: 'M-20 -70 L20 -70 L0 0 Z' }, body);
+      el('path', { 'class': 'tss-cone-grid', d: 'M-14 -62 L8 -24 M-6 -70 L13 -40 M14 -62 L-8 -24 M6 -70 L-13 -40' }, body);
+      var drip = el('path', { 'class': 'tss-scoop' + flavor }, body);
+      var scoop = el('circle', { 'class': 'tss-scoop' + flavor, cx: 0, cy: -84, r: 26 }, body);
+      el('path', { 'class': 'tss-sand', d: 'M-50 30 Q-36 -10 0 -13 Q36 -10 50 30 Z' }, g);
+      var puddle = el('ellipse', { 'class': 'tss-scoop' + flavor, cx: 0, cy: 30, rx: 0, ry: 0 }, g);
       ices.push({ node: g, scoop: scoop, drip: drip, puddle: puddle, m: 0 });
-      B.tag((name || 'Someone') + ' got an ice cream!', x, y - 150, true);
+      B.tag((name || 'Someone') + ' got an ice cream!', x, y - 70, true);
     }
     function stepIces(dt) {
       for (var i = ices.length - 1; i >= 0; i--) {

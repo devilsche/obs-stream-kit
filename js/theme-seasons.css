@@ -225,6 +225,7 @@
 .tss-utop { fill: #e84a5f; }
 .tss-ustripe { fill: #ffffff; }
 .tss-pole { stroke: #e8e2d0; stroke-width: 5; }
+.tss-utip { fill: #e8e2d0; }
 
 /* Sandpalast (Sub-Projekt) */
 .tss-pal-line { fill: none; stroke: #c9a865; stroke-width: 2; opacity: 0.7; }
