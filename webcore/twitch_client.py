@@ -256,3 +256,27 @@ def get_recent_followers(access_token: str, client_id: str, broadcaster_id: str,
     if resp.status_code != 200:
         raise RuntimeError(f"Twitch /channels/followers fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
     return [f.get("user_name") or f.get("user_login") or "" for f in resp.json().get("data", [])]
+
+
+def get_subscribers(access_token: str, client_id: str, broadcaster_id: str, limit: int = 1000) -> list:
+    """Aktuelle Abonnenten (ohne Datum, Reihenfolge von Twitch): je
+    {"name", "tier" 1|2|3, "gift", "gifter"}. Braucht channel:read:subscriptions."""
+    out, after = [], None
+    while len(out) < limit:
+        params = {"broadcaster_id": broadcaster_id, "first": 100}
+        if after:
+            params["after"] = after
+        resp = requests.get(f"{TWITCH_HELIX}/subscriptions", params=params,
+                            headers={"Authorization": f"Bearer {access_token}", "Client-Id": client_id},
+                            timeout=10)
+        if resp.status_code != 200:
+            raise RuntimeError(f"Twitch /subscriptions fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
+        body = resp.json()
+        for s in body.get("data", []):
+            out.append({"name": s.get("user_name") or s.get("user_login") or "",
+                        "tier": max(1, int(str(s.get("tier") or "1000")[:1] or 1)),
+                        "gift": bool(s.get("is_gift")), "gifter": s.get("gifter_name") or ""})
+        after = (body.get("pagination") or {}).get("cursor")
+        if not after or not body.get("data"):
+            break
+    return out

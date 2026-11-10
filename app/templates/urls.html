@@ -529,11 +529,19 @@ G1R_STEAM_NAME=</code></pre>
           const q = new URLSearchParams(location.search);
           const done = q.get("followers_imported");
           const msg = done === null ? "" : `Imported ${escapeHtml(done)} new of ${escapeHtml(q.get("followers_seen") || "0")} recent followers.`;
+          const subs = q.get("subs_imported");
+          const subMsg = subs === null ? "" : `Added ${escapeHtml(subs)} gifts from ${escapeHtml(q.get("subs_seen") || "0")} current subscribers.`;
           return `<div class="url-cheat">
             <div class="url-cheat__head"><b>Followers</b>
               <a class="url-act ghost" href="/app/twitch/import-followers"><span class="material-symbols-outlined" aria-hidden="true">download</span>Import last 60 Twitch followers</a></div>
             <p class="url-dbox__desc">Every follower appears in every season (ornament or mini snowman, pumpkin, flower, sand castle). The import asks Twitch once for permission to read your followers; the access is not stored. Names already in the list are skipped.</p>
             ${msg ? `<p class="url-follow-msg" role="status">${msg}</p>` : ""}
+          </div>
+          <div class="url-cheat">
+            <div class="url-cheat__head"><b>Subscribers</b>
+              <a class="url-act ghost" href="/app/twitch/import-subs"><span class="material-symbols-outlined" aria-hidden="true">redeem</span>Import current subscribers as gifts</a></div>
+            <p class="url-dbox__desc">Every current subscriber gets a gift under the Christmas tree (tier 2 and 3 count more); gifted subs count for the person who gifted them. Twitch only lists current subscribers, without dates. The import asks Twitch once for permission to read your subscribers; the access is not stored. Names that already have a gift are skipped.</p>
+            ${subMsg ? `<p class="url-follow-msg" role="status">${subMsg}</p>` : ""}
           </div>`;
         })() : ""}
         ${cheat ? `<div class="url-cheat">

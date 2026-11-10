@@ -81,6 +81,13 @@ def add_gift(conn, tenant_id: int, name: str, gtype: str, amount: int):
     conn.commit()
 
 
+def gift_names(conn, tenant_id: int) -> set:
+    """Namen, die schon ein Geschenk haben (klein geschrieben)."""
+    rows = conn.execute("SELECT DISTINCT lower(name) AS n FROM fx_xmas_item WHERE tenant_id = ? AND kind = 'gift'",
+                        (tenant_id,)).fetchall()
+    return {r["n"] for r in rows}
+
+
 def add_snow_event(conn, tenant_id: int, event: str, name: str = "", secs=None):
     """secs nur bei 'start': Schneefall endet danach von selbst (amount-Spalte)."""
     conn.execute(

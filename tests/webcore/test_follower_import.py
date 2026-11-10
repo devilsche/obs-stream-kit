@@ -42,3 +42,28 @@ def test_import_refuses_foreign_twitch_account(conn, monkeypatch):
             auth._finish_follower_import({"tenant": 7, "twitch_user_id": "99"}, "tok", {"id": "42"},
                                          {"TWITCH_CLIENT_ID": "cid"})
     assert weather_followers.load(conn, 7)["names"] == []
+
+
+def test_sub_import_turns_subscribers_into_gifts(conn, monkeypatch):
+    xmas_db.add_gift(conn, 7, "Known", "sub", 1)
+    monkeypatch.setattr(auth, "get_subscribers", lambda tok, cid, bid: [
+        {"name": "Streamer", "tier": 1, "gift": False, "gifter": ""},      # eigener Kanal zählt nicht
+        {"name": "Known", "tier": 1, "gift": False, "gifter": ""},         # hat schon ein Geschenk
+        {"name": "Tia", "tier": 1, "gift": False, "gifter": ""},
+        {"name": "x1", "tier": 1, "gift": True, "gifter": "Santa"},
+        {"name": "x2", "tier": 1, "gift": True, "gifter": "Santa"},
+        {"name": "Big", "tier": 3, "gift": False, "gifter": ""}])
+    with _app(conn).test_request_context():
+        resp = auth._finish_sub_import({"tenant": 7, "twitch_user_id": "99"}, "tok",
+                                       {"id": "99", "display_name": "Streamer"}, {"TWITCH_CLIENT_ID": "cid"})
+    assert resp.status_code == 302 and "subs_imported=3" in resp.location and "subs_seen=5" in resp.location
+    gifts = {g["name"]: (g["type"], g["amount"]) for g in xmas_db.load_state(conn, 7)["gifts"]}
+    assert gifts == {"Known": ("sub", 1), "Tia": ("sub", 1), "Santa": ("giftsub", 2), "Big": ("sub", 3)}
+
+
+def test_sub_import_refuses_foreign_twitch_account(conn, monkeypatch):
+    monkeypatch.setattr(auth, "get_subscribers", lambda *a: [{"name": "X", "tier": 1, "gift": False, "gifter": ""}])
+    with _app(conn).test_request_context():
+        with pytest.raises(Forbidden):
+            auth._finish_sub_import({"tenant": 7, "twitch_user_id": "99"}, "tok", {"id": "42"},
+                                    {"TWITCH_CLIENT_ID": "cid"})
