@@ -555,7 +555,9 @@
     }
 
     // ── Blitzfeuer im Laub: ein Feuer zur Zeit, nur im sichtbaren Thema ──
-    var fire = null, lastFireX = null, strikeN = 0, strikeNeed = 8, fireDrawn = false;
+    // nach einem Feuer braucht das Laub eine Pause, sonst brennt es im Gewitter dauernd
+    var FIRE_PAUSE = 90;
+    var fire = null, lastFireX = null, fireDrawn = false, pauseUntil = 0;
     var fctx = B.fireCtx();
     function pileFloor(x) { return surface(x) + 6; }
     // Blitz-Einschlag (vom Weather-Kit): nah, im Haufen, Laub > 5 %
@@ -564,9 +566,7 @@
       if (!B.partOn('pile') || S.shown <= 5) return;
       var x = Math.max(140, Math.min(W - 140, p.x));
       if (H - surface(x) < 45) return;                 // daneben (Mitte ist frei)
-      if (++strikeN < strikeNeed) return;
-      strikeN = 0;
-      strikeNeed = 6 + Math.floor(Math.random() * 5);  // ungefähr jeder 8.
+      if (Date.now() < pauseUntil) return;
       if (p.ground) p.ground(x, surface(x) + 6);
       ignite(x);
     }
@@ -610,7 +610,7 @@
       f.k = k; f.ember = ember;
       if (!f.out) f.dip.d = Math.min(f.dip.max, f.dip.max * f.t / (f.dur * 0.7));
       var done = f.out ? f.outT > 2.5 : f.t > f.dur + (f.wet ? 0 : 4);
-      if (done) { f.dip.heal = true; fire = null; fctx.clearRect(0, 0, W, H); fireDrawn = false; return; }
+      if (done) { f.dip.heal = true; fire = null; pauseUntil = Date.now() + FIRE_PAUSE * 1000; fctx.clearRect(0, 0, W, H); fireDrawn = false; return; }
 
       var y = surface(f.x);
       // Rauch, Funken
