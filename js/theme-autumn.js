@@ -202,6 +202,37 @@
           pctx.globalAlpha = 1;
         }
       }
+      drawPileSnow(l);
+    }
+
+    // Schnee auf dem Haufen: Puder ab wenig Schnee, bei viel Schnee eine
+    // dicke Decke, aus der nur noch einzelne Blätter schauen
+    function drawPileSnow(l) {
+      var sn = Math.min(1.2, B.snow);
+      if (sn < 0.03) return;
+      var thick = 3 + 14 * sn, pts = [];
+      for (var x = 0; x <= W; x += 12) {
+        var y = H - prof(x) * (1 - dipAt(x)) * MAXH * l * 0.88;
+        pts.push([x, Math.min(H, y + 6) - thick * (0.75 + 0.25 * Math.sin(x / 37))]);
+      }
+      pctx.save();
+      pctx.fillStyle = '#f4f8ff';
+      pctx.strokeStyle = '#ffffff';
+      // Puder: zarter Schleier; viel Schnee deckt den Haufen fast ganz zu
+      pctx.globalAlpha = Math.min(1, sn * 2.5) * (sn > 0.5 ? Math.min(0.78, 0.4 + (sn - 0.5) * 0.9) : 0.35);
+      pctx.beginPath();
+      pctx.moveTo(0, H);
+      pts.forEach(function (p) { pctx.lineTo(p[0], p[1]); });
+      pctx.lineTo(W, H);
+      pctx.fill();
+      // Saum an der Oberkante (nur oben, nicht an den Bildrändern)
+      pctx.globalAlpha = Math.min(1, sn * 2.5);
+      pctx.lineWidth = 2 + 6 * sn;
+      pctx.lineJoin = 'round';
+      pctx.beginPath();
+      pts.forEach(function (p, i) { if (i) pctx.lineTo(p[0], p[1]); else pctx.moveTo(p[0], p[1]); });
+      pctx.stroke();
+      pctx.restore();
     }
 
     // ── Kürbisse: 30 Plätze, abwechselnd links/rechts von der Ecke nach innen ──
@@ -617,7 +648,8 @@
       stepDips(dt);
       var l = lvl();
       // neu zeichnen bei Stand, Brandloch oder Nässe (gestuft)
-      var sig = dips.map(function (d) { return d.d.toFixed(2); }).join(',') + '|' + Math.round(W8.wet * 20);
+      var sig = dips.map(function (d) { return d.d.toFixed(2); }).join(',') + '|' + Math.round(W8.wet * 20) +
+                '|' + Math.round(B.snow * 20);
       if (Math.abs(l - drawn) > 0.002 || sig !== drawnSig) { drawPile(l); placePumpkins(); drawn = l; drawnSig = sig; }
       if (B.on) {
         // Schneesturm pustet den Laubhaufen weg: Blätter fliegen vom Haufen

@@ -22,6 +22,11 @@
   opacity: min(1, calc(var(--ts-snow) * 4));
 }
 
+/* Schnee am Boden: Puder ab wenig Schnee, dicke Decke erst bei viel */
+.ts-gsnow { fill: #f4f8ff; stroke: #ffffff; stroke-width: 2; }
+.ts-gsnow--dust { opacity: min(0.85, calc(var(--ts-snow) * 2.5)); }
+.ts-gsnow--deep { opacity: clamp(0, calc((var(--ts-snow) - 0.4) * 2.2), 1); }
+
 /* Nacht: Deko dunkler, Lichter bleiben hell */
 .ta-dim, .tsp-dim, .tss-dim { filter: brightness(calc(1 - 0.4 * var(--ts-night))); }
 

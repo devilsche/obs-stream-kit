@@ -179,6 +179,11 @@
       var cx0 = 70 + ((ci * 7) % MAX_C) * 56;
       CASTLE_X.push(cx0 < 720 ? cx0 : cx0 + 480);
     }
+    // Schnee am Boden: Puder unter Palast und Burgen, die dicke Decke mit
+    // Verwehungen liegt davor und deckt ihren Fuß zu
+    var sandSnow = B.groundSnow(gBeach, gPalace, sandY,
+      CASTLE_X.map(function (x) { return [x, 50, 4]; }).concat([[270, 160, 12]]));
+    gBeach.insertBefore(sandSnow.deep, gCastles.nextSibling);
     var castles = [], cNext = 0, cTotal = 0;
     function addCastle(name, animate) {
       var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.5 + (i % 3) * 0.12;

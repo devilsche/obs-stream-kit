@@ -62,6 +62,9 @@
       }
     })();
 
+    // Schnee am Boden: über der Wiese, die Grashalme schauen heraus
+    B.groundSnow(gMeadow, gBlades, groundY, [[230, 120, 12]]);
+
     // Unkraut: 40 Büschel in fester Reihenfolge, sichtbar je nach Stand
     var weedNodes = [];
     for (var wi = 0; wi < 40; wi++) {

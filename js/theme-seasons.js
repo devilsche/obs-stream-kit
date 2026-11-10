@@ -198,6 +198,29 @@
         else B.snow = Math.max(want, B.snow - dt / 60);
         B.vars({ '--ts-snow': B.snow });
         return B.snow;
+      },
+      // Schnee am Boden: dünne Puderschicht und darüber eine dicke Decke
+      // (erst bei viel Schnee), Deckkraft über --ts-snow. yAt(x) = Boden,
+      // drifts = [[x, halbe Breite, Höhe]] Verwehungen; in der Bildmitte
+      // (Spielanzeigen) bleibt die Decke flach.
+      groundSnow: function (parent, before, yAt, drifts) {
+        function top(x, deep) {
+          var mid = x > 700 && x < 1220 ? 0.3 : 1;
+          var t = deep ? (6 + 3 * Math.sin(x / 53) + 2 * Math.sin(x / 19)) * mid : 2.5 + 1.5 * Math.sin(x / 31);
+          if (deep) (drifts || []).forEach(function (d) {
+            var k = 1 - Math.abs(x - d[0]) / d[1];
+            if (k > 0) t += d[2] * k * k * (3 - 2 * k) * mid;
+          });
+          return yAt(x) - t;
+        }
+        var out = {};
+        ['dust', 'deep'].forEach(function (kind) {
+          var d = 'M0 ' + H;
+          for (var x = 0; x <= W; x += 12) d += ' L' + x + ' ' + f1(top(x, kind === 'deep'));
+          d += ' L' + W + ' ' + H + ' Z';
+          out[kind] = parent.insertBefore(el('path', { 'class': 'ts-gsnow ts-gsnow--' + kind, d: d }), before || null);
+        });
+        return out;
       }
     };
 
