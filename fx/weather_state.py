@@ -10,7 +10,7 @@ import time
 import datetime
 
 from fx import astro, weather, weather_frost, weather_season, weather_snow, weather_theme
-from fx.weather_api import current, geocode
+from fx.weather_api import climate, current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
 
@@ -129,9 +129,14 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
         # Xmas-Zeit: im Datumsfenster oder schon per Knopf aufgebaut (z. B. Mitte November);
         # ein aufgebauter Baum macht auch ein fest gewähltes Thema zum Winter
         set_up = weather_theme.is_set_up(conn, tenant_id, today, opts)
+        # Jahreszeiten am Ort: Südhalbkugel versetzt, Tropen immer Sommer
+        zone = weather_theme.climate_zone(loc["lat"], climate(loc["lat"], loc["lon"])) if loc else "north"
+        weather_theme.remember_zone(conn, tenant_id, zone)
         theme = weather_theme.theme_for(today, opts.get("theme", "auto"), start <= today <= end or set_up,
-                                        early=weather_theme.load_early(conn, tenant_id), set_up=set_up)
-        xmas = weather_theme.status(conn, tenant_id, today, opts, theme) if theme == "winter" else "off"
+                                        early=weather_theme.load_early(conn, tenant_id), set_up=set_up,
+                                        zone=zone)
+        xmas = (weather_theme.status(conn, tenant_id, today, opts, theme, zone)
+                if theme == weather_theme.xmas_theme(zone) else "off")
         snow = weather_snow.advance(conn, tenant_id, now, state.get("snow", 0) if state.get("precip") != "rain" else 0,
                                     state.get("heat", 0) > 0.5, base.get("temp") if source == "api" else None,
                                     opts.get("snowrate", 1.0))

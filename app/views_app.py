@@ -302,7 +302,8 @@ def weather_theme_now():
         set_up = weather_theme.is_set_up(conn, g.tenant_id, today, opts)
         return weather_theme.theme_for(today, request.args.get("theme") or "auto",
                                        start <= today <= end or set_up,
-                                       early=weather_theme.load_early(conn, g.tenant_id), set_up=set_up)
+                                       early=weather_theme.load_early(conn, g.tenant_id), set_up=set_up,
+                                       zone=weather_theme.load_zone(conn, g.tenant_id))
     resp = jsonify({"theme": _with_conn(pick)})
     resp.headers["Cache-Control"] = "no-store"
     return resp

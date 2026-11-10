@@ -1,7 +1,8 @@
 """Deko-Thema der Weather-Source und Ablauf der Xmas-Zeit.
 
 Thema: `auto` wählt kalendarisch (Frühling ab 20.3., Sommer ab 21.6., Herbst
-ab 22.9., Winter ab 21.12.); die Xmas-Zeit, die im November beginnen kann, ist
+ab 22.9., Winter ab 21.12.; auf der Südhalbkugel versetzt, in den Tropen immer
+Sommer, siehe climate_zone); die Xmas-Zeit, die im November beginnen kann, ist
 immer Winter. Per Knopf (`cmd=season&to=…`) startet eine Jahreszeit früher und
 hält, bis der Kalender sie erreicht. Ein aufgebauter Baum macht auch ein fest
 gewähltes Thema zum Winter.
@@ -59,42 +60,76 @@ def xmas_window(today: date, xfrom: str, xto: str):
     return start, end, season
 
 
-# Kalendarischer Beginn (Monat, Tag) je Jahreszeit, in Jahresreihenfolge
+# Kalendarischer Beginn (Monat, Tag) je Jahreszeit, in Jahresreihenfolge;
+# auf der Südhalbkugel um ein halbes Jahr versetzt
 SEASON_START = (("spring", 3, 20), ("summer", 6, 21), ("autumn", 9, 22), ("winter", 12, 21))
+SOUTH_START = (("autumn", 3, 20), ("winter", 6, 21), ("spring", 9, 22), ("summer", 12, 21))
+TROPICS = 25.0
 
 
-def calendar_theme(today: date) -> str:
-    theme = "winter"
-    for name, m, d in SEASON_START:
+def climate_zone(lat, monthly=None) -> str:
+    """Jahreszeiten am Ort → "north" | "south" | "summer" (immer Sommer) |
+    "winter" (immer Winter). Klima (12 Monatsmittel) geht vor der Breite:
+    kältester Monat ≥ 18 °C (tropisch) → Sommer, wärmster < 10 °C → Winter;
+    ohne Klimadaten zählt alles unter 25° Breite als Tropen."""
+    if lat is None:
+        return "north"
+    if monthly and len(monthly) == 12:
+        if min(monthly) >= 18:
+            return "summer"
+        if max(monthly) < 10:
+            return "winter"
+    if abs(lat) < TROPICS:
+        return "summer"
+    return "south" if lat < 0 else "north"
+
+
+def xmas_theme(zone: str = "north") -> str:
+    """Wo die Weihnachts-Deko steht: im Norden im Winter, sonst am Strand."""
+    return "winter" if zone in ("north", "winter") else "summer"
+
+
+def _starts(zone):
+    return SOUTH_START if zone == "south" else SEASON_START
+
+
+def calendar_theme(today: date, zone: str = "north") -> str:
+    if zone in ("summer", "winter"):
+        return zone
+    starts = _starts(zone)
+    theme = starts[-1][0]
+    for name, m, d in starts:
         if (today.month, today.day) >= (m, d):
             theme = name
     return theme
 
 
-def next_start(today: date, theme: str) -> date:
+def next_start(today: date, theme: str, zone: str = "north") -> date:
     """Nächster kalendarischer Beginn von `theme` nach `today`."""
-    m, d = next((m, d) for name, m, d in SEASON_START if name == theme)
+    m, d = next((m, d) for name, m, d in _starts(zone) if name == theme)
     start = date(today.year, m, d)
     return start if start > today else start.replace(year=today.year + 1)
 
 
-def theme_for(today: date, setting: str, xmas_active: bool, early=None, set_up: bool = False) -> str:
-    """Thema: `none` > aufgebauter Baum > fest gewählt > Xmas-Zeit > Frühstart > Kalender."""
+def theme_for(today: date, setting: str, xmas_active: bool, early=None, set_up: bool = False,
+              zone: str = "north") -> str:
+    """Thema: `none` > aufgebauter Baum > fest gewählt > Xmas-Zeit > Frühstart > Kalender.
+    Weihnachten steht im Norden im Winter, im Süden und in den Tropen am Strand."""
     if setting == "none":
         return "none"
     if set_up:
-        return "winter"
+        return xmas_theme(zone)
     if setting in ("winter", "spring", "summer", "autumn"):
         return setting
     if xmas_active:
-        return "winter"
+        return xmas_theme(zone)
     if early:
         try:
             if today < date.fromisoformat(early["until"]):
                 return early["theme"]
         except (KeyError, TypeError, ValueError):
             pass
-    return calendar_theme(today)
+    return calendar_theme(today, zone)
 
 
 def _load(conn, tenant_id):
@@ -108,10 +143,11 @@ def _load(conn, tenant_id):
 
 
 def _save(conn, tenant_id, data):
-    """Xmas-Ablauf schreiben; ein Frühstart bleibt erhalten."""
+    """Xmas-Ablauf schreiben; Frühstart und Zone bleiben erhalten."""
     old = _load(conn, tenant_id) or {}
-    if "early" in old:
-        data = dict(data, early=old["early"])
+    for key in ("early", "zone"):
+        if key in old:
+            data = dict(data, **{key: old[key]})
     _write(conn, tenant_id, data)
 
 
@@ -124,20 +160,22 @@ def _write(conn, tenant_id, data):
     conn.commit()
 
 
-def status(conn, tenant_id, today: date, opts: dict, theme: str = "winter") -> str:
-    """→ "off" | "setup" (fällig) | "on" | "farewell" (fällig)."""
+def status(conn, tenant_id, today: date, opts: dict, theme: str = "winter", zone: str = "north") -> str:
+    """→ "off" | "setup" (fällig) | "on" | "farewell" (fällig); gespielt wird
+    im Weihnachts-Thema der Zone (Winter bzw. Strand)."""
+    xt = xmas_theme(zone)
     start, end, season = xmas_window(today, opts.get("xmasfrom"), opts.get("xmasto"))
     data = _load(conn, tenant_id)
     state = data["state"] if data and data.get("season") == season else "off"
     if state == "on":
         if today <= end:
             return "on"
-        if theme == "winter":
+        if theme == xt:
             return "farewell"
         # Thema schon gewechselt: still abbauen, kein Abschied mehr
         _save(conn, tenant_id, {"season": season, "state": "done"})
         return "off"
-    if state == "off" and start <= today <= end and theme == "winter":
+    if state == "off" and start <= today <= end and theme == xt:
         return "setup"
     return "off"
 
@@ -155,18 +193,31 @@ def mark(conn, tenant_id, today: date, opts: dict, step: str) -> None:
     _save(conn, tenant_id, {"season": season, "state": "on" if step == "setup" else "done"})
 
 
-def early_start(conn, tenant_id, today: date, to: str) -> None:
+def early_start(conn, tenant_id, today: date, to: str, zone: str = "north") -> None:
     """Jahreszeit `to` (oder `next`) sofort starten; `auto` hebt den Frühstart auf."""
     if to == "next":
-        cur = calendar_theme(today)
-        names = [n for n, _, _ in SEASON_START]
+        cur = calendar_theme(today, zone)
+        names = [n for n, _, _ in _starts(zone)]
         to = names[(names.index(cur) + 1) % len(names)]
     data = _load(conn, tenant_id) or {}
     if to in ("winter", "spring", "summer", "autumn"):
-        data["early"] = {"theme": to, "until": next_start(today, to).isoformat()}
+        data["early"] = {"theme": to, "until": next_start(today, to, zone).isoformat()}
     else:
         data.pop("early", None)
     _write(conn, tenant_id, data)
+
+
+def remember_zone(conn, tenant_id, zone: str) -> None:
+    """Zone des Orts merken: Befehle und Dashboard kennen den Ort nicht."""
+    data = _load(conn, tenant_id) or {}
+    if data.get("zone") != zone:
+        data["zone"] = zone
+        _write(conn, tenant_id, data)
+
+
+def load_zone(conn, tenant_id) -> str:
+    data = _load(conn, tenant_id)
+    return (data or {}).get("zone") or "north"
 
 
 def load_early(conn, tenant_id):

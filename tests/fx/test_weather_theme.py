@@ -118,3 +118,47 @@ def test_tenants_are_separate(conn):
     o = {"xmasfrom": "advent", "xmasto": "12-26"}
     mark(conn, 1, date(2026, 11, 15), o, "setup")
     assert status(conn, 2, date(2026, 11, 15), o) == "off"
+
+
+def test_climate_zone():
+    from fx.weather_theme import climate_zone
+    assert climate_zone(52.5) == "north"
+    assert climate_zone(-34.6) == "south"                       # Buenos Aires
+    assert climate_zone(-23.5) == "summer"                      # São Paulo: Tropen
+    assert climate_zone(None) == "north"                        # ohne Ort wie bisher
+    # Klima geht vor der Breite: kältester Monat ≥ 18 °C → immer Sommer
+    assert climate_zone(25.3, [19, 21, 24, 28, 33, 35, 36, 37, 34, 30, 25, 21]) == "summer"   # Dubai
+    assert climate_zone(-33.9, [22, 22, 21, 18, 16, 14, 13, 14, 15, 17, 19, 21]) == "south"
+    # wärmster Monat < 10 °C → immer Winter
+    assert climate_zone(72.0, [-20, -21, -18, -12, -3, 3, 7, 6, 1, -6, -13, -18]) == "winter"
+
+
+def test_theme_by_zone():
+    assert theme_for(date(2026, 4, 10), "auto", False, zone="south") == "autumn"
+    assert theme_for(date(2026, 7, 10), "auto", False, zone="south") == "winter"
+    assert theme_for(date(2026, 10, 10), "auto", False, zone="south") == "spring"
+    assert theme_for(date(2027, 1, 10), "auto", False, zone="south") == "summer"
+    assert theme_for(date(2026, 7, 10), "auto", False, zone="summer") == "summer"
+    assert theme_for(date(2026, 1, 10), "auto", False, zone="summer") == "summer"
+    assert theme_for(date(2026, 7, 10), "auto", False, zone="winter") == "winter"
+    # Weihnachten: im Norden und im ewigen Winter Winter, sonst am Strand
+    assert theme_for(date(2026, 12, 10), "auto", True, zone="north") == "winter"
+    assert theme_for(date(2026, 12, 10), "auto", True, zone="south") == "summer"
+    assert theme_for(date(2026, 12, 10), "auto", True, zone="summer") == "summer"
+    assert theme_for(date(2026, 11, 10), "autumn", False, set_up=True, zone="south") == "summer"
+    # fest gewähltes Thema geht weiter vor
+    assert theme_for(date(2026, 7, 10), "spring", False, zone="summer") == "spring"
+
+
+def test_xmas_theme_and_status_by_zone(conn):
+    from fx.weather_theme import xmas_theme
+    assert xmas_theme("north") == "winter" and xmas_theme("winter") == "winter"
+    assert xmas_theme("south") == "summer" and xmas_theme("summer") == "summer"
+    # Aufbau ist am Strand genauso fällig
+    assert status(conn, 1, date(2026, 12, 5), {}, "summer", zone="south") == "setup"
+    assert status(conn, 1, date(2026, 12, 5), {}, "summer", zone="north") == "off"
+
+
+def test_early_start_follows_zone(conn):
+    early_start(conn, 1, date(2026, 4, 1), "next", zone="south")      # Herbst im Süden → Winter
+    assert load_early(conn, 1) == {"theme": "winter", "until": "2026-06-21"}

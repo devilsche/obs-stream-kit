@@ -86,7 +86,8 @@ def _winter_persist(conn, tenant_id, cmd):
     elif c in ("setup", "farewell"):
         weather_theme.mark(conn, tenant_id, today, {}, c)
     elif c == "season":
-        weather_theme.early_start(conn, tenant_id, today, p.get("to", "auto"))
+        weather_theme.early_start(conn, tenant_id, today, p.get("to", "auto"),
+                                  zone=weather_theme.load_zone(conn, tenant_id))
     elif c == "xmasdone":
         if p.get("step"):
             weather_theme.mark(conn, tenant_id, today, {}, p["step"])

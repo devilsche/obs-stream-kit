@@ -33,6 +33,7 @@ def reset_cache():
     with _lock:
         _cache.clear()
         _geo.clear()
+        _climate.clear()
 
 
 def _fetch_json(url: str) -> dict:
@@ -139,6 +140,46 @@ def current(tenant_id: int, lat: float, lon: float, now=None):
         return None
     with _lock:
         _cache[tenant_id] = {"at": now, "loc": loc, "value": value}
+    return value
+
+
+_ARCHIVE = "https://archive-api.open-meteo.com/v1/archive"
+CLIMATE_FRESH = 30 * 86400
+CLIMATE_RETRY = 3600
+_climate = {}   # (lat, lon) auf 1 Stelle → {"at", "value"}
+
+
+def climate(lat: float, lon: float, now=None):
+    """Monatsmittel der Temperatur (12 Werte, Januar zuerst) aus dem
+    Vorjahr, für die Jahreszeiten am Ort; None, wenn nicht abrufbar.
+    30 Tage im Cache, ein Fehlschlag wird erst nach einer Stunde neu versucht."""
+    import datetime
+    now = time.time() if now is None else now
+    key = (round(lat, 1), round(lon, 1))
+    with _lock:
+        hit = _climate.get(key)
+    if hit and now - hit["at"] < (CLIMATE_FRESH if hit["value"] else CLIMATE_RETRY):
+        return hit["value"]
+    year = datetime.datetime.fromtimestamp(now, datetime.timezone.utc).year - 1
+    url = _ARCHIVE + "?" + urllib.parse.urlencode({
+        "latitude": lat, "longitude": lon, "timezone": "auto", "daily": "temperature_2m_mean",
+        "start_date": "%d-01-01" % year, "end_date": "%d-12-31" % year})
+    value = None
+    try:
+        daily = _fetch_json(url)["daily"]
+        sums, counts = [0.0] * 12, [0] * 12
+        for day, t in zip(daily["time"], daily["temperature_2m_mean"]):
+            if t is None:
+                continue
+            m = int(day[5:7]) - 1
+            sums[m] += float(t)
+            counts[m] += 1
+        if all(counts):
+            value = [round(sums[i] / counts[i], 1) for i in range(12)]
+    except Exception as e:
+        log.warning("weather: climate fetch failed (%s)", type(e).__name__)
+    with _lock:
+        _climate[key] = {"at": now, "value": value}
     return value
 
 

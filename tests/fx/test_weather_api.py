@@ -175,3 +175,31 @@ def test_country_label_is_not_doubled(monkeypatch):
     monkeypatch.setattr(weather_api, "_fetch_json", lambda url: {"results": [
         {"latitude": 60, "longitude": -95, "name": "Kanada", "country": "Kanada", "country_code": "CA"}]})
     assert geocode("Kanada")["label"] == "Kanada"
+
+
+def test_climate_monthly_means_cached(monkeypatch):
+    calls = []
+
+    def fake(url):
+        calls.append(url)
+        days = [f"2025-{m:02d}-01" for m in range(1, 13) for _ in range(2)]
+        temps = [float(m) for m in range(1, 13) for _ in range(2)]
+        return {"daily": {"time": days, "temperature_2m_mean": temps}}
+    monkeypatch.setattr(weather_api, "_fetch_json", fake)
+    now = 1_780_000_000                                  # 2026
+    assert weather_api.climate(52.52, 13.41, now=now) == [float(m) for m in range(1, 13)]
+    assert "archive-api" in calls[0] and "2025-01-01" in calls[0]
+    weather_api.climate(52.54, 13.39, now=now + 3600)   # gleicher Ort (gerundet) → Cache
+    assert len(calls) == 1
+
+
+def test_climate_failure_is_none_and_not_retried_at_once(monkeypatch):
+    calls = []
+
+    def boom(url):
+        calls.append(url)
+        raise OSError("down")
+    monkeypatch.setattr(weather_api, "_fetch_json", boom)
+    assert weather_api.climate(1, 1, now=0) is None
+    assert weather_api.climate(1, 1, now=60) is None
+    assert len(calls) == 1

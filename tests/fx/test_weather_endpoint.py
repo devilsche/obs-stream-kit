@@ -36,6 +36,7 @@ def _clean(monkeypatch):
     monkeypatch.setattr(weather_state, "kd_snapshot",
                         lambda conn, tid: {"kd": 0.0, "matches": 0, "live": False})
     monkeypatch.setattr(weather_state, "current", lambda tid, lat, lon: None)
+    monkeypatch.setattr(weather_state, "climate", lambda lat, lon: None)
     yield
     commands.reset_store()
 
@@ -491,3 +492,34 @@ def test_avalanche_leaves_snow(conn):
     before = _state(c, "?theme=winter")["snowCover"]
     c.get("/s/t/api/fx/weather?cmd=spectacle&type=avalanche")
     assert _state(c, "?theme=winter")["snowCover"] >= before + 19.5
+
+
+SAO_PAULO = {"lat": -23.55, "lon": -46.63, "label": "São Paulo"}
+BUENOS_AIRES = {"lat": -34.6, "lon": -58.38, "label": "Buenos Aires"}
+
+
+def test_tropics_are_always_summer_and_christmas_is_on_the_beach(conn, monkeypatch):
+    _november(monkeypatch)
+    monkeypatch.setattr(weather_state, "geocode", lambda q: SAO_PAULO)
+    c = _client(conn)
+    assert _state(c, "?place=SP")["theme"] == "summer"
+    c.get("/s/t/api/fx/weather?cmd=setup")
+    st = _state(c, "?place=SP")
+    assert st["theme"] == "summer" and st["xmas"] == "on"
+
+
+def test_southern_hemisphere_seasons_and_remembered_zone(conn, monkeypatch):
+    _november(monkeypatch)
+    monkeypatch.setattr(weather_state, "geocode", lambda q: BUENOS_AIRES)
+    c = _client(conn)
+    assert _state(c, "?place=BA")["theme"] == "spring"            # Mitte November im Süden
+    # cmd=season kennt den Ort nicht: nimmt die zuletzt ermittelte Zone
+    c.get("/s/t/api/fx/weather?cmd=season&to=next")
+    assert _state(c, "?place=BA")["theme"] == "summer"
+
+
+def test_climate_overrides_latitude(conn, monkeypatch):
+    _november(monkeypatch)
+    monkeypatch.setattr(weather_state, "geocode", lambda q: BUENOS_AIRES)
+    monkeypatch.setattr(weather_state, "climate", lambda lat, lon: [20] * 12)
+    assert _state(_client(conn), "?place=BA")["theme"] == "summer"
