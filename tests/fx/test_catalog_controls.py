@@ -40,7 +40,7 @@ def test_weather_has_controls_and_live_keys():
         "cmd=spectacle&type=aurora", "cmd=spectacle&type=rainbow", "cmd=spectacle&type=hail",
         "cmd=spectacle&type=meteors", "cmd=spectacle&type=tornado", "cmd=spectacle&type=fogwall",
         "cmd=scrape", "cmd=warm", "cmd=frostclear", "cmd=leaders",
-        "cmd=setup", "cmd=farewell", "cmd=celebrate", "cmd=shovel", "cmd=shake&force=1",
+        "cmd=setup", "cmd=farewell", "cmd=build", "cmd=snowmanreset", "cmd=celebrate", "cmd=shovel", "cmd=shake&force=1",
         "cmd=icicle", "cmd=snowball", "cmd=snowboard",
         "cmd=rake", "cmd=jump", "cmd=sweep", "cmd=water", "cmd=weed&force=1", "cmd=bee",
         "cmd=splash", "cmd=ice", "cmd=cool", "cmd=celebrate", "cmd=seasonboard"]

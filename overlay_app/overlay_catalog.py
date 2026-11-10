@@ -648,6 +648,8 @@ EFFECT_META = {
         {"q": "cmd=leaders", "label": "Show top frost fighters", "group": "Frost", "icon": "leaderboard"},
         {"q": "cmd=setup", "label": "Set up Christmas", "group": "Decoration", "icon": "park"},
         {"q": "cmd=farewell", "label": "Christmas farewell", "group": "Decoration", "icon": "waving_hand"},
+        {"q": "cmd=build", "label": "Add snowman part", "group": "Winter", "icon": "add_circle"},
+        {"q": "cmd=snowmanreset", "label": "Reset snowman", "group": "Winter", "icon": "restart_alt"},
         {"q": "cmd=celebrate", "label": "Celebrate", "group": "Winter", "icon": "celebration"},
         {"q": "cmd=shovel", "label": "Shovel", "group": "Winter", "icon": "construction"},
         {"q": "cmd=shake&force=1", "label": "Shake off snow", "group": "Winter", "icon": "vibration"},
