@@ -570,9 +570,37 @@
     // genug Laub für ein Feuer: 45 px, bei dünnem Haufen 60 % seiner höchsten Stelle
     function enoughAt(x) { return H - surface(x) >= Math.min(45, 0.6 * MAXH * lvl()); }
     function emit(name, args) { if (opts.event) opts.event(name, args); }
+    // Blitz trifft einen Kürbis (nah, höchstens 90 px daneben): er platzt,
+    // nach 8–14 s wächst er mit der Aufbau-Animation nach (Follower bleibt)
+    function pumpkinBolt(p) {
+      if (!B.partOn('pumpkins')) return false;
+      var best = null;
+      pkNodes.forEach(function (pk) {
+        if (!pk || pk.mode !== null || pk.zap || Math.abs(pk.x - p.x) > 90) return;
+        if (!best || Math.abs(pk.x - p.x) < Math.abs(best.x - p.x)) best = pk;
+      });
+      if (!best || Math.random() < 0.65) return false;  // nicht jeder Blitz trifft
+      var pk = best, cy = pk.y + pk.dy - pk.h * 0.45;
+      if (p.ground) p.ground(pk.x, cy);
+      pk.zap = true;
+      pk.node.dataset.zap = '1';
+      B.chunks(pk.x, cy, 34, ['#e8761e', '#f2a03a', '#c4561a', '#f6e7b0', '#5a3a1e'], function () { return H - 4; });
+      B.sparks(pk.x, cy, 20, 30);
+      for (var i = 0; i < 4; i++) B.smoke(pk.x + rand(-25, 25), cy, { o: 0.35 });
+      emit('struck', { target: 'pumpkin', name: pk.label || '' });
+      setTimeout(function () {
+        pk.zap = false;
+        delete pk.node.dataset.zap;
+        pk.node.classList.remove('ta-pk--new');
+        void pk.node.getBBox();
+        pk.node.classList.add('ta-pk--new');
+      }, rand(8000, 14000));
+      return true;
+    }
     // Blitz-Einschlag (vom Weather-Kit): nah, im Haufen, Laub > 5 %
     function bolt(p) {
       if (!B.on || B.reduceMotion || !p.near || typeof p.x !== 'number') return;
+      if (pumpkinBolt(p)) return;
       if (!B.partOn('pile') || S.shown <= 5) return;
       var x = Math.max(140, Math.min(W - 140, p.x));
       // zum nächsten Rand hin bis zur ersten Stelle mit genug Laub (Mitte ist frei)

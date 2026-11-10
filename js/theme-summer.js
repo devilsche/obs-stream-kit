@@ -930,6 +930,8 @@
     // Reichweite reach um ihr x); Wiederaufbau erst, wenn beide vorbei sind
     function sweeping() { return (wave && wave.active()) || (twister && twister.active()); }
     function stepSlump(c, target, x, maxWait, rebuild) {
+      // vom Blitz getroffen: wie weggespült, bis zap abgelaufen ist
+      if (c.zap > 0) { c.zap -= dt0; c.washed = true; c.hard = 1; }
       if (wave && !B.reduceMotion && wave.level(x) > 30) { c.washed = true; c.hard = Math.max(c.hard || 0, rebuild.washed); }
       var tx = twister && !B.reduceMotion ? twister.x() : null;
       if (tx !== null && Math.abs(tx - x) < rebuild.reach && !c.torn) {
@@ -938,7 +940,7 @@
         c.hard = Math.max(c.hard || 0, rebuild.blown);
         if (rebuild.torn) rebuild.torn(twister.dir || (tx < x ? 1 : -1));
       }
-      if (c.washed && !sweeping()) { c.washed = false; c.torn = false; c.hard = 0; c.wait = rand(3, maxWait); }
+      if (c.washed && !sweeping() && !(c.zap > 0)) { c.washed = false; c.torn = false; c.hard = 0; c.wait = rand(3, maxWait); }
       if (c.washed) target = Math.max(target, c.hard);
       if (B.reduceMotion) { c.s = target; c.wait = null; return; }
       if (target >= c.s - 0.005) {
@@ -1059,10 +1061,29 @@
     }
     function domeTop(lx) { return -27 + 57 * (lx / 150) * (lx / 150); }
     function inDome(lx, ly) { return Math.abs(lx) < 148 && ly > domeTop(lx) - 1 && ly < 27; }
+    // Blitz trifft eine Sandburg (nah, höchstens 80 px daneben, nicht unterm
+    // Schirm): sie zerbröselt mit Funken, baut sich danach wieder auf
+    function castleBolt(p) {
+      if (!B.on || B.reduceMotion || !p.near || typeof p.x !== 'number' || !B.partOn('beach')) return;
+      var best = null;
+      castles.forEach(function (c) {
+        if (!c || c.s > 0.3 || c.zap > 0 || c.node.dataset.dry === '1' || Math.abs(c.x - p.x) > 80) return;
+        if (!best || Math.abs(c.x - p.x) < Math.abs(best.x - p.x)) best = c;
+      });
+      if (!best || Math.random() < 0.65) return;   // nicht jeder Blitz trifft
+      var c = best, y = sandY(c.x);
+      if (p.ground) p.ground(c.x, y - 20);
+      c.zap = 3;
+      debris(c.x, c.y + 40, -1, true);
+      debris(c.x, c.y + 40, 1, false);
+      B.sparks(c.x, y - 20, 24, 30);
+      for (var i = 0; i < 4; i++) B.smoke(c.x + rand(-25, 25), y - 20, { o: 0.35 });
+      if (opts.event) opts.event('struck', { target: 'castle', name: c.label || '' });
+    }
     function umbrellaBolt(p) {
-      if (!p.near || U.mode !== 'up' || !umbrellaFree() || typeof p.x !== 'number') return;
+      if (!p.near || U.mode !== 'up' || !umbrellaFree() || typeof p.x !== 'number') return castleBolt(p);
       var c = uScreen(0, -10);
-      if (Math.abs(p.x - c[0]) > 120) return;
+      if (Math.abs(p.x - c[0]) > 120) return castleBolt(p);
       U.hx = Math.max(-110, Math.min(110, p.x - c[0]));
       U.hy = domeTop(U.hx) + 4;
       var hit = uScreen(U.hx, U.hy);
@@ -1070,6 +1091,7 @@
       U.mode = 'burn'; U.t = 0; U.acc = 0;
       [U.hole, U.edge, U.edgeGlow].forEach(function (n) { n.setAttribute('cx', f1(U.hx)); n.setAttribute('cy', f1(U.hy)); });
       B.sparks(hit[0], hit[1], 24, 10);
+      if (opts.event) opts.event('struck', { target: 'umbrella', name: '' });
     }
     // Brandkante wächst vom Einschlag aus und erreicht nach 6 s den fernsten Saum
     function burnR() { return (175 + Math.abs(U.hx)) * Math.pow(B.clamp01(U.t / 6), 1.15); }

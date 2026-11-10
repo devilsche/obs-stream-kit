@@ -234,21 +234,8 @@
       }
     };
 
-    // ── Wedeln mit Nachschwingen: Ausschlag folgt dem Wind (schnell hoch,
-    //    langsam aus), Böen geben einen abklingenden Stoß. Liefert je Schritt
-    //    den Winkel; dir = Windrichtung (±1), die Mitte liegt leicht im Wind ──
-    B.sway = function () {
-      var amp = 0, ph = 0, kick = 0;
-      return function (dt, target, gust, dir) {
-        if (gust > kick) kick = gust;
-        kick *= Math.pow(0.25, dt);
-        var want = Math.max(target, kick);
-        amp += (want - amp) * Math.min(1, dt * (want > amp ? 2.5 : 0.4));
-        ph += dt * (2.4 + 3.5 * Math.min(1, amp / 6));
-        if (amp < 0.03) { amp = 0; return 0; }
-        return amp * Math.sin(ph) + 0.35 * amp * (dir || 1);
-      };
-    };
+    // Wedeln mit Nachschwingen (makeSway unten, auch fürs Winter-Thema)
+    B.sway = makeSway;
 
     // ── Gemeinsames Sub-Projekt (8 Teile, Stand gilt für alle Jahreszeiten) ──
     // cfg: parts[8] = function (g) zeichnet Teil i (Fuß bei 0/0), names[8],
@@ -410,6 +397,15 @@
                     sway: rand(10, 40), vph: rand(4, 9), vr: 0, wf: 0.3, life: rand(0.8, 1.6), draw: sparkDraw });
       }
     };
+    // Brocken (Blitz trifft Kürbis o. Ä.): fliegen in alle Richtungen, fallen zu Boden
+    B.chunks = function (x, y, n, colors, floor) {
+      if (!front) return;
+      for (var i = 0; i < n; i++) {
+        var a = rand(-Math.PI, 0), sp = rand(200, 700);
+        front.add({ x: x + rand(-15, 15), y: y + rand(-15, 15), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, g: 1500, term: 900,
+                    sway: 0, vr: 0, wf: 0, r: rand(2.5, 7), c: colors[i % colors.length], life: rand(1.2, 2), floor: floor || null, draw: dropDraw });
+      }
+    };
     // Wasser: Tropfen fliegen im Bogen auf das Ziel bzw. spritzen dort auf
     B.water = function (x, y, n, floor) {
       if (!front) return;
@@ -434,5 +430,21 @@
     root.requestAnimationFrame(frame);
   }
 
-  root.ThemeSeasons = { base: base, loop: loop, seeded: seeded, el: el, W: W, H: H };
+  // ── Wedeln mit Nachschwingen: Ausschlag folgt dem Wind (schnell hoch,
+  //    langsam aus), Böen geben einen abklingenden Stoß. Liefert je Schritt
+  //    den Winkel; dir = Windrichtung (±1), die Mitte liegt leicht im Wind ──
+  function makeSway() {
+    var amp = 0, ph = 0, kick = 0;
+    return function (dt, target, gust, dir) {
+      if (gust > kick) kick = gust;
+      kick *= Math.pow(0.25, dt);
+      var want = Math.max(target, kick);
+      amp += (want - amp) * Math.min(1, dt * (want > amp ? 2.5 : 0.4));
+      ph += dt * (2.4 + 3.5 * Math.min(1, amp / 6));
+      if (amp < 0.03) { amp = 0; return 0; }
+      return amp * Math.sin(ph) + 0.35 * amp * (dir || 1);
+    };
+  }
+
+  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H };
 })(typeof window !== 'undefined' ? window : this);

@@ -5,7 +5,10 @@
  *
  *   var audio = WeatherAudio.create('../assets/effects/');
  *   audio.set({ on, volume, thunder, ambient });  audio.update(kit.state());
- *   audio.thunder(dist);  audio.gust();
+ *   audio.thunder(dist);  audio.gust();  audio.spectacle(info);
+ * Windhose (Spektakel tornado): eigenes Sturmrauschen, lauter je näher sie der
+ * Bildmitte kommt, unabhängig vom Regler für Regen/Wind; mit siren eine
+ * erzeugte Sirene dazu (an- und abschwellender Heulton).
  * Donner aus opts.thunderFile, vorab dekodiert (Web Audio), setzt mit dem Blitz ein.
  */
 (function (root) {
@@ -30,7 +33,10 @@
         .catch(function () { thunderBuf = null; });
     }
     // ambient: Regen und Wind relativ zur Gesamtlautstärke (leise, damit das Spiel hörbar bleibt)
-    var on = false, volume = 0.6, thunderLevel = 1, ambient = AMBIENT, blocked = false;
+    var on = false, volume = 0.6, thunderLevel = 1, ambient = AMBIENT, siren = false, blocked = false;
+    // Windhose: eigene Sturm-Schleife, Pegel aus den laufenden Tornados
+    var twisters = [], twistLoop = new Audio(base + 'wind-loop-strong.wav');
+    twistLoop.loop = true; twistLoop.preload = 'auto'; twistLoop.volume = 0;
     var loops = {}, targets = {}, lastThunder = -10;
 
     LOOPS.forEach(function (name) {
@@ -64,7 +70,44 @@
         if (a.volume > 0.005 && a.paused) play(a);
         else if (a.volume <= 0.005 && !a.paused) a.pause();
       });
+      // Windhose: Hüllkurve über die Dauer, dazu Nähe zur Bildmitte
+      twisters = twisters.filter(function (t) { return t.active(); });
+      var tw = 0;
+      twisters.forEach(function (t) {
+        var p = clamp(t.elapsed() / t.dur, 0, 1), x = t.x();
+        var near = x === null ? 0.5 : 1 - clamp(Math.abs(x - 960) / 1300, 0, 1);
+        tw = Math.max(tw, smooth(p / 0.12) * (1 - smooth((p - 0.8) / 0.2)) * (0.45 + 0.55 * near));
+      });
+      var tt = on ? tw * volume * 0.9 : 0;
+      twistLoop.volume = clamp(twistLoop.volume + clamp(tt - twistLoop.volume, -0.08, 0.08), 0, 1);
+      if (twistLoop.volume > 0.005 && twistLoop.paused) play(twistLoop);
+      else if (twistLoop.volume <= 0.005 && !twistLoop.paused) twistLoop.pause();
     }, 100);
+
+    // Sirene: zwei leicht verstimmte Sägezähne durch einen Tiefpass, Ton steigt
+    // langsam an, hält und sinkt zum Ende (wie eine Motorsirene in der Ferne)
+    function playSiren(dur) {
+      if (!actx || !on || volume <= 0.01) return;
+      var t0 = actx.currentTime, end = t0 + dur;
+      var g = actx.createGain(), lp = actx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1400;
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.16 * volume, t0 + 1.5);
+      g.gain.setValueAtTime(0.16 * volume, end - 2);
+      g.gain.linearRampToValueAtTime(0, end);
+      lp.connect(g); g.connect(actx.destination);
+      [1, 1.26].forEach(function (k) {
+        var o = actx.createOscillator();
+        o.type = 'sawtooth';
+        o.frequency.setValueAtTime(160 * k, t0);
+        o.frequency.linearRampToValueAtTime(520 * k, t0 + Math.min(3.5, dur * 0.4));
+        o.frequency.setValueAtTime(520 * k, end - 3);
+        o.frequency.linearRampToValueAtTime(200 * k, end);
+        o.connect(lp);
+        o.start(t0);
+        o.stop(end + 0.05);
+      });
+    }
 
     function unlock() {
       if (actx && actx.state === 'suspended') actx.resume();
@@ -91,6 +134,7 @@
         if (typeof o.volume === 'number' && isFinite(o.volume)) volume = clamp(o.volume, 0, 1);
         if (typeof o.thunder === 'number' && isFinite(o.thunder)) thunderLevel = clamp(o.thunder, 0, 1);
         if (typeof o.ambient === 'number' && isFinite(o.ambient)) ambient = clamp(o.ambient, 0, 1);
+        if (o.siren !== undefined) siren = !!o.siren;
       },
       // Zielpegel aus dem aktuellen Wetterzustand
       update: function (cur) {
@@ -144,7 +188,13 @@
         a.playbackRate = rate;
         play(a);
       },
-      gust: function () { oneShot('wind-gust.wav', volume * ambient * 0.9); }
+      gust: function () { oneShot('wind-gust.wav', volume * ambient * 0.9); },
+      // Spektakel-Start (info aus kit.on('spectacle')): Windhose bekommt Ton
+      spectacle: function (info) {
+        if (!info || info.type !== 'tornado' || info.reduced) return;
+        twisters.push(info);
+        if (siren) playSiren(info.dur);
+      }
     };
   }
 

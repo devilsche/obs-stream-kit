@@ -561,3 +561,9 @@ def test_streamerbot_settings_only_local_addresses():
     assert parse("weather", {"cmd": "set", "sbaction": "x", "sbws": "ws://192.168.0.20:8080"})["params"]["sbws"]
     p = parse("weather", {"cmd": "set", "sbaction": "x", "sbws": "wss://evil.example.com/"})["params"]
     assert "sbws" not in p
+
+
+def test_sound_settings_ambient_and_siren():
+    from fx.commands import parse
+    p = parse("weather", {"cmd": "set", "ambient": "0.15", "siren": "1"})["params"]
+    assert p["ambient"] == 0.15 and p["siren"] is True

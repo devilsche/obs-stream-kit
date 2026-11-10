@@ -397,3 +397,6 @@
   .ts *, .ts *::before, .ts *::after { animation: none !important; }
   .ts, .ta-pk-face, .ta-pk-light, .tsp-weed, .ts-proj, .tss-castles { transition-duration: 0.4s; }
 }
+
+/* Herbst: vom Blitz geplatzter Kürbis ist weg, bis er nachwächst */
+.ta-pk[data-zap="1"] { visibility: hidden; }

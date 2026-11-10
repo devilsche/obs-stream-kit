@@ -542,6 +542,33 @@
                term: 500, sway: 0, r: rand(2, 5), life: 1.2, floor: surface, draw: flake });
       }
     }
+    // Blitz trifft einen Mini (nah, höchstens 70 px daneben): er zerstiebt,
+    // nach 8–14 s steht er mit der Aufbau-Animation wieder (Follower bleibt)
+    function miniBolt(p) {
+      if (!S.on || reduceMotion || !p.near || typeof p.x !== 'number' || !partOn('minis') || minisHidden()) return;
+      var best = null;
+      minis.forEach(function (m) {
+        if (!m || m.zap || m.bz > 0.5 || m.av > 0.3 || Math.abs(m.x - p.x) > 70) return;
+        if (!best || Math.abs(m.x - p.x) < Math.abs(best.x - p.x)) best = m;
+      });
+      if (!best || Math.random() < 0.65) return;   // nicht jeder Blitz trifft
+      var m = best, cy = surface(m.x) + m.dy - 40 * m.k;
+      if (p.ground) p.ground(m.x, cy);
+      m.zap = true;
+      m.outer.dataset.zap = '1';
+      for (var i = 0; i < 30; i++) {
+        addP({ x: m.x + rand(-15, 15) * m.k, y: cy + rand(-30, 20) * m.k, vx: rand(-420, 420), vy: rand(-650, -100),
+               term: 600, sway: 0, r: rand(2, 6), life: rand(1, 1.8), floor: surface, draw: i % 6 ? flake : spark });
+      }
+      if (opts.event) opts.event('struck', { target: 'snowman', name: m.label || '' });
+      setTimeout(function () {
+        m.zap = false;
+        delete m.outer.dataset.zap;
+        m.inner.classList.remove('tw-mini--new');
+        void m.inner.getBBox();
+        m.inner.classList.add('tw-mini--new');
+      }, rand(8000, 14000));
+    }
     function stepMinis(dt) {
       var visible = S.on && partOn('minis') && !minisHidden();
       var bzNow = visible && opts.blizzard ? clamp01(opts.blizzard()) : 0;
@@ -586,6 +613,40 @@
       });
     }
 
+    // ── Sturm: Baum und Schneemann schwingen mit Wind, Böen und naher Windhose
+    //    gedämpft aus (wie der Strand-Baum); Minis zittern, solange sie zieht.
+    //    Nur der Baum selbst biegt sich, Wehe und Geschenke bleiben ruhig ──
+    var TREE_CX = TREE_X + 200 * TREE_K;
+    var SWAY = root.ThemeSeasons ? root.ThemeSeasons.sway : null;
+    var treeSway = SWAY && SWAY(), smSway = SWAY && SWAY();
+    var twister = null, gustKick = 0, swayDrawn = '', smSwayDrawn = '', jigDrawn = '', quakeDrawn = '';
+    function liveWind() { var sky = opts.sky ? opts.sky() : null; return sky ? (sky.wind || 0) : 0; }
+    function stormy(w) {
+      var sky = opts.sky ? opts.sky() : null, kind = sky ? sky.kind : '';
+      var bz = opts.blizzard ? opts.blizzard() : 0;
+      return kind === 'storm' || kind === 'blizzard' || bz > 0.3 || Math.abs(w) >= 0.8;
+    }
+    function stepSway(dt) {
+      if (!SWAY) return;
+      if (twister && !twister.active()) twister = null;
+      var on = S.on && !reduceMotion, w = liveWind();
+      var tx = on && twister ? twister.x() : null, storm = on && stormy(w);
+      var gust = on ? gustKick : 0;
+      gustKick = 0;
+      var tT = 0, sT = 0;
+      if (on && partOn('tree') && xmasShown()) tT = tx !== null && Math.abs(tx - TREE_CX) < 320 ? 6 : storm ? 2.2 : 0;
+      if (on && partOn('snowman') && S.sm > 0) sT = tx !== null && Math.abs(tx - SM_X) < 320 ? 4 : storm ? 1 : 0;
+      var dir = w < 0 ? -1 : 1;
+      var a = treeSway(dt, tT, gust, dir).toFixed(2), b = smSway(dt, sT, gust * 0.5, dir).toFixed(2);
+      if (a !== swayDrawn) { swayDrawn = a; rootEl.style.setProperty('--twb-sway', a); }
+      if (b !== smSwayDrawn) { smSwayDrawn = b; rootEl.style.setProperty('--tw-sm-sway', b); }
+      // Kugeln am Baum wackeln, solange die Windhose ihn biegt
+      var jig = tT >= 6 ? '1' : '';
+      if (jig !== jigDrawn) { jigDrawn = jig; rootEl.dataset.jiggle = jig; }
+      var quake = tx !== null && partOn('minis') && !minisHidden() ? '1' : '';
+      if (quake !== quakeDrawn) { quakeDrawn = quake; rootEl.dataset.quake = quake; }
+    }
+
     // ── Hauptschleife ──
     var last = null, dirty = true, dripAcc = 0, wasOn = false;
     function frame(ts) {
@@ -593,6 +654,7 @@
       last = ts;
       X.step(dt);
       syncMinis();
+      stepSway(dt);
       // Schneedecke folgt dem Server-Stand weich
       var prev = S.shown;
       if (reduceMotion) S.shown = S.target;
@@ -729,7 +791,12 @@
             showBoard('Top snow shovelers', S.snowTop); break;
           case 'spectacle':
             if (p.type === 'avalanche') avalanche(p);
+            if (p.type === 'tornado' && !p.reduced) twister = p;
             break;
+          case 'gust':
+            gustKick = 3; break;
+          case 'bolt':
+            miniBolt(p); break;
           case 'clear':
             if (p.kind === 'ornaments' || p.kind === 'gifts') X.clear(p.kind);
             else if (p.kind === 'minis') { clear(gMinis); minis = []; miniNext = 0; miniTotal = 0; }

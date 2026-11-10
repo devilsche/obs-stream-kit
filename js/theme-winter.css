@@ -143,7 +143,8 @@
 /* Hitze: schrumpft leicht und sackt zusammen */
 .tw-sm-body {
   transform-box: fill-box; transform-origin: 50% 100%;
-  transform: scale(calc(1 - 0.07 * var(--tw-melt)), calc(1 - 0.14 * var(--tw-melt)));
+  /* Sturm: schwingt um den Fuß (--tw-sm-sway in Grad, aus dem Skript) */
+  transform: rotate(calc(var(--tw-sm-sway, 0) * 1deg)) scale(calc(1 - 0.07 * var(--tw-melt)), calc(1 - 0.14 * var(--tw-melt)));
 }
 /* Xmas: Weihnachtsmütze statt Zylinder, Lichterkette um den Bauch */
 .tw-sm-xmas { opacity: 0; transition: opacity 1.5s ease; }
@@ -162,6 +163,15 @@
 .tw-minis { opacity: 1; transition: opacity 1s ease; }
 .tw[data-hidemini="1"] .tw-minis { opacity: 0; visibility: hidden; transition: opacity 1s ease, visibility 0s linear 1s; }
 .tw-mini { transform-box: fill-box; transform-origin: 50% 100%; }
+/* vom Blitz getroffen: weg, bis er nachwächst */
+.tw-minis > g[data-zap="1"] { visibility: hidden; }
+/* Windhose zieht durchs Bild: die Minis zittern */
+.tw[data-quake="1"] .tw-mini { animation: twQuake 0.16s linear infinite; }
+@keyframes twQuake { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-3deg) translateX(-1px); } 75% { transform: rotate(3deg) translateX(1px); } }
+/* Baum im Sturm: biegt sich mit dem Wind (unten fest), bei naher Windhose stark;
+   nur der Baum, nicht die Schneewehe davor (gleiche Klasse plus .tw-dim) */
+.tw .tw-treebox:not(.tw-dim) { transform-box: fill-box; transform-origin: 50% 100%; transform: skewX(calc(var(--twb-sway, 0) * 1deg)); }
+.tw[data-jiggle="1"] .tw-orn { animation: twJiggle 0.35s ease-in-out infinite; }
 .tw-mini--new { animation: twPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 .tw-mini__ball { fill: url(#tw-ballG); }
 .tw-mini__hat1 { fill: #c4302b; } .tw-mini__hat2 { fill: #2a64b8; } .tw-mini__hat3 { fill: #2e9e5b; } .tw-mini__hat4 { fill: #8e4bb8; }

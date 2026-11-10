@@ -930,33 +930,41 @@
       bolts = bolts.filter(function (b) { return !b.done; });
     }
 
-    // ── Spektakel: eins läuft, höchstens eins wartet ──
-    var show = null, queued = null;
+    // ── Spektakel: bis zu SHOW_MAX laufen gleichzeitig (auch zweimal dasselbe),
+    //    weitere warten (höchstens SHOW_MAX) und starten, sobald Platz ist ──
+    var SHOW_MAX = 3;
+    var shows = [], queued = [];
 
     function spectacle(type) {
       if (SPECTACLES.indexOf(type) < 0) return false;
-      if (show) { queued = type; return true; }
+      if (shows.length >= SHOW_MAX) {
+        if (queued.length < SHOW_MAX) queued.push(type);
+        return true;
+      }
       startShow(type);
       return true;
     }
 
     function startShow(type) {
+      var s;
       if (reduceMotion) {
-        show = { type: 'tint', t: 0, dur: 1.2, color: TINT[type] };
-        emit('spectacle', showInfo(show, type, true));
+        s = { type: 'tint', t: 0, dur: 1.2, color: TINT[type] };
+        shows.push(s);
+        emit('spectacle', showInfo(s, type, true));
         return;
       }
-      show = SHOWS[type].init();
-      show.type = type;
-      show.t = 0;
-      emit('spectacle', showInfo(show, type, false));
+      s = SHOWS[type].init();
+      s.type = type;
+      s.t = 0;
+      shows.push(s);
+      emit('spectacle', showInfo(s, type, false));
     }
 
     // Auskunft an die Deko-Themen: Art, Dauer, Richtung (1 = von links),
     // live abfragbar solange das Spektakel läuft: Wasserstand über dem
     // unteren Rand an Stelle x (Tsunami), x der Windhose, Aufprall der Lawine
     function showInfo(s, type, reduced) {
-      function on() { return show === s; }
+      function on() { return shows.indexOf(s) >= 0; }
       return {
         type: type, dur: s.dur, dir: s.dir || 0, reduced: reduced, land: s.land || null,
         active: on,
@@ -1657,7 +1665,8 @@
     // Abdunklung 0..1 (Mega-Blitz) für Himmel und Deko (--wk-dark an der Bühne)
     var darkNow = 0, darkShown = -1;
     function setDark() {
-      darkNow = show && show.type === 'megabolt' ? clamp(show.dark || 0, 0, 1) : 0;
+      darkNow = 0;
+      shows.forEach(function (s) { if (s.type === 'megabolt') darkNow = Math.max(darkNow, clamp(s.dark || 0, 0, 1)); });
       if (Math.abs(darkNow - darkShown) < 0.01 && !(darkNow === 0 && darkShown > 0)) return;
       darkShown = darkNow;
       stage.style.setProperty('--wk-dark', darkNow.toFixed(3));
@@ -1667,20 +1676,23 @@
     function drawShow(dt) {
       fctx.clearRect(0, 0, W, H);
       setDark();
-      if (!show) return;
-      show.t += dt;
-      if (show.type === 'tint') {
-        var a = 0.14 * Math.sin(Math.PI * clamp(show.t / show.dur, 0, 1));
-        fctx.fillStyle = 'rgba(' + show.color + ',' + a + ')';
-        fctx.fillRect(0, 0, W, H);
-      } else {
-        SHOWS[show.type].draw(show, dt);
-      }
-      if (show.t >= show.dur) {
-        show = null;
-        fctx.clearRect(0, 0, W, H);
-        if (queued) { var q = queued; queued = null; startShow(q); }
-      }
+      if (!shows.length) return;
+      shows.slice().forEach(function (s) {
+        s.t += dt;
+        fctx.save(); sctx.save();
+        if (s.type === 'tint') {
+          var a = 0.14 * Math.sin(Math.PI * clamp(s.t / s.dur, 0, 1));
+          fctx.fillStyle = 'rgba(' + s.color + ',' + a + ')';
+          fctx.fillRect(0, 0, W, H);
+        } else {
+          SHOWS[s.type].draw(s, dt);
+        }
+        fctx.restore(); sctx.restore();
+        if (s.t >= s.dur) {
+          shows.splice(shows.indexOf(s), 1);
+          if (queued.length) startShow(queued.shift());
+        }
+      });
     }
 
     // ── Haupt-Schleife ──
@@ -1733,7 +1745,7 @@
       pause: function (v) { paused = !!v; },
       state: function () { return cur; },
       progress: function () { return transT; },
-      busy: function () { return show ? show.type : null; },
+      busy: function () { return shows.length ? shows[0].type : null; },
       // Schneesturm-Grad 0..1 (viel Schnee und starker Wind), live
       blizzard: function () { return bz; },
       // Dächer setzen, an denen Regen zerplatzt (leer = keine)

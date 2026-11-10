@@ -147,7 +147,9 @@
       // Deko-Thema vor dem Frost anlegen: der Frost liegt als „Scheibe“ darüber
       var theme = window.ThemeWinter.create(document.getElementById('stage'), {
         tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
-        blizzard: function () { return kit.blizzard(); } });
+        sky: function () { return kit.state(); },
+        blizzard: function () { return kit.blizzard(); },
+        event: function (name, args) { sbEvent(name, args); } });
       // Herbst, Frühling, Sommer: je ein Baustein, sichtbar nur im eigenen Thema
       var seasonOpts = { tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
                          sky: function () { return kit.state(); },
@@ -183,12 +185,19 @@
       kit.on('strike', function (dist, hit) {
         audio.thunder(dist);
         if (hit && seasons[lastTheme]) seasons[lastTheme].command('bolt', hit);
+        else if (hit && lastTheme === 'winter') theme.command('bolt', hit);
       });
-      kit.on('gust', function () { audio.gust(); });
+      // jede Böe (Befehl oder zufälliger Wind) an das sichtbare Deko-Thema
+      kit.on('gust', function () {
+        audio.gust();
+        if (seasons[lastTheme]) seasons[lastTheme].command('gust', {});
+        else if (lastTheme === 'winter') theme.command('gust', {});
+      });
       kit.on('pop', function () { audio.thunder(0.1); });
       // Spektakel-Start (Art schon aufgelöst, auch bei Zufall) an das
       // sichtbare Deko-Thema; ausgeblendete Themen reagieren nicht
       kit.on('spectacle', function (info) {
+        audio.spectacle(info);
         if (seasons[lastTheme]) seasons[lastTheme].command('spectacle', info);
         else if (lastTheme === 'winter') theme.command('spectacle', info);
       });
@@ -237,7 +246,7 @@
       }
 
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
-                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder', 'ambient', 'sbaction', 'sbws',
+                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder', 'ambient', 'siren', 'sbaction', 'sbws',
                   'theme', 'xmasfrom', 'xmasto', 'snowrate', 'leafrate', 'shakeneed', 'shakewin',
                   'lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover',
                   'garland', 'branch', 'pile', 'leaves', 'pumpkins', 'meadow', 'bugs', 'beach', 'umbrella'];
@@ -376,7 +385,8 @@
         audio.set({ on: flag(settings.sound),
                     volume: settings.volume !== undefined ? parseFloat(settings.volume) : 0.6,
                     thunder: settings.thunder !== undefined ? parseFloat(settings.thunder) : 1,
-                    ambient: settings.ambient !== undefined ? parseFloat(settings.ambient) : 0.3 });
+                    ambient: settings.ambient !== undefined ? parseFloat(settings.ambient) : 0.3,
+                    siren: flag(settings.siren) });
       }
 
       // Testhintergrund nur außerhalb von OBS (dort liegt das echte Spiel dahinter)
@@ -457,8 +467,7 @@
             kit.strike(p.dist);
             break;
           case 'gust':
-            kit.gust();
-            if (seasons[lastTheme]) seasons[lastTheme].command('gust', p);
+            kit.gust();   // Thema bekommt die Böe über kit.on('gust')
             break;
           case 'scrape':
             frost.scrape(p.name, p.done, p.level);

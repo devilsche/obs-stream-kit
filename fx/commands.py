@@ -202,6 +202,7 @@ EFFECTS = {
             "volume": _level,
             "thunder": _level,
             "ambient": _level,
+            "siren": _flag,
             "sbaction": _sb_action,
             "sbws": _sb_ws,
             # Deko-Thema (Teil 3: Winter mit Xmas-Zeit)
