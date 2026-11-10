@@ -555,8 +555,9 @@
     }
 
     // ── Blitzfeuer im Laub: ein Feuer zur Zeit, nur im sichtbaren Thema ──
-    // nach einem Feuer braucht das Laub eine Pause, sonst brennt es im Gewitter dauernd
-    var FIRE_PAUSE = 90;
+    // nach einem Feuer kurze Pause, sonst brennt es im Gewitter ohne Unterbrechung;
+    // ein naher Blitz bis REACH px neben dem Haufen springt hinein
+    var FIRE_PAUSE = 20, REACH = 250;
     var fire = null, lastFireX = null, fireDrawn = false, pauseUntil = 0;
     var fctx = B.fireCtx();
     function pileFloor(x) { return surface(x) + 6; }
@@ -565,7 +566,11 @@
       if (!B.on || B.reduceMotion || fire || !p.near || typeof p.x !== 'number') return;
       if (!B.partOn('pile') || S.shown <= 5) return;
       var x = Math.max(140, Math.min(W - 140, p.x));
-      if (H - surface(x) < 45) return;                 // daneben (Mitte ist frei)
+      // zum nächsten Rand hin bis zur ersten Stelle mit genug Laub (Mitte ist frei)
+      var dir = x < W / 2 ? -1 : 1, moved = 0;
+      while (H - surface(x) < 45 && moved < REACH) { x += dir * 10; moved += 10; }
+      if (H - surface(x) < 45) return;                 // zu weit daneben
+      x = Math.max(140, Math.min(W - 140, x + dir * Math.random() * 60));
       if (Date.now() < pauseUntil) return;
       if (p.ground) p.ground(x, surface(x) + 6);
       ignite(x);
