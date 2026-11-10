@@ -162,7 +162,9 @@ EFFECTS = {
                      "snowboard", "clear", "follow",
                      # Herbst, Frühling, Sommer
                      "pumpkin", "rake", "jump", "sweep", "flower", "water", "weed", "bee",
-                     "castle", "splash", "ice", "cool", "seasonboard"),
+                     "castle", "splash", "ice", "cool", "seasonboard",
+                     # Jahreszeit früher starten bzw. zurück zum Kalender
+                     "season"),
         "settings": {
             "place": _place,
             "mood": _float_range(0, 1),
@@ -224,6 +226,7 @@ EFFECTS = {
             "snowball": {"name": _name},
             "celebrate": {"name": _name},
             "xmasdone": {"step": _choice("setup", "farewell")},
+            "season": {"to": _choice("next", "auto", "winter", "spring", "summer", "autumn")},
             "clear": {"kind": _choice("followers", "ornaments", "gifts", "minis", "snow", "snowman",
                                       "pumpkins", "leaves", "flowers", "garden", "castles", "heat")},
             "pumpkin": {"name": _name},

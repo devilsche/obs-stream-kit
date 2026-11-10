@@ -389,28 +389,32 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 
 **Frost:** Bei echter Temperatur ≤ 0 °C oder im Schneesturm wachsen Eisblumen von den Ecken über die Ränder ins Bild (Mitte bleibt frei): (2 + Kältegrade) % pro Minute, im Schneesturm mindestens 10 %; über 0 °C taut es langsam ((1 + Temperatur/2) % pro Minute), bei Hitze – auch eingestellt – schmilzt er mit 25 % pro Minute. Der Stand liegt auf dem Server und überlebt Reload und Neustart. `!scrape` kratzt 6 % frei (Kratzer fährt eine Bahn), `!warm` haucht 10 % frei (Atemwolke, Dampf); beides wirkt nur an der Stelle, die übrige Scheibe bleibt; freie Stellen frieren in etwa 90 s wieder zu. Beide zählen für die Rangliste „Top frost fighters“; ist die Scheibe ganz frei, funkelt es. Schalter `frost` (`1`/`0`) und `frostrate` (`0.25`–`4`).
 
-**Deko-Themen:** Schalter `theme` (`auto` = nach Datum: März–Mai `spring`, Juni–August `summer`, September–November `autumn`, Dezember–Februar und die Xmas-Zeit `winter`; oder fest, `none` = nur Wetter). Es ist immer genau ein Thema aktiv; die Mechaniken laufen auf dem Server und folgen dem wirksamen Wetter:
+**Deko-Themen:** Schalter `theme` (`auto` = kalendarisch: `spring` ab 20.3., `summer` ab 21.6., `autumn` ab 22.9., `winter` ab 21.12. und während der Xmas-Zeit; oder fest, `none` = nur Wetter). `cmd=season&to=next` (Knopf „Start next season now“) startet die nächste Jahreszeit sofort und hält, bis der Kalender sie erreicht; `to=winter|spring|summer|autumn` wählt gezielt, `to=auto` hebt den Frühstart auf. Ein per Knopf aufgebauter Weihnachtsbaum zeigt immer Winter, auch bei fest gewähltem Herbst, bis zum Abschied. Es ist immer genau ein Thema aktiv; die Mechaniken laufen auf dem Server und folgen dem wirksamen Wetter:
 
 - **Herbst:** Blätterranke, Ast, fallendes Laub, Laubhaufen (wächst stetig, bei Wind schneller, `leafrate`), Follower-Kürbisse (leuchten nachts). `!rake` (−5, „Top rakers“), `!jump`, Mods `sweep`.
 - **Frühling:** Blumenwiese mit Follower-Blumen, Kirschblütenzweig, Bienen, Schmetterlinge. Die Erde trocknet (2 %/min, bei Hitze 6), Regen gießt (30 %/min), unter 30 % lassen die Blumen die Köpfe hängen; Unkraut wächst 1 %/min. `!water` (+10), `!weed` (−3, 3 Leute in 20 s ziehen die Hälfte; „Top gardeners“), `!bee`.
 - **Sommer:** Strand mit Follower-Sandburgen, Sonnenschirm, abends Glühwürmchen. Die Hitze steigt bei Hitzewelle (20 %/min) und Sonne (2 %/min), sinkt bei Regen und nachts. `!splash` (−5, „Top coolers“), `!ice` (Eis schmilzt mit der Hitze), Mods `cool`.
 - **Winter:** siehe unten.
 
-`cmd=follow&name=%user%` legt je Thema das passende Item an (Kürbis, Blume, Sandburg, im Winter Kugel bzw. Mini-Schneemann); `cmd=celebrate`, `cmd=seasonboard` (Rangliste des aktiven Themas), `cmd=clear&kind=pumpkins|leaves|flowers|garden|castles|heat`.
+**Gemeinsame Follower:** Alle Jahreszeiten teilen eine Follower-Liste. `cmd=follow&name=%user%` trägt den Namen einmal ein (doppelte Namen zählen nicht), und er erscheint in jedem Thema in dessen Form: Kürbis, Blume, Sandburg, im Winter Kugel am Baum (Xmas-Zeit) bzw. Mini-Schneemann (sonst; in der Xmas-Zeit ausgeblendet, damit jeder Follower nur einmal im Bild ist). Beim Umschalten des Themas sind also gleich viele Follower zu sehen. Die bisher gesammelten Kugeln, Kürbisse, Blumen, Sandburgen und Mini-Schneemänner wurden zusammengeführt. **Import:** Auf der Weather-Karte im Tab **Chat commands** holt „Import last 60 Twitch followers“ per einmaligem Twitch-Login (Recht `moderator:read:followers`) die letzten 60 Follower; der Token wird nicht gespeichert.
+
+**Sub-Projekt:** Jeder Sub (`cmd=build&name=%user%`) baut ein Teil am gemeinsamen Projekt (8 Teile, gleicher Fortschritt in allen Themen): Winter Schneemann, Herbst Vogelscheuche, Frühling Sonnenblume, Sommer Sandpalast. Zurückgesetzt wird nur per Knopf „Start a new sub project“ (`cmd=snowmanreset`).
+
+`cmd=celebrate`, `cmd=seasonboard` (Rangliste des aktiven Themas), `cmd=clear&kind=pumpkins|leaves|flowers|garden|castles|heat`.
 
 **Winter mit Xmas-Zeit:** Winter: Schneedecke (wächst, solange es schneit, bis 6 %/min × `snowrate`; Hitze und Tauwetter lassen sie schmelzen), Eiszapfen, Schneemann (ein Teil pro Sub, in der Xmas-Zeit mit Mütze und Lichterkette) und Mini-Schneemänner der Follower. Xmas-Zeit von `xmasfrom` (`advent` = 1. Advent oder `MM-DD`) bis `xmasto` (`MM-DD`, Standard `12-26`): Lichterkette, Baum mit Follower-Kugeln, hängende Kugeln, Geschenke. Der **Aufbau** ist ab dem Beginn fällig und spielt beim ersten Stream, sobald die Source 2 min live im Programm ist; der **Abschied** ebenso nach dem Ende (Kugeln fallen nacheinander ab, Baum geht, Geschenke-Rangliste ein letztes Mal). `cmd=setup` / `cmd=farewell` (Knöpfe „Set up Christmas“ / „Christmas farewell“) lösen jederzeit sofort aus und machen den automatischen Schritt der Saison hinfällig. Einzelteile per Schalter `lights`, `tree`, `baubles`, `gifts`, `snowman`, `minis`, `icicles`, `cover`. Kugeln, Geschenke, Mini-Schneemänner und Schneemann aus `xmas.html`/`winter.html` werden übernommen.
 
 | Befehl | Wirkung |
 |--------|---------|
-| `cmd=follow&name=%user%` | Follow: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann |
-| `cmd=build&name=%user%` | Sub: nächstes Schneemann-Teil (8 Teile) |
+| `cmd=follow&name=%user%` | Follow: in alle Themen (Winter: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann) |
+| `cmd=build&name=%user%` | Sub: nächstes Teil des Sub-Projekts (8 Teile, alle Themen) |
 | `cmd=gift&name=%user%&type=sub\|resub\|giftsub\|bits\|raid&amount=…` | Geschenk unter dem Baum |
 | `cmd=shovel&name=%user%` | 5 % Schnee schippen (Rangliste „Top snow shovelers“) |
 | `cmd=shake&name=%user%` | Schnee abschütteln, gelingt bei 5 Leuten in 20 s (`&force=1` sofort) |
 | `cmd=icicle&name=%user%` / `cmd=snowball&name=%user%` | Eiszapfen abbrechen (zählt) / Schneeball werfen |
 | `cmd=celebrate[&name=…]`, `cmd=snowboard` | Feiern / Rangliste zeigen |
 | `cmd=setup` / `cmd=farewell` | Xmas-Aufbau / -Abschied sofort |
-| `cmd=clear&kind=ornaments\|gifts\|minis\|snow\|snowman` | Mods: dauerhaft löschen |
+| `cmd=clear&kind=followers\|gifts\|snow\|snowman` | Mods: dauerhaft löschen (`followers` leert die gemeinsame Liste aller Themen) |
 
 **Befehle** an `https://stream-overlay.com/s/<token>/api/fx/weather?cmd=…` (Streamer.bot **Fetch URL**):
 

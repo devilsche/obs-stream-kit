@@ -1,8 +1,10 @@
 """Deko-Thema der Weather-Source und Ablauf der Xmas-Zeit.
 
-Thema: `auto` wählt nach Monat (März–Mai Frühling, Juni–August Sommer,
-September–November Herbst, Dezember–Februar Winter); die Xmas-Zeit, die im
-November beginnen kann, ist immer Winter.
+Thema: `auto` wählt kalendarisch (Frühling ab 20.3., Sommer ab 21.6., Herbst
+ab 22.9., Winter ab 21.12.); die Xmas-Zeit, die im November beginnen kann, ist
+immer Winter. Per Knopf (`cmd=season&to=…`) startet eine Jahreszeit früher und
+hält, bis der Kalender sie erreicht. Ein aufgebauter Baum macht auch ein fest
+gewähltes Thema zum Winter.
 
 Xmas-Zeit: von `xmasfrom` (`advent` = 1. Advent oder `MM-DD`) bis `xmasto`
 (`MM-DD`). Die Saison ist das Jahr des Beginns; Januar und Februar gehören
@@ -57,13 +59,42 @@ def xmas_window(today: date, xfrom: str, xto: str):
     return start, end, season
 
 
-def theme_for(today: date, setting: str, xmas_active: bool) -> str:
-    """Fest gewähltes Thema oder nach Monat; die Xmas-Zeit ist immer Winter."""
-    if setting in ("winter", "spring", "summer", "autumn", "none"):
-        return setting
-    if xmas_active or today.month in (12, 1, 2):
+# Kalendarischer Beginn (Monat, Tag) je Jahreszeit, in Jahresreihenfolge
+SEASON_START = (("spring", 3, 20), ("summer", 6, 21), ("autumn", 9, 22), ("winter", 12, 21))
+
+
+def calendar_theme(today: date) -> str:
+    theme = "winter"
+    for name, m, d in SEASON_START:
+        if (today.month, today.day) >= (m, d):
+            theme = name
+    return theme
+
+
+def next_start(today: date, theme: str) -> date:
+    """Nächster kalendarischer Beginn von `theme` nach `today`."""
+    m, d = next((m, d) for name, m, d in SEASON_START if name == theme)
+    start = date(today.year, m, d)
+    return start if start > today else start.replace(year=today.year + 1)
+
+
+def theme_for(today: date, setting: str, xmas_active: bool, early=None, set_up: bool = False) -> str:
+    """Thema: `none` > aufgebauter Baum > fest gewählt > Xmas-Zeit > Frühstart > Kalender."""
+    if setting == "none":
+        return "none"
+    if set_up:
         return "winter"
-    return {3: "spring", 4: "spring", 5: "spring", 6: "summer", 7: "summer", 8: "summer"}.get(today.month, "autumn")
+    if setting in ("winter", "spring", "summer", "autumn"):
+        return setting
+    if xmas_active:
+        return "winter"
+    if early:
+        try:
+            if today < date.fromisoformat(early["until"]):
+                return early["theme"]
+        except (KeyError, TypeError, ValueError):
+            pass
+    return calendar_theme(today)
 
 
 def _load(conn, tenant_id):
@@ -77,6 +108,14 @@ def _load(conn, tenant_id):
 
 
 def _save(conn, tenant_id, data):
+    """Xmas-Ablauf schreiben; ein Frühstart bleibt erhalten."""
+    old = _load(conn, tenant_id) or {}
+    if "early" in old:
+        data = dict(data, early=old["early"])
+    _write(conn, tenant_id, data)
+
+
+def _write(conn, tenant_id, data):
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
     conn.execute(
         "INSERT INTO fx_weather_theme (tenant_id, data, updated_at) VALUES (?, ?, ?) "
@@ -114,3 +153,22 @@ def mark(conn, tenant_id, today: date, opts: dict, step: str) -> None:
     """Aufbau (`setup`) bzw. Abschied (`farewell`) für die Saison erledigt."""
     _, _, season = xmas_window(today, opts.get("xmasfrom"), opts.get("xmasto"))
     _save(conn, tenant_id, {"season": season, "state": "on" if step == "setup" else "done"})
+
+
+def early_start(conn, tenant_id, today: date, to: str) -> None:
+    """Jahreszeit `to` (oder `next`) sofort starten; `auto` hebt den Frühstart auf."""
+    if to == "next":
+        cur = calendar_theme(today)
+        names = [n for n, _, _ in SEASON_START]
+        to = names[(names.index(cur) + 1) % len(names)]
+    data = _load(conn, tenant_id) or {}
+    if to in ("winter", "spring", "summer", "autumn"):
+        data["early"] = {"theme": to, "until": next_start(today, to).isoformat()}
+    else:
+        data.pop("early", None)
+    _write(conn, tenant_id, data)
+
+
+def load_early(conn, tenant_id):
+    data = _load(conn, tenant_id)
+    return data.get("early") if data else None

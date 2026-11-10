@@ -286,6 +286,28 @@ def weather_lookup():
     return resp
 
 
+@bp_app.route("/app/api/weather/theme")
+@require_session
+def weather_theme_now():
+    """Weather-Karte: welches Deko-Thema die Source gerade zeigt — dieselbe
+    Regel wie im Overlay (Kalender, Xmas-Zeit, Frühstart, aufgebauter Baum)."""
+    import datetime
+    from fx import weather_theme
+    from fx.endpoints import _with_conn
+    opts = {k: request.args.get(k) for k in ("xmasfrom", "xmasto")}
+    today = datetime.date.today()
+
+    def pick(conn):
+        start, end, _ = weather_theme.xmas_window(today, opts["xmasfrom"], opts["xmasto"])
+        set_up = weather_theme.is_set_up(conn, g.tenant_id, today, opts)
+        return weather_theme.theme_for(today, request.args.get("theme") or "auto",
+                                       start <= today <= end or set_up,
+                                       early=weather_theme.load_early(conn, g.tenant_id), set_up=set_up)
+    resp = jsonify({"theme": _with_conn(pick)})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @bp_app.route("/app/settings/accounts", methods=["POST"])
 @require_session
 def settings_accounts():

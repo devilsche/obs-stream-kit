@@ -4,7 +4,8 @@ from datetime import date
 
 import pytest
 
-from fx.weather_theme import (advent1, init_schema, mark, status, theme_for, xmas_window)
+from fx.weather_theme import (advent1, early_start, init_schema, load_early, mark, status, theme_for,
+                              xmas_window)
 
 
 @pytest.fixture
@@ -28,16 +29,52 @@ def test_window_and_season():
     assert xmas_window(date(2026, 11, 15), "11-15", "12-26")[0] == date(2026, 11, 15)
 
 
-def test_theme_by_date():
-    assert theme_for(date(2026, 1, 10), "auto", False) == "winter"
+def test_theme_by_calendar():
+    # kalendarische Jahreszeiten: 20.3., 21.6., 22.9., 21.12.
+    assert theme_for(date(2026, 12, 20), "auto", False) == "autumn"
+    assert theme_for(date(2026, 12, 21), "auto", False) == "winter"
+    assert theme_for(date(2027, 3, 19), "auto", False) == "winter"
+    assert theme_for(date(2027, 3, 20), "auto", False) == "spring"
+    assert theme_for(date(2026, 6, 20), "auto", False) == "spring"
+    assert theme_for(date(2026, 6, 21), "auto", False) == "summer"
+    assert theme_for(date(2026, 9, 21), "auto", False) == "summer"
+    assert theme_for(date(2026, 9, 22), "auto", False) == "autumn"
     assert theme_for(date(2026, 11, 30), "auto", True) == "winter"       # Xmas-Zeit im November
-    assert theme_for(date(2026, 11, 10), "auto", False) == "autumn"
-    assert theme_for(date(2026, 4, 10), "auto", False) == "spring"
-    assert theme_for(date(2026, 7, 10), "auto", False) == "summer"
     assert theme_for(date(2026, 7, 10), "spring", False) == "spring"
     assert theme_for(date(2026, 7, 1), "winter", False) == "winter"
     assert theme_for(date(2026, 12, 24), "none", True) == "none"
 
+
+def test_tree_set_up_beats_fixed_season():
+    # Baum per Knopf aufgebaut: Winter auch bei fest gewähltem Herbst
+    assert theme_for(date(2026, 11, 10), "autumn", False, set_up=True) == "winter"
+    assert theme_for(date(2026, 11, 10), "none", False, set_up=True) == "none"
+    # Datumsfenster allein lässt das feste Thema stehen
+    assert theme_for(date(2026, 12, 10), "autumn", True) == "autumn"
+
+
+def test_early_start_holds_until_calendar_catches_up(conn):
+    early_start(conn, 1, date(2026, 11, 10), "winter")
+    early = load_early(conn, 1)
+    assert early == {"theme": "winter", "until": "2026-12-21"}
+    assert theme_for(date(2026, 11, 10), "auto", False, early=early) == "winter"
+    assert theme_for(date(2026, 12, 20), "auto", False, early=early) == "winter"
+    # danach übernimmt der Kalender, im Frühling wirkt der alte Frühstart nicht mehr
+    assert theme_for(date(2027, 3, 25), "auto", False, early=early) == "spring"
+    # fest gewähltes Thema geht vor
+    assert theme_for(date(2026, 11, 10), "autumn", False, early=early) == "autumn"
+    # „next“ = die nächste Jahreszeit nach dem Kalender; „auto“ hebt auf
+    early_start(conn, 1, date(2026, 8, 1), "next")
+    assert load_early(conn, 1) == {"theme": "autumn", "until": "2026-09-22"}
+    early_start(conn, 1, date(2026, 8, 1), "auto")
+    assert load_early(conn, 1) is None
+
+
+def test_early_start_survives_xmas_steps(conn):
+    early_start(conn, 1, date(2026, 11, 10), "winter")
+    mark(conn, 1, date(2026, 11, 12), {}, "setup")
+    assert load_early(conn, 1) == {"theme": "winter", "until": "2026-12-21"}
+    assert status(conn, 1, date(2026, 11, 12), {}) == "on"
 
 def test_automatic_setup_then_farewell(conn):
     o = {"xmasfrom": "advent", "xmasto": "12-26"}

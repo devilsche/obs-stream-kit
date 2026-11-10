@@ -300,32 +300,27 @@ G1R_STEAM_NAME=</code></pre>
   }
 
   // ── Jahreszeiten: nur Abschnitte/Knöpfe des gewählten Themas zeigen ──
-  function advent1(y) {
-    const d = new Date(y, 10, 27);
-    d.setDate(d.getDate() + (7 - d.getDay()) % 7);
-    return d;
-  }
-  function activeDecoration() {
+  // Thema fragt den Server: Kalender, Xmas-Zeit, Frühstart und aufgebauter Baum
+  async function activeDecoration() {
     const pick = key => {
       const b = document.querySelector('.sw-group[data-param="' + key + '"] .sw-btn.active');
       return b ? b.dataset.value : null;
     };
     const theme = pick("theme");
     if (!theme) return null;
-    if (theme !== "auto") return theme;
-    // nach Datum, wie der Server: Xmas-Zeit ist Winter
-    const now = new Date(), y = now.getMonth() <= 1 ? now.getFullYear() - 1 : now.getFullYear();
-    const from = pick("xmasfrom") || "advent", to = pick("xmasto") || "12-26";
-    const start = from === "advent" ? advent1(y) : new Date(y, +from.slice(0, 2) - 1, +from.slice(3));
-    let end = new Date(y, +to.slice(0, 2) - 1, +to.slice(3), 23, 59);
-    if (end < start) end = new Date(y + 1, end.getMonth(), end.getDate(), 23, 59);
-    const m = now.getMonth() + 1;
-    if ((now >= start && now <= end) || m === 12 || m <= 2) return "winter";
-    return m <= 5 ? "spring" : m <= 8 ? "summer" : "autumn";
+    if (theme === "none") return theme;
+    try {
+      const q = new URLSearchParams({ theme, xmasfrom: pick("xmasfrom") || "advent", xmasto: pick("xmasto") || "12-26" });
+      const res = await fetch("/app/api/weather/theme?" + q, { credentials: "same-origin", cache: "no-store" });
+      const d = await res.json();
+      if (d.theme) return d.theme;
+    } catch (_) { /* offline: Auswahl übernehmen */ }
+    return theme === "auto" ? null : theme;
   }
+  let themeSync = null;
   function wireThemeSections() {
-    function sync() {
-      const active = activeDecoration();
+    async function sync() {
+      const active = await activeDecoration();
       if (active === null) return;
       document.querySelectorAll("[data-theme]").forEach(el => {
         if (el.matches(".sw-section, .url-ctlgroup")) el.hidden = el.dataset.theme !== active;
@@ -335,6 +330,7 @@ G1R_STEAM_NAME=</code></pre>
       });
     }
     sync();
+    themeSync = sync;
     const scope = document.getElementById("urlDetailContent");
     if (scope) scope.addEventListener("click", e => {
       if (e.target.closest('.sw-group[data-param="theme"], .sw-group[data-param="xmasfrom"], .sw-group[data-param="xmasto"]')) {
@@ -930,6 +926,8 @@ G1R_STEAM_NAME=</code></pre>
         const json = await res.json().catch(() => ({}));
         if (!res.ok || !json.ok) throw new Error(json.error || ("HTTP " + res.status));
         ctlStatus.textContent = "Sent: " + label;
+        // Jahreszeit oder Baum gewechselt: sichtbare Abschnitte nachziehen
+        if (themeSync && /^cmd=(season|setup|farewell)\b/.test(q)) themeSync();
       } catch (e) {
         ctlStatus.classList.add("is-error");
         ctlStatus.textContent = "Failed: " + label + " (" + e.message + ")";

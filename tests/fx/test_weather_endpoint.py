@@ -450,3 +450,37 @@ def test_manual_setup_in_november_switches_auto_theme_to_winter(conn, monkeypatc
     c.get("/s/t/api/fx/weather?cmd=setup")
     st = _state(c)
     assert st["theme"] == "winter" and st["xmas"] == "on"
+
+
+def _november(monkeypatch):
+    import datetime as _dt
+    import fx.endpoints as ep
+    nov15 = _dt.datetime(2026, 11, 15, 18, 0).timestamp()
+    monkeypatch.setattr(weather_state.time, "time", lambda: nov15)
+
+    class _D(_dt.date):
+        @classmethod
+        def today(cls):
+            return _dt.date(2026, 11, 15)
+    monkeypatch.setattr(ep.datetime, "date", _D)
+
+
+def test_manual_setup_beats_fixed_autumn(conn, monkeypatch):
+    _november(monkeypatch)
+    c = _client(conn)
+    assert _state(c, "?theme=autumn")["theme"] == "autumn"
+    c.get("/s/t/api/fx/weather?cmd=setup")
+    st = _state(c, "?theme=autumn")
+    assert st["theme"] == "winter" and st["xmas"] == "on"
+    c.get("/s/t/api/fx/weather?cmd=farewell")
+    assert _state(c, "?theme=autumn")["theme"] == "autumn"
+
+
+def test_start_next_season_early(conn, monkeypatch):
+    _november(monkeypatch)
+    c = _client(conn)
+    assert commands.parse("weather", {"cmd": "season", "to": "NEXT"})["params"] == {"to": "next"}
+    c.get("/s/t/api/fx/weather?cmd=season&to=next")
+    assert _state(c)["theme"] == "winter"
+    c.get("/s/t/api/fx/weather?cmd=season&to=auto")
+    assert _state(c)["theme"] == "autumn"
