@@ -44,7 +44,7 @@
     var gBugs = el('g', { 'class': 'tsp-bugs' }, B.svg());
 
     // ── Wiese ──
-    function groundY(x) { return H - 44 - 8 * Math.sin(x / 110) - 5 * Math.sin(x / 37); }
+    function groundY(x) { return H - 22 - 6 * Math.sin(x / 110) - 4 * Math.sin(x / 37); }
     (function () {
       var d = 'M0 ' + H;
       for (var x = 0; x <= W; x += 16) d += ' L' + x + ' ' + f1(groundY(x));
@@ -52,7 +52,9 @@
       grass.setAttribute('d', d);
       grassDry.setAttribute('d', d);
       for (var bx = 0; bx < W; bx += 9) {
-        var y = groundY(bx) + 6, h = 14 + rnd() * 26, lean = (rnd() - 0.5) * 16;
+        // in der Mitte (Lebensbalken, Munition) nur kurze Halme
+        var mid = bx > 700 && bx < 1220 ? 0.4 : 1;
+        var y = groundY(bx) + 6, h = (14 + rnd() * 26) * mid, lean = (rnd() - 0.5) * 16 * mid;
         el('path', { 'class': 'tsp-blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, gBlades);
       }
     })();
@@ -60,7 +62,9 @@
     // Unkraut: 40 Büschel in fester Reihenfolge, sichtbar je nach Stand
     var weedNodes = [];
     for (var wi = 0; wi < 40; wi++) {
-      var wx = 30 + rnd() * (W - 60), wy = groundY(wx) + 4;
+      // nicht in der Mitte (Spielanzeigen)
+      var wx = 30 + rnd() * (W - 600); if (wx > 700) wx += 540;
+      var wy = groundY(wx) + 4;
       var wOuter = el('g', { transform: 'translate(' + wx.toFixed(0) + ' ' + wy.toFixed(0) + ')' }, gWeeds);
       var wg = el('g', { 'class': 'tsp-weed' }, wOuter);
       var dd = '';
@@ -94,12 +98,12 @@
     function addFlower(name, animate) {
       var i = flNext % SLOTS.length, x = SLOTS[i], y = groundY(x) + 8;
       if (flowers[i]) gFlowers.removeChild(flowers[i].node);
-      var h = 45 + ((i * 37) % 55), type = i % 3, col = 'tsp-p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
+      var h = 34 + ((i * 37) % 40), type = i % 3, col = 'tsp-p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
       var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, outer);
       el('path', { 'class': 'tsp-stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
       el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
-      var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(0.8)' }, grow);
+      var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(0.68)' }, grow);
       var head = el('g', { 'class': 'tsp-head' + (i % 2 ? '' : ' tsp-head--l') }, hp);
       var bloom = el('g', { 'class': 'tsp-bloom' }, head);
       if (type === 0) {          // Margerite

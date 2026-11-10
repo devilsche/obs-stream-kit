@@ -37,14 +37,10 @@
     evening.className = 'tss-evening';
     B.root.insertBefore(evening, B.root.firstChild);
 
-    // Ebenen: Glühwürmchen (Basis), Sonnenbrille, Strand, Flimmern, Eis
+    // Ebenen: Glühwürmchen (Basis), Sonnen-Halo, Strand, Flimmern, Eis
     var skySvg = B.svg();
     var gSun = el('g', { 'class': 'tss-sun' }, skySvg);
     var halo = el('circle', { 'class': 'tss-halo', r: 1 }, gSun);
-    var gShades = el('g', { 'class': 'tss-shades' }, gSun);
-    el('path', { 'class': 'tss-shades-glass', d: 'M-62 -22 L-8 -22 Q-8 12 -34 12 Q-60 12 -62 -22 Z M8 -22 L62 -22 Q60 12 34 12 Q8 12 8 -22 Z M-8 -18 L8 -18 L8 -12 L-8 -12 Z' }, gShades);
-    el('path', { 'class': 'tss-shades-glint', d: 'M-52 -16 L-40 -16 L-50 2 Z M18 -16 L30 -16 L20 2 Z' }, gShades);
-    el('path', { 'class': 'tss-smile', d: 'M-30 26 Q0 50 30 26' }, gShades);
 
     var beachSvg = B.svg();
     var gBeach = el('g', { 'class': 'tss-beach tss-dim' }, beachSvg);
@@ -278,7 +274,6 @@
       gSun.setAttribute('transform', 'translate(' + f1(sx) + ' ' + f1(sy) + ')');
       halo.setAttribute('r', f1(110 + 150 * hk));
       B.vars({ '--tss-sun': vis, '--tss-halo': vis * hk });
-      gShades.setAttribute('transform', 'scale(' + (0.5 + 0.12 * hk).toFixed(3) + ')');
     }
 
     // ── Animationen zu den Befehlen ──

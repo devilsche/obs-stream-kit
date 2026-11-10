@@ -209,10 +209,6 @@
 
 /* Sonnenbrille auf der Sonne der Weather-Kit, Hof wächst mit der Hitze */
 .tss-halo { fill: url(#tss-haloG); opacity: var(--tss-halo); }
-.tss-shades { opacity: var(--tss-sun); }
-.tss-shades-glass { fill: #1d1d24; }
-.tss-shades-glint { fill: rgba(255, 255, 255, 0.35); }
-.tss-smile { fill: none; stroke: #c96a00; stroke-width: 5; stroke-linecap: round; }
 
 /* Strand: heißer Sand wird orange */
 .tss-sand { fill: url(#tss-sandG); }
