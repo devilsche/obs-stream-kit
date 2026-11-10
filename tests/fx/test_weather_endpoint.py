@@ -426,3 +426,21 @@ def test_season_commands_parse():
     for cmd in ("sweep", "cool", "seasonboard"):
         assert commands.parse("weather", {"cmd": cmd})["cmd"] == cmd
     assert commands.parse("weather", {"cmd": "clear", "kind": "castles"})["params"] == {"kind": "castles"}
+
+
+def test_manual_setup_in_november_switches_auto_theme_to_winter(conn, monkeypatch):
+    import datetime as _dt
+    nov15 = _dt.datetime(2026, 11, 15, 18, 0).timestamp()
+    monkeypatch.setattr(weather_state.time, "time", lambda: nov15)
+    import fx.endpoints as ep
+
+    class _D(_dt.date):
+        @classmethod
+        def today(cls):
+            return _dt.date(2026, 11, 15)
+    monkeypatch.setattr(ep.datetime, "date", _D)
+    c = _client(conn)
+    assert _state(c)["theme"] == "autumn"
+    c.get("/s/t/api/fx/weather?cmd=setup")
+    st = _state(c)
+    assert st["theme"] == "winter" and st["xmas"] == "on"

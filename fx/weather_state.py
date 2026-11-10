@@ -126,7 +126,9 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     today = datetime.date.fromtimestamp(now)
     try:
         start, end, _ = weather_theme.xmas_window(today, opts.get("xmasfrom"), opts.get("xmasto"))
-        theme = weather_theme.theme_for(today, opts.get("theme", "auto"), start <= today <= end)
+        # Xmas-Zeit: im Datumsfenster oder schon per Knopf aufgebaut (z. B. Mitte November)
+        xmas_active = start <= today <= end or weather_theme.is_set_up(conn, tenant_id, today, opts)
+        theme = weather_theme.theme_for(today, opts.get("theme", "auto"), xmas_active)
         xmas = weather_theme.status(conn, tenant_id, today, opts, theme) if theme == "winter" else "off"
         snow = weather_snow.advance(conn, tenant_id, now, state.get("snow", 0) if state.get("precip") != "rain" else 0,
                                     state.get("heat", 0) > 0.5, base.get("temp") if source == "api" else None,

@@ -103,6 +103,13 @@ def status(conn, tenant_id, today: date, opts: dict, theme: str = "winter") -> s
     return "off"
 
 
+def is_set_up(conn, tenant_id, today: date, opts: dict) -> bool:
+    """Steht der Baum gerade (Aufbau dieser Saison erledigt, Abschied noch nicht)?"""
+    _, _, season = xmas_window(today, opts.get("xmasfrom"), opts.get("xmasto"))
+    data = _load(conn, tenant_id)
+    return bool(data and data.get("season") == season and data.get("state") == "on")
+
+
 def mark(conn, tenant_id, today: date, opts: dict, step: str) -> None:
     """Aufbau (`setup`) bzw. Abschied (`farewell`) für die Saison erledigt."""
     _, _, season = xmas_window(today, opts.get("xmasfrom"), opts.get("xmasto"))
