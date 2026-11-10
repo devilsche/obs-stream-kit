@@ -154,7 +154,13 @@
 .tw-santa-red { fill: #c4302b; }
 .tw-santa-white { fill: #f7fbff; }
 
-/* ── Mini-Schneemänner ── */
+/* Zurücksetzen: kurz ausblenden */
+.tw-sm { transition: opacity 0.6s ease; }
+.tw-sm.is-clearing { opacity: 0; }
+
+/* ── Mini-Schneemänner: in der Xmas-Zeit (Baum steht) ausgeblendet ── */
+.tw-minis { opacity: 1; transition: opacity 1s ease; }
+.tw[data-hidemini="1"] .tw-minis { opacity: 0; visibility: hidden; transition: opacity 1s ease, visibility 0s linear 1s; }
 .tw-mini { transform-box: fill-box; transform-origin: 50% 100%; }
 .tw-mini--new { animation: twPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 .tw-mini__ball { fill: url(#tw-ballG); }
@@ -194,5 +200,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tw *, .tw *::before, .tw *::after { animation: none !important; }
-  .tw, .tw-x, .tw-sm-xmas, .tw-sm-tophat { transition-duration: 0.4s; }
+  .tw, .tw-x, .tw-sm-xmas, .tw-sm-tophat, .tw-sm, .tw-minis { transition-duration: 0.4s; }
 }

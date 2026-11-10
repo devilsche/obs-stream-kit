@@ -1,6 +1,7 @@
 /* Winter-Thema der Weather-Source: Schneedecke, Eiszapfen, Schneemann (Sub
- * baut), Mini-Schneemänner (Follow) – in der Xmas-Zeit zusätzlich
- * Lichterkette, Baum mit Follower-Kugeln, hängende Kugeln und Geschenke,
+ * baut, gemeinsames Sub-Projekt), Mini-Schneemänner (Follow) – in der
+ * Xmas-Zeit stattdessen Follower-Kugeln am Baum (Minis ausgeblendet), dazu
+ * Lichterkette, Baum, hängende Kugeln und Geschenke,
  * mit Aufbau- und Abschied-Animation. Optik aus effects/xmas.html und
  * effects/winter.html übernommen; Stände (Schneedecke, Xmas-Ablauf) rechnet
  * der Server, hier wird nur gezeigt. Braucht js/season-kit.js.
@@ -583,6 +584,7 @@
       var want = S.on && xmasWanted();
       if (want && !xmasShown() && !anim) resetAnimAttrs();
       rootEl.dataset.xmas = want ? '1' : '0';
+      syncMinis();
     }
 
     // ── Aufbau / Abschied ──
@@ -814,10 +816,15 @@
         if (k < 1) root.requestAnimationFrame(step); else hit();
       })();
     }
-    function build(name) {
+    // Bau-Schritt; unsichtbar nur Stand nachziehen (gemeinsames Sub-Projekt)
+    var smClearTimer = null;
+    function build(name, visible) {
+      clearTimeout(smClearTimer);
+      gSm.classList.remove('is-clearing');
       var done = S.sm < 8;
       S.sm = Math.min(8, S.sm + 1);
-      showSnowman(done ? S.sm : 0);
+      showSnowman(done && visible ? S.sm : 0);
+      if (!visible) return;
       var y = smTop() - 40;
       if (!done) { tag('Snowman is finished!', SM_X, y, true); return; }
       tag((name || 'Someone') + ' added ' + PART_NAMES[S.sm] + '!', SM_X, y, true);
@@ -825,6 +832,31 @@
         gSm.classList.remove('is-done'); void gSm.getBoundingClientRect(); gSm.classList.add('is-done');
         celebrate('');
       }
+    }
+
+    function resetSnowman(visible) {
+      clearTimeout(smClearTimer);
+      if (!visible || reduceMotion || !S.sm) { S.sm = 0; gSm.classList.remove('is-clearing'); showSnowman(0); return; }
+      gSm.classList.add('is-clearing');
+      smClearTimer = setTimeout(function () { S.sm = 0; showSnowman(0); gSm.classList.remove('is-clearing'); }, 700);
+    }
+    // Follow: in der Xmas-Zeit Kugel am Baum, sonst Mini-Schneemann; die
+    // jeweils andere Form still mitführen, damit beide Listen stimmen
+    function follow(name) {
+      var xm = xmasWanted() && !(anim && anim.type === 'farewell');
+      addOrnament(name, xm && S.on);
+      addMini(name, !xm && S.on);
+      ornTotal++; miniTotal++;
+      updateCounter();
+    }
+    // Minis verschwinden, sobald der Baum steht, und kommen nach dem Abschied wieder
+    function minisHidden() {
+      if (anim) return anim.type === 'setup' ? anim.t >= 2.5 : anim.t < 7.6;
+      return xmasShown();
+    }
+    function syncMinis() {
+      var v = minisHidden() ? '1' : '0';
+      if (rootEl.dataset.hidemini !== v) rootEl.dataset.hidemini = v;
     }
 
     // ── Hauptschleife ──
@@ -837,6 +869,7 @@
         (anim.type === 'setup' ? renderSetup : renderFarewell)(Math.min(anim.t, anim.dur));
         if (anim.t >= anim.dur) finishAnim();
       }
+      syncMinis();
       // Schneedecke folgt dem Server-Stand weich
       var prev = S.shown;
       if (reduceMotion) S.shown = S.target;
@@ -889,7 +922,7 @@
         if (partOn('tree')) orns.forEach(function (o) { if (o && o.label) pool.push({ node: o.inner, label: o.label, p: treeToScreen(o.x, o.y - 16) }); });
         if (partOn('gifts')) gifts.forEach(function (g) { if (g && g.label) pool.push({ node: g.inner, label: g.label, p: treeToScreen(g.x, g.y) }); });
       }
-      if (partOn('minis')) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, surface(m.x) - 110 * m.k] }); });
+      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, surface(m.x) - 110 * m.k] }); });
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
       if (lastSpot && pick.label === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
@@ -915,7 +948,10 @@
         ornTotal = deco.ornament_total || orns.filter(Boolean).length;
         giftTotal = deco.gift_total || gifts.filter(Boolean).length;
         miniTotal = deco.mini_total || 0;
-        S.sm = Math.max(0, Math.min(8, parseInt(deco.snowman, 10) || 0));
+        var proj = deco.project != null ? deco.project : deco.snowman;
+        clearTimeout(smClearTimer);
+        gSm.classList.remove('is-clearing');
+        S.sm = Math.max(0, Math.min(8, parseInt(proj, 10) || 0));
         showSnowman(0);
         updateCounter();
       },
@@ -953,10 +989,12 @@
             addGift({ name: p.name || '', type: p.type, amount: parseInt(p.amount, 10) || 1 }, true); giftTotal++; updateCounter(); break;
           case 'mini':
             addMini(p.name || '', true); miniTotal++; break;
+          case 'follow':
+            follow(p.name || ''); break;
           case 'build':
-            build(p.name || ''); break;
+            build(p.name || '', S.on); break;
           case 'snowmanreset':
-            S.sm = 0; showSnowman(0); break;
+            resetSnowman(S.on); break;
           case 'shovel':
             shovel(p); break;
           case 'shake':

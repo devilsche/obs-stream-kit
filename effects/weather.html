@@ -246,12 +246,19 @@
         ss.parts = parts;
         Object.keys(seasons).forEach(function (n) { seasons[n].update(ss); });
         lastTheme = state.theme || 'none';
+        // Aufbau aus einem anderen Thema: erst spielen, wenn Winter sichtbar ist
+        if (deferredStep && lastTheme === 'winter') {
+          var ds = deferredStep;
+          deferredStep = null;
+          playStep(ds, false);
+        }
         wantStep(lastTheme === 'winter' ? state.xmas : null);
       }
 
       // Fälliger Aufbau/Abschied: in OBS erst, wenn die Source 2 min live im
       // Programm ist, im Browser-Tab sofort; danach meldet xmasdone den Schritt
       var lastTheme = 'none';
+      var deferredStep = null;   // setup, bis der Server auf Winter umgestellt hat
       var played = {}, pending = null, readySince = null;
       var obsActive = true;   // ohne Auskunft von OBS: als live annehmen
       window.addEventListener('obsSourceActiveChanged', function (e) {
@@ -354,9 +361,13 @@
       var SEASON_OF = { pumpkins: 'autumn', leaves: 'autumn', flowers: 'spring', garden: 'spring',
                         castles: 'summer', heat: 'summer' };
       var LEVEL_KINDS = { leaves: 1, garden: 1, heat: 1 };
-      var SEASON_OF_CMD = { pumpkin: 'autumn', rake: 'autumn', jump: 'autumn', sweep: 'autumn',
-                            flower: 'spring', water: 'spring', weed: 'spring', bee: 'spring',
-                            castle: 'summer', splash: 'summer', ice: 'summer', cool: 'summer' };
+      var SEASON_OF_CMD = { rake: 'autumn', jump: 'autumn', sweep: 'autumn',
+                            water: 'spring', weed: 'spring', bee: 'spring',
+                            splash: 'summer', ice: 'summer', cool: 'summer' };
+      function allThemes(fn) {
+        fn(theme);
+        Object.keys(seasons).forEach(function (n) { fn(seasons[n]); });
+      }
       function applyCommand(c) {
         var p = c.params || {};
         switch (c.cmd) {
@@ -390,12 +401,23 @@
           case 'spectacle':
             kit.spectacle(p.type || randomShow());
             break;
-          // Winter-Thema
+          // Follower: an alle Themen, jedes legt ihn in seiner Form an
+          // (animiert nur das sichtbare); alte Einzelbefehle wirken gleich
+          case 'follow':
           case 'ornament':
-          case 'gift':
           case 'mini':
+          case 'pumpkin':
+          case 'flower':
+          case 'castle':
+            allThemes(function (t) { t.command('follow', p); });
+            break;
+          // Sub-Projekt: Stand gilt für alle Jahreszeiten
           case 'build':
           case 'snowmanreset':
+            allThemes(function (t) { t.command(c.cmd, p); });
+            break;
+          // Winter-Thema
+          case 'gift':
           case 'shovel':
           case 'icicle':
           case 'snowball':
@@ -417,13 +439,7 @@
               if (LEVEL_KINDS[p.kind]) fetchState();
             } else theme.command('clear', p);
             break;
-          // Herbst, Frühling, Sommer: Follower-Items immer (Stand bleibt
-          // aktuell), Aktionen nur im aktiven Thema
-          case 'pumpkin':
-          case 'flower':
-          case 'castle':
-            seasons[SEASON_OF_CMD[c.cmd]].command(c.cmd, p);
-            break;
+          // Herbst, Frühling, Sommer: Aktionen nur im aktiven Thema
           case 'rake':
           case 'jump':
           case 'sweep':
@@ -438,9 +454,15 @@
           case 'shake':
             theme.command('shake', Object.assign({ win: settings.shakewin }, p));
             break;
+          // Aufbau: ist ein anderes Thema sichtbar, schaltet der Server auf
+          // Winter; abspielen erst, wenn der neue Stand angekommen ist.
+          // Abschied nur, wenn Winter sichtbar ist.
           case 'setup':
+            if (lastTheme === 'winter') playStep('setup', false);
+            else { deferredStep = 'setup'; fetchState(); }
+            break;
           case 'farewell':
-            playStep(c.cmd, false);
+            if (lastTheme === 'winter') playStep('farewell', false);
             break;
           case 'set':
             Object.keys(p).forEach(function (k) { settings[k] = String(p[k]); });

@@ -1,5 +1,6 @@
 /* Sommer-Thema der Weather-Source: Strand unten mit Follower-Sandburgen
- * (Fahne mit Namen), Sonnenschirm, Muscheln, Hitzeflimmern über dem Sand,
+ * (Fahne mit Namen), Sandpalast als gemeinsames Sub-Projekt (8 Teile),
+ * Sonnenschirm, Muscheln, Hitzeflimmern über dem Sand,
  * Eis, das mit der Hitze schmilzt, abends dunklerer Rand und Glühwürmchen.
  * Eine eigene Sonne gibt es nicht: die Sonnenbrille sitzt auf der Sonne der
  * Weather-Kit (opts.sky liefert deren Stand), ihr Hof wächst mit der Hitze.
@@ -51,6 +52,8 @@
     var sand = el('path', { 'class': 'tss-sand' }, gBeach);
     var sandHot = el('path', { 'class': 'tss-sand tss-sand--hot' }, gBeach);
     var gDeco = el('g', {}, gBeach);
+    // Sandpalast hinter der Burgenreihe
+    var gPalace = el('g', { 'class': 'tss-palace' }, gBeach);
     var gCastles = el('g', {}, gBeach);
     var gIces = el('g', {}, gBeach);
     var shimmerCanvas = B.canvas();
@@ -99,6 +102,70 @@
       if (animate && B.on && B.partOn('beach')) B.tag(name, x, y - 160 * k, false);
     }
     function clearCastles() { B.clear(gCastles); castles = []; cNext = 0; cTotal = 0; }
+
+    // ── Sandpalast: gemeinsames Sub-Projekt, wächst Turm um Turm ──
+    function merlons(x0, x1, y, w) {
+      var d = '', n = Math.max(2, Math.round((x1 - x0) / (w * 2)));
+      var step = (x1 - x0 - w) / (n - 1);
+      for (var i = 0; i < n; i++) { var x = x0 + i * step; d += 'M' + f1(x) + ' ' + y + ' h' + w + ' v-' + w + ' h-' + w + ' Z '; }
+      return d;
+    }
+    var palace = B.project(gPalace, {
+      x: 270, k: 0.85,
+      y: function () { return sandY(270) + 14; },
+      top: function (n) { return [0, 40, 150, 150, 230, 310, 326, 326, 420][n]; },
+      done: 'The sand palace is complete!',
+      names: ['the foundation', 'the walls', 'the gate', 'two towers', 'the keep', 'battlements', 'little flags', 'the royal flag'],
+      parts: [
+        function (g) {
+          el('path', { 'class': 'tss-castle', d: 'M-200 0 Q-206 -30 -178 -40 L178 -40 Q206 -30 200 0 Z' }, g);
+          el('path', { 'class': 'tss-pal-line', d: 'M-170 -20 L170 -20' }, g);
+        },
+        function (g) {
+          el('rect', { 'class': 'tss-castle', x: -140, y: -150, width: 280, height: 112 }, g);
+          el('path', { 'class': 'tss-pal-line', d: 'M-140 -112 L140 -112 M-140 -76 L140 -76 M-90 -150 L-90 -112 M60 -112 L60 -76 M-40 -76 L-40 -40 M100 -150 L100 -112' }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'tss-door', d: 'M-32 -38 L-32 -98 Q0 -132 32 -98 L32 -38 Z' }, g);
+          el('path', { 'class': 'tss-pal-grid', d: 'M-16 -40 L-16 -114 M0 -40 L0 -120 M16 -40 L16 -114 M-32 -80 L32 -80 M-32 -60 L32 -60' }, g);
+          el('path', { 'class': 'tss-castle', d: 'M-46 -38 L46 -38 L54 -24 L-54 -24 Z M-54 -24 L54 -24 L60 -10 L-60 -10 Z' }, g);
+        },
+        function (g) {
+          [-160, 160].forEach(function (cx) {
+            el('rect', { 'class': 'tss-castle', x: cx - 32, y: -230, width: 64, height: 192 }, g);
+            el('path', { 'class': 'tss-door', d: 'M' + (cx - 9) + ' -170 L' + (cx - 9) + ' -190 Q' + cx + ' -202 ' + (cx + 9) + ' -190 L' + (cx + 9) + ' -170 Z' }, g);
+            el('path', { 'class': 'tss-pal-line', d: 'M' + (cx - 32) + ' -130 L' + (cx + 32) + ' -130 M' + (cx - 32) + ' -90 L' + (cx + 32) + ' -90' }, g);
+          });
+        },
+        function (g) {
+          el('rect', { 'class': 'tss-castle', x: -56, y: -310, width: 112, height: 162 }, g);
+          el('path', { 'class': 'tss-door', d: 'M-12 -238 L-12 -266 Q0 -282 12 -266 L12 -238 Z' }, g);
+          el('circle', { 'class': 'tss-shell-dot', cx: -30, cy: -200, r: 6 }, g);
+          el('circle', { 'class': 'tss-shell-dot', cx: 30, cy: -200, r: 6 }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'tss-castle', d: merlons(-140, 140, -150, 16) + merlons(-192, -128, -230, 14) + merlons(128, 192, -230, 14) + merlons(-56, 56, -310, 16) }, g);
+        },
+        function (g) {
+          [-160, 160].forEach(function (cx, i) {
+            el('line', { 'class': 'tss-flagpole', x1: cx, y1: -244, x2: cx, y2: -296 }, g);
+            el('path', { 'class': 'tss-flag tss-f' + (i ? 5 : 2), d: 'M' + (cx + 1) + ' -296 L' + (cx + 34) + ' -288 L' + (cx + 1) + ' -279 Z' }, g);
+          });
+        },
+        function (g) {
+          el('line', { 'class': 'tss-flagpole tss-flagpole--big', x1: 0, y1: -326, x2: 0, y2: -420 }, g);
+          el('path', { 'class': 'tss-flag tss-f1', d: 'M2 -420 L76 -403 L2 -384 Z' }, g);
+          el('circle', { 'class': 'tss-pal-knob', cx: 0, cy: -424, r: 5 }, g);
+        }
+      ],
+      burst: function (x, y) {
+        if (!B.front) return;
+        for (var i = 0; i < 26; i++) {
+          B.front.add({ x: x + rand(-60, 60), y: y + rand(-20, 20), vx: rand(-300, 300), vy: rand(-650, -250), g: 1400, term: 900,
+                        sway: 0, vr: 0, wf: 0, r: rand(2, 5), c: i % 4 ? '#e2c27f' : '#ffffff', life: 1.4, floor: sandY, draw: droplet });
+        }
+      }
+    });
 
     // ── Hitze ──
     var S = { heat: 0, heatT: 0, first: true, top: [] };
@@ -292,6 +359,7 @@
         clearCastles();
         (deco.castles || []).forEach(function (c) { addCastle(c.name || '', false); });
         cTotal = deco.castle_total || castles.filter(Boolean).length;
+        palace.set(deco.project != null ? deco.project : deco.snowman);
       },
       update: function (s) {
         s = s || {};
@@ -307,7 +375,11 @@
       command: function (cmd, p) {
         p = p || {};
         switch (cmd) {
-          case 'castle': addCastle(p.name || '', true); cTotal++; break;
+          // Follow: Sandburg immer anlegen, sichtbar nur im aktiven Thema
+          case 'follow':
+          case 'castle': addCastle(p.name || '', B.on); cTotal++; break;
+          case 'build': palace.build(p.name || '', B.on); break;
+          case 'snowmanreset': palace.reset(B.on); break;
           case 'splash': splash(p); break;
           case 'ice': addIce(p.name || ''); break;
           case 'cool': cool(p); break;
@@ -321,7 +393,7 @@
         }
       },
       busy: function () { return null; },
-      status: function () { return { on: B.on, heat: Math.round(S.heat), castles: cTotal }; }
+      status: function () { return { on: B.on, heat: Math.round(S.heat), castles: cTotal, project: palace.n() }; }
     };
   }
 

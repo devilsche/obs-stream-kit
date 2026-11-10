@@ -186,6 +186,73 @@
       },
       windPx: function () { return B.windBase * 320 + B.gustPx; }
     };
+
+    // ── Gemeinsames Sub-Projekt (8 Teile, Stand gilt für alle Jahreszeiten) ──
+    // cfg: parts[8] = function (g) zeichnet Teil i (Fuß bei 0/0), names[8],
+    //      x, y() = Fuß auf dem Bildschirm, k = Maßstab, top(n) = Schild-Höhe
+    //      über dem Fuß bei Stand n (lokal), done = Text wenn fertig,
+    //      burst(x, y) = kleine Partikel beim Bauen (optional)
+    B.project = function (parent, cfg) {
+      var pos = el('g', { 'class': 'ts-proj' }, parent);
+      var body = el('g', { 'class': 'ts-proj-body' }, pos);
+      var parts = cfg.parts.map(function (fn, i) {
+        var g = el('g', { 'class': 'ts-proj-part', 'data-step': i + 1 }, body);
+        fn(g);
+        return g;
+      });
+      var n = 0, clearTimer = null;
+      function place() {
+        pos.setAttribute('transform', 'translate(' + f1(cfg.x) + ' ' + f1(cfg.y()) + ') scale(' + cfg.k + ')');
+      }
+      function show(animStep) {
+        parts.forEach(function (g, i) {
+          g.classList.toggle('is-on', i + 1 <= n);
+          g.classList.toggle('is-new', i + 1 === animStep);
+        });
+        pos.setAttribute('data-n', String(n));
+      }
+      function tagY() { return cfg.y() - cfg.top(n) * cfg.k - 30; }
+      place();
+      show(0);
+      return {
+        place: place,
+        n: function () { return n; },
+        set: function (v) {
+          clearTimeout(clearTimer);
+          pos.classList.remove('is-clearing');
+          n = Math.max(0, Math.min(8, parseInt(v, 10) || 0));
+          show(0);
+        },
+        // Teil dazu; animiert nur, wenn das Thema sichtbar ist
+        build: function (name, visible) {
+          clearTimeout(clearTimer);
+          pos.classList.remove('is-clearing');
+          if (n >= 8) {
+            if (visible) tag(cfg.done, cfg.x, tagY(), true);
+            return;
+          }
+          n++;
+          show(visible ? n : 0);
+          if (!visible) return;
+          tag((name || 'Someone') + ' added ' + cfg.names[n - 1] + '!', cfg.x, tagY(), true);
+          if (cfg.burst) cfg.burst(cfg.x, cfg.y() - cfg.top(n) * cfg.k * 0.6);
+          if (n === 8) {
+            pos.classList.remove('is-done'); void pos.getBoundingClientRect(); pos.classList.add('is-done');
+          }
+        },
+        // Zurücksetzen: sichtbar kurz ausblenden, sonst sofort
+        reset: function (visible) {
+          clearTimeout(clearTimer);
+          if (!visible || reduceMotion || !n) { n = 0; show(0); return; }
+          pos.classList.add('is-clearing');
+          clearTimer = setTimeout(function () {
+            n = 0; show(0);
+            pos.classList.remove('is-clearing');
+          }, 700);
+        },
+        node: pos
+      };
+    };
     return B;
   }
 

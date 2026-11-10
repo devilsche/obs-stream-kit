@@ -583,7 +583,7 @@ EFFECT_META = {
          "tooltip": "End of the Christmas period. The farewell animation plays at the first stream after this date."},
         {"key": "snowrate", "label": "Snow cover speed", "type": "select", "default": "1",
          "options": [["0.5", "Slow"], ["1", "Normal"], ["2", "Fast"]],
-         "tooltip": "How fast the snow cover grows while it snows (normal: up to 6 % per minute)."},
+         "tooltip": "How fast the snow cover grows while it snows (normal: blizzard 25 %, snow 10 %, sleet 6 % per minute; an avalanche leaves 20 %)."},
         {"key": "lights", "label": "Light string", "type": "select", "default": "1",
          "options": [["1", "On"], ["0", "Off"]], "tooltip": "Light string at the top (Christmas period)"},
         {"key": "tree", "label": "Christmas tree", "type": "select", "default": "1",

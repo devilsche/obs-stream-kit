@@ -1,6 +1,7 @@
 /* Herbst-Thema der Weather-Source: Blätterranke mit Lichtern oben, Ast in
  * der Ecke, fallendes Laub (Wind treibt es zur Seite), Laubhaufen in den
- * Ecken, Follower-Kürbisse mit Namen (nachts leuchten die Gesichter).
+ * Ecken, Follower-Kürbisse mit Namen (nachts leuchten die Gesichter),
+ * Vogelscheuche als gemeinsames Sub-Projekt (8 Teile).
  * Optik aus effects/autumn.html; die Laubhöhe rechnet der Server
  * (seasonLevels.leaves), hier wird nur gezeigt. Braucht js/season-kit.js
  * und js/theme-seasons.js.
@@ -77,6 +78,8 @@
     var branchSvg = B.svg('ta-branch-l');
     var gBranch = el('g', { 'class': 'ta-branch ta-dim' }, branchSvg);
     var gSway = el('g', { 'class': 'ta-sway' }, gBranch);
+    // Vogelscheuche hinter dem Laubhaufen (der Pfahl steckt im Laub)
+    var gScare = el('g', { 'class': 'ta-scare ta-dim' }, B.svg());
     var pileCanvas = B.canvas();
     pileCanvas.classList.add('ta-pile', 'ta-dim');
     var pctx = pileCanvas.getContext('2d');
@@ -208,6 +211,62 @@
       if (animate && B.on && B.partOn('pumpkins')) B.tag(name, pkNodes[i].x, pkNodes[i].y - pkNodes[i].h - 12, false);
     }
     function clearPumpkins() { B.clear(gPumpkins); pkNodes = []; pkNext = 0; pkTotal = 0; }
+
+    // ── Vogelscheuche: gemeinsames Sub-Projekt, 8 Teile ──
+    var scare = B.project(gScare, {
+      x: 250, k: 0.85,
+      y: function () { return H + 4; },
+      top: function (n) { return n >= 5 ? 450 : 420; },
+      done: 'The scarecrow is finished!',
+      names: ['the post', 'a straw body', 'a shirt', 'the head', 'a hat', 'a face', 'patches and straw', 'a crow'],
+      parts: [
+        function (g) {
+          el('rect', { 'class': 'ta-sc-wood', x: -7, y: -420, width: 14, height: 424, rx: 3 }, g);
+          el('rect', { 'class': 'ta-sc-wood', x: -142, y: -306, width: 284, height: 12, rx: 3 }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'ta-sc-straw', d: 'M-44 -300 L44 -300 L58 -170 L30 -150 L0 -164 L-30 -150 L-58 -170 Z' }, g);
+          el('path', { 'class': 'ta-sc-strand', d: 'M-50 -175 L-62 -128 M-30 -160 L-36 -116 M-8 -164 L-6 -118 M16 -160 L22 -120 M40 -168 L54 -126' }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'ta-sc-shirt', d: 'M-52 -306 L-140 -310 L-140 -282 L-56 -268 L-60 -198 L60 -198 L56 -268 L140 -282 L140 -310 L52 -306 Z' }, g);
+          el('path', { 'class': 'ta-sc-plaid', d: 'M-30 -304 L-34 -198 M0 -304 L0 -198 M30 -304 L34 -198 M-57 -260 L57 -260 M-59 -226 L59 -226 M-110 -308 L-110 -286 M-80 -307 L-80 -280 M110 -308 L110 -286 M80 -307 L80 -280' }, g);
+          el('path', { 'class': 'ta-sc-strand', d: 'M-140 -306 L-162 -318 M-140 -296 L-166 -296 M-140 -287 L-160 -274 M140 -306 L162 -318 M140 -296 L166 -296 M140 -287 L160 -274' }, g);
+        },
+        function (g) {
+          el('circle', { 'class': 'ta-sc-sack', cx: 0, cy: -352, r: 46 }, g);
+          el('path', { 'class': 'ta-sc-sack', d: 'M-24 -310 L-32 -296 L-16 -300 L-10 -290 L0 -299 L10 -290 L16 -300 L32 -296 L24 -310 Z' }, g);
+          el('path', { 'class': 'ta-sc-twine', d: 'M-24 -310 Q0 -302 24 -310' }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'ta-sc-hat', d: 'M-38 -390 Q-36 -440 -8 -447 Q18 -451 34 -438 Q40 -420 38 -390 Z' }, g);
+          el('ellipse', { 'class': 'ta-sc-hat', cx: 0, cy: -388, rx: 72, ry: 12 }, g);
+          el('rect', { 'class': 'ta-sc-band', x: -38, y: -406, width: 76, height: 11 }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'ta-sc-stitch', d: 'M-26 -370 L-12 -356 M-12 -370 L-26 -356 M12 -370 L26 -356 M26 -370 L12 -356' }, g);
+          el('path', { 'class': 'ta-sc-nose', d: 'M-6 -348 L6 -348 L0 -337 Z' }, g);
+          el('path', { 'class': 'ta-sc-stitch', d: 'M-24 -328 Q0 -314 24 -328 M-16 -330 L-14 -318 M-5 -326 L-4 -314 M5 -326 L4 -314 M16 -330 L14 -318' }, g);
+        },
+        function (g) {
+          el('rect', { 'class': 'ta-sc-patch', x: -44, y: -258, width: 24, height: 22 }, g);
+          el('rect', { 'class': 'ta-sc-patch ta-sc-patch--b', x: 92, y: -306, width: 22, height: 18 }, g);
+          el('rect', { 'class': 'ta-sc-patch ta-sc-patch--b', x: 18, y: -384, width: 16, height: 13 }, g);
+          el('path', { 'class': 'ta-sc-strand', d: 'M-60 -386 L-78 -370 M-50 -384 L-60 -362 M52 -384 L68 -366 M60 -386 L80 -374 M-20 -298 L-26 -282 M20 -298 L28 -284' }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'ta-sc-crow', d: 'M76 -334 L50 -344 L56 -328 Z' }, g);
+          el('ellipse', { 'class': 'ta-sc-crow', cx: 96, cy: -332, rx: 24, ry: 14 }, g);
+          el('circle', { 'class': 'ta-sc-crow', cx: 116, cy: -348, r: 11 }, g);
+          el('path', { 'class': 'ta-sc-beak', d: 'M124 -351 L140 -347 L124 -342 Z' }, g);
+          el('circle', { 'class': 'ta-sc-eye', cx: 119, cy: -351, r: 2.4 }, g);
+          el('path', { 'class': 'ta-sc-legs', d: 'M92 -320 L92 -311 M102 -320 L102 -311' }, g);
+        }
+      ],
+      burst: function (x, y) {
+        for (var i = 0; i < 26; i++) spawn({ x: x + rand(-50, 50), y: y + rand(-30, 30), vx: rand(-300, 300), vy: rand(-650, -250), front: true, s: rand(0.6, 1), life: 1.6 });
+      }
+    });
 
     // ── Partikel ──
     function spawn(o) {
@@ -357,6 +416,7 @@
         clearPumpkins();
         (deco.pumpkins || []).forEach(function (p) { addPumpkin(p.name || '', false); });
         pkTotal = deco.pumpkin_total || pkNodes.filter(Boolean).length;
+        scare.set(deco.project != null ? deco.project : deco.snowman);
       },
       update: function (s) {
         s = s || {};
@@ -374,7 +434,11 @@
       command: function (cmd, p) {
         p = p || {};
         switch (cmd) {
-          case 'pumpkin': addPumpkin(p.name || '', true); pkTotal++; break;
+          // Follow: Kürbis immer anlegen, sichtbar nur im aktiven Thema
+          case 'follow':
+          case 'pumpkin': addPumpkin(p.name || '', B.on); pkTotal++; break;
+          case 'build': scare.build(p.name || '', B.on); break;
+          case 'snowmanreset': scare.reset(B.on); break;
           case 'rake': rake(p); break;
           case 'jump': jump(p.name || ''); break;
           case 'sweep': sweep(p); break;
@@ -388,7 +452,7 @@
         }
       },
       busy: function () { return null; },
-      status: function () { return { on: B.on, leaves: Math.round(S.shown), pumpkins: pkTotal }; }
+      status: function () { return { on: B.on, leaves: Math.round(S.shown), pumpkins: pkTotal, project: scare.n() }; }
     };
   }
 

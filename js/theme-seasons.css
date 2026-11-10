@@ -16,6 +16,17 @@
 /* Nacht: Deko dunkler, Lichter bleiben hell */
 .ta-dim, .tsp-dim, .tss-dim { filter: brightness(calc(1 - 0.4 * var(--ts-night))); }
 
+/* Gemeinsames Sub-Projekt: Teile erscheinen einzeln mit Pop, Reset blendet aus */
+.ts-proj { opacity: 1; transition: opacity 0.6s ease; }
+.ts-proj.is-clearing { opacity: 0; }
+.ts-proj-part { display: none; transform-box: fill-box; transform-origin: 50% 100%; }
+.ts-proj-part.is-on { display: inline; }
+.ts-proj-part.is-new { animation: tsPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes tsPop { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
+.ts-proj-body { transform-box: fill-box; transform-origin: 50% 100%; }
+.ts-proj.is-done .ts-proj-body { animation: tsDone 0.9s ease-in-out; }
+@keyframes tsDone { 0%, 100% { transform: none; } 30% { transform: scale(1.06, 0.95); } 60% { transform: scale(0.97, 1.04); } }
+
 /* ═════ Herbst ═════ */
 .ts[data-garland="0"] .ta-garland,
 .ts[data-branch="0"] .ta-branch,
@@ -65,6 +76,27 @@
 @keyframes taDrop { from { transform: translateY(-260px); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
 .ts[data-celebrate="1"] .ta-pk-inner { animation: tsHop 0.35s ease-in-out 4; }
 @keyframes tsHop { 0%, 100% { transform: none; } 50% { transform: translateY(-14px); } }
+
+/* Vogelscheuche (Sub-Projekt) */
+.ta-sc-wood { fill: #6b4423; stroke: #3e2512; stroke-width: 2; }
+.ta-sc-straw { fill: #e3b844; stroke: #a87a1c; stroke-width: 2; }
+.ta-sc-strand, .ta-sc-legs { fill: none; stroke: #d9a92e; stroke-width: 4; stroke-linecap: round; }
+.ta-sc-legs { stroke: #3a2a10; stroke-width: 3; }
+.ta-sc-shirt { fill: #b5442a; stroke: #6e2414; stroke-width: 2.5; stroke-linejoin: round; }
+.ta-sc-plaid { fill: none; stroke: rgba(40, 20, 10, 0.4); stroke-width: 4; }
+.ta-sc-sack { fill: #cfa970; stroke: #8a6a3a; stroke-width: 2.5; }
+.ta-sc-twine { fill: none; stroke: #6b4423; stroke-width: 5; stroke-linecap: round; }
+.ta-sc-hat { fill: #4e3a26; stroke: #2e2015; stroke-width: 2; }
+.ta-sc-band { fill: #d9480f; }
+.ta-sc-stitch { fill: none; stroke: #2a1a0c; stroke-width: 4; stroke-linecap: round; }
+.ta-sc-nose { fill: #e8740c; }
+.ta-sc-patch { fill: #4f7a3a; stroke: #f2e2b0; stroke-width: 2; stroke-dasharray: 4 3; }
+.ta-sc-patch--b { fill: #3b5f8a; }
+.ta-sc-crow { fill: #1b1b22; }
+.ta-sc-beak { fill: #e3a72f; }
+.ta-sc-eye { fill: #f6f2e0; }
+.ts-proj-part.is-on .ta-sc-beak { animation: taCaw 6s ease-in-out infinite; transform-box: fill-box; transform-origin: 0% 50%; }
+@keyframes taCaw { 0%, 90%, 100% { transform: none; } 94% { transform: rotate(-14deg); } }
 
 /* Rechen */
 .ta-rake { display: none; }
@@ -130,6 +162,22 @@
 .tsp-bfly-b { fill: #6fb7ff; stroke: #1a2f50; stroke-width: 2; }
 .tsp-bfly-body { fill: #2a1b12; }
 
+/* Sonnenblume (Sub-Projekt) */
+.tsp-sf-stem { fill: none; stroke: #3d8a2e; stroke-width: 10; stroke-linecap: round; }
+.tsp-sf-leaf { fill: #4fa23c; stroke: #2f6e24; stroke-width: 2; }
+.tsp-sf-sepal { fill: #3d8a2e; }
+.tsp-sf-bud { fill: #5fae45; stroke: #2f6e24; stroke-width: 2; }
+.tsp-sf-petal { fill: #ffd23f; stroke: #d9a20a; stroke-width: 1.5; }
+.tsp-sf-petal2 { fill: #f5a90a; stroke: #c4820a; stroke-width: 1.5; }
+.tsp-sf-disk { fill: #6b3e14; stroke: #3e2008; stroke-width: 3; }
+.tsp-sf-seed { fill: #3e2008; }
+.tsp-sf-eye { fill: #1d1208; }
+.tsp-sf-smile { fill: none; stroke: #1d1208; stroke-width: 3.5; stroke-linecap: round; }
+.tsp-sf-cheek { fill: #ff8a6a; opacity: 0.6; }
+.tsp-sf-bee { animation: tspBob 2.4s ease-in-out infinite; }
+.tsp-sf-bee .tsp-wing { animation-duration: 0.3s; }
+@keyframes tspBob { 0%, 100% { transform: none; } 50% { transform: translateY(-5px); } }
+
 /* Gießkanne */
 .tsp-can { display: none; }
 .tsp-can.is-on { display: inline; }
@@ -178,6 +226,13 @@
 .tss-ustripe { fill: #ffffff; }
 .tss-pole { stroke: #e8e2d0; stroke-width: 5; }
 
+/* Sandpalast (Sub-Projekt) */
+.tss-pal-line { fill: none; stroke: #c9a865; stroke-width: 2; opacity: 0.7; }
+.tss-pal-grid { fill: none; stroke: #6b4a2b; stroke-width: 3; }
+.tss-shell-dot { fill: #ffe0d0; stroke: #d9a08a; stroke-width: 1.5; }
+.tss-pal-knob { fill: #f2b705; }
+.tss-flagpole--big { stroke-width: 4; }
+
 /* Eis */
 .tss-cone { fill: #d9a35a; stroke: #a8742e; stroke-width: 2; }
 .tss-cone-grid { fill: none; stroke: #a8742e; stroke-width: 1.2; }
@@ -189,5 +244,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ts *, .ts *::before, .ts *::after { animation: none !important; }
-  .ts, .ta-pk-face, .ta-pk-light, .tsp-weed { transition-duration: 0.4s; }
+  .ts, .ta-pk-face, .ta-pk-light, .tsp-weed, .ts-proj { transition-duration: 0.4s; }
 }

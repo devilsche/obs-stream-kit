@@ -1,6 +1,7 @@
 /* Frühlings-Thema der Weather-Source: Blumenwiese unten (Follower-Blumen
  * mit Namen), Kirschblütenzweig in der Ecke, Blütenblätter treiben mit dem
- * Wind, Schmetterlinge, Bienen auf Befehl. Garten nach dem Server-Stand
+ * Wind, Schmetterlinge, Bienen auf Befehl, Sonnenblume als gemeinsames
+ * Sub-Projekt (8 Teile). Garten nach dem Server-Stand
  * (seasonLevels.water/weeds): trockene Erde und hängende Köpfe unter 30 %
  * Wasser, Unkraut wächst; Regen gießt sichtbar (Köpfe richten sich auf).
  * Optik aus effects/spring.html. Braucht js/season-kit.js und
@@ -31,6 +32,8 @@
     // Ebenen: Blütenblätter (Basis), Zweig, Wiese, Insekten
     var gBranch = el('g', { 'class': 'tsp-branch tsp-dim' }, B.svg());
     var gSway = el('g', { 'class': 'tsp-sway' }, gBranch);
+    // Sonnenblume hinter der Wiese (Halme verdecken den Fuß)
+    var gSun = el('g', { 'class': 'tsp-sunflower tsp-dim' }, B.svg());
     var meadowSvg = B.svg();
     var gMeadow = el('g', { 'class': 'tsp-meadow tsp-dim' }, meadowSvg);
     var gWeeds = el('g', {}, gMeadow);
@@ -109,6 +112,72 @@
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 40, false); }, 1300);
     }
     function clearFlowers() { B.clear(gFlowers); flowers = []; flNext = 0; flTotal = 0; }
+
+    // ── Sonnenblume: gemeinsames Sub-Projekt, wächst mit jedem Teil ──
+    var SF_Y = -385;     // Mitte des Blütenkopfs
+    function ring(g, n, r, rx, ry, off, cls) {
+      for (var i = 0; i < n; i++) {
+        el('ellipse', { 'class': cls, cx: 0, cy: f1(SF_Y - r), rx: rx, ry: ry,
+                        transform: 'rotate(' + f1(off + i * 360 / n) + ' 0 ' + SF_Y + ')' }, g);
+      }
+    }
+    var sunflower = B.project(gSun, {
+      x: 230, k: 0.9,
+      y: function () { return groundY(230) + 12; },
+      top: function (n) { return [0, 130, 250, 360, 418, 470, 470, 470, 500][n]; },
+      done: 'The sunflower is in full bloom!',
+      names: ['a sprout', 'more stem', 'the tall stem', 'a bud', 'the first petals', 'a full bloom', 'a happy face', 'a bee'],
+      parts: [
+        function (g) {
+          el('path', { 'class': 'tsp-sf-stem', d: 'M0 4 Q-6 -60 0 -132' }, g);
+          el('path', { 'class': 'tsp-sf-leaf', d: 'M-2 -50 Q-40 -76 -58 -58 Q-34 -40 -2 -50 Z M2 -70 Q36 -96 54 -80 Q32 -60 2 -70 Z' }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'tsp-sf-stem', d: 'M0 -132 Q8 -190 0 -252' }, g);
+          el('path', { 'class': 'tsp-sf-leaf', d: 'M2 -150 Q-50 -186 -82 -160 Q-46 -130 2 -150 Z M2 -205 Q52 -240 84 -214 Q48 -184 2 -205 Z' }, g);
+        },
+        function (g) {
+          el('path', { 'class': 'tsp-sf-stem', d: 'M0 -252 Q-7 -310 0 -362' }, g);
+          el('path', { 'class': 'tsp-sf-leaf', d: 'M-2 -292 Q-46 -322 -72 -300 Q-42 -274 -2 -292 Z' }, g);
+        },
+        function (g) {
+          for (var i = 0; i < 10; i++) {
+            el('path', { 'class': 'tsp-sf-sepal', d: 'M-9 ' + (SF_Y - 18) + ' L0 ' + (SF_Y - 46) + ' L9 ' + (SF_Y - 18) + ' Z',
+                         transform: 'rotate(' + (i * 36) + ' 0 ' + SF_Y + ')' }, g);
+          }
+          el('circle', { 'class': 'tsp-sf-bud', cx: 0, cy: SF_Y, r: 28 }, g);
+        },
+        function (g) { ring(g, 16, 50, 11, 30, 0, 'tsp-sf-petal2'); },
+        function (g) { ring(g, 16, 50, 11, 30, 11.25, 'tsp-sf-petal'); },
+        function (g) {
+          el('circle', { 'class': 'tsp-sf-disk', cx: 0, cy: SF_Y, r: 34 }, g);
+          for (var i = 0; i < 18; i++) {
+            var a = i * 2.4, rr = 6 + i * 1.4;
+            el('circle', { 'class': 'tsp-sf-seed', cx: f1(Math.cos(a) * rr), cy: f1(SF_Y + Math.sin(a) * rr), r: 2 }, g);
+          }
+          el('circle', { 'class': 'tsp-sf-eye', cx: -11, cy: SF_Y - 7, r: 5 }, g);
+          el('circle', { 'class': 'tsp-sf-eye', cx: 11, cy: SF_Y - 7, r: 5 }, g);
+          el('path', { 'class': 'tsp-sf-smile', d: 'M-15 ' + (SF_Y + 8) + ' Q0 ' + (SF_Y + 22) + ' 15 ' + (SF_Y + 8) }, g);
+          el('circle', { 'class': 'tsp-sf-cheek', cx: -21, cy: SF_Y + 6, r: 5 }, g);
+          el('circle', { 'class': 'tsp-sf-cheek', cx: 21, cy: SF_Y + 6, r: 5 }, g);
+        },
+        function (g) {
+          var bee = el('g', { 'class': 'tsp-sf-bee' }, el('g', { transform: 'translate(26 ' + (SF_Y - 82) + ') scale(0.8)' }, g));
+          el('ellipse', { 'class': 'tsp-wing', cx: -4, cy: -14, rx: 7, ry: 11 }, bee);
+          el('ellipse', { 'class': 'tsp-wing', cx: 6, cy: -14, rx: 7, ry: 11 }, bee);
+          el('ellipse', { 'class': 'tsp-bee', cx: 0, cy: 0, rx: 18, ry: 12 }, bee);
+          el('rect', { 'class': 'tsp-bee-stripe', x: -6, y: -11, width: 5, height: 22 }, bee);
+          el('rect', { 'class': 'tsp-bee-stripe', x: 4, y: -11, width: 5, height: 22 }, bee);
+        }
+      ],
+      burst: function (x, y) {
+        if (!B.front) return;
+        for (var i = 0; i < 24; i++) {
+          B.front.add({ x: x + rand(-40, 40), y: y + rand(-30, 30), vx: rand(-260, 260), vy: rand(-600, -250), term: rand(60, 100),
+                        sway: rand(20, 50), r: rand(4, 7), c: i % 3 ? '#ffd23f' : '#ffffff', life: 1.8, draw: petal });
+        }
+      }
+    });
 
     // ── Kirschzweig oben links ──
     var blossoms = [];
@@ -299,6 +368,7 @@
         clearFlowers();
         (deco.flowers || []).forEach(function (f) { addFlower(f.name || '', false); });
         flTotal = deco.flower_total || flowers.filter(Boolean).length;
+        sunflower.set(deco.project != null ? deco.project : deco.snowman);
       },
       update: function (s) {
         s = s || {};
@@ -314,7 +384,11 @@
       command: function (cmd, p) {
         p = p || {};
         switch (cmd) {
-          case 'flower': addFlower(p.name || '', true); flTotal++; break;
+          // Follow: Blume immer anlegen, sichtbar nur im aktiven Thema
+          case 'follow':
+          case 'flower': addFlower(p.name || '', B.on); flTotal++; break;
+          case 'build': sunflower.build(p.name || '', B.on); break;
+          case 'snowmanreset': sunflower.reset(B.on); break;
           case 'water': water(p); break;
           case 'weed': weed(p); break;
           case 'bee': sendBee(p.name || ''); break;
@@ -331,7 +405,7 @@
         }
       },
       busy: function () { return null; },
-      status: function () { return { on: B.on, water: Math.round(S.water), weeds: Math.round(S.weeds), flowers: flTotal }; }
+      status: function () { return { on: B.on, water: Math.round(S.water), weeds: Math.round(S.weeds), flowers: flTotal, project: sunflower.n() }; }
     };
   }
 
