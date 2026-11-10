@@ -308,6 +308,12 @@ def weather_theme_now():
     return resp
 
 
+# Follower-Import startet hier, weil nginx /app/* an diesen Dienst schickt;
+# der Twitch-Callback läuft im API-Dienst (gemeinsame Session).
+from webcore.auth import import_followers as _import_followers  # noqa: E402
+bp_app.add_url_rule("/app/twitch/import-followers", "twitch_import_followers", _import_followers)
+
+
 @bp_app.route("/app/settings/accounts", methods=["POST"])
 @require_session
 def settings_accounts():

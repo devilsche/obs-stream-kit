@@ -34,3 +34,10 @@ def test_theme_follows_early_start_and_tree(pg_conn_test_setup):
 
 def test_theme_needs_login(client):
     assert client.get("/app/api/weather/theme").status_code in (302, 401)
+
+
+def test_follower_import_starts_on_dashboard_service(pg_conn_test_setup):
+    # nginx schickt /app/* an den Dashboard-Dienst; der Callback läuft im API-Dienst
+    conn, _, _, sid = pg_conn_test_setup
+    r = _client(conn, sid).get("/app/twitch/import-followers")
+    assert r.status_code == 302 and "moderator%3Aread%3Afollowers" in r.headers["Location"]
