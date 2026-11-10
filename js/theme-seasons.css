@@ -65,6 +65,14 @@
 .ta-pk-lobe { fill: #f08c1a; }
 .ta-pk-rib { fill: none; stroke: #b5520a; stroke-width: 2.5; }
 .ta-pk-stem { fill: #5a6b2a; }
+.ta-pk-shadow { fill: #2a1405; opacity: 0.35; }
+.ta-pk-sheen { fill: #ffffff; opacity: 0.22; }
+.ta-pk-shade { fill: #2a1405; }
+/* Sorten: orange, rotorange, gelb, cremeweiß, grün-orange */
+.ta-pk--c2 .ta-pk-body { fill: #c94a12; } .ta-pk--c2 .ta-pk-lobe { fill: #dc5c1c; } .ta-pk--c2 .ta-pk-rib { stroke: #8f300a; }
+.ta-pk--c3 .ta-pk-body { fill: #e8a514; } .ta-pk--c3 .ta-pk-lobe { fill: #f4bb2c; } .ta-pk--c3 .ta-pk-rib { stroke: #a87208; }
+.ta-pk--c4 .ta-pk-body { fill: #e6dcc4; } .ta-pk--c4 .ta-pk-lobe { fill: #f2ead6; } .ta-pk--c4 .ta-pk-rib { stroke: #b3a585; }
+.ta-pk--c5 .ta-pk-body { fill: #d97a16; } .ta-pk--c5 .ta-pk-lobe { fill: #8a9a3a; } .ta-pk--c5 .ta-pk-rib { stroke: #5e6a22; }
 .ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 3s ease; }
 .ta-pk-light { fill: #ffb43a; filter: url(#ta-glow); opacity: 0; transition: opacity 3s ease; }
 .ts[data-night="1"] .ta-pk-face { opacity: 1; animation: taFlicker 2.2s ease-in-out infinite; }

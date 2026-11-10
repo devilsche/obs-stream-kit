@@ -174,25 +174,35 @@
     var PK_X = [];
     for (var pi = 0; pi < MAX_PK / 2; pi++) { PK_X.push(60 + pi * 46); PK_X.push(W - 60 - pi * 46); }
     var pkNodes = [], pkNext = 0, pkTotal = 0;
+    // Je Platz feste Streuung: Sorte (Farbe), Form, Neigung und Tiefe –
+    // hinten kleiner, höher und dunkler, damit der Haufen räumlich wirkt
+    function pkRand(slot, s) { var v = Math.sin(slot * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); }
     function buildPumpkin(name, slot, animate) {
-      var scale = 0.68 + ((slot * 7919) % 100) / 100 * 0.3;
-      var g = el('g', { 'class': 'ta-pk' + (animate ? ' ta-pk--new' : '') });
+      var depth = pkRand(slot, 3);
+      var scale = (0.68 + ((slot * 7919) % 100) / 100 * 0.3) * (1 - 0.22 * depth);
+      var wide = pkRand(slot, 1), sx = scale * (0.86 + 0.34 * wide), sy = scale * (1.12 - 0.28 * wide);
+      var tilt = (pkRand(slot, 4) - 0.5) * 14;
+      var g = el('g', { 'class': 'ta-pk ta-pk--c' + (1 + Math.floor(pkRand(slot, 2) * 5)) + (animate ? ' ta-pk--new' : '') });
       var inner = el('g', { 'class': 'ta-pk-inner' }, g);
-      var body = el('g', { transform: 'scale(' + scale.toFixed(2) + ')' }, inner);
+      el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: f1(44 * sx), ry: f1(7 * scale) }, inner);
+      var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, inner);
       el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
       el('ellipse', { 'class': 'ta-pk-body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
       el('ellipse', { 'class': 'ta-pk-body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
       el('ellipse', { 'class': 'ta-pk-lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
       el('path', { 'class': 'ta-pk-rib', d: 'M-12 -58 Q-20 -30 -12 -2 M12 -58 Q20 -30 12 -2' }, body);
+      el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
+      // Tiefe: dunkler Schleier über den hinteren Kürbissen
+      el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': (0.42 * depth).toFixed(2) }, body);
       el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
       el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
-      return { node: g, inner: inner, label: name, slot: slot, h: 80 * scale, x: PK_X[slot], y: H };
+      return { node: g, inner: inner, label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: -26 * depth };
     }
     function placePumpkins() {
       var l = lvl();
       pkNodes.forEach(function (pk) {
         if (!pk) return;
-        pk.y = Math.min(H - 6, surface(pk.x, l) + 10);
+        pk.y = Math.min(H - 6, surface(pk.x, l) + 10) + pk.dy;
         pk.node.setAttribute('transform', 'translate(' + pk.x + ' ' + f1(pk.y) + ')');
       });
     }
