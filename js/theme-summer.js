@@ -322,6 +322,10 @@
             ice.stolen = true;
             B.tag('A seagull stole ' + ice.name + "'s ice cream!", x, y - 90, true);
             return { scoop: ice.flavor, r: Math.max(8, 26 * (1 - Math.min(1, ice.m) * 0.85)) };
+          }, null, function () {
+            // Kugelmitte im Bild (Waffel gekippt, Kugel sackt beim Schmelzen)
+            var a = ice.tilt * Math.PI / 180, m = Math.min(1, ice.m), d = (60 - m * 30) * 0.6;
+            return [x + d * Math.sin(a), y - d * Math.cos(a), 26 * (1 - m * 0.85) * 0.6];
           });
         }, rand(3000, 6000));
       }
@@ -384,7 +388,7 @@
         }, function () {
           if (fr.left > 0 && trips > 0) setTimeout(trip, rand(1500, 4000));
           else fr.fade = 0;
-        });
+        }, function (dir) { return [fr.x - dir * 16, fr.y - 32, 2]; });
       })();
     }
     function stepFries(dt) {
@@ -398,71 +402,308 @@
     }
 
     // ── Möwe: gleitet von der Seite heran, landet neben dem Ziel, pickt,
-    // schnappt sich die Beute (grab liefert, was sie trägt) und fliegt davon ──
-    var gulls = [];
-    function gull(tx, ty, grab, done) {
+    // schnappt sich die Beute (grab liefert, was sie trägt) und fliegt davon.
+    // Gliederpuppe in Körpereinheiten (GK px je Einheit), Blick nach +x:
+    // Rumpf und Kopf als Profil, die Flügel als 3D-Gelenkkette (Schulter >
+    // Handgelenk > Spitze), schräg projiziert, damit Schlag und M-Form lesbar
+    // sind. Schlag: schneller Abschlag (40 %), langsamer Aufschlag mit
+    // angewinkelter Hand, die Spitze hinkt nach; der Rumpf wippt gegenläufig ──
+    var GK = 1.2, STAND = 15, DEG = Math.PI / 180;
+    var CAM_Y = 0.45, CAM_P = -0.4;   // Kamera: Gier und Neigung (rad)
+    var gulls = [], gullN = 0;
+    function mix(a, b, k) { return a + (b - a) * k; }
+    function ease(k) { k = clamp01(k); return k * k * (3 - 2 * k); }
+    // Schlagstellung: +1 oben, −1 unten; Abschlag 40 % der Periode
+    function wbeat(p) {
+      p -= Math.floor(p);
+      return p < 0.4 ? Math.cos(Math.PI * p / 0.4) : -Math.cos(Math.PI * (p - 0.4) / 0.6);
+    }
+    // Handgelenk beim Aufschlag angewinkelt, beim Abschlag gestreckt
+    function wfold(p) { p -= Math.floor(p); return p < 0.4 ? 0 : Math.sin(Math.PI * (p - 0.4) / 0.6); }
+    function wingPose(b, t) {
+      var p = b.fp, A = b.amp, fo = wfold(p) * Math.min(1, A), sw = Math.sin(t * 1.9);
+      var gl = { a1: 20 + 2.5 * sw, a2: -14 + 3 * Math.sin(t * 1.9 - 0.7), b1: -14, b2: 28, ext: 1 };
+      var fl = { a1: 8 + 40 * A * wbeat(p), a2: -2 + 56 * A * wbeat(p - 0.09), b1: -6 + 10 * fo, b2: 20 + 40 * fo, ext: 1 - 0.22 * fo };
+      // Abfangen: Flügel weit vorn, gewölbt, kurze Bremsschläge
+      var fr = { a1: 26 + 26 * wbeat(p), a2: 6 + 36 * wbeat(p - 0.08), b1: -24 + 10 * fo, b2: 4 + 26 * fo, ext: 1 - 0.1 * fo };
+      var o = {};
+      ['a1', 'a2', 'b1', 'b2', 'ext'].forEach(function (k) { o[k] = mix(mix(gl[k], fl[k], b.flapW), fr[k], b.flareW); });
+      // Anlegen: Spannweite schrumpft, Hand klappt nach hinten
+      o.ext *= 1 - 0.85 * b.F;
+      o.b1 = mix(o.b1, 40, b.F); o.b2 = mix(o.b2, 120, b.F); o.a1 = mix(o.a1, 10, b.F); o.a2 = mix(o.a2, 0, b.F);
+      return o;
+    }
+    // Körperraum (x vor, y oben, z zum Betrachter) > Bildebene der Puppe
+    function gproj(v, roll) {
+      var cr = Math.cos(roll), sr = Math.sin(roll);
+      var y = v[1] * cr - v[2] * sr, z = v[1] * sr + v[2] * cr;
+      var X = v[0] * Math.cos(CAM_Y) - z * Math.sin(CAM_Y), D = v[0] * Math.sin(CAM_Y) + z * Math.cos(CAM_Y);
+      return [X, -(y * Math.cos(CAM_P) + D * Math.sin(CAM_P))];
+    }
+    function wdir(a, b, s) {
+      a *= DEG; b *= DEG;
+      return [-Math.sin(b), Math.sin(a) * Math.cos(b), s * Math.cos(a) * Math.cos(b)];
+    }
+    function drawWing(w, P, s, roll) {
+      var S = [2, 2.2, s * 2], d1 = wdir(P.a1, P.b1, s), d2 = wdir(P.a2, P.b2, s);
+      var Wr = [S[0] + d1[0] * 15 * P.ext, S[1] + d1[1] * 15 * P.ext, S[2] + d1[2] * 15 * P.ext];
+      var T = [Wr[0] + d2[0] * 21 * P.ext, Wr[1] + d2[1] * 21 * P.ext, Wr[2] + d2[2] * 21 * P.ext];
+      function lead(u) { return [Wr[0] + (T[0] - Wr[0]) * u, Wr[1] + (T[1] - Wr[1]) * u, Wr[2] + (T[2] - Wr[2]) * u]; }
+      function trail(u) { var q = lead(u); q[0] -= 10.5 * Math.pow(1 - u, 0.6) * P.ext + 0.6 * (1 - u); return q; }
+      function pt(v) { var q = gproj(v, roll); return f1(q[0]) + ' ' + f1(q[1]); }
+      var sp = gproj(S, roll), wp = gproj(Wr, roll), st = gproj([S[0] - 12 * P.ext, S[1], S[2]], roll);
+      var d = 'M' + pt(S) + ' L' + pt(Wr) + ' Q' + pt(lead(0.5).map(function (c, i) { return c + (i === 1 ? 0.6 : 0); })) + ' ' + pt(T) +
+              ' Q' + pt(trail(0.7)) + ' ' + pt(trail(0.35)) + ' L' + pt(trail(0)) +
+              ' Q' + pt([(S[0] + Wr[0]) / 2 - 11.5, (S[1] + Wr[1]) / 2, (S[2] + Wr[2]) / 2]) + ' ' + pt([S[0] - 12 * P.ext, S[1], S[2]]) + ' Z';
+      w.main.setAttribute('d', d);
+      w.edge.setAttribute('d', d.slice(0, -2));
+      w.tip.setAttribute('d', 'M' + pt(lead(0.6)) + ' L' + pt(T) + ' Q' + pt(trail(0.82)) + ' ' + pt(trail(0.6)) + ' Z');
+      var m = gproj(lead(0.9), roll), m2 = gproj(trail(0.9), roll);
+      w.mirror.setAttribute('cx', f1((m[0] * 2 + m2[0]) / 3)); w.mirror.setAttribute('cy', f1((m[1] * 2 + m2[1]) / 3));
+      // Unterseite sichtbar, wenn die Armfläche im Bild umklappt
+      var cross = (wp[0] - sp[0]) * (st[1] - sp[1]) - (wp[1] - sp[1]) * (st[0] - sp[0]);
+      var under = cross * s > 0 ? '1' : '0';
+      if (w.g.dataset.under !== under) w.g.dataset.under = under;
+    }
+    function newWing(parent, far) {
+      var g = el('g', { 'class': 'tss-gull-wing' + (far ? ' tss-gull-wing--far' : '') }, parent);
+      var main = el('path', { 'class': 'tss-gull-wfill' }, g);
+      return { g: g, main: main, edge: el('path', { 'class': 'tss-gull-wedge' }, g), tip: el('path', { 'class': 'tss-gull-tip' }, g),
+               mirror: el('circle', { 'class': 'tss-gull-mirror', r: 0.8 }, g) };
+    }
+    // Bein als Zweigelenk: Hüfte > Ferse (knickt nach hinten) > Fuß
+    function legPath(h, f, toe) {
+      var l1 = 5.5, l2 = 8.5, dx = f[0] - h[0], dy = f[1] - h[1], d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      var dd = Math.min(d, l1 + l2 - 0.05), ux = dx / d, uy = dy / d;
+      var a = (l1 * l1 - l2 * l2 + dd * dd) / (2 * dd), hh = Math.sqrt(Math.max(0, l1 * l1 - a * a));
+      var px = h[0] + ux * a, py = h[1] + uy * a, k1x = px - uy * hh, k2x = px + uy * hh;
+      var kx = k1x < k2x ? k1x : k2x, ky = k1x < k2x ? py + ux * hh : py - ux * hh;
+      var fx = h[0] + ux * dd, fy = h[1] + uy * dd;
+      return { leg: 'M' + f1(h[0]) + ' ' + f1(h[1]) + ' L' + f1(kx) + ' ' + f1(ky) + ' L' + f1(fx) + ' ' + f1(fy),
+               foot: 'M' + f1(fx - 0.8) + ' ' + f1(fy - 0.6) + ' L' + f1(fx + toe[0] * 3.6) + ' ' + f1(fy + toe[1] * 3.6 - 0.2) +
+                     ' L' + f1(fx + toe[0] * 3.2 + 0.6) + ' ' + f1(fy + toe[1] * 3.2 + 1) + ' Z' };
+    }
+
+    function gull(tx, ty, grab, done, reach) {
+      // reach(dir): Zielpunkt [x, y, r] für die Schnabelspitze (Kugel, Pommes)
       var fromLeft = tx < W / 2, dir = fromLeft ? 1 : -1;
+      var rc = reach ? reach(dir) : [tx, ty - 30, 8];
+      // Rumpfmitte so, dass die Schnabelspitze nach dem Landehüpfer (7 px) knapp vor dem Ziel ist
+      var lx = rc[0] - dir * (rc[2] + 3 + 22 * GK + 7), gy = sandY(lx) + 3, ly = gy - STAND * GK;
       var g = el('g', { 'class': 'tss-gull', opacity: 0 }, gBirds);
       var flip = el('g', {}, g);
-      var carry = el('g', {}, flip);
-      var body = el('g', {}, flip);
-      el('path', { 'class': 'tss-gull-leg', d: 'M-4 10 L-6 24 M4 10 L6 24' }, body);
-      el('ellipse', { 'class': 'tss-gull-body', cx: 0, cy: 0, rx: 26, ry: 13 }, body);
-      el('path', { 'class': 'tss-gull-tail', d: 'M-22 -4 L-40 -10 L-38 2 Z' }, body);
-      var head = el('g', {}, body);
-      el('circle', { 'class': 'tss-gull-body', cx: 22, cy: -12, r: 10 }, head);
-      el('circle', { 'class': 'tss-gull-eye', cx: 25, cy: -15, r: 1.8 }, head);
-      el('path', { 'class': 'tss-gull-beak', d: 'M30 -13 L44 -10 L30 -7 Z' }, head);
-      var wing = el('path', { 'class': 'tss-gull-wing', d: 'M-14 -6 Q4 -40 26 -44 Q10 -18 12 -4 Z' }, flip);
-      var landX = tx - dir * 52, landY = ty - 22;
-      var gl = { g: g, flip: flip, carry: carry, head: head, wing: wing, dir: dir, phase: 'in', t: 0,
-                 x0: fromLeft ? -120 : W + 120, y0: rand(180, 320), lx: landX, ly: landY, x: 0, y: 0, grab: grab, done: done };
+      var legs = el('g', { 'class': 'tss-gull-legs' }, flip);
+      var legF = el('path', { 'class': 'tss-gull-leg tss-gull-leg--far' }, legs), footF = el('path', { 'class': 'tss-gull-foot tss-gull-leg--far' }, legs);
+      var legN = el('path', { 'class': 'tss-gull-leg' }, legs), footN = el('path', { 'class': 'tss-gull-foot' }, legs);
+      var pose = el('g', {}, flip);
+      var wFar = newWing(pose, true);
+      // Weiße Teile einmal als graue Kontur (use) dahinter, dann weiß darüber
+      var id = 'tss-gullw' + (++gullN);
+      el('use', { 'class': 'tss-gull-ol', href: '#' + id }, pose);
+      var white = el('g', { 'class': 'tss-gull-white' }, pose);
+      var wIn = el('g', { id: id }, white);
+      el('path', { d: 'M-13.5 -2 L-20.5 -2.6 Q-21.8 -0.6 -20.5 1.4 L-13.5 1 Z' }, wIn);
+      el('path', { d: 'M10 -0.8 C10 -4.4 4.5 -5.2 -2 -4.8 C-8 -4.4 -12.5 -3 -15 -1.8 L-15 1 C-11.5 2.6 -6 4.6 0 4.6 C6 4.6 10 2.6 10 -0.8 Z' }, wIn);
+      var neck = el('path', {}, wIn);
+      var head = el('g', {}, wIn);
+      el('circle', { r: 4.5 }, head);
+      // angelegter Flügel: grauer Mantel, schwarze Handschwingen über dem Schwanz
+      var folded = el('g', { 'class': 'tss-gull-folded', opacity: 0 }, pose);
+      el('path', { 'class': 'tss-gull-mantle', d: 'M8 -3.6 C2 -7 -8 -6.4 -13.5 -3.6 L-15 -0.8 C-8 1.4 0 1 6.5 -1 Z' }, folded);
+      el('path', { 'class': 'tss-gull-tip', d: 'M-11 -3.9 L-25 -2.4 Q-25.2 -1.4 -24 -1.1 L-12.5 -0.4 Z' }, folded);
+      el('circle', { 'class': 'tss-gull-mirror', cx: -22.6, cy: -1.9, r: 0.6 }, folded);
+      el('path', { 'class': 'tss-gull-tertial', d: 'M5 -1.4 C-2 0.4 -8 0.6 -12.5 -0.6' }, folded);
+      var wNear = newWing(pose, false);
+      var headTop = el('g', {}, pose);
+      el('path', { 'class': 'tss-gull-bill', d: 'M3.4 -1.7 L9.4 -1 Q10.9 -0.6 10.4 0.9 L9.6 0.5 L3.6 1.1 Z' }, headTop);
+      el('circle', { 'class': 'tss-gull-gonys', cx: 8.9, cy: 0.75, r: 0.6 }, headTop);
+      el('circle', { 'class': 'tss-gull-eye', cx: 1.3, cy: -1.5, r: 0.8 }, headTop);
+      var carry = el('g', {}, headTop);
+      // Anflug: Bézier von außerhalb des Bilds bis zum Abfangpunkt vor der Landestelle
+      var x0 = fromLeft ? -170 : W + 170, y0 = rand(140, 300);
+      var x3 = lx - dir * 38, y3 = ly - 34, dx = Math.abs(x3 - x0), dy = y3 - y0;
+      var gl = { g: g, flip: flip, pose: pose, head: head, headTop: headTop, neck: neck, folded: folded, carry: carry,
+                 wFar: wFar, wNear: wNear, legs: legs, legN: legN, legF: legF, footN: footN, footF: footF,
+                 dir: dir, face: dir, phase: 'in', t: 0, age: 0, grab: grab, done: done, reach: reach,
+                 bz: [x0, y0, x0 + dir * dx * 0.45, y0 + dy * 0.12, x3 - dir * dx * 0.45, y3 - dy * 0.14, x3, y3],
+                 tin: Math.max(2.1, Math.min(3.4, Math.sqrt(dx * dx + dy * dy) / 330)),
+                 lx: lx, ly: ly, gy: gy, x: x0, y: y0, px: x0, py: y0, vx: 0, vy: 0,
+                 fp: 0, amp: 1, flapW: 1, flareW: 0, F: 0, pitch: 0, roll: 0, bob: 0, stand: 0,
+                 hx: 0, hy: 0, hr: 0, feet: null, legW: 0, plant: 0, fx: 0 };
       gulls.push(gl);
+    }
+    function bez(c, u) {
+      var v = 1 - u;
+      return [v * v * v * c[0] + 3 * v * v * u * c[2] + 3 * v * u * u * c[4] + u * u * u * c[6],
+              v * v * v * c[1] + 3 * v * v * u * c[3] + 3 * v * u * u * c[5] + u * u * u * c[7]];
+    }
+    // Flugneigung aus der Bahn: sinkend Nase runter, steigend hoch
+    function flightPitch(b, lo, hi) {
+      var a = -Math.atan2(b.vy, Math.abs(b.vx) + 1) / DEG * 0.45;
+      return Math.max(lo, Math.min(hi, a));
+    }
+    // Schnabelspitze (Kopfmitte + Schnabel) in Puppen-Einheiten zum Ziel
+    function peckVec(b) {
+      if (!b.reach) return [5, 3];
+      var rc = b.reach(b.dir), tipx = 12.5 + 10.4, tipy = -9 + 0.6;
+      var vx = (rc[0] - b.x) * b.face / GK - tipx, vy = (rc[1] - b.y) / GK - tipy;
+      return [Math.max(-2, Math.min(8, vx)), Math.max(-6, Math.min(8, vy))];
     }
     function stepGulls(dt) {
       for (var i = gulls.length - 1; i >= 0; i--) {
-        var b = gulls[i], flap = 0, face = b.dir;
-        b.t += dt;
+        var b = gulls[i], t, k, per = 0.42, standFeet = false;
+        b.t += dt; b.age += dt; t = b.t;
+        b.px = b.x; b.py = b.y;
         if (b.phase === 'in') {
-          // Gleitflug in einer Kurve herunter
-          var k = clamp01(b.t / 2.6), e = 1 - Math.pow(1 - k, 2);
-          b.x = b.x0 + (b.lx - b.x0) * e;
-          b.y = b.y0 + (b.ly - b.y0) * Math.pow(k, 1.6) - Math.sin(k * Math.PI) * 30;
-          flap = k > 0.8 ? Math.sin(b.t * 18) : Math.sin(b.t * 3) * 0.3;
-          if (k >= 1) { b.phase = 'peck'; b.t = 0; }
-        } else if (b.phase === 'peck') {
-          // pickt zweimal nach der Beute, dann zugreifen
-          var pk = Math.max(0, Math.sin(b.t * 7));
-          b.head.setAttribute('transform', 'rotate(' + f1(pk * 35) + ' 14 -8)');
-          if (b.t >= 1.8) {
-            b.head.setAttribute('transform', '');
+          // ein paar Schläge, dann Gleitflug in einer Kurve herunter
+          k = clamp01(t / b.tin);
+          var q = bez(b.bz, k * (1.25 - 0.25 * k));
+          b.x = q[0]; b.y = q[1];
+          b.flapW = 1 - ease((t - 0.7) / 0.5);
+          b.amp = 0.9;
+          b.flareW = 0;
+          // im Gleiten in die Kurve geneigt, leicht pendelnd
+          b.roll = 0.1 * Math.sin(t * 1.1) * b.flapW + (0.32 + 0.08 * Math.sin(t * 1.1)) * (1 - b.flapW);
+          if (k >= 1) { b.phase = 'land'; b.t = 0; b.lx0 = b.x; b.ly0 = b.y; b.p0 = b.pitch; }
+        } else if (b.phase === 'land') {
+          // Abfangen: Rumpf steil, Flügel nach vorn gewölbt, Beine vor,
+          // 2–3 Bremsschläge, aufsetzen, ein Hüpfer, Flügel anlegen
+          k = clamp01(t / 0.62);
+          per = 0.24;
+          b.flareW = ease(t / 0.15) * (1 - ease((t - 0.62) / 0.3));
+          b.flapW = 0; b.amp = 1 - clamp01((t - 0.55) / 0.3);
+          b.roll *= Math.pow(0.02, dt);
+          b.pitch = k < 0.45 ? mix(b.p0, 30, ease(k / 0.45)) : mix(30, 8, ease((k - 0.45) / 0.55));
+          b.legW = ease(t / 0.3);
+          if (t < 0.62) {
+            b.x = mix(b.lx0, b.lx, 1 - (1 - k) * (1 - k));
+            b.y = mix(b.ly0, b.ly, Math.pow(k, 1.5));
+            b.feet = 'fwd';
+          } else {
+            // Hüpfer nach dem Aufsetzen
+            var h = clamp01((t - 0.62) / 0.3);
+            b.x = b.lx + b.dir * 7 * ease(h);
+            b.y = b.ly - 6 * Math.sin(Math.PI * h);
+            b.F = ease((t - 0.62) / 0.4);
+            b.stand = ease((t - 0.62) / 0.4);
+            b.feet = h < 1 ? 'hop' : 'stand';
+            if (t >= 1.05) { b.phase = 'stand'; b.t = 0; b.fx = b.x; b.feet = 'stand'; }
+          }
+        } else if (b.phase === 'stand') {
+          // pickt dreimal nach der Beute, beim dritten Mal zugreifen
+          b.F = 1; b.stand = 1; b.amp = 0; b.flareW = 0; b.feet = 'stand';
+          var pk = 0;
+          [[0.4, 0.34], [0.95, 0.34], [1.45, 0.4]].forEach(function (w) {
+            if (t > w[0] && t < w[0] + w[1]) pk = Math.max(pk, Math.sin(Math.PI * (t - w[0]) / w[1]));
+          });
+          var pv = peckVec(b);
+          b.hx = pv[0] * pk; b.hy = pv[1] * pk + 0.6 * Math.sin(t * 9) * (1 - pk) * (t < 1.65 ? 1 : 0);
+          b.hr = 28 * pk - (t > 1.7 ? 14 * Math.sin(Math.PI * clamp01((t - 1.7) / 0.4)) : 0);
+          b.pitch = 6 - 14 * pk;
+          b.y = b.ly + 0.8 * GK * pk;
+          if (t >= 1.65 && !b.grabbed) {
+            b.grabbed = true;
             var loot = b.grab ? b.grab() : null;
-            if (loot && loot.scoop) el('circle', { 'class': 'tss-scoop' + loot.scoop, cx: 44, cy: -6, r: f1(Math.min(14, loot.r * 0.6)) }, b.carry);
+            var rr = loot && loot.scoop ? Math.max(2.4, Math.min(5, loot.r * 0.6 * 0.5 / GK)) : 0;
+            if (rr) el('circle', { 'class': 'tss-scoop' + loot.scoop, cx: f1(9.6 + rr * 0.45), cy: f1(0.8 + rr * 0.75), r: f1(rr) }, b.carry);
             if (loot && loot.fries) {
-              for (var j = 0; j < Math.min(6, loot.fries); j++) {
-                el('rect', { 'class': 'tss-fry', x: 38 + j * 2, y: -16 + (j % 2) * 3, width: 4, height: 22, rx: 1, transform: 'rotate(' + (70 + j * 8) + ' 40 -6)' }, b.carry);
+              for (var j = 0; j < Math.min(4, loot.fries); j++) {
+                el('rect', { 'class': 'tss-fry tss-gull-fry', x: f1(7 + j * 0.8), y: -6.5 + (j % 2) * 0.8, width: 2.6, height: 13, rx: 0.6,
+                             transform: 'rotate(' + (62 + j * 9) + ' 9.4 0.2)' }, b.carry);
               }
             }
-            b.phase = 'out'; b.t = 0; b.x0 = b.x; b.y0 = b.y;
           }
+          if (t >= 2.1) { b.phase = 'turn'; b.t = 0; b.hx = b.hy = b.hr = 0; }
+        } else if (b.phase === 'turn') {
+          // Hüpfer mit Kehrtwende
+          k = clamp01(t / 0.32);
+          b.y = b.ly - 5 * Math.sin(Math.PI * k);
+          b.x = b.fx - b.dir * 3 * ease(k);
+          if (k >= 0.5) b.face = -b.dir;
+          b.feet = k < 1 ? 'hop' : 'stand';
+          b.pitch = 6;
+          if (k >= 1) { b.phase = 'off'; b.t = 0; b.x0 = b.x; b.y0 = b.ly; b.fx = b.x; }
         } else {
-          // davon, zurück zur nahen Seite und nach oben
-          face = -b.dir;
-          b.x = b.x0 - b.dir * (b.t * 240 + b.t * b.t * 160);
-          b.y = b.y0 - (b.t * 180 + b.t * b.t * 60);
-          flap = Math.sin(b.t * 16);
+          // Abflug: ducken, abspringen, kräftige Schläge, steigend davon
+          var face = b.face, c = ease(t / 0.16);
+          b.flareW = 0; b.flapW = 1;
+          if (t < 0.16) {
+            b.y = b.y0 + 2.6 * GK * c; b.pitch = 6 + 8 * c; b.hx = 1.5 * c; b.hy = 2 * c;
+            b.F = 1 - 0.5 * c; b.amp = 1.25; b.feet = 'stand';
+            b.fp = 0.62;   // Flügel kommen im Aufschlag hoch
+          } else {
+            var u = t - 0.16;
+            b.x = b.x0 + face * (70 * u + 150 * u * u);
+            b.y = b.y0 + 2.6 * GK * Math.exp(-14 * u) - (22 * (1 - Math.exp(-7 * u)) + 115 * u + 45 * u * u);
+            b.F = 0.5 * (1 - ease(u / 0.16));
+            b.stand = 1 - ease(u / 0.4);
+            b.amp = u < 1.2 ? 1.25 : mix(1.25, 0.9, ease((u - 1.2) / 0.6));
+            per = u < 1.2 ? 0.32 : 0.42;
+            b.hx *= Math.pow(0.01, dt); b.hy *= Math.pow(0.01, dt);
+            b.legW = 1 - ease((u - 0.12) / 0.25);
+            b.feet = 'trail';
+          }
         }
+        // Geschwindigkeit, Schlag, Neigung im Flug
+        if (dt > 0) { b.vx = (b.x - b.px) / dt; b.vy = (b.y - b.py) / dt; }
+        b.fp += dt / per * (b.amp > 0 ? 1 : 0);
+        if (b.phase === 'in') b.pitch = flightPitch(b, -18, 10);
+        if (b.phase === 'off' && t >= 0.16) b.pitch = mix(14, flightPitch(b, -8, 24), ease((t - 0.16) / 0.3));
+        if (b.phase === 'off') b.roll = 0.08 * Math.sin(b.t * 1.3);
+        // Rumpf wippt gegen den Schlag (Abschlag hebt)
+        var A = (1 - b.F) * b.amp * Math.max(b.flapW, b.flareW);
+        b.bob = 0.9 * A * wbeat(b.fp - 0.05);
+        drawGull(b);
         var op = clamp01(Math.min(b.x + 60, W + 60 - b.x) / 180) * clamp01((b.y + 60) / 160);
-        b.g.setAttribute('transform', 'translate(' + f1(b.x) + ' ' + f1(b.y) + ')');
         b.g.setAttribute('opacity', op.toFixed(3));
-        b.flip.setAttribute('transform', face < 0 ? 'scale(-1 1)' : '');
-        b.wing.setAttribute('transform', 'scale(1 ' + (0.35 + 0.65 * Math.abs(flap)).toFixed(2) + ')' + (flap < 0 ? ' scale(1 -1)' : ''));
-        if (b.phase === 'out' && (op <= 0 || b.t > 6)) {
+        if (b.phase === 'off' && (op <= 0 && b.t > 0.5 || b.t > 6)) {
           gBirds.removeChild(b.g);
           gulls.splice(i, 1);
           if (b.done) b.done();
         }
       }
+    }
+    function drawGull(b) {
+      var P = wingPose(b, b.age), pr = -b.pitch * DEG, cp = Math.cos(pr), sp = Math.sin(pr);
+      b.g.setAttribute('transform', 'translate(' + f1(b.x) + ' ' + f1(b.y) + ')');
+      b.flip.setAttribute('transform', 'scale(' + (b.face * GK) + ' ' + GK + ')');
+      b.pose.setAttribute('transform', 'translate(0 ' + f1(b.bob) + ') rotate(' + f1(-b.pitch) + ')');
+      drawWing(b.wFar, P, -1, b.roll);
+      drawWing(b.wNear, P, 1, b.roll);
+      var wo = clamp01((0.9 - b.F) / 0.4).toFixed(2), fo = clamp01((b.F - 0.4) / 0.4).toFixed(2);
+      b.wFar.g.setAttribute('opacity', wo); b.wNear.g.setAttribute('opacity', wo);
+      b.folded.setAttribute('opacity', fo);
+      // Kopf: im Flug eingezogen nach vorn, im Stand höher auf dem Hals
+      var hx = mix(13.5, 12.5, b.stand) + b.hx, hy = mix(-3.6, -9, b.stand) + b.hy;
+      var ht = 'translate(' + f1(hx) + ' ' + f1(hy) + ') rotate(' + f1(b.hr) + ')';
+      b.head.setAttribute('transform', ht);
+      b.headTop.setAttribute('transform', ht);
+      b.neck.setAttribute('d', 'M4.5 -5 L' + f1(hx - 2.2) + ' ' + f1(hy - 3.6) + ' L' + f1(hx + 1.5) + ' ' + f1(hy + 3.4) + ' L8.6 2 Z');
+      // Beine: im Reiseflug eingezogen, beim Landen vorgestreckt, im Stand fest am Boden
+      var hips = [[-1, 4.2], [-2.6, 3.8]].map(function (h) {
+        return [h[0] * cp - h[1] * sp, h[0] * sp + h[1] * cp + b.bob];
+      });
+      var vis = b.feet === 'stand' || b.feet === 'hop' || b.legW > 0.02;
+      if (b.legs.getAttribute('opacity') !== (vis ? '1' : '0')) b.legs.setAttribute('opacity', vis ? '1' : '0');
+      if (!vis) return;
+      [[b.legN, b.footN, 0], [b.legF, b.footF, 1]].forEach(function (L) {
+        var h = hips[L[2]], f, toe;
+        if (b.feet === 'stand') {
+          f = [(b.fx - b.x) * b.face / GK + 1.5 - L[2] * 3, (b.gy - b.y) / GK];
+          toe = [1, 0];
+        } else if (b.feet === 'hop') {
+          f = [h[0] + 1.5 - L[2] * 2, h[1] + 10.5]; toe = [1, 0];
+        } else if (b.feet === 'fwd') {
+          var tk = [h[0] - 9, h[1] + 3], fw = [h[0] + 6.5 - L[2] * 1.5, h[1] + 9];
+          f = [mix(tk[0], fw[0], b.legW), mix(tk[1], fw[1], b.legW)]; toe = [0.8, 0.6];
+        } else {
+          var tr = [h[0] - 9, h[1] + 3], dn = [h[0] - 5 - L[2] * 1.5, h[1] + 10];
+          f = [mix(tr[0], dn[0], b.legW), mix(tr[1], dn[1], b.legW)]; toe = [-0.2, 1];
+        }
+        var lp = legPath(h, f, toe);
+        L[0].setAttribute('d', lp.leg);
+        L[1].setAttribute('d', lp.foot);
+      });
     }
     function clearSnacks() {
       gulls.forEach(function (b) { if (b.g.parentNode) b.g.parentNode.removeChild(b.g); });

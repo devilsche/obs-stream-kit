@@ -298,12 +298,28 @@
 .tss-tray { fill: #e8333f; stroke: #a8202a; stroke-width: 2; }
 .tss-tray-stripe { fill: #ffffff; }
 .tss-fry { fill: #f6c84a; stroke: #c8922a; stroke-width: 1; }
-.tss-gull-body { fill: #f7f7f4; stroke: #9aa2aa; stroke-width: 1.5; }
-.tss-gull-wing { fill: #a9b3bd; stroke: #6c7782; stroke-width: 1.5; }
-.tss-gull-tail { fill: #3a3f45; }
+/* Möwe (Silbermöwe): weiß mit grauer Kontur, silbergrauer Mantel und
+   Oberflügel, schwarze Spitzen mit weißem Fleck, gelber Schnabel mit rotem
+   Fleck, rosa Beine; Maße in Puppen-Einheiten (x1.2 px) */
+.tss-gull-white { fill: #fbfbf8; }
+.tss-gull-ol { fill: #6f7a84; stroke: #6f7a84; stroke-width: 1.6; stroke-linejoin: round; }
+.tss-gull-wfill { fill: #aab5bf; }
+.tss-gull-wedge { fill: none; stroke: #6f7a84; stroke-width: 0.7; stroke-linejoin: round; stroke-linecap: round; }
+.tss-gull-wing[data-under="1"] .tss-gull-wfill { fill: #dfe4e8; }
+.tss-gull-wing--far .tss-gull-wfill { fill: #98a3ad; }
+.tss-gull-wing--far[data-under="1"] .tss-gull-wfill { fill: #c9d0d6; }
+.tss-gull-tip { fill: #1d2024; }
+.tss-gull-mirror { fill: #ffffff; }
+.tss-gull-mantle { fill: #aab5bf; stroke: #6f7a84; stroke-width: 0.6; stroke-linejoin: round; }
+.tss-gull-tertial { fill: none; stroke: #ffffff; stroke-width: 0.8; stroke-linecap: round; }
 .tss-gull-eye { fill: #1b1b1f; }
-.tss-gull-beak { fill: #f2b705; }
-.tss-gull-leg { fill: none; stroke: #e8a040; stroke-width: 2.5; stroke-linecap: round; }
+.tss-gull-bill { fill: #f4c430; stroke: #a8841a; stroke-width: 0.4; stroke-linejoin: round; }
+.tss-gull-gonys { fill: #d8322a; }
+.tss-gull-leg { fill: none; stroke: #e7a29c; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.tss-gull-foot { fill: #e7a29c; stroke: none; }
+.tss-gull-leg.tss-gull-leg--far { stroke: #c4847e; }
+.tss-gull-foot.tss-gull-leg--far { fill: #c4847e; stroke: none; }
+.tss-gull-fry { stroke-width: 0.5; }
 
 /* Sandpalast (Sub-Projekt) */
 .tss-pal-line { fill: none; stroke: #c9a865; stroke-width: 2; opacity: 0.7; }
