@@ -345,7 +345,7 @@
 .tw--beach .tw-tree-g { fill: url(#twb-treeG); }
 .tw--beach .tw-mound { fill: url(#tss-sandG); transform: none; }
 .tw--beach .tw-mound.tss-sand--hot { fill: url(#tss-hotG); }
-.tw--beach .tw-mound.ts-gsnow { fill: #f4f8ff; }
+.tw--beach .tw-mound.ts-gsnow { fill: #f4f8ff; stroke: none; }
 /* Schnee am Strand-Baum: Winter-Variablen aus dem Schnee-Stand des Sommers,
    ohne Schnee unsichtbar */
 .tw.tw--beach {
@@ -353,10 +353,10 @@
   --tw-light: clamp(0, calc(var(--ts-snow) / 0.08), 1);
   --tw-cap: clamp(0, calc((var(--ts-snow) - 0.08) / 0.35), 1);
   --tw-hat: clamp(0, calc((var(--ts-snow) - 0.6) / 0.25), 1);
-  --tw-drift: calc(0.1 * clamp(0, calc((var(--ts-snow) - 0.4) / 0.6), 1));
 }
 .tw--beach .tw-snowcap, .tw--beach .tw-gsnow { opacity: var(--tw-light); }
-.tw--beach .tw-drift { fill: url(#twb-moundG); }
+/* keine Winter-Schneewehe am Strand: der Hügel bekommt dieselbe Schneeschicht wie der Sand */
+.tw--beach .tw-drift { display: none; }
 .tss-starfish { fill: #f08a5d; stroke: #c4603a; stroke-width: 1.5; }
 /* Sandburgen treten zur Seite, solange der Baum steht (Sandpalast bleibt) */
 .tss-castles { opacity: 1; transition: opacity 1s ease; }
