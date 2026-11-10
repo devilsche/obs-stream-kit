@@ -196,6 +196,9 @@
 
     // ── Partikel-Verwaltung: zu viele fallen zu Ende, fehlende kommen von oben ──
     var parts = [];
+    // Dächer (z. B. Sonnenschirm): [{x0, x1, y(x)}]; Regen zerplatzt dort,
+    // an den Rändern tropft es ab
+    var shelters = [], splashes = [], drips = [];
     var spawnAcc = {};
 
     function target(type, li) {
@@ -279,6 +282,20 @@
           p.y += dy;
           p.x += dy * tanA * L.drift;
           gone = p.y - p.len > H;
+          for (var si = 0; si < shelters.length && !gone; si++) {
+            var sh = shelters[si];
+            if (p.x < sh.x0 || p.x > sh.x1) continue;
+            var sy = sh.y(p.x);
+            if (p.y >= sy && p.y - dy < sy + 4) {
+              gone = true;
+              if (splashes.length < 80) splashes.push({ x: p.x, y: sy, t: 0 });
+              // jeder vierte Tropfen läuft zum nächsten Rand und tropft ab
+              if (Math.random() < 0.25 && drips.length < 60) {
+                var ex = p.x - sh.x0 < sh.x1 - p.x ? sh.x0 + 2 : sh.x1 - 2;
+                drips.push({ x: ex, y: sh.y(ex) + 2, v: 0, wait: 0.15 + Math.random() * 0.5 });
+              }
+            }
+          }
         }
         if (gone) {
           var key = p.type + p.layer;
@@ -292,10 +309,36 @@
         }
       }
       if (anyDead) parts = parts.filter(function (p) { return !p.dead; });
+      splashes.forEach(function (s) { s.t += dt; });
+      splashes = splashes.filter(function (s) { return s.t < 0.22; });
+      drips.forEach(function (d) {
+        if (d.wait > 0) { d.wait -= dt; return; }
+        d.v += 1800 * dt;
+        d.y += d.v * dt;
+      });
+      drips = drips.filter(function (d) { return d.y < H + 20; });
     }
 
     function drawParts(wind) {
       pctx.clearRect(0, 0, W, H);
+      // Spritzer auf dem Dach und abtropfendes Wasser an den Rändern
+      if (splashes.length || drips.length) {
+        pctx.strokeStyle = 'rgba(200,222,245,0.8)';
+        pctx.lineWidth = 1.4;
+        pctx.beginPath();
+        splashes.forEach(function (s) {
+          var k = s.t / 0.22, r = 3 + 7 * k;
+          pctx.moveTo(s.x - r, s.y - 1 - 4 * k);
+          pctx.lineTo(s.x - r * 0.4, s.y);
+          pctx.moveTo(s.x + r, s.y - 1 - 4 * k);
+          pctx.lineTo(s.x + r * 0.4, s.y);
+        });
+        drips.forEach(function (d) {
+          pctx.moveTo(d.x, d.y);
+          pctx.lineTo(d.x, d.y - (d.wait > 0 ? 3 : 10));
+        });
+        pctx.stroke();
+      }
       var tanA = wind * MAX_TAN;
       [['rain', RAIN_LAYERS], ['drizzle', DRIZZLE_LAYERS]].forEach(function (pair) {
         var type = pair[0], layers = pair[1];
@@ -1688,6 +1731,8 @@
       busy: function () { return show ? show.type : null; },
       // Schneesturm-Grad 0..1 (viel Schnee und starker Wind), live
       blizzard: function () { return bz; },
+      // Dächer setzen, an denen Regen zerplatzt (leer = keine)
+      setShelters: function (list) { shelters = list || []; },
       // Abdunklung durch den Mega-Blitz 0..1, live
       dark: function () { return darkNow; },
       counts: function () {

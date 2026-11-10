@@ -152,6 +152,8 @@
       var seasonOpts = { tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
                          sky: function () { return kit.state(); },
                          blizzard: function () { return kit.blizzard(); },
+                         // Dächer (Sonnenschirm), an denen der Regen zerplatzt
+                         shelter: function (list) { kit.setShelters(list); },
                          // Blitz hat das Laub entzündet: der Server verbrennt 10 % und
                          // hält das Feuer für !extinguish offen (nass kürzer)
                          ignite: function (wet) {

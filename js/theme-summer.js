@@ -914,7 +914,9 @@
       var r = liveRain();
       castles.forEach(function (c) {
         if (!c) return;
-        stepSlump(c, 0.6 * r, c.x, 60, { washed: 1, blown: 1, reach: 110,
+        // unter dem stehenden Schirm bleibt die Burg trocken
+        var dry = U.mode === 'up' && B.partOn('umbrella') && Math.abs(c.x - U.tx) < 135;
+        stepSlump(c, dry ? 0 : 0.6 * r, c.x, 60, { washed: 1, blown: 1, reach: 110,
                                          torn: function (dir) { debris(c.x, c.y + 40, dir, true); },
                                          burst: function () { sandPuff(c.x, sandY(c.x)); } });
         renderCastle(c);
@@ -992,6 +994,19 @@
       var o = op === undefined ? '1' : op.toFixed(3);
       if (o !== U.op) { gUFly.setAttribute('opacity', o); U.op = o; }
     }
+    // Schirm als Dach für den Regen der Wetter-Engine (Kuppel ungefähr als
+    // Parabel, mit der Neigung der Kuppel); nur solange er steht
+    var shelterOn = null;
+    function shelterUmbrella() {
+      var on = B.on && U.mode === 'up' && B.partOn('beach') && B.partOn('umbrella');
+      if (on === shelterOn || !opts.shelter) return;
+      shelterOn = on;
+      var a = U.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+      opts.shelter(on ? [{ x0: U.tx - 148, x1: U.tx + 148, y: function (x) {
+        var lx = x - U.tx, ly = 30 - 57 * (1 - Math.pow(lx / 150, 2));
+        return U.ty + lx * sa + ly * ca;
+      } }] : []);
+    }
     // stehender Schirm neigt sich in Böen und flattert leicht bei Wind (um den Fuß)
     var uLean = 0, uLeanT = 0;
     function leanUmbrella() {
@@ -1027,6 +1042,7 @@
         if (U.mode !== 'up') freshUmbrella(false);
         if (uDrawn) { uctx.clearRect(0, 0, W, H); uDrawn = false; }
         tornado = null;
+        shelterUmbrella();
         return;
       }
       if (tornado && !tornado.active()) tornado = null;
@@ -1040,6 +1056,7 @@
         sandPuff(U.px, U.py - 10);
       }
       if (U.mode === 'up') leanUmbrella();
+      shelterUmbrella();
       if (U.mode === 'burn') {
         // Bespannung brennt in ~6 s bis auf Speichen und Stange ab
         var r = burnR();
