@@ -931,7 +931,19 @@
     var tornado = null, uDrawn = false, uctx = B.fireCtx();
     // Baum am Strand steht vor dem Schirm: dann weder Feuer noch Wegwehen
     function treeOver() { return X.shown() && xRoot.dataset.tree !== '0'; }
-    function umbrellaFree() { return B.on && !B.reduceMotion && B.partOn('beach') && B.partOn('umbrella') && !treeOver(); }
+    // der Schirm fliegt auch weg, wenn der Weihnachtsbaum davor steht
+    function umbrellaFree() { return B.on && !B.reduceMotion && B.partOn('beach') && B.partOn('umbrella'); }
+    // Strand-Baum biegt sich im Sturm, bei naher Windhose kräftig
+    var TREE_CX = TREE_X + 200 * TREE_K, swayDrawn = '';
+    function stepTreeSway() {
+      var tx = tornado ? tornado.x() : null, v = '';
+      if (B.on && !B.reduceMotion && treeOver()) {
+        if (tx !== null && Math.abs(tx - TREE_CX) < 320) v = 'strong';
+        else if (stormy()) v = 'storm';
+        else if (Math.abs(B.gustPx) > 150) v = 'gust';     // Böe: kurz wackeln
+      }
+      if (v !== swayDrawn) { swayDrawn = v; xRoot.dataset.sway = v; }
+    }
     // Kuppel-Punkt (lokal) auf den Bildschirm (ohne Flug)
     function uScreen(lx, ly) {
       var a = U.rot * Math.PI / 180;
@@ -967,9 +979,21 @@
       var o = op === undefined ? '1' : op.toFixed(3);
       if (o !== U.op) { gUFly.setAttribute('opacity', o); U.op = o; }
     }
+    // stehender Schirm neigt sich in Böen und flattert leicht bei Wind (um den Fuß)
+    var uLean = 0, uLeanT = 0;
+    function leanUmbrella() {
+      if (B.reduceMotion) return;
+      uLeanT += 1 / 60;
+      var w = Math.abs(B.windBase);
+      var a = Math.max(-10, Math.min(10, B.gustPx / 600 * 8)) + B.windBase * 2.5 +
+              (w > 0.3 ? Math.sin(uLeanT * 11) * 1.5 * w : 0);
+      if (Math.abs(a - uLean) < 0.05) return;
+      uLean = a;
+      gUFly.setAttribute('transform', Math.abs(a) < 0.05 ? '' : 'rotate(' + f1(a) + ' ' + U.px + ' ' + f1(U.py) + ')');
+    }
     // neuer Schirm steht sofort (ohne Animation) bzw. poppt aus dem Sand
     function freshUmbrella(pop) {
-      U.mode = 'up'; U.t = 0; U.x = 0; U.y = 0; U.a = 0; U.calm = 0;
+      U.mode = 'up'; U.t = 0; U.x = 0; U.y = 0; U.a = 0; U.calm = 0; uLean = 0;
       setBurn(0, 0, 0);
       U.ribs.classList.remove('is-burnt');
       U.pole.classList.remove('is-burnt');
@@ -993,6 +1017,7 @@
         return;
       }
       if (tornado && !tornado.active()) tornado = null;
+      stepTreeSway();
       U.t += dt;
       var burning = false;
       if (U.mode === 'up' && umbrellaFree() && (stormy() || tornadoNear())) {
@@ -1001,6 +1026,7 @@
         U.dir = tx !== null ? (tornado.dir || (tx < U.px ? 1 : -1)) : (B.windBase < 0 ? -1 : 1);
         sandPuff(U.px, U.py - 10);
       }
+      if (U.mode === 'up') leanUmbrella();
       if (U.mode === 'burn') {
         // Bespannung brennt in ~6 s bis auf Speichen und Stange ab
         var r = burnR();
@@ -1026,7 +1052,7 @@
       } else if (U.mode === 'away') {
         // kommt wieder, wenn es ~20 s ruhig ist und keine Windhose läuft
         U.calm = !stormy() && Math.abs(B.windBase) < 0.5 && !tornado ? U.calm + dt : 0;
-        if (U.calm >= 20 && !treeOver()) {
+        if (U.calm >= 20) {
           U.mode = 'back'; U.t = 0; U.x = 0; U.y = -1150; U.a = -U.dir * 35; U.vy = 0;
           placeFly(0);
         }

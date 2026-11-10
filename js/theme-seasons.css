@@ -355,6 +355,15 @@
   --tw-hat: clamp(0, calc((var(--ts-snow) - 0.6) / 0.25), 1);
 }
 .tw--beach .tw-snowcap, .tw--beach .tw-gsnow { opacity: var(--tw-light); }
+/* Strand-Baum im Sturm: biegt sich mit dem Wind (unten fest), bei naher Windhose stark */
+.tw--beach .tw-x:not(.tw-lights) > .tw-shk { transform-box: fill-box; transform-origin: 50% 100%; }
+.tw--beach[data-sway="storm"] .tw-x:not(.tw-lights) > .tw-shk { animation: twbSway 1.8s ease-in-out infinite; }
+.tw--beach[data-sway="gust"] .tw-x:not(.tw-lights) > .tw-shk { animation: twbSway 0.7s ease-in-out 2; }
+.tw--beach[data-sway="strong"] .tw-x:not(.tw-lights) > .tw-shk { animation: twbSwayStrong 0.9s ease-in-out infinite; }
+.tw--beach[data-sway="strong"] .tw-orn { animation: twJiggle 0.35s ease-in-out infinite; }
+@keyframes twbSway { 0%, 100% { transform: skewX(-1.5deg); } 50% { transform: skewX(2.5deg); } }
+@keyframes twbSwayStrong { 0%, 100% { transform: skewX(-4deg); } 50% { transform: skewX(6deg); } }
+
 /* keine Winter-Schneewehe am Strand: der Hügel bekommt dieselbe Schneeschicht wie der Sand */
 .tw--beach .tw-drift { display: none; }
 .tss-starfish { fill: #f08a5d; stroke: #c4603a; stroke-width: 1.5; }
