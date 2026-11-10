@@ -82,13 +82,36 @@ def test_lightning_fire_burns_leaves_and_extinguish_counts(conn):
     advance(conn, 1, 0, "autumn", W)
     advance(conn, 1, 1800, "autumn", {**W, "wind": 1})                     # 90
     r = ignite(conn, 1, 1800, wet=False)
-    assert r["burned"] == 10 and r["secs"] == 30
-    assert load(conn, 1)["levels"]["leaves"] == pytest.approx(80)
-    assert ignite(conn, 1, 1805, wet=False)["burned"] == 0                 # brennt schon
+    assert r["secs"] == 30
+    assert load(conn, 1)["levels"]["leaves"] == pytest.approx(90)       # Loch nur im Bild, an der Stelle
     assert use(conn, 1, "extinguish", "Mia", 1810)["done"] == 1
     assert load(conn, 1)["top"]["autumn"] == [["Mia", 1]]
     assert use(conn, 1, "extinguish", "Tom", 1811)["done"] == 0            # schon aus, zählt nicht
     assert load(conn, 1)["top"]["autumn"] == [["Mia", 1]]
+
+
+def test_up_to_five_fires_burn_at_once_and_extinguish_takes_the_oldest(conn):
+    advance(conn, 1, 0, "autumn", W)
+    advance(conn, 1, 6000, "autumn", {**W, "wind": 1})                     # 100
+    for i in range(5):
+        r = ignite(conn, 1, 6000 + i, wet=False)
+        assert r["fires"] == i + 1
+    assert ignite(conn, 1, 6006, wet=False) == {"secs": 0, "fires": 5}   # voll
+    for left, name in ((4, "Mia"), (3, "Tom"), (2, "Mia")):
+        r = use(conn, 1, "extinguish", name, 6010)
+        assert r["done"] == 1 and r["fires"] == left
+    assert ignite(conn, 1, 6011, wet=False)["fires"] == 3                  # zwei brennen noch
+    # die beiden übrigen ersten Feuer gehen nach 30 s von selbst aus
+    assert ignite(conn, 1, 6035, wet=False)["fires"] == 2
+
+
+def test_old_single_fire_state_still_counts(conn):
+    advance(conn, 1, 0, "autumn", W)
+    from fx.weather_season import _get, _put
+    data = _get(conn, 1)
+    data["fire"] = {"until": 500}
+    _put(conn, 1, data)
+    assert use(conn, 1, "extinguish", "Mia", 400)["done"] == 1
 
 
 def test_wet_fire_only_smoulders_and_goes_out_by_itself(conn):

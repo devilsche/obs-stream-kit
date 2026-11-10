@@ -552,3 +552,12 @@ def test_time_of_day_is_independent_of_weather(conn):
     c.get("/s/t/api/fx/weather?cmd=auto")
     st = _state(c)
     assert st["night"] == 0 and st["dusk"] == 0 and st["source"] != "override"
+
+
+def test_streamerbot_settings_only_local_addresses():
+    from fx.commands import parse
+    p = parse("weather", {"cmd": "set", "sbaction": " Weather <Event> ", "sbws": "ws://127.0.0.1:8080/"})["params"]
+    assert p == {"sbaction": "Weather Event", "sbws": "ws://127.0.0.1:8080/"}
+    assert parse("weather", {"cmd": "set", "sbaction": "x", "sbws": "ws://192.168.0.20:8080"})["params"]["sbws"]
+    p = parse("weather", {"cmd": "set", "sbaction": "x", "sbws": "wss://evil.example.com/"})["params"]
+    assert "sbws" not in p

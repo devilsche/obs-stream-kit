@@ -121,6 +121,24 @@ def _weather_wind(v):
     return "auto" if v.lower() == "auto" else _wind(v)
 
 
+_SB_ACTION_DROP_RE = re.compile(r"[^\w .:()/\-]")
+# nur Adressen im eigenen Rechner oder Heimnetz: das Overlay läuft in OBS
+_SB_WS_RE = re.compile(r"^wss?://(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d{1,3}\.\d{1,3}|10\.\d{1,3}\.\d{1,3}\.\d{1,3})"
+                       r"(:\d{1,5})?/?$")
+
+
+def _sb_action(v):
+    """Name der Streamer.bot-Action für Weather-Ereignisse (leer = aus)."""
+    v = " ".join(_SB_ACTION_DROP_RE.sub("", v).split())[:80].strip()
+    return v or None
+
+
+def _sb_ws(v):
+    """Websocket-Adresse von Streamer.bot, nur lokal (Standard ws://127.0.0.1:8080/)."""
+    v = v.strip()
+    return v if _SB_WS_RE.match(v) else None
+
+
 _TEST_BG_RE = re.compile(r"^https?://[A-Za-z0-9._~:/?#\[\]@!$&*+,;=%-]{1,480}$")
 
 
@@ -183,6 +201,9 @@ EFFECTS = {
             "sound": _flag,
             "volume": _level,
             "thunder": _level,
+            "ambient": _level,
+            "sbaction": _sb_action,
+            "sbws": _sb_ws,
             # Deko-Thema (Teil 3: Winter mit Xmas-Zeit)
             "theme": _choice("auto", "winter", "spring", "summer", "autumn", "none"),
             "leafrate": _float_range(0.25, 4),

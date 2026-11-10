@@ -158,7 +158,9 @@
                          // hält das Feuer für !extinguish offen (nass kürzer)
                          ignite: function (wet) {
                            if (apiBase) fetch(apiBase + 'weather?cmd=ignite' + (wet ? '&wet=1' : ''), { cache: 'no-store' }).catch(function () {});
-                         } };
+                         },
+                         // Ereignisse (Feuer, ausgebrannt, gelöscht) an Streamer.bot
+                         event: function (name, args) { sbEvent(name, args); } };
       var seasons = {
         autumn: window.ThemeAutumn.create(document.getElementById('stage'), seasonOpts),
         spring: window.ThemeSpring.create(document.getElementById('stage'), seasonOpts),
@@ -193,8 +195,49 @@
       setInterval(function () { audio.update(kit.state()); }, 250);
       var rootEl = document.documentElement;
 
+      // ── Streamer.bot: Ereignisse als Action-Aufruf über den lokalen Websocket-
+      //    Server von Streamer.bot (DoAction, Argument event = fire/fireOut/
+      //    extinguished). Nur in OBS, damit Vorschauen im Browser nichts doppelt
+      //    auslösen; ohne Action-Namen aus. ──
+      var SB_URL = 'ws://127.0.0.1:8080/';
+      var sb = { ws: null, url: null, queue: [], retry: 0, timer: null, n: 0 };
+      function sbEvent(name, args) {
+        if (!settings.sbaction || !window.obsstudio) return;
+        var a = { event: name, theme: lastTheme };
+        for (var k in args) a[k] = args[k];
+        sb.queue.push({ at: Date.now(), msg: { request: 'DoAction', id: 'weather-' + (++sb.n),
+                                               action: { name: settings.sbaction }, args: a } });
+        if (sb.queue.length > 20) sb.queue.shift();
+        sbFlush();
+      }
+      function sbFlush() {
+        var url = settings.sbws || SB_URL;
+        if (sb.ws && sb.url !== url) { sb.ws.close(); sb.ws = null; }
+        if (!sb.ws) { sbConnect(url); return; }
+        if (sb.ws.readyState !== 1) return;
+        var now = Date.now();
+        while (sb.queue.length) {
+          var q = sb.queue.shift();
+          if (now - q.at < 30000) sb.ws.send(JSON.stringify(q.msg));   // Altes verfällt
+        }
+      }
+      function sbConnect(url) {
+        if (sb.timer) return;
+        var ws;
+        try { ws = new WebSocket(url); } catch (e) { sbRetry(); return; }
+        sb.ws = ws; sb.url = url;
+        ws.onopen = function () { sb.retry = 0; sbFlush(); };
+        ws.onclose = function () { if (sb.ws === ws) { sb.ws = null; if (sb.queue.length) sbRetry(); } };
+        ws.onerror = function () { console.warn('weather: Streamer.bot not reachable at ' + url); };
+      }
+      function sbRetry() {
+        if (sb.timer) return;
+        sb.retry = Math.min(sb.retry + 1, 6);
+        sb.timer = setTimeout(function () { sb.timer = null; if (sb.queue.length) sbFlush(); }, 2000 * sb.retry);
+      }
+
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
-                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder',
+                  'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder', 'ambient', 'sbaction', 'sbws',
                   'theme', 'xmasfrom', 'xmasto', 'snowrate', 'leafrate', 'shakeneed', 'shakewin',
                   'lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover',
                   'garland', 'branch', 'pile', 'leaves', 'pumpkins', 'meadow', 'bugs', 'beach', 'umbrella'];
@@ -332,7 +375,8 @@
         rootEl.dataset.veil = flag(settings.veil) ? 'on' : 'off';
         audio.set({ on: flag(settings.sound),
                     volume: settings.volume !== undefined ? parseFloat(settings.volume) : 0.6,
-                    thunder: settings.thunder !== undefined ? parseFloat(settings.thunder) : 1 });
+                    thunder: settings.thunder !== undefined ? parseFloat(settings.thunder) : 1,
+                    ambient: settings.ambient !== undefined ? parseFloat(settings.ambient) : 0.3 });
       }
 
       // Testhintergrund nur außerhalb von OBS (dort liegt das echte Spiel dahinter)

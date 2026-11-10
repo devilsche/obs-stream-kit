@@ -153,7 +153,7 @@
     var S = { target: 0, shown: 0, first: true, top: [] };
     function lvl() { return B.partOn('pile') ? drawnLevel(S.shown) : 0; }
     // Brandlöcher: Senke im Profil (Anteil der Höhe), wächst beim Brennen,
-    // füllt sich danach langsam wieder (der Server senkt den Stand ohnehin)
+    // füllt sich danach langsam wieder; der gemeinsame Laubstand beider Haufen bleibt
     var dips = [];
     function dipAt(x) {
       var d = 0;
@@ -554,35 +554,51 @@
       if (B.root.dataset.leafwet !== flag) B.root.dataset.leafwet = flag;
     }
 
-    // ── Blitzfeuer im Laub: ein Feuer zur Zeit, nur im sichtbaren Thema ──
-    // nach einem Feuer kurze Pause, sonst brennt es im Gewitter ohne Unterbrechung;
-    // ein naher Blitz bis REACH px neben dem Haufen springt hinein
-    var FIRE_PAUSE = 20, REACH = 250;
-    var fire = null, lastFireX = null, fireDrawn = false, pauseUntil = 0;
+    // ── Blitzfeuer im Laub: bis zu FIRE_MAX Feuer, nur im sichtbaren Thema ──
+    // Ein naher Blitz bis REACH px neben dem Haufen springt hinein; trifft er
+    // ein Feuer (FIRE_NEAR), facht er es neu an. Trockene Feuer springen nach
+    // einer Weile auf die Nachbarstelle über (Kettenreaktion bis zum Maximum).
+    var FIRE_MAX = 5, REACH = 250, FIRE_NEAR = 110;
+    var fires = [], lastFireX = null, fireDrawn = false;
     var fctx = B.fireCtx();
     function pileFloor(x) { return surface(x) + 6; }
+    function burning() { return fires.filter(function (f) { return !f.out; }); }
+    function fireAt(x) {
+      for (var i = 0; i < fires.length; i++) if (!fires[i].out && Math.abs(fires[i].x - x) < FIRE_NEAR) return fires[i];
+      return null;
+    }
+    // genug Laub für ein Feuer: 45 px, bei dünnem Haufen 60 % seiner höchsten Stelle
+    function enoughAt(x) { return H - surface(x) >= Math.min(45, 0.6 * MAXH * lvl()); }
+    function emit(name, args) { if (opts.event) opts.event(name, args); }
     // Blitz-Einschlag (vom Weather-Kit): nah, im Haufen, Laub > 5 %
     function bolt(p) {
-      if (!B.on || B.reduceMotion || fire || !p.near || typeof p.x !== 'number') return;
+      if (!B.on || B.reduceMotion || !p.near || typeof p.x !== 'number') return;
       if (!B.partOn('pile') || S.shown <= 5) return;
       var x = Math.max(140, Math.min(W - 140, p.x));
       // zum nächsten Rand hin bis zur ersten Stelle mit genug Laub (Mitte ist frei)
-      // genug Laub: 45 px, bei dünnem Haufen 60 % seiner höchsten Stelle
-      var need = Math.min(45, 0.6 * MAXH * lvl());
       var dir = x < W / 2 ? -1 : 1, moved = 0;
-      while (H - surface(x) < need && moved < REACH) { x += dir * 10; moved += 10; }
-      if (H - surface(x) < need) return;               // zu weit daneben
+      while (!enoughAt(x) && moved < REACH) { x += dir * 10; moved += 10; }
+      if (!enoughAt(x)) return;                        // zu weit daneben
       x = Math.max(140, Math.min(W - 140, x + dir * Math.random() * 60));
-      if (Date.now() < pauseUntil) return;
-      if (p.ground) p.ground(x, surface(x) + 6);
-      ignite(x);
+      var hit = fireAt(x);
+      if (!hit && burning().length >= FIRE_MAX) return;
+      if (p.ground) p.ground(hit ? hit.x : x, surface(hit ? hit.x : x) + 6);
+      if (hit) {
+        // frische Glut: brennt von vorn, springt erneut über
+        if (!hit.wet) { hit.t = Math.min(hit.t, 3); hit.spreadAt = hit.t + rand(8, 14); }
+        B.sparks(hit.x, surface(hit.x), 24, 30);
+        return;
+      }
+      ignite(x, 'lightning');
     }
-    function ignite(x) {
+    function ignite(x, cause) {
       var wet = liveRain() > 0.2;
-      fire = { x: x, wet: wet, t: 0, dur: wet ? 8 : 30, out: false, outT: 0, smokeAcc: 0, sparkAcc: 0, k: 0, ember: 0,
-               dip: { x: x, w: wet ? 50 : 75, d: 0, max: wet ? 0.15 : 0.6, heal: false } };
+      var f = { x: x, wet: wet, t: 0, dur: wet ? 8 : 30, out: false, outT: 0, smokeAcc: 0, sparkAcc: 0, k: 0, ember: 0,
+                spreadAt: wet ? Infinity : rand(8, 14),
+                dip: { x: x, w: wet ? 50 : 75, d: 0, max: wet ? 0.15 : 0.7, heal: false } };
+      fires.push(f);
       lastFireX = x;
-      dips.push(fire.dip);
+      dips.push(f.dip);
       var y = surface(x);
       B.sparks(x, y, wet ? 10 : 30, 30);
       if (wet) {
@@ -591,13 +607,39 @@
         for (var j = 0; j < 5; j++) B.smoke(x + rand(-30, 30), y - 10, { o: 0.45 });
       }
       if (opts.ignite) opts.ignite(wet);
+      emit('fire', { cause: cause, wet: wet, fires: burning().length, side: x < W / 2 ? 'left' : 'right' });
+    }
+    // Funkenflug: Nachbarstelle im Haufen (mit dem Wind eher in seine Richtung)
+    function spread(f) {
+      var wind = B.windBase || 0;
+      for (var tries = 0; tries < 4; tries++) {
+        var dir = Math.random() < 0.5 + 0.35 * Math.max(-1, Math.min(1, wind)) ? 1 : -1;
+        var x = f.x + dir * rand(130, 200);
+        if (x < 140 || x > W - 140 || !enoughAt(x) || fireAt(x)) continue;
+        B.sparks(f.x, surface(f.x) - 20, 18, 60);
+        ignite(x, 'spread');
+        return;
+      }
     }
     function stepFire(dt, t) {
-      if (!fire) {
+      if (!fires.length) {
         if (fireDrawn) { fctx.clearRect(0, 0, W, H); fireDrawn = false; }
         return;
       }
-      var f = fire;
+      fctx.clearRect(0, 0, W, H);
+      fireDrawn = true;
+      for (var n = fires.length - 1; n >= 0; n--) {
+        var f = fires[n];
+        if (stepOne(f, dt, t)) {
+          f.dip.heal = true;
+          fires.splice(n, 1);
+          // von selbst ausgebrannt (nicht gelöscht)
+          if (!f.out) emit('fireOut', { wet: f.wet, fires: burning().length });
+        }
+      }
+    }
+    // ein Feuer fortschreiben und zeichnen; true = vorbei
+    function stepOne(f, dt, t) {
       f.t += dt;
       var k, ember;
       if (f.out) {
@@ -616,8 +658,12 @@
       }
       f.k = k; f.ember = ember;
       if (!f.out) f.dip.d = Math.min(f.dip.max, f.dip.max * f.t / (f.dur * 0.7));
-      var done = f.out ? f.outT > 2.5 : f.t > f.dur + (f.wet ? 0 : 4);
-      if (done) { f.dip.heal = true; fire = null; pauseUntil = Date.now() + FIRE_PAUSE * 1000; fctx.clearRect(0, 0, W, H); fireDrawn = false; return; }
+      if (f.out ? f.outT > 2.5 : f.t > f.dur + (f.wet ? 0 : 4)) return true;
+      // im Regen springt nichts über
+      if (!f.out && f.t >= f.spreadAt) {
+        f.spreadAt = Infinity;
+        if (k > 0.5 && liveRain() <= 0.2 && burning().length < FIRE_MAX && Math.random() < 0.7) spread(f);
+      }
 
       var y = surface(f.x);
       // Rauch, Funken
@@ -626,10 +672,8 @@
       f.sparkAcc += dt * 14 * k;
       while (f.sparkAcc >= 1) { f.sparkAcc--; B.sparks(f.x, y - 20, 1, 50); }
 
-      fctx.clearRect(0, 0, W, H);
-      fireDrawn = true;
       B.glow(fctx, f.x, y - 30, 300, 0.3 * k + 0.08 * ember);
-      var fl = 0.75 + 0.25 * Math.sin(t * 0.009) * Math.sin(t * 0.0137);
+      var fl = 0.75 + 0.25 * Math.sin(t * 0.009 + f.x) * Math.sin(t * 0.0137);
       B.glow(fctx, f.x, y + 4, 80 + 30 * k, 0.75 * ember * fl, '255,80,20');
       B.glow(fctx, f.x, y + 8, 34, 0.7 * ember * fl, '255,190,90');
       // Glutpunkte in der Senke
@@ -641,27 +685,32 @@
       var pts = [];
       for (var i = -3; i <= 3; i++) { var px = f.x + i * 19 + Math.sin(i * 5.3) * 5; pts.push([px, surface(px) + 12, 1 - Math.abs(i) * 0.2]); }
       B.flames(fctx, pts, 44, 160, k, t / 1000);
+      return false;
     }
-    // !extinguish: done = 1 löscht mit Wasser und Dampf (Schild), sonst kleiner Spritzer
+    // !extinguish: done = 1 löscht das älteste Feuer mit Wasser und Dampf (Schild),
+    // sonst kleiner Spritzer
     function extinguish(p) {
       if (!B.on) return;
       var done = parseFloat(p.done) > 0;
-      var x = fire ? fire.x : lastFireX !== null ? lastFireX : (Math.random() < 0.5 ? 330 : W - 330);
+      var live = burning(), f = live[0] || null;
+      var x = f ? f.x : lastFireX !== null ? lastFireX : (Math.random() < 0.5 ? 330 : W - 330);
       if (!done) {
-        var sx = fire ? x : Math.random() < 0.5 ? rand(200, 520) : rand(W - 520, W - 200);
+        var sx = f ? x : Math.random() < 0.5 ? rand(200, 520) : rand(W - 520, W - 200);
         B.water(sx, surface(sx), 14, pileFloor);
         return;
       }
       var y = surface(x);
       B.water(x, y, 70, pileFloor);
       for (var i = 0; i < 16; i++) B.smoke(x + rand(-70, 70), y - rand(0, 40), { steam: true, o: 0.6, up: rand(70, 150), r: rand(20, 34), life: rand(2, 3.5) });
-      if (fire) { fire.out = true; fire.outT = 0; }
-      B.tag((p.name || 'Someone') + ' put out the fire!', x, y - 190, true);
+      if (f) { f.out = true; f.outT = 0; }
+      var left = burning().length;
+      B.tag((p.name || 'Someone') + ' put out the fire!' + (left ? ' ' + left + ' left' : ''), x, y - 190, true);
+      emit('extinguished', { name: p.name || '', fires: left });
     }
     function stepDips(dt) {
       for (var i = dips.length - 1; i >= 0; i--) {
         if (!dips[i].heal) continue;
-        dips[i].d -= dt * dips[i].max / 90;
+        dips[i].d -= dt * dips[i].max / 240;   // neues Laub füllt das Loch in ~4 min
         if (dips[i].d <= 0) dips.splice(i, 1);
       }
     }
@@ -678,7 +727,7 @@
       // ausgeblendet nur noch kurz weiterzeichnen (Partikel fallen zu Ende)
       offFor = B.on ? 0 : offFor + dt;
       // ausgeblendet: laufendes Feuer endet still
-      if (!B.on && fire) { fire = null; dips = []; }
+      if (!B.on && fires.length) { fires = []; dips = []; }
       stepWet(dt);
       stepFire(dt, ts);
       if (offFor > 3) return;
@@ -799,7 +848,7 @@
       },
       busy: function () { return null; },
       status: function () { return { on: B.on, leaves: Math.round(S.shown), pumpkins: pkTotal, project: scare.n(),
-                                     fire: fire ? (fire.wet ? 'wet' : 'dry') : 'off', wet: +W8.wet.toFixed(2) }; }
+                                     fire: burning().length, wet: +W8.wet.toFixed(2) }; }
     };
   }
 

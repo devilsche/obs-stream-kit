@@ -4,7 +4,7 @@
  * rauschen. Dateien aus assets/effects/.
  *
  *   var audio = WeatherAudio.create('../assets/effects/');
- *   audio.set({ on, volume, thunder });  audio.update(kit.state());
+ *   audio.set({ on, volume, thunder, ambient });  audio.update(kit.state());
  *   audio.thunder(dist);  audio.gust();
  * Donner aus opts.thunderFile, vorab dekodiert (Web Audio), setzt mit dem Blitz ein.
  */
@@ -14,6 +14,7 @@
   function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
 
+  var AMBIENT = 0.3;   // Standard für Regen und Wind (früher voll = 1)
   var LOOPS = ['rain-loop-light', 'rain-loop-medium', 'rain-loop-storm', 'wind-loop-light', 'wind-loop-strong'];
 
   function create(base, opts) {
@@ -28,7 +29,8 @@
         .then(function (buf) { thunderBuf = buf; })
         .catch(function () { thunderBuf = null; });
     }
-    var on = false, volume = 0.6, thunderLevel = 1, blocked = false;
+    // ambient: Regen und Wind relativ zur Gesamtlautstärke (leise, damit das Spiel hörbar bleibt)
+    var on = false, volume = 0.6, thunderLevel = 1, ambient = AMBIENT, blocked = false;
     var loops = {}, targets = {}, lastThunder = -10;
 
     LOOPS.forEach(function (name) {
@@ -56,7 +58,7 @@
     // Lautstärken weich nachführen; stumme Schleifen anhalten
     setInterval(function () {
       LOOPS.forEach(function (name) {
-        var a = loops[name], tgt = on ? targets[name] * volume : 0;
+        var a = loops[name], tgt = on ? targets[name] * volume * ambient : 0;
         var v = a.volume + clamp(tgt - a.volume, -0.05, 0.05);
         a.volume = clamp(v, 0, 1);
         if (a.volume > 0.005 && a.paused) play(a);
@@ -88,6 +90,7 @@
         if (on && actx && actx.state === 'suspended') actx.resume().catch(function () {});
         if (typeof o.volume === 'number' && isFinite(o.volume)) volume = clamp(o.volume, 0, 1);
         if (typeof o.thunder === 'number' && isFinite(o.thunder)) thunderLevel = clamp(o.thunder, 0, 1);
+        if (typeof o.ambient === 'number' && isFinite(o.ambient)) ambient = clamp(o.ambient, 0, 1);
       },
       // Zielpegel aus dem aktuellen Wetterzustand
       update: function (cur) {
@@ -141,7 +144,7 @@
         a.playbackRate = rate;
         play(a);
       },
-      gust: function () { oneShot('wind-gust.wav', volume * 0.9); }
+      gust: function () { oneShot('wind-gust.wav', volume * ambient * 0.9); }
     };
   }
 

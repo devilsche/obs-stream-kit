@@ -20,9 +20,9 @@ TOP = 5
 LEVELS = ("leaves", "water", "weeds", "heat")
 THEME_OF = {"rake": "autumn", "sweep": "autumn", "extinguish": "autumn", "water": "spring", "weed": "spring",
             "splash": "summer", "cool": "summer"}
-FIRE_BURN = 10        # Prozent Laub, die ein Blitzfeuer wegbrennt
 FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
 FIRE_WET_SECS = 8
+FIRE_MAX = 5          # so viele Feuer brennen höchstens gleichzeitig
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_weather_season (
@@ -131,21 +131,31 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dic
     return _out(data)
 
 
+def _fires(data, now) -> list:
+    """Laufende Feuer (Ende je Feuer, ältestes zuerst); übernimmt den alten
+    Einzel-Stand "fire" und wirft abgelaufene weg."""
+    old = data.pop("fire", None)
+    fires = data.setdefault("fires", [])
+    if old:
+        fires.insert(0, old["until"])
+    fires[:] = [u for u in fires if now < u]
+    return fires
+
+
 def ignite(conn, tenant_id, now, wet: bool = False) -> dict:
-    """Blitz schlägt ins Laub (meldet das Overlay): brennt ein Loch in den
-    Haufen und brennt eine Weile, bis es von selbst ausgeht oder jemand
-    löscht. Brennt es schon, passiert nichts → {"burned", "secs"}."""
+    """Blitz schlägt ins Laub oder ein Feuer springt über (meldet das Overlay):
+    brennt eine Weile, bis es von selbst ausgeht oder jemand löscht. Das Loch
+    brennt das Overlay nur an der Stelle; der gemeinsame Laubstand beider
+    Haufen bleibt. Bis zu FIRE_MAX gleichzeitig, darüber passiert nichts
+    → {"secs", "fires"}."""
     data = _get(conn, tenant_id) or _fresh(now)
-    fire = data.get("fire")
-    if fire and now < fire["until"]:
-        return {"burned": 0, "secs": 0}
+    fires = _fires(data, now)
+    if len(fires) >= FIRE_MAX:
+        return {"secs": 0, "fires": len(fires)}
     secs = FIRE_WET_SECS if wet else FIRE_SECS
-    lv = data["levels"]
-    burned = min(FIRE_BURN, lv["leaves"])
-    lv["leaves"] -= burned
-    data["fire"] = {"until": now + secs}
+    fires.append(now + secs)
     _put(conn, tenant_id, data)
-    return {"burned": round(burned, 2), "secs": secs}
+    return {"secs": secs, "fires": len(fires)}
 
 
 def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: int = 3, win: int = 20) -> dict:
@@ -158,9 +168,12 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
     elif cmd == "sweep":
         done = lv["leaves"]; lv["leaves"] = 0; key = "leaves"
     elif cmd == "extinguish":
-        # nur ein laufendes Feuer lässt sich löschen
-        fire = data.pop("fire", None)
-        done = 1 if fire and now < fire["until"] else 0
+        # löscht das älteste laufende Feuer; ohne Feuer zählt es nicht
+        fires = _fires(data, now)
+        done = 1 if fires else 0
+        if fires:
+            fires.pop(0)
+        out["fires"] = len(fires)   # brennen danach noch
         key = "leaves"
     elif cmd == "water":
         done = min(10, 100 - lv["water"]); lv["water"] += done; key = "water"
