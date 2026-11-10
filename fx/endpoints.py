@@ -36,11 +36,15 @@ _PERSISTENT = {
 def _weather_persist(conn, tenant_id, cmd):
     """Übersteuerung speichern; der Befehl geht trotzdem in die Warteschlange,
     damit das Overlay den Zustand sofort neu holt."""
-    if cmd["cmd"] == "weather":
+    if cmd["cmd"] == "weather" and cmd["params"]["to"] in weather_theme.TIMES_OF_DAY:
+        # Nacht/Dämmerung ist Tageszeit, nicht Wetter: bleibt beim nächsten Wetterwechsel
+        weather_theme.set_tod(conn, tenant_id, cmd["params"]["to"], cmd["params"]["hold"], time.time())
+    elif cmd["cmd"] == "weather":
         weather_db.set_override(conn, tenant_id, cmd["params"]["to"],
                                 cmd["params"]["hold"], time.time())
     elif cmd["cmd"] == "auto":
         weather_db.clear_override(conn, tenant_id)
+        weather_theme.clear_tod(conn, tenant_id)
     elif cmd["cmd"] in ("scrape", "warm"):
         # Ergebnis mitschicken, damit das Overlay passend animiert
         cmd["params"].update(weather_frost.use(conn, tenant_id, cmd["cmd"],

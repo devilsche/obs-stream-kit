@@ -87,11 +87,25 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
             state.update(night=base.get("night", 0), dusk=base.get("dusk", 0))
         source, until, transition = "override", ov["until"], TRANSITION_FAST
 
+    # Tageszeit per Knopf (night/dawn/dusk) liegt über jedem Wetter
+    try:
+        tod = weather_theme.current_tod(conn, tenant_id, now)
+    except Exception:
+        log.exception("weather: time of day failed for tenant %s", tenant_id)
+        tod = None
+    if tod:
+        prof = weather.profile(tod)
+        state.update(night=prof["night"], dusk=prof["dusk"])
+        if source != "override":
+            source, transition = "override", TRANSITION_FAST
+
     state = weather.apply_daylight(state)
     if loc:
         state.update(_sky(now, loc["lat"], loc["lon"]))
-    # Feste Nacht/Dämmerung zum Testen: feste Szene statt echtem Himmel
+    # Feste Nacht/Dämmerung (Lage oder Knopf): feste Szene statt echtem Himmel
     # (sonst wäre bei Neumond oder tagsüber kein Mond zu sehen)
+    if tod and not (lock and lock != "off"):
+        lock = tod
     if lock == "night":
         state.update(sunUp=0, sunX=0.1, sunY=1, moonUp=1, moonX=0.78, moonY=0.2, moonLit=0.9, moonWax=1)
     elif lock == "dawn":

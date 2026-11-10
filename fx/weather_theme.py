@@ -145,7 +145,7 @@ def _load(conn, tenant_id):
 def _save(conn, tenant_id, data):
     """Xmas-Ablauf schreiben; Frühstart und Zone bleiben erhalten."""
     old = _load(conn, tenant_id) or {}
-    for key in ("early", "zone"):
+    for key in ("early", "zone", "tod"):
         if key in old:
             data = dict(data, **{key: old[key]})
     _write(conn, tenant_id, data)
@@ -205,6 +205,34 @@ def early_start(conn, tenant_id, today: date, to: str, zone: str = "north") -> N
     else:
         data.pop("early", None)
     _write(conn, tenant_id, data)
+
+
+TIMES_OF_DAY = ("night", "dawn", "dusk")
+
+
+def set_tod(conn, tenant_id, kind: str, hold, now: float) -> None:
+    """Tageszeit übersteuern (night/dawn/dusk), unabhängig vom Wetter;
+    hold in Sekunden, 0 = bis `auto`."""
+    data = _load(conn, tenant_id) or {}
+    data["tod"] = {"kind": kind, "until": now + hold if hold else None}
+    _write(conn, tenant_id, data)
+
+
+def clear_tod(conn, tenant_id) -> None:
+    data = _load(conn, tenant_id)
+    if data and data.pop("tod", None) is not None:
+        _write(conn, tenant_id, data)
+
+
+def current_tod(conn, tenant_id, now: float):
+    """Laufende Tageszeit-Übersteuerung (night/dawn/dusk) oder None."""
+    tod = (_load(conn, tenant_id) or {}).get("tod")
+    if not tod:
+        return None
+    if tod.get("until") is not None and now >= tod["until"]:
+        clear_tod(conn, tenant_id)
+        return None
+    return tod["kind"]
 
 
 def remember_zone(conn, tenant_id, zone: str) -> None:

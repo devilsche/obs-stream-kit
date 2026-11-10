@@ -533,3 +533,22 @@ def test_ignite_is_not_broadcast_and_extinguish_reports(conn):
     c.get("/s/t/api/fx/weather?cmd=extinguish&name=Mia")
     cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
     assert cmds[-1]["cmd"] == "extinguish" and cmds[-1]["params"]["done"] == 1
+
+
+def test_time_of_day_is_independent_of_weather(conn):
+    # Tag ohne Ort; Night per Knopf bleibt, wenn danach Regen kommt
+    c = _client(conn)
+    assert _state(c)["night"] == 0
+    c.get("/s/t/api/fx/weather?cmd=weather&to=night&hold=0")
+    assert _state(c)["night"] == 1
+    c.get("/s/t/api/fx/weather?cmd=weather&to=rain&hold=0")
+    st = _state(c)
+    assert st["night"] == 1 and st["rain"] > 0.5 and st["kind"] == "rain"
+    # Dusk ersetzt nur die Tageszeit, das Wetter bleibt
+    c.get("/s/t/api/fx/weather?cmd=weather&to=dusk&hold=0")
+    st = _state(c)
+    assert st["dusk"] == 1 and st["rain"] > 0.5
+    # Auto setzt beides zurück
+    c.get("/s/t/api/fx/weather?cmd=auto")
+    st = _state(c)
+    assert st["night"] == 0 and st["dusk"] == 0 and st["source"] != "override"

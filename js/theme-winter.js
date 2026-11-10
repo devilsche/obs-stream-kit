@@ -602,6 +602,11 @@
       }
       if (Math.abs(prev - S.shown) > 0.001) dirty = true;
       // Hitze: Schneemann schrumpft langsam und erholt sich wieder
+      if (S.nightT !== undefined && S.night !== S.nightT) {
+        var nd = S.nightT - S.night, ns = dt / 4;
+        S.night = Math.abs(nd) <= ns ? S.nightT : S.night + (nd > 0 ? ns : -ns);
+        dirty = true;
+      }
       var ph = S.heat;
       S.heat += (S.heatT - S.heat) * Math.min(1, dt / (S.heatT > S.heat ? 8 : 15));
       if (Math.abs(S.heat - S.heatT) < 0.002) S.heat = S.heatT;
@@ -681,8 +686,10 @@
         }
         if (Array.isArray(s.snowTop)) S.snowTop = s.snowTop;
         S.heatT = (s.heat || 0) > 0.5 ? 1 : 0;
-        S.night = clamp01(s.night || 0);
-        rootEl.dataset.night = S.night > 0.05 ? '1' : '0';
+        // Nacht kommt weich: die Schleife gleitet S.night in ~4 s nach
+        S.nightT = clamp01(s.night || 0);
+        if (S.night === undefined) S.night = S.nightT;
+        rootEl.dataset.night = Math.max(S.night, S.nightT) > 0.05 ? '1' : '0';
         var p = s.parts || {};
         PART_KEYS.forEach(function (k) {
           S.partsOn[k] = p[k] !== false;

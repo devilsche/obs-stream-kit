@@ -154,7 +154,9 @@
       // Weather-Zustand übernehmen; liefert true, wenn das Thema sichtbar ist
       apply: function (s) {
         B.on = s.theme === name;
-        B.night = clamp01(s.night || 0);
+        // Nacht kommt weich (stepSnow gleitet B.night in ~4 s nach)
+        B.nightT = clamp01(s.night || 0);
+        if (B.night === undefined || B.firstNight !== false) { B.night = B.nightT; B.firstNight = false; }
         B.rain = clamp01((s.rain || 0) + 0.5 * (s.drizzle || 0));
         B.heat = clamp01(s.heat || 0);
         B.sun = clamp01(s.sun || 0);
@@ -189,6 +191,12 @@
       // wächst mit der Schneemenge, Schneesturm macht dicker; danach in ~1 min
       // weg. Ausgeblendet sofort 0. Setzt --ts-snow, liefert den Stand.
       stepSnow: function (dt) {
+        // Nacht gleitet (keine harte Umschaltung bei fester Lage „Night“)
+        if (B.nightT !== undefined && B.night !== B.nightT) {
+          var nd = B.nightT - B.night, ns = dt / 4;
+          B.night = Math.abs(nd) <= ns ? B.nightT : B.night + (nd > 0 ? ns : -ns);
+          rootEl.dataset.night = B.night > 0.5 ? '1' : '0';
+        }
         var sky = opts.sky ? opts.sky() : null;
         var sn = sky ? clamp01(sky.snow || 0) : 0;
         var bz = opts.blizzard ? clamp01(opts.blizzard()) : 0;
