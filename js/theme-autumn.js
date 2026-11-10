@@ -237,7 +237,7 @@
 
     // ── Kürbisse: 12 Plätze, abwechselnd links/rechts von der Ecke nach innen ──
     var PK_X = [];
-    for (var pi = 0; pi < MAX_PK / 2; pi++) { PK_X.push(60 + pi * 46); PK_X.push(W - 60 - pi * 46); }
+    for (var pi = 0; pi < MAX_PK / 2; pi++) { PK_X.push(64 + pi * 82); PK_X.push(W - 64 - pi * 82); }
     var pkNodes = [], pkNext = 0, pkTotal = 0, pkGen = 0;
     // Je Platz feste Streuung: Sorte (Farbe), Form, Neigung und Tiefe –
     // hinten kleiner, höher und dunkler, damit der Haufen räumlich wirkt
