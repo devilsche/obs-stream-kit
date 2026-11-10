@@ -18,7 +18,7 @@ from flask import Blueprint, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, season_db, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, commands, season_db, weather_chat, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -117,17 +117,22 @@ def _winter_persist(conn, tenant_id, cmd):
     return True
 
 
-def _weather_state(conn, tenant_id):
-    """Deko-Stand fürs Winter-Thema beim ersten Poll: Kugeln, Geschenke,
-    Mini-Schneemänner, Schneemann-Stufe (Subs seit dem letzten Reset, max 8)."""
-    x = xmas_db.load_state(conn, tenant_id)
-    w = season_db.load_state(conn, tenant_id, "winter")
+def _project_stage(conn, tenant_id) -> int:
+    """Stufe des gemeinsamen Sub-Projekts: Subs seit dem letzten Reset, max 8."""
     stage = 0
-    for e in w["events"]:
+    for e in season_db.load_state(conn, tenant_id, "winter")["events"]:
         if e["k"] == "build":
             stage = min(8, stage + 1)
         elif e["k"] == "smreset":
             stage = 0
+    return stage
+
+
+def _weather_state(conn, tenant_id):
+    """Deko-Stand fürs Winter-Thema beim ersten Poll: Kugeln, Geschenke,
+    Mini-Schneemänner, Schneemann-Stufe (Subs seit dem letzten Reset, max 8)."""
+    x = xmas_db.load_state(conn, tenant_id)
+    stage = _project_stage(conn, tenant_id)
     # gemeinsame Follower-Liste, je Gestalt so viele neueste, wie Platz ist
     f = weather_followers.load(conn, tenant_id, limit=60)
     names, total = f["names"], f["total"]
@@ -177,6 +182,32 @@ def push(token, effect):
         cmd = commands.parse(effect, args)
     except ValueError as e:
         return _no_store(jsonify({"ok": False, "error": str(e)})), 400
+    extra = {}
+    if effect == "weather" and cmd["cmd"] == "build":
+        # Antwort mit Projektstand, damit Streamer.bot den Fortschritt melden kann
+        try:
+            before = _with_conn(lambda conn: _project_stage(conn, g.tenant_id))
+        except Exception:
+            log.exception("fx weather: project stage failed")
+            before = None
+    out = _dispatch(effect, cmd)
+    if out.get("duplicate"):
+        return _no_store(jsonify(out))
+    if effect == "weather" and cmd["cmd"] == "build" and before is not None:
+        try:
+            after = _with_conn(lambda conn: _project_stage(conn, g.tenant_id))
+            theme = weather_state.LAST_THEME.get(g.tenant_id, "autumn")
+            done = after == weather_chat.PROJECT_PARTS and before < after
+            extra = {"project": after, "left": weather_chat.PROJECT_PARTS - after, "completed": done, "theme": theme,
+                     "say": weather_chat.project_say(theme, after, cmd["params"].get("name", ""), done)}
+        except Exception:
+            log.exception("fx weather: project stage failed")
+    out.update(extra)
+    return _no_store(jsonify(out))
+
+
+def _dispatch(effect, cmd) -> dict:
+    """Befehl dauerhaft ablegen (falls nötig) und an die Source schicken."""
     if effect in _PERSISTENT:
         persist = _PERSISTENT[effect][0]
         try:
@@ -186,9 +217,78 @@ def push(token, effect):
             log.exception("fx %s: persist failed", effect)
             forward = True
         if not forward:
-            return _no_store(jsonify({"ok": True, "duplicate": True}))
-    seq = commands.push(g.tenant_id, effect, cmd)
-    return _no_store(jsonify({"ok": True, "seq": seq}))
+            return {"ok": True, "duplicate": True}
+    return {"ok": True, "seq": commands.push(g.tenant_id, effect, cmd)}
+
+
+@bp_fx.route("/s/<token>/api/fx/weather/paid")
+def weather_paid_route(token):
+    """Streamer.bot: Wetter gegen Bits/Spende oder Raid-Begrüßung.
+    kind=bits|money|raid, amount, name, msg (Befehl wie !tornado optional).
+    → {"ok", "offer", "say"}; say leer = nichts in den Chat."""
+    if g.tenant_id is None:
+        abort(404)
+    kind = (request.args.get("kind") or "").strip().lower()
+    amount, name = request.args.get("amount", ""), (request.args.get("name") or "")[:40]
+    if kind == "raid":
+        r = weather_chat.raid(amount, name)
+    elif kind in ("bits", "money"):
+        r = weather_chat.paid(kind, amount, (request.args.get("msg") or "")[:300], name)
+    else:
+        return _no_store(jsonify({"ok": False, "error": "kind must be bits, money or raid"})), 400
+    out = {"ok": True, "offer": r["offer"] if r["command"] else None, "say": r["say"]}
+    if r["command"]:
+        out.update(_dispatch("weather", commands.parse("weather", {"cmd": r["command"]["cmd"], **r["command"]["params"]})))
+    return _no_store(jsonify(out))
+
+
+_INFO_TURN = {}
+
+
+@bp_fx.route("/s/<token>/api/fx/weather/info")
+def weather_info_route(token):
+    """Streamer.bot: fertige Chat-Sätze. what=weather|project|top|tip|rotate
+    (rotate wechselt Projekt, Rangliste, Tipp); place wie in der Overlay-URL."""
+    if g.tenant_id is None:
+        abort(404)
+    what = (request.args.get("what") or "weather").strip().lower()
+    opts = {}
+    place = (request.args.get("place") or "").strip()
+    if place:
+        val = commands.EFFECTS["weather"]["settings"]["place"](place)
+        if val is not None:
+            opts["place"] = val
+
+    def build(conn):
+        state = None
+        if what == "weather" or g.tenant_id not in weather_state.LAST_THEME:
+            state = weather_state.resolve(conn, g.tenant_id, opts)
+        theme = weather_state.LAST_THEME.get(g.tenant_id, "autumn")
+
+        def top():
+            if theme == "winter":
+                return weather_chat.top_say(theme, weather_snow.load(conn, g.tenant_id)["top"])
+            return weather_chat.top_say(theme, weather_season.load(conn, g.tenant_id)["top"].get(theme, []))
+        says = {"weather": lambda: weather_chat.weather_say(state),
+                "project": lambda: weather_chat.project_say(theme, _project_stage(conn, g.tenant_id)),
+                "top": top, "tip": lambda: weather_chat.tip_say(theme)}
+        if what == "rotate":
+            order = ("project", "top", "tip")
+            turn = _INFO_TURN.get(g.tenant_id, 0)
+            for i in range(len(order)):
+                key = order[(turn + i) % len(order)]
+                text = says[key]()
+                if text:
+                    _INFO_TURN[g.tenant_id] = turn + i + 1
+                    return text
+            return ""
+        return says[what]() if what in says else ""
+    try:
+        say = _with_conn(build)
+    except Exception:
+        log.exception("fx weather: info failed")
+        say = ""
+    return _no_store(jsonify({"ok": True, "say": say}))
 
 
 @bp_fx.route("/s/<token>/api/fx/<effect>/poll")

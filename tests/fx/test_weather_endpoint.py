@@ -567,3 +567,48 @@ def test_sound_settings_ambient_and_siren():
     from fx.commands import parse
     p = parse("weather", {"cmd": "set", "ambient": "0.15", "siren": "1"})["params"]
     assert p["ambient"] == 0.15 and p["siren"] is True
+
+
+def test_build_answers_with_project_progress(conn):
+    c = _client(conn)
+    weather_state.LAST_THEME[1] = "autumn"
+    for i in range(6):
+        r = c.get("/s/t/api/fx/weather?cmd=build&name=Sub" + str(i)).get_json()
+    assert r["left"] == 2 and r["completed"] is False
+    assert r["say"] == "Danke Sub5! Noch 2 Subs bis zur fertigen Vogelscheuche."
+    c.get("/s/t/api/fx/weather?cmd=build&name=A")
+    r = c.get("/s/t/api/fx/weather?cmd=build&name=B").get_json()
+    assert r["completed"] is True and "ist fertig" in r["say"]
+    r = c.get("/s/t/api/fx/weather?cmd=build&name=C").get_json()
+    assert r["completed"] is False and "schon fertig" in r["say"]
+
+
+def test_paid_weather_pushes_command_only_when_enough(conn):
+    c = _client(conn)
+    r = c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&name=Tim&msg=cheer100%20!tornado").get_json()
+    assert r["offer"] is None and "500 Bits" in r["say"]
+    assert commands.poll(1, "weather", 0)["commands"] == []
+    r = c.get("/s/t/api/fx/weather/paid?kind=money&amount=5&name=Tim&msg=!tornado").get_json()
+    assert r["offer"] == "tornado"
+    cmds = commands.poll(1, "weather", 0)["commands"]
+    assert cmds[-1]["cmd"] == "spectacle" and cmds[-1]["params"]["type"] == "tornado"
+    # Wetter-Befehl setzt die Übersteuerung wie ein normaler cmd=weather
+    c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&msg=!thunderstorm")
+    assert weather_db.current_override(conn, 1, __import__("time").time())["kind"] == "storm"
+    assert c.get("/s/t/api/fx/weather/paid?kind=x").status_code == 400
+
+
+def test_raid_greeting(conn):
+    c = _client(conn)
+    assert c.get("/s/t/api/fx/weather/paid?kind=raid&amount=3&name=X").get_json()["say"] == ""
+    assert c.get("/s/t/api/fx/weather/paid?kind=raid&amount=60&name=X").get_json()["offer"] == "megabolt"
+
+
+def test_info_sentences(conn):
+    c = _client(conn)
+    say = c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
+    assert say.startswith("Wetter gerade: ")
+    weather_state.LAST_THEME[1] = "autumn"
+    assert c.get("/s/t/api/fx/weather/info?what=project").get_json()["say"] == "Noch 8 Subs bis zur fertigen Vogelscheuche."
+    seen = {c.get("/s/t/api/fx/weather/info?what=rotate").get_json()["say"][:5] for _ in range(3)}
+    assert "Noch " in seen and "Probi" in seen     # leere Rangliste wird übersprungen
