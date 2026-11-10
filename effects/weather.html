@@ -198,6 +198,7 @@
       // sichtbare Deko-Thema; ausgeblendete Themen reagieren nicht
       kit.on('spectacle', function (info) {
         audio.spectacle(info);
+        sbEvent('spectacle', { type: info.type });
         if (seasons[lastTheme]) seasons[lastTheme].command('spectacle', info);
         else if (lastTheme === 'winter') theme.command('spectacle', info);
       });
@@ -206,7 +207,7 @@
 
       // ── Streamer.bot: Ereignisse als Action-Aufruf über den lokalen Websocket-
       //    Server von Streamer.bot (DoAction, Argument event = fire/fireOut/
-      //    extinguished). Nur in OBS, damit Vorschauen im Browser nichts doppelt
+      //    extinguished/struck/spectacle). Nur in OBS, damit Vorschauen im Browser nichts doppelt
       //    auslösen; ohne Action-Namen aus. ──
       var SB_URL = 'ws://127.0.0.1:8080/';
       var sb = { ws: null, url: null, queue: [], retry: 0, timer: null, n: 0 };
