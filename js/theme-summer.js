@@ -2,6 +2,8 @@
  * (Fahne mit Namen), Sandpalast als gemeinsames Sub-Projekt (8 Teile),
  * Sonnenschirm, Muscheln, Hitzeflimmern über dem Sand,
  * Eis, das mit der Hitze schmilzt, abends dunklerer Rand und Glühwürmchen.
+ * Bei Regen sacken die Sandburgen in sich zusammen (der Palast etwas),
+ * ein Tsunami spült sie flach; Schnee setzt Hauben auf Burgen, Palast und Schirm; danach bauen sie sich nach und nach wieder auf.
  * Eine eigene Sonne gibt es nicht: die Sonnenbrille sitzt auf der Sonne der
  * Weather-Kit (opts.sky liefert deren Stand), ihr Hof wächst mit der Hitze.
  * Hitze rechnet der Server (seasonLevels.heat). Optik aus effects/summer.html.
@@ -24,6 +26,11 @@
     var W = B.W, H = B.H, el = B.el, f1 = B.f1, rand = B.rand, clamp01 = B.clamp01;
     var rnd = TS.seeded(31);
 
+    // Schneehaube auf einer flachen Oberkante (x0..x1 bei y), wächst über --ts-snow
+    function cap(parent, x0, x1, y, h) {
+      return el('path', { 'class': 'ts-cap', d: 'M' + (x0 - 3) + ' ' + (y + 1) + ' Q' + (x0 - 3) + ' ' + (y - h) + ' ' + (x0 + 6) + ' ' + (y - h) +
+                          ' L' + (x1 - 6) + ' ' + (y - h) + ' Q' + (x1 + 3) + ' ' + (y - h) + ' ' + (x1 + 3) + ' ' + (y + 1) + ' Z' }, parent);
+    }
     function grad(kind, id, attrs, stops) {
       var g = el(kind, Object.assign({ id: id }, attrs), B.defs);
       stops.forEach(function (s) { el('stop', { offset: s[0], 'stop-color': s[1], 'stop-opacity': s[2] === undefined ? 1 : s[2] }, g); });
@@ -57,8 +64,15 @@
     var shctx = shimmerCanvas.getContext('2d');
     var gBall = el('g', {}, B.fxSvg);
 
-    // ── Strand ──
-    function sandY(x) { return H - 70 - 10 * Math.sin(x / 140) - 6 * Math.sin(x / 47 + 1); }
+    // ── Strand: in der Mitte (Lebensbalken, x 700–1220) nur ein flacher
+    // Streifen, zu den Seiten hin weich über 250 px ansteigend ──
+    function sandY(x) {
+      var hi = H - 70 - 10 * Math.sin(x / 140) - 6 * Math.sin(x / 47 + 1);
+      var lo = H - 18 - 3 * Math.sin(x / 47 + 1);
+      var d = x < 700 ? (700 - x) / 250 : x > 1220 ? (x - 1220) / 250 : 0;
+      var k = d >= 1 ? 0 : 0.5 + 0.5 * Math.cos(Math.PI * d);
+      return hi + (lo - hi) * k;
+    }
     (function () {
       var d = 'M0 ' + H;
       for (var x = 0; x <= W; x += 16) d += ' L' + x + ' ' + f1(sandY(x));
@@ -66,7 +80,7 @@
       sand.setAttribute('d', d);
       sandHot.setAttribute('d', d);
       for (var i = 0; i < 160; i++) { var dx = rnd() * W; el('circle', { 'class': 'tss-dot', cx: dx.toFixed(0), cy: (sandY(dx) + 10 + rnd() * 50).toFixed(0), r: (1 + rnd() * 2).toFixed(1) }, gDeco); }
-      [[300, 1], [1130, -1], [1590, 1]].forEach(function (s) {
+      [[300, 1], [1700, -1], [1590, 1]].forEach(function (s) {
         var g = el('g', { transform: 'translate(' + s[0] + ' ' + (sandY(s[0]) + 28).toFixed(0) + ') scale(' + s[1] + ' 1)' }, gDeco);
         el('path', { 'class': 'tss-shell', d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
       });
@@ -81,6 +95,7 @@
       el('path', { 'class': 'tss-utop', d: DOME }, top);
       el('path', { 'class': 'tss-ustripe', 'clip-path': 'url(#tss-uclip)',
                    d: 'M0 -27 Q-62 -14 -100 40 L-50 40 Q-24 -2 0 -27 Z M0 -27 Q24 -2 50 40 L100 40 Q62 -14 0 -27 Z' }, top);
+      el('path', { 'class': 'ts-cap', d: 'M-122 -6 C-104 -42 104 -42 122 -6 C80 -24 -80 -24 -122 -6 Z' }, top);
       el('circle', { 'class': 'tss-utip', cx: 0, cy: -29, r: 5 }, top);
     })();
 
@@ -96,15 +111,22 @@
       var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.5 + (i % 3) * 0.12;
       if (castles[i]) gCastles.removeChild(castles[i].node);
       var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, gCastles);
-      var g = el('g', { 'class': 'tss-castle-g' + (animate ? ' tss-castle-g--new' : '') }, outer);
+      // Zwischenebene fürs Zusammensacken (Fuß bei 0/0), darin die Burg mit ihren CSS-Animationen
+      var slump = el('g', {}, outer);
+      var g = el('g', { 'class': 'tss-castle-g' + (animate ? ' tss-castle-g--new' : '') }, slump);
       el('path', { 'class': 'tss-castle', d: 'M-50 0 L-50 -40 L50 -40 L50 0 Z' }, g);
       el('path', { 'class': 'tss-castle', d: 'M-58 0 L-58 -64 L-52 -64 L-52 -72 L-44 -72 L-44 -64 L-36 -64 L-36 -72 L-28 -72 L-28 -64 L-24 -64 L-24 0 Z' }, g);
       el('path', { 'class': 'tss-castle', d: 'M24 0 L24 -64 L28 -64 L28 -72 L36 -72 L36 -64 L44 -64 L44 -72 L52 -72 L52 -64 L58 -64 L58 0 Z' }, g);
       el('path', { 'class': 'tss-castle', d: 'M-16 -40 L-16 -84 L-10 -84 L-10 -92 L-2 -92 L-2 -84 L2 -84 L2 -92 L10 -92 L10 -84 L16 -84 L16 -40 Z' }, g);
       el('path', { 'class': 'tss-door', d: 'M-10 0 L-10 -20 Q0 -32 10 -20 L10 0 Z' }, g);
+      cap(g, -58, -24, -72, 10); cap(g, 24, 58, -72, 10); cap(g, -16, 16, -92, 10);
       el('line', { 'class': 'tss-flagpole', x1: 0, y1: -92, x2: 0, y2: -140 }, g);
-      el('path', { 'class': 'tss-flag tss-f' + (1 + i % 5), d: 'M1 -140 L36 -132 L1 -122 Z' }, g);
-      castles[i] = { node: outer, inner: g, x: x, y: y - 150 * k, label: name };
+      var flagG = el('g', {}, g);
+      el('path', { 'class': 'tss-flag tss-f' + (1 + i % 5), d: 'M1 -140 L36 -132 L1 -122 Z' }, flagG);
+      // weggesackter Sand vor dem Fuß
+      var mound = el('path', { 'class': 'tss-mound', d: 'M-74 6 Q-46 -24 0 -27 Q46 -24 74 6 Z', opacity: 0 }, outer);
+      castles[i] = { node: outer, inner: g, slump: slump, flagG: flagG, mound: mound, x: x, y: y - 150 * k, label: name,
+                     s: 0, shown: -1, wait: null, washed: false };
       cNext++;
       if (animate && B.on && B.partOn('beach')) B.tag(name, x, y - 160 * k, false);
     }
@@ -131,6 +153,7 @@
         function (g) {
           el('rect', { 'class': 'tss-castle', x: -140, y: -150, width: 280, height: 112 }, g);
           el('path', { 'class': 'tss-pal-line', d: 'M-140 -112 L140 -112 M-140 -76 L140 -76 M-90 -150 L-90 -112 M60 -112 L60 -76 M-40 -76 L-40 -40 M100 -150 L100 -112' }, g);
+          cap(g, -140, 140, -150, 14);
         },
         function (g) {
           el('path', { 'class': 'tss-door', d: 'M-32 -38 L-32 -98 Q0 -132 32 -98 L32 -38 Z' }, g);
@@ -142,6 +165,7 @@
             el('rect', { 'class': 'tss-castle', x: cx - 32, y: -230, width: 64, height: 192 }, g);
             el('path', { 'class': 'tss-door', d: 'M' + (cx - 9) + ' -170 L' + (cx - 9) + ' -190 Q' + cx + ' -202 ' + (cx + 9) + ' -190 L' + (cx + 9) + ' -170 Z' }, g);
             el('path', { 'class': 'tss-pal-line', d: 'M' + (cx - 32) + ' -130 L' + (cx + 32) + ' -130 M' + (cx - 32) + ' -90 L' + (cx + 32) + ' -90' }, g);
+            cap(g, cx - 32, cx + 32, -230, 14);
           });
         },
         function (g) {
@@ -149,6 +173,7 @@
           el('path', { 'class': 'tss-door', d: 'M-12 -238 L-12 -266 Q0 -282 12 -266 L12 -238 Z' }, g);
           el('circle', { 'class': 'tss-shell-dot', cx: -30, cy: -200, r: 6 }, g);
           el('circle', { 'class': 'tss-shell-dot', cx: 30, cy: -200, r: 6 }, g);
+          cap(g, -56, 56, -310, 14);
         },
         function (g) {
           el('path', { 'class': 'tss-castle', d: merlons(-140, 140, -150, 16) + merlons(-192, -128, -230, 14) + merlons(128, 192, -230, 14) + merlons(-56, 56, -310, 16) }, g);
@@ -325,6 +350,78 @@
       })();
     }
 
+    // ── Regen und Tsunami: Burgen sacken zusammen und bauen sich wieder auf ──
+    // s = 0 (steht) .. 1 (flach); Regen drückt höchstens auf 0,6
+    var wave = null;          // laufender Tsunami (Auskunft der Weather-Kit)
+    var pal = { s: 0, shown: -1, wait: null, washed: false };
+    function liveRain() {
+      var sky = opts.sky ? opts.sky() : null;
+      return sky ? clamp01((sky.rain || 0) + 0.5 * (sky.drizzle || 0)) : B.rain;
+    }
+    // ein Bauwerk Richtung Ziel bewegen; Wiederaufbau erst nach Wartezeit
+    // (gestaffelt, ein paar zugleich), dann in ~25 s
+    function stepSlump(c, target, x, maxWait, rebuild) {
+      if (wave && !B.reduceMotion && wave.level(x) > 30) c.washed = true;
+      if (c.washed && !(wave && wave.active())) { c.washed = false; c.wait = rand(3, maxWait); }
+      if (c.washed) target = Math.max(target, rebuild.washed);
+      if (B.reduceMotion) { c.s = target; c.wait = null; return; }
+      if (target >= c.s - 0.005) {
+        c.wait = null;
+        c.s += Math.min(target - c.s, dt0 * (c.washed ? 2.5 : 0.01 + target / 60));
+        return;
+      }
+      if (c.wait === null) c.wait = rand(0, maxWait);
+      if (c.wait > 0) { c.wait -= dt0; if (c.wait <= 0 && rebuild.burst) rebuild.burst(); return; }
+      c.s = Math.max(target, c.s - dt0 / 25);
+    }
+    var dt0 = 0;
+    function sandPuff(x, y) {
+      if (!B.front) return;
+      for (var i = 0; i < 10; i++) {
+        B.front.add({ x: x + rand(-30, 30), y: y - rand(0, 20), vx: rand(-160, 160), vy: rand(-420, -160), g: 1400, term: 900,
+                      sway: 0, vr: 0, wf: 0, r: rand(2, 4), c: '#e2c27f', life: 1, floor: sandY, draw: droplet });
+      }
+    }
+    function renderCastle(c) {
+      if (Math.abs(c.s - c.shown) < 0.002) return;
+      c.shown = c.s;
+      var sv = c.s, sy = 1 - 0.82 * sv, sx = 1 + 0.3 * sv;
+      c.slump.setAttribute('transform', sv < 0.002 ? '' : 'scale(' + sx.toFixed(3) + ' ' + sy.toFixed(3) + ')');
+      // nasse Fahne hängt, bei flacher Burg ist sie weggespült
+      c.flagG.setAttribute('transform', 'rotate(' + (70 * clamp01(sv / 0.4)).toFixed(1) + ' 0 -140)');
+      c.flagG.setAttribute('opacity', (1 - clamp01((sv - 0.75) / 0.15)).toFixed(3));
+      c.mound.setAttribute('transform', 'scale(' + (0.5 + 0.7 * sv).toFixed(3) + ' ' + sv.toFixed(3) + ')');
+      c.mound.setAttribute('opacity', clamp01(sv * 6).toFixed(3));
+    }
+    function renderPalace() {
+      if (Math.abs(pal.s - pal.shown) < 0.002) return;
+      pal.shown = pal.s;
+      var px = 270, py = sandY(270) + 14, sy = 1 - 0.5 * pal.s, sx = 1 + 0.12 * pal.s;
+      gPalace.setAttribute('transform', pal.s < 0.002 ? '' : 'translate(' + px + ' ' + f1(py) + ') scale(' + sx.toFixed(3) + ' ' + sy.toFixed(3) + ') translate(' + (-px) + ' ' + f1(-py) + ')');
+    }
+    function stepCastles(dt) {
+      dt0 = dt;
+      if (wave && !wave.active()) {
+        // erst loslassen, wenn alle gespülten Burgen ihre Wartezeit haben
+        if (!castles.some(function (c) { return c && c.washed; }) && !pal.washed) wave = null;
+      }
+      if (!B.on) {
+        // ausgeblendet: nichts animieren, alles steht wieder
+        castles.forEach(function (c) { if (c) { c.s = 0; c.wait = null; c.washed = false; renderCastle(c); } });
+        pal.s = 0; pal.washed = false; pal.wait = null; renderPalace();
+        wave = null;
+        return;
+      }
+      var r = liveRain();
+      castles.forEach(function (c) {
+        if (!c) return;
+        stepSlump(c, 0.6 * r, c.x, 60, { washed: 1, burst: function () { sandPuff(c.x, sandY(c.x)); } });
+        renderCastle(c);
+      });
+      stepSlump(pal, 0.3 * r, 270, 30, { washed: 0.7 });
+      renderPalace();
+    }
+
     // ── Hauptschleife ──
     var ffAcc = 0, offFor = 99;
     TS.loop(function (dt) {
@@ -335,7 +432,9 @@
       var hk = heatK();
       B.vars({ '--tss-heat': hk, '--ts-night': B.night });
       placeSun();
+      B.stepSnow(dt);
       stepIces(dt);
+      stepCastles(dt);
       // Glühwürmchen am Abend über dem Strand
       if (B.on && B.night > 0.5) {
         ffAcc += dt * 3 * B.night;
@@ -397,6 +496,10 @@
           case 'gust': B.gust(600); break;
           case 'celebrate': celebrate(p.name || ''); break;
           case 'seasonboard': B.board('Top coolers', S.top); break;
+          // Tsunami spült die Burgen flach, sobald das Wasser sie erreicht
+          case 'spectacle':
+            if (B.on && p.type === 'tsunami' && !p.reduced) wave = p;
+            break;
           case 'clear':
             if (p.kind === 'castles') clearCastles();
             else if (p.kind === 'heat') { S.heatT = 0; S.top = []; }

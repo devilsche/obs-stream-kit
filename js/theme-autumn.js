@@ -1,7 +1,10 @@
 /* Herbst-Thema der Weather-Source: Blätterranke mit Lichtern oben, Ast in
  * der Ecke, fallendes Laub (Wind treibt es zur Seite), Laubhaufen in den
  * Ecken, Follower-Kürbisse mit Namen (nachts leuchten die Gesichter),
- * Vogelscheuche als gemeinsames Sub-Projekt (8 Teile).
+ * Vogelscheuche als gemeinsames Sub-Projekt (8 Teile). Spektakel: eine
+ * Windhose wirbelt Laub auf und hebt 2–4 Kürbisse an, beim Tsunami
+ * schwimmen die Kürbisse kurz auf und setzen sich wieder. Schnee setzt
+ * Hauben auf Kürbisse und den Hut der Vogelscheuche, die danach schmelzen.
  * Optik aus effects/autumn.html; die Laubhöhe rechnet der Server
  * (seasonLevels.leaves), hier wird nur gezeigt. Braucht js/season-kit.js
  * und js/theme-seasons.js.
@@ -183,7 +186,9 @@
       var wide = pkRand(slot, 1), sx = scale * (0.86 + 0.34 * wide), sy = scale * (1.12 - 0.28 * wide);
       var tilt = (pkRand(slot, 4) - 0.5) * 14;
       var g = el('g', { 'class': 'ta-pk ta-pk--c' + (1 + Math.floor(pkRand(slot, 2) * 5)) + (animate ? ' ta-pk--new' : '') });
-      var inner = el('g', { 'class': 'ta-pk-inner' }, g);
+      // Zwischenebene zum Anheben/Aufschwimmen (Fuß bei 0/0)
+      var lift = el('g', {}, g);
+      var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
       el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: f1(44 * sx), ry: f1(7 * scale) }, inner);
       var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, inner);
       el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
@@ -194,9 +199,11 @@
       el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
       // Tiefe: dunkler Schleier über den hinteren Kürbissen
       el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': (0.42 * depth).toFixed(2) }, body);
+      el('path', { 'class': 'ts-cap', d: 'M-40 -45 Q-37 -64 -18 -63 Q0 -68 18 -63 Q37 -64 40 -45 Q20 -54 0 -52 Q-20 -54 -40 -45 Z' }, body);
       el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
       el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
-      return { node: g, inner: inner, label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: -26 * depth };
+      return { node: g, inner: inner, lift: lift, label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: -26 * depth,
+               ly: 0, lx: 0, rot: 0, vy: 0, mode: null, shown: '' };
     }
     function placePumpkins() {
       var l = lvl();
@@ -252,6 +259,8 @@
           el('path', { 'class': 'ta-sc-hat', d: 'M-38 -390 Q-36 -440 -8 -447 Q18 -451 34 -438 Q40 -420 38 -390 Z' }, g);
           el('ellipse', { 'class': 'ta-sc-hat', cx: 0, cy: -388, rx: 72, ry: 12 }, g);
           el('rect', { 'class': 'ta-sc-band', x: -38, y: -406, width: 76, height: 11 }, g);
+          el('path', { 'class': 'ts-cap', d: 'M-38 -426 Q-36 -452 -8 -458 Q20 -462 36 -440 Q38 -432 38 -426 Q0 -436 -38 -426 Z' }, g);
+          el('path', { 'class': 'ts-cap', d: 'M-74 -389 Q-72 -401 -38 -400 L38 -400 Q72 -401 74 -389 Q0 -395 -74 -389 Z' }, g);
         },
         function (g) {
           el('path', { 'class': 'ta-sc-stitch', d: 'M-26 -370 L-12 -356 M-12 -370 L-26 -356 M12 -370 L26 -356 M26 -370 L12 -356' }, g);
@@ -283,8 +292,8 @@
       var parts = o.front ? B.front : B.back;
       if (!parts) return;
       parts.add({
-        x: o.x, y: o.y, vx: o.vx || 0, vy: o.vy === undefined ? rand(50, 90) : o.vy,
-        term: rand(60, 100), sway: rand(20, 60), vph: rand(2, 5),
+        x: o.x, y: o.y, vx: o.vx || 0, vy: o.vy === undefined ? rand(50, 90) : o.vy, g: o.g,
+        term: rand(60, 100), sway: o.sway || rand(20, 60), vph: o.vph || rand(2, 5),
         shape: Math.floor(Math.random() * 3), ci: Math.floor(Math.random() * 5), s: o.s || rand(0.8, 1.4),
         floor: o.land === false ? null : function (x) { return surface(x) + 6; },
         life: o.life, draw: leafDraw
@@ -357,6 +366,85 @@
       B.tag('Swept clean!', W / 2, 300, true);
     }
 
+    // ── Spektakel: Windhose und Tsunami ──
+    var show = null, whirlAcc = 0, tNow = 0;
+    function spectacle(p) {
+      if (!B.on || p.reduced || (p.type !== 'tornado' && p.type !== 'tsunami')) return;
+      show = p;
+      if (p.type !== 'tornado' || !B.partOn('pumpkins')) return;
+      // 2–4 Kürbisse werden mitgerissen
+      var pool = pkNodes.filter(Boolean), n = Math.min(pool.length, 2 + Math.floor(Math.random() * 3));
+      for (var i = 0; i < n; i++) {
+        var k = Math.floor(Math.random() * pool.length);
+        pool[k].mode = 'wait';
+        pool[k].peak = rand(170, 280);
+        pool.splice(k, 1);
+      }
+    }
+    function renderPk(pk) {
+      var tr = pk.ly < 0.3 && Math.abs(pk.lx) < 0.3 && Math.abs(pk.rot) < 0.3 ? ''
+        : 'translate(' + f1(pk.lx) + ' ' + f1(-pk.ly) + ') rotate(' + f1(pk.rot) + ' 0 -30)';
+      if (tr === pk.shown) return;
+      pk.shown = tr;
+      pk.lift.setAttribute('transform', tr);
+    }
+    function stepShow(dt) {
+      tNow += dt;
+      var live = show && show.active();
+      var tx = live && show.type === 'tornado' ? show.x() : null;
+      // Laub am Fuß der Windhose aufwirbeln (Partikel blenden an den Rändern aus)
+      if (tx !== null && tx > -100 && tx < W + 100) {
+        whirlAcc += dt * 45;
+        while (whirlAcc >= 1) {
+          whirlAcc--;
+          var x = tx + rand(-70, 70);
+          spawn({ x: x, y: surface(x) + rand(0, 10), vx: show.dir * rand(150, 450) + rand(-250, 250), vy: rand(-1200, -550),
+                  g: 650, sway: rand(90, 170), vph: rand(5, 9), front: true, s: rand(0.8, 1.4), life: rand(2.5, 4) });
+        }
+      }
+      pkNodes.forEach(function (pk) {
+        if (!pk) return;
+        if (pk.mode === 'wait' && tx !== null && Math.abs(tx - pk.x) < 110) pk.mode = 'up';
+        if (pk.mode === 'up') {
+          // im Wirbel: steigt, kreiselt, folgt der Windhose ein Stück
+          pk.ly += (pk.peak - pk.ly) * Math.min(1, dt * 2.2);
+          pk.lx += (Math.max(-130, Math.min(130, ((tx === null ? pk.x : tx) - pk.x) * 0.6)) + Math.sin(tNow * 7) * 30 - pk.lx) * Math.min(1, dt * 3);
+          pk.rot += dt * 260 * (show.dir || 1);
+          if (tx === null || (tx - pk.x) * (show.dir || 1) > 220) { pk.mode = 'fall'; pk.vy = 0; }
+        } else if (pk.mode === 'fall') {
+          // fällt zurück auf seinen Platz, kurzer Hüpfer
+          pk.vy += 2200 * dt;
+          pk.ly -= pk.vy * dt;
+          pk.lx *= Math.pow(0.02, dt);
+          pk.rot += (Math.round(pk.rot / 360) * 360 - pk.rot) * Math.min(1, dt * 6);
+          if (pk.ly <= 0) {
+            pk.ly = 0;
+            if (pk.vy > 500) pk.vy = -pk.vy * 0.3;
+            else { pk.mode = null; pk.vy = 0; pk.lx = 0; pk.rot = 0; }
+          }
+        } else if (pk.mode === 'wait' && !live) {
+          pk.mode = null;
+        } else if (!pk.mode) {
+          // Tsunami: auf dem Wasser treiben (gut halb eingetaucht), sonst wieder absetzen
+          var target = 0, bob = 0;
+          if (live && show.type === 'tsunami') {
+            target = Math.max(0, Math.min(320, pk.y - (H - show.level(pk.x)) - 0.45 * pk.h));
+            bob = target > 4 ? 1 : 0;
+          }
+          pk.ly += (target - pk.ly) * Math.min(1, dt * (target > pk.ly ? 3 : 1.4));
+          pk.rot = bob * Math.sin(tNow * 2.1 + pk.slot) * 9 * Math.min(1, pk.ly / 30) + (1 - bob) * pk.rot * Math.pow(0.1, dt);
+          pk.lx = Math.sin(tNow * 1.3 + pk.slot * 2) * 8 * Math.min(1, pk.ly / 30);
+          if (pk.ly < 0.3 && !live) { pk.ly = 0; pk.lx = 0; pk.rot = 0; }
+        }
+        renderPk(pk);
+      });
+      if (show && !live && !pkNodes.some(function (pk) { return pk && (pk.mode || pk.ly > 0); })) show = null;
+    }
+    function resetShow() {
+      show = null;
+      pkNodes.forEach(function (pk) { if (pk) { pk.mode = null; pk.ly = 0; pk.lx = 0; pk.rot = 0; renderPk(pk); } });
+    }
+
     // ── Hauptschleife ──
     var spawnAcc = 0, branchAcc = 0, drawn = -1, offFor = 99;
     TS.loop(function (dt) {
@@ -369,6 +457,8 @@
       // ausgeblendet nur noch kurz weiterzeichnen (Partikel fallen zu Ende)
       offFor = B.on ? 0 : offFor + dt;
       if (offFor > 3) return;
+      if (B.on) stepShow(dt); else if (show) resetShow();
+      B.stepSnow(dt);
       var l = lvl();
       if (Math.abs(l - drawn) > 0.002) { drawPile(l); placePumpkins(); drawn = l; }
       if (B.on) {
@@ -455,6 +545,7 @@
           case 'gust': gust(); break;
           case 'celebrate': celebrate(p.name || ''); break;
           case 'seasonboard': B.board('Top rakers', S.top); break;
+          case 'spectacle': spectacle(p); break;
           case 'clear':
             if (p.kind === 'pumpkins') clearPumpkins();
             else if (p.kind === 'leaves') { S.target = 0; S.top = []; }

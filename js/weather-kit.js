@@ -5,6 +5,8 @@
  *   var kit = WeatherKit.create(stageEl);
  *   kit.setState(WeatherKit.profile('rain'), 25);   // Übergang in s
  *   kit.strike(); kit.gust(); kit.spectacle('tsunami');
+ *   kit.on('spectacle', function (info) { … });   // Art, Dauer, Live-Abfragen
+ *   kit.blizzard();                                 // Schneesturm-Grad 0..1
  *
  * Die Lagen (PROFILES) spiegeln fx/weather.py 1:1 — der Server rechnet
  * Stimmung und Übersteuerung aus und liefert den fertigen Zustand.
@@ -872,17 +874,36 @@
     }
 
     function startShow(type) {
-      if (reduceMotion) { show = { type: 'tint', t: 0, dur: 1.2, color: TINT[type] }; return; }
+      if (reduceMotion) {
+        show = { type: 'tint', t: 0, dur: 1.2, color: TINT[type] };
+        emit('spectacle', showInfo(show, type, true));
+        return;
+      }
       show = SHOWS[type].init();
       show.type = type;
       show.t = 0;
-      emit('spectacle', type);
+      emit('spectacle', showInfo(show, type, false));
+    }
+
+    // Auskunft an die Deko-Themen: Art, Dauer, Richtung (1 = von links),
+    // live abfragbar solange das Spektakel läuft: Wasserstand über dem
+    // unteren Rand an Stelle x (Tsunami), x der Windhose, Aufprall der Lawine
+    function showInfo(s, type, reduced) {
+      function on() { return show === s; }
+      return {
+        type: type, dur: s.dur, dir: s.dir || 0, reduced: reduced, land: s.land || null,
+        active: on,
+        elapsed: function () { return on() ? s.t : s.dur; },
+        level: function (x) { return on() && s.level ? Math.max(0, s.level(x)) : 0; },
+        x: function () { return on() && typeof s.x === 'number' ? s.x : null; }
+      };
     }
 
     var TINT = { tsunami: '40,120,190', megabolt: '200,215,255', ballbolt: '255,170,80', avalanche: '235,242,250',
                  aurora: '90,230,160', rainbow: '255,210,140', hail: '220,228,240', meteors: '200,215,255',
                  tornado: '150,140,120', fogwall: '225,230,235' };
 
+    var AV_ARRIVE = 1.4, AV_PASS = 7.2;   // Lawine: Kopf erscheint / ist durch
     var SHOWS = {
       tsunami: {
         // Tsunami wie in echt: erst zieht sich das Wasser am unteren Rand
@@ -943,6 +964,7 @@
               var face = 1 - smooth(d / 520);                     // Wand fällt nach hinten zum Flutstand ab
               return flood + (wall - flood) * face + chop(x) * (0.6 + 0.4 * face);
             };
+            s.level = levelAt;
             var back = dir > 0 ? -40 : W + 40;
             waterPath(levelAt, back, front + dir * 2);
 
@@ -1272,6 +1294,7 @@
           var p = s.t / s.dur;
           var env = smooth(p / 0.12) * (1 - smooth((p - 0.85) / 0.15));
           var x = s.dir > 0 ? lerp(-200, W + 200, p) : lerp(W + 200, -200, p);
+          s.x = x;
           var topY = H * 0.2;
           var swayAt = function (k) { return Math.sin(s.t * 1.8 + k * 2.6) * 55 * k + Math.sin(s.t * 4.5 + k * 8) * 7; };
           var widthAt = function (k) { return lerp(16, 250, Math.pow(k, 1.9)); };
@@ -1386,8 +1409,15 @@
             var k = i / 12;
             crack.push([lerp(40, 560, k) + rand(-12, 12), lerp(300, 30, k) + rand(-12, 12)]);
           }
+          // Aufprall: wo und wann die Bahn des Kopfes den unteren Rand kreuzt
+          // (gleiche Rechnung wie in draw)
+          var lx0 = -160, ly0 = -160, lx1 = W + 420, ly1 = H + 360;
+          var dl = Math.hypot(lx1 - lx0, ly1 - ly0), f = (H - ly0) / (ly1 - ly0);
+          var run = Math.pow(f * dl / (dl + 700), 1 / 0.8);
+          var lx = lx0 + (lx1 - lx0) * f;
+          var land = { x: dir > 0 ? lx : W - lx, t: AV_ARRIVE + run * (AV_PASS - AV_ARRIVE) };
           return { dur: 12, dir: dir, crack: crack, billows: [], chunks: [], streaks: [], flakes: [],
-                   acc: 0, gusted: false };
+                   acc: 0, gusted: false, land: land };
         },
         draw: function (s, dt) {
           var t = s.t, dir = s.dir;
@@ -1395,7 +1425,7 @@
           var snow = nightRgb([248, 250, 255], [170, 182, 206]);
           var shade = nightRgb([168, 182, 208], [88, 100, 130]);
           var fade = 1 - smooth((t - (s.dur - 1.5)) / 1.5);
-          var ARRIVE = 1.4, PASS = 7.2;
+          var ARRIVE = AV_ARRIVE, PASS = AV_PASS;
 
           // 1) Abriss: gezackte Bruchkante oben in der Ecke, Staubschleier
           if (t < 1.6) {
@@ -1624,6 +1654,8 @@
       state: function () { return cur; },
       progress: function () { return transT; },
       busy: function () { return show ? show.type : null; },
+      // Schneesturm-Grad 0..1 (viel Schnee und starker Wind), live
+      blizzard: function () { return bz; },
       counts: function () {
         var c = { rain: 0, drizzle: 0, snow: 0 };
         parts.forEach(function (p) { c[p.type]++; });

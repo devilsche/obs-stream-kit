@@ -2,7 +2,9 @@
  * baut, gemeinsames Sub-Projekt), Mini-Schneemänner (Follow) – in der
  * Xmas-Zeit stattdessen Follower-Kugeln am Baum (Minis ausgeblendet), dazu
  * Lichterkette, Baum, hängende Kugeln und Geschenke,
- * mit Aufbau- und Abschied-Animation. Optik aus effects/xmas.html und
+ * mit Aufbau- und Abschied-Animation. Im Schneesturm schneien die Minis bis
+ * zum Hut ein (Schneehügel davor), eine Lawine begräbt die Minis in ihrer
+ * Ecke kurz; danach graben sie sich wieder frei. Optik aus effects/xmas.html und
  * effects/winter.html übernommen; Stände (Schneedecke, Xmas-Ablauf) rechnet
  * der Server, hier wird nur gezeigt. Braucht js/season-kit.js.
  *
@@ -516,7 +518,10 @@
       el('path', { 'class': 'tw-sm-nose', d: 'M0 -53 L14 -50 L0 -48 Z' }, g);
       el('path', { 'class': 'tw-mini__hat' + (1 + i % 4), d: 'M-16 -64 Q0 -98 16 -64 Z' }, g);
       el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, g);
-      minis[i] = { outer: outer, inner: g, x: slot[0], k: slot[1], dy: slot[2], rot: slot[3], label: name };
+      // Schneehügel vor dem Mini (Sturm, Lawine)
+      var mound = el('path', { 'class': 'tw-mini__mound' }, outer);
+      minis[i] = { outer: outer, inner: g, mound: mound, x: slot[0], k: slot[1], dy: slot[2], rot: slot[3], label: name,
+                   bz: 0, av: 0, avAt: null, avHold: 0, wait: null, shown: -1 };
       miniNext++;
       placeMini(minis[i]);
       if (animate && S.on && partOn('minis')) tag(name, slot[0], miniTop(minis[i]));
@@ -871,6 +876,71 @@
       if (rootEl.dataset.hidemini !== v) rootEl.dataset.hidemini = v;
     }
 
+    // ── Einschneien: Schneesturm (bis zum Hut) und Lawine (ganz begraben) ──
+    // b = Hügelhöhe in Mini-Einheiten: 1 = bis unter den Hut, 1,45 = ganz bedeckt
+    var aval = null;
+    function moundPath(b) {
+      var h = 68 * b, w = 24 + 16 * Math.min(1, b) + 12 * Math.max(0, b - 1);
+      return 'M' + f1(-w - 14) + ' 14 Q' + f1(-w) + ' ' + f1(-h * 0.95) + ' 0 ' + f1(-h) +
+             ' Q' + f1(w) + ' ' + f1(-h * 0.95) + ' ' + f1(w + 14) + ' 14 Z';
+    }
+    function renderMound(m) {
+      var b = Math.max(m.bz, m.av);
+      if (Math.abs(b - m.shown) < 0.004) return;
+      m.shown = b;
+      m.mound.setAttribute('d', b < 0.02 ? '' : moundPath(b));
+    }
+    function digPuff(m) {
+      var base = surface(m.x) + m.dy;
+      for (var i = 0; i < 12; i++) {
+        addP({ x: m.x + rand(-20, 20) * m.k, y: base - rand(20, 70) * m.k, vx: rand(-220, 220), vy: rand(-420, -150),
+               term: 500, sway: 0, r: rand(2, 5), life: 1.2, floor: surface, draw: flake });
+      }
+    }
+    function stepMinis(dt) {
+      var visible = S.on && partOn('minis') && !minisHidden();
+      var bzNow = visible && opts.blizzard ? clamp01(opts.blizzard()) : 0;
+      var av = visible ? aval : null;
+      var avT = av ? av.elapsed() : 0, avLive = av && av.active();
+      minis.forEach(function (m) {
+        if (!m) return;
+        if (!visible) { m.bz = 0; m.av = 0; m.avAt = null; m.wait = null; renderMound(m); return; }
+        // Sturm: wächst mit dem Sturm, nach dem Sturm gestaffelt freigraben (~1 min)
+        var want = 0.98 * bzNow;
+        if (reduceMotion) m.bz = want;
+        else if (want >= m.bz - 0.005) { m.wait = null; m.bz += Math.min(want - m.bz, dt * (0.01 + want / 35)); }
+        else {
+          if (m.wait === null) m.wait = rand(0, 25);
+          if (m.wait > 0) { m.wait -= dt; if (m.wait <= 0 && m.bz > 0.3) digPuff(m); }
+          else m.bz = Math.max(want, m.bz - dt / 35);
+        }
+        // Lawine: begräbt die Minis auf der Aufprall-Seite, kurz danach graben sie sich aus
+        if (m.avAt !== null) {
+          if (m.avHold > 0) {
+            if (avT >= m.avAt) m.av = Math.min(1.45, m.av + dt * 3);
+            // nach der Lawine noch 2–6 s begraben, dann freigraben (~5 s)
+            if (!avLive) { m.avHold -= dt; if (m.avHold <= 0) digPuff(m); }
+          } else {
+            m.av = Math.max(0, m.av - dt / 5);
+            if (m.av <= 0) m.avAt = null;
+          }
+        }
+        renderMound(m);
+      });
+      if (aval && !avLive && !minis.some(function (m) { return m && m.avAt !== null; })) aval = null;
+    }
+    function avalanche(p) {
+      if (!S.on || p.reduced || !p.land || !partOn('minis') || minisHidden()) return;
+      aval = p;
+      var right = p.land.x > W / 2;
+      minis.forEach(function (m) {
+        if (!m || (m.x > W / 2) !== right) return;
+        // je weiter weg vom Aufprall, desto später erreicht ihn der Schnee
+        m.avAt = p.land.t + Math.abs(m.x - p.land.x) / 1600;
+        m.avHold = rand(2, 6);
+      });
+    }
+
     // ── Hauptschleife ──
     var last = null, dirty = true, dripAcc = 0, wasOn = false;
     function frame(ts) {
@@ -897,6 +967,7 @@
       if (ph !== S.heat) dirty = true;
       icicles.forEach(function (ic) { if (ic.grow < 1) { ic.grow = Math.min(1, ic.grow + dt / 30); dirty = true; } });
       if (S.on || wasOn) {
+        stepMinis(dt);
         if (dirty) {
           drawCover(); drawIce(); placeSnowman();
           minis.forEach(function (m) { if (m) placeMini(m); });
@@ -1019,6 +1090,9 @@
             celebrate(p.name || ''); break;
           case 'snowboard':
             showBoard('Top snow shovelers', S.snowTop); break;
+          case 'spectacle':
+            if (p.type === 'avalanche') avalanche(p);
+            break;
           case 'clear':
             if (p.kind === 'ornaments') { clear(gOrns); orns = []; ornNext = 0; ornTotal = 0; updateCounter(); }
             else if (p.kind === 'gifts') { clear(giftsBack); clear(giftsFront); gifts = []; giftNext = 0; giftTotal = 0; giftLog = []; updateCounter(); }

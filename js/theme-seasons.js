@@ -145,7 +145,7 @@
     var B = {
       W: W, H: H, reduceMotion: reduceMotion,
       root: rootEl, fx: fxEl, defs: defs, fxSvg: fxSvg, back: back, front: front,
-      on: false, night: 0, rain: 0, heat: 0, sun: 0, windBase: 0, gustPx: 0, partsOn: {},
+      on: false, night: 0, rain: 0, heat: 0, sun: 0, windBase: 0, gustPx: 0, partsOn: {}, snow: 0,
       el: el, clear: clear, f1: f1, rand: rand, clamp01: clamp01, seeded: seeded, yes: yes,
       canvas: function () { return canvas(rootEl); },
       svg: function (cls) { return svgLayer(rootEl, cls); },
@@ -184,7 +184,21 @@
         if (back) { back.windTarget = w; back.step(dt); }
         if (front) { front.windTarget = w; front.step(dt); }
       },
-      windPx: function () { return B.windBase * 320 + B.gustPx; }
+      windPx: function () { return B.windBase * 320 + B.gustPx; },
+      // Schnee-Stand 0..1,2 (Schneehauben, hängende Köpfe) aus dem Live-Wetter:
+      // wächst mit der Schneemenge, Schneesturm macht dicker; danach in ~1 min
+      // weg. Ausgeblendet sofort 0. Setzt --ts-snow, liefert den Stand.
+      stepSnow: function (dt) {
+        var sky = opts.sky ? opts.sky() : null;
+        var sn = sky ? clamp01(sky.snow || 0) : 0;
+        var bz = opts.blizzard ? clamp01(opts.blizzard()) : 0;
+        var want = B.on ? Math.min(1.2, sn + 0.3 * bz) : 0;
+        if (!B.on || reduceMotion) B.snow = want;
+        else if (want > B.snow) B.snow = Math.min(want, B.snow + dt / 25);
+        else B.snow = Math.max(want, B.snow - dt / 60);
+        B.vars({ '--ts-snow': B.snow });
+        return B.snow;
+      }
     };
 
     // ── Gemeinsames Sub-Projekt (8 Teile, Stand gilt für alle Jahreszeiten) ──

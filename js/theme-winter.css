@@ -166,6 +166,7 @@
 .tw-mini__ball { fill: url(#tw-ballG); }
 .tw-mini__hat1 { fill: #c4302b; } .tw-mini__hat2 { fill: #2a64b8; } .tw-mini__hat3 { fill: #2e9e5b; } .tw-mini__hat4 { fill: #8e4bb8; }
 .tw-mini__pom { fill: #ffffff; }
+.tw-mini__mound { fill: url(#tw-moundG); }
 
 /* ── Effekte: Schaufel, Schneeball ── */
 .tw-shovel { transform-box: fill-box; transform-origin: 90% 10%; animation: twScoop 0.9s ease-in-out forwards; }

@@ -396,6 +396,17 @@ Lagen: `clear`, `cloudy`, `fog`, `drizzle`, `rain`, `storm`, `sleet`, `snow`, `s
 - **Sommer:** Strand mit Follower-Sandburgen, Sonnenschirm, abends Glühwürmchen. Die Hitze steigt bei Hitzewelle (20 %/min) und Sonne (2 %/min), sinkt bei Regen und nachts. `!splash` (−5, „Top coolers“), `!ice` (Eis schmilzt mit der Hitze), Mods `cool`.
 - **Winter:** siehe unten.
 
+**Deko reagiert auf Wetter und Spektakel** (nur das sichtbare Thema, alles vorübergehend, kein Follower verschwindet):
+
+- **Regen/Gewitter (Sommer):** Sandburgen sacken je nach Regenmenge zusammen (Türme flacher, Fahnen hängen, Sand rutscht vor den Fuß), der Sandpalast etwas; nach dem Regen bauen sie sich in 1–2 min nach und nach wieder auf.
+- **Schnee/Schneesturm (jedes Thema):** Im Sommer bekommen Sandburgen, Sandpalast und Sonnenschirm Schneehauben, im Herbst Kürbisse und der Hut der Vogelscheuche; im Schneesturm dicker, nach dem Schnee in etwa 1 min weggeschmolzen. Im Frühling lassen die Blumen und die Sonnenblume die Köpfe hängen. Im Winter schneien die Mini-Schneemänner im Schneesturm bis zum Hut ein und graben sich danach in etwa 1 min frei.
+- **Tsunami:** Im Sommer spült die Welle die Sandburgen flach, sobald sie sie erreicht; danach Wiederaufbau. Im Herbst schwimmen die Kürbisse auf dem Wasser auf und setzen sich wieder.
+- **Windhose:** Im Herbst wirbelt sie Laub auf und reißt 2–4 Kürbisse mit, die zurückfallen; im Frühling zerrt sie an den Blumen, Blütenblätter fliegen.
+- **Lawine (Winter):** Die Minis in der Ecke, in der sie aufschlägt, sind kurz begraben.
+- **Hagel (Frühling):** Ein paar Blumen knicken um und richten sich nach 20–30 s wieder auf.
+
+Der Strand lässt in der Bildmitte (Lebensbalken) nur einen flachen Streifen frei.
+
 **Gemeinsame Follower:** Alle Jahreszeiten teilen eine Follower-Liste. `cmd=follow&name=%user%` trägt den Namen einmal ein (doppelte Namen zählen nicht), und er erscheint in jedem Thema in dessen Form: Kürbis, Blume, Sandburg, im Winter Kugel am Baum (Xmas-Zeit) bzw. Mini-Schneemann (sonst; in der Xmas-Zeit ausgeblendet, damit jeder Follower nur einmal im Bild ist). Beim Umschalten des Themas sind also gleich viele Follower zu sehen. Die bisher gesammelten Kugeln, Kürbisse, Blumen, Sandburgen und Mini-Schneemänner wurden zusammengeführt. **Import:** Auf der Weather-Karte im Tab **Chat commands** holt „Import last 60 Twitch followers“ per einmaligem Twitch-Login (Recht `moderator:read:followers`) die letzten 60 Follower; der Token wird nicht gespeichert. Daneben holt „Import current subscribers as gifts“ (Recht `channel:read:subscriptions`) die aktuellen Abonnenten als Geschenke unter den Baum: Tier 2/3 zählen mehr, Geschenk-Subs zählen für den Schenkenden, wer schon ein Geschenk hat, wird übersprungen. Twitch liefert nur aktuelle Abonnenten ohne Datum. Namen, die nach einer nicht ersetzten Streamer.bot-Variable aussehen (`latestFollower.user`, `%user%`, `user`), lehnt der Server ab.
 
 **Sub-Projekt:** Jeder Sub (`cmd=build&name=%user%`) baut ein Teil am gemeinsamen Projekt (8 Teile, gleicher Fortschritt in allen Themen): Winter Schneemann, Herbst Vogelscheuche, Frühling Sonnenblume, Sommer Sandpalast. Zurückgesetzt wird nur per Knopf „Start a new sub project“ (`cmd=snowmanreset`).

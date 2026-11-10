@@ -4,6 +4,9 @@
  * Sub-Projekt (8 Teile). Garten nach dem Server-Stand
  * (seasonLevels.water/weeds): trockene Erde und hängende Köpfe unter 30 %
  * Wasser, Unkraut wächst; Regen gießt sichtbar (Köpfe richten sich auf).
+ * Spektakel: eine Windhose zerrt an den Blumen (Blütenblätter fliegen),
+ * Hagel knickt ein paar um, sie richten sich nach 20–30 s wieder auf. Bei
+ * Schnee lassen Blumen und Sonnenblume die Köpfe hängen.
  * Optik aus effects/spring.html. Braucht js/season-kit.js und
  * js/theme-seasons.js.
  *
@@ -100,7 +103,9 @@
       if (flowers[i]) gFlowers.removeChild(flowers[i].node);
       var h = 34 + ((i * 37) % 40), type = i % 3, col = 'tsp-p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
-      var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, outer);
+      // Zwischenebene zum Biegen/Umknicken (Fuß bei 0/0)
+      var bend = el('g', {}, outer);
+      var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, bend);
       el('path', { 'class': 'tsp-stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
       el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
       var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(0.68)' }, grow);
@@ -115,7 +120,8 @@
         for (var m = 0; m < 5; m++) el('circle', { 'class': col, cx: 0, cy: -12, r: 11, transform: 'rotate(' + m * 72 + ')' }, bloom);
         el('circle', { 'class': 'tsp-center--dark', r: 7 }, bloom);
       }
-      flowers[i] = { node: outer, head: head, x: x, y: y - h, label: name };
+      flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, label: name, c: PETALS[(i * 3) % 5],
+                     ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0 };
       flNext++;
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }
@@ -128,6 +134,15 @@
         el('ellipse', { 'class': cls, cx: 0, cy: f1(SF_Y - r), rx: rx, ry: ry,
                         transform: 'rotate(' + f1(off + i * 360 / n) + ' 0 ' + SF_Y + ')' }, g);
       }
+    }
+    // Kopf-Teile in eine Hülle, die sich bei Schnee am Stängelende neigt
+    var sfHeads = [], sfDroop = 0;
+    function droopG(g) { var h = el('g', {}, g); sfHeads.push(h); return h; }
+    function droopSunflower(k) {
+      if (Math.abs(k - sfDroop) < 0.003) return;
+      sfDroop = k;
+      var tr = k < 0.003 ? '' : 'rotate(' + (k * 30).toFixed(1) + ' 0 -362)';
+      sfHeads.forEach(function (h) { h.setAttribute('transform', tr); });
     }
     var sunflower = B.project(gSun, {
       x: 230, k: 0.9,
@@ -149,15 +164,17 @@
           el('path', { 'class': 'tsp-sf-leaf', d: 'M-2 -292 Q-46 -322 -72 -300 Q-42 -274 -2 -292 Z' }, g);
         },
         function (g) {
+          g = droopG(g);
           for (var i = 0; i < 10; i++) {
             el('path', { 'class': 'tsp-sf-sepal', d: 'M-9 ' + (SF_Y - 18) + ' L0 ' + (SF_Y - 46) + ' L9 ' + (SF_Y - 18) + ' Z',
                          transform: 'rotate(' + (i * 36) + ' 0 ' + SF_Y + ')' }, g);
           }
           el('circle', { 'class': 'tsp-sf-bud', cx: 0, cy: SF_Y, r: 28 }, g);
         },
-        function (g) { ring(g, 16, 50, 11, 30, 0, 'tsp-sf-petal2'); },
-        function (g) { ring(g, 16, 50, 11, 30, 11.25, 'tsp-sf-petal'); },
+        function (g) { g = droopG(g); ring(g, 16, 50, 11, 30, 0, 'tsp-sf-petal2'); },
+        function (g) { g = droopG(g); ring(g, 16, 50, 11, 30, 11.25, 'tsp-sf-petal'); },
         function (g) {
+          g = droopG(g);
           el('circle', { 'class': 'tsp-sf-disk', cx: 0, cy: SF_Y, r: 34 }, g);
           for (var i = 0; i < 18; i++) {
             var a = i * 2.4, rr = 6 + i * 1.4;
@@ -170,6 +187,7 @@
           el('circle', { 'class': 'tsp-sf-cheek', cx: 21, cy: SF_Y + 6, r: 5 }, g);
         },
         function (g) {
+          g = droopG(g);
           var bee = el('g', { 'class': 'tsp-sf-bee' }, el('g', { transform: 'translate(26 ' + (SF_Y - 82) + ') scale(0.8)' }, g));
           el('ellipse', { 'class': 'tsp-wing', cx: -4, cy: -14, rx: 7, ry: 11 }, bee);
           el('ellipse', { 'class': 'tsp-wing', cx: 6, cy: -14, rx: 7, ry: 11 }, bee);
@@ -331,6 +349,82 @@
       if (name) B.tag('Thank you, ' + name + '!', W / 2, 300, true);
     }
 
+    // ── Spektakel: Windhose und Hagel ──
+    var show = null, tNow = 0;
+    function spectacle(p) {
+      if (!B.on || p.reduced || (p.type !== 'tornado' && p.type !== 'hail')) return;
+      show = p;
+      if (p.type !== 'hail' || !B.partOn('meadow')) return;
+      // ein paar Blumen werden während des Schauers getroffen
+      var pool = flowers.filter(Boolean), n = Math.min(pool.length, 3 + Math.floor(Math.random() * 3));
+      for (var i = 0; i < n; i++) {
+        var k = Math.floor(Math.random() * pool.length);
+        pool[k].hitIn = rand(0.8, 4.4);
+        pool.splice(k, 1);
+      }
+    }
+    function flowerPetal(f, vx, vy) {
+      if (!B.front) return;
+      var a = f.ang * Math.PI / 180;
+      B.front.add({ x: f.x + Math.sin(a) * f.h, y: f.y + f.h - Math.cos(a) * f.h, vx: vx, vy: vy, g: 500, term: rand(50, 90),
+                    sway: rand(30, 80), r: rand(4, 7), c: f.c, life: rand(2.5, 4), floor: groundY, draw: petal });
+    }
+    function stepShow(dt) {
+      tNow += dt;
+      var live = show && show.active();
+      var tx = live && show.type === 'tornado' ? show.x() : null;
+      var busy = false;
+      flowers.forEach(function (f) {
+        if (!f) return;
+        var want = 0;
+        // Windhose: je näher, desto heftiger (zur Windhose hin geneigt), Blätter fliegen
+        if (tx !== null) {
+          var d = tx - f.x, str = clamp01(1 - Math.abs(d) / 450);
+          want = str * ((d > 0 ? 1 : -1) * 28 + Math.sin(tNow * 8 + f.x * 0.05) * 32);
+          if (str > 0.35 && Math.random() < dt * 10 * str) {
+            flowerPetal(f, (d > 0 ? 1 : -1) * rand(150, 450) + (show.dir || 0) * 200, rand(-650, -250));
+          }
+        }
+        // Hagel: Treffer knickt die Blume um, nach 20–30 s richtet sie sich auf
+        if (f.hitIn !== null) {
+          f.hitIn -= dt;
+          if (f.hitIn <= 0) {
+            f.hitIn = null;
+            f.knock = (Math.random() < 0.5 ? -1 : 1) * rand(60, 82);
+            f.holdFor = rand(20, 30);
+            for (var i = 0; i < 3; i++) flowerPetal(f, rand(-120, 120), rand(-300, -120));
+          }
+          busy = true;
+        }
+        if (f.knock) {
+          f.holdFor -= dt;
+          if (f.holdFor <= 0) {
+            f.knock *= Math.pow(0.4, dt);
+            if (Math.abs(f.knock) < 0.5) f.knock = 0;
+          }
+          busy = true;
+        }
+        want += f.knock;
+        // Umknicken schnell, Aufrichten weich
+        f.ang += (want - f.ang) * Math.min(1, dt * (Math.abs(want) > Math.abs(f.ang) ? 9 : 4));
+        if (Math.abs(f.ang) < 0.05 && !want) f.ang = 0;
+        if (Math.abs(f.ang - f.shown) > 0.05) {
+          f.shown = f.ang;
+          f.bend.setAttribute('transform', f.ang ? 'rotate(' + f.ang.toFixed(1) + ')' : '');
+        }
+        if (f.ang) busy = true;
+      });
+      if (show && !live && !busy) show = null;
+    }
+    function resetShow() {
+      show = null;
+      flowers.forEach(function (f) {
+        if (!f) return;
+        f.ang = f.shown = f.knock = 0; f.hitIn = null;
+        f.bend.setAttribute('transform', '');
+      });
+    }
+
     // ── Hauptschleife ──
     var petalAcc = 0, offFor = 99;
     TS.loop(function (dt) {
@@ -339,10 +433,15 @@
       S.weeds += (S.weedsT - S.weeds) * k;
       offFor = B.on ? 0 : offFor + dt;
       if (offFor > 3) return;
+      if (B.on) { if (show) stepShow(dt); } else if (show) resetShow();
       // Regen richtet die Köpfe sofort auf, bevor der Wasserstand nachzieht
       var wilt = clamp01((30 - S.water) / 30) * (1 - B.rain);
       var dry = clamp01((55 - S.water) / 55) * (1 - 0.7 * B.rain);
+      // Schnee: Köpfe hängen, auch die Sonnenblume ein Stück
+      var cold = Math.min(1, B.stepSnow(dt));
+      wilt = Math.max(wilt, 0.85 * cold);
       B.vars({ '--tsp-wilt': wilt, '--tsp-dry': dry, '--ts-night': B.night });
+      droopSunflower(cold);
       showWeeds(S.weeds);
       if (B.on && B.partOn('branch')) {
         petalAcc += dt * (1.5 + 3 * Math.abs(B.windBase));
@@ -406,6 +505,7 @@
             break;
           case 'celebrate': celebrate(p.name || ''); break;
           case 'seasonboard': B.board('Top gardeners', S.top); break;
+          case 'spectacle': spectacle(p); break;
           case 'clear':
             if (p.kind === 'flowers') clearFlowers();
             else if (p.kind === 'garden') { S.weedsT = 0; S.top = []; }

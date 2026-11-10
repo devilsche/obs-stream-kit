@@ -145,10 +145,12 @@
       var kit = K.create(document.getElementById('stage'));
       // Deko-Thema vor dem Frost anlegen: der Frost liegt als „Scheibe“ darüber
       var theme = window.ThemeWinter.create(document.getElementById('stage'), {
-        tags: document.getElementById('tags'), hud: document.querySelector('.hud') });
+        tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
+        blizzard: function () { return kit.blizzard(); } });
       // Herbst, Frühling, Sommer: je ein Baustein, sichtbar nur im eigenen Thema
       var seasonOpts = { tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
-                         sky: function () { return kit.state(); } };
+                         sky: function () { return kit.state(); },
+                         blizzard: function () { return kit.blizzard(); } };
       var seasons = {
         autumn: window.ThemeAutumn.create(document.getElementById('stage'), seasonOpts),
         spring: window.ThemeSpring.create(document.getElementById('stage'), seasonOpts),
@@ -167,6 +169,12 @@
       kit.on('strike', function (dist) { audio.thunder(dist); });
       kit.on('gust', function () { audio.gust(); });
       kit.on('pop', function () { audio.thunder(0.1); });
+      // Spektakel-Start (Art schon aufgelöst, auch bei Zufall) an das
+      // sichtbare Deko-Thema; ausgeblendete Themen reagieren nicht
+      kit.on('spectacle', function (info) {
+        if (seasons[lastTheme]) seasons[lastTheme].command('spectacle', info);
+        else if (lastTheme === 'winter') theme.command('spectacle', info);
+      });
       setInterval(function () { audio.update(kit.state()); }, 250);
       var rootEl = document.documentElement;
 
