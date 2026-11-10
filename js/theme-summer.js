@@ -208,28 +208,90 @@
       sandSnow.deep.setAttribute('mask', 'url(#tss-snowspot)');
     })();
     var castles = [], cNext = 0, cTotal = 0;
+    // Burg-Varianten je Platz fest gestreut: Bauform, Sandton, Spiegelung,
+    // Muschel, Größe. build(g) zeichnet (Fuß bei 0/0) und liefert die
+    // Fahnenstange [x, Fuß, Spitze] und die Höhe für Schild und Spotlight
+    function cRand(i, s) { var v = Math.sin(i * 91.7 + s * 47.3) * 43758.5453; return v - Math.floor(v); }
+    function wall(x0, x1, y0, y1) { return 'M' + x0 + ' ' + y0 + ' L' + x0 + ' ' + y1 + ' L' + x1 + ' ' + y1 + ' L' + x1 + ' ' + y0 + ' Z'; }
+    function tower(x0, x1, top, mw) {
+      // Turm mit Zinnen auf der Oberkante
+      var d = 'M' + x0 + ' 0 L' + x0 + ' ' + top, n = Math.max(2, Math.round((x1 - x0) / (mw * 2))), st = (x1 - x0) / (2 * n - 1);
+      for (var j = 0; j < 2 * n - 1; j++) {
+        var xa = x0 + j * st, xb = xa + st;
+        d += j % 2 ? ' L' + f1(xa) + ' ' + top + ' L' + f1(xb) + ' ' + top : ' L' + f1(xa) + ' ' + (top - mw) + ' L' + f1(xb) + ' ' + (top - mw) + ' L' + f1(xb) + ' ' + top;
+      }
+      return d + ' L' + x1 + ' 0 Z';
+    }
+    var CASTLE_BUILD = [
+      function (g) {   // zwei Türme und Bergfried (Klassiker)
+        el('path', { 'class': 'tss-castle', d: wall(-50, 50, 0, -40) }, g);
+        el('path', { 'class': 'tss-castle', d: tower(-58, -24, -64, 8) }, g);
+        el('path', { 'class': 'tss-castle', d: tower(24, 58, -64, 8) }, g);
+        el('path', { 'class': 'tss-castle', d: tower(-16, 16, -84, 8).replace('M-16 0', 'M-16 -40').replace(/L16 0 Z$/, 'L16 -40 Z') }, g);
+        el('path', { 'class': 'tss-door', d: 'M-10 0 L-10 -20 Q0 -32 10 -20 L10 0 Z' }, g);
+        cap(g, -58, -24, -72, 10); cap(g, 24, 58, -72, 10); cap(g, -16, 16, -92, 10);
+        return { pole: [0, -92, -140], top: 150 };
+      },
+      function (g) {   // Eimerburg: zwei gestapelte Eimerformen
+        el('path', { 'class': 'tss-castle', d: 'M-38 0 L-32 -60 L32 -60 L38 0 Z' }, g);
+        el('path', { 'class': 'tss-castle', d: tower(-30, 30, -60, 7).replace('M-30 0', 'M-30 -58').replace(/L30 0 Z$/, 'L30 -58 Z') }, g);
+        el('path', { 'class': 'tss-castle', d: 'M-22 -66 L-18 -100 L18 -100 L22 -66 Z' }, g);
+        el('path', { 'class': 'tss-castle', d: tower(-18, 18, -100, 6).replace('M-18 0', 'M-18 -98').replace(/L18 0 Z$/, 'L18 -98 Z') }, g);
+        el('path', { 'class': 'tss-castle-ring', d: 'M-35 -22 L35 -22 M-33 -40 L33 -40 M-20 -84 L20 -84' }, g);
+        el('path', { 'class': 'tss-door', d: 'M-8 0 L-8 -16 Q0 -26 8 -16 L8 0 Z' }, g);
+        cap(g, -30, 30, -67, 8); cap(g, -18, 18, -106, 8);
+        return { pole: [0, -106, -150], top: 158 };
+      },
+      function (g) {   // breite Mauer mit drei kleinen Türmen
+        el('path', { 'class': 'tss-castle', d: tower(-64, 64, -32, 7) }, g);
+        el('path', { 'class': 'tss-castle', d: tower(-70, -50, -56, 6) }, g);
+        el('path', { 'class': 'tss-castle', d: tower(50, 70, -56, 6) }, g);
+        el('path', { 'class': 'tss-castle', d: tower(-12, 12, -64, 6) }, g);
+        el('path', { 'class': 'tss-door', d: 'M-9 0 L-9 -18 Q0 -28 9 -18 L9 0 Z' }, g);
+        el('rect', { 'class': 'tss-door', x: -42, y: -24, width: 7, height: 9, rx: 3 }, g);
+        el('rect', { 'class': 'tss-door', x: 35, y: -24, width: 7, height: 9, rx: 3 }, g);
+        cap(g, -64, 64, -39, 6); cap(g, -70, -50, -62, 7); cap(g, 50, 70, -62, 7); cap(g, -12, 12, -70, 7);
+        return { pole: [0, -70, -112], top: 120 };
+      },
+      function (g) {   // Doppelturm mit spitzen Dächern und Torbogen
+        el('path', { 'class': 'tss-castle', d: wall(-16, 16, 0, -46) }, g);
+        el('path', { 'class': 'tss-castle', d: wall(-44, -16, 0, -80) }, g);
+        el('path', { 'class': 'tss-castle', d: wall(16, 44, 0, -80) }, g);
+        el('path', { 'class': 'tss-castle-roof', d: 'M-48 -80 L-30 -112 L-12 -80 Z M12 -80 L30 -112 L48 -80 Z' }, g);
+        el('path', { 'class': 'tss-door', d: 'M-12 0 L-12 -22 Q0 -38 12 -22 L12 0 Z' }, g);
+        el('rect', { 'class': 'tss-door', x: -33, y: -62, width: 6, height: 10, rx: 3 }, g);
+        el('rect', { 'class': 'tss-door', x: 27, y: -62, width: 6, height: 10, rx: 3 }, g);
+        cap(g, -16, 16, -46, 6);
+        return { pole: [-30, -112, -146], top: 152 };
+      }
+    ];
     function addCastle(name, animate) {
-      var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.5 + (i % 3) * 0.12;
+      var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26;
+      var k = 0.5 + 0.26 * cRand(i, 1), form = Math.floor(cRand(i, 2) * CASTLE_BUILD.length);
+      var mirror = cRand(i, 3) < 0.4, tone = 1 + Math.floor(cRand(i, 4) * 3);
       if (castles[i]) gCastles.removeChild(castles[i].node);
       var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, gCastles);
       // Zwischenebene fürs Zusammensacken (Fuß bei 0/0), darin die Burg mit ihren CSS-Animationen
       var slump = el('g', {}, outer);
-      var g = el('g', { 'class': 'tss-castle-g' + (animate ? ' tss-castle-g--new' : '') }, slump);
-      el('path', { 'class': 'tss-castle', d: 'M-50 0 L-50 -40 L50 -40 L50 0 Z' }, g);
-      el('path', { 'class': 'tss-castle', d: 'M-58 0 L-58 -64 L-52 -64 L-52 -72 L-44 -72 L-44 -64 L-36 -64 L-36 -72 L-28 -72 L-28 -64 L-24 -64 L-24 0 Z' }, g);
-      el('path', { 'class': 'tss-castle', d: 'M24 0 L24 -64 L28 -64 L28 -72 L36 -72 L36 -64 L44 -64 L44 -72 L52 -72 L52 -64 L58 -64 L58 0 Z' }, g);
-      el('path', { 'class': 'tss-castle', d: 'M-16 -40 L-16 -84 L-10 -84 L-10 -92 L-2 -92 L-2 -84 L2 -84 L2 -92 L10 -92 L10 -84 L16 -84 L16 -40 Z' }, g);
-      el('path', { 'class': 'tss-door', d: 'M-10 0 L-10 -20 Q0 -32 10 -20 L10 0 Z' }, g);
-      cap(g, -58, -24, -72, 10); cap(g, 24, 58, -72, 10); cap(g, -16, 16, -92, 10);
-      el('line', { 'class': 'tss-flagpole', x1: 0, y1: -92, x2: 0, y2: -140 }, g);
+      var g = el('g', { 'class': 'tss-castle-g tss-tone' + tone + (animate ? ' tss-castle-g--new' : '') }, slump);
+      var body = el('g', mirror ? { transform: 'scale(-1 1)' } : {}, g);
+      var info = CASTLE_BUILD[form](body);
+      var px = mirror ? -info.pole[0] : info.pole[0];
+      el('line', { 'class': 'tss-flagpole', x1: px, y1: info.pole[1], x2: px, y2: info.pole[2] }, g);
       var flagG = el('g', {}, g);
-      el('path', { 'class': 'tss-flag tss-f' + (1 + i % 5), d: 'M1 -140 L36 -132 L1 -122 Z' }, flagG);
+      el('path', { 'class': 'tss-flag tss-f' + (1 + i % 5), d: 'M' + (px + 1) + ' ' + info.pole[2] + ' l35 8 l-35 10 Z' }, flagG);
+      // manche haben eine Muschel am Fuß
+      if (cRand(i, 5) < 0.35) {
+        var sx = (cRand(i, 6) < 0.5 ? -1 : 1) * (52 + 14 * cRand(i, 7));
+        el('path', { 'class': 'tss-shell', transform: 'translate(' + f1(sx) + ' -2) scale(0.7)',
+                     d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
+      }
       // weggesackter Sand vor dem Fuß
       var mound = el('path', { 'class': 'tss-mound', d: 'M-74 6 Q-46 -24 0 -27 Q46 -24 74 6 Z', opacity: 0 }, outer);
-      castles[i] = { node: outer, inner: g, slump: slump, flagG: flagG, mound: mound, x: x, y: y - 150 * k, label: name,
-                     s: 0, shown: -1, wait: null, washed: false };
+      castles[i] = { node: outer, inner: g, slump: slump, flagG: flagG, mound: mound, x: x, y: y - info.top * k, label: name,
+                     fx: px, fy: info.pole[2], s: 0, shown: -1, wait: null, washed: false };
       cNext++;
-      if (animate && B.on && B.partOn('beach')) B.tag(name, x, y - 160 * k, false);
+      if (animate && B.on && B.partOn('beach')) B.tag(name, x, y - (info.top + 10) * k, false);
     }
     function clearCastles() { B.clear(gCastles); castles = []; cNext = 0; cTotal = 0; }
 
@@ -915,7 +977,7 @@
       var sv = c.s, sy = 1 - 0.82 * sv, sx = 1 + 0.3 * sv;
       c.slump.setAttribute('transform', sv < 0.002 ? '' : 'scale(' + sx.toFixed(3) + ' ' + sy.toFixed(3) + ')');
       // nasse Fahne hängt, bei flacher Burg ist sie weggespült
-      c.flagG.setAttribute('transform', 'rotate(' + (70 * clamp01(sv / 0.4)).toFixed(1) + ' 0 -140)');
+      c.flagG.setAttribute('transform', 'rotate(' + (70 * clamp01(sv / 0.4)).toFixed(1) + ' ' + c.fx + ' ' + c.fy + ')');
       c.flagG.setAttribute('opacity', (1 - clamp01((sv - 0.75) / 0.15)).toFixed(3));
       c.mound.setAttribute('transform', 'scale(' + (0.5 + 0.7 * sv).toFixed(3) + ' ' + sv.toFixed(3) + ')');
       c.mound.setAttribute('opacity', clamp01(sv * 6).toFixed(3));

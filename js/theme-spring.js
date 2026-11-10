@@ -104,14 +104,18 @@
     function addFlower(name, animate) {
       var i = flNext % SLOTS.length, x = SLOTS[i], y = groundY(x) + 8;
       if (flowers[i]) gFlowers.removeChild(flowers[i].node);
-      var h = 34 + ((i * 37) % 40), type = i % 3, col = 'tsp-p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
+      // je Platz fest gestreut: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
+      var fr = function (s) { var v = Math.sin(i * 77.3 + s * 23.9) * 43758.5453; return v - Math.floor(v); };
+      var h = 34 + ((i * 37) % 40), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + (i * 3) % 5);
+      var lean = (fr(2) < 0.5 ? -1 : 1) * (4 + 8 * fr(3)), hk = 0.55 + 0.25 * fr(4);
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
       // Zwischenebene zum Biegen/Umknicken (Fuß bei 0/0)
       var bend = el('g', {}, outer);
       var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, bend);
       el('path', { 'class': 'tsp-stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
       el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
-      var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(0.68)' }, grow);
+      if (fr(5) < 0.45) el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.6) + ' Q' + (lean * 3) + ' ' + (-h * 0.72) + ' ' + (lean * 3.4) + ' ' + (-h * 0.85) + ' Q' + (lean * 0.8) + ' ' + (-h * 0.72) + ' 0 ' + (-h * 0.6) + ' Z' }, grow);
+      var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(' + hk.toFixed(2) + ')' }, grow);
       var head = el('g', { 'class': 'tsp-head' + (i % 2 ? '' : ' tsp-head--l') }, hp);
       var bloom = el('g', { 'class': 'tsp-bloom' }, head);
       if (type === 0) {          // Margerite
@@ -119,9 +123,25 @@
         el('circle', { 'class': 'tsp-center', r: 8 }, bloom);
       } else if (type === 1) {   // Tulpe
         el('path', { 'class': col, d: 'M-16 -4 Q-20 -30 -12 -38 L-6 -24 L0 -40 L6 -24 L12 -38 Q20 -30 16 -4 Q0 6 -16 -4 Z' }, bloom);
-      } else {                   // Mohn
+      } else if (type === 2) {   // Mohn
         for (var m = 0; m < 5; m++) el('circle', { 'class': col, cx: 0, cy: -12, r: 11, transform: 'rotate(' + m * 72 + ')' }, bloom);
         el('circle', { 'class': 'tsp-center--dark', r: 7 }, bloom);
+      } else if (type === 3) {   // Glockenblume: drei hängende Glocken am Bogen
+        el('path', { 'class': 'tsp-stem', d: 'M0 0 Q14 -8 22 6' }, bloom);
+        [[0, 0], [12, 0], [22, 8]].forEach(function (b) {
+          el('path', { 'class': 'tsp-bell', d: 'M' + (b[0] - 7) + ' ' + (b[1] + 14) + ' Q' + (b[0] - 7) + ' ' + b[1] + ' ' + b[0] + ' ' + b[1] +
+                       ' Q' + (b[0] + 7) + ' ' + b[1] + ' ' + (b[0] + 7) + ' ' + (b[1] + 14) + ' L' + (b[0] + 4) + ' ' + (b[1] + 11) +
+                       ' L' + b[0] + ' ' + (b[1] + 15) + ' L' + (b[0] - 4) + ' ' + (b[1] + 11) + ' Z' }, bloom);
+        });
+      } else if (type === 4) {   // kleine Sonnenblume
+        for (var q = 0; q < 12; q++) el('ellipse', { 'class': 'tsp-p2', cx: 0, cy: -14, rx: 4.5, ry: 10, transform: 'rotate(' + q * 30 + ')' }, bloom);
+        el('circle', { 'class': 'tsp-center--dark', r: 9 }, bloom);
+      } else {                   // Gänseblümchen-Büschel: drei kleine Köpfe
+        [[-12, 6, 0.6], [12, 10, 0.55], [0, 0, 0.75]].forEach(function (d) {
+          var dg = el('g', { transform: 'translate(' + d[0] + ' ' + d[1] + ') scale(' + d[2] + ')' }, bloom);
+          for (var k2 = 0; k2 < 12; k2++) el('ellipse', { 'class': 'tsp-daisy', cx: 0, cy: -11, rx: 3.5, ry: 9, transform: 'rotate(' + k2 * 30 + ')' }, dg);
+          el('circle', { 'class': 'tsp-center', r: 6 }, dg);
+        });
       }
       flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, label: name, c: PETALS[(i * 3) % 5],
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0 };
