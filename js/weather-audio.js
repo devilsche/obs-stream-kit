@@ -9,7 +9,8 @@
  * Windhose (Spektakel tornado): eigenes Sturmrauschen, lauter je näher sie der
  * Bildmitte kommt, unabhängig vom Regler für Regen/Wind; mit siren eine
  * erzeugte Sirene dazu (an- und abschwellender Heulton).
- * Donner aus opts.thunderFile, vorab dekodiert (Web Audio), setzt mit dem Blitz ein.
+ * Alles läuft über Web Audio (vorab dekodierte Puffer): OBS gibt <audio>-Elemente
+ * einer Browser-Source nicht aus. Donner aus opts.thunderFile setzt mit dem Blitz ein.
  */
 (function (root) {
   'use strict';
@@ -34,19 +35,61 @@
     }
     // ambient: Regen und Wind relativ zur Gesamtlautstärke (leise, damit das Spiel hörbar bleibt)
     var on = false, volume = 0.6, thunderLevel = 1, ambient = AMBIENT, siren = false, blocked = false;
+
+    // OBS gibt <audio>-Elemente der Browser-Source nicht aus, Web Audio schon:
+    // Schleifen und Böen laufen deshalb wie der Donner über dekodierte Puffer
+    var bufs = {};
+    function load(url, cb) {
+      if (bufs[url]) { if (bufs[url].buf) cb(bufs[url].buf); else bufs[url].wait.push(cb); return; }
+      var entry = bufs[url] = { buf: null, wait: [cb] };
+      fetch(url).then(function (r) { return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, no) { actx.decodeAudioData(ab, ok, no); }); })
+        .then(function (buf) { entry.buf = buf; entry.wait.forEach(function (f) { f(buf); }); entry.wait = []; })
+        .catch(function () { delete bufs[url]; });
+    }
+    // Schleife mit derselben Schnittstelle wie ein <audio>-Element (volume, paused, play, pause)
+    function makeLoop(url) {
+      if (!actx) {
+        var a = new Audio(url);
+        a.loop = true; a.preload = 'auto'; a.volume = 0;
+        return a;
+      }
+      var g = actx.createGain(), buf = null, src = null, vol = 0;
+      g.gain.value = 0;
+      g.connect(actx.destination);
+      load(url, function (b) { buf = b; });
+      return {
+        get volume() { return vol; },
+        set volume(v) { vol = v; g.gain.setTargetAtTime(v, actx.currentTime, 0.03); },
+        get paused() { return !src; },
+        play: function () {
+          if (!src && buf) {
+            src = actx.createBufferSource();
+            src.buffer = buf;
+            src.loop = true;
+            src.connect(g);
+            src.start();
+          }
+          return Promise.resolve();
+        },
+        pause: function () {
+          if (!src) return;
+          try { src.stop(); } catch (e) { /* schon beendet */ }
+          src.disconnect();
+          src = null;
+        }
+      };
+    }
+
     // Windhose: eigene Sturm-Schleife, Pegel aus den laufenden Tornados
-    var twisters = [], twistLoop = new Audio(base + 'wind-loop-strong.wav');
-    twistLoop.loop = true; twistLoop.preload = 'auto'; twistLoop.volume = 0;
+    var twisters = [], twistLoop = makeLoop(base + 'wind-loop-strong.wav');
     var loops = {}, targets = {}, lastThunder = -10;
 
     LOOPS.forEach(function (name) {
-      var a = new Audio(base + name + '.wav');
-      a.loop = true;
-      a.preload = 'auto';
-      a.volume = 0;
-      loops[name] = a;
+      loops[name] = makeLoop(base + name + '.wav');
       targets[name] = 0;
     });
+    if (actx) load(base + 'wind-gust.wav', function () {});
 
     // Autoplay-Sperre (nur im Browser-Tab, OBS erlaubt Ton): nicht ständig
     // neu versuchen, sondern melden und beim ersten Klick nachholen
@@ -82,6 +125,15 @@
       twistLoop.volume = clamp(twistLoop.volume + clamp(tt - twistLoop.volume, -0.08, 0.08), 0, 1);
       if (twistLoop.volume > 0.005 && twistLoop.paused) play(twistLoop);
       else if (twistLoop.volume <= 0.005 && !twistLoop.paused) twistLoop.pause();
+      // im Browser-Tab startet Web Audio erst nach einem Klick: Hinweis zeigen
+      if (on && actx && actx.state === 'suspended' && !blocked && volume > 0.01) {
+        blocked = true;
+        if (opts.onBlocked) opts.onBlocked(true);
+        actx.resume().catch(function () {});
+      } else if (blocked && actx && actx.state === 'running') {
+        blocked = false;
+        if (opts.onBlocked) opts.onBlocked(false);
+      }
     }, 100);
 
     // Sirene: zwei leicht verstimmte Sägezähne durch einen Tiefpass, Ton steigt
@@ -121,6 +173,16 @@
 
     function oneShot(file, vol) {
       if (!on || vol <= 0.01) return;
+      if (actx) {
+        var entry = bufs[base + file];
+        if (!entry || !entry.buf || actx.state !== 'running') return;
+        var src = actx.createBufferSource(), g = actx.createGain();
+        src.buffer = entry.buf;
+        g.gain.value = clamp(vol, 0, 1);
+        src.connect(g).connect(actx.destination);
+        src.start();
+        return;
+      }
       var a = new Audio(base + file);
       a.volume = clamp(vol, 0, 1);
       play(a);
