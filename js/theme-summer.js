@@ -81,12 +81,16 @@
       el('path', { 'class': 'tss-ustripe', d: 'M-50 30 Q-30 -30 0 -40 Q-14 -10 0 30 Q-25 16 -50 30 Z M50 30 Q30 -30 0 -40 Q14 -10 0 30 Q25 16 50 30 Z' }, top);
     })();
 
-    // ── Sandburgen der Follower: 24 Plätze ──
+    // ── Sandburgen der Follower: 24 Plätze links und rechts, die Mitte
+    // unten (Spielanzeigen) bleibt frei ──
     var CASTLE_X = [];
-    for (var ci = 0; ci < MAX_C; ci++) CASTLE_X.push(90 + ((ci * 7) % MAX_C) * 76);
+    for (var ci = 0; ci < MAX_C; ci++) {
+      var cx0 = 70 + ((ci * 7) % MAX_C) * 56;
+      CASTLE_X.push(cx0 < 720 ? cx0 : cx0 + 480);
+    }
     var castles = [], cNext = 0, cTotal = 0;
     function addCastle(name, animate) {
-      var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.8 + (i % 3) * 0.15;
+      var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.5 + (i % 3) * 0.12;
       if (castles[i]) gCastles.removeChild(castles[i].node);
       var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, gCastles);
       var g = el('g', { 'class': 'tss-castle-g' + (animate ? ' tss-castle-g--new' : '') }, outer);

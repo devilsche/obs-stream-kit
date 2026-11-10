@@ -83,19 +83,23 @@
       weedNodes.forEach(function (w, i) { w.node.classList.toggle('is-on', i < n); });
     }
 
-    // ── Blumen der Follower: 40 Plätze über die Breite ──
+    // ── Blumen der Follower: 40 Plätze links und rechts, die Mitte unten
+    // (Spielanzeigen) bleibt frei ──
     var SLOTS = [];
-    for (var si = 0; si < MAX_FL; si++) SLOTS.push(50 + ((si * 23) % 40) * 46 + rnd() * 14);
+    for (var si = 0; si < MAX_FL; si++) {
+      var sx = 40 + ((si * 23) % 40) * 34 + rnd() * 10;
+      SLOTS.push(sx < 720 ? sx : sx + 480);
+    }
     var flowers = [], flNext = 0, flTotal = 0;
     function addFlower(name, animate) {
       var i = flNext % SLOTS.length, x = SLOTS[i], y = groundY(x) + 8;
       if (flowers[i]) gFlowers.removeChild(flowers[i].node);
-      var h = 70 + ((i * 37) % 90), type = i % 3, col = 'tsp-p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
+      var h = 45 + ((i * 37) % 55), type = i % 3, col = 'tsp-p' + (1 + (i * 3) % 5), lean = i % 2 ? 8 : -8;
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
       var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, outer);
       el('path', { 'class': 'tsp-stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
       el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
-      var hp = el('g', { transform: 'translate(0 ' + (-h) + ')' }, grow);
+      var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(0.8)' }, grow);
       var head = el('g', { 'class': 'tsp-head' + (i % 2 ? '' : ' tsp-head--l') }, hp);
       var bloom = el('g', { 'class': 'tsp-bloom' }, head);
       if (type === 0) {          // Margerite
@@ -109,7 +113,7 @@
       }
       flowers[i] = { node: outer, head: head, x: x, y: y - h, label: name };
       flNext++;
-      if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 40, false); }, 1300);
+      if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }
     function clearFlowers() { B.clear(gFlowers); flowers = []; flNext = 0; flTotal = 0; }
 
