@@ -91,7 +91,8 @@
     function xrnd() { xSeed = (xSeed * 16807) % 2147483647; return xSeed / 2147483647; }
     var X = root.ThemeXmas.create({
       root: xRoot, tree: gXTree, baubles: null, lights: gXLights,
-      x: TREE_X, y: TREE_Y, k: TREE_K, pfx: 'twb-', snow: false,
+      // Schneeteile wie im Winter, eingeblendet nur bei Schnee (CSS über --ts-snow)
+      x: TREE_X, y: TREE_Y, k: TREE_K, pfx: 'twb-', snow: true,
       rnd: xrnd, seed: function (n) { xSeed = n; }, bulbs: root.ThemeXmas.bulbs(xrnd),
       // Sandhügel bis unter den Bildrand, Seestern und Muschel davor
       mound: { cls: 'tw-mound', d: 'M-120 600 L-120 560 Q-70 506 10 508 Q104 494 200 500 Q296 492 390 508 Q470 506 520 560 L520 600 Z' },
@@ -105,6 +106,15 @@
       board: function (title, rows) { B.board(title, rows); },
       onSync: function () { syncCastles(); }
     });
+    // Hügel unter dem Baum macht Hitze und Schnee wie der übrige Strand mit
+    (function () {
+      var m = xRoot.querySelector('.tw-mound');
+      ['tw-mound tss-sand--hot', 'tw-mound ts-gsnow ts-gsnow--dust', 'tw-mound ts-gsnow ts-gsnow--deep'].forEach(function (cls) {
+        var c = m.cloneNode(false);
+        c.setAttribute('class', cls);
+        m.parentNode.insertBefore(c, m.nextSibling);
+      });
+    })();
     // Burgen ausblenden, sobald der Baum steht, und nach dem Abschied zurück
     function syncCastles() {
       var v = X.followersHidden() ? '1' : '0';
