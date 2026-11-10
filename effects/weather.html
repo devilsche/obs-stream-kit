@@ -128,6 +128,7 @@
   <script src="../js/weather-kit.js"></script>
   <script src="../js/weather-frost.js"></script>
   <script src="../js/weather-audio.js"></script>
+  <script src="../js/theme-xmas.js"></script>
   <script src="../js/theme-winter.js"></script>
   <script src="../js/theme-seasons.js"></script>
   <script src="../js/theme-autumn.js"></script>
@@ -156,6 +157,9 @@
         spring: window.ThemeSpring.create(document.getElementById('stage'), seasonOpts),
         summer: window.ThemeSummer.create(document.getElementById('stage'), seasonOpts)
       };
+      // Weihnachten steht im Winter (Norden) oder am Strand (Süden, Tropen);
+      // welches Thema es ist, sagt der Server: xmas ≠ off nur im Xmas-Thema
+      var XMAS = { winter: theme, summer: seasons.summer };
       var frost = window.WeatherFrost.create(document.getElementById('stage'), {
         tags: document.getElementById('tags'), board: document.getElementById('frostBoard') });
       var lastFrostTop = [];
@@ -254,19 +258,24 @@
         ss.parts = parts;
         Object.keys(seasons).forEach(function (n) { seasons[n].update(ss); });
         lastTheme = state.theme || 'none';
-        // Aufbau aus einem anderen Thema: erst spielen, wenn Winter sichtbar ist
-        if (deferredStep && lastTheme === 'winter') {
+        lastXmas = state.xmas || 'off';
+        if (XMAS[lastTheme] && lastXmas !== 'off') xmasTheme = lastTheme;
+        // Aufbau aus einem anderen Thema: erst spielen, wenn das Xmas-Thema
+        // (Winter oder Strand) mit Xmas-Stand sichtbar ist
+        if (deferredStep && XMAS[lastTheme] && lastXmas !== 'off') {
           var ds = deferredStep;
           deferredStep = null;
           playStep(ds, false);
         }
-        wantStep(lastTheme === 'winter' ? state.xmas : null);
+        wantStep(XMAS[lastTheme] ? state.xmas : null);
       }
 
       // Fälliger Aufbau/Abschied: in OBS erst, wenn die Source 2 min live im
       // Programm ist, im Browser-Tab sofort; danach meldet xmasdone den Schritt
-      var lastTheme = 'none';
-      var deferredStep = null;   // setup, bis der Server auf Winter umgestellt hat
+      var lastTheme = 'none', lastXmas = 'off';
+      // zuletzt gesehenes Xmas-Thema; ohne Auskunft wie bisher Winter
+      var xmasTheme = null;
+      var deferredStep = null;   // setup, bis der Server aufs Xmas-Thema umgestellt hat
       var played = {}, pending = null, readySince = null;
       var obsActive = true;   // ohne Auskunft von OBS: als live annehmen
       window.addEventListener('obsSourceActiveChanged', function (e) {
@@ -280,7 +289,7 @@
         checkPending();
       }
       function checkPending() {
-        if (!pending || theme.busy()) return;
+        if (!pending || xmasBusy()) return;
         if (window.obsstudio) {
           if (!obsActive) { readySince = null; return; }
           if (readySince === null) readySince = Date.now();
@@ -291,10 +300,16 @@
         playStep(step, true);
       }
       setInterval(checkPending, 1000);
+      function xmasBusy() {
+        return Object.keys(XMAS).some(function (n) { return XMAS[n].busy(); });
+      }
+      // spielt im Modul des sichtbaren Xmas-Themas
       function playStep(step, auto) {
+        var mod = XMAS[lastTheme];
+        if (!mod) return;
         played[step] = true;
         if (pending === step) pending = null;
-        var fn = step === 'setup' ? theme.playSetup : theme.playFarewell;
+        var fn = step === 'setup' ? mod.playSetup : mod.playFarewell;
         fn(function () {
           if (!apiBase) return;
           var done = auto ? fetch(apiBase + 'weather?cmd=xmasdone&step=' + step, { cache: 'no-store' }) : Promise.resolve();
@@ -424,8 +439,12 @@
           case 'snowmanreset':
             allThemes(function (t) { t.command(c.cmd, p); });
             break;
-          // Winter-Thema
+          // Geschenke: Winter und Strand führen sie, animiert nur sichtbar
           case 'gift':
+            theme.command('gift', p);
+            seasons.summer.command('gift', p);
+            break;
+          // Winter-Thema
           case 'shovel':
           case 'icicle':
           case 'snowball':
@@ -445,7 +464,10 @@
             if (SEASON_OF[p.kind]) {
               seasons[SEASON_OF[p.kind]].command('clear', p);
               if (LEVEL_KINDS[p.kind]) fetchState();
-            } else theme.command('clear', p);
+            } else {
+              theme.command('clear', p);
+              if (p.kind === 'ornaments' || p.kind === 'gifts') seasons.summer.command('clear', p);
+            }
             break;
           // Herbst, Frühling, Sommer: Aktionen nur im aktiven Thema
           case 'rake':
@@ -462,15 +484,15 @@
           case 'shake':
             theme.command('shake', Object.assign({ win: settings.shakewin }, p));
             break;
-          // Aufbau: ist ein anderes Thema sichtbar, schaltet der Server auf
-          // Winter; abspielen erst, wenn der neue Stand angekommen ist.
-          // Abschied nur, wenn Winter sichtbar ist.
+          // Aufbau: ist das Xmas-Thema (Winter oder Strand) nicht sichtbar, schaltet
+          // der Server um; abspielen erst, wenn der neue Stand angekommen ist.
+          // Abschied nur, wenn das Xmas-Thema sichtbar ist.
           case 'setup':
-            if (lastTheme === 'winter') playStep('setup', false);
+            if (XMAS[lastTheme] && lastTheme === xmasTheme) playStep('setup', false);
             else { deferredStep = 'setup'; fetchState(); }
             break;
           case 'farewell':
-            if (lastTheme === 'winter') playStep('farewell', false);
+            if (lastTheme === (xmasTheme || 'winter')) playStep('farewell', false);
             break;
           case 'set':
             Object.keys(p).forEach(function (k) { settings[k] = String(p[k]); });

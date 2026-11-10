@@ -7,15 +7,23 @@
  * Eine eigene Sonne gibt es nicht: die Sonnenbrille sitzt auf der Sonne der
  * Weather-Kit (opts.sky liefert deren Stand), ihr Hof wächst mit der Hitze.
  * Hitze rechnet der Server (seasonLevels.heat). Optik aus effects/summer.html.
- * Braucht js/season-kit.js und js/theme-seasons.js.
+ * Weihnachten am Strand (Südhalbkugel, Tropen: Server schickt xmas mit
+ * theme=summer): Lichterkette, Tannenbaum im Sand mit Follower-Kugeln und
+ * Geschenke aus js/theme-xmas.js, mit Aufbau und Abschied wie im Winter;
+ * die Sandburgen treten so lange zur Seite (jeder Follower einmal im Bild).
+ * Braucht js/season-kit.js, js/theme-seasons.js und js/theme-xmas.js.
  *
  *   var theme = ThemeSummer.create(stageEl, { tags, hud, sky: function () { return kit.state(); } });
  *   theme.load(deco);  theme.update(state);  theme.command(cmd, params);
+ *   theme.playSetup(done);  theme.playFarewell(done);
  */
 (function (root) {
   'use strict';
 
   var PART_KEYS = ['beach', 'umbrella'];
+  var XMAS_KEYS = ['lights', 'tree', 'gifts'];
+  // Baum am Strand: rechts neben der Bildmitte, Fuß im Sand
+  var TREE_X = 1470, TREE_Y = 520, TREE_K = 0.95;
   var MAX_C = 24;
   var CONFETTI = ['#e84a5f', '#2a9df4', '#f2b705', '#2ec27e', '#ffffff'];
 
@@ -57,8 +65,43 @@
     var gDeco = el('g', {}, gBeach);
     // Sandpalast hinter der Burgenreihe
     var gPalace = el('g', { 'class': 'tss-palace' }, gBeach);
-    var gCastles = el('g', {}, gBeach);
+    var gCastles = el('g', { 'class': 'tss-castles' }, gBeach);
     var gIces = el('g', {}, gBeach);
+    // ── Weihnachten am Strand: eigene .tw-Wurzel mit den Stilen aus
+    // theme-winter.css, sichtbar nur mit dem Sommer (liegt in dessen Wurzel) ──
+    var xRoot = document.createElement('div');
+    xRoot.className = 'tw tw--beach';
+    xRoot.dataset.on = '1';
+    xRoot.dataset.xmas = '0';
+    B.root.appendChild(xRoot);
+    var xDefs = el('svg', { 'class': 'tw-defs', width: 0, height: 0 }, xRoot);
+    root.ThemeXmas.defs(xDefs, 'twb-');
+    var xSvg = el('svg', { 'class': 'tw-layer', viewBox: '0 0 1920 1080' }, xRoot);
+    var gXTree = el('g', { 'class': 'tw-shk' }, el('g', { 'class': 'tw-x', transform: 'translate(' + TREE_X + ' ' + TREE_Y + ') scale(' + TREE_K + ')' }, xSvg));
+    var gXLights = el('g', { 'class': 'tw-shk' }, el('g', { 'class': 'tw-x tw-lights' }, xSvg));
+    var xSeed = 7;
+    function xrnd() { xSeed = (xSeed * 16807) % 2147483647; return xSeed / 2147483647; }
+    var X = root.ThemeXmas.create({
+      root: xRoot, tree: gXTree, baubles: null, lights: gXLights,
+      x: TREE_X, y: TREE_Y, k: TREE_K, pfx: 'twb-', snow: false,
+      rnd: xrnd, seed: function (n) { xSeed = n; }, bulbs: root.ThemeXmas.bulbs(xrnd),
+      // Sandhügel bis unter den Bildrand, Seestern und Muschel davor
+      mound: { cls: 'tw-mound', d: 'M-120 600 L-120 560 Q-70 506 10 508 Q104 494 200 500 Q296 492 390 508 Q470 506 520 560 L520 600 Z' },
+      ground: function (g) {
+        el('path', { 'class': 'tss-starfish', transform: 'translate(-86 534) rotate(-14)',
+                     d: 'M0 -17 L5 -6 L17 -5 L8 3 L11 15 L0 9 L-11 15 L-8 3 L-17 -5 L-5 -6 Z' }, g);
+        el('path', { 'class': 'tss-shell', transform: 'translate(-40 552) scale(-1 1)',
+                     d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
+      },
+      tag: function (text, x, y) { B.tag(text, x, y, false); },
+      board: function (title, rows) { B.board(title, rows); },
+      onSync: function () { syncCastles(); }
+    });
+    // Burgen ausblenden, sobald der Baum steht, und nach dem Abschied zurück
+    function syncCastles() {
+      var v = X.followersHidden() ? '1' : '0';
+      if (B.root.dataset.hidecastle !== v) B.root.dataset.hidecastle = v;
+    }
     var shimmerCanvas = B.canvas();
     shimmerCanvas.classList.add('tss-shimmer');
     var shctx = shimmerCanvas.getContext('2d');
@@ -424,7 +467,10 @@
 
     // ── Hauptschleife ──
     var ffAcc = 0, offFor = 99;
+    var xmas = 'off';
     TS.loop(function (dt) {
+      X.step(dt);
+      syncCastles();
       if (B.reduceMotion) S.heat = S.heatT;
       else S.heat += (S.heatT - S.heat) * Math.min(1, dt * 0.8);
       offFor = B.on ? 0 : offFor + dt;
@@ -450,17 +496,21 @@
 
     // ── Spotlight: alle 8 s eine Sandburg, jedes 4. Mal der beste Abkühler ──
     var spotRound = 0;
+    // In der Xmas-Zeit statt der Burgen Kugeln und Geschenke am Baum
     setInterval(function () {
-      if (!B.on) return;
+      if (!B.on || X.busy()) return;
       spotRound++;
       var top = S.top[0];
       if (top && spotRound % 4 === 0) { B.tag('Top cooler: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
-      if (!B.partOn('beach')) return;
-      var pool = castles.filter(function (c) { return c && c.label; });
+      var pool = [];
+      X.spotPool(pool);
+      if (B.partOn('beach') && !X.followersHidden()) {
+        castles.forEach(function (c) { if (c && c.label) pool.push({ node: c.inner, label: c.label, p: [c.x, c.y] }); });
+      }
       if (!pool.length) return;
-      var c = pool[Math.floor(Math.random() * pool.length)];
-      B.spot(c.inner);
-      B.tag(c.label, c.x, c.y, false);
+      var pick = pool[Math.floor(Math.random() * pool.length)];
+      B.spot(pick.node);
+      B.tag(pick.label, pick.p[0], pick.p[1], false);
     }, 8000);
 
     return {
@@ -469,6 +519,7 @@
         clearCastles();
         (deco.castles || []).forEach(function (c) { addCastle(c.name || '', false); });
         cTotal = deco.castle_total || castles.filter(Boolean).length;
+        X.load(deco);
         palace.set(deco.project != null ? deco.project : deco.snowman);
       },
       update: function (s) {
@@ -481,20 +532,42 @@
           S.first = false;
         }
         if (s.seasonTop && Array.isArray(s.seasonTop.summer)) S.top = s.seasonTop.summer;
+        // Xmas-Teile einzeln abschaltbar wie im Winter
+        var pp = s.parts || {}, xp = {};
+        XMAS_KEYS.forEach(function (k) {
+          xp[k] = pp[k] !== false;
+          xRoot.dataset[k] = xp[k] ? '1' : '0';
+        });
+        xRoot.dataset.night = B.night > 0.05 ? '1' : '0';
+        xRoot.style.setProperty('--tw-night', B.night.toFixed(3));
+        xmas = s.xmas || 'off';
+        X.update(B.on, xmas, xp);
       },
       command: function (cmd, p) {
         p = p || {};
         switch (cmd) {
           // Follow: Sandburg immer anlegen, sichtbar nur im aktiven Thema
+          // Follow: in der Xmas-Zeit Kugel am Baum, sonst Sandburg; die jeweils
+          // andere Form still mitführen, damit beide Listen stimmen
           case 'follow':
-          case 'castle': addCastle(p.name || '', B.on); cTotal++; break;
+          case 'castle':
+            var xm = X.followAsOrnament();
+            X.ornament(p.name || '', xm && B.on);
+            addCastle(p.name || '', !xm && B.on);
+            cTotal++;
+            break;
+          case 'ornament': X.ornament(p.name || '', true); break;
+          case 'gift': X.gift({ name: p.name || '', type: p.type, amount: parseInt(p.amount, 10) || 1 }, true); break;
           case 'build': palace.build(p.name || '', B.on); break;
           case 'snowmanreset': palace.reset(B.on); break;
           case 'splash': splash(p); break;
           case 'ice': addIce(p.name || ''); break;
           case 'cool': cool(p); break;
           case 'gust': B.gust(600); break;
-          case 'celebrate': celebrate(p.name || ''); break;
+          case 'celebrate':
+            if (X.shown()) X.celebrate();
+            celebrate(p.name || '');
+            break;
           case 'seasonboard': B.board('Top coolers', S.top); break;
           // Tsunami spült die Burgen flach, sobald das Wasser sie erreicht
           case 'spectacle':
@@ -502,12 +575,19 @@
             break;
           case 'clear':
             if (p.kind === 'castles') clearCastles();
+            else if (p.kind === 'ornaments' || p.kind === 'gifts') X.clear(p.kind);
             else if (p.kind === 'heat') { S.heatT = 0; S.top = []; }
             break;
         }
       },
-      busy: function () { return null; },
-      status: function () { return { on: B.on, heat: Math.round(S.heat), castles: cTotal, project: palace.n() }; }
+      playSetup: function (done) { X.start('setup', done); },
+      playFarewell: function (done) { X.start('farewell', done); },
+      busy: function () { return X.busy(); },
+      status: function () {
+        var t = X.totals();
+        return { on: B.on, heat: Math.round(S.heat), castles: cTotal, project: palace.n(),
+                 xmas: xmas, shown: X.shown(), ornaments: t.ornaments, gifts: t.gifts };
+      }
     };
   }
 
