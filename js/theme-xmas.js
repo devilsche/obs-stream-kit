@@ -219,34 +219,35 @@
     });
     var treeBulbs = [];
     GARLANDS.forEach(function (d) {
-      var p = el('path', { 'class': 'tw-garland', d: d }, gTree), len = p.getTotalLength();
+      var p = el('path', { 'class': 'tw-garland tw-dim', d: d }, gTree), len = p.getTotalLength();
       for (var s = 8; s < len; s += 22) {
         var pt = p.getPointAtLength(s);
         treeBulbs.push(B.bulb(gTree, pt.x, pt.y - 4, rnd() * 30 - 15, 0.42));
       }
     });
-    var gFixedOrn = el('g', {}, gTree);
+    // nachts wie die Schneedecke abdunkeln; Lichter und Stern bleiben hell
+    var gFixedOrn = el('g', { 'class': 'tw-dim' }, gTree);
     FIXED.forEach(function (f) {
       var g = el('g', { 'class': 'tw-orn' }, gFixedOrn);
       el('line', { x1: f[0], y1: f[1] - 20, x2: f[0], y2: f[1] - 12, stroke: '#ccc' }, g);
       el('circle', { cx: f[0], cy: f[1], r: 13, fill: 'url(#' + pfx + f[2] + ')' }, g);
     });
-    var gOrns = el('g', {}, gTree);
+    var gOrns = el('g', { 'class': 'tw-dim' }, gTree);
     var gStar = el('g', { transform: 'translate(200 34)' }, gTree);
     el('path', { 'class': 'tw-star-rays', opacity: 0.55, d: 'M0 -62 L5 -8 L62 0 L5 8 L0 62 L-5 8 L-62 0 L-5 -8 Z' }, gStar);
     el('path', { 'class': 'tw-star', d: 'M0 -30 L8.8 -12 L28.5 -9.3 L14.3 4.6 L17.6 24.3 L0 15 L-17.6 24.3 L-14.3 4.6 L-28.5 -9.3 L-8.8 -12 Z' }, gStar);
     if (snow) el('path', { 'class': 'tw-starhat', d: 'M-15 -20 Q-14 -38 0 -40 Q14 -38 15 -20 Q8 -25 0 -24 Q-8 -25 -15 -20 Z' }, gStar);
     // Hügel nach dem Baum: der Stamm steckt darin, beim Aufbau steigt der
     // Baum hinter ihm hervor
-    var gMoundBox = el('g', {}, gTreeShk);
+    var gMoundBox = el('g', { 'class': 'tw-dim' }, gTreeShk);
     var mound = el('path', { 'class': cfg.mound.cls, d: cfg.mound.d }, gMoundBox);
     if (cfg.ground) cfg.ground(gMoundBox);
-    var gGiftBox = el('g', { 'class': 'tw-gifts' }, gTreeShk);
+    var gGiftBox = el('g', { 'class': 'tw-gifts tw-dim' }, gTreeShk);
     var gGifts = el('g', {}, gGiftBox);
     var giftsBack = el('g', {}, gGifts), giftsFront = el('g', {}, gGifts);
     // Schneewehe vor Baum und Geschenken, steigt mit dem Schnee
     if (snow) {
-      var gDriftBox = el('g', { 'class': 'tw-treebox' }, gTreeShk);
+      var gDriftBox = el('g', { 'class': 'tw-treebox tw-dim' }, gTreeShk);
       el('path', { 'class': 'tw-drift', d: 'M-170 540 Q-120 470 -60 410 Q-10 318 50 316 Q120 292 200 305 Q280 288 350 316 Q410 318 460 410 Q520 470 570 540 Z' }, gDriftBox);
     }
     var counterEl = el('text', { 'class': 'tw-counter', x: 200, y: 536, 'text-anchor': 'middle' }, gTreeShk);
