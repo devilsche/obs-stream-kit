@@ -15,7 +15,7 @@
 (function (root) {
   'use strict';
 
-  var PART_KEYS = ['garland', 'branch', 'pile', 'pumpkins'];
+  var PART_KEYS = ['garland', 'branch', 'pile', 'leaves', 'pumpkins'];
 
   // ── Blattformen: Stiel bei y≈+18, Spitze bei y≈-20 ──
   var LEAVES = [
@@ -475,9 +475,9 @@
                     sway: rand(40, 90), vph: rand(6, 10), front: true, s: rand(0.8, 1.3), life: rand(1.8, 3), land: false });
           }
         }
-        // Laub fällt stetig, mit Wind deutlich mehr
+        // Laub fällt stetig, mit Wind deutlich mehr (Schalter leaves)
         var w = Math.abs(B.windBase);
-        spawnAcc += (2.5 + 9 * w) * dt;
+        spawnAcc = B.partOn('leaves') ? spawnAcc + (2.5 + 9 * w) * dt : 0;
         while (spawnAcc >= 1) {
           spawnAcc--;
           spawn({ x: rand(-200, W + 200) - B.windBase * 400, y: -40 });

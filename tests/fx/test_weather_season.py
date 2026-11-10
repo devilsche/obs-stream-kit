@@ -3,7 +3,7 @@ import sqlite3
 
 import pytest
 
-from fx.weather_season import advance, init_schema, load, use
+from fx.weather_season import advance, ignite, init_schema, load, use
 
 
 @pytest.fixture
@@ -76,3 +76,22 @@ def test_tenants_are_separate(conn):
     advance(conn, 1, 0, "autumn", W)
     advance(conn, 1, 600, "autumn", W)
     assert load(conn, 2)["levels"]["leaves"] == 0
+
+
+def test_lightning_fire_burns_leaves_and_extinguish_counts(conn):
+    advance(conn, 1, 0, "autumn", W)
+    advance(conn, 1, 1800, "autumn", {**W, "wind": 1})                     # 90
+    r = ignite(conn, 1, 1800, wet=False)
+    assert r["burned"] == 10 and r["secs"] == 30
+    assert load(conn, 1)["levels"]["leaves"] == pytest.approx(80)
+    assert ignite(conn, 1, 1805, wet=False)["burned"] == 0                 # brennt schon
+    assert use(conn, 1, "extinguish", "Mia", 1810)["done"] == 1
+    assert load(conn, 1)["top"]["autumn"] == [["Mia", 1]]
+    assert use(conn, 1, "extinguish", "Tom", 1811)["done"] == 0            # schon aus, zählt nicht
+    assert load(conn, 1)["top"]["autumn"] == [["Mia", 1]]
+
+
+def test_wet_fire_only_smoulders_and_goes_out_by_itself(conn):
+    advance(conn, 1, 0, "autumn", W)
+    assert ignite(conn, 1, 100, wet=True)["secs"] == 8
+    assert use(conn, 1, "extinguish", "Mia", 120)["done"] == 0             # schon von selbst aus

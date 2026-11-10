@@ -164,7 +164,9 @@ EFFECTS = {
                      "pumpkin", "rake", "jump", "sweep", "flower", "water", "weed", "bee",
                      "castle", "splash", "ice", "cool", "seasonboard",
                      # Jahreszeit früher starten bzw. zurück zum Kalender
-                     "season"),
+                     "season",
+                     # Blitzfeuer im Laub (meldet das Overlay) und Löschen
+                     "ignite", "extinguish"),
         "settings": {
             "place": _place,
             "mood": _float_range(0, 1),
@@ -200,6 +202,7 @@ EFFECTS = {
             "garland": _flag,
             "branch": _flag,
             "pile": _flag,
+            "leaves": _flag,
             "pumpkins": _flag,
             "meadow": _flag,
             "bugs": _flag,
@@ -227,6 +230,8 @@ EFFECTS = {
             "celebrate": {"name": _name},
             "xmasdone": {"step": _choice("setup", "farewell")},
             "season": {"to": _choice("next", "auto", "winter", "spring", "summer", "autumn")},
+            "ignite": {"wet": _flag},
+            "extinguish": {"name": _name},
             "clear": {"kind": _choice("followers", "ornaments", "gifts", "minis", "snow", "snowman",
                                       "pumpkins", "leaves", "flowers", "garden", "castles", "heat")},
             "pumpkin": {"name": _name},

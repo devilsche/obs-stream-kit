@@ -18,8 +18,11 @@ import json
 
 TOP = 5
 LEVELS = ("leaves", "water", "weeds", "heat")
-THEME_OF = {"rake": "autumn", "sweep": "autumn", "water": "spring", "weed": "spring",
+THEME_OF = {"rake": "autumn", "sweep": "autumn", "extinguish": "autumn", "water": "spring", "weed": "spring",
             "splash": "summer", "cool": "summer"}
+FIRE_BURN = 10        # Prozent Laub, die ein Blitzfeuer wegbrennt
+FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
+FIRE_WET_SECS = 8
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_weather_season (
@@ -123,6 +126,23 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dic
     return _out(data)
 
 
+def ignite(conn, tenant_id, now, wet: bool = False) -> dict:
+    """Blitz schlägt ins Laub (meldet das Overlay): brennt ein Loch in den
+    Haufen und brennt eine Weile, bis es von selbst ausgeht oder jemand
+    löscht. Brennt es schon, passiert nichts → {"burned", "secs"}."""
+    data = _get(conn, tenant_id) or _fresh(now)
+    fire = data.get("fire")
+    if fire and now < fire["until"]:
+        return {"burned": 0, "secs": 0}
+    secs = FIRE_WET_SECS if wet else FIRE_SECS
+    lv = data["levels"]
+    burned = min(FIRE_BURN, lv["leaves"])
+    lv["leaves"] -= burned
+    data["fire"] = {"until": now + secs}
+    _put(conn, tenant_id, data)
+    return {"burned": round(burned, 2), "secs": secs}
+
+
 def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: int = 3, win: int = 20) -> dict:
     """Chat-/Mod-Aktion → {"done", "level"} (Jäten zusätzlich success/count/need)."""
     data = _get(conn, tenant_id) or _fresh(now)
@@ -132,6 +152,11 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
         done = min(5, lv["leaves"]); lv["leaves"] -= done; key = "leaves"
     elif cmd == "sweep":
         done = lv["leaves"]; lv["leaves"] = 0; key = "leaves"
+    elif cmd == "extinguish":
+        # nur ein laufendes Feuer lässt sich löschen
+        fire = data.pop("fire", None)
+        done = 1 if fire and now < fire["until"] else 0
+        key = "leaves"
     elif cmd == "water":
         done = min(10, 100 - lv["water"]); lv["water"] += done; key = "water"
     elif cmd == "splash":
@@ -155,7 +180,7 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
             data["pull"] = hits
             out.update(success=success, count=0 if success else len(hits), need=need)
         done = start - lv["weeds"]
-    if done > 0 and cmd in ("rake", "water", "weed", "splash") and not force:
+    if done > 0 and cmd in ("rake", "extinguish", "water", "weed", "splash") and not force:
         _count(data, theme, name)
     _put(conn, tenant_id, data)
     out.update(done=round(done, 2), level=round(lv[key], 2))

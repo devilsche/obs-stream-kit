@@ -523,3 +523,13 @@ def test_climate_overrides_latitude(conn, monkeypatch):
     monkeypatch.setattr(weather_state, "geocode", lambda q: BUENOS_AIRES)
     monkeypatch.setattr(weather_state, "climate", lambda lat, lon: [20] * 12)
     assert _state(_client(conn), "?place=BA")["theme"] == "summer"
+
+
+def test_ignite_is_not_broadcast_and_extinguish_reports(conn):
+    c = _client(conn)
+    _state(c, "?theme=autumn")
+    c.get("/s/t/api/fx/weather?cmd=ignite")
+    assert c.get("/s/t/api/fx/weather/poll?since=0").json["commands"] == []
+    c.get("/s/t/api/fx/weather?cmd=extinguish&name=Mia")
+    cmds = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"]
+    assert cmds[-1]["cmd"] == "extinguish" and cmds[-1]["params"]["done"] == 1

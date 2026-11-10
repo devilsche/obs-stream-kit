@@ -92,6 +92,10 @@ def _winter_persist(conn, tenant_id, cmd):
         if p.get("step"):
             weather_theme.mark(conn, tenant_id, today, {}, p["step"])
         return False
+    elif c == "ignite":
+        # vom Overlay gemeldet (Blitz ins Laub); spielt dort schon, nicht verteilen
+        weather_season.ignite(conn, tenant_id, now, wet=bool(p.get("wet")))
+        return False
     elif c in weather_season.THEME_OF:
         p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force"))))
     elif c == "clear" and p.get("kind") in ("followers", "ornaments", "minis", "pumpkins", "flowers", "castles"):
