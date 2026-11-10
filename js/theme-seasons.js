@@ -446,5 +446,44 @@
     };
   }
 
-  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H };
+  // Ältester Follower macht Platz für einen neuen: rollt zum nächsten Rand
+  // hinaus (blendet vor der Kante aus) oder, mit crow, ein Vogel holt ihn ab.
+  // node bleibt an seiner Stelle im SVG, bekommt nur Hüllen für die
+  // CSS-Animationen; x/top = Mitte und Oberkante im Bild, r = Rollradius.
+  // → ms, nach denen der Platz frei aussieht (dann fällt der Neue)
+  var LEAVE_ROLL = 2200, LEAVE_CROW = 3400;
+  function leave(node, o) {
+    var parent = node.parentNode;
+    if (!parent) return 0;
+    var crow = !!o.crow, wrap = el('g', { 'class': 'ts-leave ts-leave--' + (crow ? 'crow' : 'roll') });
+    parent.insertBefore(wrap, node);
+    var inner = el('g', { 'class': 'ts-leave__item' }, wrap);
+    inner.appendChild(node);
+    var dir = o.x < W / 2 ? -1 : 1;
+    if (crow) {
+      // Vogel kommt von schräg oben aus der Bildmitte, packt zu und fliegt mit
+      // der Beute zur näheren Seite hinaus
+      var bird = el('g', { transform: 'translate(' + Math.round(o.x) + ' ' + Math.round(o.top) + ')' }, wrap);
+      var fly = el('g', { 'class': 'ts-bird ts-bird--' + (o.bird || 'crow') }, bird);
+      el('path', { 'class': 'ts-bird__wing', d: 'M-4 -18 Q-26 -44 -44 -30 Q-24 -30 -8 -14 Z' }, fly);
+      el('path', { 'class': 'ts-bird__wing ts-bird__wing--far', d: 'M4 -18 Q26 -44 44 -30 Q24 -30 8 -14 Z' }, fly);
+      el('ellipse', { 'class': 'ts-bird__body', cx: 0, cy: -14, rx: 20, ry: 11 }, fly);
+      el('circle', { 'class': 'ts-bird__body', cx: dir * 20, cy: -22, r: 8 }, fly);
+      el('path', { 'class': 'ts-bird__beak', d: 'M' + dir * 27 + ' -24 L' + dir * 38 + ' -21 L' + dir * 27 + ' -18 Z' }, fly);
+      el('path', { 'class': 'ts-bird__feet', d: 'M-5 -4 L-6 2 M5 -4 L6 2' }, fly);
+      wrap.style.setProperty('--ts-bx', (-dir * 520) + 'px');
+      wrap.style.setProperty('--ts-fx', (dir * (dir < 0 ? o.x + 160 : W - o.x + 160)) + 'px');
+      wrap.style.setProperty('--ts-fy', (-Math.max(260, o.top + 200)) + 'px');
+    } else {
+      // bis knapp vor die Kante; Drehung passend zum Weg (Abrollen)
+      var dx = dir < 0 ? -(o.x - 20) : W - 20 - o.x, r = Math.max(10, o.r || 24);
+      wrap.style.setProperty('--ts-dx', Math.round(dx) + 'px');
+      wrap.style.setProperty('--ts-rot', Math.round(dx / r * 57.3) + 'deg');
+    }
+    var ms = crow ? LEAVE_CROW : LEAVE_ROLL;
+    setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, ms + 200);
+    return crow ? 1700 : 900;
+  }
+
+  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave };
 })(typeof window !== 'undefined' ? window : this);

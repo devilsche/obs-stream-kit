@@ -18,7 +18,7 @@
 
   var PART_KEYS = ['meadow', 'branch', 'bugs'];
   var PETALS = ['#ff5d8f', '#ffd23f', '#8e6cff', '#ff8a3d', '#ffffff'];
-  var MAX_FL = 40;
+  var MAX_FL = 12;
 
   function create(stage, opts) {
     var TS = root.ThemeSeasons;
@@ -93,17 +93,31 @@
       weedNodes.forEach(function (w, i) { w.node.classList.toggle('is-on', i < n); });
     }
 
-    // ── Blumen der Follower: 40 Plätze links und rechts, die Mitte unten
+    // ── Blumen der Follower: 12 Plätze links und rechts, die Mitte unten
     // (Spielanzeigen) bleibt frei ──
     var SLOTS = [];
     for (var si = 0; si < MAX_FL; si++) {
       var sx = 40 + ((si * 23) % 40) * 34 + rnd() * 10;
       SLOTS.push(sx < 720 ? sx : sx + 480);
     }
-    var flowers = [], flNext = 0, flTotal = 0;
+    var flowers = [], flNext = 0, flTotal = 0, flGen = 0;
+    // Sind alle Plätze belegt, macht die älteste Platz: sie purzelt zur Kante
+    // hinaus, ab und zu holt sie eine Amsel; die Neue wächst danach
     function addFlower(name, animate) {
-      var i = flNext % SLOTS.length, x = SLOTS[i], y = groundY(x) + 8;
-      if (flowers[i]) gFlowers.removeChild(flowers[i].node);
+      var i = flNext % SLOTS.length, old = flowers[i];
+      flNext++;
+      if (old && animate) {
+        flowers[i] = null;
+        var gen = flGen;
+        var wait = TS.leave(old.node, { x: old.x, top: old.y, r: old.h / 2, crow: Math.random() < 0.25 });
+        setTimeout(function () { if (gen === flGen && !flowers[i]) putFlower(name, i, true); }, wait);
+        return;
+      }
+      if (old) gFlowers.removeChild(old.node);
+      putFlower(name, i, animate);
+    }
+    function putFlower(name, i, animate) {
+      var x = SLOTS[i], y = groundY(x) + 8;
       // je Platz fest gestreut: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
       var fr = function (s) { var v = Math.sin(i * 77.3 + s * 23.9) * 43758.5453; return v - Math.floor(v); };
       var h = 34 + ((i * 37) % 40), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + (i * 3) % 5);
@@ -145,10 +159,9 @@
       }
       flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, label: name, c: PETALS[(i * 3) % 5],
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0 };
-      flNext++;
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }
-    function clearFlowers() { B.clear(gFlowers); flowers = []; flNext = 0; flTotal = 0; }
+    function clearFlowers() { B.clear(gFlowers); flowers = []; flNext = 0; flTotal = 0; flGen++; }
 
     // ── Sonnenblume: gemeinsames Sub-Projekt, wächst mit jedem Teil ──
     var SF_Y = -385;     // Mitte des Blütenkopfs

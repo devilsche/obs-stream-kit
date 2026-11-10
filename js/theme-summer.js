@@ -29,7 +29,7 @@
   var XMAS_KEYS = ['lights', 'tree', 'gifts'];
   // Baum am Strand: rechts neben der Bildmitte, Fuß im Sand
   var TREE_X = 1470, TREE_Y = 520, TREE_K = 0.95;
-  var MAX_C = 24;
+  var MAX_C = 12;
   var CONFETTI = ['#e84a5f', '#2a9df4', '#f2b705', '#2ec27e', '#ffffff'];
 
   function create(stage, opts) {
@@ -182,12 +182,12 @@
       el('circle', { 'class': 'tss-utip', cx: 0, cy: -29, r: 5 }, top);
     })();
 
-    // ── Sandburgen der Follower: 24 Plätze links und rechts, die Mitte
-    // unten (Spielanzeigen) bleibt frei ──
+    // ── Sandburgen der Follower: 12 Plätze, abwechselnd links/rechts von der
+    // Ecke nach innen; die Mitte unten (Spielanzeigen) bleibt frei ──
     var CASTLE_X = [];
     for (var ci = 0; ci < MAX_C; ci++) {
-      var cx0 = 70 + ((ci * 7) % MAX_C) * 56;
-      CASTLE_X.push(cx0 < 720 ? cx0 : cx0 + 480);
+      var cx0 = 70 + Math.floor(ci / 2) * 56;
+      CASTLE_X.push(ci % 2 ? W - cx0 : cx0);
     }
     // Schnee am Boden: Puder unter Palast und Burgen, die dicke Decke mit
     // Verwehungen liegt davor und deckt ihren Fuß zu
@@ -207,7 +207,7 @@
       sandSnow.dust.setAttribute('mask', 'url(#tss-snowspot)');
       sandSnow.deep.setAttribute('mask', 'url(#tss-snowspot)');
     })();
-    var castles = [], cNext = 0, cTotal = 0;
+    var castles = [], cNext = 0, cTotal = 0, cGen = 0;
     // Burg-Varianten je Platz fest gestreut: Bauform, Sandton, Spiegelung,
     // Muschel, Größe. build(g) zeichnet (Fuß bei 0/0) und liefert die
     // Fahnenstange [x, Fuß, Spitze] und die Höhe für Schild und Spotlight
@@ -265,11 +265,25 @@
         return { pole: [-30, -112, -146], top: 152 };
       }
     ];
+    // Sind alle Plätze belegt, macht die älteste Platz: sie rollt zur Kante
+    // hinaus, ab und zu holt sie eine Möwe; die Neue entsteht danach
     function addCastle(name, animate) {
-      var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26;
+      var i = cNext % CASTLE_X.length, old = castles[i];
+      cNext++;
+      if (old && animate) {
+        castles[i] = null;
+        var gen = cGen;
+        var wait = TS.leave(old.node, { x: old.x, top: old.y, r: 30, crow: Math.random() < 0.25, bird: 'gull' });
+        setTimeout(function () { if (gen === cGen && !castles[i]) putCastle(name, i, true); }, wait);
+        return;
+      }
+      if (old) gCastles.removeChild(old.node);
+      putCastle(name, i, animate);
+    }
+    function putCastle(name, i, animate) {
+      var x = CASTLE_X[i], y = sandY(x) + 26;
       var k = 0.5 + 0.26 * cRand(i, 1), form = Math.floor(cRand(i, 2) * CASTLE_BUILD.length);
       var mirror = cRand(i, 3) < 0.4, tone = 1 + Math.floor(cRand(i, 4) * 3);
-      if (castles[i]) gCastles.removeChild(castles[i].node);
       var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, gCastles);
       // Zwischenebene fürs Zusammensacken (Fuß bei 0/0), darin die Burg mit ihren CSS-Animationen
       var slump = el('g', {}, outer);
@@ -290,10 +304,9 @@
       var mound = el('path', { 'class': 'tss-mound', d: 'M-74 6 Q-46 -24 0 -27 Q46 -24 74 6 Z', opacity: 0 }, outer);
       castles[i] = { node: outer, inner: g, slump: slump, flagG: flagG, mound: mound, x: x, y: y - info.top * k, label: name,
                      fx: px, fy: info.pole[2], s: 0, shown: -1, wait: null, washed: false };
-      cNext++;
       if (animate && B.on && B.partOn('beach')) B.tag(name, x, y - (info.top + 10) * k, false);
     }
-    function clearCastles() { B.clear(gCastles); castles = []; cNext = 0; cTotal = 0; }
+    function clearCastles() { B.clear(gCastles); castles = []; cNext = 0; cTotal = 0; cGen++; }
 
     // ── Sandpalast: gemeinsames Sub-Projekt, wächst Turm um Turm ──
     function merlons(x0, x1, y, w) {

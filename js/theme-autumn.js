@@ -41,7 +41,7 @@
   var WETPAL = [];
   for (var wq = 0; wq <= 10; wq++) WETPAL.push(PALETTE.map(function (c) { return shade(c, 1 - 0.4 * wq / 10); }));
 
-  var MAX_PK = 30;
+  var MAX_PK = 12;
   var MAXH = 190;          // Haufenhöhe bei 100 %
   var BASE = 0.15;         // ein bisschen Laub liegt immer, auch frisch gerecht
 
@@ -235,10 +235,10 @@
       pctx.restore();
     }
 
-    // ── Kürbisse: 30 Plätze, abwechselnd links/rechts von der Ecke nach innen ──
+    // ── Kürbisse: 12 Plätze, abwechselnd links/rechts von der Ecke nach innen ──
     var PK_X = [];
     for (var pi = 0; pi < MAX_PK / 2; pi++) { PK_X.push(60 + pi * 46); PK_X.push(W - 60 - pi * 46); }
-    var pkNodes = [], pkNext = 0, pkTotal = 0;
+    var pkNodes = [], pkNext = 0, pkTotal = 0, pkGen = 0;
     // Je Platz feste Streuung: Sorte (Farbe), Form, Neigung und Tiefe –
     // hinten kleiner, höher und dunkler, damit der Haufen räumlich wirkt
     function pkRand(slot, s) { var v = Math.sin(slot * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); }
@@ -279,17 +279,30 @@
       pkNodes.filter(Boolean).sort(function (a, b) { return a.y - b.y; })
         .forEach(function (pk) { gPumpkins.appendChild(pk.node); });
     }
+    // Sind alle Plätze belegt, macht der älteste Platz: er rollt zur Kante
+    // hinaus, ab und zu holt ihn eine Krähe; der Neue fällt danach
     function addPumpkin(name, animate) {
-      var i = pkNext % MAX_PK;
-      if (pkNodes[i]) gPumpkins.removeChild(pkNodes[i].node);
+      var i = pkNext % MAX_PK, old = pkNodes[i];
+      if (old && animate) {
+        pkNodes[i] = null;
+        pkNext++;
+        var gen = pkGen;
+        var wait = TS.leave(old.node, { x: old.x, top: old.y - old.h, r: old.h / 2, crow: Math.random() < 0.25 });
+        setTimeout(function () { if (gen === pkGen && !pkNodes[i]) putPumpkin(name, i, true); }, wait);
+        return;
+      }
+      if (old) gPumpkins.removeChild(old.node);
+      putPumpkin(name, i, animate);
+      pkNext++;
+    }
+    function putPumpkin(name, i, animate) {
       pkNodes[i] = buildPumpkin(name, i, animate);
       gPumpkins.appendChild(pkNodes[i].node);
-      pkNext++;
       placePumpkins();
       sortPumpkins();
       if (animate && B.on && B.partOn('pumpkins')) B.tag(name, pkNodes[i].x, pkNodes[i].y - pkNodes[i].h - 12, false);
     }
-    function clearPumpkins() { B.clear(gPumpkins); pkNodes = []; pkNext = 0; pkTotal = 0; }
+    function clearPumpkins() { B.clear(gPumpkins); pkNodes = []; pkNext = 0; pkTotal = 0; pkGen++; }
 
     // ── Vogelscheuche: gemeinsames Sub-Projekt, 8 Teile ──
     var scare = B.project(gScare, {

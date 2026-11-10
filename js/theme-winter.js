@@ -66,7 +66,7 @@
       while (l.length || r.length) { if (l.length) out.push(l.shift()); if (r.length) out.push(r.shift()); }
       return out;
     }
-    return zip(front, 9).concat(zip(back, 8)).slice(0, 30);
+    return zip(front, 9).concat(zip(back, 8)).slice(0, 12);
   })();
   var PART_NAMES = ['', 'the base', 'the belly', 'the head', 'eyes and a smile', 'a carrot nose',
                     'buttons and arms', 'a scarf', 'the top hat'];
@@ -257,15 +257,29 @@
       on: false, xmas: 'off', target: 0, shown: 0, first: true, heatT: 0, heat: 0, night: 0,
       snowTop: [], sm: 0, partsOn: {}
     };
-    var minis = [], miniNext = 0, miniTotal = 0;
+    var minis = [], miniNext = 0, miniTotal = 0, miniGen = 0;
 
     function surface(x) { return H - coverH(x, S.shown / 100); }
     function xmasShown() { return X.shown(); }
     function partOn(k) { return S.partsOn[k] !== false; }
 
+    // Sind alle Plätze belegt, macht der älteste Platz: er rollt zur Kante
+    // hinaus, ab und zu holt ihn eine Krähe; der Neue entsteht danach
     function addMini(name, animate) {
-      var i = miniNext % MINI_SLOTS.length, slot = MINI_SLOTS[i];
-      if (minis[i]) minis[i].outer.parentNode.removeChild(minis[i].outer);
+      var i = miniNext % MINI_SLOTS.length, old = minis[i];
+      miniNext++;
+      if (old && animate && root.ThemeSeasons) {
+        minis[i] = null;
+        var gen = miniGen;
+        var wait = root.ThemeSeasons.leave(old.outer, { x: old.x, top: miniTop(old), r: 22 * old.k, crow: Math.random() < 0.25 });
+        setTimeout(function () { if (gen === miniGen && !minis[i]) putMini(name, i, true); }, wait);
+        return;
+      }
+      if (old) old.outer.parentNode.removeChild(old.outer);
+      putMini(name, i, animate);
+    }
+    function putMini(name, i, animate) {
+      var slot = MINI_SLOTS[i];
       // nach Tiefe einsortieren: wer höher steht (weiter hinten), liegt dahinter
       var outer = el('g', {}), before = null;
       outer.twDy = slot[2];
@@ -283,7 +297,6 @@
       var mound = el('path', { 'class': 'tw-mini__mound' }, outer);
       minis[i] = { outer: outer, inner: g, mound: mound, x: slot[0], k: slot[1], dy: slot[2], rot: slot[3], label: name,
                    bz: 0, av: 0, avAt: null, avHold: 0, wait: null, shown: -1 };
-      miniNext++;
       placeMini(minis[i]);
       if (animate && S.on && partOn('minis')) tag(name, slot[0], miniTop(minis[i]));
     }
@@ -727,7 +740,7 @@
       load: function (deco) {
         if (!deco) return;
         X.load(deco);
-        clear(gMinis); minis = []; miniNext = 0;
+        clear(gMinis); minis = []; miniNext = 0; miniGen++;
         (deco.minis || []).forEach(function (m) { addMini(m.name || '', false); });
         miniTotal = deco.mini_total || 0;
         var proj = deco.project != null ? deco.project : deco.snowman;
@@ -799,7 +812,7 @@
             miniBolt(p); break;
           case 'clear':
             if (p.kind === 'ornaments' || p.kind === 'gifts') X.clear(p.kind);
-            else if (p.kind === 'minis') { clear(gMinis); minis = []; miniNext = 0; miniTotal = 0; }
+            else if (p.kind === 'minis') { clear(gMinis); minis = []; miniNext = 0; miniGen++; miniTotal = 0; }
             else if (p.kind === 'snow') { S.target = 0; S.snowTop = []; }
             else if (p.kind === 'snowman') { S.sm = 0; showSnowman(0); }
             break;
