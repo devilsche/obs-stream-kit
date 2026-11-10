@@ -299,6 +299,50 @@ G1R_STEAM_NAME=</code></pre>
     }, true);
   }
 
+  // ── Jahreszeiten: nur Abschnitte/Knöpfe des gewählten Themas zeigen ──
+  function advent1(y) {
+    const d = new Date(y, 10, 27);
+    d.setDate(d.getDate() + (7 - d.getDay()) % 7);
+    return d;
+  }
+  function activeDecoration() {
+    const pick = key => {
+      const b = document.querySelector('.sw-group[data-param="' + key + '"] .sw-btn.active');
+      return b ? b.dataset.value : null;
+    };
+    const theme = pick("theme");
+    if (!theme) return null;
+    if (theme !== "auto") return theme;
+    // nach Datum, wie der Server: Xmas-Zeit ist Winter
+    const now = new Date(), y = now.getMonth() <= 1 ? now.getFullYear() - 1 : now.getFullYear();
+    const from = pick("xmasfrom") || "advent", to = pick("xmasto") || "12-26";
+    const start = from === "advent" ? advent1(y) : new Date(y, +from.slice(0, 2) - 1, +from.slice(3));
+    let end = new Date(y, +to.slice(0, 2) - 1, +to.slice(3), 23, 59);
+    if (end < start) end = new Date(y + 1, end.getMonth(), end.getDate(), 23, 59);
+    const m = now.getMonth() + 1;
+    if ((now >= start && now <= end) || m === 12 || m <= 2) return "winter";
+    return m <= 5 ? "spring" : m <= 8 ? "summer" : "autumn";
+  }
+  function wireThemeSections() {
+    function sync() {
+      const active = activeDecoration();
+      if (active === null) return;
+      document.querySelectorAll("[data-theme]").forEach(el => {
+        if (el.matches(".sw-section, .url-ctlgroup")) el.hidden = el.dataset.theme !== active;
+      });
+      document.querySelectorAll("[data-theme-soft]").forEach(el => {
+        el.open = el.dataset.themeSoft === active;
+      });
+    }
+    sync();
+    const scope = document.getElementById("urlDetailContent");
+    if (scope) scope.addEventListener("click", e => {
+      if (e.target.closest('.sw-group[data-param="theme"], .sw-group[data-param="xmasfrom"], .sw-group[data-param="xmasto"]')) {
+        setTimeout(sync, 0);
+      }
+    });
+  }
+
   // ── Reiter der Detailseite (Setup / Live control / Chat commands) ──
   function wireDetailTabs() {
     const tabs = [...document.querySelectorAll(".url-dtab")];
@@ -328,8 +372,26 @@ G1R_STEAM_NAME=</code></pre>
   }
 
   // ── Switch-Controls-HTML aus switches-Array ───────────────
+  // Jahreszeiten-Abschnitte/-Gruppen: nur das gewählte Thema ist sichtbar
+  const THEME_OF_GROUP = { Winter: "winter", Autumn: "autumn", Spring: "spring", Summer: "summer" };
   function renderSwitches(switches) {
     if (!switches || !switches.length) return "";
+    if (!switches.some(sw => sw.group)) return renderSwitchRows(switches);
+    // Abschnitte in Reihenfolge des ersten Auftretens, aufklappbar
+    const sections = [];
+    switches.forEach(sw => {
+      let sec = sections.find(x => x.name === (sw.group || ""));
+      if (!sec) { sec = { name: sw.group || "", theme: sw.theme || "", items: [] }; sections.push(sec); }
+      sec.items.push(sw);
+    });
+    return sections.map((sec, i) => `
+      <details class="sw-section"${sec.theme ? ` data-theme="${escapeAttr(sec.theme)}"` : ""}${i === 0 || sec.theme ? " open" : ""}>
+        <summary class="sw-section__head">${escapeHtml(sec.name || "More")}
+          <span class="sw-section__meta">${sec.items.length} ${sec.items.length === 1 ? "setting" : "settings"}</span></summary>
+        ${renderSwitchRows(sec.items)}
+      </details>`).join("");
+  }
+  function renderSwitchRows(switches) {
     return switches.map(sw => {
       const tooltip = sw.tooltip
         ? `<span class="info-i" data-tip="${escapeHtml(sw.tooltip)}" aria-label="Info"><span class="material-symbols-outlined icon-sm" aria-hidden="true">info</span></span>`
@@ -472,7 +534,7 @@ G1R_STEAM_NAME=</code></pre>
           <pre class="url-cheat__text">${escapeHtml(cheat)}</pre>
         </div>` : ""}
         ${cmdGroups.map((g, gi) => `
-        <details class="url-cmdgroup"${gi === 0 ? " open" : ""}>
+        <details class="url-cmdgroup"${THEME_OF_GROUP[g.name] ? ` data-theme-soft="${THEME_OF_GROUP[g.name]}"` : ""}${gi === 0 ? " open" : ""}>
           <summary><span class="url-cmdgroup__name">${escapeHtml(g.name)}</span>
             <span class="url-cmdgroup__meta">${g.rows.length} ${g.rows.length === 1 ? "command" : "commands"}${WHO_LABEL[g.who] ? " · " + WHO_LABEL[g.who] : ""}</span></summary>
           <ul class="url-cmdlist">${g.rows.map(r => {
@@ -514,12 +576,17 @@ G1R_STEAM_NAME=</code></pre>
       <div class="url-dbox url-ctlbox">
         <h2>Live control <span class="url-dbox__tag">running source</span></h2>
         <p class="url-dbox__desc">Acts on the source that is running in OBS right now, within about a second.</p>
-        ${controls.length ? ctlGroups(controls).map(g => `
-          ${g.name ? `<h3 class="url-ctl__group">${escapeHtml(g.name)}</h3>` : ""}
-          <div class="url-ctl">${g.items.map(c => `
+        ${controls.length ? ctlGroups(controls).map((g, gi) => {
+          const btns = `<div class="url-ctl">${g.items.map(c => `
           <button type="button" class="url-act url-ctl__btn" data-q="${escapeAttr(c.q)}" data-label="${escapeAttr(c.label)}">
             <span class="material-symbols-outlined" aria-hidden="true">${escapeHtml(c.icon || "play_arrow")}</span>${escapeHtml(c.label)}
-          </button>`).join("")}</div>`).join("") : ""}
+          </button>`).join("")}</div>`;
+          if (!g.name) return btns;
+          const th = THEME_OF_GROUP[g.name] || "";
+          return `<details class="url-ctlgroup"${th ? ` data-theme="${th}"` : ""}${gi === 0 || th ? " open" : ""}>
+            <summary class="url-ctl__group">${escapeHtml(g.name)}
+              <span class="url-cmdgroup__meta">${g.items.length}</span></summary>${btns}</details>`;
+        }).join("") : ""}
 
         <span class="url-copied" id="urlCtlStatus" role="status" aria-live="polite"></span>
       </div>` : "";
@@ -577,6 +644,7 @@ G1R_STEAM_NAME=</code></pre>
       ${controlsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-live" role="tabpanel" aria-labelledby="dtab-live" hidden>${controlsHtml}</div>` : ""}
       ${commandsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-chat" role="tabpanel" aria-labelledby="dtab-chat" hidden>${commandsHtml}</div>` : ""}`;
     if (hasTabs) wireDetailTabs();
+    wireThemeSections();
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,

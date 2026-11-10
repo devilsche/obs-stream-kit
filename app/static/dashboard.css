@@ -1265,6 +1265,16 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-dpanel{display:grid;grid-template-columns:1.3fr .9fr;gap:16px;align-items:start}
 .url-dpanel--single{grid-template-columns:minmax(0,1fr)}
 .url-dpanel[hidden]{display:none}
+/* ── aufklappbare Abschnitte der Schalter und Knopfgruppen ── */
+.sw-section{border-bottom:1px solid var(--border)}
+.sw-section[hidden], .url-ctlgroup[hidden]{display:none}
+.sw-section__head{cursor:pointer;display:flex;align-items:baseline;gap:10px;padding:14px 20px;min-height:24px;
+  font-weight:600;font-size:14px;color:var(--text);background:var(--bg-deeper)}
+.sw-section__head:focus-visible, .url-ctlgroup > summary:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.sw-section__meta{font-size:12px;font-weight:400;color:var(--text-muted)}
+.url-ctlgroup{border-top:1px solid var(--border);padding:2px 0 10px}
+.url-ctlgroup:first-of-type{border-top:0}
+.url-ctlgroup > summary{cursor:pointer;display:flex;align-items:baseline;gap:10px;list-style-position:inside}
 @media (max-width:900px){.url-dpanel{grid-template-columns:minmax(0,1fr)}}
 
 /* ── Parameter-Switches im Detail (param-Zeilen-Look) ── */

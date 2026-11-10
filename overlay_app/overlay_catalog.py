@@ -602,7 +602,7 @@ EFFECT_META = {
          "options": [["1", "On"], ["0", "Off"]], "tooltip": "Grows while it snows, !shovel and !shake clear it"},
         {"key": "garland", "label": "Leaf garland", "type": "select", "default": "1",
          "options": [["1", "On"], ["0", "Off"]], "tooltip": "Autumn: leaf garland with lights at the top"},
-        {"key": "branch", "label": "Branch", "type": "select", "default": "1",
+        {"key": "branch", "label": "Branch (autumn, spring)", "type": "select", "default": "1",
          "options": [["1", "On"], ["0", "Off"]], "tooltip": "Autumn branch and spring cherry blossom branch in the corner"},
         {"key": "pile", "label": "Leaf piles", "type": "select", "default": "1",
          "options": [["1", "On"], ["0", "Off"]], "tooltip": "Autumn: leaf piles in the corners, grow with the falling leaves"},
@@ -775,6 +775,38 @@ EFFECT_META = {
         {"q": "cmd=reset", "label": "Back to URL settings"},
     ]},
 }
+
+# Weather-Karte: Schalter in aufklappbare Abschnitte gliedern; Jahreszeiten-
+# Abschnitte zeigt das Dashboard nur fürs gewählte Thema (data-theme)
+_WEATHER_SECTIONS = [
+    ("Weather", None, ("place", "lock", "fallback", "wind")),
+    ("K/D mood", None, ("mood", "kdlow", "kdhigh", "kdtest", "aurorakd", "veil")),
+    ("Frost", None, ("frost", "frostrate")),
+    ("Sound", None, ("sound", "volume", "thunder")),
+    ("Decoration", None, ("theme", "branch")),
+    ("Winter", "winter", ("xmasfrom", "xmasto", "snowrate", "lights", "tree", "baubles", "gifts",
+                          "snowman", "minis", "icicles", "cover")),
+    ("Autumn", "autumn", ("leafrate", "garland", "pile", "pumpkins")),
+    ("Spring", "spring", ("meadow", "bugs")),
+    ("Summer", "summer", ("beach", "umbrella")),
+    ("Preview", None, ("testbg",)),
+]
+
+
+def _group_weather_switches():
+    by_key = {sw["key"]: sw for sw in EFFECT_META["weather.html"]["switches"]}
+    out = []
+    for name, theme, keys in _WEATHER_SECTIONS:
+        for k in keys:
+            sw = dict(by_key.pop(k), group=name)
+            if theme:
+                sw["theme"] = theme
+            out.append(sw)
+    out.extend(by_key.values())          # neue Schalter ohne Abschnitt landen am Ende
+    EFFECT_META["weather.html"]["switches"] = out
+
+
+_group_weather_switches()
 
 TRANSITIONS = [
     {
