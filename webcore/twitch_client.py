@@ -244,3 +244,15 @@ def get_clips_by_ids(client_id: str, client_secret: str, slugs: list) -> list:
     except Exception:
         return []
     return _map_clips(cdata)
+
+
+def get_recent_followers(access_token: str, client_id: str, broadcaster_id: str, first: int = 60) -> list:
+    """Neueste Follower (Anzeigenamen, neueste zuerst). Braucht einen
+    User-Token mit moderator:read:followers des Broadcasters."""
+    resp = requests.get(f"{TWITCH_HELIX}/channels/followers",
+                        params={"broadcaster_id": broadcaster_id, "first": first},
+                        headers={"Authorization": f"Bearer {access_token}", "Client-Id": client_id},
+                        timeout=10)
+    if resp.status_code != 200:
+        raise RuntimeError(f"Twitch /channels/followers fehlgeschlagen: {resp.status_code} {resp.text[:200]}")
+    return [f.get("user_name") or f.get("user_login") or "" for f in resp.json().get("data", [])]

@@ -9,9 +9,9 @@ from flask import (
 )
 
 from webcore.config import Config
-from webcore.twitch_client import exchange_code, get_user_info  # exposed for mock
+from webcore.twitch_client import exchange_code, get_user_info, get_recent_followers  # exposed for mock
 from webcore import sessions as srv_sessions
-from webcore.middleware import _get_conn
+from webcore.middleware import _get_conn, require_session
 
 
 bp_auth = Blueprint("auth", __name__)
@@ -32,6 +32,51 @@ def login():
     return redirect(url, code=302)
 
 
+@bp_auth.route("/app/twitch/import-followers")
+@require_session
+def import_followers():
+    """Einmal-Login mit moderator:read:followers: holt die letzten 60
+    Follower in die gemeinsame Follower-Liste der Weather-Source. Der Token
+    wird nur für diesen Abruf benutzt und nicht gespeichert."""
+    state = secrets.token_urlsafe(32)
+    session["oauth_state"] = state
+    session["oauth_import"] = {"tenant": g.tenant_id, "twitch_user_id": g.user.get("twitch_user_id")}
+    params = {
+        "client_id": current_app.config["TWITCH_CLIENT_ID"],
+        "redirect_uri": current_app.config["TWITCH_REDIRECT_URI"],
+        "response_type": "code",
+        "scope": "user:read:email moderator:read:followers",
+        "state": state,
+    }
+    return redirect(current_app.config["TWITCH_AUTH_URL"] + "?" + urllib.parse.urlencode(params), code=302)
+
+
+def _finish_follower_import(imp, access_token, info, cfg):
+    """Nur der eigene Kanal: der Twitch-Account muss zum angemeldeten Nutzer passen."""
+    from fx import weather_followers
+    from core.db_compat import SqliteCompatConn
+    if not imp.get("tenant") or str(info.get("id")) != str(imp.get("twitch_user_id")):
+        abort(403, description="Twitch account does not match the logged-in user")
+    try:
+        names = get_recent_followers(access_token, cfg["TWITCH_CLIENT_ID"], info["id"], 60)
+    except RuntimeError as e:
+        abort(502, description=str(e))
+    import sqlite3
+    raw = _get_conn()
+    conn = raw if isinstance(raw, (sqlite3.Connection, SqliteCompatConn)) else SqliteCompatConn(raw)
+    added = 0
+    try:
+        for name in reversed(names):          # älteste zuerst, damit die Reihenfolge stimmt
+            if name and weather_followers.add(conn, imp["tenant"], name):
+                added += 1
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            raw.close()
+    # zurück auf die Weather-Karte (Reiter bleibt wie zuletzt geöffnet)
+    return redirect("/app/urls?followers_imported=%d&followers_seen=%d#src=effects%%2Fweather.html"
+                    % (added, len(names)), code=302)
+
+
 @bp_auth.route("/app/oauth/callback")
 def callback():
     state = request.args.get("state")
@@ -50,6 +95,10 @@ def callback():
         info = get_user_info(access_token, cfg["TWITCH_CLIENT_ID"])
     except RuntimeError as e:
         abort(502, description=str(e))
+
+    imp = session.pop("oauth_import", None)
+    if imp:
+        return _finish_follower_import(imp, access_token, info, cfg)
 
     conn = _get_conn()
     try:

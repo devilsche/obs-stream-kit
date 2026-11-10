@@ -528,6 +528,18 @@ G1R_STEAM_NAME=</code></pre>
       <div class="url-dbox url-cmdbox">
         <h2>Chat commands <span class="url-dbox__tag">Streamer.bot</span></h2>
         <p class="url-dbox__desc">In Streamer.bot add a chat command (e.g. <code>!thunderstorm</code>) with a <b>Fetch URL</b> sub-action and paste the copied URL. The running source reacts within about a second.</p>
+        ${/\/weather$/.test(card.dataset.fx || "") ? (() => {
+          // Follower-Import: einmal über den Twitch-Login, Ergebnis kommt als URL-Parameter zurück
+          const q = new URLSearchParams(location.search);
+          const done = q.get("followers_imported");
+          const msg = done === null ? "" : `Imported ${escapeHtml(done)} new of ${escapeHtml(q.get("followers_seen") || "0")} recent followers.`;
+          return `<div class="url-cheat">
+            <div class="url-cheat__head"><b>Followers</b>
+              <a class="url-act ghost" href="/app/twitch/import-followers"><span class="material-symbols-outlined" aria-hidden="true">download</span>Import last 60 Twitch followers</a></div>
+            <p class="url-dbox__desc">Every follower appears in every season (ornament or mini snowman, pumpkin, flower, sand castle). The import asks Twitch once for permission to read your followers; the access is not stored. Names already in the list are skipped.</p>
+            ${msg ? `<p class="url-follow-msg" role="status">${msg}</p>` : ""}
+          </div>`;
+        })() : ""}
         ${cheat ? `<div class="url-cheat">
           <div class="url-cheat__head"><b>Cheat sheet for viewers</b>
             <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(cheat)}" aria-label="Copy cheat sheet"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy</button></div>
