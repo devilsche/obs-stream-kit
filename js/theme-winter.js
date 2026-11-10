@@ -121,12 +121,21 @@
 
   // ── Schneemann links, Minis dazwischen (Mitte unten bleibt frei) ──
   var SM_X = 250, SM_K = 0.85;
+  // Plätze: [x, Maßstab, Höhenversatz, Neigung]; Größe, Tiefe und Versatz je
+  // Platz fest gestreut (kein Springen beim Neuladen), hinten kleiner und höher
+  function hash(i, s) { var v = Math.sin(i * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); }
+  function slot(x, n, back) {
+    var size = 0.62 + 0.5 * hash(n, 1);
+    var depth = back ? 0.45 + 0.55 * hash(n, 2) : 0.4 * hash(n, 2);
+    return [Math.round(x + (hash(n, 3) - 0.5) * 30), +(size * (1 - 0.28 * depth)).toFixed(2),
+            Math.round(10 - 36 * depth), Math.round((hash(n, 4) - 0.5) * 12)];
+  }
   var MINI_SLOTS = (function () {
     var front = [], back = [], i;
-    for (i = 0; i < 9; i++) front.push([420 + i * 48, 1]);
-    for (i = 0; i < 8; i++) front.push([1430 - i * 48, 1]);
-    for (i = 0; i < 8; i++) back.push([444 + i * 48, 0.78]);
-    for (i = 0; i < 7; i++) back.push([1406 - i * 48, 0.78]);
+    for (i = 0; i < 9; i++) front.push(slot(420 + i * 48, i, false));
+    for (i = 0; i < 8; i++) front.push(slot(1430 - i * 48, 10 + i, false));
+    for (i = 0; i < 8; i++) back.push(slot(444 + i * 48, 20 + i, true));
+    for (i = 0; i < 7; i++) back.push(slot(1406 - i * 48, 30 + i, true));
     // abwechselnd links/rechts, von außen nach innen
     function zip(list, nl) {
       var l = list.slice(0, nl), r = list.slice(nl), out = [];
@@ -494,9 +503,11 @@
     function addMini(name, animate) {
       var i = miniNext % MINI_SLOTS.length, slot = MINI_SLOTS[i];
       if (minis[i]) minis[i].outer.parentNode.removeChild(minis[i].outer);
-      // hintere Reihe zuerst einfügen, vordere davor
-      var outer = el('g', {});
-      if (slot[1] < 1) gMinis.insertBefore(outer, gMinis.firstChild); else gMinis.appendChild(outer);
+      // nach Tiefe einsortieren: wer höher steht (weiter hinten), liegt dahinter
+      var outer = el('g', {}), before = null;
+      outer.twDy = slot[2];
+      for (var c = gMinis.firstChild; c; c = c.nextSibling) if (c !== outer && c.twDy > slot[2]) { before = c; break; }
+      gMinis.insertBefore(outer, before);
       var g = el('g', { 'class': 'tw-mini' + (animate ? ' tw-mini--new' : '') }, outer);
       el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -20, r: 22 }, g);
       el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -54, r: 15 }, g);
@@ -504,15 +515,16 @@
       el('circle', { 'class': 'tw-sm-coal', cx: 5, cy: -57, r: 2.4 }, g);
       el('path', { 'class': 'tw-sm-nose', d: 'M0 -53 L14 -50 L0 -48 Z' }, g);
       el('path', { 'class': 'tw-mini__hat' + (1 + i % 4), d: 'M-16 -64 Q0 -98 16 -64 Z' }, g);
-      el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -96, r: 5 }, g);
-      minis[i] = { outer: outer, inner: g, x: slot[0], k: slot[1], label: name };
+      el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, g);
+      minis[i] = { outer: outer, inner: g, x: slot[0], k: slot[1], dy: slot[2], rot: slot[3], label: name };
       miniNext++;
       placeMini(minis[i]);
-      if (animate && S.on && partOn('minis')) tag(name, slot[0], surface(slot[0]) - 110 * slot[1]);
+      if (animate && S.on && partOn('minis')) tag(name, slot[0], miniTop(minis[i]));
     }
+    function miniTop(m) { return surface(m.x) + m.dy - 110 * m.k; }
     function placeMini(m) {
-      var y = surface(m.x) + (m.k < 1 ? -4 : 8);
-      m.outer.setAttribute('transform', 'translate(' + m.x + ' ' + f1(y) + ') scale(' + m.k + ')');
+      m.outer.setAttribute('transform', 'translate(' + m.x + ' ' + f1(surface(m.x) + m.dy) + ') rotate(' + m.rot +
+                           ') scale(' + m.k + ')');
     }
     function placeSnowman() {
       gSmPos.setAttribute('transform', 'translate(' + SM_X + ' ' + f1(surface(SM_X) + 26) + ') scale(' + SM_K + ')');
@@ -922,7 +934,7 @@
         if (partOn('tree')) orns.forEach(function (o) { if (o && o.label) pool.push({ node: o.inner, label: o.label, p: treeToScreen(o.x, o.y - 16) }); });
         if (partOn('gifts')) gifts.forEach(function (g) { if (g && g.label) pool.push({ node: g.inner, label: g.label, p: treeToScreen(g.x, g.y) }); });
       }
-      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, surface(m.x) - 110 * m.k] }); });
+      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
       if (lastSpot && pick.label === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
