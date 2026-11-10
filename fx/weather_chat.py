@@ -70,14 +70,14 @@ def paid(kind: str, amount, msg: str = "", name: str = "", rnd=random) -> dict:
     if wanted:
         command, tier, label = OFFERS[wanted]
         if pts >= PRICE[tier]:
-            return {"command": command, "offer": wanted, "say": f"Danke {who}! Du hast {label} bestellt."}
+            return {"command": command, "offer": wanted, "say": f"Danke dir, {who}! Gleich gibt es {label}."}
         return {"command": None, "offer": wanted,
-                "say": f"Danke {who}! Für !{wanted} braucht es {price_text(tier)}."}
+                "say": f"Danke dir, {who}! (!{wanted} gibt es ab {price_text(tier)}.)"}
     for tier in TIER_ORDER:
         if pts >= PRICE[tier]:
             choice = rnd.choice(sorted(k for k, v in OFFERS.items() if v[1] == tier))
             command, _, label = OFFERS[choice]
-            return {"command": command, "offer": choice, "say": f"Danke {who}! Dafür gibt es {label}."}
+            return {"command": command, "offer": choice, "say": f"Danke dir, {who}! Zum Dank gibt es {label}."}
     return {"command": None, "offer": None, "say": ""}
 
 
@@ -89,7 +89,7 @@ def raid(viewers, name: str = "", rnd=random) -> dict:
     who = name.strip() or "dem Raid"
     if n >= RAID_BIG:
         return {"command": OFFERS["megabolt"][0], "offer": "megabolt",
-                "say": f"Was für ein Raid von {who}! Da zieht ein Unwetter auf."}
+                "say": f"Willkommen, Raid von {who}! So viele auf einmal, da zieht glatt ein Unwetter auf."}
     if n >= RAID_MIN:
         choice = rnd.choice(RAID_FRIENDLY)
         command, _, label = OFFERS[choice]
@@ -107,14 +107,17 @@ PROJECT_PARTS = 8
 
 
 def project_say(theme: str, stage: int, name: str = "", completed: bool = False) -> str:
-    noun, until = PROJECT.get(theme, PROJECT["autumn"])
-    left = max(0, PROJECT_PARTS - stage)
-    who = f"Danke {name.strip()}! " if name and name.strip() else ""
+    """Fortschritt freundlich melden, ohne zum Abonnieren zu drängen."""
+    noun, _ = PROJECT.get(theme, PROJECT["autumn"])
+    art = "Der" if noun in ("Schneemann", "Sandpalast") else "Die"
+    who = f"Danke dir, {name.strip()}! " if name and name.strip() else ""
     if completed:
-        return f"{who}{'Der' if noun in ('Schneemann', 'Sandpalast') else 'Die'} {noun} ist fertig! Danke an alle Subs!"
-    if left == 0:
-        return f"{who}{'Der' if noun in ('Schneemann', 'Sandpalast') else 'Die'} {noun} ist schon fertig."
-    return f"{who}Noch {left} {'Sub' if left == 1 else 'Subs'} bis {until}."
+        return f"{who}{art} {noun} ist fertig, danke an alle, die mitgebaut haben!"
+    if stage >= PROJECT_PARTS:
+        return f"{who}{art} {noun} steht schon komplett."
+    if stage <= 0:
+        return f"{art} {noun} wartet noch auf das erste Teil."
+    return f"{who}{art} {noun} wächst: {stage} von {PROJECT_PARTS} Teilen."
 
 
 KIND_SAY = {"clear": "klar", "cloudy": "bewölkt", "fog": "neblig", "drizzle": "Nieselregen",
@@ -150,7 +153,7 @@ def top_say(theme: str, top: list) -> str:
     if not top:
         return ""
     name, n = top[0][0], top[0][1]
-    return f"{TOP_SAY.get(theme, 'Spitzenreiter')}: {name} mit {n}×. Wer holt sich Platz 1?"
+    return f"{TOP_SAY.get(theme, 'Spitzenreiter')} bisher: {name} ({n}×)."
 
 
 TIPS = {"autumn": ("!rake", "!jump", "!extinguish"),
@@ -161,6 +164,4 @@ TIPS = {"autumn": ("!rake", "!jump", "!extinguish"),
 
 def tip_say(theme: str, rnd=random) -> str:
     cmd = rnd.choice(TIPS.get(theme, TIPS["autumn"]))
-    return (f"Probiert mal {cmd}! Wetter gibt es gegen Bits oder Spende: "
-            f"Wetter ab {PRICE['weather']} Bits, Spektakel ab {PRICE['small']}, Tornado & Co. ab {PRICE['big']} "
-            f"(Befehl in die Nachricht schreiben, z. B. !tornado).")
+    return f"Kleiner Tipp: Mit {cmd} könnt ihr bei der Deko mitmachen. Alle Befehle zeigt !commands."

@@ -575,12 +575,12 @@ def test_build_answers_with_project_progress(conn):
     for i in range(6):
         r = c.get("/s/t/api/fx/weather?cmd=build&name=Sub" + str(i)).get_json()
     assert r["left"] == 2 and r["completed"] is False
-    assert r["say"] == "Danke Sub5! Noch 2 Subs bis zur fertigen Vogelscheuche."
+    assert r["say"] == "Danke dir, Sub5! Die Vogelscheuche wächst: 6 von 8 Teilen."
     c.get("/s/t/api/fx/weather?cmd=build&name=A")
     r = c.get("/s/t/api/fx/weather?cmd=build&name=B").get_json()
     assert r["completed"] is True and "ist fertig" in r["say"]
     r = c.get("/s/t/api/fx/weather?cmd=build&name=C").get_json()
-    assert r["completed"] is False and "schon fertig" in r["say"]
+    assert r["completed"] is False and "schon komplett" in r["say"]
 
 
 def test_paid_weather_pushes_command_only_when_enough(conn):
@@ -609,6 +609,6 @@ def test_info_sentences(conn):
     say = c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
     assert say.startswith("Wetter gerade: ")
     weather_state.LAST_THEME[1] = "autumn"
-    assert c.get("/s/t/api/fx/weather/info?what=project").get_json()["say"] == "Noch 8 Subs bis zur fertigen Vogelscheuche."
+    assert c.get("/s/t/api/fx/weather/info?what=project").get_json()["say"] == "Die Vogelscheuche wartet noch auf das erste Teil."
     seen = {c.get("/s/t/api/fx/weather/info?what=rotate").get_json()["say"][:5] for _ in range(3)}
-    assert "Noch " in seen and "Probi" in seen     # leere Rangliste wird übersprungen
+    assert "Die V" in seen and "Klein" in seen     # leere Rangliste wird übersprungen
