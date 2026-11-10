@@ -55,6 +55,19 @@
 .ts-proj-part.is-new { animation: tsPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 @keyframes tsPop { from { transform: scale(0.2); opacity: 0; } to { transform: none; opacity: 1; } }
 .ts-proj-body { transform-box: fill-box; transform-origin: 50% 100%; }
+/* Vogelscheuche im Wind (Fuß bleibt stehen), Winkel aus dem Pendel in JS */
+.ta-scare .ts-proj-body { transform: rotate(calc(var(--ta-sc-sway, 0) * 1deg)); }
+/* Hut (Teil 5) und Krähe (Teil 8) fliegen mit der Windhose davon und kehren zurück */
+.ta-scare .ts-proj-part[data-step="5"], .ta-scare .ts-proj-part[data-step="8"] {
+  transition: transform 1.6s cubic-bezier(0.3, 0.8, 0.4, 1), opacity 1.2s ease;
+}
+.ta-scare[data-gone="1"] .ts-proj-part[data-step="5"] { transition-duration: 1.2s, 1s; opacity: 0; }
+.ta-scare[data-gone="1"][data-dir="r"] .ts-proj-part[data-step="5"] { transform: translate(520px, -380px) rotate(260deg); }
+.ta-scare[data-gone="1"][data-dir="l"] .ts-proj-part[data-step="5"] { transform: translate(-520px, -380px) rotate(-260deg); }
+.ta-scare[data-gone="1"] .ts-proj-part[data-step="8"] { transform: translate(160px, -420px); opacity: 0; transition-duration: 1.4s, 1.2s; }
+/* Sandpalast bebt, wenn die Windhose naht */
+.tss-palace[data-quake="1"] .ts-proj-body { animation: tssQuake 0.18s linear infinite; }
+@keyframes tssQuake { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(2px) translateY(-1px); } }
 .ts-proj.is-done .ts-proj-body { animation: tsDone 0.9s ease-in-out; }
 @keyframes tsDone { 0%, 100% { transform: none; } 30% { transform: scale(1.06, 0.95); } 60% { transform: scale(0.97, 1.04); } }
 
@@ -356,13 +369,9 @@
 }
 .tw--beach .tw-snowcap, .tw--beach .tw-gsnow { opacity: var(--tw-light); }
 /* Strand-Baum im Sturm: biegt sich mit dem Wind (unten fest), bei naher Windhose stark */
-.tw--beach .tw-x:not(.tw-lights) > .tw-shk { transform-box: fill-box; transform-origin: 50% 100%; }
-.tw--beach[data-sway="storm"] .tw-x:not(.tw-lights) > .tw-shk { animation: twbSway 1.8s ease-in-out infinite; }
-.tw--beach[data-sway="gust"] .tw-x:not(.tw-lights) > .tw-shk { animation: twbSway 0.7s ease-in-out 2; }
-.tw--beach[data-sway="strong"] .tw-x:not(.tw-lights) > .tw-shk { animation: twbSwayStrong 0.9s ease-in-out infinite; }
-.tw--beach[data-sway="strong"] .tw-orn { animation: twJiggle 0.35s ease-in-out infinite; }
-@keyframes twbSway { 0%, 100% { transform: skewX(-1.5deg); } 50% { transform: skewX(2.5deg); } }
-@keyframes twbSwayStrong { 0%, 100% { transform: skewX(-4deg); } 50% { transform: skewX(6deg); } }
+/* nur der Baum selbst biegt sich (Stamm bleibt im Sand); Hügel, Geschenke bleiben ruhig */
+.tw--beach .tw-treebox { transform-box: fill-box; transform-origin: 50% 100%; transform: skewX(calc(var(--twb-sway, 0) * 1deg)); }
+.tw--beach[data-jiggle="1"] .tw-orn { animation: twJiggle 0.35s ease-in-out infinite; }
 
 /* keine Winter-Schneewehe am Strand: der Hügel bekommt dieselbe Schneeschicht wie der Sand */
 .tw--beach .tw-drift { display: none; }

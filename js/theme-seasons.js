@@ -224,6 +224,22 @@
       }
     };
 
+    // ── Wedeln mit Nachschwingen: Ausschlag folgt dem Wind (schnell hoch,
+    //    langsam aus), Böen geben einen abklingenden Stoß. Liefert je Schritt
+    //    den Winkel; dir = Windrichtung (±1), die Mitte liegt leicht im Wind ──
+    B.sway = function () {
+      var amp = 0, ph = 0, kick = 0;
+      return function (dt, target, gust, dir) {
+        if (gust > kick) kick = gust;
+        kick *= Math.pow(0.25, dt);
+        var want = Math.max(target, kick);
+        amp += (want - amp) * Math.min(1, dt * (want > amp ? 2.5 : 0.4));
+        ph += dt * (2.4 + 3.5 * Math.min(1, amp / 6));
+        if (amp < 0.03) { amp = 0; return 0; }
+        return amp * Math.sin(ph) + 0.35 * amp * (dir || 1);
+      };
+    };
+
     // ── Gemeinsames Sub-Projekt (8 Teile, Stand gilt für alle Jahreszeiten) ──
     // cfg: parts[8] = function (g) zeichnet Teil i (Fuß bei 0/0), names[8],
     //      x, y() = Fuß auf dem Bildschirm, k = Maßstab, top(n) = Schild-Höhe

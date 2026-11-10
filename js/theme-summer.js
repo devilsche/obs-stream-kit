@@ -919,11 +919,19 @@
                                          burst: function () { sandPuff(c.x, sandY(c.x)); } });
         renderCastle(c);
       });
-      stepSlump(pal, 0.3 * r, 270, 30, { washed: 0.7, blown: 0.22, reach: 200,
-                                         torn: function (dir) { debris(270, sandY(270) - 260, dir, false); } });
-      // Windhose: Palast verliert die Fahnen, bis er wieder steht
+      stepSlump(pal, 0.3 * r, 270, 30, { washed: 0.7, blown: 0.55, reach: 280,
+                                         torn: function (dir) {
+                                           debris(270, sandY(270) - 260, dir, true);
+                                           debris(230, sandY(230) - 150, dir, false);
+                                           debris(310, sandY(310) - 120, dir, false);
+                                         } });
+      // Windhose: Palast verliert Türme und Fahnen, bis er wieder steht
       var pb = pal.torn || pal.s > 0.05 && gPalace.dataset.blown === '1' ? '1' : '0';
       if (gPalace.dataset.blown !== pb) gPalace.dataset.blown = pb;
+      // naht die Windhose, bebt der Palast
+      var ptx = twister && twister.active && twister.active() ? twister.x() : null;
+      var pq = !B.reduceMotion && ptx !== null && Math.abs(ptx - 270) < 380 ? '1' : '0';
+      if (gPalace.dataset.quake !== pq) gPalace.dataset.quake = pq;
       renderPalace();
     }
 
@@ -934,15 +942,20 @@
     // der Schirm fliegt auch weg, wenn der Weihnachtsbaum davor steht
     function umbrellaFree() { return B.on && !B.reduceMotion && B.partOn('beach') && B.partOn('umbrella'); }
     // Strand-Baum biegt sich im Sturm, bei naher Windhose kräftig
-    var TREE_CX = TREE_X + 200 * TREE_K, swayDrawn = '';
-    function stepTreeSway() {
-      var tx = tornado ? tornado.x() : null, v = '';
+    var TREE_CX = TREE_X + 200 * TREE_K, treeSway = B.sway(), swayDrawn = '', jigDrawn = '';
+    function stepTreeSway(dt) {
+      var tx = tornado ? tornado.x() : null, target = 0, gust = 0;
       if (B.on && !B.reduceMotion && treeOver()) {
-        if (tx !== null && Math.abs(tx - TREE_CX) < 320) v = 'strong';
-        else if (stormy()) v = 'storm';
-        else if (Math.abs(B.gustPx) > 150) v = 'gust';     // Böe: kurz wackeln
+        if (tx !== null && Math.abs(tx - TREE_CX) < 320) target = 6;
+        else if (stormy()) target = 2.2;
+        gust = Math.min(4, Math.abs(B.gustPx) / 200);
       }
-      if (v !== swayDrawn) { swayDrawn = v; xRoot.dataset.sway = v; }
+      var a = treeSway(dt, target, gust, B.windBase < 0 ? -1 : 1);
+      var v = a.toFixed(2);
+      if (v !== swayDrawn) { swayDrawn = v; xRoot.style.setProperty('--twb-sway', v); }
+      // Kugeln wackeln mit, solange der Baum stark schwingt
+      var jig = target >= 6 ? '1' : '';
+      if (jig !== jigDrawn) { jigDrawn = jig; xRoot.dataset.jiggle = jig; }
     }
     // Kuppel-Punkt (lokal) auf den Bildschirm (ohne Flug)
     function uScreen(lx, ly) {
@@ -1017,7 +1030,7 @@
         return;
       }
       if (tornado && !tornado.active()) tornado = null;
-      stepTreeSway();
+      stepTreeSway(dt);
       U.t += dt;
       var burning = false;
       if (U.mode === 'up' && umbrellaFree() && (stormy() || tornadoNear())) {

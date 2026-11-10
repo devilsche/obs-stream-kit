@@ -454,6 +454,7 @@
       tNow += dt;
       var live = show && show.active();
       var tx = live && show.type === 'tornado' ? show.x() : null;
+      stepScare(dt, tx);
       // Laub am Fuß der Windhose aufwirbeln (Partikel blenden an den Rändern aus)
       if (tx !== null && tx > -100 && tx < W + 100) {
         whirlAcc += dt * 45;
@@ -502,8 +503,39 @@
       });
       if (show && !live && !pkNodes.some(function (pk) { return pk && (pk.mode || pk.ly > 0); })) show = null;
     }
+    // Vogelscheuche: biegt sich bei Sturm, schwankt bei Böen; naht die
+    // Windhose, wird sie durchgeschüttelt, Hut und Krähe fliegen davon und
+    // kommen danach zurück
+    var SC_X = 250, scHatBack = 0, scStraw = 0, scSway = B.sway(), scDrawn = '';
+    function scSet(k, v) { if (gScare.dataset[k] !== v) gScare.dataset[k] = v; }
+    function stepScare(dt, tx) {
+      var near = tx !== null && Math.abs(tx - SC_X) < 330;
+      var sky = opts.sky ? opts.sky() : null, kind = sky ? sky.kind : '';
+      var bz = opts.blizzard ? opts.blizzard() : 0;
+      var stormy = kind === 'storm' || kind === 'blizzard' || bz > 0.3 || Math.abs(B.windBase) >= 0.8;
+      // gedämpftes Pendel: schwingt nach, wenn der Wind nachlässt
+      var a = B.reduceMotion ? 0 : scSway(dt, near ? 7 : stormy ? 2 : 0, Math.min(4, Math.abs(B.gustPx) / 200),
+                                          B.windBase < 0 ? -1 : 1);
+      var av = a.toFixed(2);
+      if (av !== scDrawn) { scDrawn = av; gScare.style.setProperty('--ta-sc-sway', av); }
+      if (near && !B.reduceMotion && scare.n() >= 5) {
+        if (gScare.dataset.gone !== '1') { scSet('dir', show.dir < 0 ? 'l' : 'r'); scSet('gone', '1'); }
+        scHatBack = 2.5;
+        // Stroh und Laub fliegen mit dem Wirbel
+        scStraw += dt * 18;
+        while (scStraw >= 1) {
+          scStraw--;
+          spawn({ x: SC_X + rand(-60, 60), y: H - rand(150, 330), vx: (show.dir || 1) * rand(300, 700), vy: rand(-500, -150),
+                  g: 500, sway: rand(80, 150), vph: rand(5, 9), front: true, s: rand(0.6, 1), life: rand(1.5, 2.5), land: false });
+        }
+      } else if (gScare.dataset.gone === '1') {
+        scHatBack -= dt;
+        if (scHatBack <= 0) scSet('gone', '');
+      }
+    }
     function resetShow() {
       show = null;
+      scSet('gone', '');
       pkNodes.forEach(function (pk) { if (pk) { pk.mode = null; pk.ly = 0; pk.lx = 0; pk.rot = 0; renderPk(pk); } });
     }
 
