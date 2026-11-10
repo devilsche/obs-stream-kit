@@ -198,7 +198,7 @@
       // sichtbare Deko-Thema; ausgeblendete Themen reagieren nicht
       kit.on('spectacle', function (info) {
         audio.spectacle(info);
-        sbEvent('spectacle', { type: info.type });
+        sbEvent('spectacle', { type: info.type, snow: info.snow ? 1 : 0 });
         if (seasons[lastTheme]) seasons[lastTheme].command('spectacle', info);
         else if (lastTheme === 'winter') theme.command('spectacle', info);
       });

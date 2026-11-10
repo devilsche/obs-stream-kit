@@ -966,7 +966,7 @@
     function showInfo(s, type, reduced) {
       function on() { return shows.indexOf(s) >= 0; }
       return {
-        type: type, dur: s.dur, dir: s.dir || 0, reduced: reduced, land: s.land || null,
+        type: type, dur: s.dur, dir: s.dir || 0, reduced: reduced, land: s.land || null, snow: !!s.snow,
         active: on,
         elapsed: function () { return on() ? s.t : s.dur; },
         level: function (x) { return on() && s.level ? Math.max(0, s.level(x)) : 0; },
@@ -1360,12 +1360,15 @@
       },
       tornado: {
         // Windhose: dunkler Trichter unter einer Wolkenbasis, unten schmal,
-        // oben breit, dreht sich (Wirbelstreifen), Staub und Trümmer am Fuß
+        // oben breit, dreht sich (Wirbelstreifen), Staub und Trümmer am Fuß.
+        // Im Winter, bei liegendem Schnee oder kräftigem Schneefall eine
+        // Schneehose: hell, halb durchsichtig, wirbelt Schnee statt Staub
         init: function () {
           var dir = Math.random() < 0.5 ? 1 : -1;
           var debris = [];
           for (var i = 0; i < 120; i++) debris.push({ h: Math.pow(Math.random(), 1.8), a: rand(0, 6.3), sp: rand(3, 7), r: rand(2, 5) });
-          return { dur: 9, dir: dir, debris: debris };
+          var snow = cur.theme === 'winter' || (cur.snowCover || 0) > 15 || (cur.snow || 0) > 0.4;
+          return { dur: 9, dir: dir, debris: debris, snow: snow };
         },
         draw: function (s) {
           var p = s.t / s.dur;
@@ -1378,8 +1381,9 @@
 
           // Wolkenbasis oben (Himmels-Ebene)
           var cb = sctx.createRadialGradient(x, topY - 40, 0, x, topY - 40, 620);
-          cb.addColorStop(0, 'rgba(40,40,46,' + (0.75 * env) + ')');
-          cb.addColorStop(1, 'rgba(40,40,46,0)');
+          var baseRgb = s.snow ? nightRgb([120, 128, 142], [70, 78, 98]) : '40,40,46';
+          cb.addColorStop(0, 'rgba(' + baseRgb + ',' + ((s.snow ? 0.6 : 0.75) * env) + ')');
+          cb.addColorStop(1, 'rgba(' + baseRgb + ',0)');
           sctx.save();
           sctx.translate(x, topY - 40); sctx.scale(1, 0.35); sctx.translate(-x, -(topY - 40));
           sctx.fillStyle = cb;
@@ -1394,9 +1398,10 @@
             var y = Math.round(topY + i * bandH), y2 = Math.round(topY + (i + 1) * bandH);
             var cx = x + swayAt(k), w = widthAt(k);
             // oben weich in die Wolkenbasis übergehen, keine harte Kante
-            var a = env * (0.92 - 0.2 * k) * smooth(i / 8);
+            var a = env * (0.92 - 0.2 * k) * smooth(i / 8) * (s.snow ? 0.7 : 1);
             var g = fctx.createLinearGradient(cx - w, 0, cx + w, 0);
-            var edgeRgb = nightRgb([60, 57, 54], [62, 66, 82]), coreRgb = nightRgb([46, 44, 42], [44, 47, 60]);
+            var edgeRgb = s.snow ? nightRgb([226, 232, 240], [150, 160, 182]) : nightRgb([60, 57, 54], [62, 66, 82]);
+            var coreRgb = s.snow ? nightRgb([190, 200, 214], [118, 128, 152]) : nightRgb([46, 44, 42], [44, 47, 60]);
             g.addColorStop(0, 'rgba(' + edgeRgb + ',0)');
             g.addColorStop(0.22, 'rgba(' + edgeRgb + ',' + (a * 0.85) + ')');
             g.addColorStop(0.5, 'rgba(' + coreRgb + ',' + a + ')');
@@ -1411,7 +1416,8 @@
             var kk = ((s.t * 0.22 + j / 9) % 1);
             var yy = lerp(H, topY, kk), cx2 = x + swayAt(kk), w2 = widthAt(kk) * 0.75;
             var off = Math.sin(s.t * 6 + j) * w2 * 0.5;
-            fctx.strokeStyle = 'rgba(' + nightRgb([150, 145, 138], [95, 102, 122]) + ',' + (0.5 * env * Math.sin(Math.PI * kk)) + ')';
+            fctx.strokeStyle = 'rgba(' + (s.snow ? nightRgb([255, 255, 255], [200, 210, 230]) : nightRgb([150, 145, 138], [95, 102, 122])) +
+                               ',' + ((s.snow ? 0.7 : 0.5) * env * Math.sin(Math.PI * kk)) + ')';
             fctx.beginPath();
             fctx.moveTo(cx2 - w2, yy + 6);
             fctx.quadraticCurveTo(cx2 + off, yy - 10, cx2 + w2, yy + 4);
@@ -1430,13 +1436,14 @@
             sctx.fillStyle = fl;
             sctx.fillRect(x - 520, topY - 560, 1040, 1040);
           }
-          // Staubwolke am Fuß
-          var dust = fctx.createRadialGradient(x, H, 0, x, H, 240);
-          dust.addColorStop(0, 'rgba(160,138,108,' + (0.75 * env) + ')');
-          dust.addColorStop(1, 'rgba(160,138,108,0)');
+          // Staub- bzw. Schneewolke am Fuß, darin Trümmer bzw. Flocken
+          var dustRgb = s.snow ? nightRgb([240, 244, 250], [170, 180, 200]) : '160,138,108';
+          var dust = fctx.createRadialGradient(x, H, 0, x, H, s.snow ? 300 : 240);
+          dust.addColorStop(0, 'rgba(' + dustRgb + ',' + ((s.snow ? 0.85 : 0.75) * env) + ')');
+          dust.addColorStop(1, 'rgba(' + dustRgb + ',0)');
           fctx.fillStyle = dust;
-          fctx.fillRect(x - 240, H - 240, 480, 240);
-          fctx.fillStyle = 'rgba(55,48,40,1)';
+          fctx.fillRect(x - 300, H - 300, 600, 300);
+          fctx.fillStyle = s.snow ? 'rgba(' + nightRgb([252, 253, 255], [205, 214, 232]) + ',1)' : 'rgba(55,48,40,1)';
           s.debris.forEach(function (d) {
             d.a += d.sp * 0.016;
             var y = lerp(H - 10, topY + 60, d.h);
