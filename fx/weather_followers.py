@@ -8,6 +8,7 @@ in der Reihenfolge des ersten Follows; eine Markierungszeile verhindert
 ein zweites Übernehmen. DAO im sqlite-Stil.
 """
 import datetime
+import re
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_weather_follower (
@@ -78,8 +79,21 @@ def _ensure_imported(conn, tenant_id):
     conn.commit()
 
 
+# Twitch-Namen: Buchstaben (auch lokalisiert), Ziffern, Unterstrich
+_NAME = re.compile(r"\w{1,25}")
+_PLACEHOLDERS = {"user", "username", "name", "displayname", "follower"}
+
+
+def is_placeholder(name: str) -> bool:
+    """Nicht ersetzte Streamer.bot-Variable (`latestFollower.user`, `%user%`, `user`)?"""
+    return bool(name) and (not _NAME.fullmatch(name) or name.lower() in _PLACEHOLDERS)
+
+
 def add(conn, tenant_id: int, name: str) -> bool:
-    """False, wenn der Name schon folgt (Refollow). Ohne Namen immer."""
+    """False, wenn der Name schon folgt (Refollow) oder ein Platzhalter ist.
+    Ohne Namen immer."""
+    if is_placeholder(name):
+        return False
     _ensure_imported(conn, tenant_id)
     if name and conn.execute(
             "SELECT 1 FROM fx_weather_follower WHERE tenant_id = ? AND kind = 'follower' "

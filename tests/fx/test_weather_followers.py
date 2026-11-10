@@ -46,3 +46,12 @@ def test_newest_limited(conn):
 def test_tenants_are_separate(conn):
     add(conn, 1, "Ann")
     assert load(conn, 2)["names"] == []
+
+
+def test_placeholder_names_are_rejected(conn):
+    # nicht ersetzte Streamer.bot-Variablen landen nicht in der Liste
+    for bad in ("latestFollower.user", "%user%", "user", "USER", "username", "{user}", "a b"):
+        assert add(conn, 1, bad) is False, bad
+    assert add(conn, 1, "Dany_George3") is True
+    assert add(conn, 1, "名前テスト") is True                         # lokalisierte Anzeigenamen bleiben
+    assert load(conn, 1)["names"] == ["Dany_George3", "名前テスト"]
