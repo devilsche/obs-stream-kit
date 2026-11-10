@@ -276,6 +276,11 @@
           p.x += (wind * (160 + p.layer * 90) * sl.drift * (1 + 2.2 * bz) +
                   Math.sin(p.phase + time * p.freq) * sl.sway) * dt;
           gone = p.y - p.r > H || p.x < -1000 || p.x > W + 1000;
+          // Flocken bleiben auf einem Dach liegen (ohne Spritzer)
+          for (var sj = 0; sj < shelters.length && !gone; sj++) {
+            var sf = shelters[sj];
+            if (p.x >= sf.x0 && p.x <= sf.x1 && p.y >= sf.y(p.x)) gone = true;
+          }
         } else {
           var L = (p.type === 'rain' ? RAIN_LAYERS : DRIZZLE_LAYERS)[p.layer];
           var dy = p.v * dt;

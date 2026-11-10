@@ -916,6 +916,9 @@
         if (!c) return;
         // unter dem stehenden Schirm bleibt die Burg trocken
         var dry = U.mode === 'up' && B.partOn('umbrella') && Math.abs(c.x - U.tx) < 135;
+        // unterm Schirm auch keine Schneehaube
+        var dv = dry ? '1' : '';
+        if (c.node.dataset.dry !== dv) c.node.dataset.dry = dv;
         stepSlump(c, dry ? 0 : 0.6 * r, c.x, 60, { washed: 1, blown: 1, reach: 110,
                                          torn: function (dir) { debris(c.x, c.y + 40, dir, true); },
                                          burst: function () { sandPuff(c.x, sandY(c.x)); } });

@@ -22,6 +22,9 @@
   opacity: min(1, calc(var(--ts-snow) * 4));
 }
 
+/* Burgen unter dem Sonnenschirm bleiben ohne Schneehaube */
+.tss-castles [data-dry="1"] .ts-cap { opacity: 0; }
+
 /* Schnee am Boden: Puder ab wenig Schnee, dicke Decke erst bei viel */
 .ts-gsnow { fill: #f4f8ff; stroke: #ffffff; stroke-width: 2; }
 .ts-gsnow--dust { opacity: min(0.85, calc(var(--ts-snow) * 2.5)); }
