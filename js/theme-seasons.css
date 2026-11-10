@@ -22,6 +22,9 @@
   opacity: min(1, calc(var(--ts-snow) * 4));
 }
 
+/* Aussparung im Bodenschnee unter dem Schirm: fehlt der Schirm, schneit sie zu */
+.tss-uspot { opacity: 1; transition: opacity 4s ease; }
+.tss-uspot.is-off { opacity: 0; }
 /* Burgen unter dem Sonnenschirm bleiben ohne Schneehaube */
 .tss-castles [data-dry="1"] .ts-cap { opacity: 0; }
 

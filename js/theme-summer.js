@@ -194,6 +194,19 @@
     var sandSnow = B.groundSnow(gBeach, gPalace, sandY,
       CASTLE_X.map(function (x) { return [x, 50, 4]; }).concat([[270, 160, 12]]));
     gBeach.insertBefore(sandSnow.deep, gCastles.nextSibling);
+    // unter dem offenen Schirm bleibt der Sand fast frei: weiche Aussparung
+    // in beiden Schneeschichten (Maske), verschwindet, wenn der Schirm fehlt
+    (function () {
+      var g = el('radialGradient', { id: 'tss-uspotG' }, B.defs);
+      [[0, 0.85], [0.6, 0.7], [1, 0]].forEach(function (s) {
+        el('stop', { offset: s[0], 'stop-color': '#000', 'stop-opacity': s[1] }, g);
+      });
+      var m = el('mask', { id: 'tss-snowspot', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H }, B.defs);
+      el('rect', { x: 0, y: 0, width: W, height: H, fill: '#fff' }, m);
+      U.spot = el('ellipse', { 'class': 'tss-uspot', cx: 1470, cy: f1(sandY(1470) + 8), rx: 165, ry: 70, fill: 'url(#tss-uspotG)' }, m);
+      sandSnow.dust.setAttribute('mask', 'url(#tss-snowspot)');
+      sandSnow.deep.setAttribute('mask', 'url(#tss-snowspot)');
+    })();
     var castles = [], cNext = 0, cTotal = 0;
     function addCastle(name, animate) {
       var i = cNext % CASTLE_X.length, x = CASTLE_X[i], y = sandY(x) + 26, k = 0.5 + (i % 3) * 0.12;
@@ -1004,6 +1017,7 @@
       var on = B.on && U.mode === 'up' && B.partOn('beach') && B.partOn('umbrella');
       if (on === shelterOn || !opts.shelter) return;
       shelterOn = on;
+      if (U.spot) U.spot.classList.toggle('is-off', !on);
       var a = U.rot * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
       opts.shelter(on ? [{ x0: U.tx - 148, x1: U.tx + 148, y: function (x) {
         var lx = x - U.tx, ly = 30 - 57 * (1 - Math.pow(lx / 150, 2));
