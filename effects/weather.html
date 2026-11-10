@@ -210,7 +210,9 @@
       //    extinguished/struck/spectacle). Nur in OBS, damit Vorschauen im Browser nichts doppelt
       //    auslösen; ohne Action-Namen aus. ──
       var SB_URL = 'ws://127.0.0.1:8080/';
-      var sb = { ws: null, url: null, queue: [], retry: 0, timer: null, n: 0 };
+      // Verbindung bleibt dauerhaft offen und wird nach einem Abbruch (Streamer.bot
+      // neu gestartet) immer wieder aufgebaut; ein hängender Aufbau wird verworfen
+      var sb = { ws: null, url: null, queue: [], retry: 0, timer: null, n: 0, since: 0 };
       function sbEvent(name, args) {
         if (!settings.sbaction || !window.obsstudio) return;
         var a = { event: name, theme: lastTheme };
@@ -221,8 +223,14 @@
         sbFlush();
       }
       function sbFlush() {
+        if (!settings.sbaction || !window.obsstudio) return;
         var url = settings.sbws || SB_URL;
-        if (sb.ws && sb.url !== url) { sb.ws.close(); sb.ws = null; }
+        if (sb.ws && (sb.url !== url || sb.ws.readyState > 1 ||
+                      (sb.ws.readyState === 0 && Date.now() - sb.since > 8000))) {
+          var old = sb.ws;
+          sb.ws = null;
+          try { old.close(); } catch (e) { /* schon zu */ }
+        }
         if (!sb.ws) { sbConnect(url); return; }
         if (sb.ws.readyState !== 1) return;
         var now = Date.now();
@@ -235,16 +243,18 @@
         if (sb.timer) return;
         var ws;
         try { ws = new WebSocket(url); } catch (e) { sbRetry(); return; }
-        sb.ws = ws; sb.url = url;
+        sb.ws = ws; sb.url = url; sb.since = Date.now();
         ws.onopen = function () { sb.retry = 0; sbFlush(); };
-        ws.onclose = function () { if (sb.ws === ws) { sb.ws = null; if (sb.queue.length) sbRetry(); } };
+        ws.onclose = function () { if (sb.ws === ws) { sb.ws = null; sbRetry(); } };
         ws.onerror = function () { console.warn('weather: Streamer.bot not reachable at ' + url); };
       }
       function sbRetry() {
         if (sb.timer) return;
-        sb.retry = Math.min(sb.retry + 1, 6);
-        sb.timer = setTimeout(function () { sb.timer = null; if (sb.queue.length) sbFlush(); }, 2000 * sb.retry);
+        sb.retry = Math.min(sb.retry + 1, 15);
+        sb.timer = setTimeout(function () { sb.timer = null; sbFlush(); }, 2000 * sb.retry);
       }
+      // Wächter: hält die Verbindung auch ohne Ereignisse am Leben
+      setInterval(sbFlush, 10000);
 
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
                   'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder', 'ambient', 'siren', 'sbaction', 'sbws',

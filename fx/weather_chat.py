@@ -161,6 +161,4 @@ TIPS = {"autumn": ("!rake", "!jump", "!extinguish"),
 
 def tip_say(theme: str, rnd=random) -> str:
     cmd = rnd.choice(TIPS.get(theme, TIPS["autumn"]))
-    return (f"Probiert mal {cmd}! Wetter gibt es gegen Bits oder Spende: "
-            f"Wetter ab {PRICE['weather']} Bits, Spektakel ab {PRICE['small']}, Tornado & Co. ab {PRICE['big']} "
-            f"(Befehl in die Nachricht schreiben, z. B. !tornado).")
+    return f"Probiert mal {cmd}! Alle Befehle zeigt !commands."
