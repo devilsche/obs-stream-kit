@@ -162,7 +162,7 @@ EFFECTS = {
                      "snowboard", "clear", "follow",
                      # Herbst, Frühling, Sommer
                      "pumpkin", "rake", "jump", "sweep", "flower", "water", "weed", "bee",
-                     "castle", "splash", "ice", "cool", "seasonboard",
+                     "castle", "splash", "ice", "fries", "cool", "seasonboard",
                      # Jahreszeit früher starten bzw. zurück zum Kalender
                      "season",
                      # Blitzfeuer im Laub (meldet das Overlay) und Löschen
@@ -244,6 +244,7 @@ EFFECTS = {
             "castle": {"name": _name},
             "splash": {"name": _name},
             "ice": {"name": _name},
+            "fries": {"name": _name},
         },
         "defaults": {
             "weather": {"hold": 150},

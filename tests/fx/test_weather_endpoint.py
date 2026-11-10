@@ -428,7 +428,7 @@ def test_season_actions_report_results_and_levels(conn, monkeypatch):
 
 
 def test_season_commands_parse():
-    for cmd in ("pumpkin", "rake", "jump", "flower", "water", "weed", "bee", "castle", "splash", "ice"):
+    for cmd in ("pumpkin", "rake", "jump", "flower", "water", "weed", "bee", "castle", "splash", "ice", "fries"):
         assert commands.parse("weather", {"cmd": cmd, "name": "X"})["params"] == {"name": "X"}
     for cmd in ("sweep", "cool", "seasonboard"):
         assert commands.parse("weather", {"cmd": cmd})["cmd"] == cmd
