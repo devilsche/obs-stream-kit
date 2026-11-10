@@ -13,7 +13,7 @@ def test_points_bits_and_money():
 def test_paid_command_in_message_with_enough_bits():
     r = wc.paid("bits", 500, "cheer500 !Tornado los!", "Tim")
     assert r["command"] == {"cmd": "spectacle", "params": {"type": "tornado"}}
-    assert r["say"] == "Danke dir, Tim! Gleich gibt es einen Tornado."
+    assert r["say"] == "Danke Tim! Du hast einen Tornado bestellt."
 
 
 def test_paid_command_too_cheap_says_price():
@@ -46,9 +46,9 @@ def test_raid_thresholds():
 
 
 def test_project_say():
-    assert wc.project_say("autumn", 5, "Tim") == "Danke dir, Tim! Die Vogelscheuche wächst: 5 von 8 Teilen."
-    assert wc.project_say("winter", 7) == "Der Schneemann wächst: 7 von 8 Teilen."
-    assert wc.project_say("summer", 8, "Tim", completed=True) == "Danke dir, Tim! Der Sandpalast ist fertig, danke an alle, die mitgebaut haben!"
+    assert wc.project_say("autumn", 5, "Tim") == "Danke Tim! Noch 3 Subs bis zur fertigen Vogelscheuche."
+    assert wc.project_say("winter", 7) == "Noch 1 Sub bis zum fertigen Schneemann."
+    assert wc.project_say("summer", 8, "Tim", completed=True) == "Danke Tim! Der Sandpalast ist fertig! Danke an alle Subs!"
 
 
 def test_weather_say_with_level():
@@ -57,6 +57,6 @@ def test_weather_say_with_level():
 
 
 def test_top_and_tip():
-    assert wc.top_say("autumn", [["Tim", 12]]) == "Top-Laubrecher bisher: Tim (12×)."
+    assert wc.top_say("autumn", [["Tim", 12]]).startswith("Top-Laubrecher: Tim mit 12×")
     assert wc.top_say("autumn", []) == ""
     assert "!" in wc.tip_say("summer", rnd=random.Random(0))
