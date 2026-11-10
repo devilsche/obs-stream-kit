@@ -135,9 +135,11 @@
 .ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 3s ease; }
 .ta-pk-light { fill: #ffb43a; filter: url(#ta-glow); opacity: 0; transition: opacity 3s ease; }
 .ts[data-night="1"] .ta-pk-face { opacity: 1; animation: taFlicker 2.2s ease-in-out infinite; }
-.ts[data-night="1"] .ta-pk-light { opacity: 0.6; animation: taFlicker 2.2s ease-in-out infinite; }
-.ts[data-celebrate="1"] .ta-pk-light { opacity: 1; }
+/* Lichtschein gedämpft: eigene Flacker-Kurve, sonst setzt taFlicker die Deckkraft auf bis zu 1 */
+.ts[data-night="1"] .ta-pk-light { opacity: 0.3; animation: taGlowFlicker 2.2s ease-in-out infinite; }
+.ts[data-celebrate="1"] .ta-pk-light { opacity: 0.7; animation: none; }
 @keyframes taFlicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
+@keyframes taGlowFlicker { 0%, 100% { opacity: 0.32; } 30% { opacity: 0.24; } 55% { opacity: 0.3; } 70% { opacity: 0.18; } }
 .ta-pk-inner { transform-box: fill-box; transform-origin: 50% 100%; }
 .ta-pk--new .ta-pk-inner { animation: taDrop 0.8s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 @keyframes taDrop { from { transform: translateY(-260px); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
