@@ -139,10 +139,35 @@
 .ta-pk.is-lit .ta-pk-face { opacity: 1; animation: taFlicker 2.2s ease-in-out 2s infinite; }
 /* Lichtschein gedämpft: eigene Flacker-Kurve, sonst setzt taFlicker die Deckkraft auf bis zu 1 */
 .ta-pk.is-lit .ta-pk-light { opacity: 0.3; animation: taGlowFlicker 2.2s ease-in-out 2s infinite; }
-/* manche drehen sich einmal um und zeigen dabei ihr Gesicht */
-.ta-pk.is-turn .ta-pk-inner { animation: taPkTurn 0.9s ease-in-out both; }
-@keyframes taPkTurn { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.08); } }
-@media (prefers-reduced-motion: reduce) { .ta-pk.is-turn .ta-pk-inner { animation: none; } }
+/* morgens: eigene Ausblend-Animation, sonst springt die Deckkraft beim Ende des Flackerns auf 0 */
+.ta-pk.is-dim .ta-pk-face { animation: taFaceOut 2s ease forwards; }
+.ta-pk.is-dim .ta-pk-light { animation: taGlowOut 2s ease forwards; }
+@keyframes taFaceOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes taGlowOut { from { opacity: 0.3; } to { opacity: 0; } }
+/* manche drehen sich wie ein Ball: der Umriss bleibt, Gesicht und Rippen kommen
+   von der Seite herum (dort schmal und blass, zur Mitte hin voll) */
+.ta-pk.is-turn .ta-pk-face, .ta-pk.is-turn .ta-pk-rib { transform-box: fill-box; transform-origin: 50% 50%; }
+.ta-pk.is-turn .ta-pk-face { animation: taFaceSpinIn 1.2s cubic-bezier(0.3, 0.6, 0.3, 1) both; }
+.ta-pk.is-turn .ta-pk-rib { animation: taRibSpin 1.2s ease-in-out both; }
+@keyframes taFaceSpinIn {
+  0% { transform: translateX(-34px) scaleX(0.1); opacity: 0; }
+  35% { transform: translateX(-24px) scaleX(0.45); opacity: 0.55; }
+  100% { transform: translateX(0) scaleX(1); opacity: 1; }
+}
+@keyframes taRibSpin {
+  0% { transform: translateX(0) scaleX(1); opacity: 1; }
+  45% { transform: translateX(16px) scaleX(0.5); opacity: 0.3; }
+  55% { transform: translateX(-16px) scaleX(0.5); opacity: 0.3; }
+  100% { transform: translateX(0) scaleX(1); opacity: 1; }
+}
+/* … oder rollen weg und kommen mit Gesicht von derselben Kante zurück */
+.ta-pk.is-rollin .ta-pk-inner { transform-origin: 50% 50%; animation: taPkRollIn 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+@keyframes taPkRollIn {
+  0% { transform: translateX(var(--pk-in)) rotate(var(--pk-spin)); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateX(0) rotate(0deg); opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) { .ta-pk.is-turn .ta-pk-face, .ta-pk.is-turn .ta-pk-rib, .ta-pk.is-rollin .ta-pk-inner { animation: none; } }
 .ts[data-celebrate="1"] .ta-pk-light { opacity: 0.7; animation: none; }
 @keyframes taFlicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
 @keyframes taGlowFlicker { 0%, 100% { opacity: 0.32; } 30% { opacity: 0.24; } 55% { opacity: 0.3; } 70% { opacity: 0.18; } }

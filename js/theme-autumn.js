@@ -307,13 +307,40 @@
         at += rand(350, 900);
         setTimeout(function () {
           if (pkLit !== on || pkNodes.indexOf(pk) < 0) return;
-          if (!on) { pk.node.classList.remove('is-lit'); return; }
+          if (!on) {
+            pk.node.classList.remove('is-lit');
+            pk.node.classList.add('is-dim');
+            setTimeout(function () { pk.node.classList.remove('is-dim'); }, 2100);
+            return;
+          }
+          pk.node.classList.remove('is-dim');
           var r = Math.random();
-          if (r < 0.6 || pk.zap || pk.mode !== null) { pk.node.classList.add('is-lit'); return; }
-          if (r < 0.88) {
-            pk.node.classList.add('is-turn');
-            setTimeout(function () { pk.node.classList.add('is-lit'); }, 420);
-            setTimeout(function () { pk.node.classList.remove('is-turn'); }, 950);
+          if (r < 0.5 || pk.zap || pk.mode !== null) { pk.node.classList.add('is-lit'); return; }
+          if (r < 0.7) {
+            // rollt zur Kante hinaus, derselbe kommt mit Gesicht zurückgerollt
+            var ghost = pk.node.cloneNode(true);
+            ghost.classList.remove('ta-pk--new', 'is-lit');
+            pk.node.parentNode.insertBefore(ghost, pk.node);
+            var back = TS.leave(ghost, { x: pk.x, top: pk.y - pk.h, r: pk.h / 2 });
+            pk.zap = true;
+            pk.node.dataset.zap = '1';
+            var dx = pk.x < W / 2 ? -(pk.x - 20) : W - 20 - pk.x;
+            setTimeout(function () {
+              pk.zap = false;
+              delete pk.node.dataset.zap;
+              pk.node.classList.add('is-lit');
+              pk.node.style.setProperty('--pk-in', Math.round(dx) + 'px');
+              pk.node.style.setProperty('--pk-spin', Math.round(dx / (pk.h / 2) * 57.3) + 'deg');
+              pk.node.classList.remove('is-rollin');
+              void pk.node.getBBox();
+              pk.node.classList.add('is-rollin');
+              setTimeout(function () { pk.node.classList.remove('is-rollin'); }, 1700);
+            }, back + 1400);
+            return;
+          }
+          if (r < 0.9) {
+            pk.node.classList.add('is-turn', 'is-lit');
+            setTimeout(function () { pk.node.classList.remove('is-turn'); }, 1250);
             return;
           }
           var cy = pk.y + pk.dy - pk.h * 0.45;
