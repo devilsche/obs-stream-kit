@@ -384,6 +384,8 @@
       var outer = el('g', {}, gOrns);
       var g = el('g', { 'class': 'tw-orn' + (animate ? ' tw-orn--new' : '') }, outer);
       drawOrnament(el('g', { transform: 'translate(' + f1(s[0]) + ' ' + f1(s[1] - 13) + ')' }, g), name, pfx);
+      // Einflug-Klasse danach weg, sonst spielt ein späteres Spotlight den Einflug erneut ab
+      if (animate) setTimeout(function () { g.classList.remove('tw-orn--new'); }, (wait + 2) * 1000);
       orns[i] = { outer: outer, inner: g, label: name, x: s[0], y: s[1], order: ornNext };
       ornNext++;
       if (live) {
