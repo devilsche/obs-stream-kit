@@ -398,11 +398,12 @@
     // oben, 10–25° schräg; schmilzt in 40 s (kühl) bis 12 s (volle Hitze),
     // nur Show; links oder rechts, die Mitte bleibt frei ──
     var ices = [];
-    // Eis und Pommes in die Lücke zwischen Sandburgen (Ecken bis ~400 px) und
-    // Bildmitte, rechts auch nicht an die Stange des Sonnenschirms (1470)
-    function sideX() { return Math.random() < 0.5 ? rand(420, 680) : rand(1240, 1420); }
+    // Eis und Pommes überall am Strand, auch in der Mitte (sie sind nur kurz da);
+    // sie stehen vorn im Sand, vor dem Fuß der Sandburgen, aber nicht unter der Bildkante
+    function sideX() { return rand(120, W - 120); }
+    function frontY(x, d) { return Math.min(sandY(x) + d, H - 10); }
     function addIce(name) {
-      var x = sideX(), y = sandY(x) + 6;
+      var x = sideX(), y = frontY(x, 30);
       var flavor = 1 + Math.floor(Math.random() * 4), tilt = (Math.random() < 0.5 ? -1 : 1) * rand(10, 25);
       var g = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ') scale(0.6)' }, gIces);
       // Spitze 24 unter der Sandlinie, um sie herum gekippt
@@ -462,7 +463,7 @@
     // die Möwe sie in 2–4 Flügen (oder einem großen Griff), dann verblasst die Schale ──
     var fries = [];
     function addFries(name) {
-      var x = sideX(), y = sandY(x) + 10;
+      var x = sideX(), y = frontY(x, 34);
       var g = el('g', { 'class': 'tss-fries', transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ') scale(0.7)' }, gIces);
       var sticks = [];
       for (var i = 0; i < 12; i++) {
