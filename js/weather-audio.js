@@ -19,7 +19,6 @@
   function smooth(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
 
   var AMBIENT = 0.3;   // Standard für Regen und Wind (früher voll = 1)
-  var DUCK = 0.3;      // Regen und Wind beim Donner kurz auf diesen Anteil
   var LOOPS = ['rain-loop-light', 'rain-loop-medium', 'rain-loop-storm', 'wind-loop-light', 'wind-loop-strong'];
 
   function create(base, opts) {
@@ -48,19 +47,6 @@
         .then(function (buf) { entry.buf = buf; entry.wait.forEach(function (f) { f(buf); }); entry.wait = []; })
         .catch(function () { delete bufs[url]; });
     }
-    // Regen und Wind laufen über einen gemeinsamen Bus, der sich unter den
-    // Donner duckt: sonst deckt der Regen die Blitze zu
-    var loopBus = null;
-    if (actx) { loopBus = actx.createGain(); loopBus.gain.value = 1; loopBus.connect(actx.destination); }
-    function duck() {
-      if (!loopBus) return;
-      var t = actx.currentTime;
-      loopBus.gain.cancelScheduledValues(t);
-      loopBus.gain.setValueAtTime(loopBus.gain.value, t);
-      loopBus.gain.setTargetAtTime(DUCK, t, 0.08);
-      loopBus.gain.setTargetAtTime(1, t + 2.2, 0.6);
-    }
-
     // Schleife mit derselben Schnittstelle wie ein <audio>-Element (volume, paused, play, pause)
     function makeLoop(url) {
       if (!actx) {
@@ -70,7 +56,7 @@
       }
       var g = actx.createGain(), buf = null, src = null, vol = 0;
       g.gain.value = 0;
-      g.connect(loopBus);
+      g.connect(actx.destination);
       load(url, function (b) { buf = b; });
       return {
         get volume() { return vol; },
@@ -236,7 +222,6 @@
         if (vol <= 0.01) return;
         var rate = (1 - 0.15 * d) * (0.94 + Math.random() * 0.12);
         if (actx && thunderBuf && actx.state === 'running') {
-          duck();
           var src = actx.createBufferSource(), g = actx.createGain();
           src.buffer = thunderBuf;
           src.playbackRate.value = rate;
@@ -247,7 +232,8 @@
             old.g.gain.linearRampToValueAtTime(0, t + 0.4);
             try { old.src.stop(t + 0.45); } catch (e) { /* schon beendet */ }
           }
-          g.gain.value = clamp(vol / Math.pow(voices.length + 1, 0.35), 0, 1);
+          // gleichzeitige Donner teilen sich etwas Pegel (Summe übersteuert nicht), einzeln bleiben sie laut
+          g.gain.value = clamp(vol / Math.pow(voices.length + 1, 0.2), 0, 1);
           src.connect(g).connect(actx.destination);
           var voice = { src: src, g: g };
           voices.push(voice);
