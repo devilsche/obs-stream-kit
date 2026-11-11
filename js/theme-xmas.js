@@ -50,7 +50,7 @@
   ];
   var GARLANDS = ['M140 178 Q200 206 262 172', 'M106 272 Q200 304 298 262', 'M74 372 Q200 410 330 362'];
   var FIXED = [[160, 160, 'ornR'], [236, 243, 'ornG'], [140, 334, 'ornB'], [272, 342, 'ornP']];
-  var MAX_ORN = 60;
+  var MAX_ORN = 24;   // die neuesten Follower, locker über den Baum verteilt
   var GRADS = ['ornR', 'ornG', 'ornB', 'ornP'];
   // Wabenraster in den drei Stufen, gemischt: der Baum füllt sich gleichmäßig
   function makeSlots(rnd) {

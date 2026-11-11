@@ -526,7 +526,7 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 | Cheer | `cmd=gift&type=bits&name=%user%&amount=%bits%` | kleines blaues Paket, ab 1000 / 10000 Bits größer |
 | Raid | `cmd=gift&type=raid&name=%user%&amount=%viewers%` | großes oranges Paket, ab 50 Zuschauern größer |
 
-**Dauerhaft:** Kugeln und Geschenke liegen in der Datenbank (Tabelle `fx_xmas_item`) und überstehen Neuladen, Szenenwechsel und Server-Neustarts — geleert wird nur per `cmd=clear`. Sichtbar sind die neuesten **60 Kugeln** und **15 Geschenke**, ältere bleiben gespeichert; unter dem Baum zählt eine Zeile alle („128 ornaments · 23 gifts“).
+**Dauerhaft:** Kugeln und Geschenke liegen in der Datenbank (Tabelle `fx_xmas_item`) und überstehen Neuladen, Szenenwechsel und Server-Neustarts — geleert wird nur per `cmd=clear`. Sichtbar sind die neuesten **24 Kugeln** (Weather-Source; früher 60, das wurde zu voll) und **15 Geschenke**, ältere bleiben gespeichert; unter dem Baum zählt eine Zeile alle („128 ornaments · 23 gifts“).
 
 **Spotlight:** Alle 8 s leuchtet eine zufällige Kugel oder ein Geschenk auf und zeigt kurz den Namen — so kommt im Lauf des Streams jeder mal dran.
 
