@@ -796,9 +796,9 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `weapon-milestone-bar.html` | Dieselben Meilensteine als Leiste am Bildrand | `wait`, `poll`, `pos=bottom\|top`, `confetti=0`, `demo=<anlass>\|1\|all`, `value`, `subject` |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
+(alte URL `overlays/stats.html?player=NAME` leitet weiter)
 
 `/api/pubg/co-player/NAME` liefert zusätzlich `together` (gemeinsame Matches, 0 bei unbekanntem Namen oder ohne gemeinsames Spiel). Streamer.bot prüft das bei `!coplayer`, bevor es die Karte zeigt; ohne Namen antwortet der Bot mit einer kurzen Anleitung.
-(alte URL `overlays/stats.html?player=NAME` leitet weiter)
 
 **Fremdsicht (`?asTenant=`)**: Admins können jedes Tool und Widget in der Sicht eines
 anderen Tenants öffnen — `?asTenant=2` oder `?asTenant=<slug>`. Der Parameter wird von
