@@ -137,10 +137,10 @@
   70%, 100% { transform: rotate(0); }
   76% { transform: rotate(-9deg); }   82% { transform: rotate(7deg); }  88% { transform: rotate(-3deg); }
 }
-/* Spotlight auf eine Kugel (Zufallsname, !whereiam ohne Hüpfen): leuchten und
-   dazu am Faden wackeln, damit man sieht, welche gemeint ist */
-.tw-orn.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both, twOrnWig 3.2s ease-in-out both; }
-@media (prefers-reduced-motion: reduce) { .tw-orn.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both; } }
+/* Spotlight auf eine Kugel (Zufallsname und !whereiam): leuchten und dazu am
+   Faden wackeln statt hüpfen, damit man sieht, welche gemeint ist */
+.tw-orn.is-spot, .tw-orn.is-spot.is-hop { animation: spot 3.2s ease-in-out both, twOrnWig 3.2s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) { .tw-orn.is-spot, .tw-orn.is-spot.is-hop { animation: spot 3.2s ease-in-out both; } }
 /* Funkeln an der neuen Stelle: goldener Lichtkranz + Funken, die nach außen ausblenden */
 .tw-orn-halo { transform-box: fill-box; transform-origin: 50% 50%;
                animation: twOrnHalo 3s ease-out calc(1.3s + var(--orn-wait, 0s)) both; }
