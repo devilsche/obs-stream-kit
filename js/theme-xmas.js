@@ -387,9 +387,12 @@
       orns[i] = { outer: outer, inner: g, label: name, x: s[0], y: s[1], order: ornNext };
       ornNext++;
       if (live) {
-        // Weg vom Stern bis zum Aufhängepunkt
-        g.style.setProperty('--orn-fx', f1(STAR[0] - s[0]) + 'px');
-        g.style.setProperty('--orn-fy', f1(STAR[1] - (s[1] - 13)) + 'px');
+        // seitlich neben dem Baum einblenden (Seite des Platzes, solange dort
+        // Bildschirm frei ist) und in flachem Bogen zum Aufhängepunkt fliegen
+        var leftX = Math.max(-150, (40 - TX) / TK), rightX = Math.min(550, (1880 - TX) / TK);
+        var fromX = s[0] >= STAR[0] && rightX - s[0] > 140 ? rightX : (s[0] - leftX > 140 ? leftX : rightX);
+        g.style.setProperty('--orn-fx', f1(fromX - s[0]) + 'px');
+        g.style.setProperty('--orn-fy', '-80px');
         g.style.setProperty('--orn-wait', wait + 's');
         sparkle(s[0], s[1], wait);
         var p = toScreen(s[0], s[1] - 16);
