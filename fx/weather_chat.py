@@ -132,7 +132,7 @@ def project_say(theme: str, stage: int, name: str = "", completed: bool = False)
     return f"{who}Noch {left} {'Sub' if left == 1 else 'Subs'} bis {until}."
 
 
-KIND_SAY = {"clear": "klar", "cloudy": "bewölkt", "fog": "neblig", "drizzle": "Nieselregen",
+KIND_SAY = {"clear": "klar", "cloudy": "bewölkt", "fog": "Nebel", "drizzle": "Nieselregen",
             "rain": "Regen", "storm": "Gewitter", "sleet": "Schneeregen", "snow": "Schnee",
             "blizzard": "Schneesturm", "heat": "Hitze", "night": "Sternennacht", "day": "klar",
             "dawn": "Morgendämmerung", "dusk": "Abenddämmerung"}
@@ -167,6 +167,8 @@ def weather_say(state: dict, place: str = "", orders: dict = None, now: float = 
     kind = state.get("kind") or "clear"
     temp = f"{round(state['temp'])} °C" if isinstance(state.get("temp"), (int, float)) else ""
     look = KIND_SAY.get(kind, kind)
+    if state.get("mix") in KIND_SAY:
+        look += " und " + KIND_SAY[state["mix"]]
     source = state.get("source")
     live = bool(town) and (source == "api" or (source == "override" and temp))
     weather_ordered = source == "override" and ("weather" in orders or "tod" not in orders)

@@ -18,7 +18,7 @@ from flask import Blueprint, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, season_db, weather_chat, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, commands, season_db, weather, weather_chat, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -56,8 +56,12 @@ def _weather_persist(conn, tenant_id, cmd):
         # Nacht/Dämmerung ist Tageszeit, nicht Wetter: bleibt beim nächsten Wetterwechsel
         weather_theme.set_tod(conn, tenant_id, cmd["params"]["to"], cmd["params"]["hold"], time.time())
     elif cmd["cmd"] == "weather":
-        weather_db.set_override(conn, tenant_id, cmd["params"]["to"],
-                                cmd["params"]["hold"], time.time())
+        # mit dem laufenden (oder wartenden) bestellten Wetter mischen, z. B. Regen + Nebel
+        now = time.time()
+        cur = weather_db.current_override(conn, tenant_id, now)
+        base = ((cur or {}).get("pending") or {}).get("kind") or (cur or {}).get("kind")
+        weather_db.set_override(conn, tenant_id, weather.combine(base, cmd["params"]["to"]),
+                                cmd["params"]["hold"], now)
     elif cmd["cmd"] == "auto":
         weather_db.clear_override(conn, tenant_id)
         weather_theme.clear_tod(conn, tenant_id)

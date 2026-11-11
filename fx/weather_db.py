@@ -11,7 +11,7 @@ Neustart des Dienstes überlebt. DAO im sqlite-Stil ('?'-Platzhalter).
 import datetime
 import json
 
-from fx.weather import KINDS
+from fx.weather import valid_kind
 
 MIN_HOLD = 15
 DEFAULT_HOLD = 150
@@ -62,7 +62,7 @@ def _start(kind, hold, at):
 
 def set_override(conn, tenant_id, kind, hold, now: float) -> None:
     """hold in Sekunden, 0 = unbegrenzt bis `auto`. Unbekannte Lage → nichts."""
-    if kind not in KINDS:
+    if not valid_kind(kind):
         return
     hold = max(0, int(hold))
     cur = current_override(conn, tenant_id, now)

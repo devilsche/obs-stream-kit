@@ -592,6 +592,12 @@ G1R_STEAM_NAME=</code></pre>
       <div class="url-dbox url-ctlbox">
         <h2>Live control <span class="url-dbox__tag">running source</span></h2>
         <p class="url-dbox__desc">Acts on the source that is running in OBS right now, within about a second.</p>
+        ${/\/weather$/.test(card.dataset.fx || "") ? `<div class="url-cheat">
+          <div class="url-cheat__head"><b>OBS dock</b>
+            <button type="button" class="url-act ghost" id="urlDockCopy"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy dock URL</button></div>
+          <p class="url-dbox__desc">All these buttons as a slim panel inside OBS, with a status line (live weather, who ordered what, season). In OBS: Docks → Custom Browser Docks, paste the URL, log in once inside the dock.</p>
+          <code class="url-dock-url" id="urlDockUrl"></code>
+        </div>` : ""}
         ${controls.length ? ctlGroups(controls).map((g, gi) => {
           const btns = `<div class="url-ctl">${g.items.map(c => `
           <button type="button" class="url-act url-ctl__btn" data-q="${escapeAttr(c.q)}" data-label="${escapeAttr(c.label)}">
@@ -942,6 +948,25 @@ G1R_STEAM_NAME=</code></pre>
       }
       ctlTimer = setTimeout(() => { ctlStatus.textContent = ""; }, 3000);
     }
+    // ── Weather: URL für das OBS-Dock, mit dem Ort aus „Location“ ──
+    const dockCopy = document.getElementById("urlDockCopy");
+    if (dockCopy) {
+      const dockUrl = () => {
+        const inp = document.querySelector('.sw-group[data-param="place"] .sw-input');
+        const pl = inp ? inp.value.trim() : "";
+        return location.origin + "/app/dock/weather" + (pl ? "?place=" + encodeURIComponent(pl) : "");
+      };
+      const showDock = () => { document.getElementById("urlDockUrl").textContent = dockUrl(); };
+      showDock();
+      document.addEventListener("input", e => { if (e.target.closest('.sw-group[data-param="place"]')) showDock(); });
+      dockCopy.addEventListener("click", async () => {
+        const st = document.getElementById("urlCtlStatus");
+        try { await navigator.clipboard.writeText(dockUrl()); st.textContent = "Dock URL copied."; }
+        catch (_) { st.textContent = "Copy failed — please select the URL manually."; }
+        setTimeout(() => { st.textContent = ""; }, 2500);
+      });
+    }
+
     document.querySelectorAll(".url-ctl__btn").forEach(btn => btn.addEventListener("click", () => {
       // Zurück auf die OBS-URL beendet auch das Live-Setzen, sonst würde die
       // nächste Schalteränderung den Reset gleich wieder überschreiben

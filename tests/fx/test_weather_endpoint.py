@@ -640,3 +640,13 @@ def test_whereami_says_when_not_visible(conn):
     assert r["visible"] is False and "neuesten 12" in r["say"]
     cmds = commands.poll(1, "weather", 0)["commands"]
     assert cmds[-1]["cmd"] == "whereami" and cmds[-1]["params"]["name"] == "F0"
+
+
+def test_fog_and_rain_run_together(conn):
+    c = _client(conn)
+    c.get("/s/t/api/fx/weather?cmd=weather&to=rain&name=A")
+    c.get("/s/t/api/fx/weather?cmd=weather&to=fog&name=B")
+    import time as _t
+    ov = weather_db.current_override(conn, 1, _t.time())
+    kind = (ov.get("pending") or ov)["kind"]
+    assert kind == "rain+fog"

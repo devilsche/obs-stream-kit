@@ -1251,6 +1251,7 @@ html:not([data-theme="entry"]) .url-detail::after{content:"";position:absolute;r
 .url-cmdgroup__meta{font-size:12px;font-weight:400;color:var(--text-muted)}
 .url-cheat{margin:12px 0 14px;padding:12px 14px;background:var(--bg-deeper);border:1px solid var(--border);border-radius:var(--r-ctrl)}
 .url-cheat__head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+.url-dock-url{display:block;margin-top:6px;padding:6px 8px;background:var(--bg-deeper);border:1px solid var(--border);border-radius:var(--r-ctrl);font-size:12px;overflow-wrap:anywhere}
 .url-follow-msg{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--brand-ink)}
 .url-cheat__text{margin:0;white-space:pre-wrap;font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:12.5px;
   line-height:1.6;color:var(--text)}

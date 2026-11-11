@@ -43,9 +43,43 @@ def _clamp(v, lo=0.0, hi=1.0):
     return max(lo, min(hi, v))
 
 
+# Bestelltes Wetter darf sich mischen: Nebel legt sich über Niederschlag und
+# Wolken, Regen und Schnee zusammen ergeben Schneeregen; alles andere ersetzt
+FOGGABLE = ("drizzle", "rain", "storm", "snow", "sleet", "cloudy")
+
+
+def combine(cur, new: str) -> str:
+    """Laufende Lage (auch „rain+fog“) + neu bestellte → neue Lage."""
+    if not cur:
+        return new
+    main, _, mix = cur.partition("+")
+    fog = mix == "fog" or main == "fog"
+    if {main, new} in ({"rain", "snow"}, {"drizzle", "snow"}, {"sleet", "rain"}, {"sleet", "snow"}):
+        new = "sleet"
+    if new == "fog" and main in FOGGABLE:
+        return main + "+fog"
+    if new in FOGGABLE and fog:
+        return new + "+fog"
+    return new
+
+
+def valid_kind(kind: str) -> bool:
+    main, _, mix = kind.partition("+")
+    return main in PROFILES and (not mix or (mix == "fog" and main in FOGGABLE))
+
+
 def profile(kind: str) -> dict:
-    k = kind if kind in PROFILES else "clear"
-    return {"kind": k, "gloom": 0, "wind": 0, **PROFILES[k]}
+    """Lage → Werte; „rain+fog“: Hauptlage mit dem Nebel der Nebel-Lage (kind
+    bleibt die Hauptlage, mix nennt den Zusatz)."""
+    main, _, mix = (kind or "").partition("+")
+    k = main if main in PROFILES else "clear"
+    out = {"kind": k, "gloom": 0, "wind": 0, **PROFILES[k]}
+    if mix in PROFILES and valid_kind(kind):
+        for key, val in PROFILES[mix].items():
+            if isinstance(val, (int, float)) and key not in ("night", "dusk"):
+                out[key] = max(out.get(key, 0), val)
+        out["mix"] = mix
+    return out
 
 
 def _kind_for_code(code: int, temp_c: float, wind_kmh: float) -> str:

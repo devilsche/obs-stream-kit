@@ -143,3 +143,17 @@ def test_good_mood_does_not_turn_overcast_into_full_sun():
     s = apply_mood(profile("cloudy"), 1, 1.0, None)
     assert s["sun"] <= 0.4 and s["clouds"] >= 0.45
     assert apply_mood(profile("clear"), 1, 1.0, None)["sun"] == 1
+
+
+def test_ordered_weather_mixes_fog_and_turns_rain_with_snow_into_sleet():
+    from fx.weather import combine, valid_kind
+    assert combine("rain", "fog") == "rain+fog"
+    assert combine("fog", "snow") == "snow+fog"
+    assert combine("rain+fog", "snow") == "sleet+fog"
+    assert combine("snow", "rain") == "sleet"
+    assert combine("rain", "blizzard") == "blizzard"
+    assert combine("heat", "fog") == "fog"
+    assert combine(None, "rain") == "rain"
+    assert valid_kind("storm+fog") and not valid_kind("heat+fog") and not valid_kind("rain+snow")
+    p = profile("rain+fog")
+    assert p["kind"] == "rain" and p["mix"] == "fog" and p["rain"] > 0.5 and p["fog"] >= 0.8 and p["night"] == 0
