@@ -295,8 +295,45 @@
       putPumpkin(name, i, animate);
       pkNext++;
     }
+    // Nachts bekommen die Kürbisse ihr Gesicht, einer nach dem anderen: meist
+    // glimmt es weich auf, manche drehen sich einmal um, selten platzt einer
+    // und ein geschnitzter fällt an seinen Platz; morgens erlöschen sie ebenso
+    var pkLit = false;
+    function lightPumpkins(on) {
+      var list = pkNodes.filter(Boolean).sort(function () { return Math.random() - 0.5; });
+      if (!B.on || B.reduceMotion) { list.forEach(function (pk) { pk.node.classList.toggle('is-lit', on); }); return; }
+      var at = 300;
+      list.forEach(function (pk) {
+        at += rand(350, 900);
+        setTimeout(function () {
+          if (pkLit !== on || pkNodes.indexOf(pk) < 0) return;
+          if (!on) { pk.node.classList.remove('is-lit'); return; }
+          var r = Math.random();
+          if (r < 0.6 || pk.zap || pk.mode !== null) { pk.node.classList.add('is-lit'); return; }
+          if (r < 0.88) {
+            pk.node.classList.add('is-turn');
+            setTimeout(function () { pk.node.classList.add('is-lit'); }, 420);
+            setTimeout(function () { pk.node.classList.remove('is-turn'); }, 950);
+            return;
+          }
+          var cy = pk.y + pk.dy - pk.h * 0.45;
+          pk.zap = true;
+          pk.node.dataset.zap = '1';
+          B.chunks(pk.x, cy, 26, ['#e8761e', '#f2a03a', '#c4561a', '#f6e7b0'], function () { return H - 4; });
+          setTimeout(function () {
+            pk.zap = false;
+            delete pk.node.dataset.zap;
+            pk.node.classList.add('is-lit');
+            pk.node.classList.remove('ta-pk--new');
+            void pk.node.getBBox();
+            pk.node.classList.add('ta-pk--new');
+          }, 700);
+        }, at);
+      });
+    }
     function putPumpkin(name, i, animate) {
       pkNodes[i] = buildPumpkin(name, i, animate);
+      if (pkLit) pkNodes[i].node.classList.add('is-lit');
       gPumpkins.appendChild(pkNodes[i].node);
       placePumpkins();
       sortPumpkins();
@@ -863,6 +900,8 @@
           S.first = false;
         }
         if (s.seasonTop && Array.isArray(s.seasonTop.autumn)) S.top = s.seasonTop.autumn;
+        var lit = B.nightT > 0.5;
+        if (lit !== pkLit) { pkLit = lit; lightPumpkins(lit); }
         if (s.seasonTop) S.fireTop = Array.isArray(s.seasonTop.fire) ? s.seasonTop.fire : [];
         B.vars({ '--ts-night': B.night });
         drawn = -1;

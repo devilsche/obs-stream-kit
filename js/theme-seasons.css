@@ -132,11 +132,17 @@
 .ta-pk--c3 .ta-pk-body { fill: #e8a514; } .ta-pk--c3 .ta-pk-lobe { fill: #f4bb2c; } .ta-pk--c3 .ta-pk-rib { stroke: #a87208; }
 .ta-pk--c4 .ta-pk-body { fill: #e6dcc4; } .ta-pk--c4 .ta-pk-lobe { fill: #f2ead6; } .ta-pk--c4 .ta-pk-rib { stroke: #b3a585; }
 .ta-pk--c5 .ta-pk-body { fill: #d97a16; } .ta-pk--c5 .ta-pk-lobe { fill: #8a9a3a; } .ta-pk--c5 .ta-pk-rib { stroke: #5e6a22; }
-.ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 3s ease; }
-.ta-pk-light { fill: #ffb43a; filter: url(#ta-glow); opacity: 0; transition: opacity 3s ease; }
-.ts[data-night="1"] .ta-pk-face { opacity: 1; animation: taFlicker 2.2s ease-in-out infinite; }
+/* Gesichter leuchten Kürbis für Kürbis (is-lit setzt das Skript gestaffelt);
+   das Flackern setzt erst nach dem weichen Einblenden ein, sonst ploppt es auf */
+.ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 2s ease; }
+.ta-pk-light { fill: #ffb43a; filter: url(#ta-glow); opacity: 0; transition: opacity 2s ease; }
+.ta-pk.is-lit .ta-pk-face { opacity: 1; animation: taFlicker 2.2s ease-in-out 2s infinite; }
 /* Lichtschein gedämpft: eigene Flacker-Kurve, sonst setzt taFlicker die Deckkraft auf bis zu 1 */
-.ts[data-night="1"] .ta-pk-light { opacity: 0.3; animation: taGlowFlicker 2.2s ease-in-out infinite; }
+.ta-pk.is-lit .ta-pk-light { opacity: 0.3; animation: taGlowFlicker 2.2s ease-in-out 2s infinite; }
+/* manche drehen sich einmal um und zeigen dabei ihr Gesicht */
+.ta-pk.is-turn .ta-pk-inner { animation: taPkTurn 0.9s ease-in-out both; }
+@keyframes taPkTurn { 0%, 100% { transform: scaleX(1); } 50% { transform: scaleX(0.08); } }
+@media (prefers-reduced-motion: reduce) { .ta-pk.is-turn .ta-pk-inner { animation: none; } }
 .ts[data-celebrate="1"] .ta-pk-light { opacity: 0.7; animation: none; }
 @keyframes taFlicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
 @keyframes taGlowFlicker { 0%, 100% { opacity: 0.32; } 30% { opacity: 0.24; } 55% { opacity: 0.3; } 70% { opacity: 0.18; } }
