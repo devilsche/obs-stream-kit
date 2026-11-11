@@ -742,7 +742,7 @@
     // ── Spotlight: alle 8 s ein Name, jedes 4. Mal der beste Schipper ──
     var spotRound = 0, lastSpot = null;
     setInterval(function () {
-      if (!S.on || X.busy()) return;
+      if (!S.on || X.busy() || (root.ThemeSeasons && root.ThemeSeasons.visiting())) return;
       spotRound++;
       var pool = [];
       X.spotPool(pool);

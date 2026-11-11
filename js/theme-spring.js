@@ -508,7 +508,7 @@
     // ── Spotlight: alle 8 s eine Blume, jedes 4. Mal der beste Gärtner ──
     var spotRound = 0;
     setInterval(function () {
-      if (!B.on) return;
+      if (!B.on || TS.visiting()) return;
       spotRound++;
       if (!B.partOn('meadow')) return;
       var pool = flowers.filter(function (f) { return f && f.label; });

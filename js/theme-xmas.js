@@ -426,6 +426,7 @@
     // schwebt groß neben den Baum, wackelt mit Namen und fliegt wieder hinaus
     function visit(name) {
       if (!shown() || !partOn('tree') || anim) return;
+      if (root.ThemeSeasons) root.ThemeSeasons.hold(8000);
       var fromX = sideFrom(STAR[0]), left = fromX < STAR[0];
       var hx = left ? Math.max(-40, (120 - TX) / TK) : Math.min(440, (1800 - TX) / TK), hy = 200, K = 2.5;
       var outer = el('g', { opacity: '0' }, gSparks), sway = el('g', {}, outer);

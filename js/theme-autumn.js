@@ -908,7 +908,7 @@
     var fireBoardTimer = null;
     var spotRound = 0, lastSpot = null;
     setInterval(function () {
-      if (!B.on) return;
+      if (!B.on || TS.visiting()) return;
       spotRound++;
       if (!B.partOn('pumpkins')) return;
       // geplatzte Kürbisse nicht: sonst stünde ein Name über einer leeren Stelle

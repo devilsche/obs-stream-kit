@@ -1337,7 +1337,7 @@
     var spotRound = 0;
     // In der Xmas-Zeit statt der Burgen Kugeln und Geschenke am Baum
     setInterval(function () {
-      if (!B.on || X.busy()) return;
+      if (!B.on || X.busy() || TS.visiting()) return;
       spotRound++;
       var pool = [];
       X.spotPool(pool);

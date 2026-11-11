@@ -489,9 +489,14 @@
   // der näheren Kante hereingerollt (roll) oder wächst auf, meldet sich mit
   // o.arrive (Hüpfen + Name) und geht danach wie beim Platzmachen wieder
   var VISIT_IN = 1600, VISIT_POP = 700, VISIT_STAY = 5200;
+  // solange ein Besuch läuft, pausiert der Namens-Scheinwerfer (sonst überlappen die Schilder)
+  var visitEnd = 0;
+  function hold(ms) { visitEnd = Math.max(visitEnd, Date.now() + ms); }
+  function visiting() { return Date.now() < visitEnd; }
   function visit(node, o) {
     var parent = node.parentNode;
     if (!parent) return;
+    hold((o.roll ? VISIT_IN : VISIT_POP) + VISIT_STAY + 1500);
     var roll = !!o.roll, wrap = el('g', { 'class': 'ts-visit ts-visit--' + (roll ? 'roll' : 'pop') });
     parent.appendChild(wrap);
     var inner = el('g', { 'class': 'ts-visit__item' }, wrap);
@@ -509,5 +514,5 @@
     }, inMs + VISIT_STAY);
   }
 
-  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit };
+  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting };
 })(typeof window !== 'undefined' ? window : this);
