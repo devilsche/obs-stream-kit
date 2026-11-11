@@ -291,7 +291,7 @@
       el('circle', { 'class': 'tw-sm-coal', cx: -5, cy: -57, r: 2.4 }, g);
       el('circle', { 'class': 'tw-sm-coal', cx: 5, cy: -57, r: 2.4 }, g);
       el('path', { 'class': 'tw-sm-nose', d: 'M0 -53 L14 -50 L0 -48 Z' }, g);
-      el('path', { 'class': 'tw-mini__hat' + (1 + i % 4), d: 'M-16 -64 Q0 -98 16 -64 Z' }, g);
+      el('path', { 'class': 'tw-mini__hat' + (1 + Math.floor((root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, 1) : (i % 4) / 4) * 4)), d: 'M-16 -64 Q0 -98 16 -64 Z' }, g);
       el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, g);
       // Schneehügel vor dem Mini (Sturm, Lawine)
       var mound = el('path', { 'class': 'tw-mini__mound' }, outer);

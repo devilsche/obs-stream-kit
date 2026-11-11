@@ -118,9 +118,10 @@
     }
     function putFlower(name, i, animate) {
       var x = SLOTS[i], y = groundY(x) + 8;
-      // je Platz fest gestreut: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
-      var fr = function (s) { var v = Math.sin(i * 77.3 + s * 23.9) * 43758.5453; return v - Math.floor(v); };
-      var h = 34 + ((i * 37) % 40), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + (i * 3) % 5);
+      // je Name fest: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
+      var fr = function (s) { return TS.nameRand(name, s); };
+      var ci = Math.floor(fr(7) * 5);
+      var h = 34 + Math.floor(fr(6) * 40), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + ci);
       var lean = (fr(2) < 0.5 ? -1 : 1) * (4 + 8 * fr(3)), hk = 0.55 + 0.25 * fr(4);
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
       // Zwischenebene zum Biegen/Umknicken (Fuß bei 0/0)
@@ -157,7 +158,7 @@
           el('circle', { 'class': 'tsp-center', r: 6 }, dg);
         });
       }
-      flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, label: name, c: PETALS[(i * 3) % 5],
+      flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, label: name, c: PETALS[ci],
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0 };
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }

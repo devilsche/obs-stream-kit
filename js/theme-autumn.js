@@ -243,11 +243,12 @@
     // hinten kleiner, höher und dunkler, damit der Haufen räumlich wirkt
     function pkRand(slot, s) { var v = Math.sin(slot * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); }
     function buildPumpkin(name, slot, animate) {
-      var depth = pkRand(slot, 3);
-      var scale = (0.68 + ((slot * 7919) % 100) / 100 * 0.3) * (1 - 0.22 * depth);
-      var wide = pkRand(slot, 1), sx = scale * (0.86 + 0.34 * wide), sy = scale * (1.12 - 0.28 * wide);
-      var tilt = (pkRand(slot, 4) - 0.5) * 14;
-      var g = el('g', { 'class': 'ta-pk ta-pk--c' + (1 + Math.floor(pkRand(slot, 2) * 5)) + (animate ? ' ta-pk--new' : '') });
+      // Tiefe gehört zum Platz, Aussehen (Sorte, Größe, Form, Neigung) zum Namen
+      var depth = pkRand(slot, 3), nr = function (s) { return TS.nameRand(name, s); };
+      var scale = (0.68 + nr(1) * 0.3) * (1 - 0.22 * depth);
+      var wide = nr(2), sx = scale * (0.86 + 0.34 * wide), sy = scale * (1.12 - 0.28 * wide);
+      var tilt = (nr(3) - 0.5) * 14;
+      var g = el('g', { 'class': 'ta-pk ta-pk--c' + (1 + Math.floor(nr(4) * 5)) + (animate ? ' ta-pk--new' : '') });
       // Zwischenebene zum Anheben/Aufschwimmen (Fuß bei 0/0)
       var lift = el('g', {}, g);
       var inner = el('g', { 'class': 'ta-pk-inner' }, lift);

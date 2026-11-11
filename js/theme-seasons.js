@@ -520,5 +520,13 @@
     }, inMs + VISIT_STAY);
   }
 
-  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting };
+  // fester Zufallswert 0..1 je Name und Merkmal: Follower sehen in jeder
+  // Jahreszeit und bei jedem Besuch gleich aus, egal auf welchem Platz
+  function nameRand(name, s) {
+    var str = String(name || '?').toLowerCase() + '#' + s, h = 2166136261;
+    for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0) / 4294967296;
+  }
+
+  root.ThemeSeasons = { nameRand: nameRand, sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting };
 })(typeof window !== 'undefined' ? window : this);

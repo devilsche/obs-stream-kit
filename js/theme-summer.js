@@ -221,7 +221,6 @@
     // Burg-Varianten je Platz fest gestreut: Bauform, Sandton, Spiegelung,
     // Muschel, Größe. build(g) zeichnet (Fuß bei 0/0) und liefert die
     // Fahnenstange [x, Fuß, Spitze] und die Höhe für Schild und Spotlight
-    function cRand(i, s) { var v = Math.sin(i * 91.7 + s * 47.3) * 43758.5453; return v - Math.floor(v); }
     function wall(x0, x1, y0, y1) { return 'M' + x0 + ' ' + y0 + ' L' + x0 + ' ' + y1 + ' L' + x1 + ' ' + y1 + ' L' + x1 + ' ' + y0 + ' Z'; }
     function tower(x0, x1, top, mw) {
       // Turm mit Zinnen auf der Oberkante
@@ -304,8 +303,10 @@
     }
     function putCastle(name, i, animate) {
       var x = CASTLE_X[i], y = sandY(x) + 26;
-      var k = 0.5 + 0.26 * cRand(i, 1), form = Math.floor(cRand(i, 2) * CASTLE_BUILD.length);
-      var mirror = cRand(i, 3) < 0.4, tone = 1 + Math.floor(cRand(i, 4) * 3);
+      // Aussehen (Größe, Form, Sandton, Fahne, Muschel) fest aus dem Namen
+      var cr = function (s) { return TS.nameRand(name, 10 + s); };
+      var k = 0.5 + 0.26 * cr(1), form = Math.floor(cr(2) * CASTLE_BUILD.length);
+      var mirror = cr(3) < 0.4, tone = 1 + Math.floor(cr(4) * 3);
       var outer = el('g', { transform: 'translate(' + x + ' ' + y.toFixed(0) + ') scale(' + k.toFixed(2) + ')' }, gCastles);
       // Zwischenebene fürs Zusammensacken (Fuß bei 0/0), darin die Burg mit ihren CSS-Animationen
       var slump = el('g', {}, outer);
@@ -315,10 +316,10 @@
       var px = mirror ? -info.pole[0] : info.pole[0];
       el('line', { 'class': 'tss-flagpole', x1: px, y1: info.pole[1], x2: px, y2: info.pole[2] }, g);
       var flagG = el('g', {}, g);
-      el('path', { 'class': 'tss-flag tss-f' + (1 + i % 5), d: 'M' + (px + 1) + ' ' + info.pole[2] + ' l35 8 l-35 10 Z' }, flagG);
+      el('path', { 'class': 'tss-flag tss-f' + (1 + Math.floor(cr(8) * 5)), d: 'M' + (px + 1) + ' ' + info.pole[2] + ' l35 8 l-35 10 Z' }, flagG);
       // manche haben eine Muschel am Fuß
-      if (cRand(i, 5) < 0.35) {
-        var sx = (cRand(i, 6) < 0.5 ? -1 : 1) * (52 + 14 * cRand(i, 7));
+      if (cr(5) < 0.35) {
+        var sx = (cr(6) < 0.5 ? -1 : 1) * (52 + 14 * cr(7));
         el('path', { 'class': 'tss-shell', transform: 'translate(' + f1(sx) + ' -2) scale(0.7)',
                      d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
       }
