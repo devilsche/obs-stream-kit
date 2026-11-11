@@ -126,27 +126,36 @@ LEVEL_SAY = {"autumn": ("leaves", "der Laubhaufen liegt {v} % hoch"),
              "summer": ("heat", "der Strand ist {v} % heiß")}
 
 
+THEME_SAY = {"winter": "Winter", "autumn": "Herbst", "spring": "Frühling", "summer": "Sommer"}
+
+
 def weather_say(state: dict, place: str = "") -> str:
-    """place: Ortsname aus der Overlay-URL („Berlin, Land Berlin, DE“ → „Berlin“)."""
+    """Echtes Wetter am Ort, dazu was im Stream zu sehen ist (bestelltes Wetter,
+    Jahreszeit mit ihrem Stand). place: Ortsname aus der Overlay-URL
+    („Berlin, Land Berlin, DE“ → „Berlin“)."""
     town = (place or "").split(",")[0].strip()
     kind = state.get("kind") or "clear"
     temp = f"{round(state['temp'])} °C" if isinstance(state.get("temp"), (int, float)) else ""
     look = KIND_SAY.get(kind, kind)
     if state.get("source") == "override":
         live = f"Live aus {town}: {temp}. " if town and temp else ""
-        text = f"{live}Im Bild gerade: {look} (vom Chat bestellt)"
+        text = f"{live}Im Bild gerade: {look} (vom Chat bestellt)."
     elif town:
-        text = f"Live aus {town}: " + ", ".join(x for x in (look, temp) if x)
+        text = f"Live aus {town}: " + ", ".join(x for x in (look, temp) if x) + "."
     else:
-        text = "Wetter gerade: " + ", ".join(x for x in (look, temp) if x)
+        text = "Wetter gerade: " + ", ".join(x for x in (look, temp) if x) + "."
     theme = state.get("theme")
-    lv = state.get("seasonLevels") or {}
-    # Stand nur nennen, wenn etwas da ist (0 % Schnee klingt seltsam)
-    if theme in LEVEL_SAY and isinstance(lv.get(LEVEL_SAY[theme][0]), (int, float)) and lv[LEVEL_SAY[theme][0]] >= 1:
-        text += ", " + LEVEL_SAY[theme][1].format(v=round(lv[LEVEL_SAY[theme][0]]))
-    elif theme == "winter" and isinstance(state.get("snowCover"), (int, float)) and state["snowCover"] >= 1:
-        text += f", die Schneedecke liegt {round(state['snowCover'])} % hoch"
-    return text + "."
+    if theme in THEME_SAY:
+        season = "Weihnachtszeit" if state.get("xmas") not in (None, "off") else THEME_SAY[theme]
+        part = f" Im Stream ist {season}"
+        lv = state.get("seasonLevels") or {}
+        # Stand nur nennen, wenn etwas da ist (0 % Schnee klingt seltsam)
+        if theme in LEVEL_SAY and isinstance(lv.get(LEVEL_SAY[theme][0]), (int, float)) and lv[LEVEL_SAY[theme][0]] >= 1:
+            part += ", " + LEVEL_SAY[theme][1].format(v=round(lv[LEVEL_SAY[theme][0]]))
+        elif theme == "winter" and isinstance(state.get("snowCover"), (int, float)) and state["snowCover"] >= 1:
+            part += f", die Schneedecke liegt {round(state['snowCover'])} % hoch"
+        text += part + "."
+    return text
 
 
 TOP_SAY = {"autumn": "Top-Laubrecher", "spring": "Top-Gärtner", "summer": "Top-Abkühler", "winter": "Top-Schneeschipper"}

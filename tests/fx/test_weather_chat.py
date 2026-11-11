@@ -53,7 +53,7 @@ def test_project_say():
 
 def test_weather_say_with_level():
     s = wc.weather_say({"kind": "rain", "temp": 7.6, "theme": "autumn", "seasonLevels": {"leaves": 40.4}})
-    assert s == "Wetter gerade: Regen, 8 °C, der Laubhaufen liegt 40 % hoch."
+    assert s == "Wetter gerade: Regen, 8 °C. Im Stream ist Herbst, der Laubhaufen liegt 40 % hoch."
 
 
 def test_top_and_tip():
@@ -64,13 +64,13 @@ def test_top_and_tip():
 
 def test_weather_say_live_from_place_and_override():
     st = {"kind": "rain", "temp": 3.2, "theme": "autumn", "seasonLevels": {"leaves": 15}}
-    assert wc.weather_say(st, "Berlin, Land Berlin, DE") == "Live aus Berlin: Regen, 3 °C, der Laubhaufen liegt 15 % hoch."
+    assert wc.weather_say(st, "Berlin, Land Berlin, DE") == "Live aus Berlin: Regen, 3 °C. Im Stream ist Herbst, der Laubhaufen liegt 15 % hoch."
     st["source"], st["kind"] = "override", "storm"
-    assert wc.weather_say(st, "Berlin") == "Live aus Berlin: 3 °C. Im Bild gerade: Gewitter (vom Chat bestellt), der Laubhaufen liegt 15 % hoch."
+    assert wc.weather_say(st, "Berlin") == "Live aus Berlin: 3 °C. Im Bild gerade: Gewitter (vom Chat bestellt). Im Stream ist Herbst, der Laubhaufen liegt 15 % hoch."
 
 
 def test_weather_say_skips_empty_level():
-    assert wc.weather_say({"kind": "cloudy", "temp": 3, "theme": "winter", "snowCover": 0}, "Berlin") == "Live aus Berlin: bewölkt, 3 °C."
+    assert wc.weather_say({"kind": "cloudy", "temp": 3, "theme": "winter", "snowCover": 0}, "Berlin") == "Live aus Berlin: bewölkt, 3 °C. Im Stream ist Winter."
 
 
 def test_commands_only_for_current_season():
@@ -80,3 +80,8 @@ def test_commands_only_for_current_season():
     w = wc.commands_say("winter", frost=20)
     assert "!shovel" in w and "!scrape" in w and w.endswith("!snowboard und !frostboard.")
     assert all(len(wc.commands_say(t, 30)) < 500 for t in wc.SEASON_SAY for _ in range(2))
+
+
+def test_weather_say_names_xmas_and_snow():
+    st = {"kind": "clear", "temp": 2, "theme": "winter", "xmas": "on", "snowCover": 22.4}
+    assert wc.weather_say(st, "Berlin") == "Live aus Berlin: klar, 2 °C. Im Stream ist Weihnachtszeit, die Schneedecke liegt 22 % hoch."
