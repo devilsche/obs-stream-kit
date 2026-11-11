@@ -29,6 +29,9 @@ html, body {
 }
 .name-tag--big { font-size: 28px; font-weight: 800; fill: var(--tag-big, #ffd75e); stroke-width: 6px; }
 .name-tag--long { animation-duration: 6.2s; }
+/* Platz für einen !whereiam-Besuch: laufende Namen blenden schnell aus */
+.name-tag--out { animation: tagOut 0.3s ease-out forwards; }
+@keyframes tagOut { from { opacity: 0.8; } to { opacity: 0; } }
 @keyframes tagFade { 0% { opacity: 0; } 12%, 75% { opacity: 1; } 100% { opacity: 0; } }
 
 .is-spot { animation: spot 3.2s ease-in-out both; }

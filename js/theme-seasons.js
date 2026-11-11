@@ -491,7 +491,13 @@
   var VISIT_IN = 1600, VISIT_POP = 700, VISIT_STAY = 5200;
   // solange ein Besuch läuft, pausiert der Namens-Scheinwerfer (sonst überlappen die Schilder)
   var visitEnd = 0;
-  function hold(ms) { visitEnd = Math.max(visitEnd, Date.now() + ms); }
+  function hold(ms) {
+    // Namen, die der Scheinwerfer gerade zeigt (kleine Schilder), blenden sofort aus
+    if (!visiting() && root.document) {
+      [].forEach.call(root.document.querySelectorAll('.name-tag:not(.name-tag--big)'), function (t) { t.classList.add('name-tag--out'); });
+    }
+    visitEnd = Math.max(visitEnd, Date.now() + ms);
+  }
   function visiting() { return Date.now() < visitEnd; }
   function visit(node, o) {
     var parent = node.parentNode;
