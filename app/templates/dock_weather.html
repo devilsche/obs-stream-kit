@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Weather dock</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
+  <style>
+    /* Schmale Steuerseite für ein OBS-Dock: Statuszeile + Knöpfe der Weather-Source */
+    :root {
+      --bg: #17101f; --panel: #241532; --line: #3a2650; --text: #f3ecfa; --muted: #b9a8cc;
+      --purple: #5e2a79; --gold: #f2b705; --ok: #7fd18b; --err: #ff8a8a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 'DM Sans', system-ui, sans-serif; }
+    main { padding: 10px; }
+    .skip-link { position: absolute; left: -9999px; }
+    .skip-link:focus { left: 10px; top: 10px; background: var(--gold); color: #000; padding: 6px 10px; z-index: 10; }
+    .status {
+      background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+      border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; min-height: 44px;
+    }
+    .status__row { display: flex; align-items: flex-start; gap: 8px; }
+    .status__text { flex: 1; }
+    .status__time { color: var(--muted); font-size: 12px; }
+    .refresh {
+      flex: none; width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--line);
+      background: transparent; color: var(--text); cursor: pointer; display: grid; place-items: center;
+    }
+    details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
+    summary {
+      cursor: pointer; padding: 8px 10px; font-weight: 700; letter-spacing: 0.3px; list-style: none;
+      display: flex; align-items: center; gap: 6px; min-height: 36px;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before { content: 'chevron_right'; font-family: 'Material Symbols Outlined'; transition: transform 0.15s; }
+    details[open] > summary::before { transform: rotate(90deg); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; padding: 0 8px 8px; }
+    .btn {
+      display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 8px;
+      border: 1px solid var(--line); border-radius: 6px; background: var(--purple); color: var(--text);
+      font: inherit; text-align: left; cursor: pointer;
+    }
+    .btn:hover { border-color: var(--gold); }
+    .btn .material-symbols-outlined { font-size: 20px; flex: none; }
+    .btn.is-sent { border-color: var(--ok); }
+    .btn.is-failed { border-color: var(--err); }
+    .btn:focus-visible, .refresh:focus-visible, summary:focus-visible {
+      outline: 3px solid var(--gold); outline-offset: 2px;
+    }
+    .hint { color: var(--muted); font-size: 12px; margin: 8px 2px 0; }
+    .err { color: var(--err); }
+    @media (prefers-reduced-motion: reduce) { summary::before { transition: none; } }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to controls</a>
+  <main id="main-content">
+    {% if not token %}
+      <p class="err">No widget token yet. Create one in the dashboard first.</p>
+    {% else %}
+    <section class="status" aria-label="Current weather">
+      <div class="status__row">
+        <p class="status__text" id="status" role="status" aria-live="polite">Loading…</p>
+        <button class="refresh" type="button" id="refresh" aria-label="Refresh status">
+          <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
+        </button>
+      </div>
+      <div class="status__time" id="statusTime"></div>
+    </section>
+
+    {% for grp in groups %}
+    <details {% if loop.index <= 3 %}open{% endif %}>
+      <summary>{{ grp.name }}</summary>
+      <div class="grid">
+        {% for c in grp["items"] %}
+        <button class="btn" type="button" data-q="{{ c.q }}">
+          <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon or 'radio_button_checked' }}</span>
+          <span>{{ c.label }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </details>
+    {% endfor %}
+    {% if not place %}
+    <p class="hint">Tip: add <code>?place=Berlin</code> (as in your weather source URL) to this dock URL to see the live weather at your place.</p>
+    {% endif %}
+    {% endif %}
+  </main>
+  {% if token %}
+  <script>
+    (function () {
+      'use strict';
+      var api = '/s/{{ token }}/api/fx/weather';
+      var place = {{ place|tojson }}, who = {{ who|tojson }};
+      var statusEl = document.getElementById('status'), timeEl = document.getElementById('statusTime');
+
+      function loadStatus() {
+        var url = api + '/info?what=weather' + (place ? '&place=' + encodeURIComponent(place) : '');
+        fetch(url, { cache: 'no-store' })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            statusEl.textContent = d.say || 'No status.';
+            timeEl.textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+          })
+          .catch(function () { statusEl.textContent = 'Status not reachable.'; });
+      }
+
+      document.querySelectorAll('.btn[data-q]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var q = btn.getAttribute('data-q');
+          // Wetter und Tageszeit laufen unter dem Namen des Streamers (Statuszeile, !weather)
+          if (/^cmd=weather&/.test(q) && who && q.indexOf('name=') < 0) q += '&name=' + encodeURIComponent(who);
+          btn.classList.remove('is-sent', 'is-failed');
+          btn.setAttribute('aria-busy', 'true');
+          fetch(api + '?' + q, { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { btn.classList.add(d.ok ? 'is-sent' : 'is-failed'); })
+            .catch(function () { btn.classList.add('is-failed'); })
+            .then(function () {
+              btn.removeAttribute('aria-busy');
+              setTimeout(function () { btn.classList.remove('is-sent', 'is-failed'); }, 1500);
+              setTimeout(loadStatus, 1200);
+            });
+        });
+      });
+      document.getElementById('refresh').addEventListener('click', loadStatus);
+      loadStatus();
+      setInterval(loadStatus, 20000);
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>

@@ -597,6 +597,36 @@ def urls():
                            stingers=stingers, effects=effects, transitions=transitions)
 
 
+@bp_app.route("/app/dock/weather")
+@require_session
+def dock_weather():
+    """Schmale Steuerseite für ein OBS-Dock (Docks → Benutzerdefinierte Browser-Docks):
+    Statuszeile wie !weather und die Knöpfe der Weather-Source, ohne Menü.
+    ?place= wie in der Overlay-URL, damit die Statuszeile das echte Wetter am Ort zeigt."""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT token FROM widget_tokens
+                WHERE tenant_id = %s AND revoked_at IS NULL
+                ORDER BY created_at
+                LIMIT 1
+            """, (g.tenant_id,))
+            row = cur.fetchone()
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    from overlay_app.overlay_catalog import EFFECT_META
+    groups = []
+    for c in EFFECT_META["weather.html"].get("controls", []):
+        if not groups or groups[-1]["name"] != c["group"]:
+            groups.append({"name": c["group"], "items": []})
+        groups[-1]["items"].append(c)
+    return render_template("dock_weather.html", token=row["token"] if row else None, groups=groups,
+                           place=(request.args.get("place") or "").strip()[:80],
+                           who=(g.user.get("display_name") or "").strip())
+
+
 def _visible_tools():
     """Tools the current user is allowed to see."""
     return [t for t in TOOLS
