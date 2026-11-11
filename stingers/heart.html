@@ -506,8 +506,10 @@
       function clean(v) { v = (v || '').trim(); return /%/.test(v) ? '' : v; }
       var author = clean(params.get('name')) || 'Liebling';
       var msg = clean(params.get('msg')).slice(0, 90);
-      var to = clean(params.get('to')).replace(/^@+/, '');
-      if (!to && /^@\S/.test(msg)) to = msg.split(/\s+/)[0].replace(/^@+/, '');
+      // Ziel nur bei „@Name“ vorn; sonst ist es Freitext („<3 irgendwas mit pommes“),
+      // auch wenn Streamer.bot zufällig einen Nutzer „irgendwas“ findet
+      var mention = /^@\S/.test(msg) ? msg.split(/\s+/)[0].replace(/^@+/, '') : '';
+      var to = msg ? (mention ? (clean(params.get('to')) || mention) : '') : clean(params.get('to')).replace(/^@+/, '');
       if (to && !/^\w{2,25}$/.test(to)) to = '';
       var below = author;
       var nameBox = document.getElementById('username');
