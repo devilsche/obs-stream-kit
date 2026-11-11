@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pumpkin turn preview</title>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <!-- dieselben Styles wie die Weather-Source (Drehen, Wegrollen, Leuchten) -->
+  <link rel="stylesheet" href="/s/__WIDGET_TOKEN__/js/theme-seasons.css">
+  <style>
+    /* Testseite für das Umdrehen der Kürbisse: Dauer und Kurve live einstellen */
+    html, body { margin: 0; background: #1d2433; color: #f0eaf5; font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: #f2b705; color: #000; padding: 6px 10px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .lead { color: #c4bad6; margin: 0 0 18px; }
+    .stage { display: flex; flex-wrap: wrap; gap: 8px; background: #141a26; border: 1px solid #2a3346; border-radius: 10px; padding: 16px; }
+    .stage svg { width: 190px; height: 190px; overflow: visible; }
+    .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px 20px; margin: 18px 0; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field label { font-weight: 600; }
+    .field output { color: #f2b705; font-variant-numeric: tabular-nums; }
+    select, input[type=range] { width: 100%; }
+    select { background: #141a26; color: #f0eaf5; border: 1px solid #44345e; border-radius: 6px; padding: 6px; }
+    .buttons { display: flex; flex-wrap: wrap; gap: 10px; }
+    button { background: #5e2a79; color: #fff; border: 1px solid #8a4dad; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; min-height: 36px; }
+    button:hover { background: #8a4dad; }
+    button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+    .check { flex-direction: row; align-items: center; gap: 8px; }
+    pre { background: #141a26; border: 1px solid #2a3346; border-radius: 8px; padding: 10px 12px; color: #c4bad6; overflow-x: auto; }
+    #pumps { --pk-slow: 1; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <main>
+    <h1>Pumpkin turn</h1>
+    <p class="lead">The pumpkin turns like a ball: the outline stays, face and ribs move round the sphere. Adjust duration and curve, press <b>Turn</b>, and copy the CSS line below into <code>js/theme-seasons.css</code> (or tell Claude the values).</p>
+
+    <section class="stage" id="pumps" aria-label="Preview pumpkins"></section>
+
+    <section class="controls" id="controls" aria-label="Turn settings">
+      <div class="field">
+        <label for="dur">Duration</label>
+        <input type="range" id="dur" min="0.6" max="3.5" step="0.1" value="1.4">
+        <output for="dur" id="durOut">1.4 s</output>
+      </div>
+      <div class="field">
+        <label for="ease">Curve</label>
+        <select id="ease">
+          <option value="cubic-bezier(0.3, 0.1, 0.3, 1)">Smooth stop (current)</option>
+          <option value="linear">Even speed</option>
+          <option value="ease-in-out">Slow start and stop</option>
+          <option value="cubic-bezier(0.2, 0.8, 0.2, 1)">Quick start, long stop</option>
+          <option value="cubic-bezier(0.6, 0, 0.4, 1)">Wind-up</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="slow">Slow motion</label>
+        <select id="slow">
+          <option value="1">Off</option>
+          <option value="3">3× slower</option>
+          <option value="6">6× slower</option>
+        </select>
+      </div>
+      <div class="field check">
+        <input type="checkbox" id="loop">
+        <label for="loop">Repeat every few seconds</label>
+      </div>
+    </section>
+
+    <div class="buttons">
+      <button type="button" id="turn">Turn</button>
+      <button type="button" id="roll">Roll away and back</button>
+      <button type="button" id="glow">Glow up</button>
+      <button type="button" id="dark">Faces off</button>
+    </div>
+
+    <h2>CSS for the source</h2>
+    <pre id="css" aria-live="polite"></pre>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var NS = 'http://www.w3.org/2000/svg';
+      function el(name, attrs, parent) {
+        var n = document.createElementNS(NS, name);
+        for (var k in attrs) n.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(n);
+        return n;
+      }
+      // gleicher Aufbau wie buildPumpkin() in js/theme-autumn.js
+      function pumpkin(svg, color, sx, sy) {
+        var defs = el('defs', {}, svg);
+        var glow = el('filter', { id: 'ta-glow', x: '-200%', y: '-200%', width: '500%', height: '500%' }, defs);
+        el('feGaussianBlur', { stdDeviation: 6 }, glow);
+        var g = el('g', { 'class': 'ta-pk ta-pk--c' + color, transform: 'translate(95 150) scale(1.6)' }, svg);
+        var lift = el('g', {}, g);
+        var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
+        el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: 44 * sx, ry: 7 }, inner);
+        var body = el('g', { transform: 'scale(' + sx + ' ' + sy + ')' }, inner);
+        el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
+        el('ellipse', { 'class': 'ta-pk-body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
+        el('ellipse', { 'class': 'ta-pk-body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
+        el('ellipse', { 'class': 'ta-pk-lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
+        el('path', { 'class': 'ta-pk-rib', d: 'M-12 -58 Q-20 -30 -12 -2 M12 -58 Q20 -30 12 -2' }, body);
+        el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
+        el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
+        el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
+        return g;
+      }
+      var stage = document.getElementById('pumps'), pks = [];
+      [[1, 1.05, 0.95], [2, 0.95, 1.05], [3, 1.1, 0.9], [4, 0.9, 1], [5, 1, 1]].forEach(function (c) {
+        var svg = el('svg', { viewBox: '0 0 190 190', role: 'img', 'aria-label': 'Pumpkin ' + c[0] }, stage);
+        pks.push(pumpkin(svg, c[0], c[1], c[2]));
+      });
+
+      var dur = document.getElementById('dur'), ease = document.getElementById('ease'), slow = document.getElementById('slow');
+      function apply() {
+        var d = parseFloat(dur.value), f = parseFloat(slow.value);
+        document.getElementById('durOut').textContent = d.toFixed(1) + ' s';
+        stage.style.setProperty('--pk-turn-dur', (d * f).toFixed(2) + 's');
+        stage.style.setProperty('--pk-turn-ease', ease.value);
+        document.getElementById('css').textContent =
+          '/* in .ta-pk.is-turn … */\n--pk-turn-dur: ' + d.toFixed(1) + 's;\n--pk-turn-ease: ' + ease.value + ';';
+      }
+      [dur, ease, slow].forEach(function (i) { i.addEventListener('input', apply); });
+      apply();
+
+      function restart(pk, cls) {
+        pk.classList.remove(cls);
+        void pk.getBBox();
+        pk.classList.add(cls);
+      }
+      function turn() {
+        var ms = parseFloat(dur.value) * parseFloat(slow.value) * 1000 + 100;
+        pks.forEach(function (pk, i) {
+          pk.classList.remove('is-dim');
+          setTimeout(function () {
+            restart(pk, 'is-turn');
+            pk.classList.add('is-lit');
+            setTimeout(function () { pk.classList.remove('is-turn'); }, ms);
+          }, i * 120);
+        });
+      }
+      function roll() {
+        pks.forEach(function (pk) {
+          pk.classList.add('is-lit');
+          pk.style.setProperty('--pk-in', '-170px');
+          pk.style.setProperty('--pk-spin', '-340deg');
+          restart(pk, 'is-rollin');
+          setTimeout(function () { pk.classList.remove('is-rollin'); }, 1700);
+        });
+      }
+      document.getElementById('turn').addEventListener('click', turn);
+      document.getElementById('roll').addEventListener('click', roll);
+      document.getElementById('glow').addEventListener('click', function () {
+        pks.forEach(function (pk, i) { pk.classList.remove('is-dim'); setTimeout(function () { pk.classList.add('is-lit'); }, i * 400); });
+      });
+      document.getElementById('dark').addEventListener('click', function () {
+        pks.forEach(function (pk, i) {
+          setTimeout(function () {
+            pk.classList.remove('is-lit'); pk.classList.add('is-dim');
+            setTimeout(function () { pk.classList.remove('is-dim'); }, 2100);
+          }, i * 400);
+        });
+      });
+      var loopTimer = null;
+      document.getElementById('loop').addEventListener('change', function (e) {
+        clearInterval(loopTimer);
+        if (e.target.checked) { turn(); loopTimer = setInterval(turn, parseFloat(dur.value) * parseFloat(slow.value) * 1000 + 1500); }
+      });
+    })();
+  </script>
+</body>
+</html>

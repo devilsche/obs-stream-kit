@@ -46,7 +46,7 @@ def test_weather_has_controls_and_live_keys():
         "cmd=scrape", "cmd=warm", "cmd=frostclear", "cmd=leaders", "cmd=frostreset",
         "cmd=setup", "cmd=farewell", "cmd=build", "cmd=snowmanreset", "cmd=celebrate", "cmd=shovel", "cmd=shake&force=1",
         "cmd=icicle", "cmd=snowball", "cmd=snowboard",
-        "cmd=rake", "cmd=jump", "cmd=extinguish", "cmd=sweep", "cmd=water", "cmd=weed&force=1", "cmd=bee",
+        "cmd=rake", "cmd=jump", "cmd=extinguish", "cmd=sweep", "cmd=leafstorm", "cmd=water", "cmd=weed&force=1", "cmd=bee",
         "cmd=splash", "cmd=ice", "cmd=fries", "cmd=cool", "cmd=celebrate", "cmd=seasonboard"]
     assert {"mood", "kdlow", "kdhigh", "kdtest", "fallback", "lock", "veil"} <= set(src["live"])
     for c in src["commands"]:

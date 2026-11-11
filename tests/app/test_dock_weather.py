@@ -25,3 +25,12 @@ def test_dock_shows_controls_and_status(pg_conn_test_setup):
 
 def test_dock_needs_login(client):
     assert client.get("/app/dock/weather").status_code in (302, 401)
+
+
+def test_pumpkin_turn_tool_gets_the_widget_path(pg_conn_test_setup):
+    conn, tid, token, sid = pg_conn_test_setup
+    with conn.cursor() as cur:
+        cur.execute("UPDATE users SET is_admin = TRUE WHERE id = (SELECT owner_user_id FROM tenants WHERE id = %s)", (tid,))
+    conn.commit()
+    html = _client(conn, sid).get("/app/tools/pumpkin-turn").get_data(as_text=True)
+    assert f"/s/{token}/js/theme-seasons.css" in html and "/s/__WIDGET_TOKEN__/" not in html

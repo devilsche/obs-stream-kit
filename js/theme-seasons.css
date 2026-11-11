@@ -148,8 +148,12 @@
    auf der Kugel herum (Seitenposition nach sin, Breite nach cos des Drehwinkels),
    das Gesicht kommt vom linken Rand ohne Aufblenden in die Mitte */
 .ta-pk.is-turn .ta-pk-face, .ta-pk.is-turn .ta-pk-rib { transform-box: fill-box; transform-origin: 50% 50%; }
-.ta-pk.is-turn .ta-pk-face { opacity: 1; transition: none; animation: taFaceSpinIn 1.4s cubic-bezier(0.25, 0.4, 0.35, 1) both; }
-.ta-pk.is-turn .ta-pk-rib { animation: taRibSpin 0.7s linear 2; }
+/* Gesicht und Rippen teilen Dauer und Kurve (ein Drehwinkel für die ganze Kugel);
+   einstellbar über --pk-turn-dur / --pk-turn-ease (Testseite tools/pumpkin-turn.html) */
+.ta-pk.is-turn .ta-pk-face { opacity: 1; transition: none;
+  animation: taFaceSpinIn var(--pk-turn-dur, 1.4s) var(--pk-turn-ease, cubic-bezier(0.3, 0.1, 0.3, 1)) both; }
+.ta-pk.is-turn .ta-pk-rib {
+  animation: taRibSpin var(--pk-turn-dur, 1.4s) var(--pk-turn-ease, cubic-bezier(0.3, 0.1, 0.3, 1)) both; }
 @keyframes taFaceSpinIn {
   0% { transform: translateX(-32.0px) scaleX(0.04); }
   15% { transform: translateX(-30.9px) scaleX(0.26); }

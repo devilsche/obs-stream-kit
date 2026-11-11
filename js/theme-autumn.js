@@ -340,7 +340,7 @@
           }
           if (r < 0.9) {
             pk.node.classList.add('is-turn', 'is-lit');
-            setTimeout(function () { pk.node.classList.remove('is-turn'); }, 1250);
+            setTimeout(function () { pk.node.classList.remove('is-turn'); }, 1500);
             return;
           }
           var cy = pk.y + pk.dy - pk.h * 0.45;
@@ -953,6 +953,12 @@
           case 'rake': rake(p); break;
           case 'jump': jump(p.name || ''); break;
           case 'sweep': sweep(p); break;
+          case 'leafstorm':
+            setLevel(p);
+            B.gust(1600);
+            gust();
+            B.tag('Leaf storm!', W / 2, 300, true);
+            break;
           case 'gust': gust(); break;
           case 'celebrate': celebrate(p.name || ''); break;
           // erst die Laubrecher, dann (wenn schon jemand gelöscht hat) die Feuerwehr

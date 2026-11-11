@@ -16,7 +16,7 @@ from typing import Iterable
 
 # Tool-Pfade die KEINE API-Creds brauchen (Bearbeiten lokaler Daten /
 # statischer G1R-Katalog ohne PUBG-Bezug).
-_TOOLS_NO_CREDS = {"tools/poi-editor.html", "tools/g1r-database.html"}
+_TOOLS_NO_CREDS = {"tools/poi-editor.html", "tools/g1r-database.html", "tools/pumpkin-turn.html"}
 
 # Tool-Pfade die BEIDES brauchen (PUBG + Steam zusammen).
 _TOOLS_BOTH = {"tools/achievement-browser.html"}

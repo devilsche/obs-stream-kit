@@ -59,6 +59,11 @@ TOOLS = [
      "desc": "Full-screen browser through all Steam + PUBG achievements. Click a tile to re-trigger the popup.",
      "path": "tools/achievement-browser.html",
      "admin_only": False},
+    {"key": "pumpkin-turn",
+     "label": "Pumpkin turn preview",
+     "desc": "Tune how the autumn pumpkins turn, roll and light up at night.",
+     "path": "tools/pumpkin-turn.html",
+     "admin_only": True},
     {"key": "theme-preview",
      "label": "Theme Preview",
      "desc": "Preview of the medieval themes on example components — colours, type, shape, ornaments.",
@@ -757,6 +762,8 @@ def tools_open(key):
                 conn3.close()
     except Exception:                    # kein Token eingerichtet
         widget_token = ""
+    # Vorschau-Tools, die Dateien der Sources laden (/s/__WIDGET_TOKEN__/js/…)
+    html = html.replace("/s/__WIDGET_TOKEN__/", "/s/" + widget_token + "/")
     inject = (
         '<script>\n'
         'window.__SERVE_BASE__ = "/";\n'

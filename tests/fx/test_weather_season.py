@@ -134,3 +134,10 @@ def test_heat_fades_without_sun_faster_when_cold(conn):
     assert advance(conn, 1, 900, "summer", {**W, "temp": 5})["levels"]["heat"] == pytest.approx(40)   # −8 %/min
     # Sonne hält den Strand warm, auch wenn es kühl ist? Nein: unter 15 °C kühlt er trotzdem
     assert advance(conn, 1, 1020, "summer", {**W, "sun": 1, "temp": 5})["levels"]["heat"] == pytest.approx(24)
+
+
+def test_leafstorm_adds_leaves_without_ranking(conn):
+    advance(conn, 1, 0, "autumn", W)
+    r = use(conn, 1, "leafstorm", "Mod", 10)
+    assert r["done"] == 25 and r["level"] == 25
+    assert "autumn" not in load(conn, 1)["top"]

@@ -179,7 +179,7 @@ EFFECTS = {
                      "icicle", "snowball", "celebrate", "setup", "farewell", "xmasdone",
                      "snowboard", "clear", "follow", "whereami",
                      # Herbst, Frühling, Sommer
-                     "pumpkin", "rake", "jump", "sweep", "flower", "water", "weed", "bee",
+                     "pumpkin", "rake", "jump", "sweep", "leafstorm", "flower", "water", "weed", "bee",
                      "castle", "splash", "ice", "fries", "cool", "seasonboard",
                      # Jahreszeit früher starten bzw. zurück zum Kalender
                      "season",

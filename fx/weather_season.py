@@ -18,11 +18,12 @@ import json
 
 TOP = 5
 LEVELS = ("leaves", "water", "weeds", "heat")
-THEME_OF = {"rake": "autumn", "sweep": "autumn", "extinguish": "autumn", "water": "spring", "weed": "spring",
+THEME_OF = {"rake": "autumn", "sweep": "autumn", "leafstorm": "autumn", "extinguish": "autumn", "water": "spring", "weed": "spring",
             "splash": "summer", "cool": "summer"}
 FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
 FIRE_WET_SECS = 8
 FIRE_MAX = 5          # so viele Feuer brennen höchstens gleichzeitig
+LEAFSTORM = 25        # so viel Laub weht der Laubsturm auf den Haufen
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_weather_season (
@@ -167,6 +168,9 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
         done = min(5, lv["leaves"]); lv["leaves"] -= done; key = "leaves"
     elif cmd == "sweep":
         done = lv["leaves"]; lv["leaves"] = 0; key = "leaves"
+    elif cmd == "leafstorm":
+        # Mods: ein Windstoß weht Laub auf den Haufen (+25 %)
+        done = min(LEAFSTORM, 100 - lv["leaves"]); lv["leaves"] += done; key = "leaves"
     elif cmd == "extinguish":
         # löscht das älteste laufende Feuer; ohne Feuer zählt es nicht
         fires = _fires(data, now)
