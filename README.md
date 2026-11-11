@@ -536,7 +536,7 @@ Eine Source für alles; jedes Element einzeln an/aus. Alle Werte stehen im Dashb
 | `cmd=snowfall` / `cmd=snowstop` | Schneefall gezielt an bzw. aus; `cmd=snowfall&secs=120` hört nach 120 s von selbst auf |
 | `cmd=shovel&name=%user%` | −`shovel` %, Schaufel wirft einen Brocken weg, Name kurz sichtbar; zählt für die Rangliste (nur wenn es etwas zu schippen gab). Cooldown pro User in Streamer.bot setzen, z. B. 10 s |
 | `cmd=shake&name=%user%` | einzeln nur ein Wackeln; `shakeneed` verschiedene Leute innerhalb `shakewin` s schütteln den ganzen Schnee ab. Oben zeigt „Shake it off! 3/5“ mit Zeitbalken den Stand. Schneit es noch, schneit es danach wieder zu. `cmd=shake&force=1` schüttelt sofort ab (Dashboard-Knopf, Mod-Befehl) |
-| `cmd=leaders` | Rangliste „Top shovelers“ (Top 5) für 10 s; das Spotlight zeigt den Ersten zwischendurch auch von selbst |
+| `cmd=leaders` | Rangliste „Top shovelers“ (Top 5) für 10 s (Spitzenreiter erscheinen nicht mehr von selbst in der Bildmitte, nur auf Abruf) |
 | `cmd=melt` | Schnee weg, Rangliste bleibt (ein laufender Schneefall geht weiter) |
 | `cmd=clear&kind=snow` | Schnee **und** Rangliste dauerhaft löschen (`cmd=clear` ohne `kind` löscht alles) |
 

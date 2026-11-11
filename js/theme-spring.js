@@ -495,8 +495,6 @@
     setInterval(function () {
       if (!B.on) return;
       spotRound++;
-      var top = S.top[0];
-      if (top && spotRound % 4 === 0) { B.tag('Top gardener: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       if (!B.partOn('meadow')) return;
       var pool = flowers.filter(function (f) { return f && f.label; });
       if (!pool.length) return;

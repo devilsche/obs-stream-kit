@@ -898,9 +898,6 @@
     setInterval(function () {
       if (!B.on) return;
       spotRound++;
-      var top = S.top[0], fireTop = (S.fireTop || [])[0];
-      if (fireTop && spotRound % 8 === 4) { B.tag('Top firefighter: ' + fireTop[0] + ' · ' + fireTop[1] + '×', W / 2, 300, false); return; }
-      if (top && spotRound % 4 === 0) { B.tag('Top raker: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       if (!B.partOn('pumpkins')) return;
       // geplatzte Kürbisse nicht: sonst stünde ein Name über einer leeren Stelle
       var pool = pkNodes.filter(function (pk) { return pk && pk.label && !pk.zap; });

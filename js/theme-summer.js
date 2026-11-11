@@ -1308,8 +1308,6 @@
     setInterval(function () {
       if (!B.on || X.busy()) return;
       spotRound++;
-      var top = S.top[0];
-      if (top && spotRound % 4 === 0) { B.tag('Top cooler: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       var pool = [];
       X.spotPool(pool);
       if (B.partOn('beach') && !X.followersHidden()) {

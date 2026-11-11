@@ -721,8 +721,6 @@
     setInterval(function () {
       if (!S.on || X.busy()) return;
       spotRound++;
-      var top = S.snowTop[0];
-      if (top && spotRound % 4 === 0) { tag('Top shoveler: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       var pool = [];
       X.spotPool(pool);
       if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
