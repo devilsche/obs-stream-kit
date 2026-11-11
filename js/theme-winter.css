@@ -117,17 +117,9 @@
   95%  { transform: rotate(4deg); }
   100% { transform: none; opacity: 1; }
 }
-}
-/* älteste Kugel macht Platz: fällt wie beim Abbau zur Erde, prallt ab, blendet aus */
-.tw-orn-off { animation: twOrnOff 1.4s linear both; }
-@keyframes twOrnOff {
-  0%   { transform: translate(0, 0); opacity: 1; animation-timing-function: cubic-bezier(0.5, 0, 1, 1); }
-  48%  { transform: translate(calc(var(--off-dx) * 0.5), var(--off-fall)); animation-timing-function: cubic-bezier(0, 0, 0.5, 1); }
-  64%  { transform: translate(calc(var(--off-dx) * 0.7), calc(var(--off-fall) * 0.88)); animation-timing-function: cubic-bezier(0.5, 0, 1, 1); }
-  78%  { transform: translate(calc(var(--off-dx) * 0.85), var(--off-fall)); opacity: 1; animation-timing-function: cubic-bezier(0, 0, 0.5, 1); }
-  88%  { transform: translate(calc(var(--off-dx) * 0.93), calc(var(--off-fall) * 0.97)); }
-  100% { transform: translate(var(--off-dx), var(--off-fall)); opacity: 0; }
-}
+/* Scherben einer zerborstenen Kugel (Bewegung per JS in theme-xmas.js) */
+.tw-shard { fill: #e9f2ff; fill-opacity: 0.9; stroke: #6f93bd; stroke-width: 0.8; }
+.tw-shard--gold { fill: #f2c94c; }
 /* neue Kugel: nach der Landung und zwischendurch kurz am Faden schwingen */
 .tw-orn-wig { transform-box: fill-box; transform-origin: 50% 0; animation: twOrnWig 5.2s ease-in-out both; }
 @keyframes twOrnWig {

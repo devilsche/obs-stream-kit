@@ -17,14 +17,6 @@
   function rand(a, b) { return a + Math.random() * (b - a); }
   function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
   function ease(t) { t = clamp01(t); return t * t * (3 - 2 * t); }
-  function outBack(t) { t = clamp01(t); var c = 1.7; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); }
-  function outBounce(t) {
-    t = clamp01(t);
-    if (t < 1 / 2.75) return 7.5625 * t * t;
-    if (t < 2 / 2.75) { t -= 1.5 / 2.75; return 7.5625 * t * t + 0.75; }
-    if (t < 2.5 / 2.75) { t -= 2.25 / 2.75; return 7.5625 * t * t + 0.9375; }
-    t -= 2.625 / 2.75; return 7.5625 * t * t + 0.984375;
-  }
   function el(name, attrs, parent) {
     var e = document.createElementNS(NS, name);
     for (var k in attrs) e.setAttribute(k, attrs[k]);
@@ -320,7 +312,7 @@
       el('circle', { cx: f[0], cy: f[1], r: 13, fill: 'url(#' + pfx + f[2] + ')' }, g);
     });
     var gOrns = el('g', { 'class': 'tw-dim' }, gTree);
-    var STAR = [200, 34];
+    var STAR = [200, 34], GROUND = 505;
     var gStar = el('g', { transform: 'translate(' + STAR[0] + ' ' + STAR[1] + ')' }, gTree);
     el('path', { 'class': 'tw-star-rays', opacity: 0.55, d: 'M0 -62 L5 -8 L62 0 L5 8 L0 62 L-5 8 L-62 0 L-5 -8 Z' }, gStar);
     el('path', { 'class': 'tw-star', d: 'M0 -30 L8.8 -12 L28.5 -9.3 L14.3 4.6 L17.6 24.3 L0 15 L-17.6 24.3 L-14.3 4.6 L-28.5 -9.3 L-8.8 -12 Z' }, gStar);
@@ -379,7 +371,7 @@
       var live = animate && shown() && partOn('tree') && !anim, wait = 0;
       if (orns[i]) {
         // Platz voll: die älteste Kugel fällt wie beim Abbau ab, dann kommt die neue
-        if (live) { dropOff(orns[i]); wait = 1.3; } else gOrns.removeChild(orns[i].outer);
+        if (live && !reduceMotion) { dropOff(orns[i]); wait = 0.9; } else gOrns.removeChild(orns[i].outer);
       }
       var outer = el('g', {}, gOrns);
       var g = el('g', { 'class': 'tw-orn' + (animate ? ' tw-orn--new' : '') }, outer);
@@ -391,9 +383,7 @@
       if (live) {
         // seitlich neben dem Baum einblenden (Seite des Platzes, solange dort
         // Bildschirm frei ist) und in flachem Bogen zum Aufhängepunkt fliegen
-        var leftX = Math.max(-150, (40 - TX) / TK), rightX = Math.min(550, (1880 - TX) / TK);
-        var fromX = s[0] >= STAR[0] && rightX - s[0] > 140 ? rightX : (s[0] - leftX > 140 ? leftX : rightX);
-        g.style.setProperty('--orn-fx', f1(fromX - s[0]) + 'px');
+        g.style.setProperty('--orn-fx', f1(sideFrom(s[0]) - s[0]) + 'px');
         g.style.setProperty('--orn-fy', '-80px');
         g.style.setProperty('--orn-wait', wait + 's');
         sparkle(s[0], s[1], wait);
@@ -406,17 +396,76 @@
         }, (wait + 1.4) * 1000);
       }
     }
-    // wie renderFarewell: zur Erde fallen, abprallen, ausblenden
+    // Startpunkt des Einflugs: neben dem Baum auf der Seite des Platzes,
+    // solange dort Bildschirm frei ist
+    function sideFrom(x) {
+      var leftX = Math.max(-150, (40 - TX) / TK), rightX = Math.min(550, (1880 - TX) / TK);
+      return x >= STAR[0] && rightX - x > 140 ? rightX : (x - leftX > 140 ? leftX : rightX);
+    }
+    // Einflug als Pose zum Fortschritt k (0..1): flacher Bogen von der Seite,
+    // groß am Anfang, schrumpft auf Baumgröße (für den Aufbau; per Attribut,
+    // läuft damit auch in OBS)
+    function flyPose(node, x, y, k) {
+      if (k <= 0) { node.setAttribute('opacity', '0'); return; }
+      node.setAttribute('opacity', clamp01(k * 6).toFixed(3));
+      if (reduceMotion || k >= 1) { node.removeAttribute('transform'); return; }
+      var fx = sideFrom(x) - x, fy = -80, e = ease(k), u = 1 - e;
+      var px = u * u * fx + 2 * u * e * fx * 0.4, py = u * u * fy + 2 * u * e * fy * 1.8;
+      var sc = 1 + 1.5 * (1 - ease((k - 0.4) / 0.6)), hy = y - 13;
+      node.setAttribute('transform', 'translate(' + f1(px + x) + ' ' + f1(py + hy) + ') scale(' + sc.toFixed(3) + ') translate(' + f1(-x) + ' ' + f1(-hy) + ')');
+    }
+    // kleine Effekte, die X.step jeden Frame weiterrechnet (false = fertig)
+    var effects = [];
+    function runEffects(dt) {
+      // was ein Effekt unterwegs neu anlegt (Fall → Scherben), landet in der neuen Liste
+      var cur = effects;
+      effects = [];
+      effects = cur.filter(function (f) { return f(dt) !== false; }).concat(effects);
+    }
+    // älteste Kugel macht Platz: fällt zur Erde und zerbirst dort
     function dropOff(o) {
-      var n = o.outer;
-      n.style.setProperty('--off-dx', f1(rand(-25, 25)) + 'px');
-      n.style.setProperty('--off-fall', f1(Math.max(30, 505 - o.y)) + 'px');
-      n.classList.add('tw-orn-off');
-      setTimeout(function () { if (n.parentNode) n.parentNode.removeChild(n); }, 1500);
+      var n = o.outer, t = 0, T = 0.55, dx = rand(-25, 25), fall = Math.max(30, GROUND - o.y);
+      effects.push(function (dt) {
+        t += dt;
+        var k = clamp01(t / T);
+        n.setAttribute('transform', 'translate(' + f1(dx * k) + ' ' + f1(fall * k * k) + ')');
+        if (k < 1) return true;
+        if (n.parentNode) n.parentNode.removeChild(n);
+        shatter(o.x + dx, GROUND);
+        return false;
+      });
+    }
+    // Scherben springen am Boden auseinander und blenden aus
+    function shatter(x, y) {
+      if (reduceMotion) return;
+      var g = el('g', {}, gShards), parts = [];
+      for (var k = 0; k < 10; k++) {
+        var r = rand(6, 11);
+        var p = el('path', { 'class': 'tw-shard' + (k % 3 === 0 ? ' tw-shard--gold' : ''),
+                             d: 'M0 ' + f1(-r) + ' L' + f1(r * 0.8) + ' ' + f1(r * 0.5) + ' L' + f1(-r * 0.6) + ' ' + f1(r * 0.7) + ' Z',
+                             transform: 'translate(' + f1(x) + ' ' + f1(y) + ')' }, g);
+        parts.push({ n: p, x: 0, y: 0, vx: rand(-110, 110), vy: rand(-170, -60), r: rand(0, 360), vr: rand(-500, 500) });
+      }
+      var t = 0;
+      effects.push(function (dt) {
+        t += dt;
+        var op = 1 - clamp01((t - 0.6) / 0.7);
+        parts.forEach(function (q) {
+          q.vy += 460 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.r += q.vr * dt;
+          if (q.y > 0) { q.y = 0; q.vy *= -0.3; q.vx *= 0.6; q.vr *= 0.5; }
+          q.n.setAttribute('transform', 'translate(' + f1(x + q.x) + ' ' + f1(y + q.y) + ') rotate(' + f1(q.r) + ')');
+        });
+        g.setAttribute('opacity', op.toFixed(3));
+        if (t < 1.3) return true;
+        if (g.parentNode) g.parentNode.removeChild(g);
+        return false;
+      });
     }
     // Lichtkranz + Funken um die neue Kugel, kommen nach der Landung
     // Kranz hinter den Kugeln, Funken davor
     var gHalos = gTree.insertBefore(el('g', {}), gOrns), gSparks = el('g', {}, gTree);
+    // Scherben über dem Hügel am Fuß, sonst verdeckt er sie
+    var gShards = el('g', {}, gTreeShk);
     function sparkle(x, y, wait) {
       var h = el('circle', { 'class': 'tw-orn-halo', cx: f1(x), cy: f1(y - 2), r: 40, fill: 'url(#' + pfx + 'ornHalo)' }, gHalos);
       h.style.setProperty('--orn-wait', wait + 's');
@@ -504,8 +553,8 @@
       setTo(gBaubles, 0, -(1 - kb) * 460, kb);
       var os = anim.orns, n = os.length;
       os.forEach(function (o, i) {
-        var st = 4.5 + 3.6 * i / Math.max(1, n), ko = clamp01((t - st) / 0.5);
-        setTo(o.outer, 0, -(1 - outBack(ko)) * 40, ko);
+        var st = 4.5 + 3.6 * i / Math.max(1, n);
+        flyPose(o.outer, o.x, o.y, clamp01((t - st) / 0.9));
       });
       var gs = anim.gifts, m = gs.length;
       gs.forEach(function (g, j) {
@@ -517,9 +566,14 @@
     function renderFarewell(t) {
       var os = anim.orns, n = os.length;
       os.forEach(function (o, i) {
-        var st = 0.3 + 3.8 * i / Math.max(1, n), kf = clamp01((t - st) / 1.2);
-        var fall = Math.max(30, 505 - o.y);
-        setTo(o.outer, o.dx * kf, outBounce(kf) * fall, 1 - clamp01((kf - 0.65) / 0.35));
+        if (o.broke) return;
+        var st = 0.3 + 3.8 * i / Math.max(1, n), kf = clamp01((t - st) / 0.55);
+        var fall = Math.max(30, GROUND - o.y);
+        if (kf < 1) { setTo(o.outer, o.dx * kf, kf * kf * fall, 1); return; }
+        // am Boden zerbersten (nur frisch, nicht beim Nachladen mitten in der Animation)
+        o.broke = true;
+        setTo(o.outer, 0, 0, 0);
+        if (t - st - 0.55 < 0.3) shatter(o.x + o.dx, GROUND);
       });
       lightAt(topBulbs.concat(treeBulbs), t, 4.3, 2, true);
       setTo(gLights, 0, 0, 1 - clamp01((t - 7.5) / 1.5));
@@ -551,7 +605,7 @@
       anim.gifts = orderedGifts();
       if (anim.type === 'farewell') {
         anim.orns.reverse();           // neueste fallen zuerst
-        anim.orns.forEach(function (o) { o.dx = rand(-25, 25); });
+        anim.orns.forEach(function (o) { o.dx = rand(-25, 25); o.broke = false; });
       }
     }
     function start(type, done) {
@@ -634,6 +688,7 @@
         if (partOn('gifts')) gifts.forEach(function (g) { if (g && g.label) pool.push({ node: g.inner, label: g.label, p: toScreen(g.x, g.y) }); });
       },
       step: function (dt) {
+        if (effects.length) runEffects(dt);
         if (!anim) return;
         anim.t += dt;
         (anim.type === 'setup' ? renderSetup : renderFarewell)(Math.min(anim.t, anim.dur));
