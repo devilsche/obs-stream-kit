@@ -144,21 +144,28 @@
 .ta-pk.is-dim .ta-pk-light { animation: taGlowOut 2s ease forwards; }
 @keyframes taFaceOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes taGlowOut { from { opacity: 0.3; } to { opacity: 0; } }
-/* manche drehen sich wie ein Ball: der Umriss bleibt, Gesicht und Rippen kommen
-   von der Seite herum (dort schmal und blass, zur Mitte hin voll) */
+/* manche drehen sich wie ein Ball: der Umriss bleibt, Gesicht und Rippen laufen
+   auf der Kugel herum (Seitenposition nach sin, Breite nach cos des Drehwinkels),
+   das Gesicht kommt vom linken Rand ohne Aufblenden in die Mitte */
 .ta-pk.is-turn .ta-pk-face, .ta-pk.is-turn .ta-pk-rib { transform-box: fill-box; transform-origin: 50% 50%; }
-.ta-pk.is-turn .ta-pk-face { animation: taFaceSpinIn 1.2s cubic-bezier(0.3, 0.6, 0.3, 1) both; }
-.ta-pk.is-turn .ta-pk-rib { animation: taRibSpin 1.2s ease-in-out both; }
+.ta-pk.is-turn .ta-pk-face { opacity: 1; transition: none; animation: taFaceSpinIn 1.4s cubic-bezier(0.25, 0.4, 0.35, 1) both; }
+.ta-pk.is-turn .ta-pk-rib { animation: taRibSpin 0.7s linear 2; }
 @keyframes taFaceSpinIn {
-  0% { transform: translateX(-34px) scaleX(0.1); opacity: 0; }
-  35% { transform: translateX(-24px) scaleX(0.45); opacity: 0.55; }
-  100% { transform: translateX(0) scaleX(1); opacity: 1; }
+  0% { transform: translateX(-32.0px) scaleX(0.04); }
+  15% { transform: translateX(-30.9px) scaleX(0.26); }
+  30% { transform: translateX(-27.7px) scaleX(0.50); }
+  45% { transform: translateX(-22.6px) scaleX(0.71); }
+  60% { transform: translateX(-16.0px) scaleX(0.87); }
+  75% { transform: translateX(-8.8px) scaleX(0.96); }
+  100% { transform: translateX(0.0px) scaleX(1.00); }
 }
 @keyframes taRibSpin {
-  0% { transform: translateX(0) scaleX(1); opacity: 1; }
-  45% { transform: translateX(16px) scaleX(0.5); opacity: 0.3; }
-  55% { transform: translateX(-16px) scaleX(0.5); opacity: 0.3; }
-  100% { transform: translateX(0) scaleX(1); opacity: 1; }
+  0% { transform: translateX(0.0px) scaleX(1.00); }
+  25% { transform: translateX(6.7px) scaleX(0.93); }
+  50% { transform: translateX(12.7px) scaleX(0.71); }
+  50.1% { transform: translateX(-12.7px) scaleX(0.71); }
+  75% { transform: translateX(-6.7px) scaleX(0.93); }
+  100% { transform: translateX(0.0px) scaleX(1.00); }
 }
 /* … oder rollen weg und kommen mit Gesicht von derselben Kante zurück */
 .ta-pk.is-rollin .ta-pk-inner { transform-origin: 50% 50%; animation: taPkRollIn 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
