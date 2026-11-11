@@ -463,6 +463,7 @@
       var SEASON_OF_CMD = { rake: 'autumn', jump: 'autumn', sweep: 'autumn', leafstorm: 'autumn',
                             water: 'spring', weed: 'spring', bee: 'spring',
                             splash: 'summer', ice: 'summer', cool: 'summer', fries: 'summer' };
+      var FOLLOW_DELAY = 5000;
       function allThemes(fn) {
         fn(theme);
         Object.keys(seasons).forEach(function (n) { fn(seasons[n]); });
@@ -500,14 +501,16 @@
             kit.spectacle(p.type || randomShow());
             break;
           // Follower: an alle Themen, jedes legt ihn in seiner Form an
-          // (animiert nur das sichtbare); alte Einzelbefehle wirken gleich
+          // (animiert nur das sichtbare); alte Einzelbefehle wirken gleich.
+          // Erst 5 s später: zuerst schaut jeder auf den Follow-Alert in der
+          // Mitte, danach soll der Wechsel am Rand nicht übersehen werden
           case 'follow':
           case 'ornament':
           case 'mini':
           case 'pumpkin':
           case 'flower':
           case 'castle':
-            allThemes(function (t) { t.command('follow', p); });
+            setTimeout(function () { allThemes(function (t) { t.command('follow', p); }); }, FOLLOW_DELAY);
             break;
           // Sub-Projekt: Stand gilt für alle Jahreszeiten
           case 'build':
