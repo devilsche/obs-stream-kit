@@ -519,12 +519,13 @@
             theme.command('gift', p);
             seasons.summer.command('gift', p);
             break;
-          // Winter-Thema
+          // Winter-Thema: nur wenn der Winter zu sehen ist, sonst stünde
+          // z. B. „… threw a snowball!“ ohne Schneeball im Herbst
           case 'shovel':
           case 'icicle':
           case 'snowball':
           case 'snowboard':
-            theme.command(c.cmd, p);
+            if (lastTheme === 'winter') theme.command(c.cmd, p);
             break;
           // gemeinsam: an das aktive Thema
           case 'celebrate':

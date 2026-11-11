@@ -236,19 +236,33 @@
     }
 
     // ── Kürbisse: 12 Plätze, abwechselnd links/rechts von der Ecke nach innen ──
-    var PK_X = [];
-    for (var pi = 0; pi < MAX_PK / 2; pi++) { PK_X.push(64 + pi * 82); PK_X.push(W - 64 - pi * 82); }
+    // Je Seite von außen nach innen: Tiefe 0 = vorn am unteren Laubrand,
+    // 1 = hinten oben auf dem Laub; dazwischen anteilig. Je höher das Laub,
+    // desto weiter rücken sie auseinander, bei flachem Laub steht mal einer
+    // halb vor dem Nachbarn (PK_SHIFT schiebt ihn seitlich heran)
+    var PK_DEPTH = [1, 0.5, 0.2, 0.85, 0.35, 0.65], PK_SHIFT = [0, 0, 30, 0, -24, 0];
+    var PK_X = [], PK_D = [];
+    for (var pi = 0; pi < MAX_PK / 2; pi++) {
+      PK_X.push(64 + pi * 82 + PK_SHIFT[pi]); PK_X.push(W - 64 - pi * 82 - PK_SHIFT[pi]);
+      PK_D.push(PK_DEPTH[pi]); PK_D.push(PK_DEPTH[pi]);
+    }
+    // Fußpunkt bei Tiefe d: zwischen unterem Rand und Laub-Oberkante
+    function pkFootY(x, d, l) {
+      var front = H - 6, top = Math.min(front, surface(x, l) + 10);
+      return front - d * (front - top);
+    }
     var pkNodes = [], pkNext = 0, pkTotal = 0, pkGen = 0;
     // Je Platz feste Streuung: Sorte (Farbe), Form, Neigung und Tiefe –
     // hinten kleiner, höher und dunkler, damit der Haufen räumlich wirkt
-    function pkRand(slot, s) { var v = Math.sin(slot * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); }
     function buildPumpkin(name, slot, animate) {
       // Tiefe gehört zum Platz, Aussehen (Sorte, Größe, Form, Neigung) zum Namen
-      var depth = pkRand(slot, 3), nr = function (s) { return TS.nameRand(name, s); };
+      var depth = PK_D[slot] === undefined ? 0.5 : PK_D[slot], nr = function (s) { return TS.nameRand(name, s); };
       var scale = (0.68 + nr(1) * 0.3) * (1 - 0.22 * depth);
       var wide = nr(2), sx = scale * (0.86 + 0.34 * wide), sy = scale * (1.12 - 0.28 * wide);
       var tilt = (nr(3) - 0.5) * 14;
       var g = el('g', { 'class': 'ta-pk ta-pk--c' + (1 + Math.floor(nr(4) * 5)) + (animate ? ' ta-pk--new' : '') });
+      // danach weg, sonst spielt ein späterer Scheinwerfer das Herunterfallen erneut ab
+      if (animate) setTimeout(function () { g.classList.remove('ta-pk--new'); }, 1200);
       // Zwischenebene zum Anheben/Aufschwimmen (Fuß bei 0/0)
       var lift = el('g', {}, g);
       var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
@@ -265,14 +279,14 @@
       el('path', { 'class': 'ts-cap', d: 'M-40 -45 Q-37 -64 -18 -63 Q0 -68 18 -63 Q37 -64 40 -45 Q20 -54 0 -52 Q-20 -54 -40 -45 Z' }, body);
       el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
       el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
-      return { node: g, inner: inner, lift: lift, label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: -26 * depth,
+      return { node: g, inner: inner, lift: lift, label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: 0, depth: depth,
                ly: 0, lx: 0, rot: 0, vy: 0, mode: null, shown: '' };
     }
     function placePumpkins() {
       var l = lvl();
       pkNodes.forEach(function (pk) {
         if (!pk) return;
-        pk.y = Math.min(H - 6, surface(pk.x, l) + 10) + pk.dy;
+        pk.y = pkFootY(pk.x, pk.depth, l);
         pk.node.setAttribute('transform', 'translate(' + pk.x + ' ' + f1(pk.y) + ')');
       });
     }
@@ -367,7 +381,7 @@
     function visitPumpkin(name) {
       var slot = Math.floor(Math.random() * MAX_PK), v = buildPumpkin(name, slot, false);
       v.x = PK_X[slot] + (slot % 2 ? -41 : 41);
-      var y = Math.min(H - 6, surface(v.x) + 10) + 8;
+      var y = pkFootY(v.x, 0.15);
       v.node.setAttribute('transform', 'translate(' + v.x + ' ' + y.toFixed(1) + ')');
       if (pkLit) v.node.classList.add('is-lit');
       gPumpkins.appendChild(v.node);

@@ -45,14 +45,15 @@
 
   // ── Schneemann links, Minis dazwischen (Mitte unten bleibt frei) ──
   var SM_X = 250, SM_K = 0.85;
-  // Plätze: [x, Maßstab, Höhenversatz, Neigung]; Größe, Tiefe und Versatz je
-  // Platz fest gestreut (kein Springen beim Neuladen), hinten kleiner und höher
+  // Plätze: [x, Maßstab, Tiefe 0..1, Neigung]; Größe, Tiefe und Versatz je
+  // Platz fest gestreut (kein Springen beim Neuladen), hinten kleiner; die
+  // Tiefe wird mit der Schneedecke zur Höhe (miniFoot)
   function hash(i, s) { var v = Math.sin(i * 127.1 + s * 311.7) * 43758.5453; return v - Math.floor(v); }
   function slot(x, n, back) {
     var size = 0.62 + 0.5 * hash(n, 1);
     var depth = back ? 0.45 + 0.55 * hash(n, 2) : 0.4 * hash(n, 2);
     return [Math.round(x + (hash(n, 3) - 0.5) * 30), +(size * (1 - 0.28 * depth)).toFixed(2),
-            Math.round(10 - 36 * depth), Math.round((hash(n, 4) - 0.5) * 12)];
+            +depth.toFixed(2), Math.round((hash(n, 4) - 0.5) * 12)];
   }
   var MINI_SLOTS = (function () {
     var front = [], back = [], i;
@@ -282,10 +283,12 @@
       var slot = MINI_SLOTS[i];
       // nach Tiefe einsortieren: wer höher steht (weiter hinten), liegt dahinter
       var outer = el('g', {}), before = null;
-      outer.twDy = slot[2];
-      for (var c = gMinis.firstChild; c; c = c.nextSibling) if (c !== outer && c.twDy > slot[2]) { before = c; break; }
+      outer.twDepth = slot[2];
+      for (var c = gMinis.firstChild; c; c = c.nextSibling) if (c !== outer && c.twDepth < slot[2]) { before = c; break; }
       gMinis.insertBefore(outer, before);
       var g = el('g', { 'class': 'tw-mini' + (animate ? ' tw-mini--new' : '') }, outer);
+      // danach weg, sonst spielt ein späterer Scheinwerfer das Aufploppen erneut ab
+      if (animate) setTimeout(function () { g.classList.remove('tw-mini--new'); }, 1100);
       el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -20, r: 22 }, g);
       el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -54, r: 15 }, g);
       el('circle', { 'class': 'tw-sm-coal', cx: -5, cy: -57, r: 2.4 }, g);
@@ -295,7 +298,7 @@
       el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, g);
       // Schneehügel vor dem Mini (Sturm, Lawine)
       var mound = el('path', { 'class': 'tw-mini__mound' }, outer);
-      minis[i] = { outer: outer, inner: g, mound: mound, x: slot[0], k: slot[1], dy: slot[2], rot: slot[3], label: name,
+      minis[i] = { outer: outer, inner: g, mound: mound, x: slot[0], k: slot[1], depth: slot[2], rot: slot[3], label: name,
                    bz: 0, av: 0, avAt: null, avHold: 0, wait: null, shown: -1 };
       placeMini(minis[i]);
       if (animate && S.on && partOn('minis')) tag(name, slot[0], miniTop(minis[i]));
@@ -309,14 +312,17 @@
       var v = minis[i];
       minis[i] = keep;
       v.x += v.x < W / 2 ? 34 : -34;
-      v.dy += 6;
+      v.depth = Math.max(0, v.depth - 0.25);
       placeMini(v);
       root.ThemeSeasons.visit(v.outer, { x: v.x, top: miniTop(v), r: 22 * v.k, roll: true,
         arrive: function () { if (SK) SK.hop(v.inner); tag(name + ' drops by!', v.x, miniTop(v) - 12, true); } });
     }
-    function miniTop(m) { return surface(m.x) + m.dy - 110 * m.k; }
+    // Fuß bei Tiefe 0 vorn am unteren Rand, bei 1 oben auf der Schneedecke;
+    // je höher der Schnee, desto weiter stehen vorn und hinten auseinander
+    function miniFoot(m) { return H - 4 - m.depth * Math.max(22, H - surface(m.x)); }
+    function miniTop(m) { return miniFoot(m) - 110 * m.k; }
     function placeMini(m) {
-      m.outer.setAttribute('transform', 'translate(' + m.x + ' ' + f1(surface(m.x) + m.dy) + ') rotate(' + m.rot +
+      m.outer.setAttribute('transform', 'translate(' + m.x + ' ' + f1(miniFoot(m)) + ') rotate(' + m.rot +
                            ') scale(' + m.k + ')');
     }
     function placeSnowman() {
@@ -572,7 +578,7 @@
       m.mound.setAttribute('d', b < 0.02 ? '' : moundPath(b));
     }
     function digPuff(m) {
-      var base = surface(m.x) + m.dy;
+      var base = miniFoot(m);
       for (var i = 0; i < 12; i++) {
         addP({ x: m.x + rand(-20, 20) * m.k, y: base - rand(20, 70) * m.k, vx: rand(-220, 220), vy: rand(-420, -150),
                term: 500, sway: 0, r: rand(2, 5), life: 1.2, floor: surface, draw: flake });
@@ -588,7 +594,7 @@
         if (!best || Math.abs(m.x - p.x) < Math.abs(best.x - p.x)) best = m;
       });
       if (!best || Math.random() < 0.65) return;   // nicht jeder Blitz trifft
-      var m = best, cy = surface(m.x) + m.dy - 40 * m.k;
+      var m = best, cy = miniFoot(m) - 40 * m.k;
       if (p.ground) p.ground(m.x, cy);
       m.zap = true;
       m.outer.dataset.zap = '1';

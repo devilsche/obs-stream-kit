@@ -311,6 +311,7 @@
       // Zwischenebene fürs Zusammensacken (Fuß bei 0/0), darin die Burg mit ihren CSS-Animationen
       var slump = el('g', {}, outer);
       var g = el('g', { 'class': 'tss-castle-g tss-tone' + tone + (animate ? ' tss-castle-g--new' : '') }, slump);
+      if (animate) setTimeout(function () { g.classList.remove('tss-castle-g--new'); }, 1300);
       var body = el('g', mirror ? { transform: 'scale(-1 1)' } : {}, g);
       var info = CASTLE_BUILD[form](body);
       var px = mirror ? -info.pole[0] : info.pole[0];

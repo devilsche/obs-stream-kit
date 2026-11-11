@@ -201,6 +201,9 @@
 .tw-minis { opacity: 1; transition: opacity 1s ease; }
 .tw[data-hidemini="1"] .tw-minis { opacity: 0; visibility: hidden; transition: opacity 1s ease, visibility 0s linear 1s; }
 .tw-mini { transform-box: fill-box; transform-origin: 50% 100%; }
+/* Scheinwerfer: Mini hebt sich etwas an und wackelt (skLift aus season-kit.css) */
+.tw .tw-mini.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both, skLift 3.2s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) { .tw .tw-mini.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both; } }
 /* vom Blitz getroffen: weg, bis er nachwächst */
 .tw-minis > g[data-zap="1"] { visibility: hidden; }
 /* Windhose zieht durchs Bild: die Minis zittern */

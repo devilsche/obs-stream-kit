@@ -38,6 +38,26 @@ html, body {
 /* !whereiam: zum Scheinwerfer dreimal hochhüpfen (Fuß bleibt unten) */
 .is-spot.is-hop { animation: spot 3.2s ease-in-out both, skHop 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) 3;
                   transform-box: fill-box; transform-origin: 50% 100%; }
+/* Scheinwerfer: Figur hebt sich etwas an, wackelt und setzt sich wieder
+   (Kürbis, Mini); Blütenkopf nickt; Burg wackelt nur (Regeln in den Theme-CSS) */
+@keyframes skLift {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  16%, 80% { transform: translateY(-18px) rotate(0); }
+  28% { transform: translateY(-18px) rotate(-7deg); }
+  40% { transform: translateY(-18px) rotate(6deg); }
+  52% { transform: translateY(-18px) rotate(-4deg); }
+  63% { transform: translateY(-18px) rotate(2deg); }
+}
+@keyframes skNod {
+  0%, 100% { transform: rotate(0) scale(1); }
+  15%, 75% { transform: scale(1.12); }
+  27% { transform: rotate(-14deg) scale(1.12); } 39% { transform: rotate(12deg) scale(1.12); }
+  51% { transform: rotate(-7deg) scale(1.12); } 62% { transform: rotate(3deg) scale(1.12); }
+}
+@keyframes skWiggle {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-3deg); } 35% { transform: rotate(3deg); } 50% { transform: rotate(-2deg); } 65% { transform: rotate(1deg); } 80% { transform: rotate(0); }
+}
 @keyframes skHop { 0%, 100% { transform: translateY(0); } 45% { transform: translateY(-36px) scaleY(1.05); } }
 @media (prefers-reduced-motion: reduce) { .is-spot.is-hop { animation: spot 3.2s ease-in-out both; } }
 @keyframes spot {

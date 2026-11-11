@@ -127,6 +127,7 @@
       // Zwischenebene zum Biegen/Umknicken (Fuß bei 0/0)
       var bend = el('g', {}, outer);
       var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, bend);
+      if (animate) setTimeout(function () { grow.classList.remove('tsp-grow--new'); }, 2600);
       el('path', { 'class': 'tsp-stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
       el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
       if (fr(5) < 0.45) el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.6) + ' Q' + (lean * 3) + ' ' + (-h * 0.72) + ' ' + (lean * 3.4) + ' ' + (-h * 0.85) + ' Q' + (lean * 0.8) + ' ' + (-h * 0.72) + ' 0 ' + (-h * 0.6) + ' Z' }, grow);

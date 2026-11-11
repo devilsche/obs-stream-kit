@@ -333,6 +333,14 @@
 @keyframes tssFlutter { 0%, 100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(8deg) scaleX(0.85); } }
 .tss-f1 { fill: #e84a5f; } .tss-f2 { fill: #2a9df4; } .tss-f3 { fill: #f2b705; } .tss-f4 { fill: #8e4bb8; } .tss-f5 { fill: #2ec27e; }
 .tss-castle-g { transform-box: fill-box; transform-origin: 50% 100%; }
+/* Scheinwerfer: Kürbis hebt sich und wackelt, Blüte nickt, Burg wackelt (Keyframes in season-kit.css) */
+.ta-pk .ta-pk-inner.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both, skLift 3.2s ease-in-out both; }
+.tsp-head.is-spot:not(.is-hop) .tsp-bloom { animation: skNod 3.2s ease-in-out both; }
+.tss-castle-g.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both, skWiggle 3.2s ease-in-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .ta-pk .ta-pk-inner.is-spot:not(.is-hop), .tss-castle-g.is-spot:not(.is-hop) { animation: spot 3.2s ease-in-out both; }
+  .tsp-head.is-spot:not(.is-hop) .tsp-bloom { animation: none; }
+}
 .tss-castle-g--new { animation: tssRise 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 @keyframes tssRise { from { transform: scaleY(0); } to { transform: none; } }
 .ts[data-celebrate="1"] .tss-castle-g { animation: tsHop 0.35s ease-in-out 4; }
