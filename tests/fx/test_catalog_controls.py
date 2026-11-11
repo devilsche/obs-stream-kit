@@ -34,17 +34,20 @@ def test_weather_has_controls_and_live_keys():
         "cmd=auto", "cmd=weather&to=clear", "cmd=weather&to=rain",
         "cmd=weather&to=storm", "cmd=weather&to=snow",
         "cmd=weather&to=blizzard", "cmd=weather&to=fog",
+        "cmd=weather&to=cloudy", "cmd=weather&to=drizzle", "cmd=weather&to=sleet", "cmd=weather&to=heat",
         "cmd=weather&to=day", "cmd=weather&to=dawn", "cmd=weather&to=dusk", "cmd=weather&to=night",
+        "cmd=season&to=winter", "cmd=season&to=spring", "cmd=season&to=summer", "cmd=season&to=autumn",
+        "cmd=season&to=next", "cmd=season&to=auto",
         "cmd=strike", "cmd=gust",
         "cmd=spectacle&type=tsunami", "cmd=spectacle&type=megabolt",
         "cmd=spectacle&type=ballbolt", "cmd=spectacle&type=avalanche",
         "cmd=spectacle&type=aurora", "cmd=spectacle&type=rainbow", "cmd=spectacle&type=hail",
-        "cmd=spectacle&type=meteors", "cmd=spectacle&type=tornado", "cmd=spectacle&type=fogwall",
-        "cmd=scrape", "cmd=warm", "cmd=frostclear", "cmd=leaders",
-        "cmd=setup", "cmd=farewell", "cmd=season&to=next", "cmd=season&to=auto", "cmd=build", "cmd=snowmanreset", "cmd=celebrate", "cmd=shovel", "cmd=shake&force=1",
+        "cmd=spectacle&type=meteors", "cmd=spectacle&type=tornado", "cmd=spectacle&type=fogwall", "cmd=spectacle",
+        "cmd=scrape", "cmd=warm", "cmd=frostclear", "cmd=leaders", "cmd=frostreset",
+        "cmd=setup", "cmd=farewell", "cmd=build", "cmd=snowmanreset", "cmd=celebrate", "cmd=shovel", "cmd=shake&force=1",
         "cmd=icicle", "cmd=snowball", "cmd=snowboard",
         "cmd=rake", "cmd=jump", "cmd=extinguish", "cmd=sweep", "cmd=water", "cmd=weed&force=1", "cmd=bee",
-        "cmd=splash", "cmd=ice", "cmd=cool", "cmd=celebrate", "cmd=seasonboard"]
+        "cmd=splash", "cmd=ice", "cmd=fries", "cmd=cool", "cmd=celebrate", "cmd=seasonboard"]
     assert {"mood", "kdlow", "kdhigh", "kdtest", "fallback", "lock", "veil"} <= set(src["live"])
     for c in src["commands"]:
         commands.parse("weather", dict(parse_qsl(c["q"])))
