@@ -60,3 +60,10 @@ def test_top_and_tip():
     assert wc.top_say("autumn", [["Tim", 12]]).startswith("Top-Laubrecher: Tim mit 12×")
     assert wc.top_say("autumn", []) == ""
     assert "!" in wc.tip_say("summer", rnd=random.Random(0))
+
+
+def test_weather_say_live_from_place_and_override():
+    st = {"kind": "rain", "temp": 3.2, "theme": "autumn", "seasonLevels": {"leaves": 15}}
+    assert wc.weather_say(st, "Berlin, Land Berlin, DE") == "Live aus Berlin: Regen, 3 °C, der Laubhaufen liegt 15 % hoch."
+    st["source"], st["kind"] = "override", "storm"
+    assert wc.weather_say(st, "Berlin") == "Live aus Berlin: 3 °C. Im Bild gerade: Gewitter (vom Chat bestellt), der Laubhaufen liegt 15 % hoch."

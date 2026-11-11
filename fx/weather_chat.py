@@ -126,14 +126,19 @@ LEVEL_SAY = {"autumn": ("leaves", "der Laubhaufen liegt {v} % hoch"),
              "summer": ("heat", "der Strand ist {v} % heiß")}
 
 
-def weather_say(state: dict) -> str:
+def weather_say(state: dict, place: str = "") -> str:
+    """place: Ortsname aus der Overlay-URL („Berlin, Land Berlin, DE“ → „Berlin“)."""
+    town = (place or "").split(",")[0].strip()
     kind = state.get("kind") or "clear"
-    parts = [KIND_SAY.get(kind, kind)]
-    if isinstance(state.get("temp"), (int, float)):
-        parts.append(f"{round(state['temp'])} °C")
-    text = "Wetter gerade: " + ", ".join(parts)
+    temp = f"{round(state['temp'])} °C" if isinstance(state.get("temp"), (int, float)) else ""
+    look = KIND_SAY.get(kind, kind)
     if state.get("source") == "override":
-        text += " (vom Chat bestellt)"
+        live = f"Live aus {town}: {temp}. " if town and temp else ""
+        text = f"{live}Im Bild gerade: {look} (vom Chat bestellt)"
+    elif town:
+        text = f"Live aus {town}: " + ", ".join(x for x in (look, temp) if x)
+    else:
+        text = "Wetter gerade: " + ", ".join(x for x in (look, temp) if x)
     theme = state.get("theme")
     lv = state.get("seasonLevels") or {}
     if theme in LEVEL_SAY and isinstance(lv.get(LEVEL_SAY[theme][0]), (int, float)):

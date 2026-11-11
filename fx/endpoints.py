@@ -269,7 +269,7 @@ def weather_info_route(token):
             if theme == "winter":
                 return weather_chat.top_say(theme, weather_snow.load(conn, g.tenant_id)["top"])
             return weather_chat.top_say(theme, weather_season.load(conn, g.tenant_id)["top"].get(theme, []))
-        says = {"weather": lambda: weather_chat.weather_say(state),
+        says = {"weather": lambda: weather_chat.weather_say(state, opts.get("place", "")),
                 "project": lambda: weather_chat.project_say(theme, _project_stage(conn, g.tenant_id)),
                 "top": top, "tip": lambda: weather_chat.tip_say(theme)}
         if what == "rotate":
