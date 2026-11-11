@@ -67,3 +67,7 @@ def test_weather_say_live_from_place_and_override():
     assert wc.weather_say(st, "Berlin, Land Berlin, DE") == "Live aus Berlin: Regen, 3 °C, der Laubhaufen liegt 15 % hoch."
     st["source"], st["kind"] = "override", "storm"
     assert wc.weather_say(st, "Berlin") == "Live aus Berlin: 3 °C. Im Bild gerade: Gewitter (vom Chat bestellt), der Laubhaufen liegt 15 % hoch."
+
+
+def test_weather_say_skips_empty_level():
+    assert wc.weather_say({"kind": "cloudy", "temp": 3, "theme": "winter", "snowCover": 0}, "Berlin") == "Live aus Berlin: bewölkt, 3 °C."

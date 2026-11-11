@@ -141,9 +141,10 @@ def weather_say(state: dict, place: str = "") -> str:
         text = "Wetter gerade: " + ", ".join(x for x in (look, temp) if x)
     theme = state.get("theme")
     lv = state.get("seasonLevels") or {}
-    if theme in LEVEL_SAY and isinstance(lv.get(LEVEL_SAY[theme][0]), (int, float)):
+    # Stand nur nennen, wenn etwas da ist (0 % Schnee klingt seltsam)
+    if theme in LEVEL_SAY and isinstance(lv.get(LEVEL_SAY[theme][0]), (int, float)) and lv[LEVEL_SAY[theme][0]] >= 1:
         text += ", " + LEVEL_SAY[theme][1].format(v=round(lv[LEVEL_SAY[theme][0]]))
-    elif theme == "winter" and isinstance(state.get("snowCover"), (int, float)):
+    elif theme == "winter" and isinstance(state.get("snowCover"), (int, float)) and state["snowCover"] >= 1:
         text += f", die Schneedecke liegt {round(state['snowCover'])} % hoch"
     return text + "."
 
