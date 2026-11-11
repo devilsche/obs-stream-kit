@@ -362,6 +362,17 @@
       sortPumpkins();
       if (animate && B.on && B.partOn('pumpkins')) B.tag(name, pkNodes[i].x, pkNodes[i].y - pkNodes[i].h - 12, false);
     }
+    // Kurzbesuch (!whereiam, nicht im Bild): Kürbis rollt zwischen zwei Plätze, etwas vor die Reihe
+    function visitPumpkin(name) {
+      var slot = Math.floor(Math.random() * MAX_PK), v = buildPumpkin(name, slot, false);
+      v.x = PK_X[slot] + (slot % 2 ? -41 : 41);
+      var y = Math.min(H - 6, surface(v.x) + 10) + 8;
+      v.node.setAttribute('transform', 'translate(' + v.x + ' ' + y.toFixed(1) + ')');
+      if (pkLit) v.node.classList.add('is-lit');
+      gPumpkins.appendChild(v.node);
+      TS.visit(v.node, { x: v.x, top: y - v.h, r: v.h / 2, roll: true,
+        arrive: function () { if (root.SeasonKit) root.SeasonKit.hop(v.inner); B.tag(name + ' drops by!', v.x, y - v.h - 12, true); } });
+    }
     function clearPumpkins() { B.clear(gPumpkins); pkNodes = []; pkNext = 0; pkTotal = 0; pkGen++; }
 
     // ── Vogelscheuche: gemeinsames Sub-Projekt, 8 Teile ──
@@ -945,6 +956,7 @@
             var me = (p.name || '').toLowerCase();
             var pk = pkNodes.filter(function (k) { return k && k.label && !k.zap && k.label.toLowerCase() === me; })[0];
             if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); B.tag(pk.label + ' is right here!', pk.x, pk.y - pk.h - 12, true); }
+            else if (!pk && p.visit && B.on && B.partOn('pumpkins')) visitPumpkin(p.name || '');
             break;
           }
           case 'snowmanreset': scare.reset(B.on); break;

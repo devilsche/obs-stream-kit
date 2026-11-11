@@ -181,6 +181,34 @@ def _no_store(resp):
     return resp
 
 
+def _channel(conn, tenant_id: int) -> str:
+    """Twitch-Kanal des Tenants (Klartext-Spalte), leer wenn unbekannt."""
+    try:
+        row = conn.execute("SELECT twitch_channel FROM tenant_credentials WHERE tenant_id = ?",
+                           (tenant_id,)).fetchone()
+    except Exception:
+        return ""
+    return (row["twitch_channel"] if row else "") or ""
+
+
+def _whereami(cmd) -> dict:
+    """!whereiam: im Bild? Wer nicht im Bild steht, kommt im Overlay kurz vorbei
+    (params.visit); der Streamer selbst ist Gastgeber."""
+    name = cmd["params"].get("name", "")
+    try:
+        pos, channel = _with_conn(lambda conn: (
+            weather_followers.position(conn, g.tenant_id, name) if name else None, _channel(conn, g.tenant_id)))
+    except Exception:
+        log.exception("fx weather: follower position failed")
+        pos, channel = None, ""
+    shown = weather_chat.visible_count(weather_state.LAST_XMAS.get(g.tenant_id, "off"))
+    host = bool(name) and bool(channel) and name.lower() == channel.lower()
+    visible = pos is not None and pos < shown
+    if pos is not None and not visible and not host:
+        cmd["params"]["visit"] = True
+    return {"visible": visible, "say": weather_chat.whereami_say(name, pos, shown, host)}
+
+
 def _with_conn(fn):
     raw = _get_conn()
     conn = raw if isinstance(raw, (sqlite3.Connection, SqliteCompatConn)) else SqliteCompatConn(raw)
@@ -210,17 +238,11 @@ def push(token, effect):
         except Exception:
             log.exception("fx weather: project stage failed")
             before = None
+    if effect == "weather" and cmd["cmd"] == "whereami":
+        extra = _whereami(cmd)
     out = _dispatch(effect, cmd)
     if out.get("duplicate"):
         return _no_store(jsonify(out))
-    if effect == "weather" and cmd["cmd"] == "whereami":
-        name = cmd["params"].get("name", "")
-        try:
-            pos = _with_conn(lambda conn: weather_followers.position(conn, g.tenant_id, name)) if name else None
-        except Exception:
-            log.exception("fx weather: follower position failed")
-            pos = None
-        extra = {"visible": pos is not None and pos < weather_chat.VISIBLE, "say": weather_chat.whereami_say(name, pos)}
     if effect == "weather" and cmd["cmd"] == "build" and before is not None:
         try:
             after = _with_conn(lambda conn: _project_stage(conn, g.tenant_id))

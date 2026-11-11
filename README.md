@@ -432,7 +432,7 @@ Der Strand lässt in der Bildmitte (Lebensbalken) nur einen flachen Streifen fre
 
 | Befehl | Wirkung |
 |--------|---------|
-| `cmd=whereami&name=%user%` | `!whereiam`: die eigene Figur (Kürbis, Blume, Sandburg, Mini oder Kugel) leuchtet im sichtbaren Thema auf und hüpft dreimal („… is right here!“). Antwort `visible` und `say`: ist sie nicht unter den neuesten 12 oder noch kein Follower, steht in `say` ein Satz für den Chat |
+| `cmd=whereami&name=%user%` | `!whereiam`: die eigene Figur (Kürbis, Blume, Sandburg, Mini oder Kugel) leuchtet im sichtbaren Thema auf und hüpft dreimal, eine Kugel am Baum wackelt („… is right here!“). Wer nicht unter den neuesten 12 steht (solange der Weihnachtsbaum steht: 30), bekommt einen **Kurzbesuch**: Kürbis und Mini rollen von der nächsten Kante herein, Blume und Sandburg wachsen auf, am Baum schwebt die Kugel groß daneben; „… drops by!“, nach gut 5 s geht die Figur wieder (rollt hinaus, Krähe bzw. Möwe holt sie, die Kugel fliegt davon). Antwort `visible` und `say`: Satz für den Chat, wenn sie nicht im Bild ist, noch kein Follower ist oder der Streamer selbst fragt (Gastgeber; Kanal aus den Zugangsdaten) |
 | `cmd=follow&name=%user%` | Follow: in alle Themen (Winter: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann; Strand: Kugel am Baum in der Xmas-Zeit, sonst Sandburg) |
 | `cmd=build&name=%user%` | Sub: nächstes Teil des Sub-Projekts (8 Teile, alle Themen) |
 | `cmd=gift&name=%user%&type=sub\|resub\|giftsub\|bits\|raid&amount=…` | Geschenk unter dem Baum |

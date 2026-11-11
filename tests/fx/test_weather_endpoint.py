@@ -5,6 +5,7 @@ import pytest
 from flask import Flask, g
 
 from fx import autumn_db, commands, season_db, weather_api, weather_followers, weather_season, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
+from fx import endpoints
 from fx.endpoints import bp_fx
 
 LOC = {"lat": 50.1109, "lon": 8.6821, "label": "Frankfurt am Main, Hessen, Deutschland"}
@@ -25,6 +26,7 @@ def conn():
     weather_followers.init_schema(c)
     weather_state.LAST_THEME.clear()
     weather_state.LAST_OPTS.clear()
+    weather_state.LAST_XMAS.clear()
     yield c
     c.close()
 
@@ -633,6 +635,7 @@ def test_whereami_says_when_not_visible(conn):
     c = _client(conn)
     r = c.get("/s/t/api/fx/weather?cmd=whereami&name=Nobody").get_json()
     assert r["visible"] is False and "noch nicht" in r["say"]
+    assert "visit" not in commands.poll(1, "weather", 0)["commands"][-1]["params"]
     for i in range(14):
         c.get("/s/t/api/fx/weather?cmd=follow&name=F" + str(i))
     r = c.get("/s/t/api/fx/weather?cmd=whereami&name=f13").get_json()
@@ -641,6 +644,23 @@ def test_whereami_says_when_not_visible(conn):
     assert r["visible"] is False and "neuesten 12" in r["say"]
     cmds = commands.poll(1, "weather", 0)["commands"]
     assert cmds[-1]["cmd"] == "whereami" and cmds[-1]["params"]["name"] == "F0"
+    # nicht im Bild: Kurzbesuch im Overlay
+    assert cmds[-1]["params"]["visit"] is True
+
+
+def test_whereami_counts_tree_and_knows_host(conn, monkeypatch):
+    c = _client(conn)
+    for i in range(14):
+        c.get("/s/t/api/fx/weather?cmd=follow&name=F" + str(i))
+    # Weihnachtsbaum steht: die neuesten 30 hängen als Kugeln
+    weather_state.LAST_XMAS[1] = "on"
+    r = c.get("/s/t/api/fx/weather?cmd=whereami&name=F0").get_json()
+    assert r["visible"] is True and r["say"] == ""
+    weather_state.LAST_XMAS.clear()
+    monkeypatch.setattr(endpoints, "_channel", lambda conn, tid: "LuCKoR_HD")
+    r = c.get("/s/t/api/fx/weather?cmd=whereami&name=luckor_hd").get_json()
+    assert "Gastgeber" in r["say"]
+    assert "visit" not in commands.poll(1, "weather", 0)["commands"][-1]["params"]
 
 
 def test_fog_and_rain_run_together(conn):

@@ -300,6 +300,20 @@
       placeMini(minis[i]);
       if (animate && S.on && partOn('minis')) tag(name, slot[0], miniTop(minis[i]));
     }
+    // Kurzbesuch (!whereiam, nicht im Bild): Mini rollt neben einen Platz, etwas
+    // nach vorn; er gehört keinem Platz (minis bleibt unverändert)
+    function visitMini(name) {
+      if (!root.ThemeSeasons) return;
+      var i = Math.floor(Math.random() * MINI_SLOTS.length), keep = minis[i];
+      putMini(name, i, false);
+      var v = minis[i];
+      minis[i] = keep;
+      v.x += v.x < W / 2 ? 34 : -34;
+      v.dy += 6;
+      placeMini(v);
+      root.ThemeSeasons.visit(v.outer, { x: v.x, top: miniTop(v), r: 22 * v.k, roll: true,
+        arrive: function () { if (SK) SK.hop(v.inner); tag(name + ' drops by!', v.x, miniTop(v) - 12, true); } });
+    }
     function miniTop(m) { return surface(m.x) + m.dy - 110 * m.k; }
     function placeMini(m) {
       m.outer.setAttribute('transform', 'translate(' + m.x + ' ' + f1(surface(m.x) + m.dy) + ') rotate(' + m.rot +
@@ -803,6 +817,10 @@
             if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
             var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
             if (hit && S.on && SK) { SK.hop(hit.node); tag(hit.label + ' is right here!', hit.p[0], hit.p[1]); }
+            else if (!hit && p.visit && S.on) {
+              if (minisHidden()) X.visit(p.name || '');
+              else if (partOn('minis')) visitMini(p.name || '');
+            }
             break;
           }
           case 'snowmanreset':

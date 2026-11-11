@@ -422,6 +422,36 @@
       effects = [];
       effects = cur.filter(function (f) { return f(dt) !== false; }).concat(effects);
     }
+    // Kurzbesuch (!whereiam) während der Baum steht: die Kugel des Besuchers
+    // schwebt groß neben den Baum, wackelt mit Namen und fliegt wieder hinaus
+    function visit(name) {
+      if (!shown() || !partOn('tree') || anim) return;
+      var fromX = sideFrom(STAR[0]), left = fromX < STAR[0];
+      var hx = left ? Math.max(-40, (120 - TX) / TK) : Math.min(440, (1800 - TX) / TK), hy = 200, K = 2.5;
+      var outer = el('g', { opacity: '0' }, gSparks), sway = el('g', {}, outer);
+      drawOrnament(el('g', { transform: 'translate(' + f1(hx) + ' ' + f1(hy - 13) + ')' }, sway), name, pfx);
+      var t = 0, arrived = false;
+      function pose(px, py, op) {
+        outer.setAttribute('transform', 'translate(' + f1(px) + ' ' + f1(py) + ') scale(' + K + ') translate(' + f1(-hx) + ' ' + f1(-hy) + ')');
+        outer.setAttribute('opacity', clamp01(op).toFixed(3));
+      }
+      effects.push(function (dt) {
+        t += dt;
+        if (reduceMotion) { pose(hx, hy, t < 6.5 ? 1 : 0); }
+        else if (t < 1) { var e = ease(t); pose(fromX + (hx - fromX) * e, hy - 70 * (1 - e) - 50 * Math.sin(e * Math.PI), t * 4); }
+        else if (t < 6.5) { pose(hx, hy + Math.sin((t - 1) * 2.2) * 4, 1); }
+        else { var k = ease((t - 6.5) / 1); pose(hx + (fromX - hx) * k, hy - 60 * k, 1 - k); }
+        if (!arrived && t >= 1) {
+          arrived = true;
+          sway.classList.add('tw-orn-wig');
+          var p = toScreen(hx, hy - 13 - 34 * K / 2.5 - 24);
+          tag(name + ' drops by!', p[0], p[1], true);
+        }
+        if (t < 7.5) return true;
+        if (outer.parentNode) outer.parentNode.removeChild(outer);
+        return false;
+      });
+    }
     // älteste Kugel macht Platz: fällt zur Erde und zerbirst dort
     function dropOff(o) {
       var n = o.outer, t = 0, T = 0.55, dx = rand(-25, 25), fall = Math.max(30, GROUND - o.y);
@@ -682,6 +712,7 @@
         celebrateTimer = setTimeout(function () { rootEl.dataset.celebrate = '0'; }, 4000);
       },
       // Kandidaten fürs Spotlight (nur wenn der Baum steht)
+      visit: visit,
       spotPool: function (pool) {
         if (!shown()) return;
         if (partOn('tree')) orns.forEach(function (o) { if (o && o.label) pool.push({ node: o.inner, label: o.label, p: toScreen(o.x, o.y - 16) }); });

@@ -103,15 +103,24 @@ def raid(viewers, name: str = "", rnd=random) -> dict:
 # ── Sätze für den Chat ──
 
 VISIBLE = 12    # so viele neueste Follower stehen je Thema im Bild
+TREE = 30       # solange der Weihnachtsbaum steht, hängen so viele als Kugeln
 
 
-def whereami_say(name: str, pos) -> str:
-    """Antwort auf !whereiam; leer, wenn die Figur im Bild ist (dann hüpft sie)."""
+def visible_count(xmas: str) -> int:
+    """Wie viele der neuesten Follower im Bild sind (Baum steht: Kugeln)."""
+    return TREE if xmas in ("on", "farewell") else VISIBLE
+
+
+def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False) -> str:
+    """Antwort auf !whereiam; leer, wenn die Figur im Bild ist (dann wackelt oder hüpft sie)."""
     who = f"@{name} " if name else ""
+    if host:
+        return f"{who}Du bist der Gastgeber, dir gehört die ganze Deko."
     if pos is None:
-        return f"{who}Dich gibt es hier noch nicht. Mit einem Follow bekommst du deinen Platz in der Deko."
-    if pos >= VISIBLE:
-        return f"{who}Du stehst gerade nicht im Bild, zu sehen sind die neuesten {VISIBLE} Follower."
+        return f"{who}Hier stehen die Follower des Kanals, dich gibt es noch nicht."
+    if pos >= shown:
+        return (f"{who}Du bist gerade nicht im Bild, dort stehen immer die neuesten {shown} Follower. "
+                "Für einen kurzen Besuch kommst du aber vorbei.")
     return ""
 
 PROJECT = {"winter": ("Schneemann", "zum fertigen Schneemann"),

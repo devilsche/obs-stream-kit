@@ -102,3 +102,17 @@ def test_weather_say_names_who_ordered_and_time_of_day():
 def test_weather_say_fixed_weather_is_not_live():
     st = {"kind": "snow", "temp": None, "source": "lock", "theme": "winter"}
     assert wc.weather_say(st, "Berlin") == "Wetter im Stream: Schnee (fest eingestellt). Im Stream ist Winter."
+
+
+def test_whereami_say_texts():
+    assert wc.whereami_say("Tim", None) == "@Tim Hier stehen die Follower des Kanals, dich gibt es noch nicht."
+    assert wc.whereami_say("Tim", 3) == ""
+    assert wc.whereami_say("Tim", 15) == ("@Tim Du bist gerade nicht im Bild, dort stehen immer die neuesten 12 Follower. "
+                                          "Für einen kurzen Besuch kommst du aber vorbei.")
+    assert wc.whereami_say("Tim", 15, shown=30) == ""
+    assert wc.whereami_say("LuCKoR_HD", None, host=True) == "@LuCKoR_HD Du bist der Gastgeber, dir gehört die ganze Deko."
+
+
+def test_visible_count_with_tree():
+    assert wc.visible_count("off") == 12
+    assert wc.visible_count("on") == 30 and wc.visible_count("farewell") == 30

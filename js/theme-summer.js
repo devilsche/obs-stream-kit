@@ -290,6 +290,18 @@
       if (old) gCastles.removeChild(old.node);
       putCastle(name, i, animate);
     }
+    // Kurzbesuch (!whereiam, nicht im Bild): Burg wächst neben einem Platz auf,
+    // eine Möwe holt sie wieder ab; sie gehört keinem Platz (castles bleibt unverändert)
+    function visitCastle(name) {
+      var i = Math.floor(Math.random() * CASTLE_X.length), keep = castles[i];
+      putCastle(name, i, false);
+      var v = castles[i];
+      castles[i] = keep;
+      var x = v.x + (v.x < W / 2 ? 28 : -28), y = sandY(x) + 32, top = v.y - (sandY(v.x) + 26) + y;
+      v.node.setAttribute('transform', v.node.getAttribute('transform').replace(/translate\([^)]*\)/, 'translate(' + x + ' ' + y.toFixed(0) + ')'));
+      TS.visit(v.node, { x: x, top: top, r: 30, crow: true, bird: 'gull',
+        arrive: function () { if (root.SeasonKit) root.SeasonKit.hop(v.inner); B.tag(name + ' drops by!', x, top - 14, true); } });
+    }
     function putCastle(name, i, animate) {
       var x = CASTLE_X[i], y = sandY(x) + 26;
       var k = 0.5 + 0.26 * cRand(i, 1), form = Math.floor(cRand(i, 2) * CASTLE_BUILD.length);
@@ -1392,6 +1404,10 @@
             }
             var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
             if (hit && B.on && root.SeasonKit) { root.SeasonKit.hop(hit.node); B.tag(hit.label + ' is right here!', hit.p[0], hit.p[1], true); }
+            else if (!hit && p.visit && B.on) {
+              if (X.followersHidden()) X.visit(p.name || '');
+              else if (B.partOn('beach')) visitCastle(p.name || '');
+            }
             break;
           }
           case 'snowmanreset': palace.reset(B.on); break;

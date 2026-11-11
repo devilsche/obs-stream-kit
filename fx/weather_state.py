@@ -22,6 +22,8 @@ LAST_THEME = {}
 # Einstellungen, mit denen die Source zuletzt gefragt hat (Thema, feste Lage, Ort …);
 # Chat-Antworten und das Dock rechnen damit, damit sie zeigen, was im Stream ist
 LAST_OPTS = {}
+# Xmas-Stand zuletzt ("on" = Baum steht), für !whereiam
+LAST_XMAS = {}
 AURORA_KD = 3.0
 
 
@@ -164,6 +166,7 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
         theme, xmas, snow = "none", "off", {"level": 0, "top": []}
     state.update(theme=theme, xmas=xmas, snowCover=snow["level"], snowTop=snow["top"])
     LAST_THEME[tenant_id] = theme
+    LAST_XMAS[tenant_id] = xmas
     # Herbst, Frühling, Sommer: Laub, Garten, Hitze nach dem wirksamen Wetter
     try:
         season = weather_season.advance(

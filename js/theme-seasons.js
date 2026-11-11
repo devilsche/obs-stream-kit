@@ -485,5 +485,29 @@
     return crow ? 1700 : 900;
   }
 
-  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave };
+  // !whereiam für jemanden, der gerade nicht im Bild steht: die Figur kommt von
+  // der näheren Kante hereingerollt (roll) oder wächst auf, meldet sich mit
+  // o.arrive (Hüpfen + Name) und geht danach wie beim Platzmachen wieder
+  var VISIT_IN = 1600, VISIT_POP = 700, VISIT_STAY = 5200;
+  function visit(node, o) {
+    var parent = node.parentNode;
+    if (!parent) return;
+    var roll = !!o.roll, wrap = el('g', { 'class': 'ts-visit ts-visit--' + (roll ? 'roll' : 'pop') });
+    parent.appendChild(wrap);
+    var inner = el('g', { 'class': 'ts-visit__item' }, wrap);
+    inner.appendChild(node);
+    if (roll) {
+      var dir = o.x < W / 2 ? -1 : 1, dx = dir < 0 ? -(o.x - 20) : W - 20 - o.x, r = Math.max(10, o.r || 24);
+      wrap.style.setProperty('--ts-dx', Math.round(dx) + 'px');
+      wrap.style.setProperty('--ts-rot', Math.round(dx / r * 57.3) + 'deg');
+    }
+    var inMs = roll ? VISIT_IN : VISIT_POP;
+    setTimeout(function () { if (o.arrive) o.arrive(); }, inMs);
+    setTimeout(function () {
+      leave(node, o);
+      setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, (o.crow ? LEAVE_CROW : LEAVE_ROLL) + 400);
+    }, inMs + VISIT_STAY);
+  }
+
+  root.ThemeSeasons = { sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit };
 })(typeof window !== 'undefined' ? window : this);

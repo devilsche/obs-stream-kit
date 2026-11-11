@@ -497,3 +497,21 @@
   .ts-bird__wing { animation: none; }
 }
 @keyframes tsLeaveFade { to { opacity: 0; } }
+
+/* Kurzbesuch (!whereiam): rollt von der Kante herein (Gegenstück zum
+   Wegrollen, --ts-dx/--ts-rot vom Skript) oder wächst aus dem Boden auf */
+.ts-visit__item { transform-box: fill-box; transform-origin: 50% 50%; }
+.ts-visit--roll { animation: tsVisitMove 1.6s cubic-bezier(0.2, 0.4, 0.55, 1) both; }
+.ts-visit--roll .ts-visit__item { animation: tsVisitSpin 1.6s cubic-bezier(0.2, 0.4, 0.55, 1) both; }
+@keyframes tsVisitMove {
+  0% { transform: translateX(var(--ts-dx)); opacity: 0; }
+  25% { opacity: 1; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes tsVisitSpin { 0% { transform: rotate(var(--ts-rot)); } 100% { transform: rotate(0deg); } }
+.ts-visit--pop .ts-visit__item { transform-origin: 50% 100%; animation: tsVisitPop 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes tsVisitPop { 0% { transform: scale(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .ts-visit--roll, .ts-visit--roll .ts-visit__item, .ts-visit--pop .ts-visit__item { animation: tsVisitFade 0.6s ease-out both; }
+}
+@keyframes tsVisitFade { from { opacity: 0; } to { opacity: 1; } }

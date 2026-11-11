@@ -161,6 +161,19 @@
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0 };
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }
+    // Kurzbesuch (!whereiam, nicht im Bild): Blume wächst neben einem Platz auf,
+    // eine Krähe holt sie wieder ab; sie gehört keinem Platz (flowers bleibt unverändert)
+    function visitFlower(name) {
+      var i = Math.floor(Math.random() * SLOTS.length), keep = flowers[i];
+      putFlower(name, i, false);
+      var v = flowers[i];
+      flowers[i] = keep;
+      v.x += v.x < W / 2 ? 30 : -30;
+      var y = groundY(v.x) + 12;
+      v.node.setAttribute('transform', 'translate(' + v.x.toFixed(0) + ' ' + y.toFixed(0) + ')');
+      TS.visit(v.node, { x: v.x, top: y - v.h, r: v.h / 2, crow: true,
+        arrive: function () { if (root.SeasonKit) root.SeasonKit.hop(v.head); B.tag(name + ' drops by!', v.x, y - v.h - 50, true); } });
+    }
     function clearFlowers() { B.clear(gFlowers); flowers = []; flNext = 0; flTotal = 0; flGen++; }
 
     // ── Sonnenblume: gemeinsames Sub-Projekt, wächst mit jedem Teil ──
@@ -535,6 +548,7 @@
             var me = (p.name || '').toLowerCase();
             var fl = flowers.filter(function (f) { return f && f.label && f.label.toLowerCase() === me; })[0];
             if (fl && B.on && B.partOn('meadow') && root.SeasonKit) { root.SeasonKit.hop(fl.head); B.tag(fl.label + ' is right here!', fl.x, fl.y - 50, true); }
+            else if (!fl && p.visit && B.on && B.partOn('meadow')) visitFlower(p.name || '');
             break;
           }
           case 'snowmanreset': sunflower.reset(B.on); break;
