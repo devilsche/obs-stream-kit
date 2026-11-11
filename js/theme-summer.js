@@ -102,7 +102,7 @@
         el('path', { 'class': 'tss-shell', transform: 'translate(-40 552) scale(-1 1)',
                      d: 'M-12 0 Q-14 -18 0 -20 Q14 -18 12 0 Z M-6 -2 L-3 -18 M0 -2 L0 -19 M6 -2 L3 -18' }, g);
       },
-      tag: function (text, x, y) { B.tag(text, x, y, false); },
+      tag: function (text, x, y, long) { B.tag(text, x, y, false, long); },
       board: function (title, rows) { B.board(title, rows); },
       onSync: function () { syncCastles(); }
     });

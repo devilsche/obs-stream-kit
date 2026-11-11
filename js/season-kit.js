@@ -64,12 +64,13 @@
     pulses[attr] = setTimeout(function () { node.dataset[attr] = '0'; }, ms);
   }
 
-  function tag(layer, text, x, y, big) {
+  // long: Schild bleibt ~6 s statt ~3,6 s (z. B. neue Kugel am Baum)
+  function tag(layer, text, x, y, big, long) {
     if (!text) return null;
     x = Math.max(160, Math.min(W - 160, x));
-    var t = el('text', { 'class': 'name-tag' + (big ? ' name-tag--big' : ''), x: x.toFixed(0), y: y.toFixed(0), 'text-anchor': 'middle' }, layer);
+    var t = el('text', { 'class': 'name-tag' + (big ? ' name-tag--big' : '') + (long ? ' name-tag--long' : ''), x: x.toFixed(0), y: y.toFixed(0), 'text-anchor': 'middle' }, layer);
     t.textContent = text;
-    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 3700);
+    setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, long ? 6300 : 3700);
     return t;
   }
 

@@ -102,8 +102,28 @@
   fill: rgba(255, 255, 255, 0.92); paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 4px;
 }
 .tw-orn, .tw-gift { transform-box: fill-box; transform-origin: 50% 0; }
-.tw-orn--new { animation: twOrnDrop 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
-@keyframes twOrnDrop { from { transform: translateY(-60px) scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+/* neuer Follower: Kugel löst sich am Stern, schwebt groß herab, schrumpft
+   auf Baumgröße und pendelt am Faden aus (--orn-fx/--orn-fy = Weg vom Stern) */
+.tw-orn--new { animation: twOrnFall 1.9s ease-in-out both; }
+@keyframes twOrnFall {
+  0%   { transform: translate(var(--orn-fx, 0), var(--orn-fy, -60px)) scale(2.5); opacity: 0; }
+  8%   { transform: translate(var(--orn-fx, 0), var(--orn-fy, -60px)) scale(2.5); opacity: 1; }
+  55%  { transform: translate(0, 0) scale(2.2); animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1); }
+  72%  { transform: scale(1) rotate(0); }
+  80%  { transform: rotate(14deg); }
+  88%  { transform: rotate(-9deg); }
+  95%  { transform: rotate(4deg); }
+  100% { transform: none; opacity: 1; }
+}
+/* Funkeln an der neuen Stelle: goldener Lichtkranz + Funken, die nach außen ausblenden */
+.tw-orn-halo { transform-box: fill-box; transform-origin: 50% 50%;
+               animation: twOrnHalo 3s ease-out 1.3s both; }
+@keyframes twOrnHalo { 0% { opacity: 0; transform: scale(0.3); } 15% { opacity: 1; transform: scale(1); }
+                       60% { opacity: 0.8; transform: scale(1.15); } 100% { opacity: 0; transform: scale(1.4); } }
+.tw-orn-spark { fill: #ffe9a3; transform-box: fill-box; transform-origin: 50% 50%;
+                animation: twOrnSpark 1.6s ease-out var(--sp-d, 1.3s) both; }
+@keyframes twOrnSpark { 0% { opacity: 0; transform: translate(0, 0) scale(0.4); } 15% { opacity: 1; }
+                        100% { opacity: 0; transform: translate(var(--sp-x), var(--sp-y)) scale(1); } }
 .tw-gift--new { animation: twGiftDrop 0.8s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
 @keyframes twGiftDrop { from { transform: translateY(-160px); opacity: 0; } 40% { opacity: 1; } to { transform: none; opacity: 1; } }
 

@@ -66,11 +66,11 @@
     var fxSvg = svgLayer(fxEl);
 
     // lange Schilder ganz ins Bild rücken (Breite grob geschätzt)
-    function tag(text, x, y, big) {
+    function tag(text, x, y, big, long) {
       if (!SK || !tagsLayer || !text) return;
       var half = String(text).length * (big ? 8.5 : 5) + 30;
       x = Math.max(half, Math.min(W - half, x));
-      SK.tag(tagsLayer, text, x, y, !!big);
+      SK.tag(tagsLayer, text, x, y, !!big, !!long);
     }
     function spot(node) { if (SK && node) SK.spot(node); }
 

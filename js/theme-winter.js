@@ -85,7 +85,7 @@
     var SK = root.SeasonKit;
     var tagsLayer = opts.tags || null;
     var hud = opts.hud || null;
-    function tag(text, x, y, big) { if (SK && tagsLayer && text) SK.tag(tagsLayer, text, x, y, !!big); }
+    function tag(text, x, y, big, long) { if (SK && tagsLayer && text) SK.tag(tagsLayer, text, x, y, !!big, !!long); }
 
     // ── Ebenen: Deko unter Blitz-Aufhellung und Wetter-Partikeln, Effekte darüber ──
     var rootEl = document.createElement('div');
@@ -132,7 +132,7 @@
       x: TREE_X, y: TREE_Y, k: TREE_K, pfx: 'tw-', snow: true,
       rnd: rnd, seed: function (n) { seed = n; }, bulbs: root.ThemeXmas.bulbs(rnd),
       mound: { cls: 'tw-mound', d: 'M-80 540 Q-48 504 22 506 Q104 492 200 498 Q298 490 378 504 Q448 506 480 540 Z' },
-      tag: function (text, x, y) { tag(text, x, y); },
+      tag: function (text, x, y, long) { tag(text, x, y, false, long); },
       board: function (title, rows) { showBoard(title, rows); },
       onSync: function () { syncMinis(); }
     });

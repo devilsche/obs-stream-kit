@@ -28,6 +28,7 @@ html, body {
   animation: tagFade 3.6s ease-in-out forwards;
 }
 .name-tag--big { font-size: 28px; font-weight: 800; fill: var(--tag-big, #ffd75e); stroke-width: 6px; }
+.name-tag--long { animation-duration: 6.2s; }
 @keyframes tagFade { 0% { opacity: 0; } 12%, 75% { opacity: 1; } 100% { opacity: 0; } }
 
 .is-spot { animation: spot 3.2s ease-in-out both; }

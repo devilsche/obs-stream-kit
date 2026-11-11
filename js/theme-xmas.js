@@ -207,6 +207,7 @@
     grad('linearGradient', 'moundG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#dfe9f6'], [0.18, '#f4f8ff'], [1, '#f4f8ff']]);
     grad('linearGradient', 'capG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#e9d58a'], [1, '#a8892c']]);
     grad('linearGradient', 'iceG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#ffffff', 0.95], [0.6, '#bfe6ff', 0.85], [1, '#8ccfff', 0.7]]);
+    grad('radialGradient', 'ornHalo', {}, [[0, '#fff3c4', 0.95], [0.45, '#f2b705', 0.55], [1, '#f2b705', 0]]);
     grad('radialGradient', 'ballG', { cx: 0.38, cy: 0.32 }, [[0, '#ffffff'], [0.7, '#eef4fb'], [1, '#bccde2']]);
     grad('linearGradient', 'bellG', { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, '#a87c12'], [0.45, '#f7d455'], [1, '#9a6f0e']]);
     [['ornR', '#ff9a9a', '#d42a2a', '#6e0d0d'], ['ornG', '#fff1a8', '#e2ad1c', '#7a5506'],
@@ -264,7 +265,7 @@
     var rootEl = cfg.root, pfx = cfg.pfx, rnd = cfg.rnd, B = cfg.bulbs, snow = !!cfg.snow;
     var TX = cfg.x, TY = cfg.y, TK = cfg.k;
     function toScreen(x, y) { return [TX + x * TK, TY + y * TK]; }
-    function tag(text, x, y) { if (cfg.tag && text) cfg.tag(text, x, y); }
+    function tag(text, x, y, long) { if (cfg.tag && text) cfg.tag(text, x, y, long); }
     var on = false, xmas = 'off', partsOn = {};
     function partOn(k) { return partsOn[k] !== false; }
 
@@ -319,7 +320,8 @@
       el('circle', { cx: f[0], cy: f[1], r: 13, fill: 'url(#' + pfx + f[2] + ')' }, g);
     });
     var gOrns = el('g', { 'class': 'tw-dim' }, gTree);
-    var gStar = el('g', { transform: 'translate(200 34)' }, gTree);
+    var STAR = [200, 34];
+    var gStar = el('g', { transform: 'translate(' + STAR[0] + ' ' + STAR[1] + ')' }, gTree);
     el('path', { 'class': 'tw-star-rays', opacity: 0.55, d: 'M0 -62 L5 -8 L62 0 L5 8 L0 62 L-5 8 L-62 0 L-5 -8 Z' }, gStar);
     el('path', { 'class': 'tw-star', d: 'M0 -30 L8.8 -12 L28.5 -9.3 L14.3 4.6 L17.6 24.3 L0 15 L-17.6 24.3 L-14.3 4.6 L-28.5 -9.3 L-8.8 -12 Z' }, gStar);
     if (snow) el('path', { 'class': 'tw-starhat', d: 'M-15 -20 Q-14 -38 0 -40 Q14 -38 15 -20 Q8 -25 0 -24 Q-8 -25 -15 -20 Z' }, gStar);
@@ -380,7 +382,28 @@
       drawOrnament(el('g', { transform: 'translate(' + f1(s[0]) + ' ' + f1(s[1] - 13) + ')' }, g), name, pfx);
       orns[i] = { outer: outer, inner: g, label: name, x: s[0], y: s[1], order: ornNext };
       ornNext++;
-      if (animate && shown() && partOn('tree')) { var p = toScreen(s[0], s[1] - 16); tag(name, p[0], p[1]); }
+      if (animate && shown() && partOn('tree')) {
+        // Weg vom Stern (200|34) bis zum Aufhängepunkt
+        g.style.setProperty('--orn-fx', f1(STAR[0] - s[0]) + 'px');
+        g.style.setProperty('--orn-fy', f1(STAR[1] - (s[1] - 13)) + 'px');
+        sparkle(s[0], s[1]);
+        var p = toScreen(s[0], s[1] - 16); tag(name, p[0], p[1], true);
+      }
+    }
+    // Lichtkranz + Funken um die neue Kugel, kommen nach der Landung
+    // Kranz hinter den Kugeln, Funken davor
+    var gHalos = gTree.insertBefore(el('g', {}), gOrns), gSparks = el('g', {}, gTree);
+    function sparkle(x, y) {
+      var h = el('circle', { 'class': 'tw-orn-halo', cx: f1(x), cy: f1(y - 2), r: 40, fill: 'url(#' + pfx + 'ornHalo)' }, gHalos);
+      var g = el('g', {}, gSparks);
+      for (var k = 0; k < 8; k++) {
+        var a = k / 8 * Math.PI * 2 + 0.3, d = 44 + (k % 3) * 10;
+        var sp = el('path', { 'class': 'tw-orn-spark', d: 'M' + f1(x) + ' ' + f1(y - 8) + ' l2.8 5.2 5.2 2.8 -5.2 2.8 -2.8 5.2 -2.8 -5.2 -5.2 -2.8 5.2 -2.8 Z' }, g);
+        sp.style.setProperty('--sp-x', f1(Math.cos(a) * d) + 'px');
+        sp.style.setProperty('--sp-y', f1(Math.sin(a) * d) + 'px');
+        sp.style.setProperty('--sp-d', (1.3 + (k % 4) * 0.12).toFixed(2) + 's');
+      }
+      setTimeout(function () { [h, g].forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); }, 4600);
     }
     function addGift(gift, animate) {
       var i = giftNext % GIFT_SLOTS.length, slot = GIFT_SLOTS[i];
