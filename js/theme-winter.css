@@ -213,3 +213,26 @@
   .tw *, .tw *::before, .tw *::after { animation: none !important; }
   .tw, .tw-x, .tw-sm-xmas, .tw-sm-tophat, .tw-sm, .tw-minis { transition-duration: 0.4s; }
 }
+
+/* Baumschmuck der Follower (Typ fest aus dem Namen, siehe drawOrnament in theme-xmas.js) */
+.tx-gold { fill: #e8b923; }
+.tx-gold-dk { fill: #a87c12; }
+.tx-red { fill: #c8202f; }
+.tx-red-dk { fill: #8e1420; }
+.tx-white { fill: #f6f1e7; }
+.tx-black { fill: #1c1c22; }
+.tx-skin { fill: #f2c9a0; }
+.tx-blue { fill: #1f3f8a; }
+.tx-brown { fill: #6b4423; }
+.tx-brown-lt { fill: #8a5a2e; }
+.tx-tip { fill: #f3e6b0; }
+.tx-shine { fill: #fff; opacity: 0.55; }
+.tx-hang { stroke: #d9c27a; stroke-width: 0.9; fill: none; }
+.tx-thread { stroke: #b8202c; stroke-width: 1.2; fill: none; }
+.tx-knot { fill: none; stroke: #b8202c; stroke-width: 1.4; }
+.tx-straw { stroke: #e9cf7a; stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.tx-scale { fill: none; stroke: #4a2d14; stroke-width: 0.9; }
+.tx-line { stroke: #1c1c22; stroke-width: 0.8; fill: none; }
+.tx-icing { stroke: #fbf7ef; stroke-width: 1.4; fill: none; stroke-dasharray: 2.2 1.6; stroke-linecap: round; }
+.tx-cane { stroke: #fbf7ef; stroke-width: 4.2; fill: none; stroke-linecap: round; }
+.tx-cane-stripe { stroke: #c8202f; stroke-width: 4.2; fill: none; stroke-dasharray: 2.6 2.6; }

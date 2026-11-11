@@ -74,6 +74,91 @@
     return out.slice(0, MAX_ORN);
   }
 
+  // ── Baumschmuck der Follower: Typ und Farbe fest aus dem Namen (gleicher Name,
+  // gleicher Schmuck, in jedem Stream); hängt am Haken bei 0/0, etwa 30 hoch ──
+  function nameHash(name) {
+    var h = 2166136261;
+    for (var i = 0; i < name.length; i++) { h ^= name.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return h >>> 0;
+  }
+  var ORN_TYPES = [['bauble', 40], ['nutcracker', 10], ['pinecone', 10], ['candycane', 10], ['strawstar', 10], ['bell', 10], ['gingerbread', 10]];
+  function ornamentType(name) {
+    var roll = nameHash(name || '?') % 100, acc = 0;
+    for (var t = 0; t < ORN_TYPES.length; t++) { acc += ORN_TYPES[t][1]; if (roll < acc) return ORN_TYPES[t][0]; }
+    return 'bauble';
+  }
+  function drawOrnament(g, name, pfx) {
+    var h = nameHash(name || '?');
+    switch (ornamentType(name)) {
+      case 'nutcracker':
+        el('path', { 'class': 'tx-hang', d: 'M0 0 L0 1.5' }, g);
+        el('rect', { 'class': 'tx-black', x: -4.5, y: 1.5, width: 9, height: 8.5, rx: 1.2 }, g);
+        el('rect', { 'class': 'tx-gold', x: -4.5, y: 7.6, width: 9, height: 1.6 }, g);
+        el('circle', { 'class': 'tx-gold', cx: 0, cy: 4.6, r: 1.1 }, g);
+        el('rect', { 'class': 'tx-skin', x: -3.6, y: 10, width: 7.2, height: 5.6, rx: 1 }, g);
+        el('circle', { 'class': 'tx-black', cx: -1.4, cy: 12, r: 0.6 }, g);
+        el('circle', { 'class': 'tx-black', cx: 1.4, cy: 12, r: 0.6 }, g);
+        el('path', { 'class': 'tx-white', d: 'M-4 14 Q0 22 4 14 L3 14.6 Q0 18 -3 14.6 Z' }, g);
+        el('rect', { 'class': 'tx-white', x: -1.8, y: 14.2, width: 3.6, height: 1.6 }, g);
+        el('path', { 'class': 'tx-line', d: 'M-1.8 15 L1.8 15 M-0.6 14.2 L-0.6 15.8 M0.6 14.2 L0.6 15.8' }, g);
+        el('path', { 'class': 'tx-red', d: 'M-5.5 17.5 L5.5 17.5 L6 25.5 L-6 25.5 Z' }, g);
+        el('rect', { 'class': 'tx-black', x: -6, y: 22.5, width: 12, height: 1.6 }, g);
+        [19, 21, 24.6].forEach(function (y) { el('circle', { 'class': 'tx-gold', cx: 0, cy: y, r: 0.7 }, g); });
+        el('rect', { 'class': 'tx-blue', x: -4.6, y: 25.5, width: 3.6, height: 4.5 }, g);
+        el('rect', { 'class': 'tx-blue', x: 1, y: 25.5, width: 3.6, height: 4.5 }, g);
+        el('rect', { 'class': 'tx-black', x: -5, y: 29.4, width: 4.4, height: 1.8, rx: 0.6 }, g);
+        el('rect', { 'class': 'tx-black', x: 0.6, y: 29.4, width: 4.4, height: 1.8, rx: 0.6 }, g);
+        break;
+      case 'pinecone':
+        el('path', { 'class': 'tx-hang', d: 'M0 0 L0 3' }, g);
+        el('path', { 'class': 'tx-brown', d: 'M0 3 C7.5 6 9 17 0 29 C-9 17 -7.5 6 0 3 Z' }, g);
+        [[7, 3], [11, 4], [15, 4], [19, 3], [23, 2]].forEach(function (row, r) {
+          var y = row[0], n = row[1], w = (r === 0 || r === 4) ? 2.6 : 3.2;
+          for (var k = 0; k < n; k++) {
+            var x = (k - (n - 1) / 2) * w * 1.6, d = 'M' + f1(x - w) + ' ' + y + ' Q' + f1(x) + ' ' + (y + 4) + ' ' + f1(x + w) + ' ' + y;
+            el('path', { 'class': 'tx-brown-lt', d: d + ' Z' }, g);
+            el('path', { 'class': 'tx-scale', d: d }, g);
+            el('circle', { 'class': 'tx-tip', cx: f1(x), cy: y + 2.8, r: 0.6 }, g);
+          }
+        });
+        break;
+      case 'candycane':
+        el('path', { 'class': 'tx-cane', d: 'M-5 6 C-5 -1 5 -1 5 6 L5 27' }, g);
+        el('path', { 'class': 'tx-cane-stripe', d: 'M-5 6 C-5 -1 5 -1 5 6 L5 27' }, g);
+        break;
+      case 'strawstar':
+        el('path', { 'class': 'tx-thread', d: 'M0 0 L0 3' }, g);
+        for (var k = 0; k < 8; k++) {
+          var a = k / 8 * Math.PI;
+          el('line', { 'class': 'tx-straw', x1: f1(Math.cos(a) * 11), y1: f1(14 + Math.sin(a) * 11), x2: f1(-Math.cos(a) * 11), y2: f1(14 - Math.sin(a) * 11) }, g);
+        }
+        el('circle', { 'class': 'tx-knot', cx: 0, cy: 14, r: 2.6 }, g);
+        break;
+      case 'bell':
+        el('path', { 'class': 'tx-hang', d: 'M0 0 L0 3' }, g);
+        el('path', { d: 'M-8.5 21 Q-9 6 0 5 Q9 6 8.5 21 L10.5 23.5 L-10.5 23.5 Z', fill: 'url(#' + pfx + 'bellG)' }, g);
+        el('circle', { 'class': 'tx-gold-dk', cx: 0, cy: 25.5, r: 2.2 }, g);
+        el('ellipse', { 'class': 'tx-red', cx: -3.3, cy: 4.2, rx: 3, ry: 1.9 }, g);
+        el('ellipse', { 'class': 'tx-red', cx: 3.3, cy: 4.2, rx: 3, ry: 1.9 }, g);
+        el('circle', { 'class': 'tx-red-dk', cx: 0, cy: 4.3, r: 1.4 }, g);
+        el('ellipse', { 'class': 'tx-shine', cx: -4, cy: 13, rx: 1.4, ry: 4 }, g);
+        break;
+      case 'gingerbread':
+        el('path', { 'class': 'tx-thread', d: 'M0 0 L0 6' }, g);
+        el('path', { 'class': 'tx-brown', d: 'M0 27 C-10 19 -11 11 -8 7.5 C-5.5 4.5 -1.5 5.5 0 8.5 C1.5 5.5 5.5 4.5 8 7.5 C11 11 10 19 0 27 Z' }, g);
+        el('path', { 'class': 'tx-icing', d: 'M0 24 C-8 17.5 -8.6 11.5 -6.4 9.2 C-4.5 7.2 -1.6 8 0 10.8 C1.6 8 4.5 7.2 6.4 9.2 C8.6 11.5 8 17.5 0 24' }, g);
+        el('circle', { 'class': 'tx-red', cx: -2.5, cy: 15, r: 1 }, g);
+        el('circle', { 'class': 'tx-red', cx: 2.5, cy: 15, r: 1 }, g);
+        el('circle', { 'class': 'tx-white', cx: 0, cy: 19, r: 0.9 }, g);
+        break;
+      default:   // Glaskugel, Farbe ebenfalls aus dem Namen
+        el('path', { 'class': 'tx-hang', d: 'M0 0 L0 2' }, g);
+        el('rect', { 'class': 'tx-gold', x: -3, y: 2, width: 6, height: 3.5, rx: 1 }, g);
+        el('circle', { cx: 0, cy: 14.5, r: 10, fill: 'url(#' + pfx + GRADS[(h >>> 8) % GRADS.length] + ')' }, g);
+        el('ellipse', { 'class': 'tx-shine', cx: -3.5, cy: 10.5, rx: 2.4, ry: 3.4 }, g);
+    }
+  }
+
   // ── Geschenke: hintere Reihe zuerst, vordere davor ([x, vorne?]) ──
   var GIFT_SLOTS = [
     [200, 1], [150, 0], [250, 0], [135, 1], [265, 1],
@@ -123,6 +208,7 @@
     grad('linearGradient', 'capG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#e9d58a'], [1, '#a8892c']]);
     grad('linearGradient', 'iceG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#ffffff', 0.95], [0.6, '#bfe6ff', 0.85], [1, '#8ccfff', 0.7]]);
     grad('radialGradient', 'ballG', { cx: 0.38, cy: 0.32 }, [[0, '#ffffff'], [0.7, '#eef4fb'], [1, '#bccde2']]);
+    grad('linearGradient', 'bellG', { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, '#a87c12'], [0.45, '#f7d455'], [1, '#9a6f0e']]);
     [['ornR', '#ff9a9a', '#d42a2a', '#6e0d0d'], ['ornG', '#fff1a8', '#e2ad1c', '#7a5506'],
      ['ornB', '#b6dcff', '#2a78d4', '#0d2f6e'], ['ornP', '#e4c4ff', '#8e4bb8', '#3b1656'],
      ['ornGr', '#b8f5cf', '#2ecc71', '#0e5a2c'], ['ornO', '#ffd2a8', '#ff8a1f', '#7a3a06']].forEach(function (c) {
@@ -291,8 +377,7 @@
       if (orns[i]) gOrns.removeChild(orns[i].outer);
       var outer = el('g', {}, gOrns);
       var g = el('g', { 'class': 'tw-orn' + (animate ? ' tw-orn--new' : '') }, outer);
-      el('line', { x1: f1(s[0]), y1: f1(s[1] - 13), x2: f1(s[0]), y2: f1(s[1] - 6), stroke: '#ccc' }, g);
-      el('circle', { cx: f1(s[0]), cy: f1(s[1] + 4), r: 10, fill: 'url(#' + pfx + GRADS[ornNext % GRADS.length] + ')' }, g);
+      drawOrnament(el('g', { transform: 'translate(' + f1(s[0]) + ' ' + f1(s[1] - 13) + ')' }, g), name, pfx);
       orns[i] = { outer: outer, inner: g, label: name, x: s[0], y: s[1], order: ornNext };
       ornNext++;
       if (animate && shown() && partOn('tree')) { var p = toScreen(s[0], s[1] - 16); tag(name, p[0], p[1]); }
