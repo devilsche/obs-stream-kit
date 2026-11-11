@@ -11,72 +11,55 @@
   <link rel="stylesheet" href="/static/_dashboard-theme-aliases.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
   <style>
-    /* Schmale Steuerseite für ein OBS-Dock; Farben und Knöpfe aus dem Dashboard-Theme */
+    /* Schmale Steuerseite für ein OBS-Dock. Gruppen und Knöpfe sind die des
+       Dashboard-Reiters „Live control“ (url-ctlbox, url-ctlgroup, url-act) */
     html, body { min-height: 0; }
-    .dk { padding: 10px; }
     .dk-skip { position: absolute; left: -9999px; }
     .dk-skip:focus { left: 10px; top: 10px; background: var(--brand-gold); color: #000; padding: 6px 10px; z-index: 10; }
-    .dk-status {
-      background: var(--bg-elev); border: 1px solid var(--border); border-left: 4px solid var(--brand-gold);
-      border-radius: var(--r-box, 8px); padding: 8px 10px; margin-bottom: 10px;
-    }
-    .dk-status__row { display: flex; align-items: flex-start; gap: 8px; }
+    .dk-box { margin: 10px; }
+    .dk-box.url-ctlbox { padding: 12px 14px; }
+    .dk-status { display: flex; align-items: center; gap: 10px; margin: 0; }
     .dk-status__text { flex: 1; margin: 0; color: var(--text); }
-    .dk-status__time { color: var(--text-muted); font-size: 12px; }
-    .dk-refresh { flex: none; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; }
-    .dk-group { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-box, 8px); margin-bottom: 8px; }
-    .dk-group > summary {
-      cursor: pointer; padding: 8px 10px; font-weight: 700; list-style: none; color: var(--text);
-      display: flex; align-items: center; gap: 6px; min-height: 36px;
-    }
-    .dk-group > summary::-webkit-details-marker { display: none; }
-    .dk-group > summary::before { content: 'chevron_right'; font-family: 'Material Symbols Outlined'; transition: transform 0.15s; }
-    .dk-group[open] > summary::before { transform: rotate(90deg); }
-    .dk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; padding: 0 8px 8px; }
-    .dk-btn { display: flex; align-items: center; gap: 6px; min-height: 36px; text-align: left; width: 100%; }
-    .dk-btn .material-symbols-outlined { font-size: 20px; flex: none; }
-    .dk-btn.is-sent { outline: 2px solid var(--success); outline-offset: -2px; }
-    .dk-btn.is-failed { outline: 2px solid var(--danger); outline-offset: -2px; }
-    .dk-btn:focus-visible, .dk-refresh:focus-visible, .dk-group > summary:focus-visible {
-      outline: 3px solid var(--focus, var(--brand-gold)); outline-offset: 2px;
-    }
-    .dk-hint { color: var(--text-muted); font-size: 12px; margin: 8px 2px 0; }
+    .dk-status__time { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
+    .dk-refresh.url-act { flex: none; width: 36px; height: 36px; padding: 0; justify-content: center; }
+    .url-act.is-sent { border-color: var(--success); }
+    .url-act.is-failed { border-color: var(--danger); }
     .dk-err { color: var(--danger); }
-    @media (prefers-reduced-motion: reduce) { .dk-group > summary::before { transition: none; } }
   </style>
 </head>
 <body>
   <a class="dk-skip" href="#main-content">Skip to controls</a>
-  <main id="main-content" class="dk">
+  <main id="main-content">
     {% if not token %}
-      <p class="dk-err">No widget token yet. Create one in the dashboard first.</p>
+      <p class="dk-err dk-box">No widget token yet. Create one in the dashboard first.</p>
     {% else %}
-    <section class="dk-status" aria-label="Current weather">
-      <div class="dk-status__row">
+    <section class="url-cheat dk-box" aria-label="Current weather">
+      <div class="dk-status">
         <p class="dk-status__text" id="status" role="status" aria-live="polite">Loading…</p>
-        <button class="dk-refresh" type="button" id="refresh" aria-label="Refresh status">
+        <button class="url-act ghost dk-refresh" type="button" id="refresh" aria-label="Refresh status">
           <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
         </button>
       </div>
       <div class="dk-status__time" id="statusTime"></div>
     </section>
 
-    {% for grp in groups %}
-    <details class="dk-group" {% if loop.index <= 3 %}open{% endif %}>
-      <summary>{{ grp.name }}</summary>
-      <div class="dk-grid">
-        {% for c in grp["items"] %}
-        <button class="dk-btn" type="button" data-q="{{ c.q }}">
-          <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon or 'radio_button_checked' }}</span>
-          <span>{{ c.label }}</span>
-        </button>
-        {% endfor %}
-      </div>
-    </details>
-    {% endfor %}
-    {% if not place %}
-    <p class="dk-hint">Tip: add <code>?place=Berlin</code> (as in your weather source URL) to this dock URL to see the live weather at your place.</p>
-    {% endif %}
+    <div class="url-dbox url-ctlbox dk-box">
+      {% for grp in groups %}
+      <details class="url-ctlgroup" {% if loop.index <= 3 %}open{% endif %}>
+        <summary class="url-ctl__group">{{ grp.name }} <span class="url-cmdgroup__meta">{{ grp["items"]|length }}</span></summary>
+        <div class="url-ctl">
+          {% for c in grp["items"] %}
+          <button type="button" class="url-act url-ctl__btn" data-q="{{ c.q }}">
+            <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon or 'play_arrow' }}</span>{{ c.label }}
+          </button>
+          {% endfor %}
+        </div>
+      </details>
+      {% endfor %}
+      {% if not place %}
+      <p class="url-dbox__desc">Tip: add <code>?place=Berlin</code> (as in your weather source URL) to this dock URL to see the live weather at your place.</p>
+      {% endif %}
+    </div>
     {% endif %}
   </main>
   {% if token %}
@@ -98,7 +81,7 @@
           .catch(function () { statusEl.textContent = 'Status not reachable.'; });
       }
 
-      document.querySelectorAll('.dk-btn[data-q]').forEach(function (btn) {
+      document.querySelectorAll('.url-ctl__btn[data-q]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var q = btn.getAttribute('data-q');
           // Wetter und Tageszeit laufen unter dem Namen des Streamers (Statuszeile, !weather)
