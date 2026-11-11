@@ -295,9 +295,10 @@
       putPumpkin(name, i, animate);
       pkNext++;
     }
-    // Nachts bekommen die Kürbisse ihr Gesicht, einer nach dem anderen: meist
-    // glimmt es weich auf, manche drehen sich einmal um, selten platzt einer
-    // und ein geschnitzter fällt an seinen Platz; morgens erlöschen sie ebenso
+    // Nachts bekommen die Kürbisse ihr Gesicht, einer nach dem anderen: die
+    // Hälfte glimmt weich auf, viele rollen weg und kommen mit Gesicht zurück,
+    // selten platzt einer und ein geschnitzter fällt an seinen Platz; morgens
+    // erlöschen sie ebenso
     var pkLit = false;
     function lightPumpkins(on) {
       var list = pkNodes.filter(Boolean).sort(function () { return Math.random() - 0.5; });
@@ -316,7 +317,7 @@
           pk.node.classList.remove('is-dim');
           var r = Math.random();
           if (r < 0.5 || pk.zap || pk.mode !== null) { pk.node.classList.add('is-lit'); return; }
-          if (r < 0.7) {
+          if (r < 0.9) {
             // rollt zur Kante hinaus, derselbe kommt mit Gesicht zurückgerollt
             var ghost = pk.node.cloneNode(true);
             ghost.classList.remove('ta-pk--new', 'is-lit');
@@ -336,11 +337,6 @@
               pk.node.classList.add('is-rollin');
               setTimeout(function () { pk.node.classList.remove('is-rollin'); }, 1700);
             }, back + 1400);
-            return;
-          }
-          if (r < 0.9) {
-            pk.node.classList.add('is-turn', 'is-lit');
-            setTimeout(function () { pk.node.classList.remove('is-turn'); }, 1500);
             return;
           }
           var cy = pk.y + pk.dy - pk.h * 0.45;
