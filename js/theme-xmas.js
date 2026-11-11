@@ -376,34 +376,54 @@
 
     function addOrnament(name, animate) {
       var i = ornNext % SLOTS.length, s = SLOTS[i];
-      if (orns[i]) gOrns.removeChild(orns[i].outer);
+      var live = animate && shown() && partOn('tree') && !anim, wait = 0;
+      if (orns[i]) {
+        // Platz voll: die älteste Kugel fällt wie beim Abbau ab, dann kommt die neue
+        if (live) { dropOff(orns[i]); wait = 1.3; } else gOrns.removeChild(orns[i].outer);
+      }
       var outer = el('g', {}, gOrns);
       var g = el('g', { 'class': 'tw-orn' + (animate ? ' tw-orn--new' : '') }, outer);
       drawOrnament(el('g', { transform: 'translate(' + f1(s[0]) + ' ' + f1(s[1] - 13) + ')' }, g), name, pfx);
       orns[i] = { outer: outer, inner: g, label: name, x: s[0], y: s[1], order: ornNext };
       ornNext++;
-      if (animate && shown() && partOn('tree')) {
-        // Weg vom Stern (200|34) bis zum Aufhängepunkt
+      if (live) {
+        // Weg vom Stern bis zum Aufhängepunkt
         g.style.setProperty('--orn-fx', f1(STAR[0] - s[0]) + 'px');
         g.style.setProperty('--orn-fy', f1(STAR[1] - (s[1] - 13)) + 'px');
-        sparkle(s[0], s[1]);
-        var p = toScreen(s[0], s[1] - 16); tag(name, p[0], p[1], true);
+        g.style.setProperty('--orn-wait', wait + 's');
+        sparkle(s[0], s[1], wait);
+        var p = toScreen(s[0], s[1] - 16);
+        setTimeout(function () { tag(name, p[0], p[1], true); }, wait * 1000);
+        // solange der Name steht, schwingt die Kugel ab und zu am Faden
+        setTimeout(function () {
+          outer.classList.add('tw-orn-wig');
+          setTimeout(function () { outer.classList.remove('tw-orn-wig'); }, 5200);
+        }, (wait + 1.4) * 1000);
       }
+    }
+    // wie renderFarewell: zur Erde fallen, abprallen, ausblenden
+    function dropOff(o) {
+      var n = o.outer;
+      n.style.setProperty('--off-dx', f1(rand(-25, 25)) + 'px');
+      n.style.setProperty('--off-fall', f1(Math.max(30, 505 - o.y)) + 'px');
+      n.classList.add('tw-orn-off');
+      setTimeout(function () { if (n.parentNode) n.parentNode.removeChild(n); }, 1500);
     }
     // Lichtkranz + Funken um die neue Kugel, kommen nach der Landung
     // Kranz hinter den Kugeln, Funken davor
     var gHalos = gTree.insertBefore(el('g', {}), gOrns), gSparks = el('g', {}, gTree);
-    function sparkle(x, y) {
+    function sparkle(x, y, wait) {
       var h = el('circle', { 'class': 'tw-orn-halo', cx: f1(x), cy: f1(y - 2), r: 40, fill: 'url(#' + pfx + 'ornHalo)' }, gHalos);
+      h.style.setProperty('--orn-wait', wait + 's');
       var g = el('g', {}, gSparks);
       for (var k = 0; k < 8; k++) {
         var a = k / 8 * Math.PI * 2 + 0.3, d = 44 + (k % 3) * 10;
         var sp = el('path', { 'class': 'tw-orn-spark', d: 'M' + f1(x) + ' ' + f1(y - 8) + ' l2.8 5.2 5.2 2.8 -5.2 2.8 -2.8 5.2 -2.8 -5.2 -5.2 -2.8 5.2 -2.8 Z' }, g);
         sp.style.setProperty('--sp-x', f1(Math.cos(a) * d) + 'px');
         sp.style.setProperty('--sp-y', f1(Math.sin(a) * d) + 'px');
-        sp.style.setProperty('--sp-d', (1.3 + (k % 4) * 0.12).toFixed(2) + 's');
+        sp.style.setProperty('--sp-d', (wait + 1.3 + (k % 4) * 0.12).toFixed(2) + 's');
       }
-      setTimeout(function () { [h, g].forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); }, 4600);
+      setTimeout(function () { [h, g].forEach(function (n) { if (n.parentNode) n.parentNode.removeChild(n); }); }, 4600 + wait * 1000);
     }
     function addGift(gift, animate) {
       var i = giftNext % GIFT_SLOTS.length, slot = GIFT_SLOTS[i];
