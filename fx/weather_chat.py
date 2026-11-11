@@ -250,4 +250,5 @@ def commands_say(theme: str, frost: float = 0) -> str:
     if frost >= FROST_MIN:
         text += " Die Scheibe ist zugefroren: !scrape kratzt, !warm haucht an."
     board = "!snowboard" if theme == "winter" else "!board"
-    return f"{text} Wetterbericht: !weather, Bestenliste: {board}" + (" und !frostboard." if frost >= FROST_MIN else ".")
+    return (f"{text} Wo steht deine Figur? !whereiam. Wetterbericht: !weather, Bestenliste: {board}"
+            + (" und !frostboard." if frost >= FROST_MIN else "."))
