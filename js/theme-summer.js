@@ -1313,7 +1313,7 @@
       var pool = [];
       X.spotPool(pool);
       if (B.partOn('beach') && !X.followersHidden()) {
-        castles.forEach(function (c) { if (c && c.label) pool.push({ node: c.inner, label: c.label, p: [c.x, c.y] }); });
+        castles.forEach(function (c) { if (c && c.label && !(c.zap > 0)) pool.push({ node: c.inner, label: c.label, p: [c.x, c.y] }); });
       }
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
@@ -1371,7 +1371,7 @@
             var me = (p.name || '').toLowerCase(), pool = [];
             X.spotPool(pool);
             if (B.partOn('beach') && !X.followersHidden()) {
-              castles.forEach(function (c) { if (c && c.label) pool.push({ node: c.inner, label: c.label, p: [c.x, c.y] }); });
+              castles.forEach(function (c) { if (c && c.label && !(c.zap > 0)) pool.push({ node: c.inner, label: c.label, p: [c.x, c.y] }); });
             }
             var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
             if (hit && B.on && root.SeasonKit) { root.SeasonKit.hop(hit.node); B.tag(hit.label + ' is right here!', hit.p[0], hit.p[1], true); }

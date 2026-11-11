@@ -671,6 +671,8 @@
         pk.node.classList.remove('ta-pk--new');
         void pk.node.getBBox();
         pk.node.classList.add('ta-pk--new');
+        // der Name erst, wenn er wieder da ist
+        if (pk.label && B.on && B.partOn('pumpkins')) setTimeout(function () { B.tag(pk.label, pk.x, pk.y - pk.h - 12, false); }, 600);
       }, rand(8000, 14000));
       return true;
     }
@@ -900,7 +902,8 @@
       if (fireTop && spotRound % 8 === 4) { B.tag('Top firefighter: ' + fireTop[0] + ' · ' + fireTop[1] + '×', W / 2, 300, false); return; }
       if (top && spotRound % 4 === 0) { B.tag('Top raker: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       if (!B.partOn('pumpkins')) return;
-      var pool = pkNodes.filter(function (pk) { return pk && pk.label; });
+      // geplatzte Kürbisse nicht: sonst stünde ein Name über einer leeren Stelle
+      var pool = pkNodes.filter(function (pk) { return pk && pk.label && !pk.zap; });
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
       if (pick === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
@@ -942,7 +945,7 @@
           case 'build': scare.build(p.name || '', B.on); break;
           case 'whereami': {
             var me = (p.name || '').toLowerCase();
-            var pk = pkNodes.filter(function (k) { return k && k.label && k.label.toLowerCase() === me; })[0];
+            var pk = pkNodes.filter(function (k) { return k && k.label && !k.zap && k.label.toLowerCase() === me; })[0];
             if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); B.tag(pk.label + ' is right here!', pk.x, pk.y - pk.h - 12, true); }
             break;
           }

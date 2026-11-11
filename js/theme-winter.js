@@ -580,6 +580,8 @@
         m.inner.classList.remove('tw-mini--new');
         void m.inner.getBBox();
         m.inner.classList.add('tw-mini--new');
+        // der Name erst, wenn er wieder da ist
+        if (m.label && S.on && partOn('minis') && !minisHidden()) setTimeout(function () { tag(m.label, m.x, miniTop(m)); }, 600);
       }, rand(8000, 14000));
     }
     function stepMinis(dt) {
@@ -723,7 +725,7 @@
       if (top && spotRound % 4 === 0) { tag('Top shoveler: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       var pool = [];
       X.spotPool(pool);
-      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
+      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
       if (lastSpot && pick.label === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
@@ -791,7 +793,7 @@
           case 'whereami': {
             var me = (p.name || '').toLowerCase(), pool = [];
             X.spotPool(pool);
-            if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
+            if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
             var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
             if (hit && S.on && SK) { SK.hop(hit.node); tag(hit.label + ' is right here!', hit.p[0], hit.p[1]); }
             break;
