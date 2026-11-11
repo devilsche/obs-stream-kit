@@ -175,6 +175,14 @@
       el('path', { 'class': 'tss-utop', d: DOME }, fab);
       el('path', { 'class': 'tss-ustripe', 'clip-path': 'url(#tss-uclip)',
                    d: 'M0 -27 Q-62 -14 -100 40 L-50 40 Q-24 -2 0 -27 Z M0 -27 Q24 -2 50 40 L100 40 Q62 -14 0 -27 Z' }, fab);
+      // zugeklappt (nachts): schlanke Hülle entlang der Stange, Halteband,
+      // Speichenspitzen unten; liegt im Koordinatensystem der Kuppel, deren
+      // „unten“ der Stange folgt
+      U.folded = el('g', { 'class': 'tss-ufolded' }, top);
+      el('path', { 'class': 'tss-urib', d: 'M-5 124 L-7 134 M-1 125 L-2 136 M3 125 L4 135 M6 123 L8 132' }, U.folded);
+      el('path', { 'class': 'tss-utop', d: 'M0 -27 C9 -8 16 38 14 92 L7 126 L-7 126 L-14 92 C-16 38 -9 -8 0 -27 Z' }, U.folded);
+      el('path', { 'class': 'tss-ustripe', d: 'M0 -27 C3 0 4 60 3 125 L-2 125 C-1 60 -1 0 0 -27 Z M0 -27 C7 -4 11 40 10 96 L7 97 C8 42 5 -2 0 -27 Z M0 -27 C-7 -4 -11 40 -10 96 L-7 97 C-8 42 -5 -2 0 -27 Z' }, U.folded);
+      el('rect', { 'class': 'tss-ustrap', x: -15, y: 62, width: 30, height: 6, rx: 2 }, U.folded);
       U.char = el('path', { 'class': 'tss-uchar', d: DOME, opacity: 0 }, fab);
       el('path', { 'class': 'ts-cap', d: 'M-122 -6 C-104 -42 104 -42 122 -6 C80 -24 -80 -24 -122 -6 Z' }, fab);
       // glühende Brandkante, auf die Kuppel beschnitten

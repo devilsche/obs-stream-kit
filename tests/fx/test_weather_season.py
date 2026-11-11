@@ -85,9 +85,10 @@ def test_lightning_fire_burns_leaves_and_extinguish_counts(conn):
     assert r["secs"] == 30
     assert load(conn, 1)["levels"]["leaves"] == pytest.approx(90)       # Loch nur im Bild, an der Stelle
     assert use(conn, 1, "extinguish", "Mia", 1810)["done"] == 1
-    assert load(conn, 1)["top"]["autumn"] == [["Mia", 1]]
+    # eigene Rangliste der Feuerwehr, nicht die der Laubrecher
+    assert load(conn, 1)["top"]["fire"] == [["Mia", 1]] and "autumn" not in load(conn, 1)["top"]
     assert use(conn, 1, "extinguish", "Tom", 1811)["done"] == 0            # schon aus, zählt nicht
-    assert load(conn, 1)["top"]["autumn"] == [["Mia", 1]]
+    assert load(conn, 1)["top"]["fire"] == [["Mia", 1]]
 
 
 def test_up_to_five_fires_burn_at_once_and_extinguish_takes_the_oldest(conn):

@@ -827,11 +827,13 @@
     });
 
     // ── Spotlight: alle 8 s ein Kürbis, jedes 4. Mal der beste Laubrecher ──
+    var fireBoardTimer = null;
     var spotRound = 0, lastSpot = null;
     setInterval(function () {
       if (!B.on) return;
       spotRound++;
-      var top = S.top[0];
+      var top = S.top[0], fireTop = (S.fireTop || [])[0];
+      if (fireTop && spotRound % 8 === 4) { B.tag('Top firefighter: ' + fireTop[0] + ' · ' + fireTop[1] + '×', W / 2, 300, false); return; }
       if (top && spotRound % 4 === 0) { B.tag('Top raker: ' + top[0] + ' · ' + top[1] + '×', W / 2, 300, false); return; }
       if (!B.partOn('pumpkins')) return;
       var pool = pkNodes.filter(function (pk) { return pk && pk.label; });
@@ -861,6 +863,7 @@
           S.first = false;
         }
         if (s.seasonTop && Array.isArray(s.seasonTop.autumn)) S.top = s.seasonTop.autumn;
+        if (s.seasonTop) S.fireTop = Array.isArray(s.seasonTop.fire) ? s.seasonTop.fire : [];
         B.vars({ '--ts-night': B.night });
         drawn = -1;
       },
@@ -883,7 +886,12 @@
           case 'sweep': sweep(p); break;
           case 'gust': gust(); break;
           case 'celebrate': celebrate(p.name || ''); break;
-          case 'seasonboard': B.board('Top rakers', S.top); break;
+          // erst die Laubrecher, dann (wenn schon jemand gelöscht hat) die Feuerwehr
+          case 'seasonboard':
+            B.board('Top rakers', S.top);
+            clearTimeout(fireBoardTimer);
+            if (S.fireTop && S.fireTop.length) fireBoardTimer = setTimeout(function () { B.board('Top firefighters', S.fireTop); }, 10500);
+            break;
           case 'spectacle': spectacle(p); break;
           case 'bolt': bolt(p); break;
           case 'extinguish': extinguish(p); break;

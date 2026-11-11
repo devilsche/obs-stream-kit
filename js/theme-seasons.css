@@ -314,10 +314,14 @@
 .tss-uedge { fill: none; stroke: #2a1406; stroke-width: 10; }
 .tss-uedge-glow { fill: none; stroke: #ff9a3a; stroke-width: 3; }
 .tss-upop { transform-box: fill-box; transform-origin: 50% 100%; }
-/* nachts zugeklappt: Bespannung und Speichen schmal und lang an die Stange */
-.tss-ufold { transform-box: fill-box; transform-origin: 50% 0; transition: transform 1.2s ease-in-out; }
-.tss-umbrella[data-closed="1"] .tss-ufold { transform: scale(0.12, 2.65); }   /* so lang wie die Speichen (~150 px) */
-@media (prefers-reduced-motion: reduce) { .tss-ufold { transition: none; } }
+/* nachts zugeklappt: die Kuppel schrumpft zur Spitze hin und blendet in die
+   schlanke Hülle über, die entlang der Stange hängt */
+.tss-ufold { transform-box: fill-box; transform-origin: 50% 0; transition: transform 1.2s ease-in-out, opacity 0.5s ease 0.7s; }
+.tss-umbrella[data-closed="1"] .tss-ufold { transform: scale(0.12, 2.65); opacity: 0; }
+.tss-ufolded { opacity: 0; transition: opacity 0.5s ease; }
+.tss-umbrella[data-closed="1"] .tss-ufolded { opacity: 1; transition: opacity 0.5s ease 0.8s; }
+.tss-ustrap { fill: #8f2b3a; }
+@media (prefers-reduced-motion: reduce) { .tss-ufold, .tss-ufolded { transition: none; } }
 .tss-upop.is-pop { animation: tssUmbPop 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 @keyframes tssUmbPop { from { transform: scaleY(0); } to { transform: none; } }
 

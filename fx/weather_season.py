@@ -199,7 +199,8 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
             out.update(success=success, count=0 if success else len(hits), need=need)
         done = start - lv["weeds"]
     if done > 0 and cmd in ("rake", "extinguish", "water", "weed", "splash") and not force:
-        _count(data, theme, name)
+        # Löschen hat eine eigene Rangliste („Top firefighters“), nicht die der Laubrecher
+        _count(data, "fire" if cmd == "extinguish" else theme, name)
     _put(conn, tenant_id, data)
     out.update(done=round(done, 2), level=round(lv[key], 2))
     return out
@@ -212,4 +213,6 @@ def clear(conn, tenant_id, now, kind: str) -> None:
     for k in {"leaves": ("leaves",), "garden": ("water", "weeds"), "heat": ("heat",)}[kind]:
         data["levels"][k] = 60.0 if k == "water" else 0.0
     data.get("top", {}).pop(theme, None)
+    if theme == "autumn":
+        data.get("top", {}).pop("fire", None)
     _put(conn, tenant_id, data)
