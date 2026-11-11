@@ -74,6 +74,9 @@ def test_weather_say_skips_empty_level():
 
 
 def test_commands_only_for_current_season():
-    assert wc.commands_say("summer") == "Mitmachen kann jeder: !weather !splash !ice !fries – Bestenliste: !board"
+    summer = {wc.commands_say("summer") for _ in range(2)}
+    assert len(summer) == 2
+    assert all("!splash" in t and "!rake" not in t and t.endswith("Bestenliste: !board.") for t in summer)
     w = wc.commands_say("winter", frost=20)
-    assert "!shovel" in w and "!rake" not in w and "!scrape" in w and w.endswith("!snowboard !frostboard")
+    assert "!shovel" in w and "!scrape" in w and w.endswith("!snowboard und !frostboard.")
+    assert all(len(wc.commands_say(t, 30)) < 500 for t in wc.SEASON_SAY for _ in range(2))

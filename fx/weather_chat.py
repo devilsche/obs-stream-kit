@@ -170,18 +170,35 @@ def tip_say(theme: str, rnd=random) -> str:
     return f"Probiert mal {cmd}! Alle Befehle zeigt !commands."
 
 
-# Kostenlose Befehle je Thema (nur was gerade wirkt); Frost nur, wenn welcher da ist
-SEASON_CMDS = {"autumn": ("!rake", "!jump", "!extinguish"),
-               "spring": ("!water", "!weed", "!bee"),
-               "summer": ("!splash", "!ice", "!fries"),
-               "winter": ("!shovel", "!shake", "!icicle", "!snowball")}
+# Kostenlose Befehle je Thema (nur was gerade wirkt), je zwei Sprüche zum Abwechseln;
+# Frost nur, wenn welcher auf der Scheibe ist
+SEASON_SAY = {
+    "summer": ("Sommer am Strand! Abkühlen mit !splash, Eis in den Sand stecken mit !ice, und wer !fries bestellt, "
+               "sollte die Möwen im Auge behalten.",
+               "Hochsommer! Gegen die Hitze hilft !splash, gegen den Hunger !ice oder !fries. Die Möwen kennen beide Rezepte."),
+    "autumn": ("Herbst! Laub zusammenrechen mit !rake, Anlauf nehmen und reinspringen mit !jump. "
+               "Und wenn der Blitz einschlägt: !extinguish.",
+               "Blätterwetter! Wer ordentlich ist, nimmt !rake, wer Spaß will, nimmt !jump. "
+               "Brennt der Haufen, hilft nur noch !extinguish."),
+    "spring": ("Frühling! Die Blumen haben Durst (!water), das Unkraut hat Pläne (!weed, zu dritt geht's schneller), "
+               "und die Bienen warten auf ihren Einsatz (!bee).",
+               "Gartensaison! Gießen mit !water, Unkraut zupfen mit !weed, Bienen losschicken mit !bee."),
+    "winter": ("Winter! Schnee schippen mit !shovel, gemeinsam abschütteln mit !shake, Eiszapfen abbrechen mit !icicle, "
+               "und für alles andere gibt es !snowball.",
+               "Schneegestöber! Wer friert, schippt mit !shovel, wer Unfug im Kopf hat, wirft mit !snowball. "
+               "Zu fünft geht !shake, einzeln geht !icicle."),
+}
 FROST_MIN = 5
+_season_turn = [0]
 
 
 def commands_say(theme: str, frost: float = 0) -> str:
-    cmds = ["!weather"] + list(SEASON_CMDS.get(theme, ()))
-    boards = ["!snowboard" if theme == "winter" else "!board"]
+    lines = SEASON_SAY.get(theme)
+    if not lines:
+        return "Wetterbericht gibt es mit !weather."
+    _season_turn[0] += 1
+    text = lines[_season_turn[0] % len(lines)]
     if frost >= FROST_MIN:
-        cmds += ["!scrape", "!warm"]
-        boards.append("!frostboard")
-    return "Mitmachen kann jeder: " + " ".join(cmds) + " – Bestenliste: " + " ".join(boards)
+        text += " Die Scheibe ist zugefroren: !scrape kratzt, !warm haucht an."
+    board = "!snowboard" if theme == "winter" else "!board"
+    return f"{text} Wetterbericht: !weather, Bestenliste: {board}" + (" und !frostboard." if frost >= FROST_MIN else ".")

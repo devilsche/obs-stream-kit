@@ -472,7 +472,11 @@
 
       /* URL-Parameter */
       var params = new URLSearchParams(window.location.search);
-      var name = params.get('name') || 'Liebling';
+      // to = Ziel aus dem Chat („<3 @Tim“ → %input0% = @Tim) geht vor dem Absender;
+      // eine nicht ersetzte Streamer.bot-Variable (%input0%) zählt nicht
+      var to = (params.get('to') || '').replace(/^@+/, '').trim();
+      if (/%|^input\d$/.test(to)) to = '';
+      var name = to || params.get('name') || 'Liebling';
       document.getElementById('username').textContent = name;
 
       /* Herz-Outline via parametrischer Herzkurve:
