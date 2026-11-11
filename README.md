@@ -465,6 +465,8 @@ Beispiele für Chat-Befehle: `!gewitter` → `cmd=weather&to=storm`, `!schneestu
 
 **OBS-Dock:** `https://stream-overlay.com/app/dock/weather?place=Berlin` in OBS unter Docks → Benutzerdefinierte Browser-Docks eintragen (einmal im Dock anmelden, der Login bleibt). Schmale Steuerseite ohne Menü: oben die Statuszeile wie `!weather` (Live-Wetter am Ort, bestelltes Wetter mit Besteller und Restzeit, Jahreszeit; alle 20 s und nach jedem Knopf neu), darunter die Knöpfe der Weather-Source in aufklappbaren Gruppen. Wetter und Tageszeit aus dem Dock laufen unter dem eigenen Namen. `place` wie in der Overlay-URL.
 
+**Vorschau Baumschmuck:** Tools (nur Admin) „Christmas ornaments preview“: Entwürfe für den Follower-Schmuck am Weihnachtsbaum (Glaskugel, Nussknacker, Tannenzapfen, Zuckerstange, Strohstern, Glocke, Lebkuchenherz) groß und in Originalgröße an einem Probe-Baum; der Typ hängt fest am Namen.
+
 **Testseite Kürbisdrehung:** Im Dashboard unter Tools (nur Admin) „Pumpkin turn preview“: fünf Kürbisse mit denselben Styles wie die Source, Regler für Dauer, Kurve und Zeitlupe, Knöpfe für Drehen, Wegrollen, Aufglimmen und Erlöschen; die eingestellten Werte stehen als CSS darunter (`--pk-turn-dur`, `--pk-turn-ease`).
 
 **Tageszeit:** `day`, `dawn`, `dusk` und `night` (eigene Knopfgruppe „Time of day for 2.5 min“ bzw. `cmd=weather&to=day`) übersteuern nur die Tageszeit, nicht das Wetter: Nach „Night“ bleibt es bei „Rain“ Nacht, „Day“ macht es mitten in der Nacht hell, ohne das Wetter zu ändern. `cmd=auto` setzt Wetter und Tageszeit zurück. Die Deko dunkelt in etwa 4 s weich ab bzw. auf.

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Christmas ornaments preview</title>
+  <style>
+    /* Entwürfe für den Baumschmuck der Follower (Weather-Source, Xmas-Zeit):
+       jedes Teil groß und in Originalgröße an einem Probe-Baum */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --gold: #f2b705; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--gold); color: #000; padding: 6px 10px; }
+    main { max-width: 1150px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    h2 { font-size: 17px; margin: 26px 0 10px; }
+    .lead { color: var(--muted); margin: 0 0 14px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px; text-align: center; }
+    .card svg { width: 120px; height: 150px; display: block; margin: 0 auto 6px; }
+    .card b { display: block; }
+    .card span { color: var(--muted); font-size: 13px; }
+    .treebox { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; }
+    .tree { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+    .tree svg { display: block; width: 420px; height: 470px; }
+    .tree.is-night { background: #0b0f18; }
+    .opts { display: flex; flex-direction: column; gap: 10px; min-width: 220px; }
+    button { background: #5e2a79; color: #fff; border: 1px solid #8a4dad; border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; min-height: 36px; }
+    button:hover { background: #8a4dad; }
+    button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+    .legend { color: var(--muted); font-size: 13px; }
+
+    /* ── Schmuck: gemeinsame Farben (später in theme-winter.css) ── */
+    .o-gold { fill: #e8b923; }
+    .o-gold-dk { fill: #a87c12; }
+    .o-red { fill: #c8202f; }
+    .o-red-dk { fill: #8e1420; }
+    .o-white { fill: #f6f1e7; }
+    .o-black { fill: #1c1c22; }
+    .o-skin { fill: #f2c9a0; }
+    .o-blue { fill: #1f3f8a; }
+    .o-brown { fill: #6b4423; }
+    .o-brown-lt { fill: #8a5a2e; }
+    .o-straw { stroke: #e9cf7a; stroke-width: 2.4; stroke-linecap: round; fill: none; }
+    .o-thread { stroke: #b8202c; stroke-width: 1.2; fill: none; }
+    .o-hang { stroke: #d9c27a; stroke-width: 0.9; fill: none; }
+    .o-icing { stroke: #fbf7ef; stroke-width: 1.4; fill: none; stroke-dasharray: 2.2 1.6; stroke-linecap: round; }
+    .o-cane-base { stroke: #fbf7ef; stroke-width: 4.2; fill: none; stroke-linecap: round; }
+    .o-cane-stripe { stroke: #c8202f; stroke-width: 4.2; fill: none; stroke-linecap: butt; stroke-dasharray: 2.6 2.6; }
+    .o-shine { fill: #fff; opacity: 0.55; }
+    .o-tip { fill: #f3e6b0; }
+    .o-scale { fill: none; stroke: #4a2d14; stroke-width: 0.9; }
+    .o-line { stroke: #1c1c22; stroke-width: 0.8; fill: none; }
+    .t-tree { fill: #1f6b3a; }
+    .t-tree-dk { fill: #17532d; }
+    .t-trunk { fill: #5a3a1e; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#tree">Skip to the tree</a>
+  <main>
+    <h1>Christmas ornaments</h1>
+    <p class="lead">Drafts for the followers' tree ornaments. Each follower keeps one type for good (picked from the name), at the same spot as long as they hang on the tree.</p>
+
+    <h2>Large</h2>
+    <section class="cards" id="cards" aria-label="Ornament types"></section>
+
+    <h2>On the tree (original size, 30 ornaments)</h2>
+    <div class="treebox">
+      <div class="tree" id="tree" role="img" aria-label="Sample tree with 30 mixed ornaments"></div>
+      <div class="opts">
+        <button type="button" id="shuffle">Other names</button>
+        <button type="button" id="night">Night / day</button>
+        <p class="legend" id="legend" aria-live="polite"></p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      'use strict';
+      var NS = 'http://www.w3.org/2000/svg';
+      function el(name, attrs, parent) {
+        var n = document.createElementNS(NS, name);
+        for (var k in attrs) n.setAttribute(k, attrs[k]);
+        if (parent) parent.appendChild(n);
+        return n;
+      }
+      var GRADS = { ornR: ['#ff6b6b', '#b3121f'], ornG: ['#7be08f', '#17733a'], ornB: ['#7fb2ff', '#1c3f9a'], ornP: ['#d59bff', '#6a2a9a'] };
+      function defs(svg) {
+        var d = el('defs', {}, svg);
+        Object.keys(GRADS).forEach(function (k) {
+          var g = el('radialGradient', { id: k, cx: '35%', cy: '30%', r: '70%' }, d);
+          el('stop', { offset: '0%', 'stop-color': GRADS[k][0] }, g);
+          el('stop', { offset: '100%', 'stop-color': GRADS[k][1] }, g);
+        });
+        var gb = el('linearGradient', { id: 'bellG', x1: '0', x2: '1' }, d);
+        el('stop', { offset: '0%', 'stop-color': '#a87c12' }, gb);
+        el('stop', { offset: '45%', 'stop-color': '#f7d455' }, gb);
+        el('stop', { offset: '100%', 'stop-color': '#9a6f0e' }, gb);
+      }
+      // Jedes Teil hängt am Haken bei 0/0 und reicht nach unten (etwa 26 hoch)
+      var TYPES = [
+        { key: 'bauble', name: 'Glass bauble', note: 'red, green, blue, purple', share: 40, draw: function (g, i) {
+          el('path', { 'class': 'o-hang', d: 'M0 0 L0 2' }, g);
+          el('rect', { 'class': 'o-gold', x: -3, y: 2, width: 6, height: 3.5, rx: 1 }, g);
+          el('circle', { cx: 0, cy: 14.5, r: 10, fill: 'url(#' + ['ornR', 'ornG', 'ornB', 'ornP'][i % 4] + ')' }, g);
+          el('ellipse', { 'class': 'o-shine', cx: -3.5, cy: 10.5, rx: 2.4, ry: 3.4 }, g);
+        } },
+        { key: 'nutcracker', name: 'Nutcracker', note: 'Erzgebirge style', share: 10, draw: function (g) {
+          el('path', { 'class': 'o-hang', d: 'M0 0 L0 1.5' }, g);
+          el('rect', { 'class': 'o-black', x: -4.5, y: 1.5, width: 9, height: 8.5, rx: 1.2 }, g);       // Tschako
+          el('rect', { 'class': 'o-gold', x: -4.5, y: 7.6, width: 9, height: 1.6 }, g);                  // Goldband
+          el('circle', { 'class': 'o-gold', cx: 0, cy: 4.6, r: 1.1 }, g);                                // Abzeichen
+          el('rect', { 'class': 'o-skin', x: -3.6, y: 10, width: 7.2, height: 5.6, rx: 1 }, g);          // Gesicht
+          el('circle', { 'class': 'o-black', cx: -1.4, cy: 12, r: 0.6 }, g);
+          el('circle', { 'class': 'o-black', cx: 1.4, cy: 12, r: 0.6 }, g);
+          el('path', { 'class': 'o-white', d: 'M-4 14 Q0 22 4 14 L3 14.6 Q0 18 -3 14.6 Z' }, g);        // Bart
+          el('rect', { 'class': 'o-white', x: -1.8, y: 14.2, width: 3.6, height: 1.6 }, g);              // Zähne
+          el('path', { 'class': 'o-line', d: 'M-1.8 15 L1.8 15 M-0.6 14.2 L-0.6 15.8 M0.6 14.2 L0.6 15.8' }, g);
+          el('path', { 'class': 'o-red', d: 'M-5.5 17.5 L5.5 17.5 L6 25.5 L-6 25.5 Z' }, g);             // Uniform
+          el('rect', { 'class': 'o-black', x: -6, y: 22.5, width: 12, height: 1.6 }, g);                 // Gürtel
+          [19, 21, 24.6].forEach(function (y) { el('circle', { 'class': 'o-gold', cx: 0, cy: y, r: 0.7 }, g); });
+          el('rect', { 'class': 'o-blue', x: -4.6, y: 25.5, width: 3.6, height: 4.5 }, g);               // Beine
+          el('rect', { 'class': 'o-blue', x: 1, y: 25.5, width: 3.6, height: 4.5 }, g);
+          el('rect', { 'class': 'o-black', x: -5, y: 29.4, width: 4.4, height: 1.8, rx: 0.6 }, g);       // Stiefel
+          el('rect', { 'class': 'o-black', x: 0.6, y: 29.4, width: 4.4, height: 1.8, rx: 0.6 }, g);
+        } },
+        { key: 'pinecone', name: 'Pine cone', note: 'scales with golden tips', share: 10, draw: function (g) {
+          el('path', { 'class': 'o-hang', d: 'M0 0 L0 3' }, g);
+          el('path', { 'class': 'o-brown', d: 'M0 3 C7.5 6 9 17 0 29 C-9 17 -7.5 6 0 3 Z' }, g);
+          // Schuppen in versetzten Reihen
+          [[7, 3], [11, 4], [15, 4], [19, 3], [23, 2]].forEach(function (row, r) {
+            var y = row[0], n = row[1], w = (r === 0 || r === 4) ? 2.6 : 3.2;
+            for (var k = 0; k < n; k++) {
+              var x = (k - (n - 1) / 2) * w * 1.6;
+              el('path', { 'class': 'o-brown-lt', d: 'M' + (x - w) + ' ' + y + ' Q' + x + ' ' + (y + 4) + ' ' + (x + w) + ' ' + y + ' Z' }, g);
+              el('path', { 'class': 'o-scale', d: 'M' + (x - w) + ' ' + y + ' Q' + x + ' ' + (y + 4) + ' ' + (x + w) + ' ' + y }, g);
+              el('circle', { 'class': 'o-tip', cx: x, cy: y + 2.8, r: 0.6 }, g);
+            }
+          });
+        } },
+        { key: 'candycane', name: 'Candy cane', note: 'hangs by its hook', share: 10, draw: function (g) {
+          var d = 'M-5 6 C-5 -1 5 -1 5 6 L5 27';
+          el('path', { 'class': 'o-cane-base', d: d }, g);
+          el('path', { 'class': 'o-cane-stripe', d: d }, g);
+        } },
+        { key: 'strawstar', name: 'Straw star', note: 'tied with red thread', share: 10, draw: function (g) {
+          el('path', { 'class': 'o-thread', d: 'M0 0 L0 3' }, g);
+          var cy = 14, r = 11;
+          for (var k = 0; k < 8; k++) {
+            var a = k / 8 * Math.PI;
+            el('line', { 'class': 'o-straw', x1: (Math.cos(a) * r).toFixed(1), y1: (cy + Math.sin(a) * r).toFixed(1),
+                         x2: (-Math.cos(a) * r).toFixed(1), y2: (cy - Math.sin(a) * r).toFixed(1) }, g);
+          }
+          el('circle', { cx: 0, cy: cy, r: 2.6, fill: 'none', stroke: '#b8202c', 'stroke-width': 1.4 }, g);
+        } },
+        { key: 'bell', name: 'Bell', note: 'gold with a red bow', share: 10, draw: function (g) {
+          el('path', { 'class': 'o-hang', d: 'M0 0 L0 3' }, g);
+          el('path', { d: 'M-8.5 21 Q-9 6 0 5 Q9 6 8.5 21 L10.5 23.5 L-10.5 23.5 Z', fill: 'url(#bellG)' }, g);
+          el('circle', { 'class': 'o-gold-dk', cx: 0, cy: 25.5, r: 2.2 }, g);
+          el('ellipse', { 'class': 'o-red', cx: -3.3, cy: 4.2, rx: 3, ry: 1.9 }, g);
+          el('ellipse', { 'class': 'o-red', cx: 3.3, cy: 4.2, rx: 3, ry: 1.9 }, g);
+          el('circle', { 'class': 'o-red-dk', cx: 0, cy: 4.3, r: 1.4 }, g);
+          el('ellipse', { 'class': 'o-shine', cx: -4, cy: 13, rx: 1.4, ry: 4 }, g);
+        } },
+        { key: 'gingerbread', name: 'Gingerbread heart', note: 'white icing, red ribbon', share: 10, draw: function (g) {
+          el('path', { 'class': 'o-thread', d: 'M0 0 L0 6' }, g);
+          var heart = 'M0 27 C-10 19 -11 11 -8 7.5 C-5.5 4.5 -1.5 5.5 0 8.5 C1.5 5.5 5.5 4.5 8 7.5 C11 11 10 19 0 27 Z';
+          el('path', { 'class': 'o-brown', d: heart }, g);
+          el('path', { 'class': 'o-icing', d: 'M0 24 C-8 17.5 -8.6 11.5 -6.4 9.2 C-4.5 7.2 -1.6 8 0 10.8 C1.6 8 4.5 7.2 6.4 9.2 C8.6 11.5 8 17.5 0 24' }, g);
+          el('circle', { 'class': 'o-red', cx: -2.5, cy: 15, r: 1 }, g);
+          el('circle', { 'class': 'o-red', cx: 2.5, cy: 15, r: 1 }, g);
+          el('circle', { 'class': 'o-white', cx: 0, cy: 19, r: 0.9 }, g);
+        } }
+      ];
+      // Typ fest aus dem Namen (gleicher Name → gleicher Schmuck, in jedem Stream)
+      function typeFor(name) {
+        var h = 2166136261;
+        for (var i = 0; i < name.length; i++) { h ^= name.charCodeAt(i); h = Math.imul(h, 16777619); }
+        var roll = (h >>> 0) % 100, acc = 0;
+        for (var t = 0; t < TYPES.length; t++) { acc += TYPES[t].share; if (roll < acc) return TYPES[t]; }
+        return TYPES[0];
+      }
+
+      // ── groß ──
+      var cards = document.getElementById('cards');
+      TYPES.forEach(function (t, i) {
+        var card = el('div', {}, null);
+        card = document.createElement('div');
+        card.className = 'card';
+        var svg = el('svg', { viewBox: '-15 -4 30 38', role: 'img', 'aria-label': t.name }, card);
+        defs(svg);
+        t.draw(el('g', {}, svg), i);
+        var b = document.createElement('b'); b.textContent = t.name; card.appendChild(b);
+        var s = document.createElement('span'); s.textContent = t.note + ' · ' + t.share + ' %'; card.appendChild(s);
+        cards.appendChild(card);
+      });
+
+      // ── am Baum: drei Stufen wie in der Source, 30 Plätze im Wabenraster ──
+      var TIERS = [[200, 30, 170, 95], [200, 120, 285, 135], [200, 220, 410, 175]];
+      function slots() {
+        var d = 27, out = [];
+        function inside(x, y) {
+          return TIERS.some(function (t) {
+            if (y < t[1] + 34 || y > t[2] - 14) return false;
+            return Math.abs(x - 200) <= t[3] * (y - t[1]) / (t[2] - t[1]) - 13;
+          });
+        }
+        for (var r = 0, y = 72; y < 400; y += d * 0.866, r++) {
+          for (var x = 200 - 8 * d + (r % 2 ? d / 2 : 0); x <= 200 + 8 * d; x += d) if (inside(x, y)) out.push([x, y - 12]);
+        }
+        var seed = 3;
+        function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+        for (var k = out.length - 1; k > 0; k--) { var m = Math.floor(rnd() * (k + 1)), tmp = out[k]; out[k] = out[m]; out[m] = tmp; }
+        return out.slice(0, 30);
+      }
+      var SLOTS = slots(), round = 0;
+      var BASE = ['lafefellix', 'dontshoot1990', 'JxDubz_', 'SeverinVR', 'selim5536', 'astroking75', 'MacBash_', 'MrReibs',
+                  'SeXyXmAs__', 'TheMu3ller', '95kirito', 'QueenMira98'];
+      function drawTree() {
+        var box = document.getElementById('tree');
+        box.innerHTML = '';
+        var svg = el('svg', { viewBox: '0 0 400 450' }, box);
+        defs(svg);
+        el('rect', { 'class': 't-trunk', x: 186, y: 405, width: 28, height: 40 }, svg);
+        TIERS.slice().reverse().forEach(function (t) {
+          el('path', { 'class': 't-tree', d: 'M200 ' + t[1] + ' L' + (200 + t[3]) + ' ' + t[2] + ' L' + (200 - t[3]) + ' ' + t[2] + ' Z' }, svg);
+          el('path', { 'class': 't-tree-dk', d: 'M200 ' + t[1] + ' L' + (200 + t[3]) + ' ' + t[2] + ' L200 ' + t[2] + ' Z' }, svg);
+        });
+        el('path', { 'class': 'o-gold', d: 'M200 6 L206 22 L223 22 L209 32 L214 48 L200 38 L186 48 L191 32 L177 22 L194 22 Z' }, svg);
+        var counts = {};
+        SLOTS.forEach(function (s, i) {
+          var name = i < BASE.length && round === 0 ? BASE[i] : 'Viewer' + (round * 100 + i);
+          var t = typeFor(name);
+          counts[t.name] = (counts[t.name] || 0) + 1;
+          t.draw(el('g', { transform: 'translate(' + s[0] + ' ' + s[1] + ')' }, svg), i);
+        });
+        document.getElementById('legend').textContent = Object.keys(counts).map(function (k) { return k + ': ' + counts[k]; }).join(' · ');
+      }
+      drawTree();
+      document.getElementById('shuffle').addEventListener('click', function () { round++; drawTree(); });
+      document.getElementById('night').addEventListener('click', function () { document.getElementById('tree').classList.toggle('is-night'); });
+    })();
+  </script>
+</body>
+</html>
