@@ -626,3 +626,17 @@ def test_day_is_a_time_of_day_and_order_names_who(conn):
     r = c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&name=Zoe&msg=!snow").get_json()
     assert r["offer"] == "snow"
     assert "bestellt von Zoe" in c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
+
+
+def test_whereami_says_when_not_visible(conn):
+    c = _client(conn)
+    r = c.get("/s/t/api/fx/weather?cmd=whereami&name=Nobody").get_json()
+    assert r["visible"] is False and "noch nicht" in r["say"]
+    for i in range(14):
+        c.get("/s/t/api/fx/weather?cmd=follow&name=F" + str(i))
+    r = c.get("/s/t/api/fx/weather?cmd=whereami&name=f13").get_json()
+    assert r["visible"] is True and r["say"] == ""
+    r = c.get("/s/t/api/fx/weather?cmd=whereami&name=F0").get_json()
+    assert r["visible"] is False and "neuesten 12" in r["say"]
+    cmds = commands.poll(1, "weather", 0)["commands"]
+    assert cmds[-1]["cmd"] == "whereami" and cmds[-1]["params"]["name"] == "F0"

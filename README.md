@@ -429,6 +429,7 @@ Der Strand lässt in der Bildmitte (Lebensbalken) nur einen flachen Streifen fre
 
 | Befehl | Wirkung |
 |--------|---------|
+| `cmd=whereami&name=%user%` | `!whereiam`: die eigene Figur (Kürbis, Blume, Sandburg, Mini oder Kugel) leuchtet im sichtbaren Thema auf und hüpft dreimal („… is right here!“). Antwort `visible` und `say`: ist sie nicht unter den neuesten 12 oder noch kein Follower, steht in `say` ein Satz für den Chat |
 | `cmd=follow&name=%user%` | Follow: in alle Themen (Winter: Kugel am Baum in der Xmas-Zeit, sonst Mini-Schneemann; Strand: Kugel am Baum in der Xmas-Zeit, sonst Sandburg) |
 | `cmd=build&name=%user%` | Sub: nächstes Teil des Sub-Projekts (8 Teile, alle Themen) |
 | `cmd=gift&name=%user%&type=sub\|resub\|giftsub\|bits\|raid&amount=…` | Geschenk unter dem Baum |

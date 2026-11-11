@@ -105,6 +105,17 @@ def add(conn, tenant_id: int, name: str) -> bool:
     return True
 
 
+def position(conn, tenant_id: int, name: str):
+    """Platz des Followers ab dem neuesten (0 = neuester) oder None, wenn unbekannt."""
+    row = conn.execute("SELECT id FROM fx_weather_follower WHERE tenant_id = ? AND kind = 'follower' "
+                       "AND lower(name) = lower(?) ORDER BY id DESC LIMIT 1", (tenant_id, name)).fetchone()
+    if not row:
+        return None
+    newer = conn.execute("SELECT COUNT(*) AS n FROM fx_weather_follower WHERE tenant_id = ? AND kind = 'follower' "
+                         "AND id > ?", (tenant_id, row["id"])).fetchone()
+    return int(newer["n"])
+
+
 def load(conn, tenant_id: int, limit: int = 60) -> dict:
     """→ {"names": neueste `limit` Namen (älteste zuerst), "total"}."""
     _ensure_imported(conn, tenant_id)

@@ -788,6 +788,14 @@
             follow(p.name || ''); break;
           case 'build':
             build(p.name || '', S.on); break;
+          case 'whereami': {
+            var me = (p.name || '').toLowerCase(), pool = [];
+            X.spotPool(pool);
+            if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
+            var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
+            if (hit && S.on && SK) { SK.hop(hit.node); tag(hit.label + ' is right here!', hit.p[0], hit.p[1]); }
+            break;
+          }
           case 'snowmanreset':
             resetSnowman(S.on); break;
           case 'shovel':

@@ -1353,6 +1353,16 @@
           case 'ornament': X.ornament(p.name || '', true); break;
           case 'gift': X.gift({ name: p.name || '', type: p.type, amount: parseInt(p.amount, 10) || 1 }, true); break;
           case 'build': palace.build(p.name || '', B.on); break;
+          case 'whereami': {
+            var me = (p.name || '').toLowerCase(), pool = [];
+            X.spotPool(pool);
+            if (B.partOn('beach') && !X.followersHidden()) {
+              castles.forEach(function (c) { if (c && c.label) pool.push({ node: c.inner, label: c.label, p: [c.x, c.y] }); });
+            }
+            var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
+            if (hit && B.on && root.SeasonKit) { root.SeasonKit.hop(hit.node); B.tag(hit.label + ' is right here!', hit.p[0], hit.p[1], true); }
+            break;
+          }
           case 'snowmanreset': palace.reset(B.on); break;
           case 'splash': splash(p); break;
           case 'ice': addIce(p.name || ''); break;

@@ -102,6 +102,18 @@ def raid(viewers, name: str = "", rnd=random) -> dict:
 
 # ── Sätze für den Chat ──
 
+VISIBLE = 12    # so viele neueste Follower stehen je Thema im Bild
+
+
+def whereami_say(name: str, pos) -> str:
+    """Antwort auf !whereiam; leer, wenn die Figur im Bild ist (dann hüpft sie)."""
+    who = f"@{name} " if name else ""
+    if pos is None:
+        return f"{who}Dich gibt es hier noch nicht. Mit einem Follow bekommst du deinen Platz in der Deko."
+    if pos >= VISIBLE:
+        return f"{who}Du stehst gerade nicht im Bild, zu sehen sind die neuesten {VISIBLE} Follower."
+    return ""
+
 PROJECT = {"winter": ("Schneemann", "zum fertigen Schneemann"),
            "autumn": ("Vogelscheuche", "zur fertigen Vogelscheuche"),
            "spring": ("Sonnenblume", "zur fertigen Sonnenblume"),

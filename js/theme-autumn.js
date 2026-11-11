@@ -871,6 +871,12 @@
           case 'follow':
           case 'pumpkin': addPumpkin(p.name || '', B.on); pkTotal++; break;
           case 'build': scare.build(p.name || '', B.on); break;
+          case 'whereami': {
+            var me = (p.name || '').toLowerCase();
+            var pk = pkNodes.filter(function (k) { return k && k.label && k.label.toLowerCase() === me; })[0];
+            if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); B.tag(pk.label + ' is right here!', pk.x, pk.y - pk.h - 12, true); }
+            break;
+          }
           case 'snowmanreset': scare.reset(B.on); break;
           case 'rake': rake(p); break;
           case 'jump': jump(p.name || ''); break;

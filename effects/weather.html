@@ -530,6 +530,10 @@
           case 'celebrate':
             (seasons[lastTheme] || theme).command('celebrate', p);
             break;
+          // !whereiam: die eigene Figur im sichtbaren Thema hüpft
+          case 'whereami':
+            (seasons[lastTheme] || theme).command('whereami', p);
+            break;
           case 'seasonboard':
             if (seasons[lastTheme]) seasons[lastTheme].command('seasonboard', p);
             else if (lastTheme === 'winter') theme.command('snowboard', p);

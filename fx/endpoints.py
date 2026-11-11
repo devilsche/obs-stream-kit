@@ -209,6 +209,14 @@ def push(token, effect):
     out = _dispatch(effect, cmd)
     if out.get("duplicate"):
         return _no_store(jsonify(out))
+    if effect == "weather" and cmd["cmd"] == "whereami":
+        name = cmd["params"].get("name", "")
+        try:
+            pos = _with_conn(lambda conn: weather_followers.position(conn, g.tenant_id, name)) if name else None
+        except Exception:
+            log.exception("fx weather: follower position failed")
+            pos = None
+        extra = {"visible": pos is not None and pos < weather_chat.VISIBLE, "say": weather_chat.whereami_say(name, pos)}
     if effect == "weather" and cmd["cmd"] == "build" and before is not None:
         try:
             after = _with_conn(lambda conn: _project_stage(conn, g.tenant_id))
@@ -220,6 +228,7 @@ def push(token, effect):
             log.exception("fx weather: project stage failed")
     out.update(extra)
     return _no_store(jsonify(out))
+
 
 
 def _dispatch(effect, cmd) -> dict:

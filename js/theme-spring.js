@@ -531,6 +531,12 @@
           case 'follow':
           case 'flower': addFlower(p.name || '', B.on); flTotal++; break;
           case 'build': sunflower.build(p.name || '', B.on); break;
+          case 'whereami': {
+            var me = (p.name || '').toLowerCase();
+            var fl = flowers.filter(function (f) { return f && f.label && f.label.toLowerCase() === me; })[0];
+            if (fl && B.on && B.partOn('meadow') && root.SeasonKit) { root.SeasonKit.hop(fl.head); B.tag(fl.label + ' is right here!', fl.x, fl.y - 50, true); }
+            break;
+          }
           case 'snowmanreset': sunflower.reset(B.on); break;
           case 'water': water(p); break;
           case 'weed': weed(p); break;

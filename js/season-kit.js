@@ -79,6 +79,13 @@
     node.classList.add('is-spot');
     setTimeout(function () { node.classList.remove('is-spot'); }, 3300);
   }
+  // !whereiam: Scheinwerfer und dreimal hüpfen
+  function hop(node) {
+    node.classList.remove('is-hop');
+    spot(node);
+    node.classList.add('is-hop');
+    setTimeout(function () { node.classList.remove('is-hop'); }, 3300);
+  }
 
   // Rangliste (Name ohne Groß/klein → Anzahl) mit HUD-Kasten
   function Leaders(box, list) {
@@ -252,7 +259,7 @@
     W: W, H: H, reduced: reduced,
     choice: choice, num: num, flag: flag, settings: settings, copy: copy,
     el: el, rnd: rnd, rand: rand, clamp01: clamp01, styleSheet: styleSheet,
-    pulse: pulse, tag: tag, spot: spot, Leaders: Leaders, Group: Group,
+    pulse: pulse, tag: tag, spot: spot, hop: hop, Leaders: Leaders, Group: Group,
     Particles: Particles, loop: loop, connect: connect, serverNow: serverNow, testName: testName
   };
 })();
