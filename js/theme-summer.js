@@ -398,7 +398,9 @@
     // oben, 10–25° schräg; schmilzt in 40 s (kühl) bis 12 s (volle Hitze),
     // nur Show; links oder rechts, die Mitte bleibt frei ──
     var ices = [];
-    function sideX() { return Math.random() < 0.5 ? rand(120, 680) : rand(1240, W - 120); }
+    // Eis und Pommes in die Lücke zwischen Sandburgen (Ecken bis ~400 px) und
+    // Bildmitte, rechts auch nicht an die Stange des Sonnenschirms (1470)
+    function sideX() { return Math.random() < 0.5 ? rand(420, 680) : rand(1240, 1420); }
     function addIce(name) {
       var x = sideX(), y = sandY(x) + 6;
       var flavor = 1 + Math.floor(Math.random() * 4), tilt = (Math.random() < 0.5 ? -1 : 1) * rand(10, 25);
