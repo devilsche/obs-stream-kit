@@ -452,6 +452,30 @@
   // CSS-Animationen; x/top = Mitte und Oberkante im Bild, r = Rollradius.
   // → ms, nach denen der Platz frei aussieht (dann fällt der Neue)
   var LEAVE_ROLL = 2200, LEAVE_CROW = 3400;
+  // Schatten beim Rollen: dreht nicht mit, bleibt flach am Boden und wird je
+  // nach Drehlage breiter oder schmaler (ratio = Höhe/Breite der Figur)
+  function rollShadow(shadow, spin, ratio, ms) {
+    if (!shadow || !spin || !root.requestAnimationFrame) return;
+    var t0 = null;
+    function step(ts) {
+      if (t0 === null) t0 = ts;
+      var m = root.getComputedStyle(spin).transform, a = 1, b = 0;
+      if (m && m !== 'none') { var v = m.slice(m.indexOf('(') + 1, -1).split(','); a = +v[0]; b = +v[1]; }
+      var th = Math.atan2(b, a), c = Math.cos(th), s = Math.sin(th);
+      shadow.setAttribute('transform', 'scale(' + Math.sqrt(c * c + ratio * ratio * s * s).toFixed(3) + ' 1)');
+      if (ts - t0 < ms) root.requestAnimationFrame(step); else shadow.removeAttribute('transform');
+    }
+    root.requestAnimationFrame(step);
+  }
+  // rollende Figur (Besuch, Platzmachen): Schatten aus dem drehenden Teil holen,
+  // er wandert mit, dreht aber nicht
+  function groundShadow(wrap, node, item, o, ms) {
+    if (!o.shadow || !o.shadow.parentNode) return;
+    var holder = el('g', { transform: node.getAttribute('transform') || '' });
+    wrap.insertBefore(holder, item);
+    holder.appendChild(o.shadow);
+    rollShadow(o.shadow, item, o.shadowRatio || 0.7, ms);
+  }
   function leave(node, o) {
     var parent = node.parentNode;
     if (!parent) return 0;
@@ -479,6 +503,7 @@
       var dx = dir < 0 ? -(o.x - 20) : W - 20 - o.x, r = Math.max(10, o.r || 24);
       wrap.style.setProperty('--ts-dx', Math.round(dx) + 'px');
       wrap.style.setProperty('--ts-rot', Math.round(dx / r * 57.3) + 'deg');
+      groundShadow(wrap, node, inner, o, LEAVE_ROLL);
     }
     var ms = crow ? LEAVE_CROW : LEAVE_ROLL;
     setTimeout(function () { if (wrap.parentNode) wrap.parentNode.removeChild(wrap); }, ms + 200);
@@ -511,6 +536,7 @@
       var dir = o.x < W / 2 ? -1 : 1, dx = dir < 0 ? -(o.x - 20) : W - 20 - o.x, r = Math.max(10, o.r || 24);
       wrap.style.setProperty('--ts-dx', Math.round(dx) + 'px');
       wrap.style.setProperty('--ts-rot', Math.round(dx / r * 57.3) + 'deg');
+      groundShadow(wrap, node, inner, o, VISIT_IN);
     }
     var inMs = roll ? VISIT_IN : VISIT_POP;
     setTimeout(function () { if (o.arrive) o.arrive(); }, inMs);
@@ -528,5 +554,5 @@
     return (h >>> 0) / 4294967296;
   }
 
-  root.ThemeSeasons = { nameRand: nameRand, sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting };
+  root.ThemeSeasons = { nameRand: nameRand, sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting, rollShadow: rollShadow };
 })(typeof window !== 'undefined' ? window : this);

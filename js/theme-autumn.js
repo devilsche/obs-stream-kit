@@ -266,8 +266,10 @@
       // Zwischenebene zum Anheben/Aufschwimmen (Fuß bei 0/0)
       var lift = el('g', {}, g);
       var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
-      el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: f1(44 * sx), ry: f1(7 * scale) }, inner);
-      var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, inner);
+      var shadow = el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: f1(44 * sx), ry: f1(7 * scale) }, inner);
+      // beim Zurückrollen dreht nur der Körper, der Schatten bleibt flach
+      var spin = el('g', { 'class': 'ta-pk-spin' }, inner);
+      var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, spin);
       el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
       el('ellipse', { 'class': 'ta-pk-body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
       el('ellipse', { 'class': 'ta-pk-body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
@@ -279,7 +281,8 @@
       el('path', { 'class': 'ts-cap', d: 'M-40 -45 Q-37 -64 -18 -63 Q0 -68 18 -63 Q37 -64 40 -45 Q20 -54 0 -52 Q-20 -54 -40 -45 Z' }, body);
       el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
       el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
-      return { node: g, inner: inner, lift: lift, label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: 0, depth: depth,
+      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, ratio: (61 * sy) / (84 * sx),
+               label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: 0, depth: depth,
                ly: 0, lx: 0, rot: 0, vy: 0, mode: null, shown: '' };
     }
     function placePumpkins() {
@@ -302,7 +305,8 @@
         pkNodes[i] = null;
         pkNext++;
         var gen = pkGen;
-        var wait = TS.leave(old.node, { x: old.x, top: old.y - old.h, r: old.h / 2, crow: Math.random() < 0.25 });
+        var wait = TS.leave(old.node, { x: old.x, top: old.y - old.h, r: old.h / 2, crow: Math.random() < 0.25,
+                                        shadow: old.shadow, shadowRatio: old.ratio });
         setTimeout(function () { if (gen === pkGen && !pkNodes[i]) putPumpkin(name, i, true); }, wait);
         return;
       }
@@ -337,7 +341,8 @@
             var ghost = pk.node.cloneNode(true);
             ghost.classList.remove('ta-pk--new', 'is-lit');
             pk.node.parentNode.insertBefore(ghost, pk.node);
-            var back = TS.leave(ghost, { x: pk.x, top: pk.y - pk.h, r: pk.h / 2 });
+            var back = TS.leave(ghost, { x: pk.x, top: pk.y - pk.h, r: pk.h / 2,
+                                         shadow: ghost.querySelector('.ta-pk-shadow'), shadowRatio: pk.ratio });
             pk.zap = true;
             pk.node.dataset.zap = '1';
             var dx = pk.x < W / 2 ? -(pk.x - 20) : W - 20 - pk.x;
@@ -350,6 +355,7 @@
               pk.node.classList.remove('is-rollin');
               void pk.node.getBBox();
               pk.node.classList.add('is-rollin');
+              TS.rollShadow(pk.shadow, pk.spin, pk.ratio, 1600);
               setTimeout(function () { pk.node.classList.remove('is-rollin'); }, 1700);
             }, back + 1400);
             return;
@@ -385,7 +391,7 @@
       v.node.setAttribute('transform', 'translate(' + v.x + ' ' + y.toFixed(1) + ')');
       if (pkLit) v.node.classList.add('is-lit');
       gPumpkins.appendChild(v.node);
-      TS.visit(v.node, { x: v.x, top: y - v.h, r: v.h / 2, roll: true,
+      TS.visit(v.node, { x: v.x, top: y - v.h, r: v.h / 2, roll: true, shadow: v.shadow, shadowRatio: v.ratio,
         arrive: function () { if (root.SeasonKit) root.SeasonKit.hop(v.inner); B.tag(name + ' drops by!', v.x, y - v.h - 12, true); } });
     }
     function clearPumpkins() { B.clear(gPumpkins); pkNodes = []; pkNext = 0; pkTotal = 0; pkGen++; }
