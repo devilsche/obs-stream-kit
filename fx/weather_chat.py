@@ -168,3 +168,20 @@ TIPS = {"autumn": ("!rake", "!jump", "!extinguish"),
 def tip_say(theme: str, rnd=random) -> str:
     cmd = rnd.choice(TIPS.get(theme, TIPS["autumn"]))
     return f"Probiert mal {cmd}! Alle Befehle zeigt !commands."
+
+
+# Kostenlose Befehle je Thema (nur was gerade wirkt); Frost nur, wenn welcher da ist
+SEASON_CMDS = {"autumn": ("!rake", "!jump", "!extinguish"),
+               "spring": ("!water", "!weed", "!bee"),
+               "summer": ("!splash", "!ice", "!fries"),
+               "winter": ("!shovel", "!shake", "!icicle", "!snowball")}
+FROST_MIN = 5
+
+
+def commands_say(theme: str, frost: float = 0) -> str:
+    cmds = ["!weather"] + list(SEASON_CMDS.get(theme, ()))
+    boards = ["!snowboard" if theme == "winter" else "!board"]
+    if frost >= FROST_MIN:
+        cmds += ["!scrape", "!warm"]
+        boards.append("!frostboard")
+    return "Mitmachen kann jeder: " + " ".join(cmds) + " – Bestenliste: " + " ".join(boards)

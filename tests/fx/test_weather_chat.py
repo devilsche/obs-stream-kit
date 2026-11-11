@@ -71,3 +71,9 @@ def test_weather_say_live_from_place_and_override():
 
 def test_weather_say_skips_empty_level():
     assert wc.weather_say({"kind": "cloudy", "temp": 3, "theme": "winter", "snowCover": 0}, "Berlin") == "Live aus Berlin: bewölkt, 3 °C."
+
+
+def test_commands_only_for_current_season():
+    assert wc.commands_say("summer") == "Mitmachen kann jeder: !weather !splash !ice !fries – Bestenliste: !board"
+    w = wc.commands_say("winter", frost=20)
+    assert "!shovel" in w and "!rake" not in w and "!scrape" in w and w.endswith("!snowboard !frostboard")

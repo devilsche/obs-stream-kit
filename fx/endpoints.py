@@ -247,7 +247,7 @@ _INFO_TURN = {}
 
 @bp_fx.route("/s/<token>/api/fx/weather/info")
 def weather_info_route(token):
-    """Streamer.bot: fertige Chat-Sätze. what=weather|project|top|tip|rotate
+    """Streamer.bot: fertige Chat-Sätze. what=weather|project|top|tip|commands|rotate
     (rotate wechselt Projekt, Rangliste, Tipp); place wie in der Overlay-URL."""
     if g.tenant_id is None:
         abort(404)
@@ -271,7 +271,8 @@ def weather_info_route(token):
             return weather_chat.top_say(theme, weather_season.load(conn, g.tenant_id)["top"].get(theme, []))
         says = {"weather": lambda: weather_chat.weather_say(state, opts.get("place", "")),
                 "project": lambda: weather_chat.project_say(theme, _project_stage(conn, g.tenant_id)),
-                "top": top, "tip": lambda: weather_chat.tip_say(theme)}
+                "top": top, "tip": lambda: weather_chat.tip_say(theme),
+                "commands": lambda: weather_chat.commands_say(theme, weather_frost.load(conn, g.tenant_id)["level"])}
         if what == "rotate":
             order = ("project", "top", "tip")
             turn = _INFO_TURN.get(g.tenant_id, 0)
