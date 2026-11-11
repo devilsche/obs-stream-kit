@@ -158,6 +158,7 @@ def test_co_player_fasst_beide_accounts_zusammen(mitspieler_mit_zwei_accounts):
     assert status == 200
     hist = body["sharedHistory"]
     assert hist["matches"] == 2
+    assert body["together"] == 2
     assert hist["mateKills"] == 6
     assert hist["myKills"] == 2
     # Lifetime/Name bleiben beim gefragten Account

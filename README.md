@@ -317,7 +317,7 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
 | `stingers/make-it-so.html` | Star-Trek-Befehl (Picard + LCARS) | ~3.2s | 1920×1080 |
 | `stingers/engage.html` | Star-Trek-Warp-Hype (Picard) | ~3.1s | 1920×1080 |
 | `stingers/resistance-futile.html` | Star-Trek-Borg (CRT-Terminal-Look) | ~3.8s | 1920×1080 |
-| `stingers/heart.html` | Geheimer Herzschlag (Sparkle-Heart); `?name=%user%&to=%input0%`: „<3 @Tim“ zeigt Tim statt des Absenders | ~5.4s | 1920×1080 |
+| `stingers/heart.html` | Geheimer Herzschlag (Sparkle-Heart); `?name=%user%&to=%targetUser%&avatar=%targetUserProfileImageUrl%&msg=%rawInput%` (in Streamer.bot vorher „Get User Info for Target“): „<3 @Tim“ zeigt unten Tims Profilbild und Namen, „<3 Text“ den Text, darüber jeweils klein „from Absender“; „<3“ allein wie bisher den Absender | ~5.4s | 1920×1080 |
 | `stingers/kickers-remake.html` | Kickers-Intro CSS-Nachbau (Fußballfeld + Ball-Swarm + 2× HURRA + Titel „Die tollen Superzocker") — `?tune=1` fürs Tune-Panel | ~7.7s | 1920×1080 |
 | `stingers/sad.html` | `!sad` — Regenwolke mit traurigem Gesicht + Sad Trombone, Titel „sad.“ — `?left=30` linke Wolkenkante in px (Standard 30, 740 = Mitte) | ~4.6s | 1920×1080 |
 | `stingers/you-died.html` | `!sad` Souls-Style: schwarzer Balken, roter Serifentext, Gong — `?text=HOPE%20DIED` eigener Text | ~4.7s | 1920×1080 |
@@ -796,6 +796,8 @@ Alle URLs unter `http://localhost:8080/widgets/pubg/<datei>.html`.
 | `weapon-milestone-bar.html` | Dieselben Meilensteine als Leiste am Bildrand | `wait`, `poll`, `pos=bottom\|top`, `confetti=0`, `demo=<anlass>\|1\|all`, `value`, `subject` |
 
 Cross-Player-Web-View: `http://localhost:8080/widgets/pubg/coplayer.html?player=NAME`
+
+`/api/pubg/co-player/NAME` liefert zusätzlich `together` (gemeinsame Matches, 0 bei unbekanntem Namen oder ohne gemeinsames Spiel). Streamer.bot prüft das bei `!coplayer`, bevor es die Karte zeigt; ohne Namen antwortet der Bot mit einer kurzen Anleitung.
 (alte URL `overlays/stats.html?player=NAME` leitet weiter)
 
 **Fremdsicht (`?asTenant=`)**: Admins können jedes Tool und Widget in der Sicht eines

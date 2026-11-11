@@ -180,6 +180,31 @@
       animation: nameIn 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) calc(var(--name-in) - var(--time-offset)) forwards;
     }
 
+    /* „<3 @Tim“: Profilbild neben dem Namen; „<3 Text“: der Text, kleiner und umbrechend */
+    .username { display: flex; align-items: center; gap: 28px; }
+    .username.is-msg {
+      font-size: 56px; letter-spacing: 2px; white-space: normal; text-align: center;
+      width: 1500px; justify-content: center; line-height: 1.15;
+    }
+    .avatar {
+      width: 112px; height: 112px; border-radius: 50%; flex: none;
+      border: 5px solid #ff6b9d;
+      box-shadow: 0 0 24px rgba(255, 120, 170, 0.9), 0 0 50px rgba(255, 60, 130, 0.55);
+    }
+    .avatar.is-hidden { display: none; }
+    /* Absender klein über dem Herzen */
+    .author {
+      position: absolute;
+      top: calc(50% - 360px);
+      left: 50%;
+      transform: translateX(-50%) translateY(30px);
+      font-size: 40px; font-weight: 800; letter-spacing: 3px;
+      color: #ffd1e1; white-space: nowrap; z-index: 5; opacity: 0;
+      text-shadow: 0 0 18px rgba(255, 120, 170, 0.85), 3px 3px 0 rgba(0, 0, 0, 0.6);
+      animation: nameIn 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) calc(var(--name-in) - var(--time-offset)) forwards;
+    }
+    .author.is-hidden { display: none; }
+
     .stage {
       position: absolute; inset: 0;
       animation: fadeOutAll 1.0s ease-in var(--stage-out) forwards;
@@ -237,7 +262,8 @@
 
     <div class="heart-group" id="heartGroup"></div>
 
-    <div class="username" id="username">Liebling</div>
+    <div class="author is-hidden" id="author"></div>
+    <div class="username" id="username"><img class="avatar is-hidden" id="avatar" alt=""><span id="nameText">Liebling</span></div>
   </div>
 
   <audio id="audio" data-stinger-autoplay preload="auto" src="../assets/stingers/heart-beat.mp3"></audio>
@@ -472,12 +498,38 @@
 
       /* URL-Parameter */
       var params = new URLSearchParams(window.location.search);
-      // to = Ziel aus dem Chat („<3 @Tim“ → %input0% = @Tim) geht vor dem Absender;
-      // eine nicht ersetzte Streamer.bot-Variable (%input0%) zählt nicht
-      var to = (params.get('to') || '').replace(/^@+/, '').trim();
-      if (/%|^input\d$/.test(to)) to = '';
-      var name = to || params.get('name') || 'Liebling';
-      document.getElementById('username').textContent = name;
+      // name = Absender; msg = Text nach dem Befehl (%rawInput%), to = Ziel,
+      // avatar = dessen Profilbild (Streamer.bot „Get User Info for Target“).
+      // „<3 @Tim“: unten Bild + Tim, oben der Absender; „<3 Text“: unten der
+      // Text, oben der Absender; „<3“ allein: unten der Absender wie früher.
+      // Nicht ersetzte Streamer.bot-Variablen (%…%) zählen nicht.
+      function clean(v) { v = (v || '').trim(); return /%/.test(v) ? '' : v; }
+      var author = clean(params.get('name')) || 'Liebling';
+      var msg = clean(params.get('msg')).slice(0, 90);
+      var to = clean(params.get('to')).replace(/^@+/, '');
+      if (!to && /^@\S/.test(msg)) to = msg.split(/\s+/)[0].replace(/^@+/, '');
+      if (to && !/^\w{2,25}$/.test(to)) to = '';
+      var below = author;
+      var nameBox = document.getElementById('username');
+      if (to) {
+        below = to;
+        var pic = clean(params.get('avatar'));
+        if (/^https:\/\/static-cdn\.jtvnw\.net\//.test(pic)) {
+          var img = document.getElementById('avatar');
+          img.addEventListener('error', function () { img.classList.add('is-hidden'); });
+          img.src = pic;
+          img.classList.remove('is-hidden');
+        }
+      } else if (msg) {
+        below = msg;
+        nameBox.classList.add('is-msg');
+      }
+      document.getElementById('nameText').textContent = below;
+      if (below !== author) {
+        var authorEl = document.getElementById('author');
+        authorEl.textContent = 'from ' + author;
+        authorEl.classList.remove('is-hidden');
+      }
 
       /* Herz-Outline via parametrischer Herzkurve:
          x = 16 * sin(t)^3

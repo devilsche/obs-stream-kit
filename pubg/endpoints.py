@@ -2721,7 +2721,12 @@ class EndpointRegistry:
             f"co-player:{name}",
             lambda: compute_co_player(conn, self.tenant_id, self.my_account_id, name),
         )
-        return _ok(result)
+        # together: gemeinsame Matches flach, damit Streamer.bot ohne Verschachtelung
+        # entscheiden kann, ob die Karte gezeigt wird (0 = unbekannt oder nie zusammen)
+        out = dict(result) if isinstance(result, dict) else result
+        if isinstance(out, dict):
+            out["together"] = int(((out.get("sharedHistory") or {}).get("matches")) or 0)
+        return _ok(out)
 
     # ── Meilensteine ───────────────────────────────────────────────────
 
