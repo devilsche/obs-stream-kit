@@ -278,7 +278,9 @@
 
     function updateCounter() {
       var p = [];
-      if (ornTotal) p.push(ornTotal + (ornTotal === 1 ? ' ornament' : ' ornaments'));
+      // am Baum hängen nur die neuesten MAX_ORN; sind mehr gespeichert, beides nennen
+      if (ornTotal > MAX_ORN) p.push(MAX_ORN + ' of ' + ornTotal + ' ornaments');
+      else if (ornTotal) p.push(ornTotal + (ornTotal === 1 ? ' ornament' : ' ornaments'));
       if (giftTotal) p.push(giftTotal + (giftTotal === 1 ? ' gift' : ' gifts'));
       counterEl.textContent = p.join(' · ');
     }
