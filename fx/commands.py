@@ -233,7 +233,7 @@ EFFECTS = {
             "testbg": _test_bg,
         },
         "args": {
-            "weather": {"to": _choice(*weather.KINDS), "hold": _int_range(0, 3600)},
+            "weather": {"to": _choice(*weather.KINDS), "hold": _int_range(0, 3600), "name": _name},
             "strike": {"dist": _choice("near", "far")},
             "spectacle": {"type": _choice(*weather.SPECTACLES)},
             "scrape": {"name": _name},

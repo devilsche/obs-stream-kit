@@ -22,6 +22,9 @@ OFFERS = {
     "fog": ({"cmd": "weather", "params": {"to": "fog"}}, "weather", "Nebel"),
     "heatwave": ({"cmd": "weather", "params": {"to": "heat"}}, "weather", "eine Hitzewelle"),
     "night": ({"cmd": "weather", "params": {"to": "night"}}, "weather", "eine Sternennacht"),
+    "day": ({"cmd": "weather", "params": {"to": "day"}}, "weather", "hellen Tag"),
+    "dawn": ({"cmd": "weather", "params": {"to": "dawn"}}, "weather", "eine Morgendämmerung"),
+    "dusk": ({"cmd": "weather", "params": {"to": "dusk"}}, "weather", "eine Abenddämmerung"),
     "rainbow": ({"cmd": "spectacle", "params": {"type": "rainbow"}}, "small", "einen Regenbogen"),
     "aurora": ({"cmd": "spectacle", "params": {"type": "aurora"}}, "small", "Polarlicht"),
     "meteors": ({"cmd": "spectacle", "params": {"type": "meteors"}}, "small", "Sternschnuppen"),
@@ -119,7 +122,7 @@ def project_say(theme: str, stage: int, name: str = "", completed: bool = False)
 
 KIND_SAY = {"clear": "klar", "cloudy": "bewölkt", "fog": "neblig", "drizzle": "Nieselregen",
             "rain": "Regen", "storm": "Gewitter", "sleet": "Schneeregen", "snow": "Schnee",
-            "blizzard": "Schneesturm", "heat": "Hitze", "night": "Sternennacht",
+            "blizzard": "Schneesturm", "heat": "Hitze", "night": "Sternennacht", "day": "klar",
             "dawn": "Morgendämmerung", "dusk": "Abenddämmerung"}
 LEVEL_SAY = {"autumn": ("leaves", "der Laubhaufen liegt {v} % hoch"),
              "spring": ("water", "der Garten ist zu {v} % gegossen"),
@@ -129,21 +132,44 @@ LEVEL_SAY = {"autumn": ("leaves", "der Laubhaufen liegt {v} % hoch"),
 THEME_SAY = {"winter": "Winter", "autumn": "Herbst", "spring": "Frühling", "summer": "Sommer"}
 
 
-def weather_say(state: dict, place: str = "") -> str:
-    """Echtes Wetter am Ort, dazu was im Stream zu sehen ist (bestelltes Wetter,
-    Jahreszeit mit ihrem Stand). place: Ortsname aus der Overlay-URL
-    („Berlin, Land Berlin, DE“ → „Berlin“)."""
+TOD_SAY = {"day": "Tag", "night": "Nacht", "dawn": "Morgendämmerung", "dusk": "Abenddämmerung"}
+
+
+def _ordered(order, now) -> str:
+    """„bestellt von Tim, noch 2 min“; ohne Namen „vom Chat bestellt“."""
+    who = f"bestellt von {order['by']}" if order and order.get("by") else "vom Chat bestellt"
+    until = (order or {}).get("until")
+    if until and now is not None:
+        mins = max(1, round((until - now) / 60))
+        return f"{who}, noch {mins} min"
+    return who
+
+
+def weather_say(state: dict, place: str = "", orders: dict = None, now: float = None) -> str:
+    """Wetter am Ort und was im Stream zu sehen ist. „Live aus …“ nur bei echtem
+    Wetter (source api); bestelltes Wetter und bestellte Tageszeit mit Besteller
+    und Restzeit (orders aus dem Server: {"weather"|"tod": {kind, by, until}}).
+    place: Ortsname aus der Overlay-URL („Berlin, Land Berlin, DE“ → „Berlin“)."""
+    orders = orders or {}
     town = (place or "").split(",")[0].strip()
     kind = state.get("kind") or "clear"
     temp = f"{round(state['temp'])} °C" if isinstance(state.get("temp"), (int, float)) else ""
     look = KIND_SAY.get(kind, kind)
-    if state.get("source") == "override":
-        live = f"Live aus {town}: {temp}. " if town and temp else ""
-        text = f"{live}Im Bild gerade: {look} (vom Chat bestellt)."
-    elif town:
+    source = state.get("source")
+    live = bool(town) and (source == "api" or (source == "override" and temp))
+    weather_ordered = source == "override" and ("weather" in orders or "tod" not in orders)
+    if weather_ordered:
+        head = f"Live aus {town}: {temp}. " if live else ""
+        text = f"{head}Im Bild gerade: {look} ({_ordered(orders.get('weather'), now)})."
+    elif live:
         text = f"Live aus {town}: " + ", ".join(x for x in (look, temp) if x) + "."
+    elif source == "lock":
+        text = f"Wetter im Stream: {look} (fest eingestellt)."
     else:
-        text = "Wetter gerade: " + ", ".join(x for x in (look, temp) if x) + "."
+        text = "Wetter im Stream: " + ", ".join(x for x in (look, temp) if x) + "."
+    tod = orders.get("tod")
+    if tod and tod.get("kind") in TOD_SAY:
+        text += f" Tageszeit: {TOD_SAY[tod['kind']]} ({_ordered(tod, now)})."
     theme = state.get("theme")
     if theme in THEME_SAY:
         season = "Weihnachtszeit" if state.get("xmas") not in (None, "off") else THEME_SAY[theme]

@@ -607,8 +607,22 @@ def test_raid_greeting(conn):
 def test_info_sentences(conn):
     c = _client(conn)
     say = c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
-    assert say.startswith("Wetter gerade: ")
+    assert say.startswith("Wetter im Stream: ")   # ohne Ort und ohne echtes Wetter kein „Live aus“
     weather_state.LAST_THEME[1] = "autumn"
     assert c.get("/s/t/api/fx/weather/info?what=project").get_json()["say"] == "Noch 8 Subs bis zur fertigen Vogelscheuche."
     seen = {c.get("/s/t/api/fx/weather/info?what=rotate").get_json()["say"][:5] for _ in range(3)}
     assert "Noch " in seen and "Probi" in seen     # leere Rangliste wird übersprungen
+
+
+def test_day_is_a_time_of_day_and_order_names_who(conn):
+    c = _client(conn)
+    c.get("/s/t/api/fx/weather?cmd=weather&to=night")
+    c.get("/s/t/api/fx/weather?cmd=weather&to=day&name=Tim")
+    st = _state(c, "")
+    assert st["night"] == 0 and st["sunUp"] == 1
+    c.get("/s/t/api/fx/weather?cmd=weather&to=rain&name=Ann")
+    say = c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
+    assert "Regen (bestellt von Ann" in say and "Tageszeit: Tag (bestellt von Tim" in say
+    r = c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&name=Zoe&msg=!snow").get_json()
+    assert r["offer"] == "snow"
+    assert "bestellt von Zoe" in c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]

@@ -33,9 +33,25 @@ _PERSISTENT = {
 }
 
 
+# Wer zuletzt Wetter bzw. Tageszeit bestellt hat (für !weather und das Dock), je Tenant
+# {"weather"|"tod": {"kind", "by", "until"}}; nur im Speicher, gilt ohnehin nur Minuten
+ORDERS = {}
+
+
+def _remember_order(tenant_id, slot, p, now):
+    hold = p.get("hold")
+    ORDERS.setdefault(tenant_id, {})[slot] = {"kind": p["to"], "by": p.get("name") or "",
+                                              "until": now + hold if hold else None}
+
+
 def _weather_persist(conn, tenant_id, cmd):
     """Übersteuerung speichern; der Befehl geht trotzdem in die Warteschlange,
     damit das Overlay den Zustand sofort neu holt."""
+    if cmd["cmd"] == "weather":
+        _remember_order(tenant_id, "tod" if cmd["params"]["to"] in weather_theme.TIMES_OF_DAY else "weather",
+                        cmd["params"], time.time())
+    elif cmd["cmd"] == "auto":
+        ORDERS.pop(tenant_id, None)
     if cmd["cmd"] == "weather" and cmd["params"]["to"] in weather_theme.TIMES_OF_DAY:
         # Nacht/Dämmerung ist Tageszeit, nicht Wetter: bleibt beim nächsten Wetterwechsel
         weather_theme.set_tod(conn, tenant_id, cmd["params"]["to"], cmd["params"]["hold"], time.time())
@@ -238,7 +254,10 @@ def weather_paid_route(token):
         return _no_store(jsonify({"ok": False, "error": "kind must be bits, money or raid"})), 400
     out = {"ok": True, "offer": r["offer"] if r["command"] else None, "say": r["say"]}
     if r["command"]:
-        out.update(_dispatch("weather", commands.parse("weather", {"cmd": r["command"]["cmd"], **r["command"]["params"]})))
+        args = {"cmd": r["command"]["cmd"], **r["command"]["params"]}
+        if r["command"]["cmd"] == "weather" and name.strip():
+            args["name"] = name
+        out.update(_dispatch("weather", commands.parse("weather", args)))
     return _no_store(jsonify(out))
 
 
@@ -269,7 +288,9 @@ def weather_info_route(token):
             if theme == "winter":
                 return weather_chat.top_say(theme, weather_snow.load(conn, g.tenant_id)["top"])
             return weather_chat.top_say(theme, weather_season.load(conn, g.tenant_id)["top"].get(theme, []))
-        says = {"weather": lambda: weather_chat.weather_say(state, opts.get("place", "")),
+        now = time.time()
+        orders = {k: v for k, v in ORDERS.get(g.tenant_id, {}).items() if v["until"] is None or v["until"] > now}
+        says = {"weather": lambda: weather_chat.weather_say(state, opts.get("place", ""), orders, now),
                 "project": lambda: weather_chat.project_say(theme, _project_stage(conn, g.tenant_id)),
                 "top": top, "tip": lambda: weather_chat.tip_say(theme),
                 "commands": lambda: weather_chat.commands_say(theme, weather_frost.load(conn, g.tenant_id)["level"])}

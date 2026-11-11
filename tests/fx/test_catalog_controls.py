@@ -31,9 +31,10 @@ def test_non_effect_sources_have_no_live_keys():
 def test_weather_has_controls_and_live_keys():
     src = {e["key"]: e for e in list_dir_sources(".", "effects", switches_map=EFFECT_META)}["weather"]
     assert [c["q"] for c in src["controls"]] == [
-        "cmd=auto", "cmd=weather&to=night", "cmd=weather&to=clear", "cmd=weather&to=rain",
+        "cmd=auto", "cmd=weather&to=clear", "cmd=weather&to=rain",
         "cmd=weather&to=storm", "cmd=weather&to=snow",
         "cmd=weather&to=blizzard", "cmd=weather&to=fog",
+        "cmd=weather&to=day", "cmd=weather&to=dawn", "cmd=weather&to=dusk", "cmd=weather&to=night",
         "cmd=strike", "cmd=gust",
         "cmd=spectacle&type=tsunami", "cmd=spectacle&type=megabolt",
         "cmd=spectacle&type=ballbolt", "cmd=spectacle&type=avalanche",

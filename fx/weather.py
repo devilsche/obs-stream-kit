@@ -24,6 +24,7 @@ PROFILES = {
     "blizzard": {"precip": "snow", "rain": 0,    "drizzle": 0,   "snow": 1,    "clouds": 0.85, "sun": 0,    "fog": 0.4,  "heat": 0, "lightning": 0, "windMin": 0.85, "night": 0, "dusk": 0, "gloom": 0.4},
     "heat":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0,    "sun": 1,    "fog": 0,    "heat": 1, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
     # nur als feste Lage / Chat-Befehl; live kommen Nacht und Dämmerung aus daylight()
+    "day":      {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.08, "sun": 0.55, "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 0, "dusk": 0},
     "night":    {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.05, "sun": 0,    "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 1, "dusk": 0},
     "dawn":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.15, "sun": 0.35, "fog": 0.1,  "heat": 0, "lightning": 0, "windMin": 0, "night": 0.2, "dusk": 1},
     "dusk":     {"precip": "none", "rain": 0,    "drizzle": 0,   "snow": 0,    "clouds": 0.15, "sun": 0.35, "fog": 0,    "heat": 0, "lightning": 0, "windMin": 0, "night": 0.2, "dusk": 1},

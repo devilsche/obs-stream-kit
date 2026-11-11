@@ -207,11 +207,11 @@ def early_start(conn, tenant_id, today: date, to: str, zone: str = "north") -> N
     _write(conn, tenant_id, data)
 
 
-TIMES_OF_DAY = ("night", "dawn", "dusk")
+TIMES_OF_DAY = ("day", "night", "dawn", "dusk")
 
 
 def set_tod(conn, tenant_id, kind: str, hold, now: float) -> None:
-    """Tageszeit übersteuern (night/dawn/dusk), unabhängig vom Wetter;
+    """Tageszeit übersteuern (day/night/dawn/dusk), unabhängig vom Wetter;
     hold in Sekunden, 0 = bis `auto`."""
     data = _load(conn, tenant_id) or {}
     data["tod"] = {"kind": kind, "until": now + hold if hold else None}

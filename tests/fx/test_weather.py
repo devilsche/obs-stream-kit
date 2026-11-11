@@ -4,7 +4,7 @@ from fx.weather import KINDS, SPECTACLES, apply_mood, from_api, mood_precip, moo
 
 def test_profiles_cover_all_kinds():
     assert KINDS == ("clear", "cloudy", "fog", "drizzle", "rain", "storm",
-                     "sleet", "snow", "blizzard", "heat", "night", "dawn", "dusk")
+                     "sleet", "snow", "blizzard", "heat", "day", "night", "dawn", "dusk")
     assert SPECTACLES == ("tsunami", "megabolt", "ballbolt", "avalanche",
                           "aurora", "rainbow", "hail", "meteors", "tornado", "fogwall")
     for k in KINDS:

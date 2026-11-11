@@ -53,7 +53,7 @@ def test_project_say():
 
 def test_weather_say_with_level():
     s = wc.weather_say({"kind": "rain", "temp": 7.6, "theme": "autumn", "seasonLevels": {"leaves": 40.4}})
-    assert s == "Wetter gerade: Regen, 8 °C. Im Stream ist Herbst, der Laubhaufen liegt 40 % hoch."
+    assert s == "Wetter im Stream: Regen, 8 °C. Im Stream ist Herbst, der Laubhaufen liegt 40 % hoch."
 
 
 def test_top_and_tip():
@@ -63,14 +63,14 @@ def test_top_and_tip():
 
 
 def test_weather_say_live_from_place_and_override():
-    st = {"kind": "rain", "temp": 3.2, "theme": "autumn", "seasonLevels": {"leaves": 15}}
+    st = {"kind": "rain", "temp": 3.2, "theme": "autumn", "seasonLevels": {"leaves": 15}, "source": "api"}
     assert wc.weather_say(st, "Berlin, Land Berlin, DE") == "Live aus Berlin: Regen, 3 °C. Im Stream ist Herbst, der Laubhaufen liegt 15 % hoch."
     st["source"], st["kind"] = "override", "storm"
     assert wc.weather_say(st, "Berlin") == "Live aus Berlin: 3 °C. Im Bild gerade: Gewitter (vom Chat bestellt). Im Stream ist Herbst, der Laubhaufen liegt 15 % hoch."
 
 
 def test_weather_say_skips_empty_level():
-    assert wc.weather_say({"kind": "cloudy", "temp": 3, "theme": "winter", "snowCover": 0}, "Berlin") == "Live aus Berlin: bewölkt, 3 °C. Im Stream ist Winter."
+    assert wc.weather_say({"kind": "cloudy", "temp": 3, "theme": "winter", "snowCover": 0, "source": "api"}, "Berlin") == "Live aus Berlin: bewölkt, 3 °C. Im Stream ist Winter."
 
 
 def test_commands_only_for_current_season():
@@ -83,5 +83,22 @@ def test_commands_only_for_current_season():
 
 
 def test_weather_say_names_xmas_and_snow():
-    st = {"kind": "clear", "temp": 2, "theme": "winter", "xmas": "on", "snowCover": 22.4}
+    st = {"kind": "clear", "temp": 2, "theme": "winter", "xmas": "on", "snowCover": 22.4, "source": "api"}
     assert wc.weather_say(st, "Berlin") == "Live aus Berlin: klar, 2 °C. Im Stream ist Weihnachtszeit, die Schneedecke liegt 22 % hoch."
+
+
+def test_weather_say_names_who_ordered_and_time_of_day():
+    st = {"kind": "rain", "temp": 3, "source": "override", "theme": "autumn"}
+    orders = {"weather": {"kind": "rain", "by": "Tim", "until": 1000 + 130},
+              "tod": {"kind": "night", "by": "", "until": 1000 + 50}}
+    assert wc.weather_say(st, "Berlin", orders, 1000) == ("Live aus Berlin: 3 °C. Im Bild gerade: Regen (bestellt von Tim, noch 2 min). "
+                                                          "Tageszeit: Nacht (vom Chat bestellt, noch 1 min). Im Stream ist Herbst.")
+    # nur Tageszeit bestellt: Wetter bleibt live
+    st = {"kind": "cloudy", "temp": 3, "source": "override", "theme": "autumn"}
+    assert wc.weather_say(st, "Berlin", {"tod": {"kind": "day", "by": "Ann", "until": None}}, 1000).startswith(
+        "Live aus Berlin: bewölkt, 3 °C. Tageszeit: Tag (bestellt von Ann).")
+
+
+def test_weather_say_fixed_weather_is_not_live():
+    st = {"kind": "snow", "temp": None, "source": "lock", "theme": "winter"}
+    assert wc.weather_say(st, "Berlin") == "Wetter im Stream: Schnee (fest eingestellt). Im Stream ist Winter."
