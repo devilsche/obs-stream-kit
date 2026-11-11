@@ -271,6 +271,11 @@
       var spin = el('g', { 'class': 'ta-pk-spin' }, inner);
       var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, spin);
       el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
+      // dunkle Kontur: dieselbe Silhouette dahinter, nur ihr Rand bleibt sichtbar
+      // (trennt den Kürbis vom gleichfarbigen Laub)
+      [[-18, -30, 24, 30], [18, -30, 24, 30], [0, -31, 22, 31]].forEach(function (e) {
+        el('ellipse', { 'class': 'ta-pk-edge', cx: e[0], cy: e[1], rx: e[2], ry: e[3] }, body);
+      });
       el('ellipse', { 'class': 'ta-pk-body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
       el('ellipse', { 'class': 'ta-pk-body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
       el('ellipse', { 'class': 'ta-pk-lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
