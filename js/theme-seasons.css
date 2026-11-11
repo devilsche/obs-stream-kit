@@ -314,6 +314,10 @@
 .tss-uedge { fill: none; stroke: #2a1406; stroke-width: 10; }
 .tss-uedge-glow { fill: none; stroke: #ff9a3a; stroke-width: 3; }
 .tss-upop { transform-box: fill-box; transform-origin: 50% 100%; }
+/* nachts zugeklappt: Bespannung und Speichen schmal und lang an die Stange */
+.tss-ufold { transform-box: fill-box; transform-origin: 50% 0; transition: transform 1.2s ease-in-out; }
+.tss-umbrella[data-closed="1"] .tss-ufold { transform: scale(0.11, 1.75); }
+@media (prefers-reduced-motion: reduce) { .tss-ufold { transition: none; } }
 .tss-upop.is-pop { animation: tssUmbPop 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
 @keyframes tssUmbPop { from { transform: scaleY(0); } to { transform: none; } }
 

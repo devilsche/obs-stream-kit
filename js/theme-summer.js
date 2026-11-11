@@ -164,12 +164,14 @@
       [-150, -100, -50, 0, 50, 100, 150].forEach(function (hx) {
         ribs += 'M0 -27 Q' + f1(hx * 0.55) + ' ' + f1(-27 - 6 + Math.abs(hx) * 0.05) + ' ' + hx + ' ' + (Math.abs(hx) === 150 ? 30 : 26) + ' ';
       });
-      U.ribs = el('path', { 'class': 'tss-urib', d: ribs }, top);
+      U.ribs = el('path', { 'class': 'tss-urib tss-ufold', d: ribs }, top);
       // Bespannung mit Brandloch-Maske (schwarzer Kreis wächst vom Einschlag aus)
       var mask = el('mask', { id: 'tss-umask', maskUnits: 'userSpaceOnUse', x: -200, y: -120, width: 400, height: 220 }, top);
       el('rect', { x: -200, y: -120, width: 400, height: 220, fill: '#fff' }, mask);
       U.hole = el('circle', { cx: 0, cy: -20, r: 0, fill: '#000' }, mask);
       var fab = el('g', { mask: 'url(#tss-umask)' }, top);
+      U.fab = el('g', { 'class': 'tss-ufold' }, fab);
+      fab = U.fab;
       el('path', { 'class': 'tss-utop', d: DOME }, fab);
       el('path', { 'class': 'tss-ustripe', 'clip-path': 'url(#tss-uclip)',
                    d: 'M0 -27 Q-62 -14 -100 40 L-50 40 Q-24 -2 0 -27 Z M0 -27 Q24 -2 50 40 L100 40 Q62 -14 0 -27 Z' }, fab);
@@ -1023,7 +1025,7 @@
       castles.forEach(function (c) {
         if (!c) return;
         // unter dem stehenden Schirm bleibt die Burg trocken
-        var dry = U.mode === 'up' && B.partOn('umbrella') && Math.abs(c.x - U.tx) < 135;
+        var dry = U.mode === 'up' && !uClosed && B.partOn('umbrella') && Math.abs(c.x - U.tx) < 135;
         // unterm Schirm auch keine Schneehaube
         var dv = dry ? '1' : '';
         if (c.node.dataset.dry !== dv) c.node.dataset.dry = dv;
@@ -1097,7 +1099,7 @@
       if (opts.event) opts.event('struck', { target: 'castle', name: c.label || '' });
     }
     function umbrellaBolt(p) {
-      if (!p.near || U.mode !== 'up' || !umbrellaFree() || typeof p.x !== 'number') return castleBolt(p);
+      if (!p.near || U.mode !== 'up' || uClosed || !umbrellaFree() || typeof p.x !== 'number') return castleBolt(p);
       var c = uScreen(0, -10);
       if (Math.abs(p.x - c[0]) > 120) return castleBolt(p);
       U.hx = Math.max(-110, Math.min(110, p.x - c[0]));
@@ -1127,9 +1129,9 @@
     }
     // Schirm als Dach für den Regen der Wetter-Engine (Kuppel ungefähr als
     // Parabel, mit der Neigung der Kuppel); nur solange er steht
-    var shelterOn = null;
+    var shelterOn = null, uClosed = false;
     function shelterUmbrella() {
-      var on = B.on && U.mode === 'up' && B.partOn('beach') && B.partOn('umbrella');
+      var on = B.on && U.mode === 'up' && !uClosed && B.partOn('beach') && B.partOn('umbrella');
       if (on === shelterOn || !opts.shelter) return;
       shelterOn = on;
       if (U.spot) U.spot.classList.toggle('is-off', !on);
@@ -1188,6 +1190,10 @@
         sandPuff(U.px, U.py - 10);
       }
       if (U.mode === 'up') leanUmbrella();
+      // nachts zugeklappt (kein Regenschutz mehr); mit Abstand zwischen Zu und
+      // Auf, damit er in der Dämmerung nicht hin und her klappt
+      var shut = uClosed ? B.night > 0.4 : B.night > 0.6;
+      if (shut !== uClosed) { uClosed = shut; gUmbrella.dataset.closed = shut ? '1' : '0'; }
       shelterUmbrella();
       if (U.mode === 'burn') {
         // Bespannung brennt in ~6 s bis auf Speichen und Stange ab
