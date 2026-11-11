@@ -1,82 +1,72 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ theme|default('entry', true) }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>Weather dock</title>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&display=swap">
+  {# gleiche Farben wie das Dashboard: Grundwerte + Theme + Alias, Reihenfolge wie base.html #}
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <link rel="stylesheet" href="/static/_theme.css">
+  <link rel="stylesheet" href="/static/_dashboard-theme-aliases.css">
   <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Symbols+Outlined">
   <style>
-    /* Schmale Steuerseite für ein OBS-Dock: Statuszeile + Knöpfe der Weather-Source */
-    :root {
-      --bg: #17101f; --panel: #241532; --line: #3a2650; --text: #f3ecfa; --muted: #b9a8cc;
-      --purple: #5e2a79; --gold: #f2b705; --ok: #7fd18b; --err: #ff8a8a;
+    /* Schmale Steuerseite für ein OBS-Dock; Farben und Knöpfe aus dem Dashboard-Theme */
+    html, body { min-height: 0; }
+    .dk { padding: 10px; }
+    .dk-skip { position: absolute; left: -9999px; }
+    .dk-skip:focus { left: 10px; top: 10px; background: var(--brand-gold); color: #000; padding: 6px 10px; z-index: 10; }
+    .dk-status {
+      background: var(--bg-elev); border: 1px solid var(--border); border-left: 4px solid var(--brand-gold);
+      border-radius: var(--r-box, 8px); padding: 8px 10px; margin-bottom: 10px;
     }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 'DM Sans', system-ui, sans-serif; }
-    main { padding: 10px; }
-    .skip-link { position: absolute; left: -9999px; }
-    .skip-link:focus { left: 10px; top: 10px; background: var(--gold); color: #000; padding: 6px 10px; z-index: 10; }
-    .status {
-      background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--gold);
-      border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; min-height: 44px;
-    }
-    .status__row { display: flex; align-items: flex-start; gap: 8px; }
-    .status__text { flex: 1; }
-    .status__time { color: var(--muted); font-size: 12px; }
-    .refresh {
-      flex: none; width: 32px; height: 32px; border-radius: 6px; border: 1px solid var(--line);
-      background: transparent; color: var(--text); cursor: pointer; display: grid; place-items: center;
-    }
-    details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; }
-    summary {
-      cursor: pointer; padding: 8px 10px; font-weight: 700; letter-spacing: 0.3px; list-style: none;
+    .dk-status__row { display: flex; align-items: flex-start; gap: 8px; }
+    .dk-status__text { flex: 1; margin: 0; color: var(--text); }
+    .dk-status__time { color: var(--text-muted); font-size: 12px; }
+    .dk-refresh { flex: none; width: 32px; height: 32px; padding: 0; display: grid; place-items: center; }
+    .dk-group { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--r-box, 8px); margin-bottom: 8px; }
+    .dk-group > summary {
+      cursor: pointer; padding: 8px 10px; font-weight: 700; list-style: none; color: var(--text);
       display: flex; align-items: center; gap: 6px; min-height: 36px;
     }
-    summary::-webkit-details-marker { display: none; }
-    summary::before { content: 'chevron_right'; font-family: 'Material Symbols Outlined'; transition: transform 0.15s; }
-    details[open] > summary::before { transform: rotate(90deg); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; padding: 0 8px 8px; }
-    .btn {
-      display: flex; align-items: center; gap: 6px; min-height: 36px; padding: 6px 8px;
-      border: 1px solid var(--line); border-radius: 6px; background: var(--purple); color: var(--text);
-      font: inherit; text-align: left; cursor: pointer;
+    .dk-group > summary::-webkit-details-marker { display: none; }
+    .dk-group > summary::before { content: 'chevron_right'; font-family: 'Material Symbols Outlined'; transition: transform 0.15s; }
+    .dk-group[open] > summary::before { transform: rotate(90deg); }
+    .dk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; padding: 0 8px 8px; }
+    .dk-btn { display: flex; align-items: center; gap: 6px; min-height: 36px; text-align: left; width: 100%; }
+    .dk-btn .material-symbols-outlined { font-size: 20px; flex: none; }
+    .dk-btn.is-sent { outline: 2px solid var(--success); outline-offset: -2px; }
+    .dk-btn.is-failed { outline: 2px solid var(--danger); outline-offset: -2px; }
+    .dk-btn:focus-visible, .dk-refresh:focus-visible, .dk-group > summary:focus-visible {
+      outline: 3px solid var(--focus, var(--brand-gold)); outline-offset: 2px;
     }
-    .btn:hover { border-color: var(--gold); }
-    .btn .material-symbols-outlined { font-size: 20px; flex: none; }
-    .btn.is-sent { border-color: var(--ok); }
-    .btn.is-failed { border-color: var(--err); }
-    .btn:focus-visible, .refresh:focus-visible, summary:focus-visible {
-      outline: 3px solid var(--gold); outline-offset: 2px;
-    }
-    .hint { color: var(--muted); font-size: 12px; margin: 8px 2px 0; }
-    .err { color: var(--err); }
-    @media (prefers-reduced-motion: reduce) { summary::before { transition: none; } }
+    .dk-hint { color: var(--text-muted); font-size: 12px; margin: 8px 2px 0; }
+    .dk-err { color: var(--danger); }
+    @media (prefers-reduced-motion: reduce) { .dk-group > summary::before { transition: none; } }
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#main-content">Skip to controls</a>
-  <main id="main-content">
+  <a class="dk-skip" href="#main-content">Skip to controls</a>
+  <main id="main-content" class="dk">
     {% if not token %}
-      <p class="err">No widget token yet. Create one in the dashboard first.</p>
+      <p class="dk-err">No widget token yet. Create one in the dashboard first.</p>
     {% else %}
-    <section class="status" aria-label="Current weather">
-      <div class="status__row">
-        <p class="status__text" id="status" role="status" aria-live="polite">Loading…</p>
-        <button class="refresh" type="button" id="refresh" aria-label="Refresh status">
+    <section class="dk-status" aria-label="Current weather">
+      <div class="dk-status__row">
+        <p class="dk-status__text" id="status" role="status" aria-live="polite">Loading…</p>
+        <button class="dk-refresh" type="button" id="refresh" aria-label="Refresh status">
           <span class="material-symbols-outlined" aria-hidden="true">refresh</span>
         </button>
       </div>
-      <div class="status__time" id="statusTime"></div>
+      <div class="dk-status__time" id="statusTime"></div>
     </section>
 
     {% for grp in groups %}
-    <details {% if loop.index <= 3 %}open{% endif %}>
+    <details class="dk-group" {% if loop.index <= 3 %}open{% endif %}>
       <summary>{{ grp.name }}</summary>
-      <div class="grid">
+      <div class="dk-grid">
         {% for c in grp["items"] %}
-        <button class="btn" type="button" data-q="{{ c.q }}">
+        <button class="dk-btn" type="button" data-q="{{ c.q }}">
           <span class="material-symbols-outlined" aria-hidden="true">{{ c.icon or 'radio_button_checked' }}</span>
           <span>{{ c.label }}</span>
         </button>
@@ -85,7 +75,7 @@
     </details>
     {% endfor %}
     {% if not place %}
-    <p class="hint">Tip: add <code>?place=Berlin</code> (as in your weather source URL) to this dock URL to see the live weather at your place.</p>
+    <p class="dk-hint">Tip: add <code>?place=Berlin</code> (as in your weather source URL) to this dock URL to see the live weather at your place.</p>
     {% endif %}
     {% endif %}
   </main>
@@ -108,7 +98,7 @@
           .catch(function () { statusEl.textContent = 'Status not reachable.'; });
       }
 
-      document.querySelectorAll('.btn[data-q]').forEach(function (btn) {
+      document.querySelectorAll('.dk-btn[data-q]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var q = btn.getAttribute('data-q');
           // Wetter und Tageszeit laufen unter dem Namen des Streamers (Statuszeile, !weather)
