@@ -73,6 +73,32 @@
     return t;
   }
 
+  // Viele gleiche Chat-Aktionen kurz hintereinander: das erste Schild sofort, was
+  // in den nächsten 2,5 s nachkommt, als ein Sammelschild („Tim, Anna and 23 others …“)
+  var crowds = {};
+  function names(list) {
+    if (list.length === 1) return list[0];
+    if (list.length === 2) return list[0] + ' and ' + list[1];
+    var rest = list.length - 2;
+    return list[0] + ', ' + list[1] + ' and ' + rest + (rest === 1 ? ' other' : ' others');
+  }
+  function crowd(key, name, single, many, show) {
+    var c = crowds[key] || (crowds[key] = { names: [], timer: null });
+    c.show = show; c.many = many;
+    if (!c.timer) {
+      show(single(name));
+      c.timer = setTimeout(function flush() {
+        var list = c.names;
+        c.names = [];
+        if (!list.length) { c.timer = null; return; }
+        c.show(c.many(names(list), list.length));
+        c.timer = setTimeout(flush, 2500);
+      }, 2500);
+      return;
+    }
+    if (c.names.indexOf(name) < 0) c.names.push(name);
+  }
+
   function spot(node) {
     node.classList.remove('is-spot');
     void node.getBoundingClientRect();
@@ -259,7 +285,7 @@
     W: W, H: H, reduced: reduced,
     choice: choice, num: num, flag: flag, settings: settings, copy: copy,
     el: el, rnd: rnd, rand: rand, clamp01: clamp01, styleSheet: styleSheet,
-    pulse: pulse, tag: tag, spot: spot, hop: hop, Leaders: Leaders, Group: Group,
+    pulse: pulse, tag: tag, spot: spot, hop: hop, crowd: crowd, Leaders: Leaders, Group: Group,
     Particles: Particles, loop: loop, connect: connect, serverNow: serverNow, testName: testName
   };
 })();

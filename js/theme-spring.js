@@ -315,7 +315,9 @@
       fly(makeBee(), [[sx, H - rand(260, 420)], [target.x + (fromLeft ? -200 : 200), ty - 120], [target.x, ty], [target.x, ty],
                       [target.x + (fromLeft ? 180 : -180), ty - 160], [ex, H - rand(300, 460)]], 6500);
       if (target.head) setTimeout(function () { B.spot(target.head); }, 2400);
-      B.tag((name || 'Someone') + ' sent a bee!', target.x, ty - 90, true);
+      if (root.SeasonKit) root.SeasonKit.crowd('bee', name || 'Someone', function (n) { return n + ' sent a bee!'; },
+                                               function (n) { return n + ' sent bees too!'; }, function (t) { B.tag(t, target.x, ty - 90, true); });
+      else B.tag((name || 'Someone') + ' sent a bee!', target.x, ty - 90, true);
     }
     // Schmetterlinge nur tagsüber und ohne Regen, unten über der Wiese
     function wanderButterfly() {

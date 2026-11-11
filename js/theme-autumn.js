@@ -471,7 +471,10 @@
       setLevel(p);
       var left = rakeSide++ % 2 === 0;
       var mid = left ? 330 : W - 330;
-      B.tag(removed > 0 ? name + ' raked!' : name + ': nothing left to rake', mid, surface(mid) - 70, true);
+      if (removed > 0 && root.SeasonKit) {
+        root.SeasonKit.crowd('rake', name, function (n) { return n + ' raked!'; },
+                             function (n) { return n + ' raked too!'; }, function (t) { B.tag(t, mid, surface(mid) - 70, true); });
+      } else B.tag(removed > 0 ? name + ' raked!' : name + ': nothing left to rake', mid, surface(mid) - 70, true);
       if (B.reduceMotion || raking || removed <= 0) return;
       raking = true;
       rakeTool.classList.add('is-on');
@@ -495,7 +498,9 @@
       for (var i = 0; i < 70; i++) {
         spawn({ x: x + rand(-50, 50), y: y + rand(0, 20), vx: rand(-380, 380), vy: rand(-1050, -450), front: true, s: rand(0.9, 1.6) });
       }
-      B.tag((name || 'Someone') + ' jumped in!', x, y - 150, true);
+      if (root.SeasonKit) root.SeasonKit.crowd('jump', name || 'Someone', function (n) { return n + ' jumped in!'; },
+                                               function (n) { return n + ' jumped in too!'; }, function (t) { B.tag(t, x, y - 150, true); });
+      else B.tag((name || 'Someone') + ' jumped in!', x, y - 150, true);
     }
     function sweep(p) {
       setLevel(p);

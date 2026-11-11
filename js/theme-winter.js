@@ -465,9 +465,13 @@
       ic.grow = 0;
       tag(name + ' broke an icicle!', ic.x, len + 60, true);
     }
+    var splats = 0, SPLAT_MAX = 6;
     function snowball(name) {
       var tx = rand(500, 1420), ty = rand(300, 700), sx = rand(300, 1620), sy = H + 40;
-      tag((name || 'Someone') + ' threw a snowball!', tx, ty - 110, true);
+      var who = name || 'Someone';
+      if (SK) SK.crowd('snowball', who, function (n) { return n + ' threw a snowball!'; },
+                       function (n) { return n + ' threw snowballs too!'; }, function (t) { tag(t, tx, ty - 110, true); });
+      else tag(who + ' threw a snowball!', tx, ty - 110, true);
       var ball = el('circle', { 'class': 'tw-ball', r: 10 }, fxSvg);
       var t0 = performance.now(), dur = reduceMotion ? 1 : 650;
       function hit() {
@@ -479,9 +483,14 @@
           var ang = a / 16 * Math.PI * 2 - Math.PI / 2, rr = 46 + (a % 2 ? 14 : 30) * Math.random();
           d += ' L' + f1(Math.cos(ang) * rr) + ' ' + f1(Math.sin(ang) * rr);
         }
-        el('path', { 'class': 'tw-splat', d: d + ' Z' }, g);
-        el('path', { 'class': 'tw-splat', d: 'M-20 30 Q-18 90 -12 92 Q-6 90 -6 30 Z M14 34 Q16 70 20 72 Q26 70 26 34 Z' }, g);
-        setTimeout(function () { if (outer.parentNode) fxSvg.removeChild(outer); }, reduceMotion ? 2500 : 5100);
+        // höchstens SPLAT_MAX Flecken zugleich, sonst deckt ein Ansturm das Spiel zu;
+        // weitere Bälle zerstäuben nur in Flocken
+        if (splats < SPLAT_MAX) {
+          splats++;
+          el('path', { 'class': 'tw-splat', d: d + ' Z' }, g);
+          el('path', { 'class': 'tw-splat', d: 'M-20 30 Q-18 90 -12 92 Q-6 90 -6 30 Z M14 34 Q16 70 20 72 Q26 70 26 34 Z' }, g);
+          setTimeout(function () { splats--; if (outer.parentNode) fxSvg.removeChild(outer); }, reduceMotion ? 2500 : 5100);
+        } else if (outer.parentNode) fxSvg.removeChild(outer);
         for (var i = 0; i < 16; i++) addP({ x: tx, y: ty, vx: rand(-360, 360), vy: rand(-420, 120), term: 600, sway: 0, r: rand(3, 7), life: 0.9, draw: flake });
       }
       // Flugbahn per Zeitgeber, damit sie auch ohne sichtbares Bild zu Ende läuft

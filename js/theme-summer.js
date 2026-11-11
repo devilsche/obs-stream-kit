@@ -412,7 +412,19 @@
     // sie stehen vorn im Sand, vor dem Fuß der Sandburgen, aber nicht unter der Bildkante
     function sideX() { return rand(120, W - 120); }
     function frontY(x, d) { return Math.min(sandY(x) + d, H - 10); }
+    var ICE_MAX = 8, FRIES_MAX = 4;
+    function crowdTag(key, name, single, many, x, y) {
+      var SK = root.SeasonKit;
+      if (SK) SK.crowd(key, name, single, many, function (t) { B.tag(t, x, y, true); });
+      else B.tag(single(name), x, y, true);
+    }
     function addIce(name) {
+      // bei einem Ansturm nicht den ganzen Strand zustellen: nur das Schild
+      if (ices.length >= ICE_MAX) {
+        crowdTag('ice', name || 'Someone', function (n) { return n + ' got an ice cream!'; },
+                 function (n) { return n + ' got ice cream too!'; }, W / 2, H - 200);
+        return;
+      }
       var x = sideX(), y = frontY(x, 30);
       var flavor = 1 + Math.floor(Math.random() * 4), tilt = (Math.random() < 0.5 ? -1 : 1) * rand(10, 25);
       var g = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ') scale(0.6)' }, gIces);
@@ -428,7 +440,8 @@
       var ice = { node: g, scoop: scoop, drip: drip, puddle: puddle, m: 0, x: x, y: y, tilt: tilt, flavor: flavor, name: name || 'Someone',
                   stolen: false, fade: 0 };
       ices.push(ice);
-      B.tag((name || 'Someone') + ' got an ice cream!', x, y - 70, true);
+      crowdTag('ice', name || 'Someone', function (n) { return n + ' got an ice cream!'; },
+               function (n) { return n + ' got ice cream too!'; }, x, y - 70);
       // Möwen-Gag: etwa jedes 3. Eis wird nach ein paar Sekunden geklaut
       if (!B.reduceMotion && Math.random() < 1 / 3) {
         setTimeout(function () {
@@ -473,6 +486,11 @@
     // die Möwe sie in 2–4 Flügen (oder einem großen Griff), dann verblasst die Schale ──
     var fries = [];
     function addFries(name) {
+      if (fries.length >= FRIES_MAX) {
+        crowdTag('fries', name || 'Someone', function (n) { return n + ' got fries!'; },
+                 function (n) { return n + ' got fries too!'; }, W / 2, H - 200);
+        return;
+      }
       var x = sideX(), y = frontY(x, 34);
       var g = el('g', { 'class': 'tss-fries', transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ') scale(0.7)' }, gIces);
       var sticks = [];
@@ -486,7 +504,8 @@
       el('path', { 'class': 'tss-sand', d: 'M-50 16 Q-38 -4 0 -5 Q38 -4 50 16 Z' }, g);
       var fr = { node: g, sticks: sticks, x: x, y: y, left: sticks.length, fade: -1 };
       fries.push(fr);
-      B.tag((name || 'Someone') + ' got fries!', x, y - 90, true);
+      crowdTag('fries', name || 'Someone', function (n) { return n + ' got fries!'; },
+               function (n) { return n + ' got fries too!'; }, x, y - 90);
       setTimeout(function () { friesRaid(fr); }, rand(15000, 40000));
     }
     function friesRaid(fr) {

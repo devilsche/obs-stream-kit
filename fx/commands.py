@@ -14,7 +14,7 @@ from collections import deque
 
 from fx import weather
 
-MAX_KEEP = 20
+MAX_KEEP = 100     # Ansturm im Chat (50 Schneebälle in Sekunden) geht nicht verloren
 MAX_NAME = 20
 EPOCH = format(int(time.time() * 1000), "x")
 
