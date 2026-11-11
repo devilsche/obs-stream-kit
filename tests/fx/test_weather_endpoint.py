@@ -24,6 +24,7 @@ def conn():
     weather_season.init_schema(c)
     weather_followers.init_schema(c)
     weather_state.LAST_THEME.clear()
+    weather_state.LAST_OPTS.clear()
     yield c
     c.close()
 
@@ -650,3 +651,12 @@ def test_fog_and_rain_run_together(conn):
     ov = weather_db.current_override(conn, 1, _t.time())
     kind = (ov.get("pending") or ov)["kind"]
     assert kind == "rain+fog"
+
+
+
+def test_info_uses_the_settings_of_the_running_source(conn):
+    c = _client(conn)
+    _state(c, "?theme=summer&lock=snow")
+    say = c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
+    assert "Im Stream ist Sommer" in say and "fest eingestellt" in say
+    assert weather_state.LAST_THEME[1] == "summer"

@@ -284,9 +284,11 @@ def weather_info_route(token):
     if g.tenant_id is None:
         abort(404)
     what = (request.args.get("what") or "weather").strip().lower()
-    opts = {}
+    # wie die Source: deren zuletzt gemeldete Einstellungen (Thema, feste Lage, Ort);
+    # ein place in der Anfrage zählt nur, wenn die Source keinen kennt
+    opts = dict(weather_state.LAST_OPTS.get(g.tenant_id, {}))
     place = (request.args.get("place") or "").strip()
-    if place:
+    if place and not opts.get("place"):
         val = commands.EFFECTS["weather"]["settings"]["place"](place)
         if val is not None:
             opts["place"] = val
@@ -358,4 +360,5 @@ def weather_state_route(token):
             if val is not None:
                 opts[key] = val
     state = _with_conn(lambda conn: weather_state.resolve(conn, g.tenant_id, opts))
+    weather_state.LAST_OPTS[g.tenant_id] = dict(opts)
     return _no_store(jsonify({"state": state, "now": time.time()}))

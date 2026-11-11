@@ -19,6 +19,9 @@ log = logging.getLogger(__name__)
 TRANSITION_SLOW = 25
 # zuletzt gemeldetes Thema je Tenant (für cmd=follow, das keine Einstellungen kennt)
 LAST_THEME = {}
+# Einstellungen, mit denen die Source zuletzt gefragt hat (Thema, feste Lage, Ort …);
+# Chat-Antworten und das Dock rechnen damit, damit sie zeigen, was im Stream ist
+LAST_OPTS = {}
 AURORA_KD = 3.0
 
 
