@@ -790,27 +790,28 @@
     }
 
     // ── Schneesturm: Whiteout (Ränder kräftig, Mitte leicht) und Ground
-    //    Blizzard (aufgewirbelter Schnee fegt über den unteren Rand) ──
+    //    Blizzard (aufgewirbelter Schnee fegt über den unteren Rand); auf der
+    //    vorderen Ebene, damit der Sturm vor der Deko fegt und sie verschleiert ──
     var drifts = [];
     function drawBlizzard(wind, dt) {
       if (bz < 0.02 && !drifts.length) return;
       var cold = nightRgb([228, 238, 252], [120, 134, 162]);
       var gustPulse = 0.85 + 0.15 * Math.sin(time * 1.7) + 0.2 * Math.max(0, Math.abs(wind) - Math.abs(cur.wind || 0));
-      sctx.save();
-      sctx.translate(W / 2, H / 2);
-      sctx.scale(1, H / W);
-      var wo = sctx.createRadialGradient(0, 0, W * 0.12, 0, 0, W * 0.7);
+      fctx.save();
+      fctx.translate(W / 2, H / 2);
+      fctx.scale(1, H / W);
+      var wo = fctx.createRadialGradient(0, 0, W * 0.12, 0, 0, W * 0.7);
       wo.addColorStop(0, 'rgba(' + cold + ',' + (0.14 * bz * gustPulse) + ')');
       wo.addColorStop(1, 'rgba(' + cold + ',' + (0.62 * bz * gustPulse) + ')');
-      sctx.fillStyle = wo;
-      sctx.fillRect(-W, -W, W * 2, W * 2);
-      sctx.restore();
+      fctx.fillStyle = wo;
+      fctx.fillRect(-W, -W, W * 2, W * 2);
+      fctx.restore();
       // Bodenschleier
-      var gb = sctx.createLinearGradient(0, H, 0, H * 0.68);
+      var gb = fctx.createLinearGradient(0, H, 0, H * 0.68);
       gb.addColorStop(0, 'rgba(' + cold + ',' + (0.55 * bz) + ')');
       gb.addColorStop(1, 'rgba(' + cold + ',0)');
-      sctx.fillStyle = gb;
-      sctx.fillRect(0, H * 0.68, W, H * 0.32);
+      fctx.fillStyle = gb;
+      fctx.fillRect(0, H * 0.68, W, H * 0.32);
       // Treibschnee-Schlieren am Boden (Partikel-Ebene, weicher Rand)
       var dirW = wind >= 0 ? 1 : -1;
       var want = 90 * bz;
@@ -1828,9 +1829,9 @@
       stepParts(dt, wind, counts);
       drawSky(wind);
       drawParts(wind);
-      drawBlizzard(wind, dt);
       drawBolts(dt);
       drawShow(dt);
+      drawBlizzard(wind, dt);   // nach drawShow: das leert die vordere Ebene
       root.requestAnimationFrame(frame);
     }
 
