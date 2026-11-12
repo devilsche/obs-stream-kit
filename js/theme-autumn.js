@@ -574,7 +574,8 @@
       stepScare(dt, tws.near(SC_X));
       // Laub am Fuß jeder Windhose aufwirbeln (Partikel blenden an den Rändern aus)
       tws.each(function (tx, dir) {
-        if (tx < -100 || tx > W + 100) return;
+        // über dem Tsunami (Wasserhose) liegt kein Laub mehr zum Aufwirbeln
+        if (tx < -100 || tx > W + 100 || flooded(tx)) return;
         whirlAcc += dt * 45;
         while (whirlAcc >= 1) {
           whirlAcc--;
