@@ -1247,11 +1247,11 @@
         }
       },
       rainbow: {
-        // Regenbogen spannt sich von links nach rechts über den oberen Rand auf.
-        // Wie in echt unscharf: die Sonnenscheibe (~0,5°) verschmiert die
-        // Farben ineinander, innen ist der Himmel heller, außen liegt das
-        // dunklere Alexander-Band, darüber ein blasser Nebenbogen mit
-        // umgekehrten Farben; die Helligkeit schwankt entlang des Bogens
+        // Regenbogen über dem oberen Rand, blendet wie in echt langsam ein,
+        // sobald die Sonne durchkommt. Unscharf: die Sonnenscheibe (~0,5°)
+        // verschmiert die Farben ineinander, innen ist der Himmel heller,
+        // außen liegt das dunklere Alexander-Band; die Helligkeit schwankt
+        // entlang des Bogens
         init: function () {
           var cx = W / 2, cy = H * 1.3, R = H * 1.18;
           var nt = clamp(cur.night || 0, 0, 1);
@@ -1274,20 +1274,14 @@
           var VI = [150, 110, 230], BL = [90, 150, 255], GR = [110, 210, 120],
               YE = [255, 228, 100], OR = [255, 150, 60], RD = [240, 70, 60];
           o.filter = 'blur(5px)';
-          // Hauptbogen samt aufgehelltem Innenraum und blassen Interferenzstreifen
+          // Bogen samt aufgehelltem Innenraum
           ring(R - 420, R + 30, [
-            [0, WH, 0], [0.55, WH, 0.07], [0.68, GR, 0.06], [0.71, VI, 0.08], [0.74, GR, 0.07],
-            [0.77, VI, 0.22], [0.81, BL, 0.34], [0.86, GR, 0.4], [0.9, YE, 0.46],
+            [0, WH, 0], [0.55, WH, 0.07], [0.74, VI, 0.1],
+            [0.78, VI, 0.22], [0.81, BL, 0.34], [0.86, GR, 0.4], [0.9, YE, 0.46],
             [0.94, OR, 0.42], [0.97, RD, 0.3], [1, RD, 0]
           ]);
-          // Alexander-Band zwischen Haupt- und Nebenbogen
-          var R2 = R * 51 / 42;
-          ring(R + 30, R2 - 50, [[0, DK, 0], [0.25, DK, 0.08], [0.75, DK, 0.08], [1, DK, 0]]);
-          // Nebenbogen: breiter, blasser, Farben umgekehrt (rot innen)
-          ring(R2 - 50, R2 + 70, [
-            [0, RD, 0], [0.18, RD, 0.08], [0.35, OR, 0.11], [0.5, YE, 0.12],
-            [0.65, GR, 0.1], [0.8, BL, 0.08], [0.92, VI, 0.05], [1, VI, 0]
-          ]);
+          // außen das dunklere Alexander-Band
+          ring(R + 30, R + 230, [[0, DK, 0], [0.3, DK, 0.07], [1, DK, 0]]);
           o.filter = 'none';
           // Regen ist nie gleichmäßig verteilt: Helligkeit wandert entlang des Bogens
           if (o.createConicGradient) {
@@ -1299,19 +1293,12 @@
             o.fillRect(0, 0, off.width, off.height);
             o.globalCompositeOperation = 'source-over';
           }
-          return { dur: 10, off: off, cx: cx, cy: cy };
+          return { dur: 10, off: off };
         },
         draw: function (s) {
           var env = 1 - smooth((s.t - (s.dur - 2.5)) / 2.5);
-          var reveal = smooth(s.t / 3);
-          var a0 = Math.PI + 0.12, a1 = a0 + (Math.PI - 0.24) * reveal;
           sctx.save();
-          sctx.beginPath();
-          sctx.moveTo(s.cx, s.cy);
-          sctx.arc(s.cx, s.cy, W * 2, a0, a1);
-          sctx.closePath();
-          sctx.clip();
-          sctx.globalAlpha = env;
+          sctx.globalAlpha = env * smooth(s.t / 3.5);
           sctx.drawImage(s.off, 0, 0);
           sctx.restore();
         }
