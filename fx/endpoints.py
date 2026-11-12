@@ -144,10 +144,20 @@ FLOWERS_SHOWN = 24   # so viele neueste Follower stehen im Frühling als Blume
 
 
 def _water_target(conn, tenant_id, name):
-    """!water gießt die eigene Blume, wer keine im Bild hat, eine zufällige."""
+    """!water gießt die eigene Blume. Wer keine im Bild hat (auch der Dashboard-
+    Knopf ohne Namen), gießt die, die ihrer nächsten Stufe am nächsten ist –
+    so wächst sichtbar eine nach der anderen; bei Gleichstand zufällig."""
     names = weather_followers.load(conn, tenant_id, limit=FLOWERS_SHOWN)["names"]
     own = [n for n in names if name and n.lower() == name.strip().lower()]
-    return own[0] if own else (random.choice(names) if names else "")
+    if own or not names:
+        return own[0] if own else ""
+    grow = weather_season.load(conn, tenant_id)["grow"]
+    def left(n):
+        c = grow.get(n.lower(), 0)
+        nxt = [s for s in weather_season.GROW_STEPS if s > c]
+        return nxt[0] - c if nxt else 10 ** 6     # ausgewachsen: zuletzt
+    best = min(left(n) for n in names)
+    return random.choice([n for n in names if left(n) == best])
 
 
 def _project_stage(conn, tenant_id) -> int:

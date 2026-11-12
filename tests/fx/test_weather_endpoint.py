@@ -733,3 +733,16 @@ def test_water_grows_own_flower_and_poll_reports_stage(conn, monkeypatch):
     monkeypatch.setattr(weather_season, "GROW_STEPS", (1, 3))
     st = c.get("/s/t/api/fx/weather/poll").json["state"]
     assert {f["name"]: f.get("stage", 0) for f in st["flowers"]}["Anna"] >= 1
+
+
+def test_water_without_own_flower_picks_the_one_closest_to_growing(conn):
+    c = _client(conn)
+    for n in ("Anna", "Ben", "Cleo"):
+        c.get("/s/t/api/fx/weather?cmd=follow&name=" + n)
+    c.get("/s/t/api/fx/weather?cmd=water&name=ben")
+    # ohne Namen und ohne eigene Blume: immer dieselbe, bis sie wächst
+    for _ in range(4):
+        c.get("/s/t/api/fx/weather?cmd=water")
+        p = commands.poll(1, "weather", 0)["commands"][-1]["params"]
+        assert p["flower"] == "Ben"
+    assert p["stage"] == 1 and p["up"] is True
