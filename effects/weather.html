@@ -498,7 +498,9 @@
             frost.leaders(lastFrostTop);
             break;
           case 'spectacle':
-            kit.spectacle(p.type || randomShow());
+            // Apokalypse: alle Spektakel auf einmal
+            if (p.type === 'apocalypse') K.SPECTACLES.forEach(function (t) { kit.spectacle(t); });
+            else kit.spectacle(p.type || randomShow());
             break;
           // Follower: an alle Themen, jedes legt ihn in seiner Form an
           // (animiert nur das sichtbare); alte Einzelbefehle wirken gleich.

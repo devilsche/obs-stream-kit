@@ -11,7 +11,7 @@ import random
 import re
 
 # Preis je Stufe in Punkten (Bits; Spenden ×100)
-PRICE = {"weather": 100, "small": 200, "big": 500}
+PRICE = {"weather": 100, "small": 200, "big": 500, "apocalypse": 1000}
 
 # Chat-Befehl → (Befehl an die Source, Stufe, Name im Chat)
 OFFERS = {
@@ -35,8 +35,10 @@ OFFERS = {
     "megabolt": ({"cmd": "spectacle", "params": {"type": "megabolt"}}, "big", "ein Unwetter"),
     "tsunami": ({"cmd": "spectacle", "params": {"type": "tsunami"}}, "big", "einen Tsunami"),
     "avalanche": ({"cmd": "spectacle", "params": {"type": "avalanche"}}, "big", "eine Lawine"),
+    # alle Spektakel auf einmal
+    "apocalypse": ({"cmd": "spectacle", "params": {"type": "apocalypse"}}, "apocalypse", "die Apokalypse"),
 }
-TIER_ORDER = ("big", "small", "weather")
+TIER_ORDER = ("apocalypse", "big", "small", "weather")
 _CMD_RE = re.compile(r"!([a-z]+)")
 
 # Raid-Begrüßung: ab so vielen Zuschauern ein freundliches, ab RAID_BIG ein großes Spektakel

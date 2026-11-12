@@ -29,6 +29,22 @@ def test_paid_without_command_picks_highest_tier():
     assert wc.OFFERS[r["offer"]][1] == "big"
 
 
+def test_paid_apocalypse_needs_1000_bits_or_10_euro():
+    r = wc.paid("bits", 1000, "cheer1000 !apocalypse", "Tim")
+    assert r["command"] == {"cmd": "spectacle", "params": {"type": "apocalypse"}}
+    assert r["say"] == "Danke Tim! Du hast die Apokalypse bestellt."
+    r = wc.paid("money", "5", "!apocalypse", "Tim")
+    assert r["command"] is None
+    assert "1000 Bits oder 10 €" in r["say"]
+
+
+def test_paid_without_command_reaches_apocalypse_tier():
+    r = wc.paid("money", "10", "", "Tim", rnd=random.Random(1))
+    assert r["offer"] == "apocalypse"
+    r = wc.paid("bits", 999, "", "Tim", rnd=random.Random(1))
+    assert wc.OFFERS[r["offer"]][1] == "big"
+
+
 def test_paid_too_little_without_command_stays_quiet():
     assert wc.paid("bits", 50, "cheer50", "Tim") == {"command": None, "offer": None, "say": ""}
 
