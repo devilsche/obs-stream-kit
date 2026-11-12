@@ -663,7 +663,7 @@
     var TREE_CX = TREE_X + 200 * TREE_K;
     var SWAY = root.ThemeSeasons ? root.ThemeSeasons.sway : null;
     var treeSway = SWAY && SWAY(), smSway = SWAY && SWAY();
-    var twister = null, gustKick = 0, swayDrawn = '', smSwayDrawn = '', jigDrawn = '', quakeDrawn = '';
+    var tws = root.ThemeSeasons ? root.ThemeSeasons.twisters() : null, gustKick = 0, swayDrawn = '', smSwayDrawn = '', jigDrawn = '', quakeDrawn = '';
     function liveWind() { var sky = opts.sky ? opts.sky() : null; return sky ? (sky.wind || 0) : 0; }
     function stormy(w) {
       var sky = opts.sky ? opts.sky() : null, kind = sky ? sky.kind : '';
@@ -672,14 +672,14 @@
     }
     function stepSway(dt) {
       if (!SWAY) return;
-      if (twister && !twister.active()) twister = null;
-      var on = S.on && !reduceMotion, w = liveWind();
-      var tx = on && twister ? twister.x() : null, storm = on && stormy(w);
+      var on = S.on && !reduceMotion, w = liveWind(), storm = on && stormy(w);
+      // jede Windhose zerrt an dem, was ihr am nächsten steht
+      var nT = on && tws ? tws.near(TREE_CX) : null, nS = on && tws ? tws.near(SM_X) : null;
       var gust = on ? gustKick : 0;
       gustKick = 0;
       var tT = 0, sT = 0;
-      if (on && partOn('tree') && xmasShown()) tT = tx !== null && Math.abs(tx - TREE_CX) < 320 ? 6 : storm ? 2.2 : 0;
-      if (on && partOn('snowman') && S.sm > 0) sT = tx !== null && Math.abs(tx - SM_X) < 320 ? 4 : storm ? 1 : 0;
+      if (on && partOn('tree') && xmasShown()) tT = nT && Math.abs(nT.x - TREE_CX) < 320 ? 6 : storm ? 2.2 : 0;
+      if (on && partOn('snowman') && S.sm > 0) sT = nS && Math.abs(nS.x - SM_X) < 320 ? 4 : storm ? 1 : 0;
       var dir = w < 0 ? -1 : 1;
       var a = treeSway(dt, tT, gust, dir).toFixed(2), b = smSway(dt, sT, gust * 0.5, dir).toFixed(2);
       if (a !== swayDrawn) { swayDrawn = a; rootEl.style.setProperty('--twb-sway', a); }
@@ -687,7 +687,7 @@
       // Kugeln am Baum wackeln, solange die Windhose ihn biegt
       var jig = tT >= 6 ? '1' : '';
       if (jig !== jigDrawn) { jigDrawn = jig; rootEl.dataset.jiggle = jig; }
-      var quake = tx !== null && partOn('minis') && !minisHidden() ? '1' : '';
+      var quake = on && tws && tws.any() && partOn('minis') && !minisHidden() ? '1' : '';
       if (quake !== quakeDrawn) { quakeDrawn = quake; rootEl.dataset.quake = quake; }
     }
 
@@ -845,7 +845,7 @@
             showBoard('Top snow shovelers', S.snowTop); break;
           case 'spectacle':
             if (p.type === 'avalanche') avalanche(p);
-            if (p.type === 'tornado' && !p.reduced) twister = p;
+            if (tws) tws.add(p);
             break;
           case 'gust':
             gustKick = 3; break;

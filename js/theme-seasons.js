@@ -454,6 +454,28 @@
   var LEAVE_ROLL = 2200, LEAVE_CROW = 3400;
   // Schatten beim Rollen: dreht nicht mit, bleibt flach am Boden und wird je
   // nach Drehlage breiter oder schmaler (ratio = Höhe/Breite der Figur)
+  // Mehrere Windhosen zugleich: hält die laufenden (Spektakel-Infos) und
+  // liefert die nächste zu einer Stelle, damit jede an der Deko zerren kann
+  function twisters() {
+    var list = [];
+    function live() { list = list.filter(function (t) { return t.active(); }); return list; }
+    function near(x, not) {
+      var best = null;
+      live().forEach(function (t) {
+        var tx = t !== not ? t.x() : null;
+        if (tx !== null && (!best || Math.abs(tx - x) < Math.abs(best.x - x))) best = { x: tx, dir: t.dir || 0, t: t };
+      });
+      return best;
+    }
+    return {
+      add: function (p) { if (p.type === 'tornado' && !p.reduced) list.push(p); },
+      any: function () { return live().length > 0; },
+      near: near,
+      each: function (fn) { live().forEach(function (t) { var tx = t.x(); if (tx !== null) fn(tx, t.dir || 0, t); }); },
+      clear: function () { list = []; }
+    };
+  }
+
   function rollShadow(shadow, spin, ratio, ms) {
     if (!shadow || !spin || !root.requestAnimationFrame) return;
     var t0 = null;
@@ -554,5 +576,5 @@
     return (h >>> 0) / 4294967296;
   }
 
-  root.ThemeSeasons = { nameRand: nameRand, sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting, rollShadow: rollShadow };
+  root.ThemeSeasons = { nameRand: nameRand, sway: makeSway, base: base, loop: loop, seeded: seeded, el: el, W: W, H: H, leave: leave, visit: visit, hold: hold, visiting: visiting, rollShadow: rollShadow, twisters: twisters };
 })(typeof window !== 'undefined' ? window : this);

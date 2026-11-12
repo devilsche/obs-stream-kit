@@ -543,12 +543,13 @@
       B.tag('Swept clean!', W / 2, 300, true);
     }
 
-    // ── Spektakel: Windhose und Tsunami ──
-    var show = null, whirlAcc = 0, tNow = 0;
+    // ── Spektakel: Windhosen (beliebig viele) und Tsunami ──
+    var wave = null, tws = TS.twisters(), whirlAcc = 0, tNow = 0;
     function spectacle(p) {
       if (!B.on || p.reduced || (p.type !== 'tornado' && p.type !== 'tsunami')) return;
-      show = p;
-      if (p.type !== 'tornado' || !B.partOn('pumpkins')) return;
+      if (p.type === 'tsunami') { wave = p; return; }
+      tws.add(p);
+      if (!B.partOn('pumpkins')) return;
       // 2–4 Kürbisse werden mitgerissen
       var pool = pkNodes.filter(Boolean), n = Math.min(pool.length, 2 + Math.floor(Math.random() * 3));
       for (var i = 0; i < n; i++) {
@@ -567,28 +568,42 @@
     }
     function stepShow(dt) {
       tNow += dt;
-      var live = show && show.active();
-      var tx = live && show.type === 'tornado' ? show.x() : null;
-      stepScare(dt, tx);
-      // Laub am Fuß der Windhose aufwirbeln (Partikel blenden an den Rändern aus)
-      if (tx !== null && tx > -100 && tx < W + 100) {
+      var flood = wave && wave.active();
+      if (wave && !flood) wave = null;
+      var live = flood || tws.any();
+      stepScare(dt, tws.near(SC_X));
+      // Laub am Fuß jeder Windhose aufwirbeln (Partikel blenden an den Rändern aus)
+      tws.each(function (tx, dir) {
+        if (tx < -100 || tx > W + 100) return;
         whirlAcc += dt * 45;
         while (whirlAcc >= 1) {
           whirlAcc--;
           var x = tx + rand(-70, 70);
-          spawn({ x: x, y: surface(x) + rand(0, 10), vx: show.dir * rand(150, 450) + rand(-250, 250), vy: rand(-1200, -550),
+          spawn({ x: x, y: surface(x) + rand(0, 10), vx: dir * rand(150, 450) + rand(-250, 250), vy: rand(-1200, -550),
                   g: 650, sway: rand(90, 170), vph: rand(5, 9), front: true, s: rand(0.8, 1.4), life: rand(2.5, 4) });
         }
-      }
+      });
       pkNodes.forEach(function (pk) {
         if (!pk) return;
-        if (pk.mode === 'wait' && tx !== null && Math.abs(tx - pk.x) < 110) pk.mode = 'up';
+        // eine Windhose schnappt sich vorgemerkte Kürbisse, auf dem Wasser
+        // treibende (Wasserhose) und solche, die eine andere gerade fallen
+        // lässt oder noch im Wirbel hat: dann wirbelt sie weiter, noch höher
+        // (die eigene bzw. die, die ihn gerade fallen ließ, zählt nicht mit;
+        // im Wirbel erst nach einer Sekunde, sonst reißen zwei hin und her)
+        var px = pk.x + pk.lx, tn = tws.near(px, pk.mode === 'up' ? pk.tw : pk.drop);
+        if (tn && Math.abs(tn.x - px) < 110 && !B.reduceMotion &&
+            (pk.mode === 'wait' || (pk.mode === 'up' && pk.held > 1) || pk.mode === 'fall' || (!pk.mode && pk.ly > 20))) {
+          if (pk.mode !== 'wait') pk.peak = Math.min(360, Math.max(pk.peak || 0, pk.ly) + rand(30, 80));
+          pk.mode = 'up'; pk.tw = tn.t; pk.held = 0;
+        }
         if (pk.mode === 'up') {
-          // im Wirbel: steigt, kreiselt, folgt der Windhose ein Stück
+          pk.held += dt;
+          // im Wirbel: steigt, kreiselt, folgt seiner Windhose ein Stück
+          var tx = pk.tw && pk.tw.active() ? pk.tw.x() : null, dir = (pk.tw && pk.tw.dir) || 1;
           pk.ly += (pk.peak - pk.ly) * Math.min(1, dt * 2.2);
           pk.lx += (Math.max(-130, Math.min(130, ((tx === null ? pk.x : tx) - pk.x) * 0.6)) + Math.sin(tNow * 7) * 30 - pk.lx) * Math.min(1, dt * 3);
-          pk.rot += dt * 260 * (show.dir || 1);
-          if (tx === null || (tx - pk.x) * (show.dir || 1) > 220) { pk.mode = 'fall'; pk.vy = 0; }
+          pk.rot += dt * 260 * dir;
+          if (tx === null || (tx - pk.x) * dir > 220) { pk.mode = 'fall'; pk.vy = 0; pk.drop = pk.tw; pk.tw = null; }
         } else if (pk.mode === 'fall') {
           // fällt zurück auf seinen Platz, kurzer Hüpfer
           pk.vy += 2200 * dt;
@@ -598,15 +613,15 @@
           if (pk.ly <= 0) {
             pk.ly = 0;
             if (pk.vy > 500) pk.vy = -pk.vy * 0.3;
-            else { pk.mode = null; pk.vy = 0; pk.lx = 0; pk.rot = 0; }
+            else { pk.mode = null; pk.vy = 0; pk.lx = 0; pk.rot = 0; pk.drop = null; }
           }
         } else if (pk.mode === 'wait' && !live) {
           pk.mode = null;
         } else if (!pk.mode) {
           // Tsunami: auf dem Wasser treiben (gut halb eingetaucht), sonst wieder absetzen
           var target = 0, bob = 0;
-          if (live && show.type === 'tsunami') {
-            target = Math.max(0, Math.min(320, pk.y - (H - show.level(pk.x)) - 0.45 * pk.h));
+          if (flood) {
+            target = Math.max(0, Math.min(320, pk.y - (H - wave.level(pk.x)) - 0.45 * pk.h));
             bob = target > 4 ? 1 : 0;
           }
           pk.ly += (target - pk.ly) * Math.min(1, dt * (target > pk.ly ? 3 : 1.4));
@@ -616,15 +631,14 @@
         }
         renderPk(pk);
       });
-      if (show && !live && !pkNodes.some(function (pk) { return pk && (pk.mode || pk.ly > 0); })) show = null;
     }
     // Vogelscheuche: biegt sich bei Sturm, schwankt bei Böen; naht die
     // Windhose, wird sie durchgeschüttelt, Hut und Krähe fliegen davon und
     // kommen danach zurück
     var SC_X = 250, scHatBack = 0, scStraw = 0, scSway = B.sway(), scDrawn = '';
     function scSet(k, v) { if (gScare.dataset[k] !== v) gScare.dataset[k] = v; }
-    function stepScare(dt, tx) {
-      var near = tx !== null && Math.abs(tx - SC_X) < 330;
+    function stepScare(dt, tn) {
+      var near = !!tn && Math.abs(tn.x - SC_X) < 330;
       var sky = opts.sky ? opts.sky() : null, kind = sky ? sky.kind : '';
       var bz = opts.blizzard ? opts.blizzard() : 0;
       var stormy = kind === 'storm' || kind === 'blizzard' || bz > 0.3 || Math.abs(B.windBase) >= 0.8;
@@ -634,13 +648,13 @@
       var av = a.toFixed(2);
       if (av !== scDrawn) { scDrawn = av; gScare.style.setProperty('--ta-sc-sway', av); }
       if (near && !B.reduceMotion && scare.n() >= 5) {
-        if (gScare.dataset.gone !== '1') { scSet('dir', show.dir < 0 ? 'l' : 'r'); scSet('gone', '1'); }
+        if (gScare.dataset.gone !== '1') { scSet('dir', tn.dir < 0 ? 'l' : 'r'); scSet('gone', '1'); }
         scHatBack = 2.5;
         // Stroh und Laub fliegen mit dem Wirbel
         scStraw += dt * 18;
         while (scStraw >= 1) {
           scStraw--;
-          spawn({ x: SC_X + rand(-60, 60), y: H - rand(150, 330), vx: (show.dir || 1) * rand(300, 700), vy: rand(-500, -150),
+          spawn({ x: SC_X + rand(-60, 60), y: H - rand(150, 330), vx: (tn.dir || 1) * rand(300, 700), vy: rand(-500, -150),
                   g: 500, sway: rand(80, 150), vph: rand(5, 9), front: true, s: rand(0.6, 1), life: rand(1.5, 2.5), land: false });
         }
       } else if (gScare.dataset.gone === '1') {
@@ -649,9 +663,9 @@
       }
     }
     function resetShow() {
-      show = null;
+      wave = null; tws.clear();
       scSet('gone', '');
-      pkNodes.forEach(function (pk) { if (pk) { pk.mode = null; pk.ly = 0; pk.lx = 0; pk.rot = 0; renderPk(pk); } });
+      pkNodes.forEach(function (pk) { if (pk) { pk.mode = null; pk.ly = 0; pk.lx = 0; pk.rot = 0; pk.tw = pk.drop = null; renderPk(pk); } });
     }
 
     // ── Nässe: Regen macht das Laub dunkel und schwer, trocknet in ~2 min ──
@@ -876,7 +890,8 @@
       stepWet(dt);
       stepFire(dt, ts);
       if (offFor > 3) return;
-      if (B.on) stepShow(dt); else if (show) resetShow();
+      if (B.on) stepShow(dt);
+      else if (wave || tws.any() || pkNodes.some(function (pk) { return pk && (pk.mode || pk.ly); })) resetShow();
       B.stepSnow(dt);
       stepDips(dt);
       var l = lvl();

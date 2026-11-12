@@ -987,17 +987,18 @@
     // (gestaffelt, ein paar zugleich), dann in ~25 s
     // Tsunami spült flach (washed), die Windhose reißt ein (blown, nur in
     // Reichweite reach um ihr x); Wiederaufbau erst, wenn beide vorbei sind
-    function sweeping() { return (wave && wave.active()) || (twister && twister.active()); }
+    function sweeping() { return (wave && wave.active()) || tws.any(); }
     function stepSlump(c, target, x, maxWait, rebuild) {
       // vom Blitz getroffen: wie weggespült, bis zap abgelaufen ist
       if (c.zap > 0) { c.zap -= dt0; c.washed = true; c.hard = 1; }
       if (wave && !B.reduceMotion && wave.level(x) > 30) { c.washed = true; c.hard = Math.max(c.hard || 0, rebuild.washed); }
-      var tx = twister && !B.reduceMotion ? twister.x() : null;
+      // jede Windhose reißt ein, was in ihrer Reichweite steht
+      var tn = B.reduceMotion ? null : tws.near(x), tx = tn ? tn.x : null;
       if (tx !== null && Math.abs(tx - x) < rebuild.reach && !c.torn) {
         c.torn = true;
         c.washed = true;
         c.hard = Math.max(c.hard || 0, rebuild.blown);
-        if (rebuild.torn) rebuild.torn(twister.dir || (tx < x ? 1 : -1));
+        if (rebuild.torn) rebuild.torn(tn.dir || (tx < x ? 1 : -1));
       }
       if (c.washed && !sweeping() && !(c.zap > 0)) { c.washed = false; c.torn = false; c.hard = 0; c.wait = rand(3, maxWait); }
       if (c.washed) target = Math.max(target, c.hard);
@@ -1011,7 +1012,7 @@
       if (c.wait > 0) { c.wait -= dt0; if (c.wait <= 0 && rebuild.burst) rebuild.burst(); return; }
       c.s = Math.max(target, c.s - dt0 / 25);
     }
-    var dt0 = 0, twister = null;
+    var dt0 = 0, tws = TS.twisters();
     // Windhose reißt Türme und Fahnen ab: Sand und Fetzen fliegen mit dem Wirbel
     function debris(x, y, dir, flags) {
       if (!B.front) return;
@@ -1051,15 +1052,15 @@
     }
     function stepCastles(dt) {
       dt0 = dt;
-      if (!sweeping() && (wave || twister)) {
+      if (!sweeping() && wave) {
         // erst loslassen, wenn alle gespülten Burgen ihre Wartezeit haben
-        if (!castles.some(function (c) { return c && c.washed; }) && !pal.washed) { wave = null; twister = null; }
+        if (!castles.some(function (c) { return c && c.washed; }) && !pal.washed) wave = null;
       }
       if (!B.on) {
         // ausgeblendet: nichts animieren, alles steht wieder
         castles.forEach(function (c) { if (c) { c.s = 0; c.wait = null; c.washed = false; c.torn = false; c.hard = 0; renderCastle(c); } });
         pal.s = 0; pal.washed = false; pal.torn = false; pal.hard = 0; pal.wait = null; renderPalace();
-        wave = null; twister = null;
+        wave = null; tws.clear();
         return;
       }
       var r = liveRain();
@@ -1085,14 +1086,14 @@
       var pb = pal.torn || pal.s > 0.05 && gPalace.dataset.blown === '1' ? '1' : '0';
       if (gPalace.dataset.blown !== pb) gPalace.dataset.blown = pb;
       // naht die Windhose, bebt der Palast
-      var ptx = twister && twister.active && twister.active() ? twister.x() : null;
-      var pq = !B.reduceMotion && ptx !== null && Math.abs(ptx - 270) < 380 ? '1' : '0';
+      var pn = tws.near(270);
+      var pq = !B.reduceMotion && pn && Math.abs(pn.x - 270) < 380 ? '1' : '0';
       if (gPalace.dataset.quake !== pq) gPalace.dataset.quake = pq;
       renderPalace();
     }
 
     // ── Sonnenschirm: Blitz, Sturm, Windhose ──
-    var tornado = null, uDrawn = false, uctx = B.fireCtx();
+    var uDrawn = false, uctx = B.fireCtx();
     // Baum am Strand steht vor dem Schirm: dann weder Feuer noch Wegwehen
     function treeOver() { return X.shown() && xRoot.dataset.tree !== '0'; }
     // der Schirm fliegt auch weg, wenn der Weihnachtsbaum davor steht
@@ -1100,9 +1101,9 @@
     // Strand-Baum biegt sich im Sturm, bei naher Windhose kräftig
     var TREE_CX = TREE_X + 200 * TREE_K, treeSway = B.sway(), swayDrawn = '', jigDrawn = '';
     function stepTreeSway(dt) {
-      var tx = tornado ? tornado.x() : null, target = 0, gust = 0;
+      var tn = tws.near(TREE_CX), target = 0, gust = 0;
       if (B.on && !B.reduceMotion && treeOver()) {
-        if (tx !== null && Math.abs(tx - TREE_CX) < 320) target = 6;
+        if (tn && Math.abs(tn.x - TREE_CX) < 320) target = 6;
         else if (stormy()) target = 2.2;
         gust = Math.min(4, Math.abs(B.gustPx) / 200);
       }
@@ -1209,25 +1210,23 @@
       return kind === 'storm' || kind === 'blizzard' || bz > 0.3 || Math.abs(B.windBase) >= 0.8;
     }
     function tornadoNear() {
-      var tx = tornado ? tornado.x() : null;
-      return tx !== null && Math.abs(tx - U.px) < 200;
+      var tn = tws.near(U.px);
+      return !!tn && Math.abs(tn.x - U.px) < 200;
     }
     function stepUmbrella(dt, ts) {
       if (!B.on) {
         if (U.mode !== 'up') freshUmbrella(false);
         if (uDrawn) { uctx.clearRect(0, 0, W, H); uDrawn = false; }
-        tornado = null;
         shelterUmbrella();
         return;
       }
-      if (tornado && !tornado.active()) tornado = null;
       stepTreeSway(dt);
       U.t += dt;
       var burning = false;
       if (U.mode === 'up' && umbrellaFree() && (stormy() || tornadoNear())) {
         U.mode = 'fly'; U.t = 0; U.vx = 0; U.vy = -420; U.va = 0;
-        var tx = tornado ? tornado.x() : null;
-        U.dir = tx !== null ? (tornado.dir || (tx < U.px ? 1 : -1)) : (B.windBase < 0 ? -1 : 1);
+        var tn = tws.near(U.px);
+        U.dir = tn ? (tn.dir || (tn.x < U.px ? 1 : -1)) : (B.windBase < 0 ? -1 : 1);
         sandPuff(U.px, U.py - 10);
       }
       if (U.mode === 'up') leanUmbrella();
@@ -1260,7 +1259,7 @@
         if (op <= 0 && U.t > 0.5) { U.mode = 'away'; U.t = 0; U.calm = 0; }
       } else if (U.mode === 'away') {
         // kommt wieder, wenn es ~20 s ruhig ist und keine Windhose läuft
-        U.calm = !stormy() && Math.abs(B.windBase) < 0.5 && !tornado ? U.calm + dt : 0;
+        U.calm = !stormy() && Math.abs(B.windBase) < 0.5 && !tws.any() ? U.calm + dt : 0;
         if (U.calm >= 20) {
           U.mode = 'back'; U.t = 0; U.x = 0; U.y = -1150; U.a = -U.dir * 35; U.vy = 0;
           placeFly(0);
@@ -1426,7 +1425,7 @@
           // Tsunami spült die Burgen flach, sobald das Wasser sie erreicht
           case 'spectacle':
             if (B.on && p.type === 'tsunami' && !p.reduced) wave = p;
-            if (B.on && p.type === 'tornado' && !p.reduced) { twister = p; tornado = p; }
+            if (B.on) tws.add(p);
             break;
           case 'bolt': umbrellaBolt(p); break;
           case 'clear':

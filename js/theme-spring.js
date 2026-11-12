@@ -402,11 +402,12 @@
       if (name) B.tag('Thank you, ' + name + '!', W / 2, 300, true);
     }
 
-    // ── Spektakel: Windhose und Hagel ──
-    var show = null, tNow = 0;
+    // ── Spektakel: Windhosen (beliebig viele) und Hagel ──
+    var show = null, tws = TS.twisters(), tNow = 0;
     function spectacle(p) {
       if (!B.on || p.reduced || (p.type !== 'tornado' && p.type !== 'hail')) return;
       show = p;
+      tws.add(p);
       if (p.type !== 'hail' || !B.partOn('meadow')) return;
       // ein paar Blumen werden während des Schauers getroffen
       var pool = flowers.filter(Boolean), n = Math.min(pool.length, 3 + Math.floor(Math.random() * 3));
@@ -424,18 +425,18 @@
     }
     function stepShow(dt) {
       tNow += dt;
-      var live = show && show.active();
-      var tx = live && show.type === 'tornado' ? show.x() : null;
+      var live = (show && show.active()) || tws.any();
       var busy = false;
       flowers.forEach(function (f) {
         if (!f) return;
         var want = 0;
-        // Windhose: je näher, desto heftiger (zur Windhose hin geneigt), Blätter fliegen
-        if (tx !== null) {
-          var d = tx - f.x, str = clamp01(1 - Math.abs(d) / 450);
+        // Windhose: je näher, desto heftiger (zur nächsten hin geneigt), Blätter fliegen
+        var tn = tws.near(f.x);
+        if (tn) {
+          var d = tn.x - f.x, str = clamp01(1 - Math.abs(d) / 450);
           want = str * ((d > 0 ? 1 : -1) * 28 + Math.sin(tNow * 8 + f.x * 0.05) * 32);
           if (str > 0.35 && Math.random() < dt * 10 * str) {
-            flowerPetal(f, (d > 0 ? 1 : -1) * rand(150, 450) + (show.dir || 0) * 200, rand(-650, -250));
+            flowerPetal(f, (d > 0 ? 1 : -1) * rand(150, 450) + tn.dir * 200, rand(-650, -250));
           }
         }
         // Hagel: Treffer knickt die Blume um, nach 20–30 s richtet sie sich auf
@@ -470,7 +471,7 @@
       if (show && !live && !busy) show = null;
     }
     function resetShow() {
-      show = null;
+      show = null; tws.clear();
       flowers.forEach(function (f) {
         if (!f) return;
         f.ang = f.shown = f.knock = 0; f.hitIn = null;
