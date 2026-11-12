@@ -866,7 +866,7 @@
       // gegossen wird die Blume, die der Server gewählt hat (die eigene oder eine zufällige)
       var mine = live.filter(function (f) { return f.label.toLowerCase() === key; })[0];
       var t = mine || (live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 200 });
-      if (mine && typeof p.flower_level === 'number') mine.wT = p.flower_level;
+      if (mine && typeof p.flower_level === 'number') { mine.wSrv = p.flower_level; mine.holdUntil = performance.now() + (B.reduceMotion ? 0 : 2200); }
       if (mine && B.yes(p.revived)) { delete deadSet[key]; setTimeout(function () { flowerTag(mine, mine.label + "'s flower is back to life!", true); }, 2000); }
       if (key && p.stage !== undefined && !B.yes(p.revived)) {
         var stg = parseInt(p.stage, 10) || 0;
@@ -941,7 +941,13 @@
     function sprinkler(p) {
       setLevels(p, 'water');
       (p.revived || []).forEach(function (n) { delete deadSet[String(n).toLowerCase()]; });
-      flowers.forEach(function (f) { if (f) f.wT = Math.min(100, (typeof f.wT === 'number' ? f.wT : S.waterT) + 30); });
+      // die Blumen genießen erst, solange die Sprenger laufen, dann richten sie sich langsam auf
+      var until = performance.now() + (B.reduceMotion ? 0 : 5600);
+      flowers.forEach(function (f) {
+        if (!f) return;
+        f.wSrv = Math.min(100, (typeof f.wSrv === 'number' ? f.wSrv : typeof f.wT === 'number' ? f.wT : S.waterT) + 30);
+        f.holdUntil = until;
+      });
       B.tag((p.name || 'Someone') + ' turned on the sprinkler!', W / 2, 300, true);
       if (B.reduceMotion || sprinkling || !B.partOn('meadow')) return;
       sprinkling = true;
@@ -1329,8 +1335,11 @@
       flowers.forEach(function (f) {
         if (!f) return;
         // je Blume: ab 30 % Wasser sinkt der Kopf, bei 15 % (eingegangen) hängt er ganz
+        // erst genießen (Kanne gießt, Sprenger laufen), dann den neuen Stand übernehmen
+        if (f.holdUntil && performance.now() >= f.holdUntil) { f.holdUntil = 0; if (typeof f.wSrv === 'number') f.wT = f.wSrv; }
         var wt = typeof f.wT === 'number' ? f.wT : S.waterT;
-        f.wv = typeof f.wv === 'number' ? f.wv + (wt - f.wv) * k : wt;
+        // aufrichten langsam (höchstens 3 %/s), trocknen folgt direkt
+        f.wv = typeof f.wv === 'number' ? (B.reduceMotion ? wt : f.wv + Math.max(-20 * dt, Math.min(3 * dt, wt - f.wv))) : wt;
         // Regen richtet nur über das steigende Wasser auf, wie Gießen (kein Sprung)
         f.wilt = Math.max(coldWilt, clamp01((30 - f.wv) / 15));
         var dead = !!deadSet[f.label.toLowerCase()];
@@ -1391,7 +1400,9 @@
         // je Blume (Server): Wasser, eingegangen, Wachstumsstufe
         if (lv.flowers) flowers.forEach(function (f) {
           var v = f && lv.flowers[f.label.toLowerCase()];
-          if (typeof v === 'number') f.wT = v;
+          if (typeof v !== 'number') return;
+          f.wSrv = v;
+          if (!(f.holdUntil > performance.now())) f.wT = v;
         });
         if (Array.isArray(lv.deadFlowers)) { deadSet = {}; lv.deadFlowers.forEach(function (n) { deadSet[n] = true; }); }
         if (lv.stages) syncStages(lv.stages);
