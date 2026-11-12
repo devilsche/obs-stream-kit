@@ -239,8 +239,12 @@
 /* Wiese: Trockenheit legt eine gelbe Schicht darüber, Regen macht satter */
 .tsp-grass { fill: #4f9a3a; }
 .tsp-grass--dry { fill: #b4a14a; opacity: var(--tsp-dry); }
-.tsp-blade { fill: none; stroke: #3d8a2e; stroke-width: 3; stroke-linecap: round; }
+.tsp-blade { stroke: none; }
+.tsp-bl1 { fill: #4f9a3a; } .tsp-bl2 { fill: #5fae45; } .tsp-bl3 { fill: #6fbd4f; }
+.tsp-blade--back.tsp-bl1 { fill: #3b7f2c; } .tsp-blade--back.tsp-bl2 { fill: #468c33; } .tsp-blade--back.tsp-bl3 { fill: #53993b; }
 .tsp-blades { filter: saturate(calc(1 - 0.6 * var(--tsp-dry))) brightness(calc(1 + 0.15 * var(--tsp-dry))); }
+.tsp-clover { fill: #3e8a30; }
+.tsp-tiny { fill: #ffffff; }
 .ts[data-wet="1"] .tsp-meadow { filter: brightness(calc(0.92 - 0.4 * var(--ts-night))) saturate(1.25); }
 .tsp-weed { transform-box: fill-box; transform-origin: 50% 100%; transition: transform 0.6s cubic-bezier(0.3, 1.4, 0.5, 1); transform: scale(0); }
 .tsp-weed.is-on { transform: none; }

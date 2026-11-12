@@ -63,6 +63,8 @@
     var gSun = el('g', { 'class': 'tsp-sunflower tsp-dim' }, B.svg());
     var meadowSvg = B.svg();
     var gMeadow = el('g', { 'class': 'tsp-meadow tsp-dim' }, meadowSvg);
+    // hohe Halme hinter den Blumen: die Stiele wachsen aus dem Gras
+    var gBack = el('g', { 'class': 'tsp-blades tsp-blades--back' }, gMeadow);
     var gWeeds = el('g', {}, gMeadow);
     var gFlowers = el('g', {}, gMeadow);
     var grass = el('path', { 'class': 'tsp-grass' }, gMeadow);
@@ -81,12 +83,43 @@
       d += ' L' + W + ' ' + H + ' Z';
       grass.setAttribute('d', d);
       grassDry.setAttribute('d', d);
-      for (var bi2 = 0; bi2 * 60 < W; bi2++) bladeBands.push({ g: el('g', {}, gBlades), x: bi2 * 60 + 30, shown: null });
-      for (var bx = 0; bx < W; bx += 9) {
-        // in der Mitte (Lebensbalken, Munition) nur kurze Halme
-        var mid = bx > 700 && bx < 1220 ? 0.4 : 1;
-        var y = groundY(bx) + 6, h = (14 + rnd() * 26) * mid, lean = (rnd() - 0.5) * 16 * mid;
-        el('path', { 'class': 'tsp-blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, bladeBands[Math.floor(bx / 60)].g);
+      // Halme als spitz zulaufende Formen, in Horsten mit Lücken; hinten hoch
+      // und dunkler, vorn kurze helle Büschel auf der Kante (kein harter
+      // Horizont); Bänder je 60 px schwingen mit den Windwellen
+      function bands(parent, k) {
+        var list = [];
+        for (var i = 0; i * 60 < W; i++) { list.push({ g: el('g', {}, parent), x: i * 60 + 30, k: k, shown: null }); bladeBands.push(list[i]); }
+        return list;
+      }
+      var backB = bands(gBack, 1), frontB = bands(gBlades, 0.45);
+      function blade(band, x, y, h, w, lean, cls) {
+        el('path', { 'class': cls, d: 'M' + f1(x - w / 2) + ' ' + f1(y) + ' Q' + f1(x - w / 4 + lean * 0.35) + ' ' + f1(y - h * 0.55) + ' ' + f1(x + lean) + ' ' + f1(y - h) +
+                     ' Q' + f1(x + w / 4 + lean * 0.35) + ' ' + f1(y - h * 0.55) + ' ' + f1(x + w / 2) + ' ' + f1(y) + ' Z' }, band[Math.max(0, Math.min(band.length - 1, Math.floor(x / 60)))].g);
+      }
+      function tufts(band, gapLo, gapHi, nLo, nHi, hLo, hHi, wLo, wHi, dy, cls) {
+        for (var cx = rnd() * 20; cx < W; cx += gapLo + rnd() * (gapHi - gapLo)) {
+          // in der Mitte (Lebensbalken, Munition) nur kurze Halme
+          var mid = cx > 700 && cx < 1220 ? 0.4 : 1, n = nLo + Math.floor(rnd() * (nHi - nLo + 1));
+          for (var k = 0; k < n; k++) {
+            var bx = cx + (k - (n - 1) / 2) * (3 + rnd() * 3), y = groundY(bx) + dy;
+            var fan = (k - (n - 1) / 2) / Math.max(1, n - 1);
+            blade(band, bx, y, (hLo + rnd() * (hHi - hLo)) * mid, wLo + rnd() * (wHi - wLo), (fan * 14 + (rnd() - 0.5) * 8) * mid,
+                  cls + ' tsp-bl' + (1 + Math.floor(rnd() * 3)));
+          }
+        }
+      }
+      tufts(backB, 22, 48, 4, 8, 22, 52, 3, 5.5, 6, 'tsp-blade tsp-blade--back');
+      tufts(frontB, 10, 26, 3, 6, 7, 18, 2.5, 4.5, 9, 'tsp-blade');
+      // Klee und winzige Gänseblümchen, sparsam im Gras
+      for (var ci2 = 0; ci2 < 34; ci2++) {
+        var kx = 20 + rnd() * (W - 40); if (kx > 720 && kx < 1200) continue;
+        var ky = groundY(kx) + 10 + rnd() * 8, cg = el('g', { transform: 'translate(' + f1(kx) + ' ' + f1(ky) + ') scale(' + (0.8 + rnd() * 0.5).toFixed(2) + ')' }, frontB[Math.floor(kx / 60)].g);
+        if (ci2 % 3) {
+          for (var q = 0; q < 3; q++) el('circle', { 'class': 'tsp-clover', cx: f1(Math.sin(q * 2.09) * 2.6), cy: f1(-Math.cos(q * 2.09) * 2.6), r: 2.6 }, cg);
+        } else {
+          for (var q2 = 0; q2 < 8; q2++) el('ellipse', { 'class': 'tsp-tiny', cx: 0, cy: -2.2, rx: 0.9, ry: 2, transform: 'rotate(' + q2 * 45 + ')' }, cg);
+          el('circle', { 'class': 'tsp-center', r: 1.2 }, cg);
+        }
       }
     })();
 
@@ -974,7 +1007,7 @@
       });
       // Grashalme: je Band geschert, die Welle läuft von Band zu Band
       bladeBands.forEach(function (b) {
-        var a = -(windAt(b.x) + gustK * 0.5) * 1.1;
+        var a = -(windAt(b.x) + gustK * 0.5) * 1.6 * b.k;
         if (b.shown !== null && Math.abs(a - b.shown) < 0.05) return;
         b.shown = a;
         b.g.setAttribute('transform', 'translate(0 ' + (H - 20) + ') skewX(' + f1(a) + ') translate(0 ' + (20 - H) + ')');
