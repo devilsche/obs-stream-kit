@@ -709,6 +709,11 @@
     function badBugWeather() {
       return B.night > 0.5 || B.rain > 0.2 || (B.falling || 0) > 0.1 || (B.blizzard || 0) > 0.05 || B.snow > 0.2;
     }
+    // Mitte der Blüte, wie sie gerade im Wind steht
+    function headAt(f) {
+      var a = (f.sw + (f.ang || 0)) * Math.PI / 180;
+      return [f.x + Math.sin(a) * f.h, f.y + f.h - Math.cos(a) * f.h];
+    }
     function wanderButterfly() {
       if (!B.on || !B.partOn('bugs') || badBugWeather() || B.reduceMotion) return;
       // Hintergrund-Tab: Timer laufen weiter, rAF steht – sonst stauen sich Falter an
@@ -764,9 +769,13 @@
           root.requestAnimationFrame(step);
           return;
         }
+        // Ziel-Blüte weg (Tornado, Blitz, ersetzt): nicht mehr anfliegen
+        if (rest && (rest.rip || rest.fly || flowers.indexOf(rest) < 0)) { rest = null; if (sit > 0) { sit = 0; vy = -60; vx = dir * 60; } }
         if (sit > 0) {
-          // sitzt: Flügel zusammengeklappt, öffnet sie ein paar Mal zum Sonnen
+          // sitzt: Flügel zusammengeklappt, öffnet sie ein paar Mal zum Sonnen;
+          // schwingt mit der Blüte mit
           sit -= dt;
+          if (rest) { var hp0 = headAt(rest); x = hp0[0]; y = hp0[1] - 8; }
           var open = Math.max(0, Math.sin((4.5 - sit) * 1.6)) ;
           th = 1.5 - 1.1 * Math.pow(open, 3);
           tilt += (0 - tilt) * Math.min(1, dt * 6);
@@ -784,12 +793,21 @@
           // Haken: unvorhersehbar seitlich und in der Höhe
           hook -= dt;
           if (hook <= 0) { hook = rand(0.7, 2.2); vy += rand(-160, 160); vx = dir * rand(55, 140); }
-          var tx = null, ty = base;
-          if (rest && !sat) { tx = rest.x; ty = rest.y - 8; if (Math.abs(rest.x - x) < 260) vx += ((rest.x - x) * 1.6 - vx) * Math.min(1, dt * 3); }
+          var tx = null, ty = base, hp1 = rest && !sat ? headAt(rest) : null;
+          if (hp1) { tx = hp1[0]; ty = hp1[1] - 8; if (Math.abs(tx - x) < 260) vx += ((tx - x) * 1.6 - vx) * Math.min(1, dt * 3); }
           vy += (ty - y) * 1.4 * dt - vy * 0.9 * dt;
-          if (rest && !sat && Math.abs(rest.x - x) < 6 && Math.abs(ty - y) < 8) { sat = true; sit = rand(3.5, 5); x = rest.x; y = ty; vx = 0; vy = 0; }
-          // Böen treiben ihn seitlich ab
-          if (sit <= 0) { x += (vx + B.windPx() * 0.15) * dt; y += vy * dt; }
+          var dl = hp1 ? Math.hypot(tx - x, ty - y) : 1e9;
+          if (dl < 70) {
+            // Landeanflug: kein Haken, kein Flattern-Ruck, gleitet weich auf die
+            // (schwingende) Blüte und setzt sich
+            th = 0.55 + 0.35 * Math.sin(now / 55);
+            x += (tx - x) * Math.min(1, dt * 4); y += (ty - y) * Math.min(1, dt * 4);
+            vx = 0; vy = 0; hook = Math.max(hook, 0.5);
+            if (dl < 3) { sat = true; sit = rand(3.5, 5); x = tx; y = ty; }
+          } else if (sit <= 0) {
+            // Böen treiben ihn seitlich ab
+            x += (vx + B.windPx() * 0.15) * dt; y += vy * dt;
+          }
           tilt += (Math.max(-20, Math.min(20, vy * 0.08)) - tilt) * Math.min(1, dt * 5);
         }
         poseBf(b, th);
