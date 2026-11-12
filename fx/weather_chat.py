@@ -11,7 +11,7 @@ import random
 import re
 
 # Preis je Stufe in Punkten (Bits; Spenden ×100)
-PRICE = {"weather": 100, "small": 200, "big": 500, "apocalypse": 1000}
+PRICE = {"weather": 50, "small": 100, "big": 250, "apocalypse": 500}
 
 # Chat-Befehl → (Befehl an die Source, Stufe, Name im Chat)
 OFFERS = {
@@ -63,7 +63,8 @@ def points(kind: str, amount) -> int:
 
 def price_text(tier: str) -> str:
     p = PRICE[tier]
-    return f"{p} Bits oder {p // 100} €"
+    euro = str(p // 100) if p % 100 == 0 else f"{p // 100},{p % 100:02d}"
+    return f"{p} Bits oder {euro} €"
 
 
 def paid(kind: str, amount, msg: str = "", name: str = "", rnd=random) -> dict:

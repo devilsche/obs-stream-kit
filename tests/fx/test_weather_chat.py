@@ -11,7 +11,7 @@ def test_points_bits_and_money():
 
 
 def test_paid_command_in_message_with_enough_bits():
-    r = wc.paid("bits", 500, "cheer500 !Tornado los!", "Tim")
+    r = wc.paid("bits", 250, "cheer250 !Tornado los!", "Tim")
     assert r["command"] == {"cmd": "spectacle", "params": {"type": "tornado"}}
     assert r["say"] == "Danke Tim! Du hast einen Tornado bestellt."
 
@@ -19,34 +19,45 @@ def test_paid_command_in_message_with_enough_bits():
 def test_paid_command_too_cheap_says_price():
     r = wc.paid("money", "1", "!megabolt bitte", "Tim")
     assert r["command"] is None
-    assert "500 Bits oder 5 €" in r["say"]
+    assert "250 Bits oder 2,50 €" in r["say"]
 
 
 def test_paid_without_command_picks_highest_tier():
-    r = wc.paid("bits", 250, "cheer250 gg", "Tim", rnd=random.Random(1))
+    r = wc.paid("bits", 150, "cheer150 gg", "Tim", rnd=random.Random(1))
     assert wc.OFFERS[r["offer"]][1] == "small"
-    r = wc.paid("money", "5", "", "Tim", rnd=random.Random(1))
+    r = wc.paid("money", "2,50", "", "Tim", rnd=random.Random(1))
     assert wc.OFFERS[r["offer"]][1] == "big"
 
 
-def test_paid_apocalypse_needs_1000_bits_or_10_euro():
-    r = wc.paid("bits", 1000, "cheer1000 !apocalypse", "Tim")
+def test_paid_apocalypse_needs_500_bits_or_5_euro():
+    r = wc.paid("bits", 500, "cheer500 !apocalypse", "Tim")
     assert r["command"] == {"cmd": "spectacle", "params": {"type": "apocalypse"}}
     assert r["say"] == "Danke Tim! Du hast die Apokalypse bestellt."
-    r = wc.paid("money", "5", "!apocalypse", "Tim")
+    r = wc.paid("money", "4,99", "!apocalypse", "Tim")
     assert r["command"] is None
-    assert "1000 Bits oder 10 €" in r["say"]
+    assert "500 Bits oder 5 €" in r["say"]
 
 
 def test_paid_without_command_reaches_apocalypse_tier():
-    r = wc.paid("money", "10", "", "Tim", rnd=random.Random(1))
+    r = wc.paid("money", "5", "", "Tim", rnd=random.Random(1))
     assert r["offer"] == "apocalypse"
-    r = wc.paid("bits", 999, "", "Tim", rnd=random.Random(1))
+    r = wc.paid("bits", 499, "", "Tim", rnd=random.Random(1))
     assert wc.OFFERS[r["offer"]][1] == "big"
 
 
+def test_price_text_shows_cents():
+    assert wc.price_text("weather") == "50 Bits oder 0,50 €"
+    assert wc.price_text("small") == "100 Bits oder 1 €"
+    assert wc.price_text("big") == "250 Bits oder 2,50 €"
+
+
+def test_paid_weather_from_50_bits():
+    r = wc.paid("bits", 50, "cheer50 !rain", "Tim")
+    assert r["command"] is not None
+
+
 def test_paid_too_little_without_command_stays_quiet():
-    assert wc.paid("bits", 50, "cheer50", "Tim") == {"command": None, "offer": None, "say": ""}
+    assert wc.paid("bits", 49, "cheer49", "Tim") == {"command": None, "offer": None, "say": ""}
 
 
 def test_every_offer_is_a_valid_weather_command():

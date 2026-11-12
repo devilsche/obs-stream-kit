@@ -589,7 +589,7 @@ def test_build_answers_with_project_progress(conn):
 def test_paid_weather_pushes_command_only_when_enough(conn):
     c = _client(conn)
     r = c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&name=Tim&msg=cheer100%20!tornado").get_json()
-    assert r["offer"] is None and "500 Bits" in r["say"]
+    assert r["offer"] is None and "250 Bits" in r["say"]
     assert commands.poll(1, "weather", 0)["commands"] == []
     r = c.get("/s/t/api/fx/weather/paid?kind=money&amount=5&name=Tim&msg=!tornado").get_json()
     assert r["offer"] == "tornado"
