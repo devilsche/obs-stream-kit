@@ -203,3 +203,13 @@ def test_sprinkler_waters_all_and_regen_does_not_grow(conn):
     assert load(conn, 1)["levels"]["flowers"] == {"anna": 44.0, "ben": 44.0}
     advance(conn, 1, 30 * 60, "spring", dict(W, rain=1), flowers=names)
     assert grow_stages(conn, 1) == {}
+
+
+def test_rain_puts_out_running_fires_on_the_server(conn):
+    advance(conn, 1, 0, "autumn", W)
+    ignite(conn, 1, 0)
+    assert use(conn, 1, "extinguish", "", 1)["fires"] == 0      # löschbar, solange es brennt
+    ignite(conn, 1, 10)
+    advance(conn, 1, 11, "autumn", dict(W, rain=1))
+    # nach ein paar Sekunden Regen ist es aus, nichts mehr zu löschen
+    assert use(conn, 1, "extinguish", "", 16)["done"] == 0

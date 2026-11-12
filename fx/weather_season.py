@@ -32,6 +32,7 @@ THEME_OF = {"rake": "autumn", "sweep": "autumn", "leafstorm": "autumn", "extingu
 FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
 FIRE_WET_SECS = 8
 FIRE_MAX = 5          # so viele Feuer brennen höchstens gleichzeitig
+RAIN_OUT_SECS = 4     # so schnell löscht Regen ein laufendes Feuer
 LEAFSTORM = 25        # so viel Laub weht der Laubsturm auf den Haufen
 GROW_STEPS = (1, 2)   # so oft gegossen → Blume Stufe 1, Stufe 2 (jedes Gießen eine Stufe)
 OWN_COOLDOWN = 300    # die eigene Blume gießt ein Zuschauer höchstens so oft
@@ -190,12 +191,17 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0, flower
     m = max(0.0, now - last) / 60
     lv = data["levels"]
     before = dict(lv)
+    doused = False
     if theme == "autumn":
         if w.get("blizzard", 0) > 0.5:
             # Schneesturm pustet den Laubhaufen weg
             lv["leaves"] = _clamp(lv["leaves"] - 25 * m)
         else:
             lv["leaves"] = _clamp(lv["leaves"] + (1 + 2 * min(1, abs(w.get("wind", 0)))) * rate * m)
+        if w.get("rain", 0) > 0.2 and data.get("fires"):
+            # Regen löscht laufende Feuer nach ein paar Sekunden (wie im Overlay)
+            data["fires"] = [min(u, now + RAIN_OUT_SECS) for u in _fires(data, now)]
+            doused = True
     elif theme == "spring":
         dry = 6 if w.get("heat", 0) > 0.5 else 2
         delta = (30 * w.get("rain", 0) - dry) * m
@@ -221,7 +227,7 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0, flower
         else:
             per = -4        # bewölkt, ohne Sonne: kühlt langsam ab
         lv["heat"] = _clamp(lv["heat"] + per * rate * m)
-    changed = any(abs(lv[k] - before[k]) >= 0.5 for k in LEVELS)
+    changed = any(abs(lv[k] - before[k]) >= 0.5 for k in LEVELS) or doused
     if theme == "spring":
         before_dead = list(data.get("fdead", []))
         if _life(data) or data.get("fdead", []) != before_dead or flowers is not None and set(data.get("fw", {})) != {n.lower() for n in flowers}:

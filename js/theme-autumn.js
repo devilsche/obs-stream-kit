@@ -1022,6 +1022,17 @@
         for (var sm = 0; sm < 8; sm++) B.smoke(f.x + rand(-50, 50), H - wave.level(f.x), { steam: true, o: 0.6, up: rand(70, 140), life: rand(1.5, 2.5) });
         emit('fireOut', { wet: true, fires: burning().length });
       }
+      // Regen löscht ein laufendes Feuer nach ein paar Sekunden (je stärker, desto schneller)
+      var rn = liveRain();
+      if (!f.out && rn > 0.2) {
+        f.rainT = (f.rainT || 0) + dt * rn;
+        if (Math.random() < dt * 4) B.smoke(f.x + rand(-40, 40), surface(f.x), { steam: true, o: 0.4, life: rand(1.2, 2) });
+        if (f.rainT > 3) {
+          f.out = true; f.outT = 0;
+          for (var rs = 0; rs < 6; rs++) B.smoke(f.x + rand(-50, 50), surface(f.x), { steam: true, o: 0.55, up: rand(60, 120), life: rand(1.5, 2.5) });
+          emit('fireOut', { wet: true, fires: burning().length });
+        }
+      }
       var k, ember;
       if (f.out) {
         f.outT += dt;
