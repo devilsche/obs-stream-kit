@@ -373,12 +373,19 @@
             pk.zap = false;
             delete pk.node.dataset.zap;
             pk.node.classList.add('is-lit');
-            pk.node.classList.remove('ta-pk--new');
-            void pk.node.getBBox();
-            pk.node.classList.add('ta-pk--new');
+            dropIn(pk);
           }, 700);
         }, at);
       });
+    }
+    // Kürbis fällt neu auf seinen Platz; die Klasse danach wieder weg, sonst
+    // spielt der Fall erneut, sobald ein Scheinwerfer-Wackeln endet
+    function dropIn(pk) {
+      pk.node.classList.remove('ta-pk--new');
+      void pk.node.getBBox();
+      pk.node.classList.add('ta-pk--new');
+      clearTimeout(pk.dropT);
+      pk.dropT = setTimeout(function () { pk.node.classList.remove('ta-pk--new'); }, 1200);
     }
     function putPumpkin(name, i, animate) {
       pkNodes[i] = buildPumpkin(name, i, animate);
@@ -749,9 +756,7 @@
       setTimeout(function () {
         pk.zap = false;
         delete pk.node.dataset.zap;
-        pk.node.classList.remove('ta-pk--new');
-        void pk.node.getBBox();
-        pk.node.classList.add('ta-pk--new');
+        dropIn(pk);
         // der Name erst, wenn er wieder da ist
         if (pk.label && B.on && B.partOn('pumpkins')) setTimeout(function () { pkTag(pk, pk.label, false); }, 600);
       }, rand(8000, 14000));

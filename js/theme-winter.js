@@ -609,6 +609,8 @@
         m.inner.classList.remove('tw-mini--new');
         void m.inner.getBBox();
         m.inner.classList.add('tw-mini--new');
+        // danach wieder weg, sonst fällt er nach jedem Scheinwerfer-Wackeln neu
+        setTimeout(function () { m.inner.classList.remove('tw-mini--new'); }, 1100);
         // der Name erst, wenn er wieder da ist
         if (m.label && S.on && partOn('minis') && !minisHidden()) setTimeout(function () { tag(m.label, m.x, miniTop(m)); }, 600);
       }, rand(8000, 14000));
