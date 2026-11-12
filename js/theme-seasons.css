@@ -258,6 +258,9 @@
 .tsp-vein { fill: none; stroke: #2f6e24; stroke-width: 0.8; opacity: 0.7; }
 .tsp-grow { transform-box: fill-box; transform-origin: 50% 100%; }
 .tsp-grow--new { animation: tspGrow 1.6s cubic-bezier(0.3, 1.2, 0.5, 1) both; }
+/* Wachstum durch Gießen: die größere Blume federt aus der alten Größe hoch */
+.tsp-grow--up { animation: tspUp 1.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
+@keyframes tspUp { from { transform: scale(0.88); } to { transform: none; } }
 @keyframes tspGrow { from { transform: scaleY(0); } to { transform: none; } }
 .tsp-head {
   --side: 1;

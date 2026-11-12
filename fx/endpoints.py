@@ -9,6 +9,7 @@ Laub; winter/spring/summer: fx/season_db.py) schreiben den Befehl zusätzlich
 in die DB; der erste Poll ohne `since` liefert sie als `state` mit.
 """
 import functools
+import random
 import logging
 import sqlite3
 import time
@@ -121,7 +122,9 @@ def _winter_persist(conn, tenant_id, cmd):
         weather_season.ignite(conn, tenant_id, now, wet=bool(p.get("wet")))
         return False
     elif c in weather_season.THEME_OF:
-        p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force"))))
+        target = _water_target(conn, tenant_id, p.get("name", "")) if c == "water" else ""
+        p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force")),
+                                    target=target))
     elif c == "clear" and p.get("kind") in ("followers", "ornaments", "minis", "pumpkins", "flowers", "castles"):
         weather_followers.clear(conn, tenant_id)
     elif c == "clear" and p.get("kind") in ("leaves", "garden", "heat"):
@@ -135,6 +138,16 @@ def _winter_persist(conn, tenant_id, cmd):
         elif kind == "snow":
             weather_snow.clear(conn, tenant_id, now)
     return True
+
+
+FLOWERS_SHOWN = 24   # so viele neueste Follower stehen im Frühling als Blume
+
+
+def _water_target(conn, tenant_id, name):
+    """!water gießt die eigene Blume, wer keine im Bild hat, eine zufällige."""
+    names = weather_followers.load(conn, tenant_id, limit=FLOWERS_SHOWN)["names"]
+    own = [n for n in names if name and n.lower() == name.strip().lower()]
+    return own[0] if own else (random.choice(names) if names else "")
 
 
 def _project_stage(conn, tenant_id) -> int:
@@ -159,12 +172,15 @@ def _weather_state(conn, tenant_id):
 
     def newest(n):
         return [{"name": nm} for nm in names[-n:]]
+    # Blumen mit ihrer Wachstumsstufe (bleibt für immer)
+    stages = weather_season.grow_stages(conn, tenant_id)
+    flowers = [dict(f, stage=stages[f["name"].lower()]) if f["name"].lower() in stages else f for f in newest(40)]
     return {"followers": names, "follower_total": total,
             "ornaments": newest(60), "ornament_total": total,
             "gifts": x["gifts"], "gift_total": x["gift_total"],
             "minis": newest(30), "mini_total": total,
             "pumpkins": newest(30), "pumpkin_total": total,
-            "flowers": newest(40), "flower_total": total,
+            "flowers": flowers, "flower_total": total,
             "castles": newest(24), "castle_total": total,
             # Sub-Projekt aller Jahreszeiten (Schneemann, Vogelscheuche, Sonnenblume, Palast)
             "snowman": stage, "project": stage}

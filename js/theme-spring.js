@@ -244,13 +244,18 @@
         L.g.setAttribute('transform', 'translate(' + f1(px) + ' ' + f1(py) + ') rotate(' + f1(L.ang + (L.fl || 0) + f.sw * 0.6) + ')');
       });
     }
+    // Wachstum durch Gießen (Server zählt je Blume): Stufe 1 größer mit Knospe
+    // am Seitentrieb, Stufe 2 noch größer, die Knospe ist aufgeblüht
+    var STAGE_H = [1, 1.15, 1.3], STAGE_K = [1, 1.07, 1.14], flStage = {};
+    function stageOf(name) { return flStage[(name || '').toLowerCase()] || 0; }
     function putFlower(name, i, animate) {
-      var x = SLOTS[i], y = groundY(x) + 8;
+      var x = SLOTS[i], y = groundY(x) + 8, st = stageOf(name);
       // je Name fest: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
       var fr = function (s) { return TS.nameRand(name, s); };
       var ci = Math.floor(fr(7) * 5);
       var h = Math.round((34 + Math.floor(fr(6) * 40)) * 1.5), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + ci);
-      var lean = (fr(2) < 0.5 ? -1 : 1) * (4 + 8 * fr(3)), hk = 0.55 + 0.25 * fr(4);
+      var lean = (fr(2) < 0.5 ? -1 : 1) * (4 + 8 * fr(3)), hk = (0.55 + 0.25 * fr(4)) * STAGE_K[st];
+      h = Math.round(h * STAGE_H[st]);
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
       // Zwischenebene zum Biegen/Umknicken (Fuß bei 0/0)
       var bend = el('g', {}, outer);
@@ -266,6 +271,19 @@
         el('path', { 'class': 'tsp-vein', d: 'M0 0 Q' + f1(wid * 0.15) + ' ' + f1(-len * 0.5) + ' 0 ' + f1(-len * 0.88) }, lg);
         leaves.push({ g: lg, t: L[0], ang: L[1] * (fr(2) < 0.5 ? 1 : -1) * (li % 2 ? -1 : 1), ph: fr(11 + li) * 6.28 });
       });
+      if (st >= 1) {
+        // Seitentrieb: Knospe (Stufe 1) bzw. zweite, kleinere Blüte (Stufe 2)
+        var sg = el('g', {}, grow), sl = 18 + h * 0.08;
+        el('path', { 'class': 'tsp-stem tsp-stem--thin', d: 'M0 0 Q3 ' + f1(-sl * 0.5) + ' 0 ' + f1(-sl) }, sg);
+        var tip = el('g', { transform: 'translate(0 ' + f1(-sl) + ')' }, sg);
+        if (st === 1) {
+          el('ellipse', { 'class': col, cx: 0, cy: -5, rx: 3.6, ry: 6 }, tip);
+          el('path', { 'class': 'tsp-calyx', d: 'M-4 0 L-2.5 -5 L0 -1 L2.5 -5 L4 0 Q0 2 -4 0 Z' }, tip);
+        } else {
+          drawBloom(el('g', { 'class': 'tsp-bloom', transform: 'scale(' + (hk * 0.6).toFixed(2) + ')' }, tip), type, col);
+        }
+        leaves.push({ g: sg, t: 0.45, ang: (lean > 0 ? -1 : 1) * 50, ph: fr(14) * 6.28 });
+      }
       var stem = el('path', { 'class': 'tsp-stem' }, grow);
       var hp = el('g', {}, grow);
       var head = el('g', { 'class': 'tsp-head' + (i % 2 ? '' : ' tsp-head--l') }, hp);
@@ -273,7 +291,7 @@
       drawBloom(bloom, type, col);
       // Schwingung: hohe Stiele langsam und weit, kurze zittern schnell
       var f0 = 1.7 - 0.8 * clamp01((h - 51) / 60);
-      flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci],
+      flowers[i] = { node: outer, head: head, bend: bend, grow: grow, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci], stage: st,
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0, rip: null, fly: null,
                      stem: stem, hp: hp, leaves: leaves, lean: lean, sw: 0, sv: 0, wk: f0 * 6.283, zeta: 0.12 + 0.08 * fr(9),
                      ph: fr(10) * 6.28, swShown: null };
@@ -748,10 +766,18 @@
     function water(p) {
       var name = p.name || 'Someone';
       setLevels(p, 'water');
-      var live = flowers.filter(Boolean);
-      var t = live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 200 };
-      if (!(parseFloat(p.done) > 0)) { B.tag(name + ': the garden is already wet', t.x, t.y - 150, true); return; }
-      B.tag(name + ' watered the flowers!', t.x, t.y - 150, true);
+      var live = flowers.filter(Boolean), key = (p.flower || '').toLowerCase();
+      // gegossen wird die Blume, die der Server gewählt hat (die eigene oder eine zufällige)
+      var mine = live.filter(function (f) { return f.label.toLowerCase() === key; })[0];
+      var t = mine || (live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 200 });
+      if (key && p.stage !== undefined) {
+        var stg = parseInt(p.stage, 10) || 0;
+        if (B.yes(p.up) && mine) setTimeout(function () { growFlower(mine, stg); }, B.reduceMotion ? 0 : 1500);
+        else flStage[key] = Math.max(flStage[key] || 0, stg);
+      }
+      if (!(parseFloat(p.done) > 0) && !mine) { B.tag(name + ': the garden is already wet', t.x, t.y - 150, true); return; }
+      B.tag(mine && mine.label.toLowerCase() === (p.name || '').toLowerCase() ? name + ' watered their flower!' :
+            mine ? name + ' watered ' + mine.label + "'s flower!" : name + ' watered the flowers!', t.x, t.y - 150, true);
       if (B.reduceMotion || watering) return;
       watering = true;
       can.classList.add('is-on');
@@ -764,6 +790,22 @@
         }
         if (k < 1) root.requestAnimationFrame(step); else { can.classList.remove('is-on'); watering = false; }
       })();
+    }
+    // Blume eine Stufe höher: an Ort und Stelle neu aufbauen, federt groß
+    function growFlower(f, stg) {
+      flStage[f.label.toLowerCase()] = Math.max(stageOf(f.label), stg);
+      var i = flowers.indexOf(f);
+      if (i < 0 || f.rip || f.fly || f.knock) return;   // gerade im Sturm: zeigt sich beim nächsten Aufbau
+      var next = f.node.nextSibling;
+      gFlowers.removeChild(f.node);
+      putFlower(f.label, i, false);
+      var n = flowers[i];
+      gFlowers.insertBefore(n.node, next);   // gleiche Tiefe wie vorher
+      if (!B.reduceMotion) {
+        n.grow.classList.add('tsp-grow--up');
+        setTimeout(function () { n.grow.classList.remove('tsp-grow--up'); }, 1300);
+      }
+      if (B.on && B.partOn('meadow')) flowerTag(n, f.label + (stg >= 2 ? "'s flower is in full bloom!" : "'s flower is growing!"), true);
     }
     function weed(p) {
       var name = p.name || 'Someone', success = B.yes(p.success);
@@ -1063,7 +1105,11 @@
       load: function (deco) {
         if (!deco) return;
         clearFlowers();
-        (deco.flowers || []).forEach(function (f) { addFlower(f.name || '', false); });
+        flStage = {};
+        (deco.flowers || []).forEach(function (f) {
+          if (f.stage) flStage[(f.name || '').toLowerCase()] = parseInt(f.stage, 10) || 0;
+          addFlower(f.name || '', false);
+        });
         flTotal = deco.flower_total || flowers.filter(Boolean).length;
         sunflower.set(deco.project != null ? deco.project : deco.snowman);
       },

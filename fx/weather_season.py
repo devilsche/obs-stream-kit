@@ -6,7 +6,11 @@ angetrieben vom wirksamen Wetter. Ein JSON-Stand je Tenant:
 - Frühling `water`: trocknet mit 2 %/min (Hitze 6), Regen gießt mit
   30 %/min × Regenmenge, `water` +10; `weeds` wächst mit 1 %/min, `weed`
   −3, eine Gruppe (3 Namen in 20 s) halbiert, `force` (Mods) halbiert sofort.
-  Gießen und Jäten zählen für die Rangliste.
+  Gießen und Jäten zählen für die Rangliste. Gießen lässt außerdem eine
+  Blume wachsen (`target`, vom Endpoint gewählt: die eigene oder eine
+  zufällige): nach GROW_STEPS-mal Gießen Stufe 1 bzw. 2, für immer; je
+  Zuschauer zählt nur ein Gießen alle GROW_COOLDOWN s. Regen lässt nichts
+  wachsen, er hebt nur die Köpfe.
 - Sommer `heat`: steigt bei Hitzewelle mit 20 %/min, bei Sonne am Tag mit
   2 %/min, sinkt bei Regen mit 10 %/min und nachts mit 3 %/min; `splash` −5
   (Rangliste), `cool` (Mods) kühlt ganz ab.
@@ -24,6 +28,8 @@ FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
 FIRE_WET_SECS = 8
 FIRE_MAX = 5          # so viele Feuer brennen höchstens gleichzeitig
 LEAFSTORM = 25        # so viel Laub weht der Laubsturm auf den Haufen
+GROW_STEPS = (5, 15)  # so oft gegossen → Blume Stufe 1, Stufe 2
+GROW_COOLDOWN = 300   # je Zuschauer zählt ein Gießen fürs Wachsen nur so oft
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_weather_season (
@@ -73,7 +79,33 @@ def _out(data):
     for theme, board in data.get("top", {}).items():
         rows = sorted(board.values(), key=lambda e: -e[1])
         top[theme] = [list(e) for e in rows[:TOP]]
-    return {"levels": {k: round(v, 2) for k, v in data["levels"].items()}, "top": top}
+    return {"levels": {k: round(v, 2) for k, v in data["levels"].items()}, "top": top,
+            "grow": dict(data.get("grow", {}))}
+
+
+def _stage(n):
+    return sum(1 for s in GROW_STEPS if n >= s)
+
+
+def grow_stages(conn, tenant_id) -> dict:
+    """→ {name klein: Stufe 1|2} der Blumen, die schon gewachsen sind."""
+    data = _get(conn, tenant_id) or {}
+    return {k: _stage(n) for k, n in data.get("grow", {}).items() if _stage(n) > 0}
+
+
+def _grow(data, flower, who, now):
+    """Gießen für die Blume `flower` zählen (Abklingzeit je Zuschauer)."""
+    key, w = flower.strip().lower(), (who or "?").strip().lower()
+    grow, cd = data.setdefault("grow", {}), data.setdefault("growcd", {})
+    for k in [k for k, t in cd.items() if now - t >= GROW_COOLDOWN]:
+        del cd[k]
+    before = _stage(grow.get(key, 0))
+    counted = w not in cd and before < len(GROW_STEPS)
+    if counted:
+        grow[key] = grow.get(key, 0) + 1
+        cd[w] = now
+    after = _stage(grow.get(key, 0))
+    return {"flower": flower.strip(), "stage": after, "up": after > before, "counted": counted}
 
 
 def _count(data, theme, name):
@@ -159,8 +191,10 @@ def ignite(conn, tenant_id, now, wet: bool = False) -> dict:
     return {"secs": secs, "fires": len(fires)}
 
 
-def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: int = 3, win: int = 20) -> dict:
-    """Chat-/Mod-Aktion → {"done", "level"} (Jäten zusätzlich success/count/need)."""
+def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: int = 3, win: int = 20,
+        target: str = "") -> dict:
+    """Chat-/Mod-Aktion → {"done", "level"} (Jäten zusätzlich success/count/need,
+    Gießen mit `target` zusätzlich flower/stage/up/counted)."""
     data = _get(conn, tenant_id) or _fresh(now)
     lv, theme = data["levels"], THEME_OF[cmd]
     out = {}
@@ -181,6 +215,8 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
         key = "leaves"
     elif cmd == "water":
         done = min(10, 100 - lv["water"]); lv["water"] += done; key = "water"
+        if target and target.strip():
+            out.update(_grow(data, target, name, now))
     elif cmd == "splash":
         done = min(5, lv["heat"]); lv["heat"] -= done; key = "heat"
     elif cmd == "cool":

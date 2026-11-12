@@ -716,3 +716,20 @@ def test_info_uses_the_settings_of_the_running_source(conn):
     say = c.get("/s/t/api/fx/weather/info?what=weather").get_json()["say"]
     assert "Im Stream ist Sommer" in say and "fest eingestellt" in say
     assert weather_state.LAST_THEME[1] == "summer"
+
+
+def test_water_grows_own_flower_and_poll_reports_stage(conn, monkeypatch):
+    from fx import weather_season
+    c = _client(conn)
+    for n in ("Anna", "Ben"):
+        c.get("/s/t/api/fx/weather?cmd=follow&name=" + n)
+    # eigene Blume
+    r = c.get("/s/t/api/fx/weather?cmd=water&name=anna")
+    p = commands.poll(1, "weather", 0)["commands"][-1]["params"]
+    assert p["flower"] == "Anna" and p["counted"] is True
+    # ohne eigene Blume: eine zufällige der sichtbaren
+    c.get("/s/t/api/fx/weather?cmd=water&name=Zoe")
+    assert commands.poll(1, "weather", 0)["commands"][-1]["params"]["flower"] in ("Anna", "Ben")
+    monkeypatch.setattr(weather_season, "GROW_STEPS", (1, 3))
+    st = c.get("/s/t/api/fx/weather/poll").json["state"]
+    assert {f["name"]: f.get("stage", 0) for f in st["flowers"]}["Anna"] >= 1

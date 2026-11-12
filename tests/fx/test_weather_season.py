@@ -141,3 +141,30 @@ def test_leafstorm_adds_leaves_without_ranking(conn):
     r = use(conn, 1, "leafstorm", "Mod", 10)
     assert r["done"] == 25 and r["level"] == 25
     assert "autumn" not in load(conn, 1)["top"]
+
+
+def test_water_grows_the_target_flower_in_two_steps(conn):
+    from fx.weather_season import GROW_STEPS, GROW_COOLDOWN, grow_stages
+    t = 0
+    r = None
+    for i in range(GROW_STEPS[1]):
+        # jeder Zuschauer zählt höchstens alle GROW_COOLDOWN Sekunden
+        r = use(conn, 1, "water", "U" + str(i % 3), t, target="Anna")
+        t += GROW_COOLDOWN / 3 + 1
+        if i + 1 == GROW_STEPS[0]:
+            assert r["flower"] == "Anna" and r["stage"] == 1 and r["up"] is True
+    assert r["stage"] == 2 and r["up"] is True
+    # mehr als zwei Stufen gibt es nicht, und sie bleiben
+    r = use(conn, 1, "water", "U9", t + 9999, target="anna")
+    assert r["stage"] == 2 and r["up"] is False
+    assert grow_stages(conn, 1) == {"anna": 2}
+
+
+def test_water_cooldown_and_rain_do_not_grow(conn):
+    from fx.weather_season import grow_stages
+    use(conn, 1, "water", "Tim", 0, target="Anna")
+    r = use(conn, 1, "water", "Tim", 10, target="Anna")
+    assert r["counted"] is False
+    advance(conn, 1, 600, "spring", dict(W, rain=1))
+    assert grow_stages(conn, 1) == {}
+    assert load(conn, 1)["grow"] == {"anna": 1}
