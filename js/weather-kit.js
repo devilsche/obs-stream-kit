@@ -1247,30 +1247,73 @@
         }
       },
       rainbow: {
-        // Regenbogen spannt sich von links nach rechts über den oberen Rand auf
-        init: function () { return { dur: 10 }; },
+        // Regenbogen spannt sich von links nach rechts über den oberen Rand auf.
+        // Wie in echt unscharf: die Sonnenscheibe (~0,5°) verschmiert die
+        // Farben ineinander, innen ist der Himmel heller, außen liegt das
+        // dunklere Alexander-Band, darüber ein blasser Nebenbogen mit
+        // umgekehrten Farben; die Helligkeit schwankt entlang des Bogens
+        init: function () {
+          var cx = W / 2, cy = H * 1.3, R = H * 1.18;
+          var nt = clamp(cur.night || 0, 0, 1);
+          var off = document.createElement('canvas');
+          off.width = W;
+          off.height = H;
+          var o = off.getContext('2d');
+          // nachts ein Mondregenbogen: blass, fast farblos, schwächer
+          function c(rgb, a) { return 'rgba(' + mixRgb(rgb, [222, 228, 238], 0.8 * nt) + ',' + (a * (1 - 0.45 * nt)) + ')'; }
+          function ring(r0, r1, stops) {
+            var g = o.createRadialGradient(cx, cy, r0, cx, cy, r1);
+            stops.forEach(function (st) { g.addColorStop(st[0], c(st[1], st[2])); });
+            o.fillStyle = g;
+            o.beginPath();
+            o.arc(cx, cy, r1, Math.PI, Math.PI * 2);
+            o.arc(cx, cy, r0, Math.PI * 2, Math.PI, true);
+            o.fill();
+          }
+          var WH = [255, 255, 255], DK = [10, 14, 30];
+          var VI = [150, 110, 230], BL = [90, 150, 255], GR = [110, 210, 120],
+              YE = [255, 228, 100], OR = [255, 150, 60], RD = [240, 70, 60];
+          o.filter = 'blur(5px)';
+          // Hauptbogen samt aufgehelltem Innenraum und blassen Interferenzstreifen
+          ring(R - 420, R + 30, [
+            [0, WH, 0], [0.55, WH, 0.07], [0.68, GR, 0.06], [0.71, VI, 0.08], [0.74, GR, 0.07],
+            [0.77, VI, 0.22], [0.81, BL, 0.34], [0.86, GR, 0.4], [0.9, YE, 0.46],
+            [0.94, OR, 0.42], [0.97, RD, 0.3], [1, RD, 0]
+          ]);
+          // Alexander-Band zwischen Haupt- und Nebenbogen
+          var R2 = R * 51 / 42;
+          ring(R + 30, R2 - 50, [[0, DK, 0], [0.25, DK, 0.08], [0.75, DK, 0.08], [1, DK, 0]]);
+          // Nebenbogen: breiter, blasser, Farben umgekehrt (rot innen)
+          ring(R2 - 50, R2 + 70, [
+            [0, RD, 0], [0.18, RD, 0.08], [0.35, OR, 0.11], [0.5, YE, 0.12],
+            [0.65, GR, 0.1], [0.8, BL, 0.08], [0.92, VI, 0.05], [1, VI, 0]
+          ]);
+          o.filter = 'none';
+          // Regen ist nie gleichmäßig verteilt: Helligkeit wandert entlang des Bogens
+          if (o.createConicGradient) {
+            var m = o.createConicGradient(0, cx, cy);
+            m.addColorStop(0, 'rgba(0,0,0,1)');
+            for (var k = 0; k <= 8; k++) m.addColorStop(0.5 + k / 16, 'rgba(0,0,0,' + rand(0.45, 1) + ')');
+            o.globalCompositeOperation = 'destination-in';
+            o.fillStyle = m;
+            o.fillRect(0, 0, off.width, off.height);
+            o.globalCompositeOperation = 'source-over';
+          }
+          return { dur: 10, off: off, cx: cx, cy: cy };
+        },
         draw: function (s) {
           var env = 1 - smooth((s.t - (s.dur - 2.5)) / 2.5);
           var reveal = smooth(s.t / 3);
-          var cx = W / 2, cy = H * 1.3, R = H * 1.18;
           var a0 = Math.PI + 0.12, a1 = a0 + (Math.PI - 0.24) * reveal;
-          var COLORS = ['255,70,70', '255,150,50', '255,230,80', '90,210,110', '80,160,255', '150,100,230'];
-          sctx.lineWidth = 16;
-          // nachts ein Mondregenbogen: blass, fast farblos, schwächer
-          var nt = clamp(cur.night || 0, 0, 1);
-          COLORS.forEach(function (col, i) {
-            var rgb = col.split(',').map(Number);
-            sctx.strokeStyle = 'rgba(' + mixRgb(rgb, [222, 228, 238], 0.8 * nt) + ',' + (0.32 * env * (1 - 0.45 * nt)) + ')';
-            sctx.beginPath();
-            sctx.arc(cx, cy, R - i * 15, a0, a1);
-            sctx.stroke();
-          });
-          var halo = sctx.createRadialGradient(cx, cy, R - 120, cx, cy, R + 40);
-          halo.addColorStop(0, 'rgba(255,255,255,0)');
-          halo.addColorStop(0.7, 'rgba(255,255,255,' + (0.06 * env * reveal) + ')');
-          halo.addColorStop(1, 'rgba(255,255,255,0)');
-          sctx.fillStyle = halo;
-          sctx.fillRect(0, 0, W, H * 0.5);
+          sctx.save();
+          sctx.beginPath();
+          sctx.moveTo(s.cx, s.cy);
+          sctx.arc(s.cx, s.cy, W * 2, a0, a1);
+          sctx.closePath();
+          sctx.clip();
+          sctx.globalAlpha = env;
+          sctx.drawImage(s.off, 0, 0);
+          sctx.restore();
         }
       },
       hail: {
