@@ -16,7 +16,7 @@
   'use strict';
 
   var NS = 'http://www.w3.org/2000/svg';
-  var N = 10, RX = 39, RY = 31, CY = -30.5, FACE_R = 32;
+  var N = 10, RX = 41, RY = 31, CY = -30.5, FACE_R = 32;
   var STEM_AZ = 35;                      // Blickrichtung der Stielspitze in Ruhe (Grad)
   var FACE = 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z';
 
@@ -42,8 +42,8 @@
     for (var i = 0; i < N; i++) {
       var g = el('g', {}, gLobes);
       lobes.push({ g: g, az: i * 360 / N,
-                   base: el('ellipse', { 'class': 'ta-pk-body ta-pk-seg' }, g),
-                   top: el('ellipse', { 'class': 'ta-pk-lobe' }, g) });
+                   base: el('path', { 'class': 'ta-pk-body ta-pk-seg' }, g),
+                   top: el('path', { 'class': 'ta-pk-lobe' }, g) });
     }
     el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
     if (opts.shade) el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': opts.shade.toFixed(2) }, body);
@@ -55,29 +55,43 @@
     return m;
   }
 
-  // Wulst bei Azimut a (0 = vorn): sichtbarer Teil seines Bogens ±18° auf die
-  // Bildebene projiziert; vorn voll, zum Rand schmaler und flacher
+  // Furchen sind Längenlinien wie auf einem Globus: alle laufen oben in der
+  // Mulde am Stiel (TOP) und unten am Blütenansatz (BOT) zusammen, dazwischen
+  // wölbt sich der Wulst. Eine Längenlinie bei Azimut a liegt in der Mitte bei
+  // x = RX·sin(a); außen liegende Linien steigen an der Schulter etwas über die Mulde
+  var TOP = -56.5, BOT = -1.5;
+  function merDown(x) {
+    var d = 4.5 * Math.abs(x) / RX;
+    return ' C' + f1(x * 0.55) + ' ' + f1(TOP - d) + ' ' + f1(x) + ' ' + f1(CY - RY * 0.6) + ' ' + f1(x) + ' ' + f1(CY) +
+           ' C' + f1(x) + ' ' + f1(CY + RY * 0.6) + ' ' + f1(x * 0.6) + ' ' + f1(BOT + 1) + ' 0 ' + BOT;
+  }
+  function merUp(x) {
+    var d = 4.5 * Math.abs(x) / RX;
+    return ' C' + f1(x * 0.6) + ' ' + f1(BOT + 1) + ' ' + f1(x) + ' ' + f1(CY + RY * 0.6) + ' ' + f1(x) + ' ' + f1(CY) +
+           ' C' + f1(x) + ' ' + f1(CY - RY * 0.6) + ' ' + f1(x * 0.55) + ' ' + f1(TOP - d) + ' 0 ' + TOP;
+  }
+  function segment(x0, x1) { return 'M0 ' + TOP + merDown(x0) + merUp(x1) + ' Z'; }
+
+  // Wulst bei Azimut a (0 = vorn): zwischen den Furchen a ± 18°, auf die
+  // Bildebene projiziert; vorn hell, zum Rand dunkler, hinten verdeckt
   function pose(m, theta) {
     if (m.theta !== null && Math.abs(theta - m.theta) < 0.05) return;
     m.theta = theta;
     var half = 180 / N, order = [];
     m.lobes.forEach(function (L) {
       var a = L.az + theta, c = Math.cos(a * RAD);
-      if (c < -0.2) { L.g.setAttribute('visibility', 'hidden'); return; }
+      if (c < -0.25) { L.g.setAttribute('visibility', 'hidden'); return; }
       L.g.removeAttribute('visibility');
       var lo = Math.max(-90, Math.min(90, normDeg(a - half))), hi = Math.max(-90, Math.min(90, normDeg(a + half)));
       if (hi < lo) hi = lo;
-      var x0 = RX * Math.sin(lo * RAD), x1 = RX * Math.sin(hi * RAD);
+      // am Rand quillt der Wulst ein wenig über den Umriss: gibt die Buckel der Silhouette
+      var bulge = 1 + 0.05 * Math.max(0, Math.sin(Math.abs(a) * RAD));
+      var x0 = RX * Math.sin(lo * RAD) * (lo <= -89 ? bulge : 1), x1 = RX * Math.sin(hi * RAD) * (hi >= 89 ? bulge : 1);
       var face = Math.max(0, c);
-      // Wulst wölbt sich über seine Furchen hinaus, vorn mehr
-      var rx = Math.max(1.5, (x1 - x0) / 2 + 3 + 6 * face), ry = RY * (0.9 + 0.1 * face);
-      var cx = (x0 + x1) / 2, cy = CY + (1 - face) * 1.2;
-      L.base.setAttribute('cx', f1(cx)); L.base.setAttribute('cy', f1(cy));
-      L.base.setAttribute('rx', f1(rx)); L.base.setAttribute('ry', f1(ry));
-      // heller Kern, zum Rand ausgeblendet: die Furche dazwischen bleibt dunkler
-      L.top.setAttribute('cx', f1(cx)); L.top.setAttribute('cy', f1(cy - 0.5));
-      L.top.setAttribute('rx', f1(rx * 0.8)); L.top.setAttribute('ry', f1(ry * 0.97));
-      L.top.setAttribute('fill-opacity', Math.pow(face, 1.4).toFixed(2));
+      L.base.setAttribute('d', segment(x0, x1));
+      // heller Kern in der Mitte des Wulsts, die Furchen bleiben dunkler
+      L.top.setAttribute('d', segment(x0 + (x1 - x0) * 0.22, x0 + (x1 - x0) * 0.78));
+      L.top.setAttribute('fill-opacity', (0.9 * Math.pow(face, 1.4)).toFixed(2));
       order.push([c, L.g]);
     });
     // hinten zuerst, vorn zuletzt
