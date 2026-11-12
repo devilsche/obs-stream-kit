@@ -166,7 +166,7 @@ def test_water_cooldown_and_rain_do_not_grow(conn):
     r = use(conn, 1, "water", "Tim", 10, target="Anna")
     assert r["counted"] is False
     advance(conn, 1, 600, "spring", dict(W, rain=1))
-    assert grow_stages(conn, 1) == {}
+    assert grow_stages(conn, 1) == {"anna": 1}
     assert load(conn, 1)["grow"] == {"anna": 1}
 
 

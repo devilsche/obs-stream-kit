@@ -8,7 +8,7 @@ angetrieben vom wirksamen Wetter. Ein JSON-Stand je Tenant:
   −3, eine Gruppe (3 Namen in 20 s) halbiert, `force` (Mods) halbiert sofort.
   Gießen und Jäten zählen für die Rangliste. Gießen lässt außerdem eine
   Blume wachsen (`target`, vom Endpoint gewählt: die eigene oder eine
-  zufällige): nach GROW_STEPS-mal Gießen Stufe 1 bzw. 2, für immer; je
+  zufällige): jedes gezählte Gießen eine Stufe, höchstens 2, für immer; je
   Zuschauer zählt nur ein Gießen alle GROW_COOLDOWN s (ohne Namen, also
   vom Dashboard, zählt jedes). Regen lässt nichts
   wachsen, er hebt nur die Köpfe.
@@ -29,7 +29,7 @@ FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
 FIRE_WET_SECS = 8
 FIRE_MAX = 5          # so viele Feuer brennen höchstens gleichzeitig
 LEAFSTORM = 25        # so viel Laub weht der Laubsturm auf den Haufen
-GROW_STEPS = (5, 15)  # so oft gegossen → Blume Stufe 1, Stufe 2
+GROW_STEPS = (1, 2)   # so oft gegossen → Blume Stufe 1, Stufe 2 (jedes Gießen eine Stufe)
 GROW_COOLDOWN = 300   # je Zuschauer zählt ein Gießen fürs Wachsen nur so oft
 
 SCHEMA = """
