@@ -160,7 +160,8 @@ def granted_say(name: str, total: int, by: str = "") -> str:
     if total <= 0:
         return f"Freigabe für {name} zurückgenommen."
     head = f"Danke {by}! " if by else ""
-    return f"{head}{name} hat jetzt {total} Guthaben: reicht für {reach_say(total)}. Einlösen mit dem Befehl, z. B. !tornado."
+    example = "!tornado" if total >= PRICE["big"] else "!rainbow" if total >= PRICE["small"] else "!rain"
+    return f"{head}{name} hat jetzt {total} Guthaben: reicht für {reach_say(total)}. Einlösen mit dem Befehl, z. B. {example}."
 
 
 def credit_say(name: str, have: int) -> str:
