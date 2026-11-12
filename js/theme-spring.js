@@ -807,6 +807,7 @@
     function water(p) {
       var name = p.name || 'Someone';
       setLevels(p, 'water');
+      if (B.yes(p.reset)) { resetStages(); if (typeof p.gen === 'number') S.gen = p.gen; }
       var live = flowers.filter(Boolean), key = (p.flower || '').toLowerCase();
       // gegossen wird die Blume, die der Server gewählt hat (die eigene oder eine zufällige)
       var mine = live.filter(function (f) { return f.label.toLowerCase() === key; })[0];
@@ -847,6 +848,17 @@
         setTimeout(function () { n.grow.classList.remove('tsp-grow--up'); }, 1300);
       }
       if (B.on && B.partOn('meadow')) flowerTag(n, f.label + (stg >= 2 ? "'s flower is in full bloom!" : "'s flower is growing!"), true);
+    }
+    // Wiese ist eingegangen und lebt wieder auf: alle Blumen wieder klein
+    function resetStages() {
+      flStage = {};
+      flowers.forEach(function (f, i) {
+        if (!f || !f.stage || f.rip || f.fly || f.knock) return;
+        var next = f.node.nextSibling;
+        gFlowers.removeChild(f.node);
+        putFlower(f.label, i, false);
+        gFlowers.insertBefore(flowers[i].node, next);
+      });
     }
     function weed(p) {
       var name = p.name || 'Someone', success = B.yes(p.success);
@@ -1233,6 +1245,9 @@
           S.water = S.waterT; S.weeds = S.weedsT; S.first = false;    // erster Stand sofort
         }
         if (s.seasonTop && Array.isArray(s.seasonTop.spring)) S.top = s.seasonTop.spring;
+        // eingegangen (Server): welk und braun; lebt sie wieder auf (gen), alle zurück auf Stufe 0
+        if (typeof lv.dead === 'boolean') B.root.dataset.dead = lv.dead ? '1' : '0';
+        if (typeof lv.gen === 'number') { if (S.gen !== undefined && lv.gen !== S.gen) resetStages(); S.gen = lv.gen; }
       },
       command: function (cmd, p) {
         p = p || {};

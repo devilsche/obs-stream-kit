@@ -9,7 +9,6 @@ Laub; winter/spring/summer: fx/season_db.py) schreiben den Befehl zusätzlich
 in die DB; der erste Poll ohne `since` liefert sie als `state` mit.
 """
 import functools
-import random
 import logging
 import sqlite3
 import time
@@ -122,9 +121,9 @@ def _winter_persist(conn, tenant_id, cmd):
         weather_season.ignite(conn, tenant_id, now, wet=bool(p.get("wet")))
         return False
     elif c in weather_season.THEME_OF:
-        target = _water_target(conn, tenant_id, p.get("name", "")) if c == "water" else ""
+        names = weather_followers.load(conn, tenant_id, limit=FLOWERS_SHOWN)["names"] if c == "water" else None
         p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force")),
-                                    target=target))
+                                    flowers=names))
     elif c == "clear" and p.get("kind") in ("followers", "ornaments", "minis", "pumpkins", "flowers", "castles"):
         weather_followers.clear(conn, tenant_id)
     elif c == "clear" and p.get("kind") in ("leaves", "garden", "heat"):
@@ -141,13 +140,6 @@ def _winter_persist(conn, tenant_id, cmd):
 
 
 FLOWERS_SHOWN = 24   # so viele neueste Follower stehen im Frühling als Blume
-
-
-def _water_target(conn, tenant_id, name):
-    """!water gießt die eigene Blume, wer keine im Bild hat, eine zufällige."""
-    names = weather_followers.load(conn, tenant_id, limit=FLOWERS_SHOWN)["names"]
-    own = [n for n in names if name and n.lower() == name.strip().lower()]
-    return own[0] if own else (random.choice(names) if names else "")
 
 
 def _project_stage(conn, tenant_id) -> int:

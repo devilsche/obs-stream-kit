@@ -274,6 +274,9 @@
 .is-charred .tsp-ember { animation: tspEmber 6s ease-out both; }
 @keyframes tspEmber { 0% { opacity: 1; } 15% { opacity: 0.7; } 30% { opacity: 0.9; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ts[data-frost="1"] .tsp-ice, .is-charred .tsp-ember { animation: none; } }
+/* eingegangen (unter 15 % Wasser): Blüten welk und braun, Blätter vertrocknet */
+.ts[data-dead="1"] .tsp-bloom { filter: sepia(0.7) saturate(0.6) brightness(0.8); }
+.ts[data-dead="1"] .tsp-leaf { fill: #8a7a3a; }
 /* Wachstum durch Gießen: die größere Blume federt aus der alten Größe hoch */
 .tsp-grow--up { animation: tspUp 1.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 @keyframes tspUp { from { transform: scale(0.88); } to { transform: none; } }

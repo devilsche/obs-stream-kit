@@ -143,36 +143,41 @@ def test_leafstorm_adds_leaves_without_ranking(conn):
     assert "autumn" not in load(conn, 1)["top"]
 
 
-def test_water_grows_the_target_flower_in_two_steps(conn):
-    from fx.weather_season import GROW_STEPS, GROW_COOLDOWN, grow_stages
-    t = 0
-    r = None
-    for i in range(GROW_STEPS[1]):
-        # jeder Zuschauer zählt höchstens alle GROW_COOLDOWN Sekunden
-        r = use(conn, 1, "water", "U" + str(i % 3), t, target="Anna")
-        t += GROW_COOLDOWN / 3 + 1
-        if i + 1 == GROW_STEPS[0]:
-            assert r["flower"] == "Anna" and r["stage"] == 1 and r["up"] is True
-    assert r["stage"] == 2 and r["up"] is True
-    # mehr als zwei Stufen gibt es nicht, und sie bleiben
-    r = use(conn, 1, "water", "U9", t + 9999, target="anna")
-    assert r["stage"] == 2 and r["up"] is False
-    assert grow_stages(conn, 1) == {"anna": 2}
+
+def test_own_flower_first_then_random_open_ones(conn):
+    import random
+    from fx.weather_season import OWN_COOLDOWN, ANY_COOLDOWN, grow_stages
+    names = ["Anna", "Ben", "Cleo"]
+    r = use(conn, 1, "water", "anna", 0, flowers=names)
+    assert r["flower"] == "Anna" and r["stage"] == 1 and r["up"] is True
+    # zweites Mal gleich danach: zufällige, nicht ausgewachsene
+    r = use(conn, 1, "water", "anna", 1, flowers=names, rnd=random.Random(3))
+    assert r["flower"] in ("Ben", "Cleo") and r["stage"] == 1
+    # innerhalb von ANY_COOLDOWN wächst nichts
+    r = use(conn, 1, "water", "anna", 2, flowers=names)
+    assert "flower" not in r
+    # nach OWN_COOLDOWN wieder die eigene: Stufe 2, ausgewachsen
+    r = use(conn, 1, "water", "anna", OWN_COOLDOWN + 1, flowers=names)
+    assert r["flower"] == "Anna" and r["stage"] == 2
+    assert grow_stages(conn, 1)["anna"] == 2
 
 
-def test_water_cooldown_and_rain_do_not_grow(conn):
+def test_dashboard_without_name_waters_random_open_flower_every_time(conn):
+    names = ["Anna", "Ben"]
+    for t in range(4):
+        use(conn, 1, "water", "", t, flowers=names)
     from fx.weather_season import grow_stages
-    use(conn, 1, "water", "Tim", 0, target="Anna")
-    r = use(conn, 1, "water", "Tim", 10, target="Anna")
-    assert r["counted"] is False
-    advance(conn, 1, 600, "spring", dict(W, rain=1))
-    assert grow_stages(conn, 1) == {"anna": 1}
-    assert load(conn, 1)["grow"] == {"anna": 1}
+    assert grow_stages(conn, 1) == {"anna": 2, "ben": 2}
 
 
-def test_water_without_name_always_counts(conn):
-    # Dashboard-Knopf (ohne Namen): keine Abklingzeit
-    use(conn, 1, "water", "", 0, target="Anna")
-    r = use(conn, 1, "water", "", 1, target="Anna")
-    assert r["counted"] is True
-    assert load(conn, 1)["grow"] == {"anna": 2}
+def test_dead_meadow_revives_at_stage_zero_rain_does_not_grow(conn):
+    from fx.weather_season import grow_stages
+    use(conn, 1, "water", "", 0, flowers=["Anna"])
+    advance(conn, 1, 0, "spring", W)
+    # 70 % Wasser, 2 %/min: nach 30 min unter 15 % → eingegangen
+    st = advance(conn, 1, 30 * 60, "spring", W)
+    assert st["levels"]["dead"] is True and grow_stages(conn, 1) == {"anna": 1}
+    # Regen hebt über 30 %: aufgelebt, alle wieder Stufe 0, gen zählt hoch
+    st = advance(conn, 1, 31 * 60, "spring", dict(W, rain=1))
+    assert st["levels"]["dead"] is False and st["levels"]["gen"] == 1
+    assert grow_stages(conn, 1) == {}
