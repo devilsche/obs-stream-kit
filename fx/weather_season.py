@@ -9,7 +9,8 @@ angetrieben vom wirksamen Wetter. Ein JSON-Stand je Tenant:
   Gießen und Jäten zählen für die Rangliste. Gießen lässt außerdem eine
   Blume wachsen (`target`, vom Endpoint gewählt: die eigene oder eine
   zufällige): nach GROW_STEPS-mal Gießen Stufe 1 bzw. 2, für immer; je
-  Zuschauer zählt nur ein Gießen alle GROW_COOLDOWN s. Regen lässt nichts
+  Zuschauer zählt nur ein Gießen alle GROW_COOLDOWN s (ohne Namen, also
+  vom Dashboard, zählt jedes). Regen lässt nichts
   wachsen, er hebt nur die Köpfe.
 - Sommer `heat`: steigt bei Hitzewelle mit 20 %/min, bei Sonne am Tag mit
   2 %/min, sinkt bei Regen mit 10 %/min und nachts mit 3 %/min; `splash` −5
@@ -95,15 +96,17 @@ def grow_stages(conn, tenant_id) -> dict:
 
 def _grow(data, flower, who, now):
     """Gießen für die Blume `flower` zählen (Abklingzeit je Zuschauer)."""
-    key, w = flower.strip().lower(), (who or "?").strip().lower()
+    key, w = flower.strip().lower(), (who or "").strip().lower()
     grow, cd = data.setdefault("grow", {}), data.setdefault("growcd", {})
     for k in [k for k, t in cd.items() if now - t >= GROW_COOLDOWN]:
         del cd[k]
     before = _stage(grow.get(key, 0))
-    counted = w not in cd and before < len(GROW_STEPS)
+    # ohne Namen (Dashboard-Knopf des Streamers) zählt jedes Gießen
+    counted = (not w or w not in cd) and before < len(GROW_STEPS)
     if counted:
         grow[key] = grow.get(key, 0) + 1
-        cd[w] = now
+        if w:
+            cd[w] = now
     after = _stage(grow.get(key, 0))
     return {"flower": flower.strip(), "stage": after, "up": after > before, "counted": counted}
 

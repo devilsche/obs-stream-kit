@@ -168,3 +168,11 @@ def test_water_cooldown_and_rain_do_not_grow(conn):
     advance(conn, 1, 600, "spring", dict(W, rain=1))
     assert grow_stages(conn, 1) == {}
     assert load(conn, 1)["grow"] == {"anna": 1}
+
+
+def test_water_without_name_always_counts(conn):
+    # Dashboard-Knopf (ohne Namen): keine Abklingzeit
+    use(conn, 1, "water", "", 0, target="Anna")
+    r = use(conn, 1, "water", "", 1, target="Anna")
+    assert r["counted"] is True
+    assert load(conn, 1)["grow"] == {"anna": 2}
