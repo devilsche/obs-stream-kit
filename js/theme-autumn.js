@@ -130,7 +130,7 @@
     var gGarland = el('g', { 'class': 'ta-garland' }, B.svg('ta-garland-l'));
     var branchSvg = B.svg('ta-branch-l');
     var gBranch = el('g', { 'class': 'ta-branch ta-dim' }, branchSvg);
-    var gSway = el('g', { 'class': 'ta-frostable' }, gBranch);
+    var gSway = el('g', { 'class': 'ta-frostable', id: 'ta-sway-g' }, gBranch);
     // Vogelscheuche hinter dem Laubhaufen (der Pfahl steckt im Laub)
     var gScare = el('g', { 'class': 'ta-scare ta-dim' }, B.svg());
     var pileCanvas = B.canvas();
@@ -139,6 +139,7 @@
     var gPumpkins = el('g', { 'class': 'ta-pumpkins' }, B.svg());
 
     // ── Blätterranke oben mit Lichtern und Eicheln ──
+    var garlandLights = [];
     (function () {
       var d = 'M-10 4';
       for (var i = 0; i < 5; i++) {
@@ -160,6 +161,7 @@
         }
         if (n % 2 === 0) {
           var fl = el('g', { 'class': 'ta-fl ri-' + Math.floor(rnd() * 10), transform: 'translate(' + f1(p.x) + ' ' + f1(p.y + 6) + ')' }, gGarland);
+          garlandLights.push([p.x, p.y + 6]);
           el('circle', { 'class': 'ta-fl-glow', r: 11 }, fl);
           el('circle', { 'class': 'ta-fl-dot', r: 4 }, fl);
         }
@@ -236,6 +238,23 @@
         aClusters.push({ g: cg, x: pt.x, y: pt.y, f: 1.6 + rnd() * 1.4, ph: rnd() * 6.28, shown: null });
       }
     });
+    // Lichterkette beleuchtet nachts den Ast: warmer Schein je Lampe in der
+    // Nähe, per Maske nur auf Holz, Blättern und Früchten (folgt dem Schwingen)
+    (function () {
+      var white = el('filter', { id: 'ta-white', x: '0', y: '0', width: '1', height: '1' }, B.defs);
+      el('feColorMatrix', { type: 'matrix', values: '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0' }, white);
+      var mask = el('mask', { id: 'ta-branch-mask', maskUnits: 'userSpaceOnUse', x: -60, y: -60, width: 700, height: 460 }, B.defs);
+      el('use', { href: '#ta-sway-g', filter: 'url(#ta-white)' }, mask);
+      var lg = el('radialGradient', { id: 'ta-lampg' }, B.defs);
+      el('stop', { offset: '0', 'class': 'ta-lampg-0' }, lg);
+      el('stop', { offset: '0.45', 'class': 'ta-lampg-m' }, lg);
+      el('stop', { offset: '1', 'class': 'ta-lampg-1' }, lg);
+      var glowG = el('g', { 'class': 'ta-branch-glow', mask: 'url(#ta-branch-mask)' }, gBranch);
+      garlandLights.forEach(function (l) {
+        if (l[0] > 620) return;
+        el('circle', { 'class': 'ta-lamp', cx: f1(l[0]), cy: f1(l[1]), r: 260 }, glowG);
+      });
+    })();
     var aWindT = 0, aFrost = 0, aFrostShown = null;
     function stepBranch(dt) {
       if (!B.on || B.reduceMotion || !B.partOn('branch')) return;
