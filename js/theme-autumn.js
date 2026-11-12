@@ -139,7 +139,7 @@
     var gPumpkins = el('g', { 'class': 'ta-pumpkins' }, B.svg());
 
     // ── Blätterranke oben mit Lichtern und Eicheln ──
-    var garlandLights = [];
+    var garlandLights = [], garLampPos = [];
     (function () {
       var d = 'M-10 4';
       for (var i = 0; i < 5; i++) {
@@ -148,8 +148,11 @@
       }
       // Blätter und Eicheln in eigener Gruppe (nachts gedimmt wie der Ast), darüber
       // der warme Schein der Lämpchen (per Maske nur auf den Blättern), dann die Lämpchen
-      var gLeaves = el('g', { 'class': 'ta-gl-leaves', id: 'ta-gleaves' }, gGarland);
-      var glowGar = el('g', { 'class': 'ta-branch-glow', mask: 'url(#ta-garland-mask)' }, gGarland);
+      // Nachts gedimmt (Hülle); eine ungedimmte Kopie liegt darüber, sichtbar nur in
+      // der Lichtmaske um die Lämpchen: dort fällt das Dunklerwerden weg
+      var gLeaves = el('g', { id: 'ta-gleaves' }, el('g', { 'class': 'ta-gl-leaves' }, gGarland));
+      var litGar = el('g', { 'class': 'ta-lit', mask: 'url(#ta-garland-light)' }, gGarland);
+      el('use', { href: '#ta-gleaves' }, litGar);
       var vine = el('path', { 'class': 'ta-vine', d: d }, gLeaves);
       var len = vine.getTotalLength(), n = 0;
       for (var s = 10; s < len; s += 30, n++) {
@@ -166,7 +169,7 @@
         if (n % 2 === 0) {
           var fl = el('g', { 'class': 'ta-fl ri-' + Math.floor(rnd() * 10), transform: 'translate(' + f1(p.x) + ' ' + f1(p.y + 6) + ')' }, gGarland);
           garlandLights.push([p.x, p.y + 6]);
-          el('circle', { 'class': 'ta-lamp', cx: f1(p.x), cy: f1(p.y + 6), r: 85 }, glowGar);
+          garLampPos.push([p.x, p.y + 6]);
           el('circle', { 'class': 'ta-fl-glow', r: 11 }, fl);
           el('circle', { 'class': 'ta-fl-dot', r: 4 }, fl);
         }
@@ -243,24 +246,22 @@
         aClusters.push({ g: cg, x: pt.x, y: pt.y, f: 1.6 + rnd() * 1.4, ph: rnd() * 6.28, shown: null });
       }
     });
-    // Lichterkette beleuchtet nachts den Ast: warmer Schein je Lampe in der
-    // Nähe, per Maske nur auf Holz, Blättern und Früchten (folgt dem Schwingen)
+    // Lichterkette beleuchtet nachts: Lichtmasken (weiß in der Mitte, weich zum
+    // Rand) um die Lämpchen; darin zeigt eine ungedimmte Kopie von Ranke bzw. Ast
+    // die echten Farben – das nächtliche Dunklerwerden fällt dort weg
     (function () {
-      var white = el('filter', { id: 'ta-white', x: '0', y: '0', width: '1', height: '1' }, B.defs);
-      el('feColorMatrix', { type: 'matrix', values: '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0' }, white);
-      var mask = el('mask', { id: 'ta-branch-mask', maskUnits: 'userSpaceOnUse', x: -60, y: -60, width: 700, height: 460 }, B.defs);
-      el('use', { href: '#ta-sway-g', filter: 'url(#ta-white)' }, mask);
-      var gmask = el('mask', { id: 'ta-garland-mask', maskUnits: 'userSpaceOnUse', x: -40, y: -40, width: W + 80, height: 180 }, B.defs);
-      el('use', { href: '#ta-gleaves', filter: 'url(#ta-white)' }, gmask);
       var lg = el('radialGradient', { id: 'ta-lampg' }, B.defs);
       el('stop', { offset: '0', 'class': 'ta-lampg-0' }, lg);
-      el('stop', { offset: '0.45', 'class': 'ta-lampg-m' }, lg);
+      el('stop', { offset: '0.5', 'class': 'ta-lampg-m' }, lg);
       el('stop', { offset: '1', 'class': 'ta-lampg-1' }, lg);
-      var glowG = el('g', { 'class': 'ta-branch-glow', mask: 'url(#ta-branch-mask)' }, gBranch);
-      garlandLights.forEach(function (l) {
-        if (l[0] > 620) return;
-        el('circle', { 'class': 'ta-lamp', cx: f1(l[0]), cy: f1(l[1]), r: 260 }, glowG);
-      });
+      function lightMask(id, list, r) {
+        var m = el('mask', { id: id, maskUnits: 'userSpaceOnUse', x: -100, y: -100, width: W + 200, height: 600 }, B.defs);
+        list.forEach(function (l) { el('circle', { 'class': 'ta-lamp', cx: f1(l[0]), cy: f1(l[1]), r: r }, m); });
+      }
+      lightMask('ta-garland-light', garLampPos, 70);
+      lightMask('ta-branch-light', garlandLights.filter(function (l) { return l[0] < 640; }), 230);
+      var lit = el('g', { 'class': 'ta-lit ta-lit--branch', mask: 'url(#ta-branch-light)' }, branchSvg);
+      el('use', { href: '#ta-sway-g' }, lit);
     })();
     var aWindT = 0, aFrost = 0, aFrostShown = null;
     function stepBranch(dt) {

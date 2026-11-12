@@ -104,11 +104,13 @@
 /* Ranken-Blätter nachts gedimmt wie der Ast; die Lämpchen hellen sie auf */
 .ta-gl-leaves { filter: brightness(calc(1 - 0.4 * var(--ts-night))); }
 .ta-fl-dot { fill: #fff2c9; }
-/* Lichterkette beleuchtet nachts den Ast (nur dessen Formen, per Maske) */
+/* Lichterkette: im Lichtkreis der Lämpchen zeigt eine ungedimmte Kopie die echten
+   Farben (Maske weiß = Licht), nur nachts; ohne Lichterkette kein Licht */
 .ta-lamp { fill: url(#ta-lampg); }
-.ta-lampg-0 { stop-color: #ffd27f; stop-opacity: 0.9; } .ta-lampg-m { stop-color: #ffb950; stop-opacity: 0.45; } .ta-lampg-1 { stop-color: #ffb347; stop-opacity: 0; }
-.ta-branch-glow { opacity: calc(0.6 * var(--ts-night)); mix-blend-mode: screen; }
-.ts[data-garland="0"] .ta-branch-glow { display: none; }
+.ta-lampg-0 { stop-color: #fff; stop-opacity: 1; } .ta-lampg-m { stop-color: #fff; stop-opacity: 0.6; } .ta-lampg-1 { stop-color: #fff; stop-opacity: 0; }
+.ta-lit { opacity: var(--ts-night); }
+.ts[data-garland="0"] .ta-lit { display: none; }
+.ts[data-branch="0"] .ta-lit--branch { display: none; }
 .ta-fl { animation: taTwinkle 2.6s ease-in-out infinite; }
 .ts[data-celebrate="1"] .ta-fl { animation-duration: 0.4s; }
 @keyframes taTwinkle { 0%, 100% { opacity: 1; } 45% { opacity: 0.25; } 60% { opacity: 1; } }
