@@ -321,6 +321,14 @@
       // ── Deko-Thema (Winter mit Xmas-Zeit) ──
       function partOn(v) { return v === undefined || !(v === false || v === '0' || v === 'off' || v === 'false'); }
       function applyTheme(state) {
+        // Läuft gerade Aufbau oder Abschied der Weihnachtsdeko, bleibt das Xmas-Thema
+        // sichtbar, bis die Animation fertig ist (danach holt playStep den Stand neu)
+        if (XMAS[lastTheme] && (state.theme || 'none') !== lastTheme && xmasBusy()) {
+          var held = {};
+          for (var hk in state) held[hk] = state[hk];
+          held.theme = lastTheme; held.xmas = lastXmas;
+          state = held;
+        }
         var parts = {};
         PARTS.forEach(function (k) { parts[k] = partOn(settings[k]); });
         theme.update({ theme: state.theme || 'none', xmas: state.xmas || 'off',
