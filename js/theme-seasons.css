@@ -225,14 +225,40 @@
 .ts[data-branch="0"] .tsp-branch,
 .ts[data-bugs="0"] .tsp-bugs { display: none; }
 
-.tsp-p1 { fill: #ff5d8f; } .tsp-p2 { fill: #ffd23f; } .tsp-p3 { fill: #8e6cff; }
-.tsp-p4 { fill: #ff8a3d; } .tsp-p5 { fill: #ffffff; }
+.tsp-p1 { fill: url(#tsp-g1); } .tsp-p2 { fill: url(#tsp-g2); } .tsp-p3 { fill: url(#tsp-g3); }
+.tsp-p4 { fill: url(#tsp-g4); } .tsp-p5 { fill: url(#tsp-g5); }
+.tsp-g1-0 { stop-color: #d8306a; } .tsp-g1-1 { stop-color: #ff8fb3; }
+.tsp-g2-0 { stop-color: #f0a400; } .tsp-g2-1 { stop-color: #ffe27a; }
+.tsp-g3-0 { stop-color: #5b3ad0; } .tsp-g3-1 { stop-color: #b7a0ff; }
+.tsp-g4-0 { stop-color: #e2561a; } .tsp-g4-1 { stop-color: #ffb27a; }
+.tsp-g5-0 { stop-color: #e9e3d6; } .tsp-g5-1 { stop-color: #ffffff; }
+.tsp-gdaisy-0 { stop-color: #ffffff; } .tsp-gdaisy-1 { stop-color: #ffb3c9; }
+.tsp-gbell-0 { stop-color: #5d3fc4; } .tsp-gbell-1 { stop-color: #a58cff; }
+.tsp-gleaf-0 { stop-color: #3a8a2c; } .tsp-gleaf-1 { stop-color: #6cc04f; }
+.tsp-shade { filter: brightness(0.78); }
+.tsp-front { filter: brightness(1.06); }
+.tsp-dot { fill: #c98a00; }
+.tsp-pod { fill: #7b8f5a; }
+.tsp-pod-ray { stroke: #2a1b12; stroke-width: 0.9; stroke-linecap: round; }
+.tsp-seed { fill: #2a1708; }
+.tsp-center--seed { fill: #6b3e14; stroke: #3e2008; stroke-width: 1.2; }
+.tsp-calyx { fill: #3d8a2e; }
 
-/* Kirschzweig */
-.tsp-sway { animation: tsSway 8s ease-in-out infinite; transform-origin: 0 150px; }
-.tsp-wood { fill: none; stroke: #4b2e2a; stroke-linecap: round; }
-.tsp-bpetal { fill: #ffd0e0; stroke: #f59ab9; stroke-width: 0.8; }
-.tsp-bcore { fill: #e0457b; }
+/* Kirschzweig: rotbraune Rinde mit hellen Lentizellen, Blüten in Büscheln */
+.tsp-wood { fill: none; stroke: #4a2420; stroke-linecap: round; }
+.tsp-wood-hi { fill: none; stroke: #7a4436; stroke-linecap: round; opacity: 0.7; }
+.tsp-lenticel { stroke: #b88a74; stroke-width: 1.1; stroke-linecap: round; opacity: 0.4; }
+.tsp-spur { stroke: #4a2420; stroke-width: 3; stroke-linecap: round; }
+.tsp-pedicel { fill: none; stroke: #6f8a3a; stroke-width: 1; }
+.tsp-bpetal { fill: url(#tsp-bpg); stroke: #f3b7cb; stroke-width: 0.5; }
+.tsp-bpg-0 { stop-color: #e86d98; } .tsp-bpg-1 { stop-color: #ffd3e2; } .tsp-bpg-2 { stop-color: #fff7fa; }
+.tsp-bcore { fill: #c93a6b; }
+.tsp-stamen { stroke: #f7d9e4; stroke-width: 0.5; }
+.tsp-anther { fill: #f2c94c; }
+.tsp-bud { fill: #f07aa3; stroke: #c94c7a; stroke-width: 0.6; }
+.tsp-bud-cup { fill: #6b4a2a; }
+.tsp-yleaf { fill: #8c8a3a; }
+.tsp-yleaf-vein { stroke: #6a5a26; stroke-width: 0.6; }
 
 /* Wiese: Trockenheit legt eine gelbe Schicht darüber, Regen macht satter */
 .tsp-grass { fill: #4f9a3a; }
@@ -247,7 +273,9 @@
 
 /* Blumen: unter 30 % Wasser hängen die Köpfe */
 .tsp-stem { fill: none; stroke: #3d8a2e; stroke-width: 4; stroke-linecap: round; }
-.tsp-leaf { fill: #4fa23c; }
+.tsp-stem--thin { stroke-width: 2.5; }
+.tsp-leaf { fill: url(#tsp-gleaf); }
+.tsp-vein { fill: none; stroke: #2f6e24; stroke-width: 0.8; opacity: 0.7; }
 .tsp-grow { transform-box: fill-box; transform-origin: 50% 100%; }
 .tsp-grow--new { animation: tspGrow 1.6s cubic-bezier(0.3, 1.2, 0.5, 1) both; }
 @keyframes tspGrow { from { transform: scaleY(0); } to { transform: none; } }
@@ -266,8 +294,8 @@
 .ts[data-celebrate="1"] .tsp-bloom { animation: tspParty 0.5s ease-in-out 6; }
 @keyframes tspParty { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.3) rotate(15deg); } }
 .tsp-center { fill: #f5b800; }
-.tsp-bell { fill: #8e6cff; stroke: #6a4fd0; stroke-width: 1; }
-.tsp-daisy { fill: #ffffff; stroke: #e6e0ef; stroke-width: 0.8; }
+.tsp-bell { fill: url(#tsp-gbell); stroke: #4a2fb0; stroke-width: 0.8; }
+.tsp-daisy { fill: url(#tsp-gdaisy); stroke: #ece4ee; stroke-width: 0.5; }
 .tsp-center--dark { fill: #2a1b12; }
 
 /* Biene: Körper, pelzige Brust (gestrichelter Rand), Flügel als flimmernder Schleier */

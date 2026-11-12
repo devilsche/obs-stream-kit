@@ -26,15 +26,39 @@
     var W = B.W, H = B.H, el = B.el, f1 = B.f1, rand = B.rand, clamp01 = B.clamp01;
     var rnd = TS.seeded(23);
 
+    // Blütenfarben als Verlauf: am Grund kräftig, zur Spitze heller (je Blatt,
+    // dreht mit); Glocken oben dunkler, Gänseblümchen mit rosa Spitzen
+    ['g1', 'g2', 'g3', 'g4', 'g5', 'gdaisy', 'gbell', 'gleaf'].forEach(function (id) {
+      var lg = el('linearGradient', { id: 'tsp-' + id, x1: 0, y1: id === 'gbell' ? 0 : 1, x2: 0, y2: id === 'gbell' ? 1 : 0 }, B.defs);
+      el('stop', { offset: '0', 'class': 'tsp-' + id + '-0' }, lg);
+      el('stop', { offset: '1', 'class': 'tsp-' + id + '-1' }, lg);
+    });
+    // Kirschblüte: fünf an der Spitze gekerbte Blätter, innen rosa, außen fast
+    // weiß, langer Kranz Staubblätter mit gelben Beuteln; dazu Knospe und junges Blatt
+    var bpg = el('radialGradient', { id: 'tsp-bpg', gradientUnits: 'userSpaceOnUse', cx: 0, cy: 0, r: 11 }, B.defs);
+    el('stop', { offset: '0', 'class': 'tsp-bpg-0' }, bpg);
+    el('stop', { offset: '0.4', 'class': 'tsp-bpg-1' }, bpg);
+    el('stop', { offset: '1', 'class': 'tsp-bpg-2' }, bpg);
     var blossomDef = el('g', { id: 'tsp-blossom' }, B.defs);
     for (var bi = 0; bi < 5; bi++) {
-      el('ellipse', { 'class': 'tsp-bpetal', cx: 0, cy: -7, rx: 5, ry: 7, transform: 'rotate(' + bi * 72 + ')' }, blossomDef);
+      el('path', { 'class': 'tsp-bpetal', d: 'M0 0 C-5.5 -2 -7.5 -8.5 -4.2 -11.4 C-2.6 -12.6 -1 -11.8 0 -10.5 C1 -11.8 2.6 -12.6 4.2 -11.4 C7.5 -8.5 5.5 -2 0 0 Z', transform: 'rotate(' + bi * 72 + ')' }, blossomDef);
     }
-    el('circle', { 'class': 'tsp-bcore', r: 2.6 }, blossomDef);
+    el('circle', { 'class': 'tsp-bcore', r: 2.4 }, blossomDef);
+    for (bi = 0; bi < 12; bi++) {
+      var sa = bi * 30 + 15, sl = 5.2 + (bi % 3) * 0.9, sxp = Math.sin(sa * Math.PI / 180) * sl, syp = -Math.cos(sa * Math.PI / 180) * sl;
+      el('path', { 'class': 'tsp-stamen', d: 'M0 0 L' + sxp.toFixed(1) + ' ' + syp.toFixed(1) }, blossomDef);
+      el('circle', { 'class': 'tsp-anther', cx: sxp.toFixed(1), cy: syp.toFixed(1), r: 0.9 }, blossomDef);
+    }
+    var budDef = el('g', { id: 'tsp-bud' }, B.defs);
+    el('ellipse', { 'class': 'tsp-bud', cx: 0, cy: -4, rx: 3.2, ry: 4.6 }, budDef);
+    el('path', { 'class': 'tsp-bud-cup', d: 'M-3 -1.5 Q0 1.5 3 -1.5 L2 1 Q0 2.2 -2 1 Z' }, budDef);
+    var yleafDef = el('g', { id: 'tsp-yleaf' }, B.defs);
+    el('path', { 'class': 'tsp-yleaf', d: 'M0 0 C4 -3 4.5 -10 0 -16 C-4.5 -10 -4 -3 0 0 Z' }, yleafDef);
+    el('path', { 'class': 'tsp-yleaf-vein', d: 'M0 0 L0 -14' }, yleafDef);
 
     // Ebenen: Blütenblätter (Basis), Zweig, Wiese, Insekten
     var gBranch = el('g', { 'class': 'tsp-branch tsp-dim' }, B.svg());
-    var gSway = el('g', { 'class': 'tsp-sway' }, gBranch);
+    var gSway = el('g', {}, gBranch);
     // Sonnenblume hinter der Wiese (Halme verdecken den Fuß)
     var gSun = el('g', { 'class': 'tsp-sunflower tsp-dim' }, B.svg());
     var meadowSvg = B.svg();
@@ -48,6 +72,7 @@
     var gFlyHeads = el('g', {}, gMeadow);
     var gBugs = el('g', { 'class': 'tsp-bugs' }, B.svg());
 
+    var bladeBands = [];
     // ── Wiese ──
     function groundY(x) { return H - 22 - 6 * Math.sin(x / 110) - 4 * Math.sin(x / 37); }
     (function () {
@@ -56,11 +81,12 @@
       d += ' L' + W + ' ' + H + ' Z';
       grass.setAttribute('d', d);
       grassDry.setAttribute('d', d);
+      for (var bi2 = 0; bi2 * 160 < W; bi2++) bladeBands.push({ g: el('g', {}, gBlades), x: bi2 * 160 + 80, shown: null });
       for (var bx = 0; bx < W; bx += 9) {
         // in der Mitte (Lebensbalken, Munition) nur kurze Halme
         var mid = bx > 700 && bx < 1220 ? 0.4 : 1;
         var y = groundY(bx) + 6, h = (14 + rnd() * 26) * mid, lean = (rnd() - 0.5) * 16 * mid;
-        el('path', { 'class': 'tsp-blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, gBlades);
+        el('path', { 'class': 'tsp-blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, bladeBands[Math.floor(bx / 160)].g);
       }
     })();
 
@@ -118,6 +144,71 @@
       if (old) gFlowers.removeChild(old.node);
       putFlower(name, i, animate);
     }
+    // Blatt entlang -y, Fuß bei 0/0: breit in der Mitte, spitz auslaufend
+    function leafPath(len, wid) {
+      return 'M0 0 C' + f1(wid) + ' ' + f1(-len * 0.25) + ' ' + f1(wid * 0.8) + ' ' + f1(-len * 0.75) + ' 0 ' + f1(-len) +
+             ' C' + f1(-wid * 0.8) + ' ' + f1(-len * 0.75) + ' ' + f1(-wid) + ' ' + f1(-len * 0.25) + ' 0 0 Z';
+    }
+    // je Sorte [Höhe am Stiel 0..1, Winkel, Länge, Breite]; Tulpe mit breiten
+    // Grundblättern, Gänseblümchen als Rosette, Sonnenblume herzförmig breit
+    var LEAVES = [
+      [[0.3, -55, 20, 4], [0.55, 50, 17, 3.5], [0.75, -45, 13, 3]],
+      [[0.02, -16, 40, 8], [0.08, 20, 34, 7]],
+      [[0.25, -60, 22, 6.5], [0.45, 55, 19, 5.5], [0.65, -50, 14, 4.5]],
+      [[0.3, -50, 17, 3.5], [0.55, 45, 15, 3]],
+      [[0.35, -65, 22, 10], [0.6, 60, 19, 9]],
+      [[0, -70, 15, 5.5], [0, 65, 14, 5], [0.02, -25, 13, 5]]
+    ];
+    function drawBloom(bloom, type, col) {
+      var k;
+      if (type === 0) {          // Margerite: schmale, an der Spitze gekerbte Zungenblüten
+        for (k = 0; k < 14; k++) el('path', { 'class': col, d: 'M0 -5 C-4 -8 -4.6 -18 -2 -24 L0 -22.4 L2 -24 C4.6 -18 4 -8 0 -5 Z', transform: 'rotate(' + f1(k * 360 / 14) + ')' }, bloom);
+        el('circle', { 'class': 'tsp-center', r: 7.5 }, bloom);
+        for (k = 0; k < 9; k++) el('circle', { 'class': 'tsp-dot', cx: f1(Math.cos(k * 2.4) * (1.2 + k * 0.55)), cy: f1(Math.sin(k * 2.4) * (1.2 + k * 0.55)), r: 0.9 }, bloom);
+      } else if (type === 1) {   // Tulpe: hinten zwei dunklere Blätter, vorn drei überlappend
+        el('path', { 'class': col + ' tsp-shade', d: 'M-14 -6 Q-19 -30 -9 -41 Q0 -31 9 -41 Q19 -30 14 -6 Z' }, bloom);
+        el('path', { 'class': col, d: 'M-15 -4 Q-21 -28 -8 -39 Q-1 -25 2 -6 Q-6 0 -15 -4 Z' }, bloom);
+        el('path', { 'class': col, d: 'M15 -4 Q21 -28 8 -39 Q1 -25 -2 -6 Q6 0 15 -4 Z' }, bloom);
+        el('path', { 'class': col + ' tsp-front', d: 'M-8 -2 Q-11 -26 0 -37 Q11 -26 8 -2 Q0 3 -8 -2 Z' }, bloom);
+      } else if (type === 2) {   // Mohn: vier zerknitterte Blätter, dunkler Fleck, Kapsel mit Narbenstrahlen
+        for (k = 0; k < 4; k++) el('path', { 'class': col, d: 'M0 0 C-15 -1 -19 -16 -12 -23 C-7 -27 -3 -24 0 -26 C3 -24 7 -27 12 -23 C19 -16 15 -1 0 0 Z', transform: 'rotate(' + (45 + k * 90) + ')' }, bloom);
+        el('circle', { 'class': 'tsp-center--dark', r: 8.5 }, bloom);
+        el('circle', { 'class': 'tsp-pod', r: 4.6 }, bloom);
+        for (k = 0; k < 7; k++) el('path', { 'class': 'tsp-pod-ray', d: 'M0 0 L0 -4.2', transform: 'rotate(' + f1(k * 360 / 7) + ')' }, bloom);
+      } else if (type === 3) {   // Glockenblume: drei nickende Glocken mit fünf Zipfeln am Bogen
+        el('path', { 'class': 'tsp-stem tsp-stem--thin', d: 'M0 0 Q14 -10 24 4' }, bloom);
+        [[0, 0, 1], [13, -3, 0.9], [23, 6, 0.8]].forEach(function (b) {
+          var bg = el('g', { transform: 'translate(' + b[0] + ' ' + b[1] + ') scale(' + b[2] + ')' }, bloom);
+          el('path', { 'class': 'tsp-bell', d: 'M-6 1 Q-7 9 -9 15 L-6.5 13.5 L-4.5 16.5 L-1.5 14.2 L0 17 L1.5 14.2 L4.5 16.5 L6.5 13.5 L9 15 Q7 9 6 1 Q0 -2.5 -6 1 Z' }, bg);
+          el('path', { 'class': 'tsp-calyx', d: 'M-5 1.5 L-3 -2 L0 0.5 L3 -2 L5 1.5 Q0 3.5 -5 1.5 Z' }, bg);
+        });
+      } else if (type === 4) {   // kleine Sonnenblume: zwei Kränze, Scheibe mit Kernspirale
+        for (k = 0; k < 12; k++) el('ellipse', { 'class': 'tsp-p2 tsp-shade', cx: 0, cy: -14, rx: 4.5, ry: 10, transform: 'rotate(' + (k * 30 + 15) + ')' }, bloom);
+        for (k = 0; k < 12; k++) el('ellipse', { 'class': 'tsp-p2', cx: 0, cy: -14, rx: 4.5, ry: 10, transform: 'rotate(' + k * 30 + ')' }, bloom);
+        el('circle', { 'class': 'tsp-center--seed', r: 9.5 }, bloom);
+        for (k = 0; k < 22; k++) el('circle', { 'class': 'tsp-seed', cx: f1(Math.cos(k * 2.4) * Math.sqrt(k) * 1.8), cy: f1(Math.sin(k * 2.4) * Math.sqrt(k) * 1.8), r: 0.95 }, bloom);
+      } else {                   // Gänseblümchen-Büschel: drei Köpfe, Spitzen rosa
+        [[-12, 6, 0.6], [12, 10, 0.55], [0, 0, 0.75]].forEach(function (d) {
+          var dg = el('g', { transform: 'translate(' + d[0] + ' ' + d[1] + ') scale(' + d[2] + ')' }, bloom);
+          for (var k2 = 0; k2 < 16; k2++) el('ellipse', { 'class': 'tsp-daisy', cx: 0, cy: -11, rx: 2.6, ry: 9, transform: 'rotate(' + f1(k2 * 22.5) + ')' }, dg);
+          el('circle', { 'class': 'tsp-center', r: 5.5 }, dg);
+        });
+      }
+    }
+    // Stiel als Kurve: Fuß bleibt stehen, die Spitze wandert mit dem
+    // Ausschlag sw (Grad); Blätter und Kopf sitzen auf der Kurve
+    function poseFlower(f, nod) {
+      var a = f.sw * Math.PI / 180, h = f.h;
+      var tx = Math.sin(a) * h, ty = -Math.cos(a) * h, cx = f.lean + tx * 0.18, cy = -h * 0.55;
+      f.stem.setAttribute('d', 'M0 0 Q' + f1(cx) + ' ' + f1(cy) + ' ' + f1(tx) + ' ' + f1(ty));
+      var tip = Math.atan2(tx - cx, cy - ty) * 180 / Math.PI;
+      f.hp.setAttribute('transform', 'translate(' + f1(tx) + ' ' + f1(ty) + ') rotate(' + f1(tip + nod) + ') scale(' + f.hk.toFixed(2) + ')');
+      f.leaves.forEach(function (L) {
+        var t = L.t, u = 1 - t;
+        var px = 2 * u * t * cx + t * t * tx, py = 2 * u * t * cy + t * t * ty;
+        L.g.setAttribute('transform', 'translate(' + f1(px) + ' ' + f1(py) + ') rotate(' + f1(L.ang + (L.fl || 0) + f.sw * 0.6) + ')');
+      });
+    }
     function putFlower(name, i, animate) {
       var x = SLOTS[i], y = groundY(x) + 8;
       // je Name fest: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
@@ -130,39 +221,28 @@
       var bend = el('g', {}, outer);
       var grow = el('g', { 'class': 'tsp-grow' + (animate ? ' tsp-grow--new' : '') }, bend);
       if (animate) setTimeout(function () { grow.classList.remove('tsp-grow--new'); }, 2600);
-      el('path', { 'class': 'tsp-stem', d: 'M0 0 Q' + lean + ' ' + (-h / 2) + ' 0 ' + (-h) }, grow);
-      el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.35) + ' Q' + (-lean * 3.2) + ' ' + (-h * 0.5) + ' ' + (-lean * 3.8) + ' ' + (-h * 0.62) + ' Q' + (-lean) + ' ' + (-h * 0.5) + ' 0 ' + (-h * 0.35) + ' Z' }, grow);
-      if (fr(5) < 0.45) el('path', { 'class': 'tsp-leaf', d: 'M0 ' + (-h * 0.6) + ' Q' + (lean * 3) + ' ' + (-h * 0.72) + ' ' + (lean * 3.4) + ' ' + (-h * 0.85) + ' Q' + (lean * 0.8) + ' ' + (-h * 0.72) + ' 0 ' + (-h * 0.6) + ' Z' }, grow);
-      var hp = el('g', { transform: 'translate(0 ' + (-h) + ') scale(' + hk.toFixed(2) + ')' }, grow);
+      // Blätter hängen am Stiel und wandern mit, wenn er sich im Wind biegt
+      var leaves = [];
+      (LEAVES[type] || LEAVES[0]).forEach(function (L, li) {
+        if (li >= 2 && fr(5) >= 0.45) return;
+        var len = L[2] * (0.85 + 0.3 * fr(8 + li)), wid = L[3];
+        var lg = el('g', {}, grow);
+        el('path', { 'class': 'tsp-leaf', d: leafPath(len, wid) }, lg);
+        el('path', { 'class': 'tsp-vein', d: 'M0 0 Q' + f1(wid * 0.15) + ' ' + f1(-len * 0.5) + ' 0 ' + f1(-len * 0.88) }, lg);
+        leaves.push({ g: lg, t: L[0], ang: L[1] * (fr(2) < 0.5 ? 1 : -1) * (li % 2 ? -1 : 1), ph: fr(11 + li) * 6.28 });
+      });
+      var stem = el('path', { 'class': 'tsp-stem' }, grow);
+      var hp = el('g', {}, grow);
       var head = el('g', { 'class': 'tsp-head' + (i % 2 ? '' : ' tsp-head--l') }, hp);
       var bloom = el('g', { 'class': 'tsp-bloom' }, head);
-      if (type === 0) {          // Margerite
-        for (var k = 0; k < 10; k++) el('ellipse', { 'class': col, cx: 0, cy: -13, rx: 5, ry: 12, transform: 'rotate(' + k * 36 + ')' }, bloom);
-        el('circle', { 'class': 'tsp-center', r: 8 }, bloom);
-      } else if (type === 1) {   // Tulpe
-        el('path', { 'class': col, d: 'M-16 -4 Q-20 -30 -12 -38 L-6 -24 L0 -40 L6 -24 L12 -38 Q20 -30 16 -4 Q0 6 -16 -4 Z' }, bloom);
-      } else if (type === 2) {   // Mohn
-        for (var m = 0; m < 5; m++) el('circle', { 'class': col, cx: 0, cy: -12, r: 11, transform: 'rotate(' + m * 72 + ')' }, bloom);
-        el('circle', { 'class': 'tsp-center--dark', r: 7 }, bloom);
-      } else if (type === 3) {   // Glockenblume: drei hängende Glocken am Bogen
-        el('path', { 'class': 'tsp-stem', d: 'M0 0 Q14 -8 22 6' }, bloom);
-        [[0, 0], [12, 0], [22, 8]].forEach(function (b) {
-          el('path', { 'class': 'tsp-bell', d: 'M' + (b[0] - 7) + ' ' + (b[1] + 14) + ' Q' + (b[0] - 7) + ' ' + b[1] + ' ' + b[0] + ' ' + b[1] +
-                       ' Q' + (b[0] + 7) + ' ' + b[1] + ' ' + (b[0] + 7) + ' ' + (b[1] + 14) + ' L' + (b[0] + 4) + ' ' + (b[1] + 11) +
-                       ' L' + b[0] + ' ' + (b[1] + 15) + ' L' + (b[0] - 4) + ' ' + (b[1] + 11) + ' Z' }, bloom);
-        });
-      } else if (type === 4) {   // kleine Sonnenblume
-        for (var q = 0; q < 12; q++) el('ellipse', { 'class': 'tsp-p2', cx: 0, cy: -14, rx: 4.5, ry: 10, transform: 'rotate(' + q * 30 + ')' }, bloom);
-        el('circle', { 'class': 'tsp-center--dark', r: 9 }, bloom);
-      } else {                   // Gänseblümchen-Büschel: drei kleine Köpfe
-        [[-12, 6, 0.6], [12, 10, 0.55], [0, 0, 0.75]].forEach(function (d) {
-          var dg = el('g', { transform: 'translate(' + d[0] + ' ' + d[1] + ') scale(' + d[2] + ')' }, bloom);
-          for (var k2 = 0; k2 < 12; k2++) el('ellipse', { 'class': 'tsp-daisy', cx: 0, cy: -11, rx: 3.5, ry: 9, transform: 'rotate(' + k2 * 30 + ')' }, dg);
-          el('circle', { 'class': 'tsp-center', r: 6 }, dg);
-        });
-      }
+      drawBloom(bloom, type, col);
+      // Schwingung: hohe Stiele langsam und weit, kurze zittern schnell
+      var f0 = 1.7 - 0.8 * clamp01((h - 34) / 40);
       flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci],
-                     ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0, rip: null, fly: null };
+                     ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0, rip: null, fly: null,
+                     stem: stem, hp: hp, leaves: leaves, lean: lean, sw: 0, sv: 0, wk: f0 * 6.283, zeta: 0.12 + 0.08 * fr(9),
+                     ph: fr(10) * 6.28, swShown: null };
+      poseFlower(flowers[i], 0);
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }
     // Kurzbesuch (!whereiam, nicht im Bild): Blume wächst neben einem Platz auf,
@@ -254,21 +334,72 @@
       }
     });
 
-    // ── Kirschzweig oben links ──
-    var blossoms = [];
-    [{ d: 'M-20 140 Q140 120 300 160 Q400 186 470 172', w: 15 }, { d: 'M140 130 Q190 80 260 64', w: 7 },
-     { d: 'M290 158 Q330 220 310 280', w: 6 }, { d: 'M380 180 Q420 140 480 128', w: 5 }].forEach(function (t) {
-      var p = el('path', { 'class': 'tsp-wood', d: t.d, 'stroke-width': t.w }, gSway);
+    // ── Kirschzweig oben links: Rinde rotbraun mit hellen Querstreifen
+    // (Lentizellen), Blüten in Büscheln an kurzen Kurztrieben, Knospen und junge
+    // Blätter. Bewegt sich gestaffelt: Hauptast langsam, Zweige schneller,
+    // Büschel zittern ──
+    var blossoms = [], twigs = [], clusters = [];
+    var TWIGS = [{ d: 'M-20 140 Q140 120 300 160 Q400 186 470 172', w: 15, at: [-20, 140], f: 0.22, amp: 0.7 },
+                 { d: 'M140 130 Q190 80 260 64', w: 7, at: [140, 130], f: 0.55, amp: 2.2 },
+                 { d: 'M290 158 Q330 220 310 280', w: 6, at: [290, 158], f: 0.5, amp: 2.0 },
+                 { d: 'M380 180 Q420 140 480 128', w: 5, at: [380, 180], f: 0.65, amp: 2.6 }];
+    var gMainTwig = null;
+    TWIGS.forEach(function (t, ti) {
+      var tg = el('g', {}, ti ? gMainTwig : gSway);
+      if (!ti) gMainTwig = tg;
+      el('path', { 'class': 'tsp-wood', d: t.d, 'stroke-width': t.w }, tg);
+      var p = el('path', { 'class': 'tsp-wood-hi', d: t.d, 'stroke-width': (t.w * 0.35).toFixed(1), transform: 'translate(0 ' + f1(-t.w * 0.22) + ')' }, tg);
       var len = p.getTotalLength();
-      for (var s = len * 0.25; s < len; s += 24) {
-        var pt = p.getPointAtLength(s), n = rnd() < 0.5 ? 1 : 2;
+      function ptAt(s) {
+        var a = p.getPointAtLength(s), b = p.getPointAtLength(Math.min(len, s + 1));
+        var dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;
+        return { x: a.x, y: a.y + t.w * 0.22, tx: dx / n, ty: dy / n };
+      }
+      // Lentizellen: kurze helle Striche quer zur Faser
+      for (var ls = 10; t.w >= 7 && ls < len - 6; ls += 12 + rnd() * 16) {
+        var q = ptAt(ls), lw = t.w * (0.12 + rnd() * 0.16);
+        el('path', { 'class': 'tsp-lenticel', d: 'M' + f1(q.x - q.ty * lw) + ' ' + f1(q.y + q.tx * lw) + ' L' + f1(q.x + q.ty * lw * 0.6) + ' ' + f1(q.y - q.tx * lw * 0.6) }, tg);
+      }
+      twigs.push({ g: tg, x: t.at[0], y: t.at[1], f: t.f, amp: t.amp, ph: rnd() * 6.28, shown: null });
+      for (var s = len * (ti ? 0.2 : 0.3); s < len; s += 30 + rnd() * 18) {
+        var pt = ptAt(s), side = rnd() < 0.55 ? -1 : 1;
+        var nx = -pt.ty * side, ny = pt.tx * side;
+        var cg = el('g', {}, tg);
+        // Kurztrieb, daran 2–4 Blüten an langen Stielen, mal eine Knospe oder ein Blatt
+        var spx = pt.x + nx * t.w * 0.5, spy = pt.y + ny * t.w * 0.5, ex = spx + nx * 5, ey = spy + ny * 5;
+        el('path', { 'class': 'tsp-spur', d: 'M' + f1(pt.x) + ' ' + f1(pt.y) + ' L' + f1(ex) + ' ' + f1(ey) }, cg);
+        if (rnd() < 0.35) el('use', { href: '#tsp-yleaf', transform: 'translate(' + f1(ex) + ' ' + f1(ey) + ') rotate(' + f1(Math.atan2(nx, -ny) * 57.3 + (rnd() - 0.5) * 70) + ') scale(' + (0.9 + rnd() * 0.5).toFixed(2) + ')' }, cg);
+        var n = 2 + Math.floor(rnd() * 2);
         for (var k = 0; k < n; k++) {
-          var bx = pt.x + (rnd() - 0.5) * 36, by = pt.y + (rnd() - 0.5) * 28;
-          el('use', { href: '#tsp-blossom', transform: 'translate(' + bx.toFixed(0) + ' ' + by.toFixed(0) + ') rotate(' + (rnd() * 72).toFixed(0) + ') scale(' + (1 + rnd() * 0.7).toFixed(2) + ')' }, gSway);
-          blossoms.push([bx, by]);
+          var ang = Math.atan2(ny, nx) + (k - (n - 1) / 2) * 0.55 + (rnd() - 0.5) * 0.3, pl = 9 + rnd() * 9;
+          var bx = ex + Math.cos(ang) * pl, by = ey + Math.sin(ang) * pl;
+          el('path', { 'class': 'tsp-pedicel', d: 'M' + f1(ex) + ' ' + f1(ey) + ' Q' + f1(ex + Math.cos(ang) * pl * 0.5) + ' ' + f1(ey + Math.sin(ang) * pl * 0.5 + 2) + ' ' + f1(bx) + ' ' + f1(by) }, cg);
+          if (rnd() < 0.15) {
+            el('use', { href: '#tsp-bud', transform: 'translate(' + f1(bx) + ' ' + f1(by) + ') rotate(' + f1(ang * 57.3 + 90) + ')' }, cg);
+          } else {
+            el('use', { href: '#tsp-blossom', transform: 'translate(' + f1(bx) + ' ' + f1(by) + ') rotate(' + (rnd() * 72).toFixed(0) + ') scale(' + (0.95 + rnd() * 0.5).toFixed(2) + ')' }, cg);
+            blossoms.push([bx, by]);
+          }
         }
+        clusters.push({ g: cg, x: pt.x, y: pt.y, f: 1.8 + rnd() * 1.4, ph: rnd() * 6.28, shown: null });
       }
     });
+    function stepBranch(dt, gustK) {
+      if (!B.partOn('branch')) return;
+      var w = Math.abs(windAt(200)) + Math.abs(gustK) * 0.8, lean = windDir() * Math.min(1.5, w) * 0.8;
+      twigs.forEach(function (t, ti) {
+        var a = (ti ? lean * 1.5 : lean * 0.5) + Math.sin(windT * t.f * 6.283 + t.ph) * t.amp * (0.35 + w);
+        if (t.shown !== null && Math.abs(a - t.shown) < 0.02) return;
+        t.shown = a;
+        t.g.setAttribute('transform', 'rotate(' + a.toFixed(2) + ' ' + t.x + ' ' + t.y + ')');
+      });
+      clusters.forEach(function (c) {
+        var a = Math.sin(windT * c.f * 6.283 + c.ph) * (1.5 + 9 * w) + lean * 3;
+        if (c.shown !== null && Math.abs(a - c.shown) < 0.05) return;
+        c.shown = a;
+        c.g.setAttribute('transform', 'rotate(' + a.toFixed(1) + ' ' + f1(c.x) + ' ' + f1(c.y) + ')');
+      });
+    }
 
     // ── Partikel ──
     function petal(ctx, p, al) {
@@ -811,6 +942,44 @@
       });
     }
 
+    // ── Wind: Grundströmung aus dem Wetter plus Böenwellen, die mit dem Wind
+    // über die Wiese laufen (wie Wogen im Kornfeld). Auch bei Flaute eine
+    // leichte Brise. Ergebnis in Grad Auslenkung für einen mittleren Stiel ──
+    var windT = 0;
+    function windDir() { return B.windBase < -0.05 ? -1 : 1; }
+    function windAt(x) {
+      var base = Math.abs(B.windBase), d = windDir(), u = x * d;
+      var wave = 0.5 + 0.5 * Math.sin((u - (120 + 260 * base) * windT) / 260) * Math.sin((u - 90 * windT) / 610 + 1.7);
+      var flick = Math.sin((u - 200 * windT) / 70 + 0.6) * 0.18;
+      return d * ((0.1 + 0.6 * base) + (0.12 + 0.9 * base) * (wave + flick));
+    }
+    function stepSway(dt) {
+      windT += dt;
+      var gustK = Math.min(1.5, Math.abs(B.gustPx) / 700) * (B.gustPx < 0 ? -1 : 1);
+      flowers.forEach(function (f) {
+        if (!f || f.fly) return;
+        // Federpendel: Wind zieht, der Stiel federt zurück und schwingt nach
+        var target = (windAt(f.x) + gustK * 0.6) * (5 + f.h * 0.14) + Math.sin(windT * 2.3 + f.ph) * 0.8;
+        var acc = f.wk * f.wk * (target - f.sw) - 2 * f.zeta * f.wk * f.sv;
+        f.sv += acc * dt; f.sw += f.sv * dt;
+        // Blätter flattern schneller als der Stiel, je mehr Wind, desto heftiger
+        var w = Math.abs(target) / 10;
+        f.leaves.forEach(function (L) { L.fl = Math.sin(windT * (7 + w * 6) + L.ph) * (2 + 7 * w); });
+        if (f.swShown === null || Math.abs(f.sw - f.swShown) > 0.04 || w > 0.05) {
+          f.swShown = f.sw;
+          poseFlower(f, -f.sv * 0.05);
+        }
+      });
+      // Grashalme: je Band geschert, die Welle läuft von Band zu Band
+      bladeBands.forEach(function (b) {
+        var a = -(windAt(b.x) + gustK * 0.5) * 2.2;
+        if (b.shown !== null && Math.abs(a - b.shown) < 0.05) return;
+        b.shown = a;
+        b.g.setAttribute('transform', 'translate(0 ' + (H - 20) + ') skewX(' + f1(a) + ') translate(0 ' + (20 - H) + ')');
+      });
+      stepBranch(dt, gustK);
+    }
+
     // ── Hauptschleife ──
     var petalAcc = 0, offFor = 99;
     TS.loop(function (dt) {
@@ -820,6 +989,7 @@
       offFor = B.on ? 0 : offFor + dt;
       if (offFor > 3) return;
       if (B.on) { if (show || gustT > 0 || flBusy) stepShow(dt); } else if (show) resetShow();
+      if (B.on && !B.reduceMotion) stepSway(Math.min(dt, 0.05));
       // Regen richtet die Köpfe sofort auf, bevor der Wasserstand nachzieht
       var wilt = clamp01((30 - S.water) / 30) * (1 - B.rain);
       var dry = clamp01((55 - S.water) / 55) * (1 - 0.7 * B.rain);

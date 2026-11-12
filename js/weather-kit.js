@@ -1416,15 +1416,25 @@
           var x = s.dir > 0 ? lerp(-200, W + 200, p) : lerp(W + 200, -200, p);
           s.x = x;
           var topY = H * 0.2;
-          var wl = waterAt(x), wet = smooth(wl / 80), footY = H - wl;
-          var wetRgb = function (day, nite, wday, wnite) {
-            return nightRgb(day.map(function (v, i) { return lerp(v, wday[i], wet); }),
-                            nite.map(function (v, i) { return lerp(v, wnite[i], wet); }));
+          // Wasserhose entsteht allmählich: erst Gischt am Fuß, dann zieht das
+          // Wasser im Trichter von unten nach oben (lift), Staub und Trümmer
+          // gehen nach und nach in Tropfen über; beim Verlassen umgekehrt
+          var dt = Math.min(0.05, Math.max(0, s.t - (s.pt === undefined ? s.t : s.pt)));
+          s.pt = s.t;
+          var wl = waterAt(x), wetT = smooth(wl / 80), footY = H - wl;
+          s.wet = (s.wet || 0) + (wetT - (s.wet || 0)) * Math.min(1, dt * (wetT > (s.wet || 0) ? 0.9 : 1.4));
+          s.lift = wetT > 0.3 ? Math.min(H - topY, (s.lift || 0) + dt * 170 * s.wet) : Math.max(0, (s.lift || 0) - dt * 300);
+          var wet = s.wet, liftY = footY - (s.lift || 0);
+          var mixRgb = function (day, nite, wday, wnite, k) {
+            return nightRgb(day.map(function (v, i) { return lerp(v, wday[i], k); }),
+                            nite.map(function (v, i) { return lerp(v, wnite[i], k); }));
           };
-          var edgeRgb = s.snow ? wetRgb([226, 232, 240], [150, 160, 182], [205, 218, 226], [130, 145, 165])
-                               : wetRgb([60, 57, 54], [62, 66, 82], [205, 218, 226], [130, 145, 165]);
-          var coreRgb = s.snow ? wetRgb([190, 200, 214], [118, 128, 152], [168, 186, 198], [96, 112, 135])
-                               : wetRgb([46, 44, 42], [44, 47, 60], [168, 186, 198], [96, 112, 135]);
+          var edgeAt = function (k) { return s.snow ? mixRgb([226, 232, 240], [150, 160, 182], [205, 218, 226], [130, 145, 165], k)
+                                                    : mixRgb([60, 57, 54], [62, 66, 82], [205, 218, 226], [130, 145, 165], k); };
+          var coreAt = function (k) { return s.snow ? mixRgb([190, 200, 214], [118, 128, 152], [168, 186, 198], [96, 112, 135], k)
+                                                    : mixRgb([46, 44, 42], [44, 47, 60], [168, 186, 198], [96, 112, 135], k); };
+          // Nässe eines Trichterstücks: unterhalb der Wasserfront voll, darüber weicher Übergang
+          var wetAtY = function (y) { return (s.lift || 0) > 0 ? Math.max(0, Math.min(1, (y - liftY) / 160 + 1)) * Math.min(1, wet * 1.3) : 0; };
           var swayAt = function (k) { return Math.sin(s.t * 1.8 + k * 2.6) * 55 * k + Math.sin(s.t * 4.5 + k * 8) * 7; };
           var widthAt = function (k) { return lerp(16, 250, Math.pow(k, 1.9)); };
 
@@ -1441,15 +1451,17 @@
 
           // Trichter in Streifen, Mitte dunkel, Ränder weich
           // helle Hosen zeigen Stufen am Rand: dort feiner aufteilen
-          var n = s.snow || wet > 0.01 ? 120 : 48, bandH = (H + 10 - topY) / n;
+          var n = s.snow || wet > 0.01 || s.lift > 0 ? 120 : 48, bandH = (H + 10 - topY) / n;
           for (var i = 0; i < n; i++) {
             var k = 1 - i / (n - 1);                  // 1 = oben, 0 = Boden
             // ganze Pixel, ohne Überlappung: sonst zeigen sich Nahtlinien
             var y = Math.round(topY + i * bandH), y2 = Math.round(topY + (i + 1) * bandH);
-            if (wet > 0.01 && y >= footY) break;     // Wasserhose endet an der Oberfläche
-            var cx = x + swayAt(k), w = widthAt(k);
-            // oben weich in die Wolkenbasis übergehen, keine harte Kante
-            var a = env * (0.92 - 0.2 * k) * smooth(i / 8) * lerp(s.snow ? 0.7 : 1, 0.6, wet);
+            if (wet > 0.99 && y >= footY) break;     // Wasserhose endet an der Oberfläche
+            var cx = x + swayAt(k), w = widthAt(k), bw = wetAtY(y);
+            var edgeRgb = edgeAt(bw), coreRgb = coreAt(bw);
+            // oben weich in die Wolkenbasis übergehen, keine harte Kante;
+            // unter der Wasseroberfläche blendet der Trichter mit der Nässe aus
+            var a = env * (0.92 - 0.2 * k) * smooth(i / 8) * lerp(s.snow ? 0.7 : 1, 0.6, bw) * (y >= footY ? 1 - wet : 1);
             var g = fctx.createLinearGradient(cx - w, 0, cx + w, 0);
             g.addColorStop(0, 'rgba(' + edgeRgb + ',0)');
             g.addColorStop(0.22, 'rgba(' + edgeRgb + ',' + (a * 0.85) + ')');
@@ -1464,7 +1476,7 @@
           for (var j = 0; j < 9; j++) {
             var kk = ((s.t * 0.22 + j / 9) % 1);
             var yy = lerp(H, topY, kk), cx2 = x + swayAt(kk), w2 = widthAt(kk) * 0.75;
-            if (wet > 0.01 && yy > footY) continue;
+            if (wet > 0.5 && yy > footY) continue;
             var off = Math.sin(s.t * 6 + j) * w2 * 0.5;
             fctx.strokeStyle = 'rgba(' + (s.snow ? nightRgb([255, 255, 255], [200, 210, 230]) : nightRgb([150, 145, 138], [95, 102, 122])) +
                                ',' + ((s.snow ? 0.7 : 0.5) * env * Math.sin(Math.PI * kk)) + ')';
@@ -1498,18 +1510,31 @@
             var sprayRgb = nightRgb([236, 244, 248], [160, 176, 196]);
             fctx.save();
             fctx.translate(x, footY); fctx.scale(1, 0.4);
-            var sp = fctx.createRadialGradient(0, 0, 0, 0, 0, 260);
+            var sp = fctx.createRadialGradient(0, 0, 0, 0, 0, 120 + 140 * wet);
             sp.addColorStop(0, 'rgba(' + sprayRgb + ',' + (0.8 * env * wet) + ')');
             sp.addColorStop(0.5, 'rgba(' + sprayRgb + ',' + (0.4 * env * wet) + ')');
             sp.addColorStop(1, 'rgba(' + sprayRgb + ',0)');
             fctx.fillStyle = sp;
             fctx.fillRect(-260, -260, 520, 520);
             fctx.restore();
+            // Gischtmantel: aufgewirbeltes Wasser steigt am Fuß hoch
+            var mh = 40 + 120 * wet, mw = widthAt(0) * 3.2;
+            fctx.save();
+            fctx.translate(x + swayAt(0), footY); fctx.scale(mw, mh);
+            var mg = fctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+            mg.addColorStop(0, 'rgba(' + sprayRgb + ',' + (0.45 * env * wet) + ')');
+            mg.addColorStop(1, 'rgba(' + sprayRgb + ',0)');
+            fctx.fillStyle = mg;
+            fctx.fillRect(-1, -1, 2, 1);
+            fctx.restore();
           }
-          fctx.fillStyle = s.snow || wet > 0.5 ? 'rgba(' + (wet > 0.5 ? nightRgb([228, 238, 246], [160, 176, 196]) : nightRgb([252, 253, 255], [205, 214, 232])) + ',1)' : 'rgba(55,48,40,1)';
-          var base = wet > 0.01 ? footY - 10 : H - 10;
-          s.debris.forEach(function (d) {
+          var dropCol = 'rgba(' + nightRgb([228, 238, 246], [160, 176, 196]) + ',1)';
+          var dryCol = s.snow ? 'rgba(' + nightRgb([252, 253, 255], [205, 214, 232]) + ',1)' : 'rgba(55,48,40,1)';
+          var base = lerp(H - 10, footY - 10, wet);
+          s.debris.forEach(function (d, di) {
             d.a += d.sp * 0.016;
+            // nach und nach werden aus Trümmern Wassertropfen
+            fctx.fillStyle = (di % 20) / 20 < wet ? dropCol : dryCol;
             var y = lerp(base, topY + 60, d.h);
             var rw = widthAt(d.h) * 1.15;
             fctx.globalAlpha = env * (0.55 + 0.45 * Math.sin(d.a));
