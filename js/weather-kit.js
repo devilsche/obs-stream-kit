@@ -1293,10 +1293,10 @@
             o.fillRect(0, 0, off.width, off.height);
             o.globalCompositeOperation = 'source-over';
           }
-          return { dur: 10, off: off };
+          return { dur: 25, off: off };
         },
         draw: function (s) {
-          var env = 1 - smooth((s.t - (s.dur - 2.5)) / 2.5);
+          var env = 1 - smooth((s.t - (s.dur - 5)) / 5);
           sctx.save();
           sctx.globalAlpha = env * smooth(s.t / 3.5);
           sctx.drawImage(s.off, 0, 0);
