@@ -338,6 +338,22 @@ def _donation(amount, msg, name):
     return _with_conn(run)
 
 
+def _flag(v):
+    return (v or "").strip().lower() in ("true", "1", "3", "4")
+
+
+def _is_staff(name):
+    """Kanal selbst (Name = Twitch-Kanal des Tenants) oder Mod laut Streamer.bot
+    (mod=%isModerator%, role=%role% 3/4); unaufgelöste %…%-Variablen zählen nicht."""
+    try:
+        ch = _with_conn(lambda conn: _channel(conn, g.tenant_id))
+    except Exception:
+        ch = ""
+    if ch and name and name.strip().lstrip("@").lower() == ch.strip().lower():
+        return True
+    return _flag(request.args.get("mod")) or _flag(request.args.get("role"))
+
+
 def _redeem(conn, name, offer, now):
     command, tier, _ = weather_chat.OFFERS[offer]
     left = weather_credit.spend(conn, g.tenant_id, name, weather_chat.PRICE[tier], now)
@@ -355,6 +371,9 @@ def weather_grant_route(token):
     to=@name, level=l0..l5 (oder points=…). → {"ok", "to", "points", "say"}."""
     if g.tenant_id is None:
         abort(404)
+    by = request.args.get("by")
+    if by is not None and not _is_staff(by):
+        return _no_store(jsonify({"ok": False, "say": "Freigeben dürfen nur der Kanal und Mods."})), 403
     to = weather_credit.key(request.args.get("to", ""))
     pts = weather_credit.parse_level(request.args.get("level", ""))
     if pts is None and request.args.get("points"):
@@ -378,11 +397,8 @@ def weather_redeem_route(token):
     if not name or not offer:
         return _no_store(jsonify({"ok": False, "offer": None, "say": ""})), 400
     out = {"ok": True}
-    # Mods und der Kanal selbst lösen kostenlos aus (role=%role%: 3 Mod, 4 Kanal;
-    # alternativ mod=%isModerator%, bc=%broadcastUser%)
-    bc = (request.args.get("bc") or "").strip().lstrip("@").lower()
-    if ((request.args.get("role") or "") in ("3", "4") or (request.args.get("mod") or "").lower() in ("true", "1")
-            or (bc and not bc.startswith("%") and name.lower() == bc)):
+    # Mods und der Kanal selbst lösen kostenlos aus
+    if _is_staff(name):
         out.update(offer=offer, say="", free=True)
         out.update(_order(weather_chat.OFFERS[offer][0], name))
         return _no_store(jsonify(out))

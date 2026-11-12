@@ -743,9 +743,17 @@ def test_redeem_is_free_for_mods_and_broadcaster(conn):
     c = _client(conn)
     r = c.get("/s/t/api/fx/weather/redeem?name=modkim&msg=!tornado&mod=True&bc=Streamer").get_json()
     assert r["offer"] == "tornado" and r["say"] == ""
-    r = c.get("/s/t/api/fx/weather/redeem?name=streamer&msg=!tornado&mod=False&bc=Streamer").get_json()
-    assert r["offer"] == "tornado"
     r = c.get("/s/t/api/fx/weather/redeem?name=streamer&msg=!tornado&role=4").get_json()
     assert r["offer"] == "tornado"
-    r = c.get("/s/t/api/fx/weather/redeem?name=viewer&msg=!tornado&mod=False&role=1&bc=Streamer").get_json()
+    # unaufgelöste Streamer.bot-Variable zählt nicht als Mod
+    r = c.get("/s/t/api/fx/weather/redeem?name=viewer&msg=!tornado&role=%25role%25&mod=False").get_json()
     assert r["offer"] is None and "cheer250" in r["say"]
+
+
+def test_channel_owner_is_free_and_may_grant(conn, monkeypatch):
+    monkeypatch.setattr(endpoints, "_channel", lambda conn, tid: "LuCKoR_HD")
+    c = _client(conn)
+    r = c.get("/s/t/api/fx/weather/redeem?name=luckor_hd&role=%25role%25&msg=!tornado").get_json()
+    assert r["offer"] == "tornado" and r["say"] == ""
+    assert c.get("/s/t/api/fx/weather/grant?to=x&level=l1&by=viewer").status_code == 403
+    assert c.get("/s/t/api/fx/weather/grant?to=x&level=l1&by=LuCKoR_HD").get_json()["points"] == 100
