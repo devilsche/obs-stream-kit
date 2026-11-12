@@ -284,7 +284,8 @@
 .tsp-head {
   --side: 1;
   transform-box: fill-box; transform-origin: 50% 100%;
-  transform: rotate(calc(var(--tsp-wilt) * var(--side) * 110deg)) scale(calc(1 - var(--tsp-wilt) * 0.2));
+  /* Hängen übernimmt der gebogene Stiel (poseFlower), der Kopf schrumpft nur etwas */
+  transform: scale(calc(1 - var(--tsp-wilt) * 0.15));
 }
 .tsp-head--l { --side: -1; }
 /* Tornado: Blütenkopf abgerissen (fliegt als Kopie), danach wächst er nach */

@@ -237,9 +237,22 @@
     }
     // Stiel als Kurve: Fuß bleibt stehen, die Spitze wandert mit dem
     // Ausschlag sw (Grad); Blätter und Kopf sitzen auf der Kurve
+    // Welken: der Stiel biegt sich als Bogen zur Seite seiner Neigung über,
+    // bei ganz welk (wiltNow 1) zeigt die Spitze schräg nach unten
+    var wiltNow = 0, WILT_BEND = 125;
     function poseFlower(f, nod) {
-      var a = f.sw * Math.PI / 180, h = f.h;
-      var tx = Math.sin(a) * h, ty = -Math.cos(a) * h, cx = f.lean + tx * 0.18, cy = -h * 0.55;
+      var h = f.h, droop = wiltNow * WILT_BEND * (f.lean >= 0 ? 1 : -1);
+      var a = (f.sw + droop) * Math.PI / 180, tx, ty, cx, cy;
+      if (Math.abs(droop) < 2) {
+        tx = Math.sin(a) * h; ty = -Math.cos(a) * h; cx = f.lean + tx * 0.18; cy = -h * 0.55;
+      } else {
+        // Kreisbogen der Länge h: Fuß senkrecht, Spitze im Winkel a; der
+        // Kontrollpunkt liegt im Schnitt der beiden Tangenten
+        var R = h / Math.abs(a), sg = a < 0 ? -1 : 1, ab = Math.abs(a);
+        tx = sg * R * (1 - Math.cos(ab)); ty = -R * Math.sin(ab);
+        cx = f.lean * (1 - wiltNow); cy = -R * Math.tan(Math.min(ab, 2.6) / 2);
+      }
+      f.wiltShown = wiltNow;
       f.stem.setAttribute('d', 'M0 0 Q' + f1(cx) + ' ' + f1(cy) + ' ' + f1(tx) + ' ' + f1(ty));
       var tip = Math.atan2(tx - cx, cy - ty) * 180 / Math.PI;
       f.hp.setAttribute('transform', 'translate(' + f1(tx) + ' ' + f1(ty) + ') rotate(' + f1(tip + nod) + ') scale(' + f.hk.toFixed(2) + ')');
@@ -1166,7 +1179,7 @@
         // Blätter flattern schneller als der Stiel, je mehr Wind, desto heftiger
         var w = Math.abs(target) / 10;
         f.leaves.forEach(function (L) { L.fl = Math.sin(windT * (7 + w * 6) + L.ph) * (2 + 7 * w); });
-        if (f.swShown === null || Math.abs(f.sw - f.swShown) > 0.04 || w > 0.05) {
+        if (f.swShown === null || Math.abs(f.sw - f.swShown) > 0.04 || w > 0.05 || Math.abs(wiltNow - (f.wiltShown || 0)) > 0.005) {
           f.swShown = f.sw;
           poseFlower(f, -f.sv * 0.05);
         }
@@ -1264,6 +1277,9 @@
       wilt = Math.max(wilt, 0.85 * cold);
       stepFrost(dt);
       wilt = Math.max(wilt, 0.3 * frostK);
+      wiltNow = wilt;
+      // ohne Bewegung (reduzierte Animationen) läuft stepSway nicht: hier nachziehen
+      if (B.reduceMotion) flowers.forEach(function (f) { if (f && Math.abs(wiltNow - (f.wiltShown || 0)) > 0.005) poseFlower(f, 0); });
       B.vars({ '--tsp-wilt': wilt, '--tsp-dry': dry, '--ts-night': B.night });
       droopSunflower(cold);
       showWeeds(S.weeds);
