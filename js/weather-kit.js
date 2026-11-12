@@ -930,9 +930,10 @@
       bolts = bolts.filter(function (b) { return !b.done; });
     }
 
-    // ── Spektakel: bis zu SHOW_MAX laufen gleichzeitig (auch zweimal dasselbe),
-    //    weitere warten (höchstens SHOW_MAX) und starten, sobald Platz ist ──
-    var SHOW_MAX = 3;
+    // ── Spektakel: bis zu SHOW_MAX laufen gleichzeitig (auch mehrmals dasselbe,
+    //    Weltuntergang erwünscht), weitere warten (höchstens SHOW_MAX) und
+    //    starten, sobald Platz ist ──
+    var SHOW_MAX = 15;
     var shows = [], queued = [];
 
     function spectacle(type) {

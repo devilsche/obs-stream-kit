@@ -138,9 +138,12 @@
 
     // Sirene: zwei leicht verstimmte Sägezähne durch einen Tiefpass, Ton steigt
     // langsam an, hält und sinkt zum Ende (wie eine Motorsirene in der Ferne)
+    // Bei mehreren Windhosen heult nur eine Sirene, die nächste erst danach
+    var sirenEnd = 0;
     function playSiren(dur) {
-      if (!actx || !on || volume <= 0.01) return;
+      if (!actx || !on || volume <= 0.01 || actx.currentTime < sirenEnd) return;
       var t0 = actx.currentTime, end = t0 + dur;
+      sirenEnd = end;
       var g = actx.createGain(), lp = actx.createBiquadFilter();
       lp.type = 'lowpass'; lp.frequency.value = 1400;
       g.gain.setValueAtTime(0, t0);
