@@ -22,10 +22,9 @@
     .dk-status__text { flex: 1; margin: 0; color: var(--text); }
     .dk-status__time { color: var(--text-muted); font-size: 12px; margin-top: 4px; }
     .dk-refresh.url-act { flex: none; width: 36px; height: 36px; padding: 0; justify-content: center; }
-    /* schmales Dock: Knöpfe dürfen schmaler werden, der Text bricht um statt über den Rand zu laufen */
-    .dk-box .url-ctl { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; }
-    .dk-box .url-ctl .url-act { white-space: normal; overflow-wrap: anywhere; min-width: 0; text-align: left; gap: 6px;
-                               line-height: 1.2; font-size: 12px; letter-spacing: 0.02em; padding: 8px 10px; }
+    /* schmales Dock: kompaktere Knöpfe, ganze Knöpfe brechen um, der Text nicht */
+    .dk-box .url-ctl { gap: 6px; }
+    .dk-box .url-ctl .url-act { gap: 6px; line-height: 1.2; font-size: 12px; letter-spacing: 0.02em; padding: 8px 10px; }
     .url-act.is-sent { border-color: var(--success); }
     .url-act.is-failed { border-color: var(--danger); }
     .dk-err { color: var(--danger); }
