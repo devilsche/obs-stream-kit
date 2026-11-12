@@ -181,8 +181,40 @@ def visible_count(xmas: str, theme: str = "") -> int:
     return TREE if xmas in ("on", "farewell") else VISIBLE_THEME.get(theme, VISIBLE)
 
 
-def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False) -> str:
-    """Antwort auf !whereiam; leer, wenn die Figur im Bild ist (dann wackelt oder hüpft sie)."""
+def name_rand(name: str, s: int) -> float:
+    """Wie TS.nameRand im Overlay (FNV-1a über „name#s“, klein): 0..1."""
+    h = 2166136261
+    for ch in (name or "?").lower() + "#" + str(s):
+        h ^= ord(ch)
+        h = (h * 16777619) & 0xFFFFFFFF
+    return h / 4294967296
+
+
+# Blumensorten wie putFlower() in js/theme-spring.js (Sorte nameRand 1, Farbe nameRand 7)
+FLOWER_TYPES = ("Margerite", "Tulpe", "Mohnblume", "Glockenblume", "kleine Sonnenblume", "Gänseblümchen-Büschel")
+FLOWER_COLORS = ("rosa", "gelbe", "lila", "orange", "weiße")
+
+
+def flower_kind(name: str) -> tuple:
+    """→ (Sorte 0..5, Farbe 0..4) der Blume dieses Namens."""
+    return int(name_rand(name, 1) * 6), int(name_rand(name, 7) * 5)
+
+
+def flower_say(name: str) -> str:
+    """„die rosa Tulpe“; Glockenblume immer lila, Sonnenblume und Büschel ohne Farbe."""
+    t, c = flower_kind(name)
+    if t == 3:
+        return "die lila Glockenblume"
+    if t == 4:
+        return "die kleine Sonnenblume"
+    if t == 5:
+        return "das Gänseblümchen-Büschel"
+    return f"die {FLOWER_COLORS[c]} {FLOWER_TYPES[t]}"
+
+
+def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False, theme: str = "", stage: int = 0) -> str:
+    """Antwort auf !whereiam; leer, wenn die Figur im Bild ist (dann wackelt oder hüpft sie).
+    Im Frühling nennt sie die Blume („Du bist die rosa Tulpe“), mit Wachstumsstufe."""
     who = f"@{name} " if name else ""
     if host:
         return f"{who}Du bist der Gastgeber, dir gehört die ganze Deko."
@@ -191,6 +223,9 @@ def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False) -> st
     if pos >= shown:
         return (f"{who}Du bist gerade nicht im Bild, dort stehen immer die neuesten {shown} Follower. "
                 "Für einen kurzen Besuch kommst du aber vorbei.")
+    if theme == "spring":
+        grown = {1: ", schon gewachsen", 2: ", voll erblüht"}.get(stage, "")
+        return f"{who}Du bist {flower_say(name)}{grown}."
     return ""
 
 PROJECT = {"winter": ("Schneemann", "zum fertigen Schneemann"),

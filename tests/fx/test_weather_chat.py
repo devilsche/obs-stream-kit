@@ -173,3 +173,17 @@ def test_redeem_says():
     assert wc.redeem_say("Tim", "rain", 50) == "Tim schickt Regen (Rest reicht für 1× Wetter)."
     assert wc.no_credit_say("Tim", "tornado", 0) == "@Tim !tornado gibt es mit cheer250 !tornado oder per Freigabe."
     assert wc.no_credit_say("Tim", "tornado", 100) == "@Tim dein Guthaben (100) reicht nicht für !tornado, das braucht 250."
+
+
+def test_flower_kind_matches_overlay_hash():
+    # gleiche Rechnung wie TS.nameRand im Overlay (FNV-1a)
+    assert wc.flower_kind("anna")[0] == 2 and wc.flower_kind("x")[0] == 3
+    assert wc.flower_say("anna") == "die lila Mohnblume"
+    assert wc.flower_say("x") == "die lila Glockenblume"
+    assert wc.flower_say("MrReibs") == "die kleine Sonnenblume"
+
+
+def test_whereami_in_spring_names_the_flower():
+    assert wc.whereami_say("anna", 3, theme="spring") == "@anna Du bist die lila Mohnblume."
+    assert wc.whereami_say("anna", 3, theme="spring", stage=2) == "@anna Du bist die lila Mohnblume, voll erblüht."
+    assert wc.whereami_say("anna", 3) == ""

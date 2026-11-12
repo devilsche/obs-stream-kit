@@ -215,7 +215,14 @@ def _whereami(cmd) -> dict:
     visible = pos is not None and pos < shown
     if pos is not None and not visible and not host:
         cmd["params"]["visit"] = True
-    return {"visible": visible, "say": weather_chat.whereami_say(name, pos, shown, host)}
+    theme = weather_state.LAST_THEME.get(g.tenant_id, "")
+    stage = 0
+    if theme == "spring" and visible:
+        try:
+            stage = _with_conn(lambda conn: weather_season.grow_stages(conn, g.tenant_id)).get(name.lower(), 0)
+        except Exception:
+            log.exception("fx weather: flower stage failed")
+    return {"visible": visible, "say": weather_chat.whereami_say(name, pos, shown, host, theme, stage)}
 
 
 def _with_conn(fn):

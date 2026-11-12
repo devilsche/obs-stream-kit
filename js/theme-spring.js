@@ -251,8 +251,17 @@
     }
     // Wachstum durch Gießen (Server zählt je Blume): Stufe 1 größer mit Knospe
     // am Seitentrieb, Stufe 2 noch größer, die Knospe ist aufgeblüht
-    var STAGE_H = [1, 1.15, 1.3], STAGE_K = [1, 1.07, 1.14], flStage = {};
+    var STAGE_H = [1, 1.22, 1.45], STAGE_K = [1, 1.12, 1.25], flStage = {};
     function stageOf(name) { return flStage[(name || '').toLowerCase()] || 0; }
+    // Sorte für das Namensschild bei !whereiam (gleich wie flower_say im Server)
+    var KIND_EN = ['marguerite', 'tulip', 'poppy', 'bellflower', 'little sunflower', 'daisy cluster'];
+    var COLOR_EN = ['pink', 'yellow', 'purple', 'orange', 'white'];
+    function kindOf(f) {
+      if (f.type === 3) return 'a purple bellflower';
+      if (f.type === 4) return 'a little sunflower';
+      if (f.type === 5) return 'a daisy cluster';
+      return 'a ' + COLOR_EN[f.ci] + ' ' + KIND_EN[f.type];
+    }
     function putFlower(name, i, animate) {
       var x = SLOTS[i], y = groundY(x) + 8, st = stageOf(name);
       // je Name fest: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
@@ -303,7 +312,7 @@
       el('circle', { 'class': 'tsp-ember', r: 3.5 }, hp);
       // Schwingung: hohe Stiele langsam und weit, kurze zittern schnell
       var f0 = 1.7 - 0.8 * clamp01((h - 51) / 60);
-      flowers[i] = { node: outer, head: head, bend: bend, grow: grow, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci], stage: st,
+      flowers[i] = { node: outer, head: head, bend: bend, grow: grow, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci], stage: st, type: type, ci: ci,
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0, rip: null, fly: null,
                      stem: stem, hp: hp, leaves: leaves, lean: lean, sw: 0, sv: 0, wk: f0 * 6.283, zeta: 0.12 + 0.08 * fr(9),
                      ph: fr(10) * 6.28, swShown: null };
@@ -799,10 +808,23 @@
       var lv = parseFloat(p.level);
       if (!isNaN(lv)) S[key + 'T'] = Math.max(0, Math.min(100, lv));
     }
-    var can = el('g', { 'class': 'tsp-can' }, B.fxSvg);
-    el('path', { 'class': 'tsp-can-body', d: 'M-40 -30 L30 -30 L36 30 L-46 30 Z' }, can);
-    el('path', { 'class': 'tsp-can-body', d: 'M30 -20 L90 -46 L94 -38 L36 -4 Z' }, can);
-    el('path', { 'class': 'tsp-can-handle', d: 'M-40 -20 Q-74 0 -40 22' }, can);
+    // Gießkanne von der Seite: bauchiger Körper mit Rand und Ringen, Bügel
+    // oben, Griff hinten, langer Ausguss vom Boden schräg nach oben mit
+    // Brausekopf (Messing). Mitte des Körpers bei 0/0, Brause bei CAN_ROSE
+    var CAN_ROSE = [104, -58];
+    var canDef = el('linearGradient', { id: 'tsp-cang', x1: 0, y1: 0, x2: 1, y2: 0 }, B.defs);
+    el('stop', { offset: '0', 'class': 'tsp-cang-0' }, canDef);
+    el('stop', { offset: '0.45', 'class': 'tsp-cang-1' }, canDef);
+    el('stop', { offset: '1', 'class': 'tsp-cang-2' }, canDef);
+    var can = el('g', { 'class': 'tsp-can' }, B.fxSvg), canIn = el('g', {}, can);
+    el('path', { 'class': 'tsp-can-handle', d: 'M-30 -34 Q0 -78 30 -34' }, canIn);
+    el('path', { 'class': 'tsp-can-handle', d: 'M-36 -18 Q-62 -4 -38 22' }, canIn);
+    el('path', { 'class': 'tsp-can-spout', d: 'M26 18 L94 -50 L100 -44 L34 26 Z' }, canIn);
+    el('path', { 'class': 'tsp-can-body', d: 'M-34 -32 Q0 -40 34 -32 L40 26 Q0 36 -40 26 Z' }, canIn);
+    el('path', { 'class': 'tsp-can-ring', d: 'M-36 -14 Q0 -21 36 -14 M-39 14 Q0 22 39 14' }, canIn);
+    el('ellipse', { 'class': 'tsp-can-rim', cx: 0, cy: -34, rx: 35, ry: 6 }, canIn);
+    el('path', { 'class': 'tsp-can-rose', d: 'M94 -54 L108 -68 Q118 -60 112 -46 L100 -44 Z' }, canIn);
+    for (var rh = 0; rh < 4; rh++) el('circle', { 'class': 'tsp-can-hole', cx: f1(106 + rh * 2), cy: f1(-63 + rh * 4.5), r: 0.9 }, canIn);
     var watering = false;
     function water(p) {
       var name = p.name || 'Someone';
@@ -814,7 +836,7 @@
       var t = mine || (live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 200 });
       if (key && p.stage !== undefined) {
         var stg = parseInt(p.stage, 10) || 0;
-        if (B.yes(p.up) && mine) setTimeout(function () { growFlower(mine, stg); }, B.reduceMotion ? 0 : 1500);
+        if (B.yes(p.up) && mine) setTimeout(function () { growFlower(mine, stg); }, B.reduceMotion ? 0 : 2000);
         else flStage[key] = Math.max(flStage[key] || 0, stg);
       }
       if (!(parseFloat(p.done) > 0) && !mine) { B.tag(name + ': the garden is already wet', t.x, t.y - 150, true); return; }
@@ -823,14 +845,27 @@
       if (B.reduceMotion || watering) return;
       watering = true;
       can.classList.add('is-on');
-      var cx = Math.max(140, Math.min(W - 220, t.x - 90)), cy = t.y - 110, t0 = performance.now();
+      // kommt von der Seite mit mehr Platz (gespiegelt), Brause genau über der Blume
+      var side = t.x < W / 2 ? 1 : -1, tilt = 52, rx = t.x, ry = t.y - 46, t0 = performance.now();
+      canIn.setAttribute('transform', side < 0 ? 'scale(-1 1)' : '');
+      function rosePos(a) {
+        var r = a * Math.PI / 180, lx = CAN_ROSE[0] * side, ly = CAN_ROSE[1];
+        var c = Math.cos(r * side), s2 = Math.sin(r * side);
+        return [lx * c - ly * s2, lx * s2 + ly * c];
+      }
       (function step() {
-        var k = Math.min(1, (performance.now() - t0) / 1600);
-        can.setAttribute('transform', 'translate(' + cx.toFixed(0) + ' ' + cy.toFixed(0) + ') rotate(' + (Math.min(1, k * 4) * 30).toFixed(0) + ')');
-        if (k > 0.2 && k < 0.9 && B.front) {
-          for (var i = 0; i < 3; i++) B.front.add({ x: cx + 80 + rand(-6, 6), y: cy + 10, vx: rand(10, 60), vy: rand(0, 80), term: 500, g: 1200, sway: 0, wf: 0, r: rand(2, 3.5), floor: groundY, draw: spray });
+        var sec = (performance.now() - t0) / 1000;
+        // 0–0,5 s herein, 0,5–0,8 s kippen, gießen bis 2,1 s, zurück und weg bis 2,6 s
+        var a = sec < 0.5 ? 0 : sec < 0.8 ? tilt * (sec - 0.5) / 0.3 : sec < 2.1 ? tilt + Math.sin(sec * 9) * 1.5 : sec < 2.4 ? tilt * (1 - (sec - 2.1) / 0.3) : 0;
+        var rp = rosePos(a), inK = Math.min(1, sec / 0.5), outK = sec > 2.3 ? Math.min(1, (sec - 2.3) / 0.3) : 0;
+        var ox = rx - rp[0] - side * 120 * (1 - inK) * (1 - inK), oy = ry - rp[1] - 40 * (1 - inK);
+        can.setAttribute('transform', 'translate(' + f1(ox) + ' ' + f1(oy) + ') rotate(' + f1(a * side) + ')');
+        can.setAttribute('opacity', (Math.min(inK * 1.5, 1) * (1 - outK)).toFixed(2));
+        if (sec > 0.75 && sec < 2.15 && B.front) {
+          for (var i = 0; i < 4; i++) B.front.add({ x: rx + rand(-7, 7), y: ry + rand(-2, 4), vx: side * rand(10, 50) + rand(-25, 25), vy: rand(40, 120), term: 520, g: 1100,
+                                                    sway: 0, wf: 0, r: rand(1.4, 2.6), floor: groundY, draw: spray });
         }
-        if (k < 1) root.requestAnimationFrame(step); else { can.classList.remove('is-on'); watering = false; }
+        if (sec < 2.6) root.requestAnimationFrame(step); else { can.classList.remove('is-on'); watering = false; }
       })();
     }
     // Blume eine Stufe höher: an Ort und Stelle neu aufbauen, federt groß
@@ -844,8 +879,14 @@
       var n = flowers[i];
       gFlowers.insertBefore(n.node, next);   // gleiche Tiefe wie vorher
       if (!B.reduceMotion) {
+        // federt aus der alten Größe hoch
+        n.grow.style.setProperty('--tsp-from', (f.h / n.h).toFixed(3));
         n.grow.classList.add('tsp-grow--up');
-        setTimeout(function () { n.grow.classList.remove('tsp-grow--up'); }, 1300);
+        setTimeout(function () { n.grow.classList.remove('tsp-grow--up'); }, 1600);
+        for (var gi = 0; gi < 14 && B.front; gi++) {
+          B.front.add({ x: n.x + rand(-20, 20), y: n.y + rand(-10, 30), vx: rand(-90, 90), vy: rand(-260, -80), g: 300, term: 200,
+                        sway: rand(10, 30), r: rand(2, 3.5), c: gi % 2 ? '#ffe07a' : '#b9f28a', life: rand(1, 1.6), draw: petal });
+        }
       }
       if (B.on && B.partOn('meadow')) flowerTag(n, f.label + (stg >= 2 ? "'s flower is in full bloom!" : "'s flower is growing!"), true);
     }
@@ -1259,7 +1300,7 @@
           case 'whereami': {
             var me = (p.name || '').toLowerCase();
             var fl = flowers.filter(function (f) { return f && f.label && f.label.toLowerCase() === me; })[0];
-            if (fl && B.on && B.partOn('meadow') && root.SeasonKit) { root.SeasonKit.hop(fl.fly ? fl.fly.g.firstChild : fl.head); flowerTag(fl, fl.label + ' is right here!', true); }
+            if (fl && B.on && B.partOn('meadow') && root.SeasonKit) { root.SeasonKit.hop(fl.fly ? fl.fly.g.firstChild : fl.head); flowerTag(fl, fl.label + ' is ' + kindOf(fl) + '!', true); }
             else if (!fl && p.visit && B.on && B.partOn('meadow')) visitFlower(p.name || '');
             break;
           }

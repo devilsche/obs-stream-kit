@@ -278,8 +278,8 @@
 .ts[data-dead="1"] .tsp-bloom { filter: sepia(0.7) saturate(0.6) brightness(0.8); }
 .ts[data-dead="1"] .tsp-leaf { fill: #8a7a3a; }
 /* Wachstum durch Gießen: die größere Blume federt aus der alten Größe hoch */
-.tsp-grow--up { animation: tspUp 1.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
-@keyframes tspUp { from { transform: scale(0.88); } to { transform: none; } }
+.tsp-grow--up { animation: tspUp 1.5s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
+@keyframes tspUp { from { transform: scale(var(--tsp-from, 0.85)); } to { transform: none; } }
 @keyframes tspGrow { from { transform: scaleY(0); } to { transform: none; } }
 .tsp-head {
   --side: 1;
@@ -361,8 +361,14 @@
 /* Gießkanne */
 .tsp-can { display: none; }
 .tsp-can.is-on { display: inline; }
-.tsp-can-body { fill: #3fa9a0; stroke: #1f6660; stroke-width: 3; }
-.tsp-can-handle { fill: none; stroke: #1f6660; stroke-width: 6; }
+.tsp-can-body { fill: url(#tsp-cang); stroke: #1d5a3c; stroke-width: 2.5; }
+.tsp-cang-0 { stop-color: #2f7d50; } .tsp-cang-1 { stop-color: #5fbf7e; } .tsp-cang-2 { stop-color: #2a6e46; }
+.tsp-can-ring { fill: none; stroke: #1d5a3c; stroke-width: 2; opacity: 0.6; }
+.tsp-can-rim { fill: #1d4a33; stroke: #1d5a3c; stroke-width: 2; }
+.tsp-can-handle { fill: none; stroke: #1d5a3c; stroke-width: 6; stroke-linecap: round; }
+.tsp-can-spout { fill: #3f9a62; stroke: #1d5a3c; stroke-width: 2; stroke-linejoin: round; }
+.tsp-can-rose { fill: #d9a441; stroke: #8a6418; stroke-width: 1.5; stroke-linejoin: round; }
+.tsp-can-hole { fill: #6b4a10; }
 
 /* ═════ Sommer ═════ */
 .ts--summer { --tss-heat: 0; --tss-sun: 0; --tss-halo: 0; }
