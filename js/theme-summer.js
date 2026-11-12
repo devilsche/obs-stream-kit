@@ -1030,14 +1030,14 @@
       }
     }
     // Böe: Sand weht flach über den Strand und von den Burgen, Fähnchen flattern wild
-    function gust() {
-      var dir = B.gust(800);
-      B.vars({ '--ts-gust-dir': dir });
+    function gust(p) {
+      var dir = B.gust(800, p), gk = B.gustK;
+      B.vars({ '--ts-gust-dir': (dir * gk).toFixed(2) });
       B.pulse('gust', 1600);
       if (!B.on || B.reduceMotion || !B.partOn('beach') || !B.front) return;
-      for (var i = 0; i < 70; i++) {
+      for (var i = 0; i < 70 * gk; i++) {
         var x = rand(0, W);
-        B.front.add({ x: x, y: sandY(x) - rand(0, 8), vx: dir * rand(500, 950), vy: -rand(30, 140), g: 260, term: 400,
+        B.front.add({ x: x, y: sandY(x) - rand(0, 8), vx: dir * gk * rand(500, 950), vy: -rand(30, 140), g: 260, term: 400,
                       sway: 0, vr: 0, wf: 0, r: rand(1.5, 3), c: i % 3 ? '#e2c27f' : '#c9a463', life: rand(0.9, 1.6), draw: droplet });
       }
       castles.forEach(function (c) {
@@ -1515,7 +1515,7 @@
           case 'ice': addIce(p.name || ''); break;
           case 'fries': addFries(p.name || ''); break;
           case 'cool': cool(p); break;
-          case 'gust': gust(); break;
+          case 'gust': gust(p); break;
           case 'celebrate':
             if (X.shown()) X.celebrate();
             celebrate(p.name || '');

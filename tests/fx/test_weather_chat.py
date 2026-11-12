@@ -143,6 +143,9 @@ def test_whereami_say_texts():
 def test_visible_count_with_tree():
     assert wc.visible_count("off") == 12
     assert wc.visible_count("on") == 30 and wc.visible_count("farewell") == 30
+    # Frühling: 24 Blumen
+    assert wc.visible_count("off", "spring") == 24
+    assert wc.visible_count("on", "spring") == 30
 
 
 # ── Freigaben ──

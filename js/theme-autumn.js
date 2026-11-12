@@ -490,14 +490,14 @@
       if (name) B.tag('Thank you, ' + name + '!', W / 2, 300, true);
     }
     // Böe: Laub fliegt vom Haufen, Kürbisse wackeln, die Krähe flattert auf
-    function gust() {
-      var dir = B.gust(900);
-      B.vars({ '--ts-gust-dir': dir });
+    function gust(p) {
+      var dir = B.gust(900, p), gk = B.gustK;
+      B.vars({ '--ts-gust-dir': (dir * gk).toFixed(2) });
       B.pulse('gust', 1500);
       [[20, 600], [W - 600, W - 20]].forEach(function (r) {
-        for (var i = 0, n = Math.round(25 * (1 - 0.7 * W8.wet)); i < n; i++) {
+        for (var i = 0, n = Math.round(25 * gk * (1 - 0.7 * W8.wet)); i < n; i++) {
           var x = rand(r[0], r[1]);
-          spawn({ x: x, y: surface(x) + rand(0, 15), vx: dir * rand(300, 700), vy: rand(-380, -120), front: true });
+          spawn({ x: x, y: surface(x) + rand(0, 15), vx: dir * gk * rand(300, 700), vy: rand(-380, -120), front: true });
         }
       });
     }
@@ -1054,7 +1054,7 @@
             gust();
             B.tag('Leaf storm!', W / 2, 300, true);
             break;
-          case 'gust': gust(); break;
+          case 'gust': gust(p); break;
           case 'celebrate': celebrate(p.name || ''); break;
           // erst die Laubrecher, dann (wenn schon jemand gelöscht hat) die Feuerwehr
           case 'seasonboard':

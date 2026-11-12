@@ -201,7 +201,8 @@ def _whereami(cmd) -> dict:
     except Exception:
         log.exception("fx weather: follower position failed")
         pos, channel = None, ""
-    shown = weather_chat.visible_count(weather_state.LAST_XMAS.get(g.tenant_id, "off"))
+    shown = weather_chat.visible_count(weather_state.LAST_XMAS.get(g.tenant_id, "off"),
+                                       weather_state.LAST_THEME.get(g.tenant_id, ""))
     host = bool(name) and bool(channel) and name.lower() == channel.lower()
     visible = pos is not None and pos < shown
     if pos is not None and not visible and not host:

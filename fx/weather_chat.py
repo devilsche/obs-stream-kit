@@ -172,12 +172,13 @@ def credit_say(name: str, have: int) -> str:
 # ── Sätze für den Chat ──
 
 VISIBLE = 12    # so viele neueste Follower stehen je Thema im Bild
+VISIBLE_THEME = {"spring": 24}   # Blumen stehen in Grüppchen, da passen mehr hin
 TREE = 30       # solange der Weihnachtsbaum steht, hängen so viele als Kugeln
 
 
-def visible_count(xmas: str) -> int:
+def visible_count(xmas: str, theme: str = "") -> int:
     """Wie viele der neuesten Follower im Bild sind (Baum steht: Kugeln)."""
-    return TREE if xmas in ("on", "farewell") else VISIBLE
+    return TREE if xmas in ("on", "farewell") else VISIBLE_THEME.get(theme, VISIBLE)
 
 
 def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False) -> str:

@@ -188,10 +188,10 @@
         else if (hit && lastTheme === 'winter') theme.command('bolt', hit);
       });
       // jede Böe (Befehl oder zufälliger Wind) an das sichtbare Deko-Thema
-      kit.on('gust', function () {
-        audio.gust();
-        if (seasons[lastTheme]) seasons[lastTheme].command('gust', {});
-        else if (lastTheme === 'winter') theme.command('gust', {});
+      kit.on('gust', function (g) {
+        audio.gust(g.k);
+        if (seasons[lastTheme]) seasons[lastTheme].command('gust', g);
+        else if (lastTheme === 'winter') theme.command('gust', g);
       });
       kit.on('pop', function () { audio.thunder(0.1); });
       // Spektakel-Start (Art schon aufgelöst, auch bei Zufall) an das
@@ -479,7 +479,7 @@
             kit.strike(p.dist);
             break;
           case 'gust':
-            kit.gust();   // Thema bekommt die Böe über kit.on('gust')
+            kit.gust(gustOpts(p));   // Thema bekommt die Böe über kit.on('gust')
             break;
           case 'scrape':
             frost.scrape(p.name, p.done, p.level);
@@ -605,11 +605,16 @@
       // Alte rain.html-URLs leiten mit chan=rain hierher um: deren
       // Streamer.bot-Aktionen (/api/fx/rain) wirken weiter
       var RAIN_KIND = { light: 'drizzle', medium: 'rain', heavy: 'rain', storm: 'storm' };
+      // cmd=gust&dir=left|right&strength=0.4..2 (ohne: zufällig)
+      function gustOpts(p) {
+        var k = parseFloat(p.strength);
+        return { dir: p.dir === 'left' ? -1 : p.dir === 'right' ? 1 : 0, k: k > 0 ? k : 0 };
+      }
       function applyRainCommand(c) {
         var p = c.params || {};
         switch (c.cmd) {
           case 'strike': kit.strike(p.dist); break;
-          case 'gust': kit.gust(); break;
+          case 'gust': kit.gust(gustOpts(p)); break;
           case 'stop': settings.lock = 'clear'; fetchState(); break;
           case 'start':
             settings.lock = params.get('lock') || 'rain';

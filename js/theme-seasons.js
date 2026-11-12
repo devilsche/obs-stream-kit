@@ -152,7 +152,7 @@
     var B = {
       W: W, H: H, reduceMotion: reduceMotion,
       root: rootEl, fx: fxEl, defs: defs, fxSvg: fxSvg, back: back, front: front,
-      on: false, night: 0, rain: 0, heat: 0, sun: 0, windBase: 0, gustPx: 0, partsOn: {}, snow: 0,
+      on: false, night: 0, rain: 0, heat: 0, sun: 0, windBase: 0, gustPx: 0, gustK: 1, partsOn: {}, snow: 0,
       el: el, clear: clear, f1: f1, rand: rand, clamp01: clamp01, seeded: seeded, yes: yes,
       canvas: function () { return canvas(rootEl); },
       svg: function (cls) { return svgLayer(rootEl, cls); },
@@ -182,9 +182,12 @@
         return B.on;
       },
       // Böe: Partikel werden kräftig zur Seite gedrückt
-      gust: function (px) {
-        var dir = B.windBase > 0.05 ? 1 : B.windBase < -0.05 ? -1 : (Math.random() < 0.5 ? -1 : 1);
-        B.gustPx = dir * (px || 900);
+      // p = {dir, k} vom Kit (Richtung und Stärke der Böe); B.gustK für die Themen
+      gust: function (px, p) {
+        p = p || {};
+        var dir = p.dir === 1 || p.dir === -1 ? p.dir : (Math.random() < 0.5 ? -1 : 1);
+        B.gustK = p.k > 0 ? p.k : 1;
+        B.gustPx = dir * (px || 900) * B.gustK;
         return dir;
       },
       // Wind (px/s) aus dem Wetter plus abklingender Böe auf beide Partikel-Ebenen

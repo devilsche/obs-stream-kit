@@ -814,17 +814,18 @@
     // Böe: Pulverschnee weht von der Schneedecke und von den Köpfen der
     // Minis, die Minis wackeln, Hüte sitzen kurz schief
     var gustTimer = null;
-    function winterGust() {
+    function winterGust(p) {
       if (!S.on || reduceMotion) return;
-      var dir = liveWind() < -0.05 ? -1 : liveWind() > 0.05 ? 1 : (Math.random() < 0.5 ? -1 : 1);
-      rootEl.style.setProperty('--tw-gust-dir', dir);
+      p = p || {};
+      var dir = p.dir === 1 || p.dir === -1 ? p.dir : (Math.random() < 0.5 ? -1 : 1), gk = p.k > 0 ? p.k : 1;
+      rootEl.style.setProperty('--tw-gust-dir', (dir * gk).toFixed(2));
       rootEl.dataset.gust = '1';
       clearTimeout(gustTimer);
       gustTimer = setTimeout(function () { rootEl.dataset.gust = '0'; }, 1700);
       if (partOn('cover') && S.shown > 3) {
-        for (var i = 0; i < 80; i++) {
+        for (var i = 0; i < 80 * gk; i++) {
           var x = rand(0, W);
-          addP({ x: x, y: surface(x) - rand(0, 8), vx: dir * rand(500, 950), vy: -rand(40, 180), g: 160, term: 300,
+          addP({ x: x, y: surface(x) - rand(0, 8), vx: dir * gk * rand(500, 950), vy: -rand(40, 180), g: 160, term: 300,
                  sway: 0, r: rand(1.5, 3.5), life: rand(1, 1.8), draw: flake });
         }
       }
@@ -1094,7 +1095,7 @@
             if (tws) { tws.add(p); if (p.type === 'tornado' && !p.reduced) grabMinis(); }
             break;
           case 'gust':
-            gustKick = 3; winterGust(); break;
+            gustKick = 3 * (p && p.k > 0 ? p.k : 1); winterGust(p); break;
           case 'bolt':
             miniBolt(p); break;
           case 'clear':

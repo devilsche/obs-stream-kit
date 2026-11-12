@@ -18,7 +18,7 @@
 
   var PART_KEYS = ['meadow', 'branch', 'bugs'];
   var PETALS = ['#ff5d8f', '#ffd23f', '#8e6cff', '#ff8a3d', '#ffffff'];
-  var MAX_FL = 12;
+  var MAX_FL = 24;
 
   function create(stage, opts) {
     var TS = root.ThemeSeasons;
@@ -123,10 +123,12 @@
 
     // ── Blumen der Follower: 12 Plätze links und rechts, die Mitte unten
     // (Spielanzeigen) bleibt frei ──
-    var SLOTS = [];
+    // in Grüppchen: 10 Horste links und rechts (frei um die Sonnenblume bei
+    // x 230), je 2–3 Blumen; neue Blumen gehen reihum in die Horste
+    var PATCHES = [60, 340, 460, 580, 690, 1250, 1390, 1530, 1670, 1820], SLOTS = [];
     for (var si = 0; si < MAX_FL; si++) {
-      var sx = 40 + ((si * 23) % 40) * 34 + rnd() * 10;
-      SLOTS.push(sx < 720 ? sx : sx + 480);
+      var pc = PATCHES[si % PATCHES.length], m = Math.floor(si / PATCHES.length);
+      SLOTS.push(pc + [0, -26, 24][m] + (rnd() - 0.5) * 12);
     }
     var flowers = [], flNext = 0, flTotal = 0, flGen = 0;
     // Sind alle Plätze belegt, macht die älteste Platz: sie purzelt zur Kante
@@ -863,13 +865,13 @@
     // Böe: alle Blumen biegen sich in Windrichtung und federn nach, ein paar
     // Blütenblätter fliegen ab, der Zweig verliert eine Wolke Blüten
     var gustT = 0, gustDir = 1, GUST = 1.8, flBusy = false;
-    function gust() {
-      gustDir = B.gust(1000);
+    function gust(p) {
+      gustDir = B.gust(1000, p);
       for (var i = 0; i < 40 && blossoms.length; i++) { var b = blossoms[Math.floor(Math.random() * blossoms.length)]; blossomPetal(b[0], b[1]); }
       if (!B.on || B.reduceMotion || !B.partOn('meadow')) return;
       gustT = GUST;
       flowers.forEach(function (f) {
-        if (f && !f.rip && Math.random() < 0.4) flowerPetal(f, gustDir * rand(250, 520), rand(-320, -120));
+        if (f && !f.rip && Math.random() < 0.4 * B.gustK) flowerPetal(f, gustDir * B.gustK * rand(250, 520), rand(-320, -120));
       });
     }
     function stepShow(dt) {
@@ -884,7 +886,7 @@
         if (!f) return;
         var want = 0;
         // Windhose: je näher, desto heftiger (zur nächsten hin geneigt), Blätter fliegen
-        if (gEnv > 0) want += gustDir * 30 * gEnv * (0.75 + 0.35 * Math.sin(tNow * 13 + f.x * 0.07));
+        if (gEnv > 0) want += gustDir * 30 * B.gustK * gEnv * (0.75 + 0.35 * Math.sin(tNow * 13 + f.x * 0.07));
         var tn = tws.near(f.x);
         if (tn && f.rip === 'wait' && !B.reduceMotion && Math.abs(tn.x - f.x) < 90) ripHead(f, tn);
         followTag(f);
@@ -1061,7 +1063,7 @@
           case 'water': water(p); break;
           case 'weed': weed(p); break;
           case 'bee': sendBee(p.name || ''); break;
-          case 'gust': gust(); break;
+          case 'gust': gust(p); break;
           case 'celebrate': celebrate(p.name || ''); break;
           case 'seasonboard': B.board('Top gardeners', S.top); break;
           case 'spectacle': spectacle(p); break;

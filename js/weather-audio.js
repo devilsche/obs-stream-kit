@@ -254,7 +254,7 @@
         a.playbackRate = rate;
         play(a);
       },
-      gust: function () { oneShot('wind-gust.wav', volume * ambient * 0.9); },
+      gust: function (k) { oneShot('wind-gust.wav', volume * ambient * 0.9 * Math.min(1.3, 0.55 + 0.45 * (k || 1))); },
       // Spektakel-Start (info aus kit.on('spectacle')): Windhose bekommt Ton
       spectacle: function (info) {
         if (!info || info.type !== 'tornado' || info.reduced) return;

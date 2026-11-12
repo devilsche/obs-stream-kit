@@ -159,11 +159,17 @@
     }
 
     // ── Wind ──
-    var windNow = 0, gustT = -1, gustDir = 1;
-    function gust() {
+    var windNow = 0, gustT = -1, gustDir = 1, gustK = 1;
+    // Böe: Richtung zufällig (bei kräftigem Wind meist mit dem Wind), Stärke
+    // zufällig 0,4–1,6; beides lässt sich vorgeben (dir -1|1, k). Partikel,
+    // Ton und Deko-Thema bekommen dieselben Werte
+    function gust(o) {
+      o = o || {};
       gustT = 0;
-      gustDir = windNow > 0.05 ? 1 : (windNow < -0.05 ? -1 : (Math.random() < 0.5 ? -1 : 1));
-      emit('gust');
+      var with_ = Math.abs(windNow) > 0.3 && Math.random() < 0.65;
+      gustDir = o.dir === 1 || o.dir === -1 ? o.dir : with_ ? (windNow > 0 ? 1 : -1) : (Math.random() < 0.5 ? -1 : 1);
+      gustK = typeof o.k === 'number' && o.k > 0 ? Math.min(2, o.k) : rand(0.4, 1.6);
+      emit('gust', { dir: gustDir, k: gustK });
     }
     // windRandom: Richtung und Stärke wechseln alle 6–15 s weich, mal links, mal rechts
     var wander = 0, wanderAt = 0;
@@ -188,7 +194,7 @@
       if (gustT >= 0) {
         gustT += dt;
         if (gustT >= 2.5) gustT = -1;
-        else g = gustDir * 0.55 * Math.sin(Math.PI * gustT / 2.5);
+        else g = gustDir * 0.55 * gustK * Math.sin(Math.PI * gustT / 2.5);
       }
       var sway = reduceMotion ? 0 : 0.07 * Math.sin(time * 0.37) + 0.04 * Math.sin(time * 1.13);
       return clamp(windNow + g + sway, -1.6, 1.6);
