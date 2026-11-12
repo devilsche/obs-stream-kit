@@ -21,16 +21,20 @@
 
   var PART_KEYS = ['garland', 'branch', 'pile', 'leaves', 'pumpkins'];
 
-  // ── Blattformen: Stiel bei y≈+18, Spitze bei y≈-20 ──
+  // ── Blattformen nach echten Herbstblättern (Stiel bei y≈+24, Spitze bei y≈-20):
+  // Spitzahorn (fünf spitz gezähnte Lappen, Adern strahlenförmig vom Stielansatz),
+  // Stieleiche (abgerundete Lappen, Öhrchen am Grund, Seitenadern zu den Lappen),
+  // Buche/Birke (eiförmig, gesägter Rand, parallele Seitenadern) ──
   var LEAVES = [
-    { body: 'M0 -20 L4 -9 L12 -14 L10 -4 L19 -3 L11 4 L14 10 L4 8 L1 18 L-1 18 L-4 8 L-14 10 L-11 4 L-19 -3 L-10 -4 L-12 -14 L-4 -9 Z',
-      vein: 'M0 24 L0 -14 M0 4 L11 -2 M0 4 L-11 -2' },
-    { body: 'M0 -20 Q6 -17 5 -12 Q10 -10 7 -5 Q12 -2 8 3 Q12 7 6 10 Q6 16 0 18 Q-6 16 -6 10 Q-12 7 -8 3 Q-12 -2 -7 -5 Q-10 -10 -5 -12 Q-6 -17 0 -20 Z',
-      vein: 'M0 24 L0 -16' },
-    { body: 'M0 -18 Q11 -8 8 6 Q4 16 0 18 Q-4 16 -8 6 Q-11 -8 0 -18 Z',
-      vein: 'M0 24 L0 -12' }
+    { body: 'M0 -20 L2.5 -14 L5.5 -16.5 L5 -10.5 L8.5 -11.5 L6.5 -6.5 L4 -4.5 L10 -7.5 L14 -12.5 L14 -7.5 L19 -6.5 L15.5 -2.5 L17.5 0.5 L12 1 L8 2 L11.5 5.5 L12 10 L8 8.5 L5.5 11.5 L2.5 8.5 L0.8 11 L-0.8 11 L-2.5 8.5 L-5.5 11.5 L-8 8.5 L-12 10 L-11.5 5.5 L-8 2 L-12 1 L-17.5 0.5 L-15.5 -2.5 L-19 -6.5 L-14 -7.5 L-14 -12.5 L-10 -7.5 L-4 -4.5 L-6.5 -6.5 L-8.5 -11.5 L-5 -10.5 L-5.5 -16.5 L-2.5 -14 Z',
+      vein: 'M0 24 L0 10 L0 -15 M0 8 L13 -9 M0 8 L-13 -9 M0 9 L10 7 M0 9 L-10 7 M0 0 L4 -9 M0 0 L-4 -9' },
+    { body: 'M0 -20 Q5 -21 4.5 -16 Q2.5 -14 5 -12.5 Q10.5 -12 8 -8 Q5 -7 7.5 -4.5 Q12.5 -3 9.5 1 Q6 2 8.5 5 Q11.5 8.5 7 10 Q4 10.5 4.5 13 Q4 16 0.8 15 L-0.8 15 Q-4 16 -4.5 13 Q-4 10.5 -7 10 Q-11.5 8.5 -8.5 5 Q-6 2 -9.5 1 Q-12.5 -3 -7.5 -4.5 Q-5 -7 -8 -8 Q-10.5 -12 -5 -12.5 Q-2.5 -14 -4.5 -16 Q-5 -21 0 -20 Z',
+      vein: 'M0 24 L0 -17 M0 -11 L5 -14 M0 -11 L-5 -14 M0 -6 L8 -9 M0 -6 L-8 -9 M0 -1 L9 -2 M0 -1 L-9 -2 M0 5 L9 6 M0 5 L-9 6' },
+    { body: 'M0 -21 L3.7 -18.7 L3.8 -17.4 L6 -16.1 L5.7 -14.8 L7.7 -13.5 L7.2 -12.2 L9 -10.8 L8.3 -9.5 L9.9 -8.2 L8.9 -6.9 L10.3 -5.6 L9.2 -4.3 L10.3 -3 L9 -1.7 L10 -0.4 L8.5 0.9 L9.4 2.2 L7.7 3.5 L8.4 4.8 L6.5 6.2 L7 7.5 L5.1 8.8 L5.4 10.1 L3.3 11.4 L3.5 12.7 L0.8 14 L-0.8 14 L-3.5 12.7 L-3.3 11.4 L-5.4 10.1 L-5.1 8.8 L-7 7.5 L-6.5 6.2 L-8.4 4.8 L-7.7 3.5 L-9.4 2.2 L-8.5 0.9 L-10 -0.4 L-9 -1.7 L-10.3 -3 L-9.2 -4.3 L-10.3 -5.6 L-8.9 -6.9 L-9.9 -8.2 L-8.3 -9.5 L-9 -10.8 L-7.2 -12.2 L-7.7 -13.5 L-5.7 -14.8 L-6 -16.1 L-3.8 -17.4 L-3.7 -18.7 Z',
+      vein: 'M0 24 L0 -17 M0 -13 L8.5 -17.5 M0 -13 L-8.5 -17.5 M0 -8.6 L7.9 -13.1 M0 -8.6 L-7.9 -13.1 M0 -4.2 L7.3 -8.7 M0 -4.2 L-7.3 -8.7 M0 0.2 L6.7 -4.3 M0 0.2 L-6.7 -4.3 M0 4.6 L6.1 0.1 M0 4.6 L-6.1 0.1 M0 9 L5.5 4.5 M0 9 L-5.5 4.5' }
   ];
-  var PALETTE = ['#d9480f', '#f08c00', '#c92a2a', '#fab005', '#a0522d'];
+  // natürliche Herbstfarben: gebranntes Orange, Bernstein, Ahornrot, Gold, Eichenbraun
+  var PALETTE = ['#c8501a', '#e08a1e', '#a8231e', '#d9a31f', '#8a5a2b'];
   function shade(hex, f) {
     var n = parseInt(hex.replace('#', ''), 16);
     return 'rgb(' + Math.round((n >> 16) * f) + ',' + Math.round(((n >> 8) & 255) * f) + ',' + Math.round((n & 255) * f) + ')';
@@ -51,9 +55,15 @@
     var W = B.W, H = B.H, el = B.el, f1 = B.f1, rand = B.rand, clamp01 = B.clamp01;
     var rnd = TS.seeded(11);
 
+    var sheen = el('linearGradient', { id: 'ta-leafsheen', x1: 0, y1: 0, x2: 1, y2: 1 }, B.defs);
+    el('stop', { offset: '0', 'class': 'ta-sheen-0' }, sheen);
+    el('stop', { offset: '0.6', 'class': 'ta-sheen-1' }, sheen);
     LEAVES.forEach(function (l, i) {
+      // Fläche (Farbe vom use), Glanz von oben links, dunklerer Rand, Adern
       var g = el('g', { id: 'ta-lf' + i }, B.defs);
       el('path', { d: l.body }, g);
+      el('path', { 'class': 'ta-leaf-sheen', d: l.body }, g);
+      el('path', { 'class': 'ta-leaf-rim', d: l.body }, g);
       el('path', { 'class': 'ta-vein', d: l.vein }, g);
       l.p2body = new Path2D(l.body);
       l.p2vein = new Path2D(l.vein);
@@ -75,8 +85,13 @@
       ctx.scale(s * sx, s);
       ctx.fillStyle = color;
       ctx.fill(LEAVES[shape].p2body);
-      ctx.strokeStyle = 'rgba(50,20,0,.45)';
-      ctx.lineWidth = 1.4;
+      // dunklerer Rand und feine Adern wie bei echten Blättern
+      ctx.strokeStyle = 'rgba(70,25,0,.35)';
+      ctx.lineWidth = 1.2;
+      ctx.lineJoin = 'round';
+      ctx.stroke(LEAVES[shape].p2body);
+      ctx.strokeStyle = 'rgba(60,25,0,.42)';
+      ctx.lineWidth = 0.9;
       ctx.stroke(LEAVES[shape].p2vein);
       ctx.restore();
     }
