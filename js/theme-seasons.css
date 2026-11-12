@@ -258,6 +258,22 @@
 .tsp-vein { fill: none; stroke: #2f6e24; stroke-width: 0.8; opacity: 0.7; }
 .tsp-grow { transform-box: fill-box; transform-origin: 50% 100%; }
 .tsp-grow--new { animation: tspGrow 1.6s cubic-bezier(0.3, 1.2, 0.5, 1) both; }
+/* Schockfrost (Schneesturm): Eiskristalle, blasse bläuliche Farben; --tsp-frost 0..1 */
+.tsp-ice { opacity: 0; }
+.tsp-ice-l { fill: none; stroke: #f4fbff; stroke-width: 0.9; stroke-linecap: round; }
+.ts[data-frost="1"] .tsp-ice { opacity: var(--tsp-frost); }
+.ts[data-frost="1"] .tsp-frostable { filter: saturate(calc(1 - 0.55 * var(--tsp-frost))) brightness(calc(1 + 0.18 * var(--tsp-frost))) hue-rotate(calc(-12deg * var(--tsp-frost))); }
+.ts[data-frost="1"] .tsp-ice:nth-of-type(3n) { animation: tspGlint 2.6s ease-in-out infinite; }
+.ts[data-frost="1"] .tsp-ice:nth-of-type(3n+1) { animation: tspGlint 3.4s ease-in-out 1.1s infinite; }
+@keyframes tspGlint { 0%, 80%, 100% { opacity: var(--tsp-frost); } 90% { opacity: calc(0.3 * var(--tsp-frost)); } }
+/* Blitz: verkohlter Stiel, Blätter dunkel, Spitze glimmt ein paar Sekunden */
+.tsp-ember { fill: #ff8a2a; opacity: 0; }
+.is-charred .tsp-stem { stroke: #2b211c; }
+.is-charred .tsp-leaf { fill: #3b2d24; }
+.is-charred .tsp-vein { stroke: #1d1612; }
+.is-charred .tsp-ember { animation: tspEmber 6s ease-out both; }
+@keyframes tspEmber { 0% { opacity: 1; } 15% { opacity: 0.7; } 30% { opacity: 0.9; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ts[data-frost="1"] .tsp-ice, .is-charred .tsp-ember { animation: none; } }
 /* Wachstum durch Gießen: die größere Blume federt aus der alten Größe hoch */
 .tsp-grow--up { animation: tspUp 1.2s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 @keyframes tspUp { from { transform: scale(0.88); } to { transform: none; } }

@@ -49,6 +49,11 @@
       el('path', { 'class': 'tsp-stamen', d: 'M0 0 L' + sxp.toFixed(1) + ' ' + syp.toFixed(1) }, blossomDef);
       el('circle', { 'class': 'tsp-anther', cx: sxp.toFixed(1), cy: syp.toFixed(1), r: 0.9 }, blossomDef);
     }
+    // Eiskristall für den Schockfrost: sechs Strahlen mit Seitenästchen
+    var iceDef = el('g', { id: 'tsp-ice' }, B.defs);
+    for (bi = 0; bi < 3; bi++) {
+      el('path', { 'class': 'tsp-ice-l', d: 'M0 -4.5 L0 4.5 M-1.3 -3.2 L0 -2.2 L1.3 -3.2 M-1.3 3.2 L0 2.2 L1.3 3.2', transform: 'rotate(' + bi * 60 + ')' }, iceDef);
+    }
     var budDef = el('g', { id: 'tsp-bud' }, B.defs);
     el('ellipse', { 'class': 'tsp-bud', cx: 0, cy: -4, rx: 3.2, ry: 4.6 }, budDef);
     el('path', { 'class': 'tsp-bud-cup', d: 'M-3 -1.5 Q0 1.5 3 -1.5 L2 1 Q0 2.2 -2 1 Z' }, budDef);
@@ -58,7 +63,7 @@
 
     // Ebenen: Blütenblätter (Basis), Zweig, Wiese, Insekten
     var gBranch = el('g', { 'class': 'tsp-branch tsp-dim' }, B.svg());
-    var gSway = el('g', {}, gBranch);
+    var gSway = el('g', { 'class': 'tsp-frostable' }, gBranch);
     // Sonnenblume hinter der Wiese (Halme verdecken den Fuß)
     var gSun = el('g', { 'class': 'tsp-sunflower tsp-dim' }, B.svg());
     var meadowSvg = B.svg();
@@ -66,7 +71,7 @@
     // hohe Halme hinter den Blumen: die Stiele wachsen aus dem Gras
     var gBack = el('g', { 'class': 'tsp-blades tsp-blades--back' }, gMeadow);
     var gWeeds = el('g', {}, gMeadow);
-    var gFlowers = el('g', {}, gMeadow);
+    var gFlowers = el('g', { 'class': 'tsp-frostable' }, gMeadow);
     var grass = el('path', { 'class': 'tsp-grass' }, gMeadow);
     var grassDry = el('path', { 'class': 'tsp-grass tsp-grass--dry' }, gMeadow);
     var gBlades = el('g', { 'class': 'tsp-blades' }, gMeadow);
@@ -269,6 +274,7 @@
         var lg = el('g', {}, grow);
         el('path', { 'class': 'tsp-leaf', d: leafPath(len, wid) }, lg);
         el('path', { 'class': 'tsp-vein', d: 'M0 0 Q' + f1(wid * 0.15) + ' ' + f1(-len * 0.5) + ' 0 ' + f1(-len * 0.88) }, lg);
+        el('use', { href: '#tsp-ice', 'class': 'tsp-ice', transform: 'translate(' + f1(wid * 0.3) + ' ' + f1(-len * 0.55) + ') scale(0.8)' }, lg);
         leaves.push({ g: lg, t: L[0], ang: L[1] * (fr(2) < 0.5 ? 1 : -1) * (li % 2 ? -1 : 1), ph: fr(11 + li) * 6.28 });
       });
       if (st >= 1) {
@@ -289,6 +295,12 @@
       var head = el('g', { 'class': 'tsp-head' + (i % 2 ? '' : ' tsp-head--l') }, hp);
       var bloom = el('g', { 'class': 'tsp-bloom' }, head);
       drawBloom(bloom, type, col);
+      for (var ic = 0; ic < 6; ic++) {
+        var ia = fr(20 + ic) * 6.283, ir = 4 + fr(30 + ic) * 14;
+        el('use', { href: '#tsp-ice', 'class': 'tsp-ice', transform: 'translate(' + f1(Math.cos(ia) * ir) + ' ' + f1(Math.sin(ia) * ir - 12) + ') scale(' + (0.9 + fr(40 + ic) * 0.6).toFixed(2) + ')' }, head);
+      }
+      // Glut an der verkohlten Spitze nach einem Blitz
+      el('circle', { 'class': 'tsp-ember', r: 3.5 }, hp);
       // Schwingung: hohe Stiele langsam und weit, kurze zittern schnell
       var f0 = 1.7 - 0.8 * clamp01((h - 51) / 60);
       flowers[i] = { node: outer, head: head, bend: bend, grow: grow, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci], stage: st,
@@ -434,6 +446,7 @@
             blossoms.push([bx, by]);
           }
         }
+        el('use', { href: '#tsp-ice', 'class': 'tsp-ice', transform: 'translate(' + f1(ex + nx * 8) + ' ' + f1(ey + ny * 8) + ')' }, cg);
         clusters.push({ g: cg, x: pt.x, y: pt.y, f: 1.8 + rnd() * 1.4, ph: rnd() * 6.28, shown: null });
       }
     });
@@ -447,7 +460,7 @@
         t.g.setAttribute('transform', 'rotate(' + a.toFixed(2) + ' ' + t.x + ' ' + t.y + ')');
       });
       clusters.forEach(function (c) {
-        var a = Math.sin(windT * c.f * 6.283 + c.ph) * (1.5 + 9 * w) + lean * 3;
+        var a = (Math.sin(windT * c.f * 6.283 + c.ph) * (1.5 + 9 * w) + lean * 3) * (1 - 0.85 * frostK);
         if (c.shown !== null && Math.abs(a - c.shown) < 0.05) return;
         c.shown = a;
         c.g.setAttribute('transform', 'rotate(' + a.toFixed(1) + ' ' + f1(c.x) + ' ' + f1(c.y) + ')');
@@ -518,6 +531,11 @@
       var hx = target.x - dir * 46, hy = target.y - 34, t0 = performance.now(), last = t0;
       var IN = 2.4, HOVER = 0.8, LAND = 0.35, SIT = 1.3, OUT = 2.2, x = sx, y = sy, tilt = 0, arrived = false;
       var whirl = null, spin = 0, tossed = 0, tvx = 0, tvy = 0;
+      // vom Blitz durchgeschüttelt: trudelt seitlich davon
+      var me = { at: function () { return [x, y]; },
+                 zap: function () { if (!arrived) { arrived = true; if (done) done(); } whirl = null; tossed = x < W / 2 ? -1 : 1; tvx = tossed * 230; tvy = 60; } };
+      liveBugs.push(me);
+      function gone() { var j = liveBugs.indexOf(me); if (j >= 0) liveBugs.splice(j, 1); if (g.parentNode) gBugs.removeChild(g); }
       (function step() {
         var now = performance.now(), t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000), face = dir, tt;
         last = now;
@@ -540,7 +558,7 @@
           body.dataset.legs = '1';
           g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') rotate(' + f1(spin) + ') scale(' + (dir * 1.45).toFixed(2) + ' 1.45)');
           g.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
-          if (x < -80 || x > W + 80 || y < -80) { gBugs.removeChild(g); return; }
+          if (x < -80 || x > W + 80 || y < -80 || y > H + 60) { gone(); return; }
           root.requestAnimationFrame(step);
           return;
         }
@@ -571,7 +589,7 @@
           x = bx + (ex - bx) * oe + Math.sin(t * 7) * 22 * tt;
           y = by + (ey - by) * Math.sqrt(tt) + Math.sin(t * 11) * 14 * tt;
           want = -12 + 12 * tt;
-        } else { gBugs.removeChild(g); return; }
+        } else { gone(); return; }
         tilt += (want - tilt) * Math.min(1, dt * 8);
         body.dataset.legs = legs ? '1' : '0';
         g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') scale(' + (face * 1.45).toFixed(2) + ' 1.45) rotate(' + f1(tilt) + ')');
@@ -692,11 +710,24 @@
       // ab und zu eine Blüte vor ihm zum Rasten
       var cand = flowers.filter(function (f) { return f && !f.rip && (f.x - x) * dir > 300 && (f.x - x) * dir < 1500; });
       var rest = Math.random() < 0.6 && cand.length ? cand[Math.floor(Math.random() * cand.length)] : null, sit = 0, sat = false;
-      var whirl = null, spin = 0, flee = false;
+      var whirl = null, spin = 0, flee = false, jolt = 0;
+      var me = { at: function () { return [x, y]; },
+                 zap: function () { jolt = 0.9; flee = true; rest = null; sit = 0; dir = x < W / 2 ? -1 : 1; vy = 120; } };
+      liveBugs.push(me);
+      function gone() { var j = liveBugs.indexOf(me); if (j >= 0) liveBugs.splice(j, 1); if (b.g.parentNode) gBugs.removeChild(b.g); }
       (function step() {
         var now = performance.now(), dt = Math.min(0.05, (now - last) / 1000), th;
         last = now;
-        if (!B.on) { gBugs.removeChild(b.g); return; }
+        if (!B.on) { gone(); return; }
+        // vom Blitz durchgeschüttelt: taumelt ein Stück abwärts und dreht sich, dann davon
+        if (jolt > 0) {
+          jolt -= dt; spin += dt * 900 * dir; vy += 260 * dt; x += dir * 60 * dt; y += vy * dt;
+          poseBf(b, 0.4 + 0.9 * Math.abs(Math.sin(now / 40)));
+          b.g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') rotate(' + f1(spin) + ') scale(' + (dir * 1.7).toFixed(2) + ' 1.7)');
+          if (jolt <= 0) { spin = 0; vy = -80; base = Math.min(y, H - 260); }
+          root.requestAnimationFrame(step);
+          return;
+        }
         // Windhose in der Nähe: reißt ihn mit, wirbelt ihn hoch und schleudert ihn hinaus
         var tn = tws.near(x);
         if (!whirl && tn && Math.abs(tn.x - x) < 130) { whirl = tn.t; sit = 0; rest = null; }
@@ -755,7 +786,7 @@
         poseBf(b, th);
         b.g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') scale(' + (dir * 1.7).toFixed(2) + ' 1.7) rotate(' + f1(tilt * dir) + ')');
         b.g.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
-        if ((dir > 0 && x > W + 80) || (dir < 0 && x < -80)) { gBugs.removeChild(b.g); return; }
+        if ((dir > 0 && x > W + 80) || (dir < 0 && x < -80)) { gone(); return; }
         root.requestAnimationFrame(step);
       })();
     }
@@ -894,6 +925,7 @@
     }
     function regrowHead(f) {
       f.rip = null;
+      f.node.classList.remove('is-charred');
       f.head.classList.remove('tsp-head--gone');
       f.head.classList.add('tsp-head--regrow');
       setTimeout(function () { f.head.classList.remove('tsp-head--regrow'); }, 1300);
@@ -1047,6 +1079,8 @@
         if (!f || f.fly) return;
         // Federpendel: Wind zieht, der Stiel federt zurück und schwingt nach
         var target = (windAt(f.x) + gustK * 0.6) * (5 + f.h * 0.09) + Math.sin(windT * 2.3 + f.ph) * 0.8;
+        // schockgefroren: steif, nur ein Zittern
+        if (frostK > 0.01) target = target * (1 - 0.85 * frostK) + Math.sin(windT * 23 + f.ph) * 0.6 * frostK;
         var acc = f.wk * f.wk * (target - f.sw) - 2 * f.zeta * f.wk * f.sv;
         f.sv += acc * dt; f.sw += f.sv * dt;
         // Blätter flattern schneller als der Stiel, je mehr Wind, desto heftiger
@@ -1067,6 +1101,70 @@
       stepBranch(dt, gustK);
     }
 
+    // ── Schockfrost: im Schneesturm überziehen Eiskristalle Blumen und Zweig
+    // (in ~6 s), Farben blass und bläulich, alles steif; danach taut es in
+    // ~1 min ab, Tropfen fallen ──
+    var frostK = 0, frostShown = null;
+    function stepFrost(dt) {
+      var want = B.on && (B.blizzard || 0) > 0.15 ? 1 : 0;
+      var was = frostK;
+      frostK = want > frostK ? Math.min(1, frostK + dt / 6) : Math.max(0, frostK - dt / 60);
+      if (B.reduceMotion) frostK = want;
+      B.vars({ '--tsp-frost': frostK });
+      var on = frostK > 0.01 ? '1' : '0';
+      if (on !== frostShown) { frostShown = on; B.root.dataset.frost = on; }
+      // Tauwetter: Tropfen fallen von den Blüten
+      if (frostK < was && frostK > 0.05 && B.front && Math.random() < dt * 6) {
+        var live = flowers.filter(function (f) { return f && !f.rip && !f.fly; });
+        var f = live[Math.floor(Math.random() * live.length)];
+        if (f) B.front.add({ x: f.x + rand(-10, 10), y: f.y + 8, vx: 0, vy: 20, g: 900, term: 600, sway: 0, wf: 0, r: rand(1.5, 2.5), floor: groundY, life: 2, draw: spray });
+      }
+    }
+
+    // ── Blitz: trifft die Blume nächst dem Einschlag (etwa jedes zweite Mal),
+    // der Kopf zerstiebt in Asche, der Stiel bleibt verkohlt und geknickt mit
+    // glimmender Spitze, nach 20–30 s wächst eine neue Blüte. Falter und
+    // Bienen in der Nähe werden durchgeschüttelt und taumeln davon ──
+    var liveBugs = [];
+    function bolt(p) {
+      if (!B.on || B.reduceMotion || typeof p.x !== 'number') return;
+      var hx = p.x, hy = H - 120;
+      if (p.near && B.partOn('meadow')) {
+        var best = null;
+        flowers.forEach(function (f) {
+          if (!f || f.rip || f.fly || f.knock || Math.abs(f.x - p.x) > 110) return;
+          if (!best || Math.abs(f.x - p.x) < Math.abs(best.x - p.x)) best = f;
+        });
+        if (best && Math.random() < 0.55) {
+          var f = best, a = f.sw * Math.PI / 180;
+          hx = f.x + Math.sin(a) * f.h; hy = f.y + f.h - Math.cos(a) * f.h;
+          if (p.ground) p.ground(hx, hy);
+          dropFlowerTag(f);
+          f.head.classList.add('tsp-head--gone');
+          f.node.classList.add('is-charred');
+          f.rip = 'gone';
+          f.knock = (Math.random() < 0.5 ? -1 : 1) * rand(18, 32);
+          f.holdFor = rand(20, 30);
+          flBusy = true;
+          B.sparks(hx, hy, 22, 24);
+          for (var i = 0; i < 3; i++) B.smoke(hx + rand(-12, 12), hy, { o: B.rain > 0.2 ? 0.2 : 0.35 });
+          // Asche-Flocken statt Blütenblätter
+          for (var k = 0; k < 14 && B.front; k++) {
+            B.front.add({ x: hx + rand(-10, 10), y: hy + rand(-10, 10), vx: rand(-220, 220), vy: rand(-420, -120), g: 380, term: rand(40, 70),
+                          sway: rand(20, 50), r: rand(2.5, 5), c: k % 3 ? '#2b2420' : '#6b5d55', life: rand(1.6, 2.6), floor: groundY, draw: petal });
+          }
+        }
+      }
+      liveBugs.slice().forEach(function (b) {
+        var at = b.at();
+        if (Math.hypot(at[0] - hx, at[1] - hy) < 260 || Math.abs(at[0] - p.x) < 140) { B.sparks(at[0], at[1], 8, 10); b.zap(); }
+      });
+    }
+    function dropFlowerTag(f) {
+      if (f.tag && f.tag.el.parentNode) f.tag.el.parentNode.removeChild(f.tag.el);
+      f.tag = null;
+    }
+
     // ── Hauptschleife ──
     var petalAcc = 0, offFor = 99;
     TS.loop(function (dt) {
@@ -1083,6 +1181,8 @@
       // Schnee: Köpfe hängen, auch die Sonnenblume ein Stück
       var cold = Math.min(1, B.stepSnow(dt));
       wilt = Math.max(wilt, 0.85 * cold);
+      stepFrost(dt);
+      wilt = Math.max(wilt, 0.3 * frostK);
       B.vars({ '--tsp-wilt': wilt, '--tsp-dry': dry, '--ts-night': B.night });
       droopSunflower(cold);
       showWeeds(S.weeds);
@@ -1150,6 +1250,7 @@
           }
           case 'snowmanreset': sunflower.reset(B.on); break;
           case 'water': water(p); break;
+          case 'bolt': bolt(p); break;
           case 'weed': weed(p); break;
           case 'bee': sendBee(p.name || ''); break;
           case 'gust': gust(p); break;
