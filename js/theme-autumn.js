@@ -559,7 +559,28 @@
         pool.splice(k, 1);
       }
     }
+    // Namensschild am Kürbis: folgt ihm, wenn er schwimmt oder im Wirbel
+    // fliegt, und verschwindet, wenn er platzt
+    function pkTag(pk, text, big) {
+      var t = B.tag(text, pk.x + pk.lx, pk.y - pk.h - 12 - pk.ly, big);
+      if (t) pk.tag = { el: t, lx: pk.lx, ly: pk.ly };
+    }
+    function followTag(pk) {
+      var t = pk.tag;
+      if (!t) return;
+      if (!t.el.parentNode) { pk.tag = null; return; }
+      var dx = pk.lx - t.lx, dy = t.ly - pk.ly;
+      t.el.setAttribute('transform', Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3 ? '' : 'translate(' + f1(dx) + ' ' + f1(dy) + ')');
+    }
+    function dropTag(pk) {
+      if (!pk.tag) return;
+      var el = pk.tag.el;
+      pk.tag = null;
+      el.classList.add('name-tag--out');
+      setTimeout(function () { if (el.parentNode) el.parentNode.removeChild(el); }, 300);
+    }
     function renderPk(pk) {
+      followTag(pk);
       var tr = pk.ly < 0.3 && Math.abs(pk.lx) < 0.3 && Math.abs(pk.rot) < 0.3 ? ''
         : 'translate(' + f1(pk.lx) + ' ' + f1(-pk.ly) + ') rotate(' + f1(pk.rot) + ' 0 -30)';
       if (tr === pk.shown) return;
@@ -715,6 +736,7 @@
       if (!best || Math.random() < (airborne ? 0.35 : 0.65)) return false;  // nicht jeder Blitz trifft
       var pk = best, cx = pk.x + pk.lx, cy = pk.y + pk.dy - pk.h * 0.45 - pk.ly;
       if (p.ground) p.ground(cx, cy);
+      dropTag(pk);
       // zerplatzt: wächst später an seinem Platz nach
       pk.mode = null; pk.ly = 0; pk.lx = 0; pk.rot = 0; pk.vy = 0; pk.tw = pk.drop = null;
       renderPk(pk);
@@ -731,7 +753,7 @@
         void pk.node.getBBox();
         pk.node.classList.add('ta-pk--new');
         // der Name erst, wenn er wieder da ist
-        if (pk.label && B.on && B.partOn('pumpkins')) setTimeout(function () { B.tag(pk.label, pk.x, pk.y - pk.h - 12, false); }, 600);
+        if (pk.label && B.on && B.partOn('pumpkins')) setTimeout(function () { pkTag(pk, pk.label, false); }, 600);
       }, rand(8000, 14000));
       return true;
     }
@@ -973,7 +995,7 @@
       if (pick === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
       lastSpot = pick;
       B.spot(pick.inner);
-      B.tag(pick.label, pick.x, pick.y - pick.h - 12, false);
+      pkTag(pick, pick.label, false);
     }, 8000);
 
     return {
@@ -1010,7 +1032,7 @@
           case 'whereami': {
             var me = (p.name || '').toLowerCase();
             var pk = pkNodes.filter(function (k) { return k && k.label && !k.zap && k.label.toLowerCase() === me; })[0];
-            if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); B.tag(pk.label + ' is right here!', pk.x, pk.y - pk.h - 12, true); }
+            if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); pkTag(pk, pk.label + ' is right here!', true); }
             else if (!pk && p.visit && B.on && B.partOn('pumpkins')) visitPumpkin(p.name || '');
             break;
           }
