@@ -37,7 +37,7 @@
   <a class="skip" href="#controls">Skip to controls</a>
   <main>
     <h1>Pumpkin turn</h1>
-    <p class="lead">The pumpkin turns like a ball: the outline stays, face and ribs move round the sphere. Adjust duration and curve, press <b>Turn</b>, and copy the CSS line below into <code>js/theme-seasons.css</code> (or tell Claude the values).</p>
+    <p class="lead">The pumpkin turns round its stem: the ten ribs travel across (wide and bright in the middle, narrow at the edge, hidden at the back), the stem tip swings round, light and shadow stay put. Press <b>Turn</b> or <b>Spin slowly</b>, then tell Claude the values you like.</p>
 
     <section class="stage" id="pumps" aria-label="Preview pumpkins"></section>
 
@@ -48,14 +48,9 @@
         <output for="dur" id="durOut">1.4 s</output>
       </div>
       <div class="field">
-        <label for="ease">Curve</label>
-        <select id="ease">
-          <option value="cubic-bezier(0.3, 0.1, 0.3, 1)">Smooth stop (current)</option>
-          <option value="linear">Even speed</option>
-          <option value="ease-in-out">Slow start and stop</option>
-          <option value="cubic-bezier(0.2, 0.8, 0.2, 1)">Quick start, long stop</option>
-          <option value="cubic-bezier(0.6, 0, 0.4, 1)">Wind-up</option>
-        </select>
+        <label for="from">Start angle</label>
+        <input type="range" id="from" min="60" max="300" step="10" value="160">
+        <output for="from" id="fromOut">160°</output>
       </div>
       <div class="field">
         <label for="slow">Slow motion</label>
@@ -73,15 +68,17 @@
 
     <div class="buttons">
       <button type="button" id="turn">Turn</button>
+      <button type="button" id="spin" aria-pressed="false">Spin slowly</button>
       <button type="button" id="roll">Roll away and back</button>
       <button type="button" id="glow">Glow up</button>
       <button type="button" id="dark">Faces off</button>
     </div>
 
-    <h2>CSS for the source</h2>
+    <h2>Values</h2>
     <pre id="css" aria-live="polite"></pre>
   </main>
 
+  <script src="/s/__WIDGET_TOKEN__/js/pumpkin.js"></script>
   <script>
     (function () {
       'use strict';
@@ -92,7 +89,7 @@
         if (parent) parent.appendChild(n);
         return n;
       }
-      // gleicher Aufbau wie buildPumpkin() in js/theme-autumn.js
+      // gleicher Aufbau wie buildPumpkin() in js/theme-autumn.js (js/pumpkin.js)
       function pumpkin(svg, color, sx, sy) {
         var defs = el('defs', {}, svg);
         var glow = el('filter', { id: 'ta-glow', x: '-200%', y: '-200%', width: '500%', height: '500%' }, defs);
@@ -101,15 +98,9 @@
         var lift = el('g', {}, g);
         var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
         el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: 44 * sx, ry: 7 }, inner);
-        var body = el('g', { transform: 'scale(' + sx + ' ' + sy + ')' }, inner);
-        el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
-        el('ellipse', { 'class': 'ta-pk-body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
-        el('ellipse', { 'class': 'ta-pk-body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
-        el('ellipse', { 'class': 'ta-pk-lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
-        el('path', { 'class': 'ta-pk-rib', d: 'M-12 -58 Q-20 -30 -12 -2 M12 -58 Q20 -30 12 -2' }, body);
-        el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
-        el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
-        el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
+        var spin = el('g', { 'class': 'ta-pk-spin' }, inner);
+        var body = el('g', { transform: 'scale(' + sx + ' ' + sy + ')' }, spin);
+        g.model = window.Pumpkin.build(body);
         return g;
       }
       var stage = document.getElementById('pumps'), pks = [];
@@ -118,16 +109,14 @@
         pks.push(pumpkin(svg, c[0], c[1], c[2]));
       });
 
-      var dur = document.getElementById('dur'), ease = document.getElementById('ease'), slow = document.getElementById('slow');
+      var dur = document.getElementById('dur'), from = document.getElementById('from'), slow = document.getElementById('slow');
       function apply() {
-        var d = parseFloat(dur.value), f = parseFloat(slow.value);
+        var d = parseFloat(dur.value);
         document.getElementById('durOut').textContent = d.toFixed(1) + ' s';
-        stage.style.setProperty('--pk-turn-dur', (d * f).toFixed(2) + 's');
-        stage.style.setProperty('--pk-turn-ease', ease.value);
-        document.getElementById('css').textContent =
-          '/* in .ta-pk.is-turn … */\n--pk-turn-dur: ' + d.toFixed(1) + 's;\n--pk-turn-ease: ' + ease.value + ';';
+        document.getElementById('fromOut').textContent = from.value + '°';
+        document.getElementById('css').textContent = 'turn duration: ' + d.toFixed(1) + ' s\nstart angle: ' + from.value + '°';
       }
-      [dur, ease, slow].forEach(function (i) { i.addEventListener('input', apply); });
+      [dur, from, slow].forEach(function (i) { i.addEventListener('input', apply); });
       apply();
 
       function restart(pk, cls) {
@@ -136,16 +125,31 @@
         pk.classList.add(cls);
       }
       function turn() {
-        var ms = parseFloat(dur.value) * parseFloat(slow.value) * 1000 + 100;
+        var ms = parseFloat(dur.value) * parseFloat(slow.value) * 1000, a = parseFloat(from.value);
         pks.forEach(function (pk, i) {
           pk.classList.remove('is-dim');
           setTimeout(function () {
-            restart(pk, 'is-turn');
+            var side = i % 2 ? -1 : 1;
+            window.Pumpkin.pose(pk.model, side * a);
             pk.classList.add('is-lit');
-            setTimeout(function () { pk.classList.remove('is-turn'); }, ms);
+            window.Pumpkin.turn(pk.model, ms, side * a);
           }, i * 120);
         });
       }
+      // langsames Dauerdrehen zum Anschauen
+      var spinning = false, spinAt = 0;
+      function spinStep(now) {
+        if (!spinning) { pks.forEach(function (pk) { window.Pumpkin.pose(pk.model, 0); }); return; }
+        if (!spinAt) spinAt = now;
+        var a = ((now - spinAt) / 1000 * 40 / parseFloat(slow.value)) % 360;
+        pks.forEach(function (pk) { window.Pumpkin.pose(pk.model, a); });
+        requestAnimationFrame(spinStep);
+      }
+      document.getElementById('spin').addEventListener('click', function (e) {
+        spinning = !spinning; spinAt = 0;
+        e.currentTarget.setAttribute('aria-pressed', spinning ? 'true' : 'false');
+        requestAnimationFrame(spinStep);
+      });
       function roll() {
         pks.forEach(function (pk) {
           pk.classList.add('is-lit');

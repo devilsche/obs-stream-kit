@@ -123,16 +123,18 @@
 .ta-pk-body { fill: #e8740c; }
 .ta-pk-lobe { fill: #f08c1a; }
 .ta-pk-rib { fill: none; stroke: #b5520a; stroke-width: 2.5; }
+/* Wulst (js/pumpkin.js): Furche als dunkler Rand, heller Kern darüber */
+.ta-pk-seg { stroke: #b5520a; stroke-width: 1.3; vector-effect: non-scaling-stroke; }
 .ta-pk-stem { fill: #5a6b2a; }
 .ta-pk-shadow { fill: #1e0d03; opacity: 0.55; filter: blur(2.5px); }
 .ta-pk-edge { fill: #3a1806; stroke: #3a1806; stroke-width: 3.5; stroke-opacity: 0.8; vector-effect: non-scaling-stroke; }
 .ta-pk-sheen { fill: #ffffff; opacity: 0.22; }
 .ta-pk-shade { fill: #2a1405; }
 /* Sorten: orange, rotorange, gelb, cremeweiß, grün-orange */
-.ta-pk--c2 .ta-pk-body { fill: #c94a12; } .ta-pk--c2 .ta-pk-lobe { fill: #dc5c1c; } .ta-pk--c2 .ta-pk-rib { stroke: #8f300a; }
-.ta-pk--c3 .ta-pk-body { fill: #e8a514; } .ta-pk--c3 .ta-pk-lobe { fill: #f4bb2c; } .ta-pk--c3 .ta-pk-rib { stroke: #a87208; }
-.ta-pk--c4 .ta-pk-body { fill: #e6dcc4; } .ta-pk--c4 .ta-pk-lobe { fill: #f2ead6; } .ta-pk--c4 .ta-pk-rib { stroke: #b3a585; }
-.ta-pk--c5 .ta-pk-body { fill: #d97a16; } .ta-pk--c5 .ta-pk-lobe { fill: #8a9a3a; } .ta-pk--c5 .ta-pk-rib { stroke: #5e6a22; }
+.ta-pk--c2 .ta-pk-body { fill: #c94a12; } .ta-pk--c2 .ta-pk-lobe { fill: #dc5c1c; } .ta-pk--c2 .ta-pk-rib, .ta-pk--c2 .ta-pk-seg { stroke: #8f300a; }
+.ta-pk--c3 .ta-pk-body { fill: #e8a514; } .ta-pk--c3 .ta-pk-lobe { fill: #f4bb2c; } .ta-pk--c3 .ta-pk-rib, .ta-pk--c3 .ta-pk-seg { stroke: #a87208; }
+.ta-pk--c4 .ta-pk-body { fill: #e6dcc4; } .ta-pk--c4 .ta-pk-lobe { fill: #f2ead6; } .ta-pk--c4 .ta-pk-rib, .ta-pk--c4 .ta-pk-seg { stroke: #b3a585; }
+.ta-pk--c5 .ta-pk-body { fill: #d97a16; } .ta-pk--c5 .ta-pk-lobe { fill: #8a9a3a; } .ta-pk--c5 .ta-pk-rib, .ta-pk--c5 .ta-pk-seg { stroke: #5e6a22; }
 /* Gesichter leuchten Kürbis für Kürbis (is-lit setzt das Skript gestaffelt);
    das Flackern setzt erst nach dem weichen Einblenden ein, sonst ploppt es auf */
 .ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 2s ease; }
@@ -145,33 +147,7 @@
 .ta-pk.is-dim .ta-pk-light { animation: taGlowOut 2s ease forwards; }
 @keyframes taFaceOut { from { opacity: 1; } to { opacity: 0; } }
 @keyframes taGlowOut { from { opacity: 0.3; } to { opacity: 0; } }
-/* manche drehen sich wie ein Ball: der Umriss bleibt, Gesicht und Rippen laufen
-   auf der Kugel herum (Seitenposition nach sin, Breite nach cos des Drehwinkels),
-   das Gesicht kommt vom linken Rand ohne Aufblenden in die Mitte */
-.ta-pk.is-turn .ta-pk-face, .ta-pk.is-turn .ta-pk-rib { transform-box: fill-box; transform-origin: 50% 50%; }
-/* Gesicht und Rippen teilen Dauer und Kurve (ein Drehwinkel für die ganze Kugel);
-   einstellbar über --pk-turn-dur / --pk-turn-ease (Testseite tools/pumpkin-turn.html) */
-.ta-pk.is-turn .ta-pk-face { opacity: 1; transition: none;
-  animation: taFaceSpinIn var(--pk-turn-dur, 1.4s) var(--pk-turn-ease, cubic-bezier(0.3, 0.1, 0.3, 1)) both; }
-.ta-pk.is-turn .ta-pk-rib {
-  animation: taRibSpin var(--pk-turn-dur, 1.4s) var(--pk-turn-ease, cubic-bezier(0.3, 0.1, 0.3, 1)) both; }
-@keyframes taFaceSpinIn {
-  0% { transform: translateX(-32.0px) scaleX(0.04); }
-  15% { transform: translateX(-30.9px) scaleX(0.26); }
-  30% { transform: translateX(-27.7px) scaleX(0.50); }
-  45% { transform: translateX(-22.6px) scaleX(0.71); }
-  60% { transform: translateX(-16.0px) scaleX(0.87); }
-  75% { transform: translateX(-8.8px) scaleX(0.96); }
-  100% { transform: translateX(0.0px) scaleX(1.00); }
-}
-@keyframes taRibSpin {
-  0% { transform: translateX(0.0px) scaleX(1.00); }
-  25% { transform: translateX(6.7px) scaleX(0.93); }
-  50% { transform: translateX(12.7px) scaleX(0.71); }
-  50.1% { transform: translateX(-12.7px) scaleX(0.71); }
-  75% { transform: translateX(-6.7px) scaleX(0.93); }
-  100% { transform: translateX(0.0px) scaleX(1.00); }
-}
+/* manche drehen sich um die Stielachse: Bild für Bild in js/pumpkin.js */
 /* … oder rollen weg und kommen mit Gesicht von derselben Kante zurück */
 /* Zurückrollen: der Kürbis wandert (inner, mit Schatten), nur der Körper dreht */
 .ta-pk.is-rollin .ta-pk-inner { animation: taPkRollMove 1.6s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
@@ -182,7 +158,7 @@
   100% { transform: translateX(0); opacity: 1; }
 }
 @keyframes taPkRollSpin { 0% { transform: rotate(var(--pk-spin)); } 100% { transform: rotate(0deg); } }
-@media (prefers-reduced-motion: reduce) { .ta-pk.is-turn .ta-pk-face, .ta-pk.is-turn .ta-pk-rib, .ta-pk.is-rollin .ta-pk-inner, .ta-pk.is-rollin .ta-pk-spin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .ta-pk.is-rollin .ta-pk-inner, .ta-pk.is-rollin .ta-pk-spin { animation: none; } }
 .ts[data-celebrate="1"] .ta-pk-light { opacity: 0.7; animation: none; }
 @keyframes taFlicker { 0%, 100% { opacity: 1; } 30% { opacity: 0.75; } 55% { opacity: 0.95; } 70% { opacity: 0.6; } }
 @keyframes taGlowFlicker { 0%, 100% { opacity: 0.32; } 30% { opacity: 0.24; } 55% { opacity: 0.3; } 70% { opacity: 0.18; } }

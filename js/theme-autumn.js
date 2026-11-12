@@ -270,23 +270,10 @@
       // beim Zurückrollen dreht nur der Körper, der Schatten bleibt flach
       var spin = el('g', { 'class': 'ta-pk-spin' }, inner);
       var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, spin);
-      el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
-      // dunkle Kontur: dieselbe Silhouette dahinter, nur ihr Rand bleibt sichtbar
-      // (trennt den Kürbis vom gleichfarbigen Laub)
-      [[-18, -30, 24, 30], [18, -30, 24, 30], [0, -31, 22, 31]].forEach(function (e) {
-        el('ellipse', { 'class': 'ta-pk-edge', cx: e[0], cy: e[1], rx: e[2], ry: e[3] }, body);
-      });
-      el('ellipse', { 'class': 'ta-pk-body', cx: -18, cy: -30, rx: 24, ry: 30 }, body);
-      el('ellipse', { 'class': 'ta-pk-body', cx: 18, cy: -30, rx: 24, ry: 30 }, body);
-      el('ellipse', { 'class': 'ta-pk-lobe', cx: 0, cy: -31, rx: 22, ry: 31 }, body);
-      el('path', { 'class': 'ta-pk-rib', d: 'M-12 -58 Q-20 -30 -12 -2 M12 -58 Q20 -30 12 -2' }, body);
-      el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
-      // Tiefe: dunkler Schleier über den hinteren Kürbissen
-      el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': (0.42 * depth).toFixed(2) }, body);
-      el('path', { 'class': 'ts-cap', d: 'M-40 -45 Q-37 -64 -18 -63 Q0 -68 18 -63 Q37 -64 40 -45 Q20 -54 0 -52 Q-20 -54 -40 -45 Z' }, body);
-      el('path', { 'class': 'ta-pk-stem', d: 'M-3 -58 Q-4 -70 4 -76 L8 -72 Q3 -66 4 -58 Z' }, body);
-      el('path', { 'class': 'ta-pk-face', d: 'M-20 -40 L-10 -40 L-15 -50 Z M10 -40 L20 -40 L15 -50 Z M-22 -22 L-15 -16 L-8 -22 L0 -16 L8 -22 L15 -16 L22 -22 Q0 -4 -22 -22 Z' }, body);
-      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, ratio: (61 * sy) / (84 * sx),
+      // Körper aus 10 Wülsten (js/pumpkin.js), dreht sich um die Stielachse;
+      // dunkler Schleier über den hinteren Kürbissen gibt Tiefe
+      var model = root.Pumpkin.build(body, { shade: 0.42 * depth, cap: true });
+      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, model: model, ratio: (61 * sy) / (84 * sx),
                label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: 0, depth: depth,
                ly: 0, lx: 0, rot: 0, vy: 0, mode: null, shown: '' };
     }
@@ -340,7 +327,15 @@
           }
           pk.node.classList.remove('is-dim');
           var r = Math.random();
-          if (r < 0.5 || pk.zap || pk.mode !== null) { pk.node.classList.add('is-lit'); return; }
+          if (r < 0.25 || pk.zap || pk.mode !== null) { pk.node.classList.add('is-lit'); return; }
+          if (r < 0.5) {
+            // dreht sich um die eigene Achse, das Gesicht kommt von der Seite nach vorn
+            var from = (Math.random() < 0.5 ? -1 : 1) * rand(110, 200);
+            root.Pumpkin.pose(pk.model, from);
+            pk.node.classList.add('is-lit');
+            root.Pumpkin.turn(pk.model, 1400, from);
+            return;
+          }
           if (r < 0.9) {
             // rollt zur Kante hinaus, derselbe kommt mit Gesicht zurückgerollt
             var ghost = pk.node.cloneNode(true);

@@ -81,12 +81,12 @@
       d += ' L' + W + ' ' + H + ' Z';
       grass.setAttribute('d', d);
       grassDry.setAttribute('d', d);
-      for (var bi2 = 0; bi2 * 160 < W; bi2++) bladeBands.push({ g: el('g', {}, gBlades), x: bi2 * 160 + 80, shown: null });
+      for (var bi2 = 0; bi2 * 60 < W; bi2++) bladeBands.push({ g: el('g', {}, gBlades), x: bi2 * 60 + 30, shown: null });
       for (var bx = 0; bx < W; bx += 9) {
         // in der Mitte (Lebensbalken, Munition) nur kurze Halme
         var mid = bx > 700 && bx < 1220 ? 0.4 : 1;
         var y = groundY(bx) + 6, h = (14 + rnd() * 26) * mid, lean = (rnd() - 0.5) * 16 * mid;
-        el('path', { 'class': 'tsp-blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, bladeBands[Math.floor(bx / 160)].g);
+        el('path', { 'class': 'tsp-blade', d: 'M' + bx + ' ' + (y + 4).toFixed(0) + ' Q' + (bx + lean / 2).toFixed(0) + ' ' + (y - h / 2).toFixed(0) + ' ' + (bx + lean).toFixed(0) + ' ' + (y - h).toFixed(0) }, bladeBands[Math.floor(bx / 60)].g);
       }
     })();
 
@@ -216,7 +216,7 @@
       // je Name fest: Sorte, Farbe, Höhe, Neigung, Kopfgröße, Blätter
       var fr = function (s) { return TS.nameRand(name, s); };
       var ci = Math.floor(fr(7) * 5);
-      var h = 34 + Math.floor(fr(6) * 40), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + ci);
+      var h = Math.round((34 + Math.floor(fr(6) * 40)) * 1.5), type = Math.floor(fr(1) * 6), col = 'tsp-p' + (1 + ci);
       var lean = (fr(2) < 0.5 ? -1 : 1) * (4 + 8 * fr(3)), hk = 0.55 + 0.25 * fr(4);
       var outer = el('g', { transform: 'translate(' + x.toFixed(0) + ' ' + y.toFixed(0) + ')' }, gFlowers);
       // Zwischenebene zum Biegen/Umknicken (Fuß bei 0/0)
@@ -239,7 +239,7 @@
       var bloom = el('g', { 'class': 'tsp-bloom' }, head);
       drawBloom(bloom, type, col);
       // Schwingung: hohe Stiele langsam und weit, kurze zittern schnell
-      var f0 = 1.7 - 0.8 * clamp01((h - 34) / 40);
+      var f0 = 1.7 - 0.8 * clamp01((h - 51) / 60);
       flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci],
                      ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0, rip: null, fly: null,
                      stem: stem, hp: hp, leaves: leaves, lean: lean, sw: 0, sv: 0, wk: f0 * 6.283, zeta: 0.12 + 0.08 * fr(9),
@@ -961,7 +961,7 @@
       flowers.forEach(function (f) {
         if (!f || f.fly) return;
         // Federpendel: Wind zieht, der Stiel federt zurück und schwingt nach
-        var target = (windAt(f.x) + gustK * 0.6) * (5 + f.h * 0.14) + Math.sin(windT * 2.3 + f.ph) * 0.8;
+        var target = (windAt(f.x) + gustK * 0.6) * (5 + f.h * 0.09) + Math.sin(windT * 2.3 + f.ph) * 0.8;
         var acc = f.wk * f.wk * (target - f.sw) - 2 * f.zeta * f.wk * f.sv;
         f.sv += acc * dt; f.sw += f.sv * dt;
         // Blätter flattern schneller als der Stiel, je mehr Wind, desto heftiger
@@ -974,7 +974,7 @@
       });
       // Grashalme: je Band geschert, die Welle läuft von Band zu Band
       bladeBands.forEach(function (b) {
-        var a = -(windAt(b.x) + gustK * 0.5) * 2.2;
+        var a = -(windAt(b.x) + gustK * 0.5) * 1.1;
         if (b.shown !== null && Math.abs(a - b.shown) < 0.05) return;
         b.shown = a;
         b.g.setAttribute('transform', 'translate(0 ' + (H - 20) + ') skewX(' + f1(a) + ') translate(0 ' + (20 - H) + ')');
