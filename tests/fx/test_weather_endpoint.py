@@ -745,5 +745,7 @@ def test_redeem_is_free_for_mods_and_broadcaster(conn):
     assert r["offer"] == "tornado" and r["say"] == ""
     r = c.get("/s/t/api/fx/weather/redeem?name=streamer&msg=!tornado&mod=False&bc=Streamer").get_json()
     assert r["offer"] == "tornado"
-    r = c.get("/s/t/api/fx/weather/redeem?name=viewer&msg=!tornado&mod=False&bc=Streamer").get_json()
+    r = c.get("/s/t/api/fx/weather/redeem?name=streamer&msg=!tornado&role=4").get_json()
+    assert r["offer"] == "tornado"
+    r = c.get("/s/t/api/fx/weather/redeem?name=viewer&msg=!tornado&mod=False&role=1&bc=Streamer").get_json()
     assert r["offer"] is None and "cheer250" in r["say"]
