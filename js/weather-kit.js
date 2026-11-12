@@ -618,6 +618,37 @@
       fogPuffs.push({ x: rand(0, W + 800), y: rand(H - 220, H + 40), r: rand(220, 380), s: rand(10, 26) });
     }
 
+    // Nebel: Band unten und an den Seiten, Schwaden ziehen; auf der vorderen
+    // Ebene, damit er vor der Deko liegt (Blumen, Kürbisse stehen im Nebel)
+    function drawFog(wind) {
+      var f = clamp(cur.fog, 0, 1), dir = wind >= 0 ? 1 : -1;
+      if (f > 0.01) {
+        var fb = fctx.createLinearGradient(0, H, 0, H * 0.6);
+        fb.addColorStop(0, 'rgba(206,212,222,' + (0.55 * f) + ')');
+        fb.addColorStop(1, 'rgba(206,212,222,0)');
+        fctx.fillStyle = fb;
+        fctx.fillRect(0, H * 0.6, W, H * 0.4);
+        [[0, W * 0.2], [W, W * 0.8]].forEach(function (side) {
+          var sg = fctx.createLinearGradient(side[0], 0, side[1], 0);
+          sg.addColorStop(0, 'rgba(206,212,222,' + (0.32 * f) + ')');
+          sg.addColorStop(1, 'rgba(206,212,222,0)');
+          fctx.fillStyle = sg;
+          fctx.fillRect(Math.min(side[0], side[1]), 0, W * 0.2, H);
+        });
+        fogPuffs.forEach(function (p) {
+          p.x += p.s * (0.3 + Math.abs(wind)) * dir * dtFrame;
+          var span = W + 800;
+          if (p.x > W + 400) p.x -= span;
+          if (p.x < -400) p.x += span;
+          var pg = fctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+          pg.addColorStop(0, 'rgba(214,219,228,' + (0.28 * f) + ')');
+          pg.addColorStop(1, 'rgba(214,219,228,0)');
+          fctx.fillStyle = pg;
+          fctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+        });
+      }
+    }
+
     function drawSky(wind) {
       sctx.clearRect(0, 0, W, H);
       var c = clamp(cur.clouds, 0, 1), g = clamp(cur.gloom, 0, 1);
@@ -717,33 +748,6 @@
         sctx.fillStyle = vg;
         sctx.fillRect(-W, -W, W * 2, W * 2);
         sctx.restore();
-      }
-
-      // Nebel: Band unten und an den Seiten, Schwaden ziehen
-      if (f > 0.01) {
-        var fb = sctx.createLinearGradient(0, H, 0, H * 0.6);
-        fb.addColorStop(0, 'rgba(206,212,222,' + (0.55 * f) + ')');
-        fb.addColorStop(1, 'rgba(206,212,222,0)');
-        sctx.fillStyle = fb;
-        sctx.fillRect(0, H * 0.6, W, H * 0.4);
-        [[0, W * 0.2], [W, W * 0.8]].forEach(function (side) {
-          var sg = sctx.createLinearGradient(side[0], 0, side[1], 0);
-          sg.addColorStop(0, 'rgba(206,212,222,' + (0.32 * f) + ')');
-          sg.addColorStop(1, 'rgba(206,212,222,0)');
-          sctx.fillStyle = sg;
-          sctx.fillRect(Math.min(side[0], side[1]), 0, W * 0.2, H);
-        });
-        fogPuffs.forEach(function (p) {
-          p.x += p.s * (0.3 + Math.abs(wind)) * dir * dtFrame;
-          var span = W + 800;
-          if (p.x > W + 400) p.x -= span;
-          if (p.x < -400) p.x += span;
-          var pg = sctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
-          pg.addColorStop(0, 'rgba(214,219,228,' + (0.28 * f) + ')');
-          pg.addColorStop(1, 'rgba(214,219,228,0)');
-          sctx.fillStyle = pg;
-          sctx.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
-        });
       }
 
       // Hitze: warmer Saum unten, flimmernde Linien steigen auf
@@ -1831,7 +1835,8 @@
       drawParts(wind);
       drawBolts(dt);
       drawShow(dt);
-      drawBlizzard(wind, dt);   // nach drawShow: das leert die vordere Ebene
+      drawFog(wind);            // nach drawShow: das leert die vordere Ebene
+      drawBlizzard(wind, dt);
       root.requestAnimationFrame(frame);
     }
 
