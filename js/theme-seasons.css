@@ -111,8 +111,23 @@
 .ta-fl.ri-9 { animation-delay: -1.45s; }
 
 /* Ast */
-.ta-sway { animation: tsSway 7s ease-in-out infinite; transform-origin: 0 150px; }
-.ta-wood { fill: none; stroke: #4a3020; stroke-linecap: round; }
+/* Ast: Eichenrinde mit Glanzkante, Rissen und Knoten; Büschel an Stielen */
+.ta-wood { fill: none; stroke: #3e2a1c; stroke-linecap: round; }
+.ta-wood-hi { fill: none; stroke: #6e4c32; stroke-linecap: round; opacity: 0.65; }
+.ta-crack { stroke: #24170e; stroke-width: 1.2; stroke-linecap: round; opacity: 0.6; }
+.ta-knot { fill: #2a1b10; stroke: #5a3d26; stroke-width: 1; }
+.ta-stalk { stroke: #4a3020; stroke-width: 2.2; stroke-linecap: round; }
+.ta-stalk--thin { stroke-width: 1.1; }
+.ta-seed { transform-box: fill-box; transform-origin: 50% 0; transition: opacity 0.4s; }
+.ta-seed.ta-bl--gone { opacity: 0; }
+.ta-acorn-stalk { stroke: #5e4022; stroke-width: 1.5; }
+.ta-samara-wing { fill: #c99a4a; stroke: #8a6428; stroke-width: 0.6; }
+.ta-samara-seed { fill: #7a5226; }
+/* Raureif im Schneesturm (--ta-frost 0..1) */
+.ta-ice { opacity: 0; }
+.ta-ice-l { fill: none; stroke: #f4fbff; stroke-width: 0.9; stroke-linecap: round; }
+.ts[data-frost="1"] .ta-ice { opacity: var(--ta-frost); }
+.ts[data-frost="1"] .ta-frostable { filter: saturate(calc(1 - 0.5 * var(--ta-frost))) brightness(calc(1 + 0.18 * var(--ta-frost))) hue-rotate(calc(-10deg * var(--ta-frost))); }
 .ta-bl { transform-box: fill-box; transform-origin: 50% 0; transition: opacity 0.4s; }
 .ta-bl--gone { opacity: 0; }
 .ta-bl--grow { animation: taGrow 1.4s cubic-bezier(0.3, 1.4, 0.5, 1) both; }

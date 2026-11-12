@@ -192,6 +192,8 @@
         list.push(p);
       },
       count: function () { return list.length; },
+      // über alle laufenden Partikel (z. B. Blätter in der Luft anzünden)
+      each: function (fn) { list.forEach(fn); },
       step: function (dt) {
         self.wind += (self.windTarget - self.wind) * Math.min(1, dt * 3);
         self.windTarget *= Math.pow(0.35, dt);

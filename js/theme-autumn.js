@@ -81,7 +81,48 @@
       ctx.restore();
     }
     function leafDraw(ctx, p, a) {
+      if (p.burnAt !== undefined) { burnDraw(ctx, p, a); return; }
       drawLeaf(ctx, p.shape, p.x, p.y, p.rot, Math.cos(p.ph * 1.3), p.s, WETPAL[Math.round(W8.wet * 10)][p.ci], a);
+    }
+    // brennendes Blatt: glüht orange, verkohlt von außen, zerfällt zu Asche;
+    // landet es noch glühend auf dem Haufen, kann dort ein Feuer entstehen
+    function burnDraw(ctx, p, a) {
+      var t = p.age - p.burnAt, k = Math.min(1, t / p.burnFor);
+      var col = p.smolder ? 'rgb(' + Math.round(70 - 30 * k) + ',' + Math.round(50 - 25 * k) + ',' + Math.round(35 - 20 * k) + ')'
+              : k < 0.35 ? 'rgb(255,' + Math.round(150 - 160 * k) + ',40)' : 'rgb(' + Math.round(120 - 90 * k) + ',' + Math.round(45 - 30 * k) + ',' + Math.round(25 - 15 * k) + ')';
+      drawLeaf(ctx, p.shape, p.x, p.y, p.rot, Math.cos(p.ph * 1.3), p.s * (1 - 0.45 * k), col, a * (1 - 0.6 * k));
+      if (!p.smolder && k < 0.8) {
+        ctx.save(); ctx.globalAlpha = a * (0.5 - 0.5 * k); ctx.fillStyle = '#ffb347';
+        ctx.beginPath(); ctx.arc(p.x, p.y, 9 * p.s, 0, 6.283); ctx.fill(); ctx.restore();
+        if (Math.random() < 0.06) B.sparks(p.x, p.y, 2, 6);
+      }
+      if (Math.random() < (p.smolder ? 0.05 : 0.03)) B.smoke(p.x, p.y, { o: 0.25 });
+      if (!p.landed && !p.smolder && k < 0.7 && p.y >= surface(p.x) - 4) {
+        p.landed = true;
+        if (Math.random() < 0.2 && enoughAt(p.x) && !flooded(p.x) && !fireAt(p.x) && burning().length < FIRE_MAX) ignite(p.x, 'ember');
+      }
+      if (k >= 1 && !p.ash) { p.ash = true; p.life = p.age + 0.5; }
+    }
+    // Blitz: Blätter in der Luft nahe dem Blitzkanal fangen Feuer, im Regen qualmen sie nur;
+    // Blätter am Ast in der Nähe glimmen auf und fallen brennend ab
+    function igniteLeaves(x) {
+      var wet = liveRain() > 0.2;
+      [B.back, B.front].forEach(function (ps) {
+        if (ps && ps.each) ps.each(function (q) {
+          if (q.draw !== leafDraw || q.burnAt !== undefined || Math.abs(q.x - x) > 90 + Math.random() * 60) return;
+          q.burnAt = q.age; q.burnFor = rand(1.6, 2.8); q.smolder = wet;
+          q.term = (q.term || 80) * (wet ? 1 : 1.8); q.sway *= 0.5;
+        });
+      });
+      if (!B.partOn('branch') || x > 560) return;
+      branchLeaves.forEach(function (b) {
+        if (b.gone || Math.abs(b.x - x) > 110 || Math.random() < 0.5) return;
+        b.gone = true;
+        b.node.classList.remove('ta-bl--grow');
+        b.node.classList.add('ta-bl--gone');
+        spawn({ x: b.x, y: b.y, vy: 20, s: 1.4, burn: true, smolder: wet });
+        setTimeout(function () { b.gone = false; b.node.classList.remove('ta-bl--gone'); b.node.classList.add('ta-bl--grow'); }, rand(12000, 20000));
+      });
     }
     var W8 = { wet: 0 };   // Nässe 0..1
 
@@ -89,7 +130,7 @@
     var gGarland = el('g', { 'class': 'ta-garland' }, B.svg('ta-garland-l'));
     var branchSvg = B.svg('ta-branch-l');
     var gBranch = el('g', { 'class': 'ta-branch ta-dim' }, branchSvg);
-    var gSway = el('g', { 'class': 'ta-sway' }, gBranch);
+    var gSway = el('g', { 'class': 'ta-frostable' }, gBranch);
     // Vogelscheuche hinter dem Laubhaufen (der Pfahl steckt im Laub)
     var gScare = el('g', { 'class': 'ta-scare ta-dim' }, B.svg());
     var pileCanvas = B.canvas();
@@ -125,23 +166,133 @@
       }
     })();
 
-    // ── Ast oben links ──
-    var branchLeaves = [];
-    [
-      { d: 'M-20 150 Q120 130 260 170 Q360 200 430 190', w: 16 },
-      { d: 'M120 140 Q170 90 240 70', w: 7 },
-      { d: 'M240 165 Q290 230 270 290', w: 6 },
-      { d: 'M330 190 Q380 150 440 140', w: 5 },
-      { d: 'M60 146 Q80 200 60 250', w: 5 }
-    ].forEach(function (t) {
-      var path = el('path', { 'class': 'ta-wood', d: t.d, 'stroke-width': t.w }, gSway);
-      var len = path.getTotalLength();
-      for (var s = len * 0.3; s < len; s += 34) {
-        var p = path.getPointAtLength(s);
-        var u = leafUse(gSway, Math.floor(rnd() * 3), p.x, p.y, rnd() * 90 + 135, 1.3 + rnd() * 0.6, 'ta-bl');
-        branchLeaves.push({ node: u, x: p.x, y: p.y, gone: false });
+    // ── Ast oben links: Eichenrinde (dunkel, Glanzkante, Risse, Knoten),
+    // Blätter in Büscheln an kurzen Stielen, dazwischen Eicheln und Ahorn-
+    // Propeller. Bewegt sich gestaffelt mit dem Wind: Hauptast langsam, Zweige
+    // schneller, Büschel flattern; nasses Laub hängt schwer, Raureif im
+    // Schneesturm. Bei Böen fallen Eicheln und Propeller (drehen sich) ──
+    var branchLeaves = [], aTwigs = [], aClusters = [], seeds = [];
+    var iceDef = el('g', { id: 'ta-ice' }, B.defs);
+    for (var ii = 0; ii < 3; ii++) {
+      el('path', { 'class': 'ta-ice-l', d: 'M0 -4.5 L0 4.5 M-1.3 -3.2 L0 -2.2 L1.3 -3.2 M-1.3 3.2 L0 2.2 L1.3 3.2', transform: 'rotate(' + ii * 60 + ')' }, iceDef);
+    }
+    var acornDef = el('g', { id: 'ta-acorn' }, B.defs);
+    el('ellipse', { 'class': 'ta-acorn-nut', cx: 0, cy: 9, rx: 5, ry: 7 }, acornDef);
+    el('path', { 'class': 'ta-acorn-cap', d: 'M-6.5 4 Q0 -4 6.5 4 Q0 7 -6.5 4 Z' }, acornDef);
+    el('path', { 'class': 'ta-acorn-stalk', d: 'M0 -3 L0 0' }, acornDef);
+    var samDef = el('g', { id: 'ta-samara' }, B.defs);
+    el('path', { 'class': 'ta-samara-wing', d: 'M0 0 C-4 6 -16 14 -22 12 C-16 8 -8 4 -1 -1 Z' }, samDef);
+    el('path', { 'class': 'ta-samara-wing', d: 'M0 0 C4 6 16 14 22 12 C16 8 8 4 1 -1 Z' }, samDef);
+    el('circle', { 'class': 'ta-samara-seed', r: 2.6 }, samDef);
+    var A_TWIGS = [
+      { d: 'M-20 150 Q120 130 260 170 Q360 200 430 190', w: 16, at: [-20, 150], f: 0.2, amp: 0.6 },
+      { d: 'M120 140 Q170 90 240 70', w: 7, at: [120, 140], f: 0.5, amp: 2 },
+      { d: 'M240 165 Q290 230 270 290', w: 6, at: [240, 165], f: 0.45, amp: 1.8 },
+      { d: 'M330 190 Q380 150 440 140', w: 5, at: [330, 190], f: 0.6, amp: 2.4 },
+      { d: 'M60 146 Q80 200 60 250', w: 5, at: [60, 146], f: 0.55, amp: 2 }
+    ];
+    var aMain = null;
+    A_TWIGS.forEach(function (t, ti) {
+      var tg = el('g', {}, ti ? aMain : gSway);
+      if (!ti) aMain = tg;
+      el('path', { 'class': 'ta-wood', d: t.d, 'stroke-width': t.w }, tg);
+      var hi = el('path', { 'class': 'ta-wood-hi', d: t.d, 'stroke-width': (t.w * 0.3).toFixed(1), transform: 'translate(0 ' + f1(-t.w * 0.25) + ')' }, tg);
+      var len = hi.getTotalLength();
+      function ptAt(s) {
+        var a = hi.getPointAtLength(s), b = hi.getPointAtLength(Math.min(len, s + 1));
+        var dx = b.x - a.x, dy = b.y - a.y, n = Math.hypot(dx, dy) || 1;
+        return { x: a.x, y: a.y + t.w * 0.25, tx: dx / n, ty: dy / n };
+      }
+      // Risse längs der Faser, auf dem Hauptast ein paar Knoten
+      for (var cs = 12; t.w >= 6 && cs < len - 10; cs += 14 + rnd() * 18) {
+        var c = ptAt(cs), off = (rnd() - 0.5) * t.w * 0.5, cl = 6 + rnd() * 8;
+        el('path', { 'class': 'ta-crack', d: 'M' + f1(c.x - c.ty * off) + ' ' + f1(c.y + c.tx * off) + ' l' + f1(c.tx * cl) + ' ' + f1(c.ty * cl) }, tg);
+      }
+      if (!ti) [0.35, 0.62].forEach(function (k) { var q = ptAt(len * k); el('ellipse', { 'class': 'ta-knot', cx: f1(q.x), cy: f1(q.y + 1), rx: 4, ry: 2.6 }, tg); });
+      aTwigs.push({ g: tg, x: t.at[0], y: t.at[1], f: t.f, amp: t.amp, ph: rnd() * 6.28, shown: null });
+      for (var s = len * (ti ? 0.25 : 0.3); s < len; s += 42 + rnd() * 20) {
+        var pt = ptAt(s), side = rnd() < 0.6 ? 1 : -1;
+        var nx = -pt.ty * side, ny = pt.tx * side;
+        if (ny < -0.2) { nx = -nx; ny = -ny; }        // Büschel hängen eher nach unten
+        var cg = el('g', {}, tg), ex = pt.x + nx * (t.w * 0.5 + 4), ey = pt.y + ny * (t.w * 0.5 + 4);
+        el('path', { 'class': 'ta-stalk', d: 'M' + f1(pt.x) + ' ' + f1(pt.y) + ' L' + f1(ex) + ' ' + f1(ey) }, cg);
+        var n = 2 + Math.floor(rnd() * 2);
+        for (var k = 0; k < n; k++) {
+          var ang = Math.atan2(ny, nx) + (k - (n - 1) / 2) * 0.7 + (rnd() - 0.5) * 0.3, pl = 2 + rnd() * 3;
+          var lx = ex + Math.cos(ang) * pl, ly = ey + Math.sin(ang) * pl;
+          // Blattspitze zeigt vom Stiel weg (Form zeigt nach -y)
+          var u = leafUse(cg, Math.floor(rnd() * 3), lx, ly, ang * 57.3 + 90, 1 + rnd() * 0.4, 'ta-bl');
+          branchLeaves.push({ node: u, x: lx, y: ly, gone: false });
+        }
+        // ab und zu Eicheln (Hauptast, dicke Zweige) oder ein Ahorn-Propellerpaar
+        var r = rnd();
+        if (r < 0.22 || (r < 0.4 && t.w < 7)) {
+          var kind = t.w >= 6 && r < 0.22 ? 'acorn' : 'samara';
+          var sx = ex + nx * 6, sy = ey + Math.max(4, ny * 6) + 2;
+          var sn = el('use', { href: '#ta-' + kind, 'class': 'ta-seed', transform: 'translate(' + f1(sx) + ' ' + f1(sy) + ') rotate(' + f1((rnd() - 0.5) * 30) + ')' }, cg);
+          seeds.push({ node: sn, x: sx, y: sy, kind: kind, gone: false });
+        }
+        el('use', { href: '#ta-ice', 'class': 'ta-ice', transform: 'translate(' + f1(ex + nx * 6) + ' ' + f1(ey + ny * 6) + ')' }, cg);
+        aClusters.push({ g: cg, x: pt.x, y: pt.y, f: 1.6 + rnd() * 1.4, ph: rnd() * 6.28, shown: null });
       }
     });
+    var aWindT = 0, aFrost = 0, aFrostShown = null;
+    function stepBranch(dt) {
+      if (!B.on || B.reduceMotion || !B.partOn('branch')) return;
+      aWindT += dt;
+      var gk = Math.min(1.5, Math.abs(B.gustPx) / 700);
+      var w = Math.abs(B.windBase) * (0.6 + 0.4 * Math.sin(aWindT * 0.7)) + gk * 0.8 + 0.12;
+      var dir = (B.gustPx || B.windBase) < 0 ? -1 : 1, heavy = 1 - 0.5 * W8.wet, stiff = 1 - 0.85 * aFrost;
+      var lean = dir * Math.min(1.5, w) * 0.8;
+      aTwigs.forEach(function (t, ti) {
+        var a = ((ti ? lean * 1.5 : lean * 0.5) + Math.sin(aWindT * t.f * 6.283 + t.ph) * t.amp * (0.35 + w)) * heavy * stiff;
+        if (t.shown !== null && Math.abs(a - t.shown) < 0.02) return;
+        t.shown = a;
+        t.g.setAttribute('transform', 'rotate(' + a.toFixed(2) + ' ' + t.x + ' ' + t.y + ')');
+      });
+      aClusters.forEach(function (c) {
+        var a = (Math.sin(aWindT * c.f * 6.283 + c.ph) * (2 + 10 * w) + lean * 3) * heavy * stiff;
+        if (c.shown !== null && Math.abs(a - c.shown) < 0.05) return;
+        c.shown = a;
+        c.g.setAttribute('transform', 'rotate(' + a.toFixed(1) + ' ' + f1(c.x) + ' ' + f1(c.y) + ')');
+      });
+    }
+    // Raureif im Schneesturm (in ~6 s), taut danach in ~1 min ab
+    function stepAFrost(dt) {
+      var want = B.on && opts.blizzard && opts.blizzard() > 0.15 ? 1 : 0;
+      aFrost = B.reduceMotion ? want : want > aFrost ? Math.min(1, aFrost + dt / 6) : Math.max(0, aFrost - dt / 60);
+      B.vars({ '--ta-frost': aFrost });
+      var on = aFrost > 0.01 ? '1' : '0';
+      if (on !== aFrostShown) { aFrostShown = on; B.root.dataset.frost = on; }
+    }
+    // Eichel fällt gerade und springt kurz auf, Propeller trudelt drehend langsam herab
+    function seedDraw(ctx, p, a) {
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x, p.y);
+      if (p.kind === 'acorn') {
+        ctx.rotate(p.rot * 0.3);
+        ctx.fillStyle = '#9a6a2e'; ctx.beginPath(); ctx.ellipse(0, 3, 4, 5.5, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#5e4022'; ctx.beginPath(); ctx.ellipse(0, -1.5, 5, 2.6, 0, 3.14, 6.283); ctx.fill();
+      } else {
+        ctx.rotate(p.ph * 3); ctx.scale(Math.cos(p.ph * 6) * 0.5 + 0.6, 1);
+        ctx.fillStyle = '#c99a4a';
+        ctx.beginPath(); ctx.ellipse(-9, 3, 10, 3.2, 0.35, 0, 6.283); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(9, 3, 10, 3.2, -0.35, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#7a5226'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, 6.283); ctx.fill();
+      }
+      ctx.restore();
+    }
+    function dropSeeds(n) {
+      if (!B.on || !B.partOn('branch') || !B.back) return;
+      var live = seeds.filter(function (s) { return !s.gone; });
+      for (var i = 0; i < n && live.length; i++) {
+        var s = live.splice(Math.floor(Math.random() * live.length), 1)[0];
+        s.gone = true; s.node.classList.add('ta-bl--gone');
+        B.back.add(s.kind === 'acorn'
+          ? { x: s.x, y: s.y, vx: rand(-30, 30), vy: 40, g: 1300, term: 700, sway: 0, wf: 0.2, kind: 'acorn', vr: rand(-4, 4), floor: function (x) { return surface(x) + 4; }, draw: seedDraw }
+          : { x: s.x, y: s.y, vx: rand(-20, 20), vy: 10, g: 120, term: rand(45, 70), sway: rand(20, 40), vph: rand(4, 7), wf: 1, kind: 'samara', floor: function (x) { return surface(x) + 4; }, draw: seedDraw });
+        (function (sd) { setTimeout(function () { sd.gone = false; sd.node.classList.remove('ta-bl--gone'); sd.node.classList.add('ta-bl--grow'); }, rand(20000, 40000)); })(s);
+      }
+    }
 
     // ── Laubhaufen in den Ecken (Mitte bleibt frei) ──
     function prof(x) {
@@ -472,6 +623,9 @@
         floor: o.land === false ? null : function (x) { return surface(x) + 6; },
         life: o.life, draw: leafDraw
       });
+      if (o.burn && parts.each) parts.each(function (q) {
+        if (q.burnAt === undefined && q.x === o.x && q.y === o.y) { q.burnAt = 0; q.burnFor = rand(1.6, 2.8); q.smolder = !!o.smolder; q.term *= o.smolder ? 1 : 1.8; }
+      });
     }
 
     // ── Animationen zu den Befehlen ──
@@ -487,6 +641,7 @@
     // Böe: Laub fliegt vom Haufen, Kürbisse wackeln, die Krähe flattert auf
     function gust(p) {
       var dir = B.gust(900, p), gk = B.gustK;
+      dropSeeds(Math.round(1 + 2 * gk));
       B.vars({ '--ts-gust-dir': (dir * gk).toFixed(2) });
       B.pulse('gust', 1500);
       [[20, 600], [W - 600, W - 20]].forEach(function (r) {
@@ -763,6 +918,7 @@
     // Blitz-Einschlag (vom Weather-Kit): nah, im Haufen, Laub > 5 %
     function bolt(p) {
       if (!B.on || B.reduceMotion || !p.near || typeof p.x !== 'number') return;
+      igniteLeaves(p.x);
       if (pumpkinBolt(p)) return;
       if (!B.partOn('pile') || S.shown <= 5) return;
       var x = Math.max(140, Math.min(W - 140, p.x));
@@ -928,6 +1084,8 @@
       if (!B.on && fires.length) { fires = []; dips = []; }
       stepWet(dt);
       stepFire(dt, ts);
+      stepAFrost(dt);
+      stepBranch(Math.min(dt, 0.05));
       if (offFor > 3) return;
       if (B.on) stepShow(dt);
       else if (wave || tws.any() || pkNodes.some(function (pk) { return pk && (pk.mode || pk.ly); })) resetShow();
