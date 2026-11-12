@@ -704,18 +704,19 @@
     function pumpkinBolt(p) {
       if (!B.partOn('pumpkins')) return false;
       var best = null;
+      // auch auf dem Tsunami treibende (dort, wo sie gerade schwimmen)
       pkNodes.forEach(function (pk) {
-        if (!pk || pk.mode !== null || pk.zap || Math.abs(pk.x - p.x) > 90) return;
-        if (!best || Math.abs(pk.x - p.x) < Math.abs(best.x - p.x)) best = pk;
+        if (!pk || pk.mode !== null || pk.zap || Math.abs(pk.x + pk.lx - p.x) > 90) return;
+        if (!best || Math.abs(pk.x + pk.lx - p.x) < Math.abs(best.x + best.lx - p.x)) best = pk;
       });
       if (!best || Math.random() < 0.65) return false;  // nicht jeder Blitz trifft
-      var pk = best, cy = pk.y + pk.dy - pk.h * 0.45;
-      if (p.ground) p.ground(pk.x, cy);
+      var pk = best, cx = pk.x + pk.lx, cy = pk.y + pk.dy - pk.h * 0.45 - pk.ly;
+      if (p.ground) p.ground(cx, cy);
       pk.zap = true;
       pk.node.dataset.zap = '1';
-      B.chunks(pk.x, cy, 34, ['#e8761e', '#f2a03a', '#c4561a', '#f6e7b0', '#5a3a1e'], function () { return H - 4; });
-      B.sparks(pk.x, cy, 20, 30);
-      for (var i = 0; i < 4; i++) B.smoke(pk.x + rand(-25, 25), cy, { o: 0.35 });
+      B.chunks(cx, cy, 34, ['#e8761e', '#f2a03a', '#c4561a', '#f6e7b0', '#5a3a1e'], function () { return H - 4; });
+      B.sparks(cx, cy, 20, 30);
+      for (var i = 0; i < 4; i++) B.smoke(cx + rand(-25, 25), cy, { o: 0.35 });
       emit('struck', { target: 'pumpkin', name: pk.label || '' });
       setTimeout(function () {
         pk.zap = false;
