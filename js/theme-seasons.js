@@ -47,6 +47,13 @@
     fxEl.setAttribute('aria-hidden', 'true');
     fxEl.dataset.on = '0';
     stage.appendChild(fxEl);
+    // Feuer liegt unter den Spektakeln (Tsunami, Nebelwand, Lawine ziehen davor)
+    var fireEl = document.createElement('div');
+    fireEl.className = 'ts ts--' + name + ' ts--fx';
+    fireEl.setAttribute('aria-hidden', 'true');
+    fireEl.dataset.on = '0';
+    var fxAnchor = stage.querySelector('.wk-fx');
+    if (fxAnchor) stage.insertBefore(fireEl, fxAnchor); else stage.insertBefore(fireEl, fxEl);
 
     function canvas(parent) {
       var c = document.createElement('canvas');
@@ -169,6 +176,7 @@
         });
         rootEl.dataset.on = B.on ? '1' : '0';
         fxEl.dataset.on = rootEl.dataset.on;
+        fireEl.dataset.on = rootEl.dataset.on;
         rootEl.dataset.night = B.night > 0.5 ? '1' : '0';
         rootEl.dataset.wet = B.rain > 0.1 ? '1' : '0';
         return B.on;
@@ -304,12 +312,13 @@
       };
     };
     // ── Feuer (Blitz im Laub, brennender Schirm): Flammen und Glut auf einer
-    // eigenen Ebene über dem Wetter (Rand-Fade per CSS-Maske), Rauch, Funken,
+    // eigenen Ebene über dem Wetter, aber unter den Spektakeln (Rand-Fade per
+    // CSS-Maske), Rauch, Funken,
     // Dampf und Wasser als Partikel auf der vorderen Ebene ──
     var fireCtx = null;
     B.fireCtx = function () {
       if (!fireCtx) {
-        var c = canvas(fxEl);
+        var c = canvas(fireEl);
         c.classList.add('ts-fire');
         fireCtx = c.getContext('2d');
       }

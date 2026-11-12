@@ -1235,6 +1235,13 @@
       var shut = uClosed ? B.night > 0.4 : B.night > 0.6;
       if (shut !== uClosed) { uClosed = shut; gUmbrella.dataset.closed = shut ? '1' : '0'; }
       shelterUmbrella();
+      // rollt der Tsunami über die Brandstelle, ist das Feuer aus (Rest verkohlt)
+      if (U.mode === 'burn' && wave && wave.active() && wave.level(U.px) > H - uScreen(U.hx, U.hy)[1]) {
+        var hp = uScreen(U.hx, U.hy);
+        for (var sm = 0; sm < 8; sm++) B.smoke(hp[0] + rand(-60, 60), hp[1], { steam: true, o: 0.6, up: rand(70, 140), life: rand(1.5, 2.5) });
+        setBurn(burnR(), Math.min(0.55, U.t / 6), 0);
+        U.mode = 'burnt'; U.t = 0; U.ribs.classList.add('is-burnt'); U.pole.classList.add('is-burnt');
+      }
       if (U.mode === 'burn') {
         // Bespannung brennt in ~6 s bis auf Speichen und Stange ab
         var r = burnR();

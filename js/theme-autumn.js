@@ -737,7 +737,7 @@
       // zum nächsten Rand hin bis zur ersten Stelle mit genug Laub (Mitte ist frei)
       var dir = x < W / 2 ? -1 : 1, moved = 0;
       while (!enoughAt(x) && moved < REACH) { x += dir * 10; moved += 10; }
-      if (!enoughAt(x)) return;                        // zu weit daneben
+      if (!enoughAt(x) || flooded(x)) return;          // zu weit daneben oder unter Wasser
       x = Math.max(140, Math.min(W - 140, x + dir * Math.random() * 60));
       var hit = fireAt(x);
       if (!hit && burning().length >= FIRE_MAX) return;
@@ -798,8 +798,15 @@
       }
     }
     // ein Feuer fortschreiben und zeichnen; true = vorbei
+    // steht der Tsunami über dem Laub, ist das Feuer sofort aus (zischt, dampft)
+    function flooded(x) { return wave && wave.active() && wave.level(x) > H - surface(x) + 10; }
     function stepOne(f, dt, t) {
       f.t += dt;
+      if (!f.out && flooded(f.x)) {
+        f.out = true; f.outT = 0;
+        for (var sm = 0; sm < 8; sm++) B.smoke(f.x + rand(-50, 50), H - wave.level(f.x), { steam: true, o: 0.6, up: rand(70, 140), life: rand(1.5, 2.5) });
+        emit('fireOut', { wet: true, fires: burning().length });
+      }
       var k, ember;
       if (f.out) {
         f.outT += dt;
