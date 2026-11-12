@@ -4,7 +4,7 @@ import sqlite3
 import pytest
 from flask import Flask, g
 
-from fx import autumn_db, commands, season_db, weather_api, weather_followers, weather_season, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
+from fx import autumn_db, commands, season_db, weather_api, weather_credit, weather_followers, weather_season, weather_db, weather_frost, weather_snow, weather_state, weather_theme, xmas_db
 from fx import endpoints
 from fx.endpoints import bp_fx
 
@@ -24,6 +24,7 @@ def conn():
     autumn_db.init_schema(c)
     weather_season.init_schema(c)
     weather_followers.init_schema(c)
+    weather_credit.init_schema(c)
     weather_state.LAST_THEME.clear()
     weather_state.LAST_OPTS.clear()
     weather_state.LAST_XMAS.clear()
@@ -591,7 +592,7 @@ def test_paid_weather_pushes_command_only_when_enough(conn):
     r = c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&name=Tim&msg=cheer100%20!tornado").get_json()
     assert r["offer"] is None and "250 Bits" in r["say"]
     assert commands.poll(1, "weather", 0)["commands"] == []
-    r = c.get("/s/t/api/fx/weather/paid?kind=money&amount=5&name=Tim&msg=!tornado").get_json()
+    r = c.get("/s/t/api/fx/weather/paid?kind=bits&amount=250&name=Tim&msg=cheer250%20!tornado").get_json()
     assert r["offer"] == "tornado"
     cmds = commands.poll(1, "weather", 0)["commands"]
     assert cmds[-1]["cmd"] == "spectacle" and cmds[-1]["params"]["type"] == "tornado"
@@ -599,6 +600,41 @@ def test_paid_weather_pushes_command_only_when_enough(conn):
     c.get("/s/t/api/fx/weather/paid?kind=bits&amount=100&msg=!thunderstorm")
     assert weather_db.current_override(conn, 1, __import__("time").time())["kind"] == "storm"
     assert c.get("/s/t/api/fx/weather/paid?kind=x").status_code == 400
+
+
+def test_donation_grants_to_mentioned_user_and_redeems(conn):
+    c = _client(conn)
+    # ohne @name: nichts, freigeben von Hand
+    r = c.get("/s/t/api/fx/weather/paid?kind=money&amount=5&name=Oma&msg=!tornado").get_json()
+    assert r["offer"] is None and r["to"] is None and r["say"] == ""
+    assert commands.poll(1, "weather", 0)["commands"] == []
+    # mit @name: Freigabe, Befehl dazu wird gleich eingelöst
+    r = c.get("/s/t/api/fx/weather/paid?kind=money&amount=3&name=Oma&msg=f%C3%BCr%20%40Tim%20!tornado").get_json()
+    assert r["to"] == "Tim" and r["offer"] == "tornado" and r["left"] == 50
+    assert commands.poll(1, "weather", 0)["commands"][-1]["params"]["type"] == "tornado"
+    assert c.get("/s/t/api/fx/weather/credit?name=tim").get_json()["points"] == 50
+
+
+def test_grant_and_redeem(conn):
+    c = _client(conn)
+    assert c.get("/s/t/api/fx/weather/grant?to=%40User123&level=x").status_code == 400
+    r = c.get("/s/t/api/fx/weather/grant?to=%40User123&level=l3").get_json()
+    assert r["points"] == 250 and "1 großes Spektakel oder 2 kleine" in r["say"]
+    r = c.get("/s/t/api/fx/weather/redeem?name=user123&msg=!rainbow").get_json()
+    assert r["offer"] == "rainbow" and r["left"] == 150
+    r = c.get("/s/t/api/fx/weather/redeem?name=user123&msg=!tornado").get_json()
+    assert r["offer"] is None and "reicht nicht" in r["say"]
+    cmds = commands.poll(1, "weather", 0)["commands"]
+    assert [x["params"].get("type") for x in cmds] == ["rainbow"]
+    # Wetter mit Besteller
+    c.get("/s/t/api/fx/weather/redeem?name=user123&msg=!rain")
+    assert weather_db.current_override(conn, 1, __import__("time").time())["kind"] == "rain"
+    r = c.get("/s/t/api/fx/weather/grant?to=user123&level=l0").get_json()
+    assert r["points"] == 0
+    assert "keine Freigabe" in c.get("/s/t/api/fx/weather/credit?name=user123").get_json()["say"]
+    # anderer Tenant sieht nichts
+    c.get("/s/t/api/fx/weather/grant?to=x1&level=l1")
+    assert _client(conn, 2).get("/s/t/api/fx/weather/credit?name=x1").get_json()["points"] == 0
 
 
 def test_raid_greeting(conn):

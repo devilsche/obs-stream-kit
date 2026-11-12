@@ -18,7 +18,7 @@ from flask import Blueprint, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, season_db, weather, weather_chat, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, commands, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -281,19 +281,99 @@ def weather_paid_route(token):
         abort(404)
     kind = (request.args.get("kind") or "").strip().lower()
     amount, name = request.args.get("amount", ""), (request.args.get("name") or "")[:40]
+    msg = (request.args.get("msg") or "")[:300]
     if kind == "raid":
         r = weather_chat.raid(amount, name)
-    elif kind in ("bits", "money"):
-        r = weather_chat.paid(kind, amount, (request.args.get("msg") or "")[:300], name)
+    elif kind == "bits":
+        r = weather_chat.paid(kind, amount, msg, name)
+    elif kind == "money":
+        return _no_store(jsonify(_donation(amount, msg, name)))
     else:
         return _no_store(jsonify({"ok": False, "error": "kind must be bits, money or raid"})), 400
     out = {"ok": True, "offer": r["offer"] if r["command"] else None, "say": r["say"]}
     if r["command"]:
-        args = {"cmd": r["command"]["cmd"], **r["command"]["params"]}
-        if r["command"]["cmd"] == "weather" and name.strip():
-            args["name"] = name
-        out.update(_dispatch("weather", commands.parse("weather", args)))
+        out.update(_order(r["command"], name))
     return _no_store(jsonify(out))
+
+
+def _order(command, name):
+    """Bezahlten Befehl an die Source geben (Wetter mit Besteller)."""
+    args = {"cmd": command["cmd"], **command["params"]}
+    if command["cmd"] == "weather" and name.strip():
+        args["name"] = name
+    return _dispatch("weather", commands.parse("weather", args))
+
+
+def _donation(amount, msg, name):
+    """Spende: mit „@name“ in der Nachricht wird der Betrag diesem Zuschauer
+    freigegeben, steht dazu ein Befehl drin, wird er gleich eingelöst.
+    Ohne „@name“ (oder unter 1 €) passiert nichts, freigeben dann von Hand."""
+    d = weather_chat.donation(amount, msg, name)
+    out = {"ok": True, "offer": None, "say": "", "to": d["to"], "points": d["pts"]}
+    if not d["to"]:
+        return out
+    def run(conn):
+        now = time.time()
+        total = weather_credit.grant(conn, g.tenant_id, d["to"], d["pts"], now)
+        out["say"] = weather_chat.granted_say(d["to"], total, name.strip())
+        if d["offer"]:
+            out.update(_redeem(conn, d["to"], d["offer"], now))
+        return out
+    return _with_conn(run)
+
+
+def _redeem(conn, name, offer, now):
+    command, tier, _ = weather_chat.OFFERS[offer]
+    left = weather_credit.spend(conn, g.tenant_id, name, weather_chat.PRICE[tier], now)
+    if left is None:
+        have = weather_credit.balance(conn, g.tenant_id, name, now)
+        return {"offer": None, "say": weather_chat.no_credit_say(name, offer, have)}
+    out = {"offer": offer, "say": weather_chat.redeem_say(name, offer, left), "left": left}
+    out.update(_order(command, name))
+    return out
+
+
+@bp_fx.route("/s/<token>/api/fx/weather/grant")
+def weather_grant_route(token):
+    """Streamer.bot (nur Mods): !grant @name l3 → Freigabe; l0 nimmt sie weg.
+    to=@name, level=l0..l5 (oder points=…). → {"ok", "to", "points", "say"}."""
+    if g.tenant_id is None:
+        abort(404)
+    to = weather_credit.key(request.args.get("to", ""))
+    pts = weather_credit.parse_level(request.args.get("level", ""))
+    if pts is None and request.args.get("points"):
+        pts = weather_chat.points("bits", request.args.get("points"))
+    if not to or pts is None:
+        return _no_store(jsonify({"ok": False, "error": "need to=@name and level=l0..l5",
+                                  "say": "So geht's: !grant @name l1 (l1 bis l5, l0 nimmt die Freigabe weg)"})), 400
+    total = _with_conn(lambda conn: weather_credit.grant(conn, g.tenant_id, to, pts, time.time()))
+    return _no_store(jsonify({"ok": True, "to": to, "points": total,
+                              "say": weather_chat.granted_say(to, total)}))
+
+
+@bp_fx.route("/s/<token>/api/fx/weather/redeem")
+def weather_redeem_route(token):
+    """Streamer.bot: bezahlter Chat-Befehl ohne Bits (!tornado …), name=%user%,
+    msg=Befehl. Löst ein, wenn das Guthaben reicht. → {"ok", "offer", "say"}."""
+    if g.tenant_id is None:
+        abort(404)
+    name = (request.args.get("name") or "").strip().lstrip("@")[:40]
+    offer = weather_chat.wanted(request.args.get("msg", ""))
+    if not name or not offer:
+        return _no_store(jsonify({"ok": False, "offer": None, "say": ""})), 400
+    out = {"ok": True}
+    out.update(_with_conn(lambda conn: _redeem(conn, name, offer, time.time())))
+    return _no_store(jsonify(out))
+
+
+@bp_fx.route("/s/<token>/api/fx/weather/credit")
+def weather_credit_route(token):
+    """!credit: Guthaben eines Zuschauers. → {"ok", "points", "say"}."""
+    if g.tenant_id is None:
+        abort(404)
+    name = (request.args.get("name") or "").strip().lstrip("@")[:40]
+    have = _with_conn(lambda conn: weather_credit.balance(conn, g.tenant_id, name, time.time())) if name else 0
+    return _no_store(jsonify({"ok": True, "points": have, "say": weather_chat.credit_say(name, have)}))
 
 
 _INFO_TURN = {}

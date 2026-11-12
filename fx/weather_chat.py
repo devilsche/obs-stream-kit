@@ -3,7 +3,8 @@ Spende, Raid-Begrüßung und fertige Sätze für Chat-Antworten (!weather,
 Erinnerungen, Fortschritt des Sub-Projekts).
 
 Bezahlt wird in „Punkten“: 1 Bit = 1, 1 € (bzw. 1 Einheit der Spendenwährung)
-= 100. Steht ein bekannter Befehl in der Nachricht (z. B. „cheer500 !tornado“),
+= 100. Spenden werden nur als Freigabe gutgeschrieben (an „@name“ aus der
+Nachricht, fx/weather_credit.py). Steht ein bekannter Befehl in der Nachricht (z. B. „cheer250 !tornado“),
 gilt genau der, sonst wählt der Betrag zufällig aus der höchsten erreichten
 Stufe. Die Sätze sind deutsch, sie gehen in den Chat des Streamers.
 """
@@ -68,7 +69,8 @@ def price_text(tier: str) -> str:
 
 
 def paid(kind: str, amount, msg: str = "", name: str = "", rnd=random) -> dict:
-    """→ {"command": dict|None, "offer": str|None, "say": str}."""
+    """Bits → {"command": dict|None, "offer": str|None, "say": str}.
+    Spenden lösen direkt nichts aus, sie gehen als Freigabe (donation())."""
     pts = points(kind, amount)
     who = name.strip() or "Jemand"
     m = _CMD_RE.search((msg or "").lower())
@@ -102,6 +104,69 @@ def raid(viewers, name: str = "", rnd=random) -> dict:
         return {"command": command, "offer": choice, "say": f"Willkommen, Raid von {who}! Zur Begrüßung gibt es {label}."}
     return {"command": None, "offer": None, "say": ""}
 
+
+
+# ── Freigaben (fx/weather_credit.py): Guthaben statt Bits ──
+
+DONATION_MIN = 100    # Spenden ab 1 €, darunter frisst die Gebühr fast alles
+_MENTION_RE = re.compile(r"@([A-Za-z0-9_]{3,25})")
+_REACH = {"apocalypse": ("die Apokalypse", "{n}× Apokalypse"),
+          "big": ("1 großes Spektakel", "{n} große Spektakel"),
+          "small": ("1 kleines Spektakel", "{n} kleine Spektakel"),
+          "weather": ("1× Wetter", "{n}× Wetter")}
+
+
+def reach_say(pts: int) -> str:
+    """Wofür das Guthaben reicht: die zwei größten Möglichkeiten."""
+    opts = []
+    for tier in TIER_ORDER:
+        n = pts // PRICE[tier]
+        if n >= 1:
+            one, many = _REACH[tier]
+            opts.append(one if n == 1 else many.format(n=n))
+    return " oder ".join(opts[:2]) or "noch nichts"
+
+
+def wanted(msg: str):
+    """Erster bekannter bezahlter Befehl in der Nachricht, sonst None."""
+    for m in _CMD_RE.finditer((msg or "").lower()):
+        if m.group(1) in OFFERS:
+            return m.group(1)
+    return None
+
+
+def donation(amount, msg: str = "", name: str = "") -> dict:
+    """Spende → {"to": Twitch-Name aus „@name“ oder None, "pts", "offer"}.
+    Unter DONATION_MIN gibt es nichts gutzuschreiben."""
+    pts = points("money", amount)
+    m = _MENTION_RE.search(msg or "")
+    to = m.group(1) if m and pts >= DONATION_MIN else None
+    return {"to": to, "pts": pts, "offer": wanted(msg) if to else None}
+
+
+def redeem_say(name: str, offer: str, left: int) -> str:
+    rest = "Freigabe aufgebraucht" if left < PRICE["weather"] else f"Rest reicht für {reach_say(left)}"
+    return f"{name} schickt {OFFERS[offer][2]} ({rest})."
+
+
+def no_credit_say(name: str, offer: str, have: int) -> str:
+    price = PRICE[OFFERS[offer][1]]
+    if have > 0:
+        return f"@{name} dein Guthaben ({have}) reicht nicht für !{offer}, das braucht {price}."
+    return f"@{name} !{offer} gibt es mit cheer{price} !{offer} oder per Freigabe."
+
+
+def granted_say(name: str, total: int, by: str = "") -> str:
+    if total <= 0:
+        return f"Freigabe für {name} zurückgenommen."
+    head = f"Danke {by}! " if by else ""
+    return f"{head}{name} hat jetzt {total} Guthaben: reicht für {reach_say(total)}. Einlösen mit dem Befehl, z. B. !tornado."
+
+
+def credit_say(name: str, have: int) -> str:
+    if have <= 0:
+        return f"@{name} du hast gerade keine Freigabe."
+    return f"@{name} dein Guthaben: {have}, reicht für {reach_say(have)}."
 
 # ── Sätze für den Chat ──
 

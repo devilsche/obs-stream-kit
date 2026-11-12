@@ -17,7 +17,7 @@ def test_paid_command_in_message_with_enough_bits():
 
 
 def test_paid_command_too_cheap_says_price():
-    r = wc.paid("money", "1", "!megabolt bitte", "Tim")
+    r = wc.paid("bits", 100, "!megabolt bitte", "Tim")
     assert r["command"] is None
     assert "250 Bits oder 2,50 €" in r["say"]
 
@@ -25,7 +25,7 @@ def test_paid_command_too_cheap_says_price():
 def test_paid_without_command_picks_highest_tier():
     r = wc.paid("bits", 150, "cheer150 gg", "Tim", rnd=random.Random(1))
     assert wc.OFFERS[r["offer"]][1] == "small"
-    r = wc.paid("money", "2,50", "", "Tim", rnd=random.Random(1))
+    r = wc.paid("bits", 250, "", "Tim", rnd=random.Random(1))
     assert wc.OFFERS[r["offer"]][1] == "big"
 
 
@@ -33,13 +33,13 @@ def test_paid_apocalypse_needs_500_bits_or_5_euro():
     r = wc.paid("bits", 500, "cheer500 !apocalypse", "Tim")
     assert r["command"] == {"cmd": "spectacle", "params": {"type": "apocalypse"}}
     assert r["say"] == "Danke Tim! Du hast die Apokalypse bestellt."
-    r = wc.paid("money", "4,99", "!apocalypse", "Tim")
+    r = wc.paid("bits", 499, "!apocalypse", "Tim")
     assert r["command"] is None
     assert "500 Bits oder 5 €" in r["say"]
 
 
 def test_paid_without_command_reaches_apocalypse_tier():
-    r = wc.paid("money", "5", "", "Tim", rnd=random.Random(1))
+    r = wc.paid("bits", 500, "", "Tim", rnd=random.Random(1))
     assert r["offer"] == "apocalypse"
     r = wc.paid("bits", 499, "", "Tim", rnd=random.Random(1))
     assert wc.OFFERS[r["offer"]][1] == "big"
@@ -143,3 +143,30 @@ def test_whereami_say_texts():
 def test_visible_count_with_tree():
     assert wc.visible_count("off") == 12
     assert wc.visible_count("on") == 30 and wc.visible_count("farewell") == 30
+
+
+# ── Freigaben ──
+
+def test_reach_say_lists_two_biggest_options():
+    assert wc.reach_say(250) == "1 großes Spektakel oder 2 kleine Spektakel"
+    assert wc.reach_say(100) == "1 kleines Spektakel oder 2× Wetter"
+    assert wc.reach_say(500) == "die Apokalypse oder 2 große Spektakel"
+    assert wc.reach_say(50) == "1× Wetter"
+    assert wc.reach_say(20) == "noch nichts"
+
+
+def test_donation_with_mention_grants_amount_to_that_user():
+    r = wc.donation("2,50", "für @User123 !tornado", "Oma")
+    assert r == {"to": "User123", "pts": 250, "offer": "tornado"}
+    assert wc.donation("3", "gg", "Oma") == {"to": None, "pts": 300, "offer": None}
+    # unter 1 € gibt es nur ein Dankeschön
+    assert wc.donation("0,99", "@User123", "Oma")["to"] is None
+
+
+def test_redeem_says():
+    assert wc.wanted("hallo !Tornado jetzt") == "tornado"
+    assert wc.wanted("!foo") is None
+    assert wc.redeem_say("Tim", "tornado", 0) == "Tim schickt einen Tornado (Freigabe aufgebraucht)."
+    assert wc.redeem_say("Tim", "rain", 50) == "Tim schickt Regen (Rest reicht für 1× Wetter)."
+    assert wc.no_credit_say("Tim", "tornado", 0) == "@Tim !tornado gibt es mit cheer250 !tornado oder per Freigabe."
+    assert wc.no_credit_say("Tim", "tornado", 100) == "@Tim dein Guthaben (100) reicht nicht für !tornado, das braucht 250."
