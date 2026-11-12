@@ -378,6 +378,12 @@ def weather_redeem_route(token):
     if not name or not offer:
         return _no_store(jsonify({"ok": False, "offer": None, "say": ""})), 400
     out = {"ok": True}
+    # Mods und der Kanal selbst (mod=%isModerator%, bc=%broadcastUser%) lösen kostenlos aus
+    bc = (request.args.get("bc") or "").strip().lstrip("@").lower()
+    if (request.args.get("mod") or "").lower() in ("true", "1") or (bc and name.lower() == bc):
+        out.update(offer=offer, say="", free=True)
+        out.update(_order(weather_chat.OFFERS[offer][0], name))
+        return _no_store(jsonify(out))
     out.update(_with_conn(lambda conn: _redeem(conn, name, offer, time.time())))
     return _no_store(jsonify(out))
 

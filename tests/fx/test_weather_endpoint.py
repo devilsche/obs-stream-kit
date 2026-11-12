@@ -737,3 +737,13 @@ def test_watered_flower_grows_right_away(conn):
     c.get("/s/t/api/fx/weather?cmd=water&name=anna")
     p = commands.poll(1, "weather", 0)["commands"][-1]["params"]
     assert p["flower"] == "Anna" and p["stage"] == 1 and p["up"] is True
+
+
+def test_redeem_is_free_for_mods_and_broadcaster(conn):
+    c = _client(conn)
+    r = c.get("/s/t/api/fx/weather/redeem?name=modkim&msg=!tornado&mod=True&bc=Streamer").get_json()
+    assert r["offer"] == "tornado" and r["say"] == ""
+    r = c.get("/s/t/api/fx/weather/redeem?name=streamer&msg=!tornado&mod=False&bc=Streamer").get_json()
+    assert r["offer"] == "tornado"
+    r = c.get("/s/t/api/fx/weather/redeem?name=viewer&msg=!tornado&mod=False&bc=Streamer").get_json()
+    assert r["offer"] is None and "cheer250" in r["say"]
