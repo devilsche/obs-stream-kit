@@ -1256,7 +1256,8 @@
       if (B.on) { if (show || gustT > 0 || flBusy) stepShow(dt); } else if (show) resetShow();
       if (B.on && !B.reduceMotion) stepSway(Math.min(dt, 0.05));
       // Regen richtet die Köpfe sofort auf, bevor der Wasserstand nachzieht
-      var wilt = clamp01((30 - S.water) / 30) * (1 - B.rain);
+      // ab 30 % Wasser sinken die Köpfe, bei 15 % (eingegangen) hängen sie ganz
+      var wilt = clamp01((30 - S.water) / 15) * (1 - B.rain);
       var dry = clamp01((55 - S.water) / 55) * (1 - 0.7 * B.rain);
       // Schnee: Köpfe hängen, auch die Sonnenblume ein Stück
       var cold = Math.min(1, B.stepSnow(dt));
