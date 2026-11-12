@@ -241,12 +241,8 @@
         },
         function (g) {
           g = droopG(g);
-          var bee = el('g', { 'class': 'tsp-sf-bee' }, el('g', { transform: 'translate(26 ' + (SF_Y - 82) + ') scale(0.8)' }, g));
-          el('ellipse', { 'class': 'tsp-wing', cx: -4, cy: -14, rx: 7, ry: 11 }, bee);
-          el('ellipse', { 'class': 'tsp-wing', cx: 6, cy: -14, rx: 7, ry: 11 }, bee);
-          el('ellipse', { 'class': 'tsp-bee', cx: 0, cy: 0, rx: 18, ry: 12 }, bee);
-          el('rect', { 'class': 'tsp-bee-stripe', x: -6, y: -11, width: 5, height: 22 }, bee);
-          el('rect', { 'class': 'tsp-bee-stripe', x: 4, y: -11, width: 5, height: 22 }, bee);
+          var bee = el('g', { 'class': 'tsp-sf-bee' }, el('g', { transform: 'translate(26 ' + (SF_Y - 82) + ') scale(1.5)' }, g));
+          beeShape(bee).dataset.legs = '1';
         }
       ],
       burst: function (x, y) {
@@ -286,64 +282,268 @@
       ctx.globalAlpha = al; ctx.fillStyle = '#9fd6ff';
       ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.283); ctx.fill(); ctx.globalAlpha = 1;
     }
+    // Blütenblätter nachts so dunkel wie Zweig und Wiese (.tsp-dim)
+    function dimCol(hex) {
+      var k = 1 - 0.4 * B.night, n = parseInt(hex.slice(1), 16);
+      return 'rgb(' + Math.round((n >> 16) * k) + ',' + Math.round(((n >> 8) & 255) * k) + ',' + Math.round((n & 255) * k) + ')';
+    }
+    // im Regen nass und schwer: fallen schneller, fast senkrecht, kaum Flattern
     function blossomPetal(x, y) {
       if (!B.back) return;
-      B.back.add({ x: x, y: y, vy: rand(30, 60), term: rand(40, 70), sway: rand(20, 50), r: rand(5, 8),
-                   c: Math.random() < 0.7 ? '#ffc6d9' : '#ffffff', floor: groundY, draw: petal });
+      var wet = clamp01(B.rain * 2);
+      B.back.add({ x: x, y: y, vy: rand(30, 60) + 120 * wet, term: rand(40, 70) + 160 * wet, sway: rand(20, 50) * (1 - 0.85 * wet), r: rand(5, 8),
+                   c: dimCol(Math.random() < 0.7 ? '#ffc6d9' : '#ffffff'), floor: groundY, draw: petal });
     }
 
-    // ── Bienen + Schmetterlinge ──
-    function makeBee() {
-      var g = el('g', {}, gBugs);
-      el('ellipse', { 'class': 'tsp-wing', cx: -4, cy: -14, rx: 7, ry: 11 }, g);
-      el('ellipse', { 'class': 'tsp-wing', cx: 6, cy: -14, rx: 7, ry: 11 }, g);
-      el('ellipse', { 'class': 'tsp-bee', cx: 0, cy: 0, rx: 18, ry: 12 }, g);
-      el('rect', { 'class': 'tsp-bee-stripe', x: -6, y: -11, width: 5, height: 22 }, g);
-      el('rect', { 'class': 'tsp-bee-stripe', x: 4, y: -11, width: 5, height: 22 }, g);
+    // ── Biene: Kopf mit Facettenauge und geknickten Fühlern, pelzige Brust,
+    // gestreifter Hinterleib mit Stachel, hängende Beine mit Pollenhöschen.
+    // Die Flügel schlagen ~230-mal pro Sekunde mit kleinem Ausschlag: zu
+    // sehen ist nur ein flimmernder Schleier, kein einzelner Schlag ──
+    function beeShape(parent) {
+      var g = el('g', { 'class': 'tsp-bee' }, parent);
+      // Beine (hinter dem Körper): Hüfte > Knie > Fuß, das hintere Paar mit Pollen
+      [[0, 4, -3, 11, 1, 16], [3, 5, 2, 12, 5, 17], [6, 4, 8, 10, 10, 15]].forEach(function (l, i) {
+        el('path', { 'class': 'tsp-bee-leg', d: 'M' + l[0] + ' ' + l[1] + ' L' + l[2] + ' ' + l[3] + ' L' + l[4] + ' ' + l[5] }, g);
+        if (!i) el('ellipse', { 'class': 'tsp-bee-pollen', cx: -2.5, cy: 11, rx: 2.6, ry: 2 }, g);
+      });
+      // Flügelschleier hinter der Brust, darüber die flimmernden Flügel
+      el('path', { 'class': 'tsp-bee-blur', d: 'M2 -5 L-14 -20 Q-2 -26 10 -21 Z' }, g);
+      el('path', { 'class': 'tsp-bee-sting', d: 'M-20 2 L-24 3 L-20 4 Z' }, g);
+      el('ellipse', { 'class': 'tsp-bee-abd', cx: -10, cy: 3, rx: 11, ry: 7.5 }, g);
+      // Streifen als senkrechte Sehnen der Ellipse
+      [-15.5, -10, -4.5].forEach(function (x) {
+        var dx = (x + 10) / 11, hh = 7.5 * Math.sqrt(1 - dx * dx);
+        el('line', { 'class': 'tsp-bee-band', x1: x, y1: f1(3 - hh), x2: x, y2: f1(3 + hh) }, g);
+      });
+      el('circle', { 'class': 'tsp-bee-thx', cx: 2, cy: 0, r: 6.5 }, g);
+      el('circle', { 'class': 'tsp-bee-fuzz', cx: 2, cy: 0, r: 6.5 }, g);
+      el('circle', { 'class': 'tsp-bee-head', cx: 10.5, cy: 1.5, r: 4.4 }, g);
+      el('ellipse', { 'class': 'tsp-bee-eye', cx: 11.5, cy: 0.5, rx: 2, ry: 2.8 }, g);
+      el('path', { 'class': 'tsp-bee-ant', d: 'M11 -2.5 L13 -9 L18 -9.5 M12.5 -2 L16 -7 L20 -6' }, g);
+      var wings = el('g', { 'class': 'tsp-bee-wings' }, g);
+      el('path', { 'class': 'tsp-bee-wing', d: 'M2 -5 Q-6 -21 -13 -18 Q-10 -9 2 -5 Z M-1 -10 L-9 -17' }, wings);
+      el('path', { 'class': 'tsp-bee-wing tsp-bee-wing--b', d: 'M3 -5 Q0 -16 -5 -15 Q-4 -8 3 -5 Z' }, wings);
       return g;
     }
-    function makeBfly(cls) {
-      var g = el('g', {}, gBugs);
-      el('path', { 'class': 'tsp-bfly-wing ' + cls, d: 'M0 0 Q-30 -34 -26 -4 Q-30 20 0 4 Z' }, g);
-      el('path', { 'class': 'tsp-bfly-wing tsp-bfly-wing--r ' + cls, d: 'M0 0 Q30 -34 26 -4 Q30 20 0 4 Z' }, g);
-      el('ellipse', { 'class': 'tsp-bfly-body', cx: 0, cy: 0, rx: 3, ry: 12 }, g);
-      return g;
-    }
-    // Flug über Wegpunkte (sanft, mit Zittern); Start und Ende jenseits der
-    // Ränder, dort per Deckkraft ausgeblendet
-    function fly(node, pts, dur) {
-      if (B.reduceMotion) { gBugs.removeChild(node); return; }
-      var t0 = performance.now();
+    // Biene fliegt im Zickzack zur Blüte, steht davor kurz im Schwebeflug,
+    // landet mit gestreckten Beinen, geneigt zur Blüte, und summt weiter
+    function beeFlight(target, done) {
+      if (B.reduceMotion) { if (done) done(); return; }
+      var dir = target.x > W / 2 ? 1 : -1, g = el('g', {}, gBugs), body = beeShape(g);
+      var sx = dir > 0 ? -60 : W + 60, sy = H - rand(280, 440), ex = dir > 0 ? W + 60 : -60, ey = H - rand(320, 480);
+      var hx = target.x - dir * 46, hy = target.y - 34, t0 = performance.now(), last = t0;
+      var IN = 2.4, HOVER = 0.8, LAND = 0.35, SIT = 1.3, OUT = 2.2, x = sx, y = sy, tilt = 0, arrived = false;
+      var whirl = null, spin = 0, tossed = 0, tvx = 0, tvy = 0;
       (function step() {
-        var now = performance.now();
-        var k = Math.min(1, (now - t0) / dur), n = pts.length - 1;
-        var seg = Math.min(n - 1, Math.floor(k * n)), f = k * n - seg;
-        var a = pts[seg], b = pts[seg + 1], e = f * f * (3 - 2 * f);
-        var x = a[0] + (b[0] - a[0]) * e + Math.sin(now / 160) * 6, y = a[1] + (b[1] - a[1]) * e + Math.cos(now / 130) * 5;
-        node.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ')' + (b[0] < a[0] ? ' scale(-1 1)' : ''));
-        node.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
-        if (k < 1) root.requestAnimationFrame(step); else if (node.parentNode) gBugs.removeChild(node);
+        var now = performance.now(), t = (now - t0) / 1000, dt = Math.min(0.05, (now - last) / 1000), face = dir, tt;
+        last = now;
+        var want = 0, legs = 0;
+        // Windhose in der Nähe: reißt sie mit und schleudert sie aus dem Bild
+        var tn = tws.near(x);
+        if (!whirl && !tossed && tn && Math.abs(tn.x - x) < 110) { whirl = tn.t; if (!arrived) { arrived = true; if (done) done(); } }
+        if (whirl || tossed) {
+          var wx = whirl && whirl.active() ? whirl.x() : null;
+          if (whirl && (wx === null || wx < -100 || wx > W + 100)) {
+            whirl = null; tossed = x < W / 2 ? -1 : 1; tvx = tossed * 420; tvy = -160;
+          }
+          if (whirl) {
+            x += (wx + Math.sin(now / 120) * 45 - x) * Math.min(1, dt * 3);
+            y += ((H - 650) - y) * Math.min(1, dt * 0.9);
+          } else {
+            tvy += 120 * dt; x += tvx * dt; y += tvy * dt;
+          }
+          spin += dt * 720 * (whirl ? whirl.dir || 1 : tossed);
+          body.dataset.legs = '1';
+          g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') rotate(' + f1(spin) + ') scale(' + (dir * 1.45).toFixed(2) + ' 1.45)');
+          g.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
+          if (x < -80 || x > W + 80 || y < -80) { gBugs.removeChild(g); return; }
+          root.requestAnimationFrame(step);
+          return;
+        }
+        if (t < IN) {
+          // Zickzack: seitlich und in der Höhe pendelnd, zum Schwebepunkt hin langsamer
+          var k = t / IN, e = 1 - Math.pow(1 - k, 2.2), wob = 1 - k;
+          x = sx + (hx - sx) * e + Math.sin(t * 7) * 26 * wob;
+          y = sy + (hy - sy) * e + Math.sin(t * 11) * 18 * wob;
+          want = 10 * Math.cos(t * 7) * wob;
+        } else if (t < IN + HOVER) {
+          // Schwebeflug vor der Blüte, leicht aufgerichtet
+          tt = t - IN;
+          x = hx + Math.sin(tt * 9) * 3; y = hy + Math.sin(tt * 13) * 2.5;
+          want = -18; legs = 1;
+        } else if (t < IN + HOVER + LAND) {
+          tt = (t - IN - HOVER) / LAND;
+          var le = tt * tt * (3 - 2 * tt);
+          x = hx + (target.x - dir * 4 - hx) * le; y = hy + (target.y - 6 - hy) * le;
+          want = -18 + 30 * le; legs = 1;
+          if (!arrived && tt > 0.5) { arrived = true; if (done) done(); }
+        } else if (t < IN + HOVER + LAND + SIT) {
+          // sitzt, nach vorn geneigt in die Blüte
+          x = target.x - dir * 4 + Math.sin(t * 20) * 0.6; y = target.y - 6; want = 14; legs = 1;
+        } else if (t < IN + HOVER + LAND + SIT + OUT) {
+          tt = (t - IN - HOVER - LAND - SIT) / OUT;
+          var oe = tt * tt;
+          var bx = target.x - dir * 4, by = target.y - 6;
+          x = bx + (ex - bx) * oe + Math.sin(t * 7) * 22 * tt;
+          y = by + (ey - by) * Math.sqrt(tt) + Math.sin(t * 11) * 14 * tt;
+          want = -12 + 12 * tt;
+        } else { gBugs.removeChild(g); return; }
+        tilt += (want - tilt) * Math.min(1, dt * 8);
+        body.dataset.legs = legs ? '1' : '0';
+        g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') scale(' + (face * 1.45).toFixed(2) + ' 1.45) rotate(' + f1(tilt) + ')');
+        g.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
+        root.requestAnimationFrame(step);
       })();
     }
     function sendBee(name) {
-      var live = flowers.filter(Boolean);
-      var target = live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 160, head: null };
-      var fromLeft = target.x > W / 2, sx = fromLeft ? -60 : W + 60, ex = fromLeft ? W + 60 : -60, ty = target.y - 20;
-      fly(makeBee(), [[sx, H - rand(260, 420)], [target.x + (fromLeft ? -200 : 200), ty - 120], [target.x, ty], [target.x, ty],
-                      [target.x + (fromLeft ? 180 : -180), ty - 160], [ex, H - rand(300, 460)]], 6500);
-      if (target.head) setTimeout(function () { B.spot(target.head); }, 2400);
+      var live = flowers.filter(function (f) { return f && !f.rip; });
+      var f = live.length ? live[Math.floor(Math.random() * live.length)] : null;
+      var target = f ? { x: f.x, y: f.y, head: f.head } : { x: rand(300, W - 300), y: H - 160, head: null };
+      beeFlight(target, function () { if (target.head) B.spot(target.head); });
+      var ty = target.y - 20;
       if (root.SeasonKit) root.SeasonKit.crowd('bee', name || 'Someone', function (n) { return n + ' sent a bee!'; },
                                                function (n) { return n + ' sent bees too!'; }, function (t) { B.tag(t, target.x, ty - 90, true); });
       else B.tag((name || 'Someone') + ' sent a bee!', target.x, ty - 90, true);
     }
-    // Schmetterlinge nur tagsüber und ohne Regen, unten über der Wiese
+
+    // ── Schmetterling: vier Flügel (Vorder- größer als Hinterflügel) mit
+    // dunklem Rand und Zeichnung, Körper aus Kopf, Brust, Hinterleib,
+    // Fühler mit Keulen. Schräg von der Seite und leicht von oben gesehen:
+    // jeder Flügel klappt um die Körperachse (th 0° = flach, 90° = hoch),
+    // der nahe zeigt hochgeklappt seine Unterseite. Langsamer Schlag
+    // (~9/s): beim Abschlag steigt er, beim Aufschlag sackt er durch; dazu
+    // Haken und kurze Gleitstrecken. Landet ab und zu auf einer Blüte,
+    // klappt die Flügel zusammen und sonnt sich mit kurzem Öffnen ──
+    var BF_P = 0.5;   // Blick von oben (rad)
+    var BF_KINDS = ['peacock', 'brimstone', 'blue'];
+    // Flügelumriss: [v (nach vorn), u (Spanne)]
+    var BF_FORE = [[3, 0], [9, 10], [13, 24], [8, 31], [0, 29], [-5, 17], [-4, 3]];
+    var BF_HIND = [[-3, 1], [-4, 12], [-8, 21], [-15, 20], [-19, 11], [-12, 2]];
+    // Zeichnung je Art: [Flügel, v, u, r, Klasse]
+    var BF_PAT = {
+      peacock: [['f', 6, 23, 5.5, 'tsp-bf-eye1'], ['f', 6, 23, 3.4, 'tsp-bf-eye2'], ['f', 6.5, 23.5, 1.6, 'tsp-bf-eye3'],
+                ['h', -12, 13, 5, 'tsp-bf-eye4'], ['h', -12, 13, 2.6, 'tsp-bf-eye2'], ['f', 9, 14, 1.4, 'tsp-bf-dot']],
+      brimstone: [['f', 2, 16, 1.8, 'tsp-bf-spot'], ['h', -10, 11, 1.8, 'tsp-bf-spot']],
+      blue: [['f', 4, 26, 1.1, 'tsp-bf-dot'], ['f', -1, 25, 1.1, 'tsp-bf-dot'], ['h', -12, 18, 1.1, 'tsp-bf-dot'], ['h', -16, 15, 1.1, 'tsp-bf-dot']]
+    };
+    function bfProj(v, u, th, s) {
+      return [v, -u * Math.sin(th) * Math.cos(BF_P) + s * u * Math.cos(th) * Math.sin(BF_P)];
+    }
+    function bfPath(pts, th, s, shrink) {
+      var P = pts.map(function (p) { return bfProj(p[0] * shrink, p[1] * shrink, th, s); }), n = P.length;
+      function mid(a, b) { return f1((a[0] + b[0]) / 2) + ' ' + f1((a[1] + b[1]) / 2); }
+      var d = 'M' + mid(P[n - 1], P[0]);
+      for (var i = 0; i < n; i++) d += ' Q' + f1(P[i][0]) + ' ' + f1(P[i][1]) + ' ' + mid(P[i], P[(i + 1) % n]);
+      return d + ' Z';
+    }
+    function bfCircle(v, u, r, th, s) {
+      var d = '';
+      for (var i = 0; i < 10; i++) {
+        var a = i / 10 * 6.283, p = bfProj(v + Math.cos(a) * r, u + Math.sin(a) * r, th, s);
+        d += (i ? ' L' : 'M') + f1(p[0]) + ' ' + f1(p[1]);
+      }
+      return d + ' Z';
+    }
+    function makeBf(kind) {
+      var g = el('g', { 'class': 'tsp-bf tsp-bf--' + kind }, gBugs);
+      function wing(s, fore) {
+        var w = el('g', { 'class': 'tsp-bf-wing' }, g);
+        var o = { g: w, s: s, fore: fore, edge: el('path', { 'class': 'tsp-bf-edge' }, w), inner: el('path', { 'class': 'tsp-bf-in' }, w), pat: [] };
+        (BF_PAT[kind] || []).forEach(function (p) {
+          if ((p[0] === 'f') === fore) o.pat.push({ p: p, n: el('path', { 'class': 'tsp-bf-pat ' + p[4] }, w) });
+        });
+        return o;
+      }
+      var wings = [wing(-1, false), wing(-1, true)];
+      var body = el('g', { 'class': 'tsp-bf-body' }, g);
+      el('ellipse', { cx: -8, cy: 0.5, rx: 9, ry: 2.4 }, body);
+      el('ellipse', { cx: 2, cy: 0, rx: 4, ry: 3 }, body);
+      el('circle', { cx: 7.2, cy: -0.5, r: 2.5 }, body);
+      el('path', { 'class': 'tsp-bf-ant', d: 'M8 -2.5 Q12 -9 17 -13 M7 -2.5 Q9 -10 12 -15' }, body);
+      el('circle', { cx: 17, cy: -13, r: 1.3 }, body);
+      el('circle', { cx: 12, cy: -15, r: 1.3 }, body);
+      wings.push(wing(1, false), wing(1, true));
+      return { g: g, wings: wings };
+    }
+    function poseBf(b, th) {
+      b.wings.forEach(function (w) {
+        var pts = w.fore ? BF_FORE : BF_HIND;
+        // Unterseite des nahen Flügels zu sehen, sobald er steiler steht als der Blick
+        var under = w.s > 0 && th > BF_P ? '1' : '0';
+        if (w.g.dataset.under !== under) w.g.dataset.under = under;
+        w.edge.setAttribute('d', bfPath(pts, th, w.s, 1));
+        w.inner.setAttribute('d', bfPath(pts, th, w.s, 0.84));
+        w.pat.forEach(function (q) { q.n.setAttribute('d', bfCircle(q.p[1], q.p[2], q.p[3], th, w.s)); });
+      });
+    }
     function wanderButterfly() {
-      if (!B.on || !B.partOn('bugs') || B.night > 0.5 || B.rain > 0.2) return;
-      var y0 = rand(H - 380, H - 220), left = Math.random() < 0.5;
-      var pts = [[left ? -60 : W + 60, y0]];
-      for (var i = 1; i < 6; i++) pts.push([left ? i * W / 5 : W - i * W / 5, Math.min(H - 160, y0 + rand(-80, 80))]);
-      pts[pts.length - 1][0] = left ? W + 60 : -60;
-      fly(makeBfly(Math.random() < 0.5 ? 'tsp-bfly-a' : 'tsp-bfly-b'), pts, 16000);
+      if (!B.on || !B.partOn('bugs') || B.night > 0.5 || B.rain > 0.2 || B.reduceMotion) return;
+      var dir = Math.random() < 0.5 ? 1 : -1, b = makeBf(BF_KINDS[Math.floor(Math.random() * BF_KINDS.length)]);
+      var x = dir > 0 ? -60 : W + 60, base = rand(H - 380, H - 240), y = base, vx = dir * 95, vy = 0;
+      var ph = 0, hook = rand(1, 2.5), glide = 0, tilt = 0, last = performance.now();
+      // ab und zu eine Blüte vor ihm zum Rasten
+      var cand = flowers.filter(function (f) { return f && !f.rip && (f.x - x) * dir > 300 && (f.x - x) * dir < 1500; });
+      var rest = Math.random() < 0.6 && cand.length ? cand[Math.floor(Math.random() * cand.length)] : null, sit = 0, sat = false;
+      var whirl = null, spin = 0;
+      (function step() {
+        var now = performance.now(), dt = Math.min(0.05, (now - last) / 1000), th;
+        last = now;
+        if (!B.on) { gBugs.removeChild(b.g); return; }
+        // Windhose in der Nähe: reißt ihn mit, wirbelt ihn hoch und schleudert ihn hinaus
+        var tn = tws.near(x);
+        if (!whirl && tn && Math.abs(tn.x - x) < 130) { whirl = tn.t; sit = 0; rest = null; }
+        if (whirl) {
+          var wx = whirl.active() ? whirl.x() : null;
+          if (wx === null || wx < -100 || wx > W + 100) {
+            whirl = null; dir = x < W / 2 ? -1 : 1; vx = dir * 380; vy = -150; spin = 0;
+          } else {
+            x += (wx + Math.sin(now / 140) * 55 - x) * Math.min(1, dt * 3);
+            y += ((H - 700) - y) * Math.min(1, dt * 0.9);
+            spin += dt * 600 * (whirl.dir || 1);
+            th = 0.6 + 0.9 * Math.sin(now / 35);
+          }
+        }
+        if (whirl) {
+          poseBf(b, th);
+          b.g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') rotate(' + f1(spin) + ') scale(' + (dir * 1.7).toFixed(2) + ' 1.7)');
+          b.g.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
+          root.requestAnimationFrame(step);
+          return;
+        }
+        if (sit > 0) {
+          // sitzt: Flügel zusammengeklappt, öffnet sie ein paar Mal zum Sonnen
+          sit -= dt;
+          var open = Math.max(0, Math.sin((4.5 - sit) * 1.6)) ;
+          th = 1.5 - 1.1 * Math.pow(open, 3);
+          tilt += (0 - tilt) * Math.min(1, dt * 6);
+          if (sit <= 0) { vy = -60; vx = dir * 60; }
+        } else {
+          // Flug: Schlag ~9/s, Abschlag hebt, Aufschlag lässt durchsacken
+          if (glide > 0) { glide -= dt; th = 0.15; }
+          else {
+            ph += dt * 9;
+            var p = ph - Math.floor(ph);
+            th = p < 0.5 ? 1.3 - 1.65 * (0.5 - 0.5 * Math.cos(Math.PI * p / 0.5)) : -0.35 + 1.65 * (0.5 - 0.5 * Math.cos(Math.PI * (p - 0.5) / 0.5));
+            vy += (p < 0.5 ? -520 : 420) * dt;
+            if (Math.random() < dt * 0.35) glide = rand(0.25, 0.5);
+          }
+          // Haken: unvorhersehbar seitlich und in der Höhe
+          hook -= dt;
+          if (hook <= 0) { hook = rand(0.7, 2.2); vy += rand(-160, 160); vx = dir * rand(55, 140); }
+          var tx = null, ty = base;
+          if (rest && !sat) { tx = rest.x; ty = rest.y - 8; if (Math.abs(rest.x - x) < 260) vx += ((rest.x - x) * 1.6 - vx) * Math.min(1, dt * 3); }
+          vy += (ty - y) * 1.4 * dt - vy * 0.9 * dt;
+          if (rest && !sat && Math.abs(rest.x - x) < 6 && Math.abs(ty - y) < 8) { sat = true; sit = rand(3.5, 5); x = rest.x; y = ty; vx = 0; vy = 0; }
+          // Böen treiben ihn seitlich ab
+          if (sit <= 0) { x += (vx + B.windPx() * 0.15) * dt; y += vy * dt; }
+          tilt += (Math.max(-20, Math.min(20, vy * 0.08)) - tilt) * Math.min(1, dt * 5);
+        }
+        poseBf(b, th);
+        b.g.setAttribute('transform', 'translate(' + f1(x) + ' ' + f1(y) + ') scale(' + (dir * 1.7).toFixed(2) + ' 1.7) rotate(' + f1(tilt * dir) + ')');
+        b.g.setAttribute('opacity', clamp01(Math.min(x + 40, W + 40 - x) / 140).toFixed(3));
+        if ((dir > 0 && x > W + 80) || (dir < 0 && x < -80)) { gBugs.removeChild(b.g); return; }
+        root.requestAnimationFrame(step);
+      })();
     }
     setInterval(wanderButterfly, 25000);
     setTimeout(wanderButterfly, 3000);
@@ -431,8 +631,9 @@
     function flowerPetal(f, vx, vy) {
       if (!B.front) return;
       var a = f.ang * Math.PI / 180;
-      B.front.add({ x: f.x + Math.sin(a) * f.h, y: f.y + f.h - Math.cos(a) * f.h, vx: vx, vy: vy, g: 500, term: rand(50, 90),
-                    sway: rand(30, 80), r: rand(4, 7), c: f.c, life: rand(2.5, 4), floor: groundY, draw: petal });
+      var wet = clamp01(B.rain * 2);
+      B.front.add({ x: f.x + Math.sin(a) * f.h, y: f.y + f.h - Math.cos(a) * f.h, vx: vx, vy: vy, g: 500, term: rand(50, 90) + 160 * wet,
+                    sway: rand(30, 80) * (1 - 0.85 * wet), r: rand(4, 7), c: f.c.charAt(0) === '#' ? dimCol(f.c) : f.c, life: rand(2.5, 4), floor: groundY, draw: petal });
     }
     // ── Abgerissene Blüten: Kopf (Kopie) wirbelt im Trichter, eine andere
     // Windhose kann ihn übernehmen; ohne Windhose segelt er davon und blendet
@@ -609,7 +810,8 @@
       droopSunflower(cold);
       showWeeds(S.weeds);
       if (B.on && B.partOn('branch')) {
-        petalAcc += dt * (1.5 + 3 * Math.abs(B.windBase));
+        // nachts fallen weniger
+        petalAcc += dt * (1.5 + 3 * Math.abs(B.windBase)) * (1 - 0.7 * B.night);
         while (petalAcc >= 1) {
           petalAcc--;
           var b = blossoms[Math.floor(Math.random() * blossoms.length)];

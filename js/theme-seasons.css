@@ -270,17 +270,41 @@
 .tsp-daisy { fill: #ffffff; stroke: #e6e0ef; stroke-width: 0.8; }
 .tsp-center--dark { fill: #2a1b12; }
 
-/* Biene + Schmetterling */
-.tsp-bee { fill: #ffcc1f; stroke: #2a1b12; stroke-width: 2; }
-.tsp-bee-stripe { fill: #2a1b12; }
-.tsp-wing { fill: rgba(235, 248, 255, 0.85); stroke: rgba(120, 160, 190, 0.8); stroke-width: 1; transform-box: fill-box; transform-origin: 50% 100%; animation: tspFlap 0.08s linear infinite alternate; }
-@keyframes tspFlap { from { transform: scaleY(1); } to { transform: scaleY(0.3); } }
-.tsp-bfly-wing { transform-box: fill-box; transform-origin: 100% 50%; animation: tspBflap 0.35s ease-in-out infinite alternate; }
-.tsp-bfly-wing--r { transform-origin: 0% 50%; }
-@keyframes tspBflap { from { transform: scaleX(1); } to { transform: scaleX(0.25); } }
-.tsp-bfly-a { fill: #ff8a3d; stroke: #3a2010; stroke-width: 2; }
-.tsp-bfly-b { fill: #6fb7ff; stroke: #1a2f50; stroke-width: 2; }
-.tsp-bfly-body { fill: #2a1b12; }
+/* Biene: Körper, pelzige Brust (gestrichelter Rand), Flügel als flimmernder Schleier */
+.tsp-bee-abd { fill: #f2b51f; stroke: #2a1b12; stroke-width: 1.2; }
+.tsp-bee-band { stroke: #2a1b12; stroke-width: 3; }
+.tsp-bee-sting { fill: #2a1b12; }
+.tsp-bee-thx { fill: #4a3220; }
+.tsp-bee-fuzz { fill: none; stroke: #d9a94a; stroke-width: 2.2; stroke-dasharray: 1 1.6; }
+.tsp-bee-head { fill: #2a1b12; }
+.tsp-bee-eye { fill: #4d4038; }
+.tsp-bee-ant { fill: none; stroke: #2a1b12; stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+.tsp-bee-leg { fill: none; stroke: #2a1b12; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transition: opacity 0.2s ease; }
+.tsp-bee-pollen { fill: #f08a1c; opacity: 0; transition: opacity 0.2s ease; }
+.tsp-bee[data-legs="1"] .tsp-bee-leg, .tsp-bee[data-legs="1"] .tsp-bee-pollen { opacity: 1; }
+.tsp-bee-blur { fill: rgba(225, 240, 255, 0.28); }
+.tsp-bee-wing { fill: rgba(235, 248, 255, 0.55); stroke: rgba(110, 150, 180, 0.7); stroke-width: 0.6;
+                transform-box: view-box; transform-origin: 2px -5px; animation: tspBuzz 0.05s steps(2, jump-none) infinite; }
+.tsp-bee-wing--b { animation-delay: -0.025s; }
+@keyframes tspBuzz { from { transform: rotate(-18deg); } to { transform: rotate(22deg); } }
+
+/* Schmetterling: Farben je Art über Variablen, Unterseite beim hochgeklappten nahen Flügel */
+.tsp-bf--peacock { --bf-top: #b8322a; --bf-edge: #3a2418; --bf-under: #2b211c; }
+.tsp-bf--brimstone { --bf-top: #e9e35a; --bf-edge: #c9c23e; --bf-under: #dfe3a0; }
+.tsp-bf--blue { --bf-top: #6f9ff0; --bf-edge: #2a3550; --bf-under: #c9c2b8; }
+.tsp-bf-edge { fill: var(--bf-edge); }
+.tsp-bf-in { fill: var(--bf-top); }
+.tsp-bf-wing[data-under="1"] .tsp-bf-in { fill: var(--bf-under); }
+.tsp-bf-wing[data-under="1"] .tsp-bf-edge { fill: var(--bf-under); }
+.tsp-bf-wing[data-under="1"] .tsp-bf-pat { display: none; }
+.tsp-bf-eye1 { fill: #e9cf7a; }
+.tsp-bf-eye2 { fill: #3d6fd0; }
+.tsp-bf-eye3 { fill: #1c1410; }
+.tsp-bf-eye4 { fill: #1c1410; }
+.tsp-bf-spot { fill: #e07a1f; }
+.tsp-bf-dot { fill: #f4efe2; }
+.tsp-bf-body { fill: #2a1b12; }
+.tsp-bf-ant { fill: none; stroke: #2a1b12; stroke-width: 0.9; stroke-linecap: round; }
 
 /* Sonnenblume (Sub-Projekt) */
 .tsp-sf-stem { fill: none; stroke: #3d8a2e; stroke-width: 10; stroke-linecap: round; }
@@ -295,7 +319,6 @@
 .tsp-sf-smile { fill: none; stroke: #1d1208; stroke-width: 3.5; stroke-linecap: round; }
 .tsp-sf-cheek { fill: #ff8a6a; opacity: 0.6; }
 .tsp-sf-bee { animation: tspBob 2.4s ease-in-out infinite; }
-.tsp-sf-bee .tsp-wing { animation-duration: 0.3s; }
 @keyframes tspBob { 0%, 100% { transform: none; } 50% { transform: translateY(-5px); } }
 
 /* Gießkanne */

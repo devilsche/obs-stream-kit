@@ -615,7 +615,7 @@ Gleiches Prinzip wie Herbst und Weihnachten: eine Source pro Jahreszeit, alles e
 
 Parameter: `icicles`, `frost`, `cover`, `minis`, `snowman`, `falling` (je `1`/`0`), `density` (`light`/`medium`/`heavy`), `smpos` (`left`/`right`), `smx` (0–1500 px vom Rand, Standard 260), `snowrate` (20), `shovel` (5), `scrape` (5), `shakeneed` (5), `shakewin` (20). Testtasten mit `?tune=1`: **C** **M** **B** **S** **V** **K** **X** **I** **N** **L**.
 
-**Frühling** — Blumenwiese, Kirschblütenzweig mit rieselnden Blüten, Schmetterlinge.
+**Frühling** — Blumenwiese, Kirschblütenzweig mit rieselnden Blüten (nachts dunkler und seltener, im Regen nass: fallen schneller und fast senkrecht), Schmetterlinge (Tagpfauenauge, Zitronenfalter, Bläuling; vier Flügel, schräg von oben gesehen, langsamer Schlag mit Auf und Ab, Haken und Gleitstrecken, rasten ab und zu auf einer Blüte und sonnen sich). Windhosen reißen Schmetterlinge und Bienen mit, Böen treiben sie ab.
 
 | Ereignis / Befehl | Wirkung |
 |-------------------|---------|
@@ -624,7 +624,7 @@ Parameter: `icicles`, `frost`, `cover`, `minis`, `snowman`, `falling` (je `1`/`0
 | `!rain` → `cmd=raintoggle` | Regen gießt mit `rainrate` % pro Minute — in die bestehende `!rain`-Action mit aufnehmen |
 | `!water` → `cmd=water&name=%user%` | Gießkanne, +`waterpct` %, zählt für „Top gardeners“ |
 | `!weed` → `cmd=weed&name=%user%` | zupft etwas Unkraut (−3 %, zählt); `pullneed` Leute in `pullwin` s ziehen die Hälfte raus; `cmd=weed&force=1` sofort |
-| `!bee` → `cmd=bee&name=%user%` | Biene fliegt eine Blume an (nur Show) |
+| `!bee` → `cmd=bee&name=%user%` | Biene (pelzige Brust, gestreifter Hinterleib, Pollenhöschen, flimmernde Flügel) fliegt im Zickzack eine Blume an, schwebt davor, landet mit gestreckten Beinen und summt weiter (nur Show) |
 | `cmd=leaders` / `cmd=clear&kind=garden\|flowers` | Rangliste / frischer Garten (volles Wasser, kein Unkraut, Rangliste leer) bzw. Blumen dauerhaft löschen |
 
 Die Erde trocknet mit `dryrate` % pro Minute aus (Standard 2 = in 50 min leer), Unkraut wächst mit `weedrate` % pro Minute (Standard 1) — **ab dem ersten Ereignis und auch, während du offline bist**: nach einer Nacht ist der Garten trocken und verwildert, der Chat muss beim Streamstart erst gießen und zupfen. Unter 30 % Wasser lassen die Blumen die Köpfe hängen und das Gras wird gelb. Wer das nicht will, stellt `dryrate=0` und `weedrate=0`. Weitere Parameter: `meadow`, `petals`, `bugs` (`1`/`0`), `branch` (`left`/`right`/`off`), `colors` (`bright`/`pastel`/`cherry`/`theme`), `waterpct` (10), `rainrate` (30), `pullneed` (3), `pullwin` (20). Testtasten: **C** **F** **R** **W** **P** **B** **L**.
