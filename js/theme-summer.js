@@ -75,6 +75,8 @@
     var gPalace = el('g', { 'class': 'tss-palace' }, gBeach);
     var gCastles = el('g', { 'class': 'tss-castles' }, gBeach);
     var gIces = el('g', {}, gBeach);
+    // vom Tornado abgerissene Fähnchen fliegen vor Burgen und Palast
+    var gFlyFlags = el('g', {}, gBeach);
     // ── Weihnachten am Strand: eigene .tw-Wurzel mit den Stilen aus
     // theme-winter.css, sichtbar nur mit dem Sommer (liegt in dessen Wurzel) ──
     var xRoot = document.createElement('div');
@@ -317,7 +319,8 @@
       var px = mirror ? -info.pole[0] : info.pole[0];
       el('line', { 'class': 'tss-flagpole', x1: px, y1: info.pole[1], x2: px, y2: info.pole[2] }, g);
       var flagG = el('g', {}, g);
-      el('path', { 'class': 'tss-flag tss-f' + (1 + Math.floor(cr(8) * 5)), d: 'M' + (px + 1) + ' ' + info.pole[2] + ' l35 8 l-35 10 Z' }, flagG);
+      var flagCol = 1 + Math.floor(cr(8) * 5);
+      el('path', { 'class': 'tss-flag tss-f' + flagCol, d: 'M' + (px + 1) + ' ' + info.pole[2] + ' l35 8 l-35 10 Z' }, flagG);
       // manche haben eine Muschel am Fuß
       if (cr(5) < 0.35) {
         var sx = (cr(6) < 0.5 ? -1 : 1) * (52 + 14 * cr(7));
@@ -327,7 +330,7 @@
       // weggesackter Sand vor dem Fuß
       var mound = el('path', { 'class': 'tss-mound', d: 'M-74 6 Q-46 -24 0 -27 Q46 -24 74 6 Z', opacity: 0 }, outer);
       castles[i] = { node: outer, inner: g, slump: slump, flagG: flagG, mound: mound, x: x, y: y - info.top * k, label: name,
-                     fx: px, fy: info.pole[2], s: 0, shown: -1, wait: null, washed: false };
+                     fx: px, fy: info.pole[2], pole: info.pole, k: k, flagCol: flagCol, s: 0, shown: -1, wait: null, washed: false };
       if (animate && B.on && B.partOn('beach')) B.tag(name, x, y - (info.top + 10) * k, false);
     }
     function clearCastles() { B.clear(gCastles); castles = []; cNext = 0; cTotal = 0; cGen++; }
@@ -1050,8 +1053,54 @@
       var px = 270, py = sandY(270) + 14, sy = 1 - 0.5 * pal.s, sx = 1 + 0.12 * pal.s;
       gPalace.setAttribute('transform', pal.s < 0.002 ? '' : 'translate(' + px + ' ' + f1(py) + ') scale(' + sx.toFixed(3) + ' ' + sy.toFixed(3) + ') translate(' + (-px) + ' ' + f1(-py) + ')');
     }
+    // ── Fähnchen: die Windhose reißt sie samt Stab ab, sie flattern im
+    // Trichter (eine andere Windhose kann übernehmen) und fliegen dann seitlich
+    // aus dem Bild; beim Wiederaufbau steckt ein neues ──
+    var flyFlags = [];
+    function flyFlag(x, y, k, col, len, tn) {
+      var g = el('g', {}, gFlyFlags);
+      el('line', { 'class': 'tss-flagpole', x1: 0, y1: 0, x2: 0, y2: -len }, g);
+      el('path', { 'class': 'tss-flag tss-flag--fly tss-f' + col, d: 'M1 ' + (-len) + ' l35 8 l-35 10 Z' }, g);
+      var dir = tn ? tn.dir || (tn.x < x ? 1 : -1) : 1;
+      flyFlags.push({ g: g, x: x, y: y, k: k, lx: 0, ly: 0, spin: 0, mode: tn ? 'up' : 'away', tw: tn ? tn.t : null, drop: null,
+                      held: 0, peak: rand(180, 380), vx: dir * rand(350, 550), vy: -rand(80, 200), dir: dir });
+    }
+    function stepFlags(dt) {
+      flyFlags = flyFlags.filter(function (f) {
+        var px = f.x + f.lx, tn = tws.near(px, f.mode === 'up' ? f.tw : f.drop);
+        if (tn && Math.abs(tn.x - px) < 100 && (f.mode === 'away' || f.held > 1)) {
+          if (f.mode === 'away') f.peak = Math.max(f.peak, f.ly) + rand(20, 60);
+          f.mode = 'up'; f.tw = tn.t; f.held = 0;
+        }
+        if (f.mode === 'up') {
+          f.held += dt;
+          var tx = f.tw && f.tw.active() ? f.tw.x() : null, dir = (f.tw && f.tw.dir) || f.dir;
+          f.ly += (f.peak - f.ly) * Math.min(1, dt * 2.4);
+          f.lx += (((tx === null ? px : tx) - f.x) + Math.sin(tNowF * 8 + f.x) * 45 - f.lx) * Math.min(1, dt * 3);
+          f.spin += dt * 380 * dir;
+          if (tx === null || tx < -100 || tx > W + 100) {
+            f.mode = 'away'; f.drop = f.tw; f.tw = null; f.dir = dir;
+            f.vx = dir * rand(350, 550); f.vy = -rand(80, 200);
+          }
+        } else {
+          f.vy += 90 * dt;
+          f.lx += f.vx * dt; f.ly -= f.vy * dt;
+          f.spin += dt * 200 * f.dir;
+        }
+        var sx = f.x + f.lx, sy = f.y - f.ly;
+        if (sx < -200 || sx > W + 200 || sy < -200) { f.g.parentNode.removeChild(f.g); return false; }
+        // am Bildrand weich ausblenden
+        var op = Math.max(0, Math.min(1, Math.min(sx + 60, W + 60 - sx) / 220, (sy + 100) / 200)).toFixed(2);
+        if (op !== f.op) { f.op = op; f.g.setAttribute('opacity', op); }
+        f.g.setAttribute('transform', 'translate(' + f1(sx) + ' ' + f1(sy) + ') rotate(' + f1(f.spin) + ') scale(' + f.k.toFixed(2) + ')');
+        return true;
+      });
+    }
+    var tNowF = 0;
     function stepCastles(dt) {
       dt0 = dt;
+      tNowF += dt;
+      stepFlags(dt);
       if (!sweeping() && wave) {
         // erst loslassen, wenn alle gespülten Burgen ihre Wartezeit haben
         if (!castles.some(function (c) { return c && c.washed; }) && !pal.washed) wave = null;
@@ -1060,6 +1109,9 @@
         // ausgeblendet: nichts animieren, alles steht wieder
         castles.forEach(function (c) { if (c) { c.s = 0; c.wait = null; c.washed = false; c.torn = false; c.hard = 0; renderCastle(c); } });
         pal.s = 0; pal.washed = false; pal.torn = false; pal.hard = 0; pal.wait = null; renderPalace();
+        flyFlags.forEach(function (f) { f.g.parentNode.removeChild(f.g); });
+        flyFlags = [];
+        castles.forEach(function (c) { if (c) c.inner.classList.remove('is-noflag'); });
         wave = null; tws.clear();
         return;
       }
@@ -1072,13 +1124,32 @@
         var dv = dry ? '1' : '';
         if (c.node.dataset.dry !== dv) c.node.dataset.dry = dv;
         stepSlump(c, dry ? 0 : 0.6 * r, c.x, 60, { washed: 1, blown: 1, reach: 110,
-                                         torn: function (dir) { debris(c.x, c.y + 40, dir, true); },
+                                         torn: function (dir) {
+                                           debris(c.x, c.y + 40, dir, false);
+                                           // Fähnchen samt Stab reißt ab (nur, wenn es noch steht)
+                                           if (c.s < 0.5 && !c.inner.classList.contains('is-noflag')) {
+                                             c.inner.classList.add('is-noflag');
+                                             flyFlag(c.x + c.fx * c.k, sandY(c.x) + 26 + c.pole[1] * c.k, c.k, c.flagCol,
+                                                     c.pole[1] - c.pole[2], tws.near(c.x));
+                                           }
+                                         },
                                          burst: function () { sandPuff(c.x, sandY(c.x)); } });
+        // Wiederaufbau beginnt: ein neues Fähnchen steckt
+        if (!c.torn && c.inner.classList.contains('is-noflag')) c.inner.classList.remove('is-noflag');
         renderCastle(c);
       });
       stepSlump(pal, 0.3 * r, 270, 30, { washed: 0.7, blown: 0.55, reach: 280,
                                          torn: function (dir) {
-                                           debris(270, sandY(270) - 260, dir, true);
+                                           // die Fahnen, die schon stehen, fliegen davon
+                                           if (gPalace.dataset.blown !== '1') {
+                                             var tn = tws.near(270), py = sandY(270) + 14, pk = 0.85;
+                                             var fl = gPalace.querySelectorAll('.tss-flag').length;
+                                             if (fl >= 2) [-160, 160].forEach(function (cx, i) {
+                                               flyFlag(270 + cx * pk, py - 244 * pk, pk, i ? 5 : 2, 52, tn);
+                                             });
+                                             if (fl >= 3) flyFlag(270, py - 326 * pk, pk * 1.6, 1, 58, tn);
+                                           }
+                                           debris(270, sandY(270) - 260, dir, false);
                                            debris(230, sandY(230) - 150, dir, false);
                                            debris(310, sandY(310) - 120, dir, false);
                                          } });

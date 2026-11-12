@@ -86,7 +86,7 @@
     var SK = root.SeasonKit;
     var tagsLayer = opts.tags || null;
     var hud = opts.hud || null;
-    function tag(text, x, y, big, long) { if (SK && tagsLayer && text) SK.tag(tagsLayer, text, x, y, !!big, !!long); }
+    function tag(text, x, y, big, long) { return SK && tagsLayer && text ? SK.tag(tagsLayer, text, x, y, !!big, !!long) : null; }
 
     // ── Ebenen: Deko unter Blitz-Aufhellung und Wetter-Partikeln, Effekte darüber ──
     var rootEl = document.createElement('div');
@@ -286,7 +286,9 @@
       outer.twDepth = slot[2];
       for (var c = gMinis.firstChild; c; c = c.nextSibling) if (c !== outer && c.twDepth < slot[2]) { before = c; break; }
       gMinis.insertBefore(outer, before);
-      var g = el('g', { 'class': 'tw-mini' + (animate ? ' tw-mini--new' : '') }, outer);
+      // fly: Flug im Tornado (der Schneehügel bleibt am Boden)
+      var fly = el('g', {}, outer);
+      var g = el('g', { 'class': 'tw-mini' + (animate ? ' tw-mini--new' : '') }, fly);
       // danach weg, sonst spielt ein späterer Scheinwerfer das Aufploppen erneut ab
       if (animate) setTimeout(function () { g.classList.remove('tw-mini--new'); }, 1100);
       el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -20, r: 22 }, g);
@@ -294,14 +296,16 @@
       el('circle', { 'class': 'tw-sm-coal', cx: -5, cy: -57, r: 2.4 }, g);
       el('circle', { 'class': 'tw-sm-coal', cx: 5, cy: -57, r: 2.4 }, g);
       el('path', { 'class': 'tw-sm-nose', d: 'M0 -53 L14 -50 L0 -48 Z' }, g);
-      el('path', { 'class': 'tw-mini__hat' + (1 + Math.floor((root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, 1) : (i % 4) / 4) * 4)), d: 'M-16 -64 Q0 -98 16 -64 Z' }, g);
-      el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, g);
+      var hatG = el('g', { 'class': 'tw-mini__hatg' }, g);
+      el('path', { 'class': 'tw-mini__hat' + (1 + Math.floor((root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, 1) : (i % 4) / 4) * 4)), d: 'M-16 -64 Q0 -98 16 -64 Z' }, hatG);
+      el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, hatG);
       // Schneehügel vor dem Mini (Sturm, Lawine)
       var mound = el('path', { 'class': 'tw-mini__mound' }, outer);
-      minis[i] = { outer: outer, inner: g, mound: mound, x: slot[0], k: slot[1], depth: slot[2], rot: slot[3], label: name,
-                   bz: 0, av: 0, avAt: null, avHold: 0, wait: null, shown: -1 };
+      minis[i] = { outer: outer, inner: g, fly: fly, hatG: hatG, mound: mound, x: slot[0], k: slot[1], depth: slot[2], rot: slot[3], label: name,
+                   bz: 0, av: 0, avAt: null, avHold: 0, wait: null, shown: -1,
+                   mode: null, ly: 0, lx: 0, spin: 0, vy: 0, peak: 0, held: 0, tw: null, drop: null, flown: '' };
       placeMini(minis[i]);
-      if (animate && S.on && partOn('minis')) tag(name, slot[0], miniTop(minis[i]));
+      if (animate && S.on && partOn('minis')) miniTag(minis[i], name);
     }
     // Kurzbesuch (!whereiam, nicht im Bild): Mini rollt neben einen Platz, etwas
     // nach vorn; er gehört keinem Platz (minis bleibt unverändert)
@@ -589,17 +593,21 @@
     function miniBolt(p) {
       if (!S.on || reduceMotion || !p.near || typeof p.x !== 'number' || !partOn('minis') || minisHidden()) return;
       var best = null;
+      // auch im Tornado fliegende (dort, wo sie gerade sind); in der Luft öfter
       minis.forEach(function (m) {
-        if (!m || m.zap || m.bz > 0.5 || m.av > 0.3 || Math.abs(m.x - p.x) > 70) return;
-        if (!best || Math.abs(m.x - p.x) < Math.abs(best.x - p.x)) best = m;
+        if (!m || m.zap || m.bz > 0.5 || m.av > 0.3 || Math.abs(m.x + m.lx - p.x) > 70) return;
+        if (!best || Math.abs(m.x + m.lx - p.x) < Math.abs(best.x + best.lx - p.x)) best = m;
       });
-      if (!best || Math.random() < 0.65) return;   // nicht jeder Blitz trifft
-      var m = best, cy = miniFoot(m) - 40 * m.k;
-      if (p.ground) p.ground(m.x, cy);
+      var airborne = best && (best.mode === 'up' || best.mode === 'fall');
+      if (!best || Math.random() < (airborne ? 0.35 : 0.65)) return;   // nicht jeder Blitz trifft
+      var m = best, mx = m.x + m.lx, cy = miniFoot(m) - 40 * m.k - m.ly;
+      if (p.ground) p.ground(mx, cy);
+      dropTag(m);
+      landMini(m);
       m.zap = true;
       m.outer.dataset.zap = '1';
       for (var i = 0; i < 30; i++) {
-        addP({ x: m.x + rand(-15, 15) * m.k, y: cy + rand(-30, 20) * m.k, vx: rand(-420, 420), vy: rand(-650, -100),
+        addP({ x: mx + rand(-15, 15) * m.k, y: cy + rand(-30, 20) * m.k, vx: rand(-420, 420), vy: rand(-650, -100),
                term: 600, sway: 0, r: rand(2, 6), life: rand(1, 1.8), floor: surface, draw: i % 6 ? flake : spark });
       }
       if (opts.event) opts.event('struck', { target: 'snowman', name: m.label || '' });
@@ -612,17 +620,110 @@
         // danach wieder weg, sonst fällt er nach jedem Scheinwerfer-Wackeln neu
         setTimeout(function () { m.inner.classList.remove('tw-mini--new'); }, 1100);
         // der Name erst, wenn er wieder da ist
-        if (m.label && S.on && partOn('minis') && !minisHidden()) setTimeout(function () { tag(m.label, m.x, miniTop(m)); }, 600);
+        if (m.label && S.on && partOn('minis') && !minisHidden()) setTimeout(function () { miniTag(m, m.label); }, 600);
       }, rand(8000, 14000));
     }
+    // ── Tornado: schnappt sich Minis, wirbelt sie hoch, der Hut fliegt davon;
+    // eine andere Windhose kann sie übernehmen (wie die Kürbisse im Herbst) ──
+    function grabMinis() {
+      if (reduceMotion || !S.on || !partOn('minis') || minisHidden()) return;
+      var pool = minis.filter(function (m) { return m && !m.zap && !m.mode && m.bz < 0.5 && m.av < 0.3; });
+      var n = Math.min(pool.length, 2 + Math.floor(Math.random() * 3));
+      for (var i = 0; i < n; i++) {
+        var j = Math.floor(Math.random() * pool.length);
+        pool[j].mode = 'wait';
+        pool[j].peak = rand(170, 280);
+        pool.splice(j, 1);
+      }
+    }
+    function renderFly(m) {
+      followTag(m);
+      var tr = m.ly < 0.3 && Math.abs(m.lx) < 0.3 && Math.abs(m.spin) < 0.3 ? ''
+        : 'translate(' + f1(m.lx / m.k) + ' ' + f1(-m.ly / m.k) + ') rotate(' + f1(m.spin) + ' 0 -40)';
+      if (tr === m.flown) return;
+      m.flown = tr;
+      m.fly.setAttribute('transform', tr);
+    }
+    function blowHat(m, dir) {
+      m.hatG.style.setProperty('--tw-hat-dir', dir < 0 ? -1 : 1);
+      m.hatG.classList.remove('is-back');
+      m.hatG.classList.add('is-blown');
+    }
+    function hatBack(m) {
+      if (!m.hatG.classList.contains('is-blown')) return;
+      m.hatG.classList.remove('is-blown');
+      m.hatG.classList.add('is-back');
+      setTimeout(function () { m.hatG.classList.remove('is-back'); }, 700);
+    }
+    function landMini(m) {
+      m.mode = null; m.ly = 0; m.lx = 0; m.spin = 0; m.vy = 0; m.tw = m.drop = null;
+      hatBack(m);
+      renderFly(m);
+    }
+    function stepFly(m, dt) {
+      var px = m.x + m.lx, tn = tws ? tws.near(px, m.mode === 'up' ? m.tw : m.drop) : null;
+      if (tn && Math.abs(tn.x - px) < 100 && !m.zap &&
+          (m.mode === 'wait' || (m.mode === 'up' && m.held > 1) || m.mode === 'fall')) {
+        if (m.mode === 'wait') blowHat(m, tn.dir || (tn.x < m.x ? 1 : -1));
+        else m.peak = Math.min(360, Math.max(m.peak, m.ly) + rand(30, 80));
+        m.mode = 'up'; m.tw = tn.t; m.held = 0;
+      }
+      if (m.mode === 'up') {
+        m.held += dt;
+        var tx = m.tw && m.tw.active() ? m.tw.x() : null, dir = (m.tw && m.tw.dir) || 1;
+        m.ly += (m.peak - m.ly) * Math.min(1, dt * 2.2);
+        m.lx += (Math.max(-130, Math.min(130, ((tx === null ? m.x : tx) - m.x) * 0.6)) + Math.sin(tNow * 7 + m.x) * 30 - m.lx) * Math.min(1, dt * 3);
+        m.spin += dt * 300 * dir;
+        if (tx === null || (tx - m.x) * dir > 220) { m.mode = 'fall'; m.vy = 0; m.drop = m.tw; m.tw = null; }
+      } else if (m.mode === 'fall') {
+        m.vy += 2200 * dt;
+        m.ly -= m.vy * dt;
+        m.lx *= Math.pow(0.02, dt);
+        m.spin += (Math.round(m.spin / 360) * 360 - m.spin) * Math.min(1, dt * 6);
+        if (m.ly <= 0) {
+          m.ly = 0;
+          if (m.vy > 500) { m.vy = -m.vy * 0.3; digPuff(m); }
+          else landMini(m);
+        }
+      } else if (m.mode === 'wait' && !(tws && tws.any())) {
+        m.mode = null;
+      }
+      renderFly(m);
+    }
+    // Namensschild am Mini: folgt ihm im Flug, verschwindet, wenn er zerstiebt
+    function miniTag(m, text, big) {
+      var t = tag(text, m.x + m.lx, miniTop(m) - m.ly, big);
+      if (t) m.tag = { el: t, lx: m.lx, ly: m.ly };
+    }
+    function followTag(m) {
+      var t = m.tag;
+      if (!t) return;
+      if (!t.el.parentNode) { m.tag = null; return; }
+      var dx = m.lx - t.lx, dy = t.ly - m.ly;
+      t.el.setAttribute('transform', Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3 ? '' : 'translate(' + f1(dx) + ' ' + f1(dy) + ')');
+    }
+    function dropTag(m) {
+      if (!m.tag) return;
+      var el2 = m.tag.el;
+      m.tag = null;
+      el2.classList.add('name-tag--out');
+      setTimeout(function () { if (el2.parentNode) el2.parentNode.removeChild(el2); }, 300);
+    }
+    var tNow = 0;
     function stepMinis(dt) {
+      tNow += dt;
       var visible = S.on && partOn('minis') && !minisHidden();
       var bzNow = visible && opts.blizzard ? clamp01(opts.blizzard()) : 0;
       var av = visible ? aval : null;
       var avT = av ? av.elapsed() : 0, avLive = av && av.active();
       minis.forEach(function (m) {
         if (!m) return;
-        if (!visible) { m.bz = 0; m.av = 0; m.avAt = null; m.wait = null; renderMound(m); return; }
+        if (!visible) {
+          m.bz = 0; m.av = 0; m.avAt = null; m.wait = null; renderMound(m);
+          if (m.mode || m.ly) landMini(m);
+          return;
+        }
+        if (!reduceMotion) stepFly(m, dt);
         // Sturm: wächst mit dem Sturm, nach dem Sturm gestaffelt freigraben (~1 min)
         var want = 0.98 * bzNow;
         if (reduceMotion) m.bz = want;
@@ -754,13 +855,13 @@
       spotRound++;
       var pool = [];
       X.spotPool(pool);
-      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
+      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)], mini: m }); });
       if (!pool.length) return;
       var pick = pool[Math.floor(Math.random() * pool.length)];
       if (lastSpot && pick.label === lastSpot && pool.length > 1) pick = pool[(pool.indexOf(pick) + 1) % pool.length];
       lastSpot = pick.label;
       if (SK) SK.spot(pick.node);
-      tag(pick.label, pick.p[0], pick.p[1]);
+      if (pick.mini) miniTag(pick.mini, pick.label); else tag(pick.label, pick.p[0], pick.p[1]);
     }, 8000);
 
     showSnowman(0);
@@ -822,9 +923,9 @@
           case 'whereami': {
             var me = (p.name || '').toLowerCase(), pool = [];
             X.spotPool(pool);
-            if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)] }); });
+            if (partOn('minis') && !minisHidden()) minis.forEach(function (m) { if (m && m.label && !m.zap) pool.push({ node: m.inner, label: m.label, p: [m.x, miniTop(m)], mini: m }); });
             var hit = pool.filter(function (q) { return q.label.toLowerCase() === me; })[0];
-            if (hit && S.on && SK) { SK.hop(hit.node); tag(hit.label + ' is right here!', hit.p[0], hit.p[1]); }
+            if (hit && S.on && SK) { SK.hop(hit.node); if (hit.mini) miniTag(hit.mini, hit.label + ' is right here!'); else tag(hit.label + ' is right here!', hit.p[0], hit.p[1]); }
             else if (!hit && p.visit && S.on) {
               if (minisHidden()) X.visit(p.name || '');
               else if (partOn('minis')) visitMini(p.name || '');
@@ -847,7 +948,7 @@
             showBoard('Top snow shovelers', S.snowTop); break;
           case 'spectacle':
             if (p.type === 'avalanche') avalanche(p);
-            if (tws) tws.add(p);
+            if (tws) { tws.add(p); if (p.type === 'tornado' && !p.reduced) grabMinis(); }
             break;
           case 'gust':
             gustKick = 3; break;

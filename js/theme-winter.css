@@ -217,6 +217,14 @@
 .tw-mini__ball { fill: url(#tw-ballG); }
 .tw-mini__hat1 { fill: #c4302b; } .tw-mini__hat2 { fill: #2a64b8; } .tw-mini__hat3 { fill: #2e9e5b; } .tw-mini__hat4 { fill: #8e4bb8; }
 .tw-mini__pom { fill: #ffffff; }
+/* Tornado: Hut fliegt davon (Richtung über --tw-hat-dir), nach der Landung sitzt er wieder */
+.tw-mini__hatg { transform-box: fill-box; transform-origin: 50% 100%; }
+.tw-mini__hatg.is-blown { animation: twHatBlow 1.4s ease-in forwards; }
+.tw-mini__hatg.is-back { animation: twHatBack 0.6s cubic-bezier(0.3, 1.5, 0.5, 1) both; }
+@keyframes twHatBlow {
+  to { transform: translate(calc(var(--tw-hat-dir, 1) * 260px), -320px) rotate(calc(var(--tw-hat-dir, 1) * 540deg)); opacity: 0; }
+}
+@keyframes twHatBack { from { transform: translateY(-40px); opacity: 0; } to { transform: none; opacity: 1; } }
 .tw-mini__mound { fill: url(#tw-moundG); }
 
 /* ── Effekte: Schaufel, Schneeball ── */

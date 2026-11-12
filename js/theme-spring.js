@@ -44,6 +44,8 @@
     var grass = el('path', { 'class': 'tsp-grass' }, gMeadow);
     var grassDry = el('path', { 'class': 'tsp-grass tsp-grass--dry' }, gMeadow);
     var gBlades = el('g', { 'class': 'tsp-blades' }, gMeadow);
+    // vom Tornado abgerissene Blütenköpfe fliegen vor der Wiese
+    var gFlyHeads = el('g', {}, gMeadow);
     var gBugs = el('g', { 'class': 'tsp-bugs' }, B.svg());
 
     // ── Wiese ──
@@ -159,8 +161,8 @@
           el('circle', { 'class': 'tsp-center', r: 6 }, dg);
         });
       }
-      flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, label: name, c: PETALS[ci],
-                     ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0 };
+      flowers[i] = { node: outer, head: head, bend: bend, x: x, y: y - h, h: h, hk: hk, label: name, c: PETALS[ci],
+                     ang: 0, shown: 0, knock: 0, hitIn: null, holdFor: 0, rip: null, fly: null };
       if (animate && B.on && B.partOn('meadow')) setTimeout(function () { B.tag(name, x, y - h - 32, false); }, 1300);
     }
     // Kurzbesuch (!whereiam, nicht im Bild): Blume wächst neben einem Platz auf,
@@ -408,6 +410,15 @@
       if (!B.on || p.reduced || (p.type !== 'tornado' && p.type !== 'hail')) return;
       show = p;
       tws.add(p);
+      if (p.type === 'tornado' && B.partOn('meadow')) {
+        // 2–4 Blüten reißt die Windhose ab, sobald sie vorbeikommt
+        var cand = flowers.filter(function (f) { return f && !f.rip; });
+        for (var c = Math.min(cand.length, 2 + Math.floor(Math.random() * 3)); c > 0; c--) {
+          var ci = Math.floor(Math.random() * cand.length);
+          cand[ci].rip = 'wait';
+          cand.splice(ci, 1);
+        }
+      }
       if (p.type !== 'hail' || !B.partOn('meadow')) return;
       // ein paar Blumen werden während des Schauers getroffen
       var pool = flowers.filter(Boolean), n = Math.min(pool.length, 3 + Math.floor(Math.random() * 3));
@@ -423,15 +434,92 @@
       B.front.add({ x: f.x + Math.sin(a) * f.h, y: f.y + f.h - Math.cos(a) * f.h, vx: vx, vy: vy, g: 500, term: rand(50, 90),
                     sway: rand(30, 80), r: rand(4, 7), c: f.c, life: rand(2.5, 4), floor: groundY, draw: petal });
     }
+    // ── Abgerissene Blüten: Kopf (Kopie) wirbelt im Trichter, eine andere
+    // Windhose kann ihn übernehmen; ohne Windhose segelt er davon und blendet
+    // aus. Der Stiel bleibt geknickt, nach 20–30 s wächst eine neue Blüte ──
+    var flyHeads = [];
+    function ripHead(f, tn) {
+      var dir = tn.dir || (tn.x < f.x ? 1 : -1);
+      var g = el('g', {}, gFlyHeads), copy = f.head.cloneNode(true);
+      copy.classList.remove('is-spot', 'is-hop');
+      g.appendChild(copy);
+      f.head.classList.add('tsp-head--gone');
+      f.rip = 'gone';
+      f.knock = -dir * rand(55, 75);
+      f.holdFor = rand(20, 30);
+      var h = { g: g, f: f, x: f.x, y: f.y, k: f.hk, lx: 0, ly: 0, spin: 0, op: 1, mode: 'up', tw: tn.t, drop: null,
+                held: 0, peak: rand(160, 320), vx: 0, vy: 0 };
+      f.fly = h;
+      flyHeads.push(h);
+      flowerPetal(f, dir * rand(150, 350), rand(-500, -250));
+    }
+    function regrowHead(f) {
+      f.rip = null;
+      f.head.classList.remove('tsp-head--gone');
+      f.head.classList.add('tsp-head--regrow');
+      setTimeout(function () { f.head.classList.remove('tsp-head--regrow'); }, 1300);
+    }
+    function stepHeads(dt) {
+      flyHeads = flyHeads.filter(function (h) {
+        var px = h.x + h.lx, tn = tws.near(px, h.mode === 'up' ? h.tw : h.drop);
+        if (tn && Math.abs(tn.x - px) < 100 && (h.mode === 'drift' || h.held > 1)) {
+          if (h.mode === 'drift') { h.peak = Math.max(h.peak, h.ly) + rand(20, 60); h.op = 1; }
+          h.mode = 'up'; h.tw = tn.t; h.held = 0;
+        }
+        if (h.mode === 'up') {
+          h.held += dt;
+          var tx = h.tw && h.tw.active() ? h.tw.x() : null, dir = (h.tw && h.tw.dir) || 1;
+          h.ly += (h.peak - h.ly) * Math.min(1, dt * 2.5);
+          h.lx += (((tx === null ? px : tx) - h.x) + Math.sin(tNow * 8 + h.x) * 40 - h.lx) * Math.min(1, dt * 3);
+          h.spin += dt * 420 * dir;
+          if (tx === null || tx < -100 || tx > W + 100) {
+            h.mode = 'drift'; h.drop = h.tw; h.tw = null;
+            h.vx = dir * rand(180, 320); h.vy = -rand(40, 120);
+          }
+        } else {
+          // ohne Windhose: segelt mit dem Schwung davon, sinkt langsam, blendet aus
+          h.vy += 120 * dt;
+          h.lx += h.vx * dt; h.ly -= h.vy * dt;
+          h.spin += dt * 120 * (h.vx < 0 ? -1 : 1);
+          h.op -= dt / 2.5;
+        }
+        var sx = h.x + h.lx;
+        if (h.op <= 0 || sx < -150 || sx > W + 150) {
+          h.g.parentNode.removeChild(h.g);
+          if (h.f.fly === h) h.f.fly = null;
+          return false;
+        }
+        h.g.setAttribute('transform', 'translate(' + f1(sx) + ' ' + f1(h.y - h.ly) + ') rotate(' + f1(h.spin) + ') scale(' + h.k.toFixed(2) + ')');
+        var o = Math.max(0, Math.min(1, h.op)).toFixed(2);
+        if (o !== h.o) { h.o = o; h.g.setAttribute('opacity', o); }
+        return true;
+      });
+    }
+    // Namensschild an der Blume: fliegt mit dem abgerissenen Kopf mit
+    function flowerAt(f) { return f.fly ? [f.fly.x + f.fly.lx, f.fly.y - f.fly.ly] : [f.x, f.y]; }
+    function flowerTag(f, text, big) {
+      var at = flowerAt(f), t = B.tag(text, at[0], at[1] - 50, big);
+      if (t) f.tag = { el: t, x: at[0], y: at[1] };
+    }
+    function followTag(f) {
+      var t = f.tag;
+      if (!t) return;
+      if (!t.el.parentNode) { f.tag = null; return; }
+      var at = flowerAt(f), dx = at[0] - t.x, dy = at[1] - t.y;
+      t.el.setAttribute('transform', Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3 ? '' : 'translate(' + f1(dx) + ' ' + f1(dy) + ')');
+    }
     function stepShow(dt) {
       tNow += dt;
+      stepHeads(dt);
       var live = (show && show.active()) || tws.any();
-      var busy = false;
+      var busy = flyHeads.length > 0;
       flowers.forEach(function (f) {
         if (!f) return;
         var want = 0;
         // Windhose: je näher, desto heftiger (zur nächsten hin geneigt), Blätter fliegen
         var tn = tws.near(f.x);
+        if (tn && f.rip === 'wait' && !B.reduceMotion && Math.abs(tn.x - f.x) < 90) ripHead(f, tn);
+        followTag(f);
         if (tn) {
           var d = tn.x - f.x, str = clamp01(1 - Math.abs(d) / 450);
           want = str * ((d > 0 ? 1 : -1) * 28 + Math.sin(tNow * 8 + f.x * 0.05) * 32);
@@ -452,6 +540,7 @@
         }
         if (f.knock) {
           f.holdFor -= dt;
+          if (f.holdFor <= 0 && f.rip === 'gone') regrowHead(f);
           if (f.holdFor <= 0) {
             f.knock *= Math.pow(0.4, dt);
             if (Math.abs(f.knock) < 0.5) f.knock = 0;
@@ -466,14 +555,19 @@
           f.shown = f.ang;
           f.bend.setAttribute('transform', f.ang ? 'rotate(' + f.ang.toFixed(1) + ')' : '');
         }
-        if (f.ang) busy = true;
+        if (f.ang || f.rip) busy = true;
+        if (f.rip === 'wait' && !live) f.rip = null;
       });
       if (show && !live && !busy) show = null;
     }
     function resetShow() {
       show = null; tws.clear();
+      flyHeads.forEach(function (h) { if (h.g.parentNode) h.g.parentNode.removeChild(h.g); });
+      flyHeads = [];
       flowers.forEach(function (f) {
         if (!f) return;
+        if (f.rip === 'gone') regrowHead(f);
+        f.rip = null; f.fly = null;
         f.ang = f.shown = f.knock = 0; f.hitIn = null;
         f.bend.setAttribute('transform', '');
       });
@@ -517,8 +611,8 @@
       var pool = flowers.filter(function (f) { return f && f.label; });
       if (!pool.length) return;
       var f = pool[Math.floor(Math.random() * pool.length)];
-      B.spot(f.head);
-      B.tag(f.label, f.x, f.y - 50, false);
+      B.spot(f.fly ? f.fly.g.firstChild : f.head);
+      flowerTag(f, f.label, false);
     }, 8000);
 
     return {
@@ -550,7 +644,7 @@
           case 'whereami': {
             var me = (p.name || '').toLowerCase();
             var fl = flowers.filter(function (f) { return f && f.label && f.label.toLowerCase() === me; })[0];
-            if (fl && B.on && B.partOn('meadow') && root.SeasonKit) { root.SeasonKit.hop(fl.head); B.tag(fl.label + ' is right here!', fl.x, fl.y - 50, true); }
+            if (fl && B.on && B.partOn('meadow') && root.SeasonKit) { root.SeasonKit.hop(fl.fly ? fl.fly.g.firstChild : fl.head); flowerTag(fl, fl.label + ' is right here!', true); }
             else if (!fl && p.visit && B.on && B.partOn('meadow')) visitFlower(p.name || '');
             break;
           }
