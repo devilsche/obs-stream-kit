@@ -978,15 +978,16 @@
         else { heads.forEach(function (h) { h.g.parentNode.removeChild(h.g); }); sprinkling = false; }
       })();
     }
-    // Stufen vom Server übernehmen (aufgelebte Blumen sind wieder klein);
-    // ein Wachsen beim Gießen spielt growFlower, hier nur Abweichungen
+    // Stufen vom Server übernehmen, aber nur nach unten (aufgelebte Blumen sind
+    // wieder klein). Wachsen zeigt allein der Gieß-Befehl mit Animation – der
+    // Wetterstand kommt oft ein paar Sekunden vor dem Befehl an
     var deadSet = {};
     function syncStages(map) {
       flowers.forEach(function (f, i) {
         if (!f || f.rip || f.fly || f.knock || f.growing) return;
         var want = map[f.label.toLowerCase()] || 0;
+        if (want >= (f.stage || 0)) return;
         flStage[f.label.toLowerCase()] = want;
-        if (want === (f.stage || 0)) return;
         var next = f.node.nextSibling, keep = { wT: f.wT, wv: f.wv, dead: f.dead };
         gFlowers.removeChild(f.node);
         putFlower(f.label, i, false);
