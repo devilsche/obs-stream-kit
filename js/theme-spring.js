@@ -496,6 +496,8 @@
     }
     function wanderButterfly() {
       if (!B.on || !B.partOn('bugs') || B.night > 0.5 || B.rain > 0.2 || B.reduceMotion) return;
+      // Hintergrund-Tab: Timer laufen weiter, rAF steht – sonst stauen sich Falter an
+      if (document.hidden || gBugs.querySelectorAll('.tsp-bf').length >= 3) return;
       var dir = Math.random() < 0.5 ? 1 : -1, b = makeBf(BF_KINDS[Math.floor(Math.random() * BF_KINDS.length)]);
       var x = dir > 0 ? -60 : W + 60, base = rand(H - 380, H - 240), y = base, vx = dir * 95, vy = 0;
       var ph = 0, hook = rand(1, 2.5), glide = 0, tilt = 0, last = performance.now();
