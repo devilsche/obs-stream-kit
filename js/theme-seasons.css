@@ -274,9 +274,10 @@
 .is-charred .tsp-ember { animation: tspEmber 6s ease-out both; }
 @keyframes tspEmber { 0% { opacity: 1; } 15% { opacity: 0.7; } 30% { opacity: 0.9; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ts[data-frost="1"] .tsp-ice, .is-charred .tsp-ember { animation: none; } }
-/* eingegangen (unter 15 % Wasser): Blüten welk und braun, Blätter vertrocknet */
-.ts[data-dead="1"] .tsp-bloom { filter: sepia(0.7) saturate(0.6) brightness(0.8); }
-.ts[data-dead="1"] .tsp-leaf { fill: #8a7a3a; }
+/* eingegangen (Blume unter 15 % Wasser): Blüte welk und braun, Blätter und Stiel vertrocknet */
+.is-dead .tsp-bloom { filter: sepia(0.7) saturate(0.6) brightness(0.8); }
+.is-dead .tsp-leaf { fill: #8a7a3a; }
+.is-dead .tsp-stem { stroke: #7a7a32; }
 /* Wachstum durch Gießen: die größere Blume federt aus der alten Größe hoch */
 .tsp-grow--up { animation: tspUp 1.5s cubic-bezier(0.3, 1.4, 0.5, 1) both; }
 @keyframes tspUp { from { transform: scale(var(--tsp-from, 0.85)); } to { transform: none; } }
@@ -360,6 +361,9 @@
 @keyframes tspBob { 0%, 100% { transform: none; } 50% { transform: translateY(-5px); } }
 
 /* Gießkanne */
+.tsp-spr-pipe { fill: #7c8794; stroke: #4a525c; stroke-width: 1.5; }
+.tsp-spr-head { fill: #d9a441; stroke: #8a6418; stroke-width: 1.5; }
+.tsp-spr-arm { stroke: #4a525c; stroke-width: 3; stroke-linecap: round; }
 .tsp-can { display: none; }
 .tsp-can.is-on { display: inline; }
 .tsp-can-body { fill: url(#tsp-cang); stroke: #1d5a3c; stroke-width: 2.5; }

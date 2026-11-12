@@ -9,7 +9,7 @@ import time
 
 import datetime
 
-from fx import astro, weather, weather_frost, weather_season, weather_snow, weather_theme
+from fx import astro, weather, weather_followers, weather_frost, weather_season, weather_snow, weather_theme
 from fx.weather_api import climate, current, geocode
 from fx.weather_db import current_override
 from fx.weather_mood import kd_snapshot
@@ -175,7 +175,9 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
              "heat": state.get("heat", 0), "sun": state.get("sun", 0), "night": state.get("night", 0),
              "blizzard": 1 if state.get("kind") == "blizzard" else 0, "snow": state.get("snow", 0),
              "temp": base.get("temp") if source == "api" else None},
-            opts.get("leafrate", 1.0) if theme == "autumn" else 1.0)
+            opts.get("leafrate", 1.0) if theme == "autumn" else 1.0,
+            # Frühling: Wasser je Blume für die Blumen im Bild
+            flowers=weather_followers.load(conn, tenant_id, limit=24)["names"] if theme == "spring" else None)
     except Exception:
         log.exception("weather: season failed for tenant %s", tenant_id)
         season = {"levels": {}, "top": {}}

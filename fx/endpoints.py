@@ -121,7 +121,7 @@ def _winter_persist(conn, tenant_id, cmd):
         weather_season.ignite(conn, tenant_id, now, wet=bool(p.get("wet")))
         return False
     elif c in weather_season.THEME_OF:
-        names = weather_followers.load(conn, tenant_id, limit=FLOWERS_SHOWN)["names"] if c == "water" else None
+        names = weather_followers.load(conn, tenant_id, limit=FLOWERS_SHOWN)["names"] if c in ("water", "sprinkler") else None
         p.update(weather_season.use(conn, tenant_id, c, p.get("name", ""), now, force=bool(p.get("force")),
                                     flowers=names))
     elif c == "clear" and p.get("kind") in ("followers", "ornaments", "minis", "pumpkins", "flowers", "castles"):

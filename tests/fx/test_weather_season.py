@@ -40,11 +40,12 @@ def test_leaves_fall_faster_with_wind_and_rake_counts(conn):
 def test_garden_dries_rain_waters_weeds_grow(conn):
     assert advance(conn, 1, 0, "spring", W)["levels"]["water"] == 60   # frischer Garten ist feucht
     assert advance(conn, 1, 1500, "spring", W)["levels"]["water"] == pytest.approx(10)
-    use(conn, 1, "water", "Ben", 1500)                            # Feuchte 20
+    # die Gießkanne gießt nur eine Blume, der Boden bleibt
+    use(conn, 1, "water", "Ben", 1500, flowers=["Ben"])
     lv = advance(conn, 1, 1620, "spring", {**W, "rain": 1})["levels"]
-    assert lv["water"] == pytest.approx(76) and lv["weeds"] == pytest.approx(27)
-    assert advance(conn, 1, 2220, "spring", W)["levels"]["water"] == pytest.approx(56)
-    assert advance(conn, 1, 2280, "spring", {**W, "heat": 1})["levels"]["water"] == pytest.approx(50)
+    assert lv["water"] == pytest.approx(66) and lv["weeds"] == pytest.approx(27)
+    assert advance(conn, 1, 2220, "spring", W)["levels"]["water"] == pytest.approx(46)
+    assert advance(conn, 1, 2280, "spring", {**W, "heat": 1})["levels"]["water"] == pytest.approx(40)
 
 
 def test_weed_group_halves_and_force(conn):
@@ -170,14 +171,35 @@ def test_dashboard_without_name_waters_random_open_flower_every_time(conn):
     assert grow_stages(conn, 1) == {"anna": 2, "ben": 2}
 
 
-def test_dead_meadow_revives_at_stage_zero_rain_does_not_grow(conn):
+def test_each_flower_has_its_own_water_can_waters_only_one(conn):
+    names = ["Anna", "Ben"]
+    advance(conn, 1, 0, "spring", W, flowers=names)
+    r = use(conn, 1, "water", "anna", 0, flowers=names)
+    assert r["flower"] == "Anna" and r["flower_level"] == pytest.approx(85)
+    lv = load(conn, 1)["levels"]
+    assert lv["flowers"] == {"anna": 85.0, "ben": 60.0} and lv["water"] == 60
+
+
+def test_flower_dies_alone_and_revives_at_stage_zero(conn):
     from fx.weather_season import grow_stages
-    use(conn, 1, "water", "", 0, flowers=["Anna"])
-    advance(conn, 1, 0, "spring", W)
-    # 70 % Wasser, 2 %/min: nach 30 min unter 15 % → eingegangen
-    st = advance(conn, 1, 30 * 60, "spring", W)
-    assert st["levels"]["dead"] is True and grow_stages(conn, 1) == {"anna": 1}
-    # Regen hebt über 30 %: aufgelebt, alle wieder Stufe 0, gen zählt hoch
-    st = advance(conn, 1, 31 * 60, "spring", dict(W, rain=1))
-    assert st["levels"]["dead"] is False and st["levels"]["gen"] == 1
+    names = ["Anna", "Ben"]
+    advance(conn, 1, 0, "spring", W, flowers=names)
+    use(conn, 1, "water", "anna", 0, flowers=names)           # Anna 85, Stufe 1
+    st = advance(conn, 1, 23 * 60, "spring", W, flowers=names)  # −46: Anna 39, Ben 14
+    assert st["levels"]["deadFlowers"] == ["ben"] and grow_stages(conn, 1) == {"anna": 1}
+    # Gießkanne für Ben: lebt auf (39), wächst dabei aber nicht
+    r = use(conn, 1, "water", "ben", 23 * 60, flowers=names)
+    assert r["revived"] is True and r["stage"] == 0
+    assert load(conn, 1)["levels"]["deadFlowers"] == []
+
+
+def test_sprinkler_waters_all_and_regen_does_not_grow(conn):
+    from fx.weather_season import grow_stages
+    names = ["Anna", "Ben"]
+    advance(conn, 1, 0, "spring", W, flowers=names)
+    advance(conn, 1, 23 * 60, "spring", W, flowers=names)     # beide 14, eingegangen
+    r = use(conn, 1, "sprinkler", "Mod", 23 * 60, flowers=names)
+    assert sorted(r["revived"]) == ["anna", "ben"]
+    assert load(conn, 1)["levels"]["flowers"] == {"anna": 44.0, "ben": 44.0}
+    advance(conn, 1, 30 * 60, "spring", dict(W, rain=1), flowers=names)
     assert grow_stages(conn, 1) == {}

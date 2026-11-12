@@ -8,10 +8,12 @@ angetrieben vom wirksamen Wetter. Ein JSON-Stand je Tenant:
   −3, eine Gruppe (3 Namen in 20 s) halbiert, `force` (Mods) halbiert sofort.
   Gießen und Jäten zählen für die Rangliste. Gießen lässt außerdem eine
   Blume wachsen (`flowers` = Namen im Bild): die eigene (alle OWN_COOLDOWN s),
-  sonst eine zufällige, noch nicht ausgewachsene; jedes Gießen eine Stufe,
-  höchstens 2. Fällt das Wasser unter DEAD %, geht die Wiese ein; hebt
-  Gießen oder Regen es wieder über REVIVE %, stehen alle Blumen auf Stufe 0.
-  Regen lässt nichts wachsen.
+  sonst eine zufällige, noch nicht ausgewachsene oder eingegangene; jedes
+  Gießen eine Stufe, höchstens 2. Wasser hat jede Blume für sich (`fw`): die
+  Gießkanne gibt nur der gegossenen CAN %, der Rasensprenger (`sprinkler`)
+  allen SPRINKLER %, Regen gießt alle, Trocknen trifft alle. Unter DEAD %
+  geht eine Blume ein, zurück über REVIVE % lebt sie auf Stufe 0 wieder auf.
+  Regen und Sprenger lassen nichts wachsen.
 - Sommer `heat`: steigt bei Hitzewelle mit 20 %/min, bei Sonne am Tag mit
   2 %/min, sinkt bei Regen mit 10 %/min und nachts mit 3 %/min; `splash` −5
   (Rangliste), `cool` (Mods) kühlt ganz ab.
@@ -25,6 +27,7 @@ import random
 TOP = 5
 LEVELS = ("leaves", "water", "weeds", "heat")
 THEME_OF = {"rake": "autumn", "sweep": "autumn", "leafstorm": "autumn", "extinguish": "autumn", "water": "spring", "weed": "spring",
+            "sprinkler": "spring",
             "splash": "summer", "cool": "summer"}
 FIRE_SECS = 30        # so lange brennt es trocken, im Regen nur kurz
 FIRE_WET_SECS = 8
@@ -33,7 +36,9 @@ LEAFSTORM = 25        # so viel Laub weht der Laubsturm auf den Haufen
 GROW_STEPS = (1, 2)   # so oft gegossen → Blume Stufe 1, Stufe 2 (jedes Gießen eine Stufe)
 OWN_COOLDOWN = 300    # die eigene Blume gießt ein Zuschauer höchstens so oft
 ANY_COOLDOWN = 10     # sonst (zufällige, nicht ausgewachsene Blume) so oft
-DEAD, REVIVE = 15, 30  # unter DEAD % Wasser geht die Wiese ein; zurück über REVIVE: alle auf Stufe 0
+DEAD, REVIVE = 15, 30  # unter DEAD % Wasser geht eine Blume ein; zurück über REVIVE: Stufe 0
+CAN = 25              # Gießkanne: so viel Wasser für die eine Blume
+SPRINKLER = 30        # Rasensprenger: so viel für alle
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS fx_weather_season (
@@ -84,8 +89,10 @@ def _out(data):
         rows = sorted(board.values(), key=lambda e: -e[1])
         top[theme] = [list(e) for e in rows[:TOP]]
     levels = {k: round(v, 2) for k, v in data["levels"].items()}
-    levels["gen"] = data.get("gen", 0)      # zählt hoch, wenn die Wiese wieder auflebt
-    levels["dead"] = bool(data.get("dead"))
+    # Frühling je Blume: Wasser, eingegangen, Wachstumsstufe
+    levels["flowers"] = {k: round(v, 1) for k, v in data.get("fw", {}).items()}
+    levels["deadFlowers"] = list(data.get("fdead", []))
+    levels["stages"] = {k: _stage(n) for k, n in data.get("grow", {}).items() if _stage(n) > 0}
     return {"levels": levels, "top": top, "grow": dict(data.get("grow", {}))}
 
 
@@ -112,7 +119,8 @@ def _pick(data, names, who, now, rnd):
         return own[0], "own:" + w
     if w and "any:" + w in cd:
         return None, None
-    open_ = [n for n in names if _stage(grow.get(n.lower(), 0)) < len(GROW_STEPS) and n.lower() != w]
+    dead = set(data.get("fdead", []))
+    open_ = [n for n in names if (_stage(grow.get(n.lower(), 0)) < len(GROW_STEPS) or n.lower() in dead) and n.lower() != w]
     pool = open_ or list(names)
     return (rnd.choice(pool), "any:" + w if w else None) if pool else (None, None)
 
@@ -131,19 +139,32 @@ def _grow(data, flower, cd_key, now):
     return {"flower": flower.strip(), "stage": after, "up": after > before, "counted": counted}
 
 
-def _life(data) -> bool:
-    """Eingehen und Auferstehen der Wiese; True, wenn sich etwas geändert hat
-    (dann gilt: alle Blumen zurück auf Stufe 0, `gen` zählt hoch)."""
-    w = data["levels"]["water"]
-    if w < DEAD and not data.get("dead"):
-        data["dead"] = True
-        return True
-    if w >= REVIVE and data.get("dead"):
-        data["dead"] = False
-        data["grow"] = {}
-        data["gen"] = data.get("gen", 0) + 1
-        return True
-    return False
+def _fw(data, names=None) -> dict:
+    """Wasser je Blume {name klein: %}; mit `names` (Blumen im Bild) bekommt
+    jede einen Eintrag (neu: Stand des Bodens), andere fallen weg."""
+    fw = data.setdefault("fw", {})
+    if names is not None:
+        keep = {n.lower() for n in names}
+        for k in [k for k in fw if k not in keep]:
+            del fw[k]
+        for k in keep:
+            fw.setdefault(k, data["levels"]["water"])
+    return fw
+
+
+def _life(data) -> list:
+    """Eingehen und Aufleben je Blume: unter DEAD % eingegangen, zurück über
+    REVIVE % lebt sie wieder auf und steht auf Stufe 0. → Namen der aufgelebten."""
+    dead, grow, revived = set(data.get("fdead", [])), data.setdefault("grow", {}), []
+    for k, v in _fw(data).items():
+        if v < DEAD:
+            dead.add(k)
+        elif v >= REVIVE and k in dead:
+            dead.discard(k)
+            grow.pop(k, None)
+            revived.append(k)
+    data["fdead"] = sorted(dead)
+    return revived
 
 
 def _count(data, theme, name):
@@ -157,7 +178,7 @@ def load(conn, tenant_id) -> dict:
     return _out(_get(conn, tenant_id) or _fresh(None))
 
 
-def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dict:
+def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0, flowers=None) -> dict:
     """w: wirksames Wetter {wind, rain, snow, heat, sun, night, blizzard} (je 0..1),
     optional temp (°C, nur bei echtem Wetter)."""
     data = _get(conn, tenant_id)
@@ -177,7 +198,12 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dic
             lv["leaves"] = _clamp(lv["leaves"] + (1 + 2 * min(1, abs(w.get("wind", 0)))) * rate * m)
     elif theme == "spring":
         dry = 6 if w.get("heat", 0) > 0.5 else 2
-        lv["water"] = _clamp(lv["water"] + (30 * w.get("rain", 0) - dry) * m)
+        delta = (30 * w.get("rain", 0) - dry) * m
+        # jede Blume trocknet gleich, Regen gießt alle (neue zuerst mit dem Bodenstand anlegen)
+        fw = _fw(data, flowers)
+        lv["water"] = _clamp(lv["water"] + delta)
+        for k in fw:
+            fw[k] = _clamp(fw[k] + delta)
         lv["weeds"] = _clamp(lv["weeds"] + 1 * rate * m)
     elif theme == "summer":
         if w.get("snow", 0) > 0.2:
@@ -196,8 +222,10 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0) -> dic
             per = -4        # bewölkt, ohne Sonne: kühlt langsam ab
         lv["heat"] = _clamp(lv["heat"] + per * rate * m)
     changed = any(abs(lv[k] - before[k]) >= 0.5 for k in LEVELS)
-    if theme == "spring" and _life(data):
-        changed = True
+    if theme == "spring":
+        before_dead = list(data.get("fdead", []))
+        if _life(data) or data.get("fdead", []) != before_dead or flowers is not None and set(data.get("fw", {})) != {n.lower() for n in flowers}:
+            changed = True
     if changed or now - last >= 60:
         data["at"] = now
         _put(conn, tenant_id, data)
@@ -254,13 +282,31 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
         out["fires"] = len(fires)   # brennen danach noch
         key = "leaves"
     elif cmd == "water":
-        done = min(10, 100 - lv["water"]); lv["water"] += done; key = "water"
-        if _life(data) and not data.get("dead"):
-            out["reset"] = True      # aufgelebt: alle Blumen wieder klein
-        if flowers:
-            pick, cd_key = _pick(data, flowers, name, now, rnd or random)
-            if pick:
+        # Gießkanne: nur die eine Blume bekommt Wasser
+        key, done = "water", 0
+        fw = _fw(data, flowers) if flowers else _fw(data)
+        pick, cd_key = _pick(data, flowers, name, now, rnd or random) if flowers else (None, None)
+        if pick:
+            k = pick.lower()
+            before = fw.get(k, lv["water"])
+            fw[k] = min(100.0, before + CAN)
+            done = fw[k] - before
+            out["flower_level"] = round(fw[k], 1)
+            if k in _life(data):
+                # aufgelebt: wieder Stufe 0, dieses Gießen lässt sie nicht wachsen
+                out.update(flower=pick.strip(), stage=0, up=False, counted=False, revived=True)
+                if cd_key:
+                    data.setdefault("growcd", {})[cd_key] = now
+            else:
                 out.update(_grow(data, pick, cd_key, now))
+    elif cmd == "sprinkler":
+        # Rasensprenger: alle Blumen und der Boden bekommen Wasser, wachsen lässt er nichts
+        key = "water"
+        done = min(SPRINKLER, 100 - lv["water"]); lv["water"] += done
+        fw = _fw(data, flowers) if flowers else _fw(data)
+        for k in fw:
+            fw[k] = min(100.0, fw[k] + SPRINKLER)
+        out["revived"] = _life(data)
     elif cmd == "splash":
         done = min(5, lv["heat"]); lv["heat"] -= done; key = "heat"
     elif cmd == "cool":
@@ -287,8 +333,6 @@ def use(conn, tenant_id, cmd: str, name: str, now, force: bool = False, need: in
         _count(data, "fire" if cmd == "extinguish" else theme, name)
     _put(conn, tenant_id, data)
     out.update(done=round(done, 2), level=round(lv[key], 2))
-    if cmd == "water":
-        out["gen"] = data.get("gen", 0)
     return out
 
 
@@ -298,6 +342,8 @@ def clear(conn, tenant_id, now, kind: str) -> None:
     theme = {"leaves": "autumn", "garden": "spring", "heat": "summer"}[kind]
     for k in {"leaves": ("leaves",), "garden": ("water", "weeds"), "heat": ("heat",)}[kind]:
         data["levels"][k] = 60.0 if k == "water" else 0.0
+    if kind == "garden":
+        data["fw"], data["fdead"] = {}, []
     data.get("top", {}).pop(theme, None)
     if theme == "autumn":
         data.get("top", {}).pop("fire", None)

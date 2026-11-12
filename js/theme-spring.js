@@ -239,9 +239,9 @@
     // Ausschlag sw (Grad); Blätter und Kopf sitzen auf der Kurve
     // Welken: der Stiel biegt sich als Bogen zur Seite seiner Neigung über,
     // bei ganz welk (wiltNow 1) zeigt die Spitze schräg nach unten
-    var wiltNow = 0, WILT_BEND = 125;
+    var WILT_BEND = 125;
     function poseFlower(f, nod) {
-      var h = f.h, droop = wiltNow * WILT_BEND * (f.lean >= 0 ? 1 : -1);
+      var wl = f.wilt || 0, h = f.h, droop = wl * WILT_BEND * (f.lean >= 0 ? 1 : -1);
       var a = (f.sw + droop) * Math.PI / 180, tx, ty, cx, cy;
       if (Math.abs(droop) < 2) {
         tx = Math.sin(a) * h; ty = -Math.cos(a) * h; cx = f.lean + tx * 0.18; cy = -h * 0.55;
@@ -250,9 +250,9 @@
         // Kontrollpunkt liegt im Schnitt der beiden Tangenten
         var R = h / Math.abs(a), sg = a < 0 ? -1 : 1, ab = Math.abs(a);
         tx = sg * R * (1 - Math.cos(ab)); ty = -R * Math.sin(ab);
-        cx = f.lean * (1 - wiltNow); cy = -R * Math.tan(Math.min(ab, 2.6) / 2);
+        cx = f.lean * (1 - wl); cy = -R * Math.tan(Math.min(ab, 2.6) / 2);
       }
-      f.wiltShown = wiltNow;
+      f.wiltShown = wl;
       f.stem.setAttribute('d', 'M0 0 Q' + f1(cx) + ' ' + f1(cy) + ' ' + f1(tx) + ' ' + f1(ty));
       var tip = Math.atan2(tx - cx, cy - ty) * 180 / Math.PI;
       f.hp.setAttribute('transform', 'translate(' + f1(tx) + ' ' + f1(ty) + ') rotate(' + f1(tip + nod) + ') scale(' + f.hk.toFixed(2) + ')');
@@ -620,7 +620,7 @@
       })();
     }
     function sendBee(name) {
-      var live = flowers.filter(function (f) { return f && !f.rip; });
+      var live = flowers.filter(function (f) { return f && !f.rip && !f.dead; });
       var f = live.length ? live[Math.floor(Math.random() * live.length)] : null;
       var target = f ? { x: f.x, y: f.y, head: f.head } : { x: rand(300, W - 300), y: H - 160, head: null };
       beeFlight(target, function () { if (target.head) B.spot(target.head); });
@@ -720,7 +720,9 @@
     }
     // Nacht, Regen, Schneefall, Schneesturm oder liegender Schnee: Falter bleiben weg
     function badBugWeather() {
-      return B.night > 0.5 || B.rain > 0.2 || (B.falling || 0) > 0.1 || (B.blizzard || 0) > 0.05 || B.snow > 0.2;
+      var live = flowers.filter(Boolean), dead = live.filter(function (f) { return f.dead; }).length;
+      return B.night > 0.5 || B.rain > 0.2 || (B.falling || 0) > 0.1 || (B.blizzard || 0) > 0.05 || B.snow > 0.2 ||
+             (live.length && dead > live.length / 2);
     }
     // Mitte der Blüte, wie sie gerade im Wind steht
     function headAt(f) {
@@ -735,7 +737,7 @@
       var x = dir > 0 ? -60 : W + 60, base = rand(H - 380, H - 240), y = base, vx = dir * 95, vy = 0;
       var ph = 0, hook = rand(1, 2.5), glide = 0, tilt = 0, last = performance.now();
       // ab und zu eine Blüte vor ihm zum Rasten
-      var cand = flowers.filter(function (f) { return f && !f.rip && (f.x - x) * dir > 300 && (f.x - x) * dir < 1500; });
+      var cand = flowers.filter(function (f) { return f && !f.rip && !f.dead && (f.x - x) * dir > 300 && (f.x - x) * dir < 1500; });
       var rest = Math.random() < 0.6 && cand.length ? cand[Math.floor(Math.random() * cand.length)] : null, sit = 0, sat = false;
       var whirl = null, spin = 0, flee = false, jolt = 0;
       var me = { at: function () { return [x, y]; },
@@ -783,7 +785,7 @@
           return;
         }
         // Ziel-Blüte weg (Tornado, Blitz, ersetzt): nicht mehr anfliegen
-        if (rest && (rest.rip || rest.fly || flowers.indexOf(rest) < 0)) { rest = null; if (sit > 0) { sit = 0; vy = -60; vx = dir * 60; } }
+        if (rest && (rest.rip || rest.fly || rest.dead || flowers.indexOf(rest) < 0)) { rest = null; if (sit > 0) { sit = 0; vy = -60; vx = dir * 60; } }
         if (sit > 0) {
           // sitzt: Flügel zusammengeklappt, öffnet sie ein paar Mal zum Sonnen;
           // schwingt mit der Blüte mit
@@ -860,17 +862,18 @@
     function water(p) {
       var name = p.name || 'Someone';
       setLevels(p, 'water');
-      if (B.yes(p.reset)) { resetStages(); if (typeof p.gen === 'number') S.gen = p.gen; }
       var live = flowers.filter(Boolean), key = (p.flower || '').toLowerCase();
       // gegossen wird die Blume, die der Server gewählt hat (die eigene oder eine zufällige)
       var mine = live.filter(function (f) { return f.label.toLowerCase() === key; })[0];
       var t = mine || (live.length ? live[Math.floor(Math.random() * live.length)] : { x: rand(300, W - 300), y: H - 200 });
-      if (key && p.stage !== undefined) {
+      if (mine && typeof p.flower_level === 'number') mine.wT = p.flower_level;
+      if (mine && B.yes(p.revived)) { delete deadSet[key]; setTimeout(function () { flowerTag(mine, mine.label + "'s flower is back to life!", true); }, 2000); }
+      if (key && p.stage !== undefined && !B.yes(p.revived)) {
         var stg = parseInt(p.stage, 10) || 0;
-        if (B.yes(p.up) && mine) setTimeout(function () { growFlower(mine, stg); }, B.reduceMotion ? 0 : 2000);
+        if (B.yes(p.up) && mine) { mine.growing = true; setTimeout(function () { growFlower(mine, stg); }, B.reduceMotion ? 0 : 2000); }
         else flStage[key] = Math.max(flStage[key] || 0, stg);
       }
-      if (!(parseFloat(p.done) > 0) && !mine) { B.tag(name + ': the garden is already wet', t.x, t.y - 150, true); return; }
+      if (!mine) { B.tag(name + ': no flower to water right now', t.x, t.y - 150, true); return; }
       B.tag(mine && mine.label.toLowerCase() === (p.name || '').toLowerCase() ? name + ' watered their flower!' :
             mine ? name + ' watered ' + mine.label + "'s flower!" : name + ' watered the flowers!', t.x, t.y - 150, true);
       if (B.reduceMotion || watering) return;
@@ -910,6 +913,7 @@
     }
     // Blume eine Stufe höher: an Ort und Stelle neu aufbauen, federt groß
     function growFlower(f, stg) {
+      f.growing = false;
       flStage[f.label.toLowerCase()] = Math.max(stageOf(f.label), stg);
       var i = flowers.indexOf(f);
       if (i < 0 || f.rip || f.fly || f.knock) return;   // gerade im Sturm: zeigt sich beim nächsten Aufbau
@@ -918,6 +922,7 @@
       putFlower(f.label, i, false);
       var n = flowers[i];
       gFlowers.insertBefore(n.node, next);   // gleiche Tiefe wie vorher
+      n.wT = f.wT; n.wv = f.wv;
       if (!B.reduceMotion) {
         // federt aus der alten Größe hoch
         n.grow.style.setProperty('--tsp-from', (f.h / n.h).toFixed(3));
@@ -930,15 +935,59 @@
       }
       if (B.on && B.partOn('meadow')) flowerTag(n, f.label + (stg >= 2 ? "'s flower is in full bloom!" : "'s flower is growing!"), true);
     }
-    // Wiese ist eingegangen und lebt wieder auf: alle Blumen wieder klein
-    function resetStages() {
-      flStage = {};
+    // ── Rasensprenger: vier Sprenger fahren aus der Wiese, schwenken 5 s hin
+    // und her und gießen alle Blumen (Server +SPRINKLER % für jede) ──
+    var sprinkling = false;
+    function sprinkler(p) {
+      setLevels(p, 'water');
+      (p.revived || []).forEach(function (n) { delete deadSet[String(n).toLowerCase()]; });
+      flowers.forEach(function (f) { if (f) f.wT = Math.min(100, (typeof f.wT === 'number' ? f.wT : S.waterT) + 30); });
+      B.tag((p.name || 'Someone') + ' turned on the sprinkler!', W / 2, 300, true);
+      if (B.reduceMotion || sprinkling || !B.partOn('meadow')) return;
+      sprinkling = true;
+      var heads = [180, 520, 1400, 1740].map(function (x, i) {
+        var g = el('g', { 'class': 'tsp-spr' }, B.fxSvg);
+        el('rect', { 'class': 'tsp-spr-pipe', x: -3, y: -26, width: 6, height: 30, rx: 2 }, g);
+        el('path', { 'class': 'tsp-spr-head', d: 'M-9 -26 Q0 -36 9 -26 Z' }, g);
+        el('path', { 'class': 'tsp-spr-arm', d: 'M0 -31 L12 -38' }, g);
+        return { g: g, x: x, y: groundY(x) + 6, ph: i * 1.3 };
+      });
+      var t0 = performance.now();
+      (function step() {
+        var sec = (performance.now() - t0) / 1000;
+        var up = sec < 0.4 ? sec / 0.4 : sec > 5.4 ? Math.max(0, 1 - (sec - 5.4) / 0.4) : 1;
+        heads.forEach(function (h) {
+          var sweep = Math.sin(sec * 1.6 + h.ph) * 60;
+          h.g.setAttribute('transform', 'translate(' + h.x + ' ' + f1(h.y + 30 * (1 - up)) + ')');
+          h.g.lastChild.setAttribute('transform', 'rotate(' + f1(sweep) + ' 0 -31)');
+          if (up >= 1 && B.front) {
+            for (var i = 0; i < 3; i++) {
+              var a = (sweep - 90 + rand(-6, 6)) * Math.PI / 180, v = rand(380, 520);
+              B.front.add({ x: h.x, y: h.y - 32, vx: Math.cos(a) * v, vy: Math.sin(a) * v, g: 900, term: 700,
+                            sway: 0, wf: 0, r: rand(1.4, 2.4), floor: groundY, life: 1.6, draw: spray });
+            }
+          }
+        });
+        if (sec < 5.8) root.requestAnimationFrame(step);
+        else { heads.forEach(function (h) { h.g.parentNode.removeChild(h.g); }); sprinkling = false; }
+      })();
+    }
+    // Stufen vom Server übernehmen (aufgelebte Blumen sind wieder klein);
+    // ein Wachsen beim Gießen spielt growFlower, hier nur Abweichungen
+    var deadSet = {};
+    function syncStages(map) {
       flowers.forEach(function (f, i) {
-        if (!f || !f.stage || f.rip || f.fly || f.knock) return;
-        var next = f.node.nextSibling;
+        if (!f || f.rip || f.fly || f.knock || f.growing) return;
+        var want = map[f.label.toLowerCase()] || 0;
+        flStage[f.label.toLowerCase()] = want;
+        if (want === (f.stage || 0)) return;
+        var next = f.node.nextSibling, keep = { wT: f.wT, wv: f.wv, dead: f.dead };
         gFlowers.removeChild(f.node);
         putFlower(f.label, i, false);
-        gFlowers.insertBefore(flowers[i].node, next);
+        var n = flowers[i];
+        gFlowers.insertBefore(n.node, next);
+        n.wT = keep.wT; n.wv = keep.wv;
+        if (keep.dead) { n.dead = true; n.node.classList.add('is-dead'); }
       });
     }
     function weed(p) {
@@ -1179,7 +1228,7 @@
         // Blätter flattern schneller als der Stiel, je mehr Wind, desto heftiger
         var w = Math.abs(target) / 10;
         f.leaves.forEach(function (L) { L.fl = Math.sin(windT * (7 + w * 6) + L.ph) * (2 + 7 * w); });
-        if (f.swShown === null || Math.abs(f.sw - f.swShown) > 0.04 || w > 0.05 || Math.abs(wiltNow - (f.wiltShown || 0)) > 0.005) {
+        if (f.swShown === null || Math.abs(f.sw - f.swShown) > 0.04 || w > 0.05 || Math.abs((f.wilt || 0) - (f.wiltShown || 0)) > 0.005) {
           f.swShown = f.sw;
           poseFlower(f, -f.sv * 0.05);
         }
@@ -1269,17 +1318,25 @@
       if (B.on) { if (show || gustT > 0 || flBusy) stepShow(dt); } else if (show) resetShow();
       if (B.on && !B.reduceMotion) stepSway(Math.min(dt, 0.05));
       // Regen richtet die Köpfe sofort auf, bevor der Wasserstand nachzieht
-      // ab 30 % Wasser sinken die Köpfe, bei 15 % (eingegangen) hängen sie ganz
-      var wilt = clamp01((30 - S.water) / 15) * (1 - B.rain);
+      // Boden (Gras) nach dem gemeinsamen Stand; Köpfe je Blume nach ihrem Wasser
+      var wilt = 0;
       var dry = clamp01((55 - S.water) / 55) * (1 - 0.7 * B.rain);
       // Schnee: Köpfe hängen, auch die Sonnenblume ein Stück
       var cold = Math.min(1, B.stepSnow(dt));
       wilt = Math.max(wilt, 0.85 * cold);
       stepFrost(dt);
-      wilt = Math.max(wilt, 0.3 * frostK);
-      wiltNow = wilt;
-      // ohne Bewegung (reduzierte Animationen) läuft stepSway nicht: hier nachziehen
-      if (B.reduceMotion) flowers.forEach(function (f) { if (f && Math.abs(wiltNow - (f.wiltShown || 0)) > 0.005) poseFlower(f, 0); });
+      var coldWilt = Math.max(wilt, 0.3 * frostK);
+      flowers.forEach(function (f) {
+        if (!f) return;
+        // je Blume: ab 30 % Wasser sinkt der Kopf, bei 15 % (eingegangen) hängt er ganz
+        var wt = typeof f.wT === 'number' ? f.wT : S.waterT;
+        f.wv = typeof f.wv === 'number' ? f.wv + (wt - f.wv) * k : wt;
+        f.wilt = Math.max(coldWilt, clamp01((30 - f.wv) / 15) * (1 - B.rain));
+        var dead = !!deadSet[f.label.toLowerCase()];
+        if (dead !== !!f.dead) { f.dead = dead; f.node.classList.toggle('is-dead', dead); }
+        // ohne Bewegung (reduzierte Animationen) läuft stepSway nicht: hier nachziehen
+        if (B.reduceMotion && Math.abs(f.wilt - (f.wiltShown || 0)) > 0.005) poseFlower(f, 0);
+      });
       B.vars({ '--tsp-wilt': wilt, '--tsp-dry': dry, '--ts-night': B.night });
       droopSunflower(cold);
       showWeeds(S.weeds);
@@ -1330,9 +1387,13 @@
           S.water = S.waterT; S.weeds = S.weedsT; S.first = false;    // erster Stand sofort
         }
         if (s.seasonTop && Array.isArray(s.seasonTop.spring)) S.top = s.seasonTop.spring;
-        // eingegangen (Server): welk und braun; lebt sie wieder auf (gen), alle zurück auf Stufe 0
-        if (typeof lv.dead === 'boolean') B.root.dataset.dead = lv.dead ? '1' : '0';
-        if (typeof lv.gen === 'number') { if (S.gen !== undefined && lv.gen !== S.gen) resetStages(); S.gen = lv.gen; }
+        // je Blume (Server): Wasser, eingegangen, Wachstumsstufe
+        if (lv.flowers) flowers.forEach(function (f) {
+          var v = f && lv.flowers[f.label.toLowerCase()];
+          if (typeof v === 'number') f.wT = v;
+        });
+        if (Array.isArray(lv.deadFlowers)) { deadSet = {}; lv.deadFlowers.forEach(function (n) { deadSet[n] = true; }); }
+        if (lv.stages) syncStages(lv.stages);
       },
       command: function (cmd, p) {
         p = p || {};
@@ -1350,6 +1411,7 @@
           }
           case 'snowmanreset': sunflower.reset(B.on); break;
           case 'water': water(p); break;
+          case 'sprinkler': sprinkler(p); break;
           case 'bolt': bolt(p); break;
           case 'weed': weed(p); break;
           case 'bee': sendBee(p.name || ''); break;
