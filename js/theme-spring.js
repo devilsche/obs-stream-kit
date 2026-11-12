@@ -1331,7 +1331,8 @@
         // je Blume: ab 30 % Wasser sinkt der Kopf, bei 15 % (eingegangen) hängt er ganz
         var wt = typeof f.wT === 'number' ? f.wT : S.waterT;
         f.wv = typeof f.wv === 'number' ? f.wv + (wt - f.wv) * k : wt;
-        f.wilt = Math.max(coldWilt, clamp01((30 - f.wv) / 15) * (1 - B.rain));
+        // Regen richtet nur über das steigende Wasser auf, wie Gießen (kein Sprung)
+        f.wilt = Math.max(coldWilt, clamp01((30 - f.wv) / 15));
         var dead = !!deadSet[f.label.toLowerCase()];
         if (dead !== !!f.dead) { f.dead = dead; f.node.classList.toggle('is-dead', dead); }
         // ohne Bewegung (reduzierte Animationen) läuft stepSway nicht: hier nachziehen
