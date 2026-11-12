@@ -592,7 +592,7 @@
         // (die eigene bzw. die, die ihn gerade fallen ließ, zählt nicht mit;
         // im Wirbel erst nach einer Sekunde, sonst reißen zwei hin und her)
         var px = pk.x + pk.lx, tn = tws.near(px, pk.mode === 'up' ? pk.tw : pk.drop);
-        if (tn && Math.abs(tn.x - px) < 110 && !B.reduceMotion &&
+        if (tn && Math.abs(tn.x - px) < 110 && !B.reduceMotion && !pk.zap &&
             (pk.mode === 'wait' || (pk.mode === 'up' && pk.held > 1) || pk.mode === 'fall' || (!pk.mode && pk.ly > 20))) {
           if (pk.mode !== 'wait') pk.peak = Math.min(360, Math.max(pk.peak || 0, pk.ly) + rand(30, 80));
           pk.mode = 'up'; pk.tw = tn.t; pk.held = 0;
@@ -705,14 +705,19 @@
     function pumpkinBolt(p) {
       if (!B.partOn('pumpkins')) return false;
       var best = null;
-      // auch auf dem Tsunami treibende (dort, wo sie gerade schwimmen)
+      // auch auf dem Tsunami treibende und im Wirbel fliegende (dort, wo sie
+      // gerade sind); hoch in der Luft trifft er öfter
       pkNodes.forEach(function (pk) {
-        if (!pk || pk.mode !== null || pk.zap || Math.abs(pk.x + pk.lx - p.x) > 90) return;
+        if (!pk || pk.zap || Math.abs(pk.x + pk.lx - p.x) > 90) return;
         if (!best || Math.abs(pk.x + pk.lx - p.x) < Math.abs(best.x + best.lx - p.x)) best = pk;
       });
-      if (!best || Math.random() < 0.65) return false;  // nicht jeder Blitz trifft
+      var airborne = best && (best.mode === 'up' || best.mode === 'fall');
+      if (!best || Math.random() < (airborne ? 0.35 : 0.65)) return false;  // nicht jeder Blitz trifft
       var pk = best, cx = pk.x + pk.lx, cy = pk.y + pk.dy - pk.h * 0.45 - pk.ly;
       if (p.ground) p.ground(cx, cy);
+      // zerplatzt: wächst später an seinem Platz nach
+      pk.mode = null; pk.ly = 0; pk.lx = 0; pk.rot = 0; pk.vy = 0; pk.tw = pk.drop = null;
+      renderPk(pk);
       pk.zap = true;
       pk.node.dataset.zap = '1';
       B.chunks(cx, cy, 34, ['#e8761e', '#f2a03a', '#c4561a', '#f6e7b0', '#5a3a1e'], function () { return H - 4; });
