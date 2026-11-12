@@ -147,10 +147,14 @@
     var gBranch = el('g', { 'class': 'ta-branch ta-dim' }, branchSvg);
     var gSway = el('g', { 'class': 'ta-frostable', id: 'ta-sway-g' }, gBranch);
     // Vogelscheuche hinter dem Laubhaufen (der Pfahl steckt im Laub)
-    var gScare = el('g', { 'class': 'ta-scare ta-dim' }, B.svg());
+    // Strohballen und Maisgarbe ebenfalls dahinter, Pilze wachsen vor dem Laub
+    var scareSvg = B.svg();
+    var gDeco = el('g', { 'class': 'ta-deco ta-dim' }, scareSvg);
+    var gScare = el('g', { 'class': 'ta-scare ta-dim' }, scareSvg);
     var pileCanvas = B.canvas();
     pileCanvas.classList.add('ta-pile', 'ta-dim');
     var pctx = pileCanvas.getContext('2d');
+    var gShrooms = el('g', { 'class': 'ta-shrooms ta-dim' }, B.svg());
     var gPumpkins = el('g', { 'class': 'ta-pumpkins' }, B.svg());
 
     // ── Blätterranke oben mit Lichtern und Eicheln ──
@@ -278,13 +282,118 @@
       var lit = el('g', { 'class': 'ta-lit ta-lit--branch', mask: 'url(#ta-branch-light)' }, branchSvg);
       el('use', { href: '#ta-sway-g' }, lit);
     })();
+    // ── Erntedeko: Strohballen rechts (gestapelt), ein Ballen und eine
+    // Maisgarbe links neben der Vogelscheuche; die Maisblätter rascheln im Wind ──
+    var cornLeaves = [];
+    function bale(x, y, w, h) {
+      var g = el('g', { transform: 'translate(' + f1(x) + ' ' + f1(y) + ')' }, gDeco);
+      el('rect', { 'class': 'ta-bale', x: f1(-w / 2), y: f1(-h), width: f1(w), height: f1(h), rx: 7 }, g);
+      el('rect', { 'class': 'ta-bale-top', x: f1(-w / 2 + 3), y: f1(-h + 2), width: f1(w - 6), height: 7, rx: 4 }, g);
+      var d = '';
+      for (var i = 0; i < 26; i++) {
+        var sx = -w / 2 + 5 + rnd() * (w - 10), sy = -h + 8 + rnd() * (h - 12), l = 5 + rnd() * 8, a = (rnd() - 0.5) * 0.8;
+        d += 'M' + f1(sx) + ' ' + f1(sy) + ' l' + f1(Math.cos(a) * l) + ' ' + f1(Math.sin(a) * l) + ' ';
+      }
+      el('path', { 'class': 'ta-bale-straw', d: d }, g);
+      [-0.25, 0.25].forEach(function (k) { el('path', { 'class': 'ta-bale-twine', d: 'M' + f1(w * k) + ' ' + f1(-h + 1) + ' L' + f1(w * k) + ' -1' }, g); });
+      // ein paar Halme stehen über den Rand
+      for (var j = 0; j < 6; j++) {
+        var hx = -w / 2 + rnd() * w;
+        el('path', { 'class': 'ta-bale-wisp', d: 'M' + f1(hx) + ' ' + f1(-h + 2) + ' q' + f1((rnd() - 0.5) * 8) + ' ' + f1(-4 - rnd() * 4) + ' ' + f1((rnd() - 0.5) * 12) + ' ' + f1(-6 - rnd() * 5) }, g);
+      }
+    }
+    bale(W - 610, H - 2, 92, 46); bale(W - 512, H - 2, 92, 46); bale(W - 560, H - 46, 88, 44);
+    bale(470, H - 2, 84, 42);
+    (function cornSheaf(x, y) {
+      var g = el('g', { 'class': 'ta-corn', transform: 'translate(' + x + ' ' + y + ')' }, gDeco);
+      var n = 11;
+      for (var i = 0; i < n; i++) {
+        var k = (i - (n - 1) / 2) / ((n - 1) / 2), bx = k * 20, tx = k * 3, topx = k * 34 + (rnd() - 0.5) * 8, topy = -230 - rnd() * 30;
+        el('path', { 'class': 'ta-corn-stalk', d: 'M' + f1(bx) + ' 0 L' + f1(tx) + ' -110 Q' + f1(tx + (topx - tx) * 0.3) + ' -170 ' + f1(topx) + ' ' + f1(topy) }, g);
+        // Rispe oben
+        el('path', { 'class': 'ta-corn-tassel', d: 'M' + f1(topx) + ' ' + f1(topy) + ' l-4 -10 M' + f1(topx) + ' ' + f1(topy) + ' l3 -12 M' + f1(topx) + ' ' + f1(topy) + ' l7 -7' }, g);
+        // hängende, trockene Blätter in zwei Höhen
+        [0.35, 0.7].forEach(function (h, j) {
+          if (rnd() < 0.3) return;
+          var t = h, px = tx + (topx - tx) * (t - 0.0) * 0.6, py = -110 - (topy + 110) * -t;
+          var side = rnd() < 0.5 ? -1 : 1, L = 50 + rnd() * 30;
+          var lg = el('g', { transform: 'translate(' + f1(px) + ' ' + f1(py) + ')' }, g);
+          el('path', { 'class': 'ta-corn-leaf' + (rnd() < 0.4 ? ' ta-corn-leaf--b' : ''), d: 'M0 0 Q' + f1(side * L * 0.5) + ' ' + f1(-12) + ' ' + f1(side * L) + ' ' + f1(18 + rnd() * 20) + ' Q' + f1(side * L * 0.45) + ' -4 0 5 Z' }, lg);
+          cornLeaves.push({ g: lg, x: px, y: py, ph: rnd() * 6.28, f: 0.8 + rnd() * 0.8, side: side, gx: x, gy: y });
+        });
+      }
+      // Bindfaden und zwei Kolben am Fuß
+      el('path', { 'class': 'ta-corn-tie', d: 'M-12 -112 Q0 -104 12 -112 M-12 -106 Q0 -98 12 -106' }, g);
+      [[-26, -8, -25], [24, -6, 22]].forEach(function (c) {
+        var cg = el('g', { transform: 'translate(' + c[0] + ' ' + c[1] + ') rotate(' + c[2] + ')' }, g);
+        el('ellipse', { 'class': 'ta-cob', cx: 0, cy: -16, rx: 6.5, ry: 17 }, cg);
+        el('path', { 'class': 'ta-cob-rows', d: 'M-3 -30 L-3 -2 M0 -32 L0 0 M3 -30 L3 -2' }, cg);
+        el('path', { 'class': 'ta-husk', d: 'M0 0 Q-14 -12 -10 -34 Q-5 -14 0 -4 Q5 -14 10 -34 Q14 -12 0 0 Z' }, cg);
+      });
+    })(395, H - 4);
+    function stepCorn(w, dir) {
+      cornLeaves.forEach(function (L) {
+        var a = (Math.sin(aWindT * L.f * 6.283 + L.ph) * (2 + 9 * w) + dir * w * 6) * (1 - 0.5 * W8.wet);
+        L.g.setAttribute('transform', 'translate(' + f1(L.x) + ' ' + f1(L.y) + ') rotate(' + f1(a) + ')');
+      });
+    }
+
+    // ── Pilze nach Regen: solange es nass ist, wachsen nach und nach Fliegen-
+    // pilze und Steinpilze aus dem Laub (bis zu 7), nach dem Abtrocknen
+    // vergehen sie nach 2–4 min; ein Feuer an der Stelle lässt sie welken ──
+    var shrooms = [], shroomAcc = 0;
+    function makeShroom(x) {
+      var fly = Math.random() < 0.55, g = el('g', {}, gShrooms), s = 1.1 + Math.random() * 0.5;
+      var inner = el('g', { transform: 'scale(' + s.toFixed(2) + ')' }, g);
+      if (fly) {
+        el('path', { 'class': 'ta-shroom-stem', d: 'M-5 0 Q-6 -14 -4 -26 L4 -26 Q6 -14 5 0 Z' }, inner);
+        el('path', { 'class': 'ta-shroom-ring', d: 'M-6 -18 Q0 -14 6 -18 L5 -21 Q0 -18 -5 -21 Z' }, inner);
+        el('path', { 'class': 'ta-shroom-gills', d: 'M-16 -26 Q0 -21 16 -26 Z' }, inner);
+        el('path', { 'class': 'ta-shroom-red', d: 'M-17 -26 Q-17 -44 0 -45 Q17 -44 17 -26 Q0 -22 -17 -26 Z' }, inner);
+        [[-9, -33, 2.2], [-2, -40, 1.8], [6, -36, 2.4], [11, -30, 1.6], [-12, -29, 1.4], [1, -31, 1.5]].forEach(function (d) {
+          el('circle', { 'class': 'ta-shroom-dot', cx: d[0], cy: d[1], r: d[2] }, inner);
+        });
+      } else {
+        el('path', { 'class': 'ta-shroom-stem ta-shroom-stem--porcini', d: 'M-8 0 Q-11 -10 -6 -20 L6 -20 Q11 -10 8 0 Z' }, inner);
+        el('path', { 'class': 'ta-shroom-brown', d: 'M-15 -19 Q-15 -36 0 -37 Q15 -36 15 -19 Q0 -15 -15 -19 Z' }, inner);
+        el('ellipse', { 'class': 'ta-shroom-sheen', cx: -5, cy: -30, rx: 4, ry: 2.2 }, inner);
+      }
+      return { g: g, x: x, grow: 0, dry: 0, life: 120 + Math.random() * 120, gone: false };
+    }
+    function stepShrooms(dt) {
+      if (!B.on || !B.partOn('pile')) return;
+      if (W8.wet > 0.5 && !B.reduceMotion) {
+        shroomAcc += dt;
+        if (shroomAcc > (shrooms.length ? 6 + Math.random() * 6 : 3) && shrooms.length < 7) {
+          shroomAcc = 0;
+          var side = Math.random() < 0.5, x = side ? 40 + Math.random() * 540 : W - 40 - Math.random() * 540;
+          if (!fireAt(x)) {
+            var n = Math.random() < 0.4 ? 2 : 1;
+            for (var i = 0; i < n; i++) shrooms.push(makeShroom(x + i * (14 + Math.random() * 10) * (side ? 1 : -1)));
+          }
+        }
+      }
+      shrooms = shrooms.filter(function (m) {
+        if (W8.wet < 0.1) m.dry += dt;
+        var dying = m.dry > m.life || fireAt(m.x) || flooded(m.x);
+        m.grow = dying ? Math.max(0, m.grow - dt / 2.5) : Math.min(1, m.grow + dt / 3);
+        if (dying && m.grow <= 0) { m.g.parentNode.removeChild(m.g); return false; }
+        var e = m.grow < 1 ? 1 - Math.pow(1 - m.grow, 3) : 1;
+        m.g.setAttribute('transform', 'translate(' + f1(m.x) + ' ' + f1(surface(m.x) + 6) + ') scale(' + (e * (dying ? 1 : 1)).toFixed(3) + ' ' + e.toFixed(3) + ')');
+        m.g.setAttribute('opacity', dying ? Math.min(1, m.grow * 1.5).toFixed(2) : '1');
+        return true;
+      });
+    }
+
     var aWindT = 0, aFrost = 0, aFrostShown = null;
     function stepBranch(dt) {
-      if (!B.on || B.reduceMotion || !B.partOn('branch')) return;
+      if (!B.on || B.reduceMotion) return;
       aWindT += dt;
       var gk = Math.min(1.5, Math.abs(B.gustPx) / 700);
       var w = Math.abs(B.windBase) * (0.6 + 0.4 * Math.sin(aWindT * 0.7)) + gk * 0.8 + 0.12;
       var dir = (B.gustPx || B.windBase) < 0 ? -1 : 1, heavy = 1 - 0.5 * W8.wet, stiff = 1 - 0.85 * aFrost;
+      stepCorn(w, dir);
+      if (!B.partOn('branch')) return;
       var lean = dir * Math.min(1.5, w) * 0.8;
       aTwigs.forEach(function (t, ti) {
         var a = ((ti ? lean * 1.5 : lean * 0.5) + Math.sin(aWindT * t.f * 6.283 + t.ph) * t.amp * (0.35 + w)) * heavy * stiff;
@@ -1145,6 +1254,7 @@
       stepFire(dt, ts);
       stepAFrost(dt);
       stepBranch(Math.min(dt, 0.05));
+      stepShrooms(Math.min(dt, 0.05));
       if (offFor > 3) return;
       if (B.on) stepShow(dt);
       else if (wave || tws.any() || pkNodes.some(function (pk) { return pk && (pk.mode || pk.ly); })) resetShow();

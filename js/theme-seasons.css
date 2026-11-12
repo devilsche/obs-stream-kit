@@ -158,6 +158,29 @@
 .ta-pk-sheen { fill: #ffffff; opacity: 0.22; }
 .ta-pk-shade { fill: #2a1405; }
 /* Sorten: orange, rotorange, gelb, cremeweiß, grün-orange */
+/* Erntedeko: Strohballen, Maisgarbe, Pilze nach Regen (gehören zum Laubhaufen) */
+.ts[data-pile="0"] .ta-deco, .ts[data-pile="0"] .ta-shrooms { display: none; }
+.ta-bale { fill: #d4ad55; stroke: #9a7a2e; stroke-width: 1.5; }
+.ta-bale-top { fill: #e6c674; }
+.ta-bale-straw { fill: none; stroke: #a8862f; stroke-width: 1; stroke-linecap: round; opacity: 0.7; }
+.ta-bale-twine { stroke: #6e5320; stroke-width: 2.2; }
+.ta-bale-wisp { fill: none; stroke: #c9a24a; stroke-width: 1.2; stroke-linecap: round; }
+.ta-corn-stalk { fill: none; stroke: #b39048; stroke-width: 4; stroke-linecap: round; }
+.ta-corn-tassel { fill: none; stroke: #c8a65a; stroke-width: 1.5; stroke-linecap: round; }
+.ta-corn-leaf { fill: #c4a35a; stroke: #8f7434; stroke-width: 0.8; }
+.ta-corn-leaf--b { fill: #a98a46; }
+.ta-corn-tie { fill: none; stroke: #6e5320; stroke-width: 3; }
+.ta-cob { fill: #e8b52e; stroke: #b07f12; stroke-width: 1; }
+.ta-cob-rows { stroke: #c08f1c; stroke-width: 1; }
+.ta-husk { fill: #d9c27a; stroke: #9a8442; stroke-width: 0.8; }
+.ta-shroom-stem { fill: #f3ecdc; stroke: #b8ab8c; stroke-width: 0.8; }
+.ta-shroom-stem--porcini { fill: #e8dcc0; }
+.ta-shroom-ring { fill: #fffaf0; stroke: #c9bda0; stroke-width: 0.6; }
+.ta-shroom-gills { fill: #efe3c8; }
+.ta-shroom-red { fill: #d62a1e; stroke: #8f1a12; stroke-width: 1; }
+.ta-shroom-dot { fill: #fffaf0; }
+.ta-shroom-brown { fill: #7a4a22; stroke: #4e2e14; stroke-width: 1; }
+.ta-shroom-sheen { fill: #fff; opacity: 0.25; }
 /* Kürbis-Sorten (js/pumpkin.js): Körper, heller Kern, Furchen */
 .ta-pk--v-hokkaido .ta-pk-body { fill: #d9541a; } .ta-pk--v-hokkaido .ta-pk-lobe { fill: #ec6a22; } .ta-pk--v-hokkaido .ta-pk-seg { stroke: #9c3510; }
 .ta-pk--v-turban .ta-pk-body { fill: #d9661c; } .ta-pk--v-turban .ta-pk-lobe { fill: #ea7d2a; } .ta-pk--v-turban .ta-pk-seg { stroke: #9a4410; }
