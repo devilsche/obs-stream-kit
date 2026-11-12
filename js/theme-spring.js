@@ -424,7 +424,17 @@
       peacock: [['f', 6, 23, 5.5, 'tsp-bf-eye1'], ['f', 6, 23, 3.4, 'tsp-bf-eye2'], ['f', 6.5, 23.5, 1.6, 'tsp-bf-eye3'],
                 ['h', -12, 13, 5, 'tsp-bf-eye4'], ['h', -12, 13, 2.6, 'tsp-bf-eye2'], ['f', 9, 14, 1.4, 'tsp-bf-dot']],
       brimstone: [['f', 2, 16, 1.8, 'tsp-bf-spot'], ['h', -10, 11, 1.8, 'tsp-bf-spot']],
-      blue: [['f', 4, 26, 1.1, 'tsp-bf-dot'], ['f', -1, 25, 1.1, 'tsp-bf-dot'], ['h', -12, 18, 1.1, 'tsp-bf-dot'], ['h', -16, 15, 1.1, 'tsp-bf-dot']]
+      blue: [['f', 5, 24, 1, 'tsp-bf-dot'], ['f', 1, 23.5, 1, 'tsp-bf-dot'], ['h', -9, 16.5, 1, 'tsp-bf-dot'], ['h', -13, 15.5, 1, 'tsp-bf-dot']]
+    };
+    // Unterseite (Tarnung, beim hochgeklappten nahen Flügel zu sehen):
+    // Bänder als verkleinerter Umriss [Faktor, Klasse], Punkte wie oben
+    var BF_UBAND = { peacock: [[0.66, 'tsp-bf-uband'], [0.5, 'tsp-bf-uband2']] };
+    var BF_UPAT = {
+      brimstone: [['f', 2, 16, 1.1, 'tsp-bf-urust'], ['h', -10, 11, 1.1, 'tsp-bf-urust']],
+      blue: [['f', 2, 18, 2.3, 'tsp-bf-uring'], ['f', 2, 18, 1.4, 'tsp-bf-udot'], ['f', 5, 11, 2.1, 'tsp-bf-uring'], ['f', 5, 11, 1.2, 'tsp-bf-udot'],
+             ['f', 0, 20, 2, 'tsp-bf-uring'], ['f', 0, 20, 1.1, 'tsp-bf-udot'],
+             ['h', -8, 9, 2, 'tsp-bf-uring'], ['h', -8, 9, 1.1, 'tsp-bf-udot'], ['h', -13, 13, 2, 'tsp-bf-uring'], ['h', -13, 13, 1.1, 'tsp-bf-udot'],
+             ['h', -6, 15.5, 1.3, 'tsp-bf-uorange'], ['h', -10.5, 16, 1.3, 'tsp-bf-uorange'], ['h', -14.5, 14, 1.3, 'tsp-bf-uorange']]
     };
     function bfProj(v, u, th, s) {
       return [v, -u * Math.sin(th) * Math.cos(BF_P) + s * u * Math.cos(th) * Math.sin(BF_P)];
@@ -452,6 +462,13 @@
         (BF_PAT[kind] || []).forEach(function (p) {
           if ((p[0] === 'f') === fore) o.pat.push({ p: p, n: el('path', { 'class': 'tsp-bf-pat ' + p[4] }, w) });
         });
+        o.bands = [];
+        if (s > 0) {
+          (BF_UBAND[kind] || []).forEach(function (b) { o.bands.push({ k: b[0], n: el('path', { 'class': 'tsp-bf-under ' + b[1] }, w) }); });
+          (BF_UPAT[kind] || []).forEach(function (p) {
+            if ((p[0] === 'f') === fore) o.pat.push({ p: p, n: el('path', { 'class': 'tsp-bf-under ' + p[4] }, w) });
+          });
+        }
         return o;
       }
       var wings = [wing(-1, false), wing(-1, true)];
@@ -473,6 +490,7 @@
         if (w.g.dataset.under !== under) w.g.dataset.under = under;
         w.edge.setAttribute('d', bfPath(pts, th, w.s, 1));
         w.inner.setAttribute('d', bfPath(pts, th, w.s, 0.84));
+        w.bands.forEach(function (b) { b.n.setAttribute('d', bfPath(pts, th, w.s, b.k)); });
         w.pat.forEach(function (q) { q.n.setAttribute('d', bfCircle(q.p[1], q.p[2], q.p[3], th, w.s)); });
       });
     }

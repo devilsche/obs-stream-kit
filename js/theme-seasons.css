@@ -297,6 +297,13 @@
 .tsp-bf-wing[data-under="1"] .tsp-bf-in { fill: var(--bf-under); }
 .tsp-bf-wing[data-under="1"] .tsp-bf-edge { fill: var(--bf-under); }
 .tsp-bf-wing[data-under="1"] .tsp-bf-pat { display: none; }
+.tsp-bf-wing:not([data-under="1"]) .tsp-bf-under { display: none; }
+.tsp-bf-uband { fill: #4a3a2e; }
+.tsp-bf-uband2 { fill: #2b211c; }
+.tsp-bf-urust { fill: #b0542a; }
+.tsp-bf-uring { fill: #f6f2ea; }
+.tsp-bf-udot { fill: #1c1410; }
+.tsp-bf-uorange { fill: #e8892a; }
 .tsp-bf-eye1 { fill: #e9cf7a; }
 .tsp-bf-eye2 { fill: #3d6fd0; }
 .tsp-bf-eye3 { fill: #1c1410; }

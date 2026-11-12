@@ -615,7 +615,7 @@ Gleiches Prinzip wie Herbst und Weihnachten: eine Source pro Jahreszeit, alles e
 
 Parameter: `icicles`, `frost`, `cover`, `minis`, `snowman`, `falling` (je `1`/`0`), `density` (`light`/`medium`/`heavy`), `smpos` (`left`/`right`), `smx` (0–1500 px vom Rand, Standard 260), `snowrate` (20), `shovel` (5), `scrape` (5), `shakeneed` (5), `shakewin` (20). Testtasten mit `?tune=1`: **C** **M** **B** **S** **V** **K** **X** **I** **N** **L**.
 
-**Frühling** — Blumenwiese, Kirschblütenzweig mit rieselnden Blüten (nachts dunkler und seltener, im Regen nass: fallen schneller und fast senkrecht), Schmetterlinge (Tagpfauenauge, Zitronenfalter, Bläuling; vier Flügel, schräg von oben gesehen, langsamer Schlag mit Auf und Ab, Haken und Gleitstrecken, rasten ab und zu auf einer Blüte und sonnen sich). Windhosen reißen Schmetterlinge und Bienen mit, Böen treiben sie ab.
+**Frühling** — Blumenwiese, Kirschblütenzweig mit rieselnden Blüten (nachts dunkler und seltener, im Regen nass: fallen schneller und fast senkrecht), Schmetterlinge (Tagpfauenauge, Zitronenfalter, Bläuling, jeweils mit eigener Tarn-Unterseite: dunkel gebändert, blass mit Rostpunkt, graubeige mit weiß umrandeten Punkten und oranger Randreihe; vier Flügel, schräg von oben gesehen, langsamer Schlag mit Auf und Ab, Haken und Gleitstrecken, rasten ab und zu auf einer Blüte und sonnen sich). Windhosen reißen Schmetterlinge und Bienen mit, Böen treiben sie ab.
 
 | Ereignis / Befehl | Wirkung |
 |-------------------|---------|
