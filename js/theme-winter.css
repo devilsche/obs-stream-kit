@@ -285,3 +285,23 @@
 .tx-icing { stroke: #fbf7ef; stroke-width: 1.4; fill: none; stroke-dasharray: 2.2 1.6; stroke-linecap: round; }
 .tx-cane { stroke: #fbf7ef; stroke-width: 4.2; fill: none; stroke-linecap: round; }
 .tx-cane-stripe { stroke: #c8202f; stroke-width: 4.2; fill: none; stroke-dasharray: 2.6 2.6; }
+
+/* Böe (data-gust, Richtung --tw-gust-dir): Minis wackeln, Hüte sitzen kurz schief */
+.tw[data-gust="1"] .tw-mini:not(.is-spot) { animation: twGustWob 1.3s ease-out; }
+@keyframes twGustWob {
+  0%, 100% { transform: none; }
+  20% { transform: rotate(calc(var(--tw-gust-dir, 1) * 8deg)); }
+  45% { transform: rotate(calc(var(--tw-gust-dir, 1) * -4deg)); }
+  70% { transform: rotate(calc(var(--tw-gust-dir, 1) * 2deg)); }
+}
+.tw[data-gust="1"] .tw-mini__hatg:not(.is-blown):not(.is-back) { animation: twHatTilt 1.7s ease-out; }
+@keyframes twHatTilt {
+  0%, 100% { transform: none; }
+  25%, 55% { transform: rotate(calc(var(--tw-gust-dir, 1) * 20deg)) translateX(calc(var(--tw-gust-dir, 1) * 3px)); }
+}
+
+/* Tsunami: Hut, Nase und Knöpfe des Schneemanns treiben davon und kommen danach zurück */
+.tw-sm-body.is-washed .tw-sm-btn, .tw-sm-body.is-washed [data-step="5"], .tw-sm-body.is-washed .tw-sm-hatg { visibility: hidden; }
+.tw-sm-body.is-back .tw-sm-btn, .tw-sm-body.is-back [data-step="5"], .tw-sm-body.is-back .tw-sm-hatg {
+  transform-box: fill-box; transform-origin: 50% 100%; animation: twPop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}

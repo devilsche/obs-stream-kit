@@ -489,8 +489,11 @@
       }
       if (name) B.tag('Thank you, ' + name + '!', W / 2, 300, true);
     }
+    // Böe: Laub fliegt vom Haufen, Kürbisse wackeln, die Krähe flattert auf
     function gust() {
       var dir = B.gust(900);
+      B.vars({ '--ts-gust-dir': dir });
+      B.pulse('gust', 1500);
       [[20, 600], [W - 600, W - 20]].forEach(function (r) {
         for (var i = 0, n = Math.round(25 * (1 - 0.7 * W8.wet)); i < n; i++) {
           var x = rand(r[0], r[1]);

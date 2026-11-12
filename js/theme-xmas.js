@@ -528,10 +528,36 @@
       el('ellipse', { cx: f1(9 * k), cy: f1(-h - 5 * k), rx: f1(10 * k), ry: f1(6 * k), fill: look.rib, transform: 'rotate(25 ' + f1(9 * k) + ' ' + f1(-h - 5 * k) + ')' }, g);
       el('circle', { cx: 0, cy: f1(-h - 3 * k), r: f1(4 * k), fill: look.rib }, g);
       var label = giftLabel(gift);
-      gifts[i] = { outer: outer, inner: g, label: label, x: slot[0], y: baseY - h - 18 * k, order: giftNext };
+      gifts[i] = { outer: outer, inner: g, label: label, x: slot[0], y: baseY - h - 18 * k, order: giftNext, base: baseY, gh: h, fl: 0, flShown: '' };
       giftNext++;
       if (gift.name) giftLog.push(gift.name);
       if (animate && shown() && partOn('gifts')) { var p = toScreen(slot[0], baseY - h - 18 * k); tag(label, p[0], p[1]); }
+    }
+    // Tsunami: Geschenke schwimmen auf (gut halb eingetaucht), schaukeln und
+    // treiben etwas, nach dem Ablaufen setzen sie sich wieder auf ihren Platz.
+    // level(x) = Wasserstand über dem unteren Bildrand (1080 px hoch) oder null
+    var floodT = 0;
+    function flood(level, dt) {
+      floodT += dt;
+      gifts.forEach(function (g) {
+        if (!g) return;
+        var target = 0;
+        if (level && !anim && shown() && partOn('gifts')) {
+          var p = toScreen(g.x, g.base);
+          target = Math.max(0, Math.min(260, level(p[0]) - (1080 - p[1]) - 0.45 * g.gh * TK));
+        }
+        if (!target && !g.fl) return;
+        g.fl += (target - g.fl) * Math.min(1, dt * (target > g.fl ? 3 : 1.2));
+        if (g.fl < 0.3 && !target) {
+          g.fl = 0;
+          if (g.flShown) { g.outer.removeAttribute('transform'); g.flShown = ''; }
+          return;
+        }
+        var bob = Math.min(1, g.fl / 30);
+        var tr = 'translate(' + f1(Math.sin(floodT * 1.3 + g.x) * 10 * bob / TK) + ' ' + f1(-g.fl / TK) + ') rotate(' +
+                 f1(Math.sin(floodT * 2.1 + g.x * 0.1) * 9 * bob) + ' ' + g.x + ' ' + f1(g.base) + ')';
+        if (tr !== g.flShown) { g.flShown = tr; g.outer.setAttribute('transform', tr); }
+      });
     }
     function clearOrns() { clear(gOrns); orns = []; ornNext = 0; }
     function clearGifts() { clear(giftsBack); clear(giftsFront); gifts = []; giftNext = 0; giftLog = []; }
@@ -727,6 +753,7 @@
         if (anim.t >= anim.dur) finish();
       },
       start: start,
+      flood: flood,
       busy: function () { return anim ? anim.type : null; },
       totals: function () { return { ornaments: ornTotal, gifts: giftTotal }; },
       bulbs: B

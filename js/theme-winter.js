@@ -121,6 +121,8 @@
     var gMinis = el('g', { 'class': 'tw-minis tw-shk tw-dim' }, svg);
     var gSmPos = el('g', {}, svg);
     var gSm = el('g', { 'class': 'tw-sm tw-shk', 'data-head': '0', 'data-belly': '0' }, gSmPos);
+    // Treibgut vom Tsunami (Schneekugeln, Hüte, Nase, Knöpfe)
+    var gFloats = el('g', { 'class': 'tw-dim' }, svg);
     var gIce = el('g', { 'class': 'tw-ice tw-shk' }, svg);
     var gBaubleBox = el('g', { 'class': 'tw-x tw-baubles' }, svg);
     var gBaubles = el('g', { 'class': 'tw-shk' }, gBaubleBox);
@@ -168,7 +170,7 @@
     });
     smPart(5, function (g) { el('path', { 'class': 'tw-sm-nose', d: 'M-2 -266 L40 -258 L-2 -254 Z' }, g); });
     smPart(6, function (g) {
-      [-200, -176, -152].forEach(function (y) { el('circle', { 'class': 'tw-sm-coal', cx: 0, cy: y, r: 6 }, g); });
+      [-200, -176, -152].forEach(function (y) { el('circle', { 'class': 'tw-sm-coal tw-sm-btn', cx: 0, cy: y, r: 6 }, g); });
       el('path', { 'class': 'tw-sm-arm', d: 'M-48 -190 L-118 -236 M-96 -222 L-112 -252' }, g);
       var r = el('g', { 'class': 'tw-sm-armr' }, g);
       el('path', { 'class': 'tw-sm-arm', d: 'M48 -190 L118 -236 M96 -222 L114 -250' }, r);
@@ -709,7 +711,131 @@
       el2.classList.add('name-tag--out');
       setTimeout(function () { if (el2.parentNode) el2.parentNode.removeChild(el2); }, 300);
     }
+    // ── Tsunami: die Welle reißt Minis in Kugeln auseinander, die samt Hut auf
+    // dem Wasser treiben und zerfallen; nach dem Ablaufen bauen sie sich in
+    // 10–20 s wieder auf. Der große Schneemann bleibt stehen, verliert aber
+    // Hut, Nase und Knöpfe, die davontreiben, und holt sie sich danach zurück.
+    // Treibgut kann eine Windhose schnappen ──
+    var wave = null, floats = [], smWashed = false, smBack = 0;
+    function floater(node, x, y, k, kind) {
+      var g = el('g', {}, gFloats);
+      g.appendChild(node);
+      floats.push({ g: g, x: x, y: y, k: k, kind: kind, life: 1, spin: rand(-20, 20), vx: rand(-40, 40), vy: 0,
+                    mode: 'float', tw: null, drop: null, held: 0, ph: rand(0, 6.3) });
+    }
+    function centered(node, dx, dy) {
+      var w = el('g', { transform: 'translate(' + dx + ' ' + dy + ')' });
+      w.appendChild(node);
+      return w;
+    }
+    function washMini(m) {
+      m.washed = true; m.zap = true;
+      m.outer.dataset.zap = '1';
+      dropTag(m);
+      var top = miniFoot(m);
+      floater(el('circle', { 'class': 'tw-mini__ball', r: 22 }), m.x - 10, top - 20 * m.k, m.k, 'ball');
+      floater(el('circle', { 'class': 'tw-mini__ball', r: 15 }), m.x + 12, top - 54 * m.k, m.k, 'ball');
+      var hat = m.hatG.cloneNode(true);
+      hat.classList.remove('is-blown', 'is-back');
+      floater(centered(hat, 0, 80), m.x + 4, top - 80 * m.k, m.k, 'hat');
+      for (var i = 0; i < 14; i++) {
+        addP({ x: m.x + rand(-20, 20) * m.k, y: top - rand(10, 70) * m.k, vx: rand(-260, 260), vy: rand(-420, -120),
+               term: 500, sway: 0, r: rand(2, 5), life: 1.2, draw: flake });
+      }
+      m.washWait = null;
+    }
+    function washSnowman() {
+      smWashed = true;
+      gSmBody.classList.add('is-washed');
+      var base = surface(SM_X) + 26;
+      var at = function (lx, ly) { return [SM_X + lx * SM_K, base + ly * SM_K]; };
+      var p;
+      if (S.sm >= 8 && rootEl.dataset.xmas !== '1') {
+        var hat = gSmBody.querySelector('.tw-sm-hatg').cloneNode(true);
+        p = at(0, -330); floater(centered(hat, 0, 330), p[0], p[1], SM_K, 'hat');
+      }
+      if (S.sm >= 5) { p = at(19, -260); floater(el('path', { 'class': 'tw-sm-nose', d: 'M-21 -6 L21 2 L-21 6 Z' }), p[0], p[1], SM_K, 'nose'); }
+      if (S.sm >= 6) [-200, -176, -152].forEach(function (y) {
+        p = at(0, y); floater(el('circle', { 'class': 'tw-sm-coal', r: 6 }), p[0], p[1], SM_K, 'coal');
+      });
+    }
+    function stepFlood(dt) {
+      var live = wave && wave.active() && S.on && !reduceMotion;
+      if (wave && !wave.active()) wave = null;
+      // großer Schneemann: Wasser über dem Fuß reißt die losen Teile ab
+      if (live && !smWashed && partOn('snowman') && S.sm >= 5 && wave.level(SM_X) > H - (surface(SM_X) + 26) + 50) washSnowman();
+      if (smWashed && !live) {
+        if (!smBack) smBack = rand(6, 12);
+        smBack -= dt;
+        if (smBack <= 0) {
+          smWashed = false; smBack = 0;
+          gSmBody.classList.remove('is-washed');
+          gSmBody.classList.add('is-back');
+          setTimeout(function () { gSmBody.classList.remove('is-back'); }, 800);
+        }
+      }
+      floats = floats.filter(function (f) {
+        var lvl = live ? wave.level(f.x) : 0, water = H - lvl;
+        var tn = tws ? tws.near(f.x, f.mode === 'up' ? f.tw : f.drop) : null;
+        if (tn && Math.abs(tn.x - f.x) < 100 && (f.mode !== 'up' || f.held > 1)) {
+          f.mode = 'up'; f.tw = tn.t; f.held = 0; f.peak = Math.min(H - 150, Math.max(H - f.y, 0) + rand(150, 300));
+        }
+        if (f.mode === 'up') {
+          f.held += dt;
+          var tx = f.tw && f.tw.active() ? f.tw.x() : null, dir = (f.tw && f.tw.dir) || 1;
+          f.y += ((H - f.peak) - f.y) * Math.min(1, dt * 2.4);
+          f.x += ((tx === null ? f.x : tx) + Math.sin(tNow * 8 + f.ph) * 40 - f.x) * Math.min(1, dt * 3);
+          f.spin += dt * 360 * dir;
+          if (tx === null || tx < -100 || tx > W + 100) { f.mode = 'fall'; f.drop = f.tw; f.tw = null; f.vy = 0; f.vx = dir * 200; }
+        } else if (live && f.y >= water - 4 && f.mode !== 'fall') {
+          // auf dem Wasser: halb eingetaucht, schaukelt, treibt mit der Welle
+          f.mode = 'float';
+          f.y += (water - f.y) * Math.min(1, dt * 4);
+          f.x += (f.vx + (wave.dir || 0) * 50) * dt;
+          f.spin = Math.sin(tNow * 2 + f.ph) * 14;
+          f.life -= dt / (f.kind === 'ball' ? 9 : 14);
+        } else {
+          // fällt (aus dem Wirbel oder ohne Wasser) und zerfällt am Boden
+          f.vy += 1400 * dt;
+          f.x += f.vx * dt; f.y += f.vy * dt;
+          var floor = live ? Math.min(water, surface(f.x)) : surface(f.x);
+          if (f.y >= floor) { f.y = floor; f.vy = 0; f.vx *= 0.5; f.mode = live && water <= surface(f.x) ? 'float' : 'ground'; }
+          if (f.mode === 'ground') f.life -= dt / 1.5;
+        }
+        if (f.life <= 0 || f.x < -150 || f.x > W + 150) { f.g.parentNode.removeChild(f.g); return false; }
+        var sc = f.k * (f.kind === 'ball' ? 0.4 + 0.6 * f.life : 1);
+        f.g.setAttribute('transform', 'translate(' + f1(f.x) + ' ' + f1(f.y) + ') rotate(' + f1(f.spin) + ') scale(' + sc.toFixed(3) + ')');
+        var op = Math.max(0, Math.min(1, f.life * 3, Math.min(f.x + 60, W + 60 - f.x) / 200)).toFixed(2);
+        if (op !== f.op) { f.op = op; f.g.setAttribute('opacity', op); }
+        return true;
+      });
+    }
     var tNow = 0;
+    // Böe: Pulverschnee weht von der Schneedecke und von den Köpfen der
+    // Minis, die Minis wackeln, Hüte sitzen kurz schief
+    var gustTimer = null;
+    function winterGust() {
+      if (!S.on || reduceMotion) return;
+      var dir = liveWind() < -0.05 ? -1 : liveWind() > 0.05 ? 1 : (Math.random() < 0.5 ? -1 : 1);
+      rootEl.style.setProperty('--tw-gust-dir', dir);
+      rootEl.dataset.gust = '1';
+      clearTimeout(gustTimer);
+      gustTimer = setTimeout(function () { rootEl.dataset.gust = '0'; }, 1700);
+      if (partOn('cover') && S.shown > 3) {
+        for (var i = 0; i < 80; i++) {
+          var x = rand(0, W);
+          addP({ x: x, y: surface(x) - rand(0, 8), vx: dir * rand(500, 950), vy: -rand(40, 180), g: 160, term: 300,
+                 sway: 0, r: rand(1.5, 3.5), life: rand(1, 1.8), draw: flake });
+        }
+      }
+      if (partOn('minis') && !minisHidden()) minis.forEach(function (m) {
+        if (!m || m.zap || m.mode) return;
+        for (var j = 0; j < 6; j++) {
+          addP({ x: m.x + rand(-12, 12) * m.k, y: miniTop(m) + rand(0, 20) * m.k, vx: dir * rand(350, 700), vy: -rand(60, 200), g: 200,
+                 term: 300, sway: 0, r: rand(1.5, 3), life: rand(0.8, 1.4), draw: flake });
+        }
+      });
+    }
     function stepMinis(dt) {
       tNow += dt;
       var visible = S.on && partOn('minis') && !minisHidden();
@@ -724,6 +850,20 @@
           return;
         }
         if (!reduceMotion) stepFly(m, dt);
+        // Tsunami: Welle über dem Fuß reißt ihn auseinander, danach baut er sich wieder auf
+        if (wave && wave.active() && !reduceMotion && !m.zap && !m.mode && wave.level(m.x) > H - miniFoot(m) + 25 * m.k) washMini(m);
+        if (m.washed && !(wave && wave.active())) {
+          if (m.washWait === null) m.washWait = rand(10, 20);
+          m.washWait -= dt;
+          if (m.washWait <= 0) {
+            m.washed = false; m.zap = false;
+            delete m.outer.dataset.zap;
+            m.inner.classList.remove('tw-mini--new');
+            void m.inner.getBBox();
+            m.inner.classList.add('tw-mini--new');
+            setTimeout(function () { m.inner.classList.remove('tw-mini--new'); }, 1100);
+          }
+        }
         // Sturm: wächst mit dem Sturm, nach dem Sturm gestaffelt freigraben (~1 min)
         var want = 0.98 * bzNow;
         if (reduceMotion) m.bz = want;
@@ -800,6 +940,8 @@
       var dt = last === null ? 0 : Math.min((ts - last) / 1000, 0.05);
       last = ts;
       X.step(dt);
+      X.flood(wave && wave.active() && S.on ? wave.level : null, dt);
+      stepFlood(dt);
       syncMinis();
       stepSway(dt);
       // Schneedecke folgt dem Server-Stand weich
@@ -948,10 +1090,11 @@
             showBoard('Top snow shovelers', S.snowTop); break;
           case 'spectacle':
             if (p.type === 'avalanche') avalanche(p);
+            if (p.type === 'tsunami' && !p.reduced) wave = p;
             if (tws) { tws.add(p); if (p.type === 'tornado' && !p.reduced) grabMinis(); }
             break;
           case 'gust':
-            gustKick = 3; break;
+            gustKick = 3; winterGust(); break;
           case 'bolt':
             miniBolt(p); break;
           case 'clear':

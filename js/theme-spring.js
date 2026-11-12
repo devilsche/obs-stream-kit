@@ -508,8 +508,23 @@
       var at = flowerAt(f), dx = at[0] - t.x, dy = at[1] - t.y;
       t.el.setAttribute('transform', Math.abs(dx) < 0.3 && Math.abs(dy) < 0.3 ? '' : 'translate(' + f1(dx) + ' ' + f1(dy) + ')');
     }
+    // Böe: alle Blumen biegen sich in Windrichtung und federn nach, ein paar
+    // Blütenblätter fliegen ab, der Zweig verliert eine Wolke Blüten
+    var gustT = 0, gustDir = 1, GUST = 1.8, flBusy = false;
+    function gust() {
+      gustDir = B.gust(1000);
+      for (var i = 0; i < 40 && blossoms.length; i++) { var b = blossoms[Math.floor(Math.random() * blossoms.length)]; blossomPetal(b[0], b[1]); }
+      if (!B.on || B.reduceMotion || !B.partOn('meadow')) return;
+      gustT = GUST;
+      flowers.forEach(function (f) {
+        if (f && !f.rip && Math.random() < 0.4) flowerPetal(f, gustDir * rand(250, 520), rand(-320, -120));
+      });
+    }
     function stepShow(dt) {
       tNow += dt;
+      gustT = Math.max(0, gustT - dt);
+      // Hüllkurve: schnell rein, langsam raus
+      var gEnv = gustT > 0 ? Math.min(1, (GUST - gustT) / 0.2) * (gustT / GUST) : 0;
       stepHeads(dt);
       var live = (show && show.active()) || tws.any();
       var busy = flyHeads.length > 0;
@@ -517,6 +532,7 @@
         if (!f) return;
         var want = 0;
         // Windhose: je näher, desto heftiger (zur nächsten hin geneigt), Blätter fliegen
+        if (gEnv > 0) want += gustDir * 30 * gEnv * (0.75 + 0.35 * Math.sin(tNow * 13 + f.x * 0.07));
         var tn = tws.near(f.x);
         if (tn && f.rip === 'wait' && !B.reduceMotion && Math.abs(tn.x - f.x) < 90) ripHead(f, tn);
         followTag(f);
@@ -559,6 +575,7 @@
         if (f.rip === 'wait' && !live) f.rip = null;
       });
       if (show && !live && !busy) show = null;
+      flBusy = busy;
     }
     function resetShow() {
       show = null; tws.clear();
@@ -581,7 +598,7 @@
       S.weeds += (S.weedsT - S.weeds) * k;
       offFor = B.on ? 0 : offFor + dt;
       if (offFor > 3) return;
-      if (B.on) { if (show) stepShow(dt); } else if (show) resetShow();
+      if (B.on) { if (show || gustT > 0 || flBusy) stepShow(dt); } else if (show) resetShow();
       // Regen richtet die Köpfe sofort auf, bevor der Wasserstand nachzieht
       var wilt = clamp01((30 - S.water) / 30) * (1 - B.rain);
       var dry = clamp01((55 - S.water) / 55) * (1 - 0.7 * B.rain);
@@ -652,10 +669,7 @@
           case 'water': water(p); break;
           case 'weed': weed(p); break;
           case 'bee': sendBee(p.name || ''); break;
-          case 'gust':
-            B.gust(700);
-            for (var i = 0; i < 40 && blossoms.length; i++) { var b = blossoms[Math.floor(Math.random() * blossoms.length)]; blossomPetal(b[0], b[1]); }
-            break;
+          case 'gust': gust(); break;
           case 'celebrate': celebrate(p.name || ''); break;
           case 'seasonboard': B.board('Top gardeners', S.top); break;
           case 'spectacle': spectacle(p); break;

@@ -1029,6 +1029,25 @@
                       sway: rand(40, 90), vph: rand(5, 10), vr: 0, wf: 0.3, r: rand(4, 6), c: CONFETTI[j % 5], life: 2.6, draw: droplet });
       }
     }
+    // Böe: Sand weht flach über den Strand und von den Burgen, Fähnchen flattern wild
+    function gust() {
+      var dir = B.gust(800);
+      B.vars({ '--ts-gust-dir': dir });
+      B.pulse('gust', 1600);
+      if (!B.on || B.reduceMotion || !B.partOn('beach') || !B.front) return;
+      for (var i = 0; i < 70; i++) {
+        var x = rand(0, W);
+        B.front.add({ x: x, y: sandY(x) - rand(0, 8), vx: dir * rand(500, 950), vy: -rand(30, 140), g: 260, term: 400,
+                      sway: 0, vr: 0, wf: 0, r: rand(1.5, 3), c: i % 3 ? '#e2c27f' : '#c9a463', life: rand(0.9, 1.6), draw: droplet });
+      }
+      castles.forEach(function (c) {
+        if (!c || c.s > 0.5) return;
+        for (var j = 0; j < 8; j++) {
+          B.front.add({ x: c.x + rand(-30, 30), y: c.y + rand(0, 40), vx: dir * rand(400, 800), vy: -rand(40, 160), g: 300, term: 400,
+                        sway: 0, vr: 0, wf: 0, r: rand(1.5, 2.5), c: '#e2c27f', life: rand(0.8, 1.3), draw: droplet });
+        }
+      });
+    }
     function sandPuff(x, y) {
       if (!B.front) return;
       for (var i = 0; i < 10; i++) {
@@ -1385,6 +1404,8 @@
     var xmas = 'off';
     TS.loop(function (dt, ts) {
       X.step(dt);
+      // Tsunami am Strand: Geschenke unterm Baum schwimmen auf
+      X.flood(wave && wave.active() && B.on && !B.reduceMotion ? wave.level : null, dt);
       syncCastles();
       if (B.reduceMotion) S.heat = S.heatT;
       else S.heat += (S.heatT - S.heat) * Math.min(1, dt * 0.8);
@@ -1494,7 +1515,7 @@
           case 'ice': addIce(p.name || ''); break;
           case 'fries': addFries(p.name || ''); break;
           case 'cool': cool(p); break;
-          case 'gust': B.gust(600); break;
+          case 'gust': gust(); break;
           case 'celebrate':
             if (X.shown()) X.celebrate();
             celebrate(p.name || '');

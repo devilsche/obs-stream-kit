@@ -550,3 +550,20 @@
   .ts-visit--roll, .ts-visit--roll .ts-visit__item, .ts-visit--pop .ts-visit__item { animation: tsVisitFade 0.6s ease-out both; }
 }
 @keyframes tsVisitFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Böe (data-gust, Richtung --ts-gust-dir): Kürbisse wackeln, Krähe flattert auf, Fähnchen flattern wild */
+.ts[data-gust="1"] .ta-pk-inner:not(.is-spot) { animation: taPkGust 1.3s ease-out; }
+@keyframes taPkGust {
+  0%, 100% { transform: none; }
+  20% { transform: rotate(calc(var(--ts-gust-dir, 1) * 9deg)); }
+  45% { transform: rotate(calc(var(--ts-gust-dir, 1) * -5deg)); }
+  70% { transform: rotate(calc(var(--ts-gust-dir, 1) * 2deg)); }
+}
+.ts[data-gust="1"] .ta-sc-crow { animation: taCrowFlap 1.2s ease-out; }
+@keyframes taCrowFlap {
+  0%, 100% { transform: none; }
+  25% { transform: translate(calc(var(--ts-gust-dir, 1) * 6px), -22px); }
+  45% { transform: translate(calc(var(--ts-gust-dir, 1) * 4px), -12px); }
+  65% { transform: translate(calc(var(--ts-gust-dir, 1) * 2px), -18px); }
+}
+.ts[data-gust="1"] .tss-flag { animation-duration: 0.25s; }
