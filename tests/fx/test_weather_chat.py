@@ -187,3 +187,10 @@ def test_whereami_in_spring_names_the_flower():
     assert wc.whereami_say("anna", 3, theme="spring") == "@anna Du bist die lila Mohnblume."
     assert wc.whereami_say("anna", 3, theme="spring", stage=2) == "@anna Du bist die lila Mohnblume, voll erblüht."
     assert wc.whereami_say("anna", 3) == ""
+
+
+def test_pumpkin_kind_matches_overlay():
+    # gleiche Rechnung wie Pumpkin.varietyOf(nameRand(name, 4)) im Overlay
+    assert [wc.pumpkin_variety(n) for n in ("anna", "x", "MrReibs", "ben")] == ["turban", "butternut", "warty", "classic"]
+    assert wc.whereami_say("anna", 3, theme="autumn") == "@anna Du bist die Bischofsmütze."
+    assert wc.whereami_say("ben", 3, theme="autumn") == "@ben Du bist der Gartenkürbis."

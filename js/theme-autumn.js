@@ -447,13 +447,19 @@
     var pkNodes = [], pkNext = 0, pkTotal = 0, pkGen = 0;
     // Je Platz feste Streuung: Sorte (Farbe), Form, Neigung und Tiefe –
     // hinten kleiner, höher und dunkler, damit der Haufen räumlich wirkt
+    // Sorte fürs Namensschild bei !whereiam (wie PUMPKIN_SAY im Server)
+    var PK_KIND_EN = { classic: 'a garden pumpkin', hokkaido: 'a hokkaido', turban: "a turk's turban", butternut: 'a butternut',
+                       warty: 'a warty gourd', striped: 'a striped gourd', ghost: 'a white ghost pumpkin' };
     function buildPumpkin(name, slot, animate) {
       // Tiefe gehört zum Platz, Aussehen (Sorte, Größe, Form, Neigung) zum Namen
       var depth = PK_D[slot] === undefined ? 0.5 : PK_D[slot], nr = function (s) { return TS.nameRand(name, s); };
       var scale = (0.68 + nr(1) * 0.3) * (1 - 0.22 * depth);
       var wide = nr(2), sx = scale * (0.86 + 0.34 * wide), sy = scale * (1.12 - 0.28 * wide);
       var tilt = (nr(3) - 0.5) * 14;
-      var g = el('g', { 'class': 'ta-pk ta-pk--c' + (1 + Math.floor(nr(4) * 5)) + (animate ? ' ta-pk--new' : '') });
+      // Sorte je Name (Gartenkürbis, Hokkaido, Bischofsmütze, Butternut, Warzen-,
+      // gestreifter Zierkürbis, weißer Ghost), Farbe über die Sorten-Klasse
+      var variety = root.Pumpkin.varietyOf(nr(4));
+      var g = el('g', { 'class': 'ta-pk ta-pk--v-' + variety + (animate ? ' ta-pk--new' : '') });
       // danach weg, sonst spielt ein späterer Scheinwerfer das Herunterfallen erneut ab
       if (animate) setTimeout(function () { g.classList.remove('ta-pk--new'); }, 1200);
       // Zwischenebene zum Anheben/Aufschwimmen (Fuß bei 0/0)
@@ -465,8 +471,8 @@
       var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, spin);
       // Körper aus 10 Wülsten (js/pumpkin.js), dreht sich um die Stielachse;
       // dunkler Schleier über den hinteren Kürbissen gibt Tiefe
-      var model = root.Pumpkin.build(body, { shade: 0.42 * depth, cap: true });
-      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, model: model, ratio: (61 * sy) / (84 * sx),
+      var model = root.Pumpkin.build(body, { shade: 0.42 * depth, cap: true, variety: variety, seed: nr(9) });
+      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, model: model, variety: variety, ratio: (61 * sy) / (84 * sx),
                label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: 0, depth: depth,
                ly: 0, lx: 0, rot: 0, vy: 0, mode: null, shown: '' };
     }
@@ -1246,7 +1252,7 @@
           case 'whereami': {
             var me = (p.name || '').toLowerCase();
             var pk = pkNodes.filter(function (k) { return k && k.label && !k.zap && k.label.toLowerCase() === me; })[0];
-            if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); pkTag(pk, pk.label + ' is right here!', true); }
+            if (pk && B.on && B.partOn('pumpkins') && root.SeasonKit) { root.SeasonKit.hop(pk.inner); pkTag(pk, pk.label + ' is ' + PK_KIND_EN[pk.variety || 'classic'] + '!', true); }
             else if (!pk && p.visit && B.on && B.partOn('pumpkins')) visitPumpkin(p.name || '');
             break;
           }

@@ -212,9 +212,23 @@ def flower_say(name: str) -> str:
     return f"die {FLOWER_COLORS[c]} {FLOWER_TYPES[t]}"
 
 
+# Kürbis-Sorten wie Pumpkin.varietyOf in js/pumpkin.js (nameRand 4): Gartenkürbis
+# am häufigsten, die anderen gleich oft
+PUMPKIN_VARIETIES = ("classic", "hokkaido", "turban", "butternut", "warty", "striped", "ghost")
+PUMPKIN_SAY = {"classic": "der Gartenkürbis", "hokkaido": "der Hokkaido", "turban": "die Bischofsmütze",
+               "butternut": "der Butternut", "warty": "der Warzenkürbis", "striped": "der gestreifte Zierkürbis",
+               "ghost": "der weiße Ghost-Kürbis"}
+
+
+def pumpkin_variety(name: str) -> str:
+    r = name_rand(name, 4)
+    return "classic" if r < 0.28 else PUMPKIN_VARIETIES[1 + min(5, int((r - 0.28) / 0.72 * 6))]
+
+
 def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False, theme: str = "", stage: int = 0) -> str:
     """Antwort auf !whereiam; leer, wenn die Figur im Bild ist (dann wackelt oder hüpft sie).
-    Im Frühling nennt sie die Blume („Du bist die rosa Tulpe“), mit Wachstumsstufe."""
+    Im Frühling nennt sie die Blume („Du bist die rosa Tulpe“), mit Wachstumsstufe,
+    im Herbst die Kürbis-Sorte („Du bist die Bischofsmütze“)."""
     who = f"@{name} " if name else ""
     if host:
         return f"{who}Du bist der Gastgeber, dir gehört die ganze Deko."
@@ -226,6 +240,8 @@ def whereami_say(name: str, pos, shown: int = VISIBLE, host: bool = False, theme
     if theme == "spring":
         grown = {1: ", schon gewachsen", 2: ", voll erblüht"}.get(stage, "")
         return f"{who}Du bist {flower_say(name)}{grown}."
+    if theme == "autumn":
+        return f"{who}Du bist {PUMPKIN_SAY[pumpkin_variety(name)]}."
     return ""
 
 PROJECT = {"winter": ("Schneemann", "zum fertigen Schneemann"),

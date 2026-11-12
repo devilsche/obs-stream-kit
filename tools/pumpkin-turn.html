@@ -90,23 +90,23 @@
         return n;
       }
       // gleicher Aufbau wie buildPumpkin() in js/theme-autumn.js (js/pumpkin.js)
-      function pumpkin(svg, color, sx, sy) {
+      function pumpkin(svg, variety, sx, sy) {
         var defs = el('defs', {}, svg);
         var glow = el('filter', { id: 'ta-glow', x: '-200%', y: '-200%', width: '500%', height: '500%' }, defs);
         el('feGaussianBlur', { stdDeviation: 6 }, glow);
-        var g = el('g', { 'class': 'ta-pk ta-pk--c' + color, transform: 'translate(95 150) scale(1.6)' }, svg);
+        var g = el('g', { 'class': 'ta-pk ta-pk--v-' + variety, transform: 'translate(95 150) scale(1.6)' }, svg);
         var lift = el('g', {}, g);
         var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
         el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: 44 * sx, ry: 7 }, inner);
         var spin = el('g', { 'class': 'ta-pk-spin' }, inner);
         var body = el('g', { transform: 'scale(' + sx + ' ' + sy + ')' }, spin);
-        g.model = window.Pumpkin.build(body);
+        g.model = window.Pumpkin.build(body, { variety: variety });
         return g;
       }
       var stage = document.getElementById('pumps'), pks = [];
-      [[1, 1.05, 0.95], [2, 0.95, 1.05], [3, 1.1, 0.9], [4, 0.9, 1], [5, 1, 1]].forEach(function (c) {
-        var svg = el('svg', { viewBox: '0 0 190 190', role: 'img', 'aria-label': 'Pumpkin ' + c[0] }, stage);
-        pks.push(pumpkin(svg, c[0], c[1], c[2]));
+      window.Pumpkin.VARIETIES.forEach(function (v) {
+        var svg = el('svg', { viewBox: '0 0 190 190', role: 'img', 'aria-label': 'Pumpkin: ' + v }, stage);
+        pks.push(pumpkin(svg, v, 1, 1));
       });
 
       var dur = document.getElementById('dur'), from = document.getElementById('from'), slow = document.getElementById('slow');

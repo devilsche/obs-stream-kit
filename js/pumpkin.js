@@ -29,27 +29,68 @@
   function f1(v) { return (Math.round(v * 10) / 10).toString(); }
   var RAD = Math.PI / 180;
 
+  // Sorten: Form über eine Hülle (gestaucht, klein), Farbe über CSS
+  // (.ta-pk--v-<sorte>), Besonderheiten als „Merkmale“ auf der Kugel, die beim
+  // Drehen mitwandern (Warzen, Streifen der Bischofsmütze)
+  var VARIETIES = ['classic', 'hokkaido', 'turban', 'butternut', 'warty', 'striped', 'ghost'];
+  var SHAPE = { hokkaido: 'scale(1.08 0.84)', turban: 'scale(1.12 0.72)', warty: 'scale(0.8 0.82)', striped: 'scale(0.86 0.9)' };
+  // Butternut: Birnenform (Bauch unten, Hals oben), keine Wülste
+  var BUTTERNUT = 'M0 -60 C9 -60 10 -50 11 -40 C12 -32 30 -30 30 -14 C30 -2 18 1 0 1 C-18 1 -30 -2 -30 -14 C-30 -30 -12 -32 -11 -40 C-10 -50 -9 -60 0 -60 Z';
+
   // Aufbau: Glühen, Kontur, Wülste, Glanz, Tiefenschleier, Schneehaube, Stiel, Gesicht.
-  // opts.shade: Deckkraft des dunklen Schleiers (hintere Kürbisse), opts.cap: Schneehaube
+  // opts.shade: Deckkraft des dunklen Schleiers (hintere Kürbisse), opts.cap: Schneehaube,
+  // opts.variety: eine aus VARIETIES (Standard classic), opts.seed: 0..1 für Merkmale
   function build(body, opts) {
     opts = opts || {};
+    var v = VARIETIES.indexOf(opts.variety) >= 0 ? opts.variety : 'classic', seed = opts.seed || 0.37;
+    var rr = function (k) { var x = Math.sin((seed * 9301 + k * 49297) % 233280) * 10000; return x - Math.floor(x); };
     el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
-    // dunkle Kontur: genau der Umriss der Wülste (mit Mulde am Stiel), nur ihr
-    // Rand bleibt sichtbar und trennt den Kürbis vom gleichfarbigen Laub
-    el('path', { 'class': 'ta-pk-edge', d: segment(-RX * 1.03, RX * 1.03) }, body);
-    var gLobes = el('g', {}, body), lobes = [];
-    for (var i = 0; i < N; i++) {
-      var g = el('g', {}, gLobes);
-      lobes.push({ g: g, az: i * 360 / N,
-                   base: el('path', { 'class': 'ta-pk-body ta-pk-seg' }, g),
-                   top: el('path', { 'class': 'ta-pk-lobe' }, g) });
+    var vg = el('g', SHAPE[v] ? { transform: SHAPE[v] } : {}, body);
+    var butternut = v === 'butternut';
+    // dunkle Kontur: genau der Umriss (mit Mulde am Stiel), nur ihr Rand bleibt
+    // sichtbar und trennt den Kürbis vom gleichfarbigen Laub
+    el('path', { 'class': 'ta-pk-edge', d: butternut ? BUTTERNUT : segment(-RX * 1.03, RX * 1.03) }, vg);
+    var gLobes = el('g', {}, vg), lobes = [];
+    if (butternut) {
+      el('path', { 'class': 'ta-pk-body', d: BUTTERNUT }, gLobes);
+      el('path', { 'class': 'ta-pk-lobe', d: 'M0 -56 C6 -56 7 -48 7 -40 C8 -30 22 -28 22 -15 C22 -6 12 -3 0 -3 C-12 -3 -16 -8 -16 -16 C-16 -28 -6 -32 -6 -40 C-6 -48 -6 -56 0 -56 Z', 'fill-opacity': 0.55 }, gLobes);
+    } else {
+      for (var i = 0; i < N; i++) {
+        var g = el('g', {}, gLobes);
+        lobes.push({ g: g, az: i * 360 / N,
+                     base: el('path', { 'class': 'ta-pk-body ta-pk-seg' + (v === 'striped' && i % 2 ? ' ta-pk-seg--alt' : '') }, g),
+                     top: el('path', { 'class': 'ta-pk-lobe' + (v === 'striped' && i % 2 ? ' ta-pk-lobe--alt' : '') }, g) });
+      }
     }
-    el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, body);
-    if (opts.shade) el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': opts.shade.toFixed(2) }, body);
-    if (opts.cap) el('path', { 'class': 'ts-cap', d: 'M-40 -45 Q-37 -64 -18 -63 Q0 -68 18 -63 Q37 -64 40 -45 Q20 -54 0 -52 Q-20 -54 -40 -45 Z' }, body);
-    var m = { gLobes: gLobes, lobes: lobes,
-              stem: el('path', { 'class': 'ta-pk-stem' }, body),
-              face: el('path', { 'class': 'ta-pk-face', d: FACE }, body), theta: null };
+    var feats = [];
+    if (v === 'warty') {
+      // Warzen auf der Kugel: Azimut, Höhe; wandern beim Drehen mit
+      for (var w = 0; w < 18; w++) {
+        var wy = CY + (rr(w) - 0.5) * RY * 1.5, wr = 2 + rr(w + 40) * 2.2;
+        feats.push({ el: el('circle', { 'class': 'ta-pk-wart', cx: 0, cy: f1(wy), r: f1(wr) }, vg), az: rr(w + 80) * 360,
+                     rx: RX * 0.97 * Math.sqrt(Math.max(0, 1 - Math.pow((wy - CY) / RY, 2))) });
+      }
+    }
+    if (butternut) el('ellipse', { 'class': 'ta-pk-sheen', cx: -15, cy: -20, rx: 5, ry: 9, transform: 'rotate(-18 -15 -20)' }, vg);
+    else el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, vg);
+    if (opts.shade) el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': opts.shade.toFixed(2) }, vg);
+    // Bischofsmütze: bunte Kappe oben auf dem gestauchten Körper, Streifen drehen mit
+    var top = vg, stemShift = '';
+    if (v === 'turban') {
+      var capG = el('g', {}, body);
+      el('ellipse', { 'class': 'ta-pk-turban', cx: 0, cy: -46, rx: 25, ry: 15 }, capG);
+      for (var c2 = 0; c2 < 10; c2++) {
+        feats.push({ el: el('path', { 'class': 'ta-pk-turban-stripe' + (c2 % 2 ? ' ta-pk-turban-stripe--b' : ''), d: 'M-4.5 -59 Q-7 -46 -4.5 -33 L4.5 -33 Q7 -46 4.5 -59 Z' }, capG),
+                     az: c2 * 36, rx: 20 });
+      }
+      el('ellipse', { 'class': 'ta-pk-sheen', cx: -9, cy: -52, rx: 4, ry: 6, transform: 'rotate(-18 -9 -52)' }, capG);
+      top = body; stemShift = 'translate(0 -2)';
+    }
+    if (opts.cap) el('path', { 'class': 'ts-cap', d: 'M-40 -45 Q-37 -64 -18 -63 Q0 -68 18 -63 Q37 -64 40 -45 Q20 -54 0 -52 Q-20 -54 -40 -45 Z' }, vg);
+    var stemG = el('g', stemShift ? { transform: stemShift } : {}, top);
+    var m = { gLobes: gLobes, lobes: lobes, feats: feats, variety: v,
+              stem: el('path', { 'class': 'ta-pk-stem' }, stemG),
+              face: el('path', { 'class': 'ta-pk-face', d: FACE }, vg), theta: null };
     pose(m, 0);
     return m;
   }
@@ -95,6 +136,13 @@
     });
     // hinten zuerst, vorn zuletzt
     order.sort(function (p, q) { return p[0] - q[0]; }).forEach(function (o) { m.gLobes.appendChild(o[1]); });
+    // Merkmale (Warzen, Kappenstreifen) wandern mit, hinten verdeckt
+    (m.feats || []).forEach(function (F) {
+      var a = (F.az + theta) * RAD, c = Math.cos(a);
+      if (c < 0.06) { F.el.setAttribute('visibility', 'hidden'); return; }
+      F.el.removeAttribute('visibility');
+      F.el.setAttribute('transform', 'translate(' + f1(F.rx * Math.sin(a)) + ' 0) scale(' + c.toFixed(3) + ' 1)');
+    });
     // Stiel: Fuß fest in der Mitte, Spitze zeigt nach STEM_AZ + theta
     var b = (STEM_AZ + theta) * RAD, side = 7 * Math.sin(b), fwd = Math.cos(b);
     var tx = side, ty = -72 + 3 * fwd;
@@ -124,5 +172,8 @@
     root.requestAnimationFrame(step);
   }
 
-  root.Pumpkin = { build: build, pose: pose, turn: turn };
+  // Sorte je Name (gleiche Rechnung wie pumpkin_kind im Server): Gartenkürbis
+  // am häufigsten, die anderen gleich oft
+  function varietyOf(r) { return r < 0.28 ? 'classic' : VARIETIES[1 + Math.min(5, Math.floor((r - 0.28) / 0.72 * 6))]; }
+  root.Pumpkin = { build: build, pose: pose, turn: turn, varietyOf: varietyOf, VARIETIES: VARIETIES };
 })(typeof window !== 'undefined' ? window : this);

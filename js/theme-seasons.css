@@ -158,10 +158,17 @@
 .ta-pk-sheen { fill: #ffffff; opacity: 0.22; }
 .ta-pk-shade { fill: #2a1405; }
 /* Sorten: orange, rotorange, gelb, cremeweiß, grün-orange */
-.ta-pk--c2 .ta-pk-body { fill: #c94a12; } .ta-pk--c2 .ta-pk-lobe { fill: #dc5c1c; } .ta-pk--c2 .ta-pk-rib, .ta-pk--c2 .ta-pk-seg { stroke: #8f300a; }
-.ta-pk--c3 .ta-pk-body { fill: #e8a514; } .ta-pk--c3 .ta-pk-lobe { fill: #f4bb2c; } .ta-pk--c3 .ta-pk-rib, .ta-pk--c3 .ta-pk-seg { stroke: #a87208; }
-.ta-pk--c4 .ta-pk-body { fill: #e6dcc4; } .ta-pk--c4 .ta-pk-lobe { fill: #f2ead6; } .ta-pk--c4 .ta-pk-rib, .ta-pk--c4 .ta-pk-seg { stroke: #b3a585; }
-.ta-pk--c5 .ta-pk-body { fill: #d97a16; } .ta-pk--c5 .ta-pk-lobe { fill: #8a9a3a; } .ta-pk--c5 .ta-pk-rib, .ta-pk--c5 .ta-pk-seg { stroke: #5e6a22; }
+/* Kürbis-Sorten (js/pumpkin.js): Körper, heller Kern, Furchen */
+.ta-pk--v-hokkaido .ta-pk-body { fill: #d9541a; } .ta-pk--v-hokkaido .ta-pk-lobe { fill: #ec6a22; } .ta-pk--v-hokkaido .ta-pk-seg { stroke: #9c3510; }
+.ta-pk--v-turban .ta-pk-body { fill: #d9661c; } .ta-pk--v-turban .ta-pk-lobe { fill: #ea7d2a; } .ta-pk--v-turban .ta-pk-seg { stroke: #9a4410; }
+.ta-pk-turban { fill: #e9dfc0; stroke: #8a7a4a; stroke-width: 1; }
+.ta-pk-turban-stripe { fill: #4f8a3a; } .ta-pk-turban-stripe--b { fill: #e3a73a; }
+.ta-pk--v-butternut .ta-pk-body { fill: #e8c48a; } .ta-pk--v-butternut .ta-pk-lobe { fill: #f2d6a2; }
+.ta-pk--v-warty .ta-pk-body { fill: #d7b532; } .ta-pk--v-warty .ta-pk-lobe { fill: #e6c84a; } .ta-pk--v-warty .ta-pk-seg { stroke: #8a7418; }
+.ta-pk-wart { fill: #a6b84a; stroke: #6f7d2a; stroke-width: 0.8; }
+.ta-pk--v-striped .ta-pk-body { fill: #e3c24a; } .ta-pk--v-striped .ta-pk-lobe { fill: #efd56a; } .ta-pk--v-striped .ta-pk-seg { stroke: #6f6a22; }
+.ta-pk--v-striped .ta-pk-seg--alt { fill: #4f7f32; } .ta-pk--v-striped .ta-pk-lobe--alt { fill: #64953e; }
+.ta-pk--v-ghost .ta-pk-body { fill: #e6dfcf; } .ta-pk--v-ghost .ta-pk-lobe { fill: #f3eee2; } .ta-pk--v-ghost .ta-pk-seg { stroke: #b3a689; }
 /* Gesichter leuchten Kürbis für Kürbis (is-lit setzt das Skript gestaffelt);
    das Flackern setzt erst nach dem weichen Einblenden ein, sonst ploppt es auf */
 .ta-pk-face { fill: #ffd75e; opacity: 0; transition: opacity 2s ease; }
