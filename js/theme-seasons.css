@@ -127,7 +127,7 @@
 .ta-pk-seg { stroke: #b5520a; stroke-width: 1.3; vector-effect: non-scaling-stroke; }
 .ta-pk-stem { fill: #5a6b2a; }
 .ta-pk-shadow { fill: #1e0d03; opacity: 0.55; filter: blur(2.5px); }
-.ta-pk-edge { fill: #3a1806; stroke: #3a1806; stroke-width: 3.5; stroke-opacity: 0.8; vector-effect: non-scaling-stroke; }
+.ta-pk-edge { fill: #3a1806; stroke: #3a1806; stroke-width: 2; stroke-opacity: 0.5; vector-effect: non-scaling-stroke; }
 .ta-pk-sheen { fill: #ffffff; opacity: 0.22; }
 .ta-pk-shade { fill: #2a1405; }
 /* Sorten: orange, rotorange, gelb, cremeweiß, grün-orange */

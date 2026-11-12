@@ -34,10 +34,9 @@
   function build(body, opts) {
     opts = opts || {};
     el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
-    // dunkle Kontur: die Silhouette dahinter, nur ihr Rand bleibt sichtbar
-    [[-18, -30, 24, 30], [18, -30, 24, 30], [0, -31, 22, 31]].forEach(function (e) {
-      el('ellipse', { 'class': 'ta-pk-edge', cx: e[0], cy: e[1], rx: e[2], ry: e[3] }, body);
-    });
+    // dunkle Kontur: genau der Umriss der Wülste (mit Mulde am Stiel), nur ihr
+    // Rand bleibt sichtbar und trennt den Kürbis vom gleichfarbigen Laub
+    el('path', { 'class': 'ta-pk-edge', d: segment(-RX * 1.03, RX * 1.03) }, body);
     var gLobes = el('g', {}, body), lobes = [];
     for (var i = 0; i < N; i++) {
       var g = el('g', {}, gLobes);
