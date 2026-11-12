@@ -678,8 +678,12 @@
         w.pat.forEach(function (q) { q.n.setAttribute('d', bfCircle(q.p[1], q.p[2], q.p[3], th, w.s)); });
       });
     }
+    // Nacht, Regen, Schneefall, Schneesturm oder liegender Schnee: Falter bleiben weg
+    function badBugWeather() {
+      return B.night > 0.5 || B.rain > 0.2 || (B.falling || 0) > 0.1 || (B.blizzard || 0) > 0.05 || B.snow > 0.2;
+    }
     function wanderButterfly() {
-      if (!B.on || !B.partOn('bugs') || B.night > 0.5 || B.rain > 0.2 || B.reduceMotion) return;
+      if (!B.on || !B.partOn('bugs') || badBugWeather() || B.reduceMotion) return;
       // Hintergrund-Tab: Timer laufen weiter, rAF steht – sonst stauen sich Falter an
       if (document.hidden || gBugs.querySelectorAll('.tsp-bf').length >= 3) return;
       var dir = Math.random() < 0.5 ? 1 : -1, b = makeBf(BF_KINDS[Math.floor(Math.random() * BF_KINDS.length)]);
@@ -688,7 +692,7 @@
       // ab und zu eine Blüte vor ihm zum Rasten
       var cand = flowers.filter(function (f) { return f && !f.rip && (f.x - x) * dir > 300 && (f.x - x) * dir < 1500; });
       var rest = Math.random() < 0.6 && cand.length ? cand[Math.floor(Math.random() * cand.length)] : null, sit = 0, sat = false;
-      var whirl = null, spin = 0;
+      var whirl = null, spin = 0, flee = false;
       (function step() {
         var now = performance.now(), dt = Math.min(0.05, (now - last) / 1000), th;
         last = now;
@@ -696,6 +700,12 @@
         // Windhose in der Nähe: reißt ihn mit, wirbelt ihn hoch und schleudert ihn hinaus
         var tn = tws.near(x);
         if (!whirl && tn && Math.abs(tn.x - x) < 130) { whirl = tn.t; sit = 0; rest = null; }
+        // schlägt das Wetter um, sucht er schnell das Weite (zur nächsten Kante)
+        if (!whirl && !flee && badBugWeather()) {
+          flee = true; rest = null; sit = 0; glide = 0;
+          dir = x < W / 2 ? -1 : 1; base = Math.min(base, y) - 60;
+        }
+        if (flee) vx = dir * 240;
         if (whirl) {
           var wx = whirl.active() ? whirl.x() : null;
           if (wx === null || wx < -100 || wx > W + 100) {

@@ -211,6 +211,7 @@
         var sky = opts.sky ? opts.sky() : null;
         var sn = sky ? clamp01(sky.snow || 0) : 0;
         var bz = opts.blizzard ? clamp01(opts.blizzard()) : 0;
+        B.falling = sn; B.blizzard = bz;      // für Tiere: bei Schneefall/-sturm in Deckung
         // liegen bleibt erst etwas, wenn die ersten Flocken unten ankommen
         B.snowFor = sn > 0.05 ? (B.snowFor || 0) + dt : 0;
         var want = B.on && B.snowFor > 8 ? Math.min(1.2, sn + 0.3 * bz) : 0;
