@@ -146,22 +146,27 @@
         var x0 = -10 + i * 388;
         d += ' Q' + (x0 + 194) + ' ' + (i % 2 ? 66 : 80) + ' ' + (x0 + 388) + ' 4';
       }
-      var vine = el('path', { 'class': 'ta-vine', d: d }, gGarland);
+      // Blätter und Eicheln in eigener Gruppe (nachts gedimmt wie der Ast), darüber
+      // der warme Schein der Lämpchen (per Maske nur auf den Blättern), dann die Lämpchen
+      var gLeaves = el('g', { 'class': 'ta-gl-leaves', id: 'ta-gleaves' }, gGarland);
+      var glowGar = el('g', { 'class': 'ta-branch-glow', mask: 'url(#ta-garland-mask)' }, gGarland);
+      var vine = el('path', { 'class': 'ta-vine', d: d }, gLeaves);
       var len = vine.getTotalLength(), n = 0;
       for (var s = 10; s < len; s += 30, n++) {
         var p = vine.getPointAtLength(s);
         var q = vine.getPointAtLength(Math.min(len, s + 1));
         var ang = Math.atan2(q.y - p.y, q.x - p.x) * 180 / Math.PI;
         var side = n % 2 ? 1 : -1;
-        leafUse(gGarland, n % 3, p.x, p.y, 180 + ang + side * (30 + rnd() * 25), 1.1 + rnd() * 0.5, 'ta-vleaf');
+        leafUse(gLeaves, n % 3, p.x, p.y, 180 + ang + side * (30 + rnd() * 25), 1.1 + rnd() * 0.5, 'ta-vleaf');
         if (n % 9 === 4) {
-          var a = el('g', { transform: 'translate(' + f1(p.x) + ' ' + f1(p.y + 8) + ')' }, gGarland);
+          var a = el('g', { transform: 'translate(' + f1(p.x) + ' ' + f1(p.y + 8) + ')' }, gLeaves);
           el('ellipse', { 'class': 'ta-acorn-nut', cx: 0, cy: 14, rx: 8, ry: 11 }, a);
           el('path', { 'class': 'ta-acorn-cap', d: 'M-10 6 Q0 -6 10 6 Q0 10 -10 6 Z' }, a);
         }
         if (n % 2 === 0) {
           var fl = el('g', { 'class': 'ta-fl ri-' + Math.floor(rnd() * 10), transform: 'translate(' + f1(p.x) + ' ' + f1(p.y + 6) + ')' }, gGarland);
           garlandLights.push([p.x, p.y + 6]);
+          el('circle', { 'class': 'ta-lamp', cx: f1(p.x), cy: f1(p.y + 6), r: 85 }, glowGar);
           el('circle', { 'class': 'ta-fl-glow', r: 11 }, fl);
           el('circle', { 'class': 'ta-fl-dot', r: 4 }, fl);
         }
@@ -245,6 +250,8 @@
       el('feColorMatrix', { type: 'matrix', values: '0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0' }, white);
       var mask = el('mask', { id: 'ta-branch-mask', maskUnits: 'userSpaceOnUse', x: -60, y: -60, width: 700, height: 460 }, B.defs);
       el('use', { href: '#ta-sway-g', filter: 'url(#ta-white)' }, mask);
+      var gmask = el('mask', { id: 'ta-garland-mask', maskUnits: 'userSpaceOnUse', x: -40, y: -40, width: W + 80, height: 180 }, B.defs);
+      el('use', { href: '#ta-gleaves', filter: 'url(#ta-white)' }, gmask);
       var lg = el('radialGradient', { id: 'ta-lampg' }, B.defs);
       el('stop', { offset: '0', 'class': 'ta-lampg-0' }, lg);
       el('stop', { offset: '0.45', 'class': 'ta-lampg-m' }, lg);
