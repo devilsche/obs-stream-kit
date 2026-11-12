@@ -863,14 +863,23 @@
       if (B.reduceMotion || watering) return;
       watering = true;
       can.classList.add('is-on');
-      // kommt von der Seite mit mehr Platz (gespiegelt), Brause genau über der Blume
-      var side = t.x < W / 2 ? 1 : -1, tilt = 52, rx = t.x, ry = t.y - 46, t0 = performance.now();
-      canIn.setAttribute('transform', side < 0 ? 'scale(-1 1)' : '');
-      function rosePos(a) {
-        var r = a * Math.PI / 180, lx = CAN_ROSE[0] * side, ly = CAN_ROSE[1];
-        var c = Math.cos(r * side), s2 = Math.sin(r * side);
-        return [lx * c - ly * s2, lx * s2 + ly * c];
+      // kommt von einer zufälligen Seite (gespiegelt), Brause genau über der
+      // Blume; ragte sie dabei über den Bildrand, gießt sie von der anderen Seite
+      var side = Math.random() < 0.5 ? 1 : -1, tilt = 52, rx = t.x, ry = t.y - 46, t0 = performance.now();
+      function rot(px, py, a) {
+        var r = a * side * Math.PI / 180, c = Math.cos(r), s2 = Math.sin(r), lx = px * side;
+        return [lx * c - py * s2, lx * s2 + py * c];
       }
+      function rosePos(a) { return rot(CAN_ROSE[0], CAN_ROSE[1], a); }
+      function fits() {
+        var rp = rosePos(tilt);
+        return [[-66, -82], [122, -82], [122, 40], [-66, 40]].every(function (q) {
+          var p2 = rot(q[0], q[1], tilt), px = rx - rp[0] + p2[0], py = ry - rp[1] + p2[1];
+          return px >= 8 && px <= W - 8 && py >= 8;
+        });
+      }
+      if (!fits()) side = -side;
+      canIn.setAttribute('transform', side < 0 ? 'scale(-1 1)' : '');
       (function step() {
         var sec = (performance.now() - t0) / 1000;
         // 0–0,5 s herein, 0,5–0,8 s kippen, gießen bis 2,1 s, zurück und weg bis 2,6 s
