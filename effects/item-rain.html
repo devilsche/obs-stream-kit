@@ -15,6 +15,7 @@
 </head>
 <body>
   <canvas id="c" width="1920" height="1080" aria-hidden="true"></canvas>
+  <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
   <script>
     (function () {
       'use strict';
@@ -26,6 +27,16 @@
       var COUNT = Math.max(5, parseInt(params.get('count'), 10) || 120) * (reduceMotion ? 0.4 : 1);
       // etwa 1,5 × so groß wie die hängenden Weihnachtskugeln (~64 px)
       var SIZE = 96;
+      // Gummientchen in echtem 3D (WebGL, js/item-rain-duck3d.js), Sushi im 2D-Canvas
+      if (KIND === 'duck') {
+        var load = function (src, done) { var sc = document.createElement('script'); sc.src = src; sc.onload = done; document.head.appendChild(sc); };
+        load('../js/vendor/three-r128.min.js', function () {
+          load('../js/item-rain-duck3d.js', function () {
+            window.DuckRain3D.start({ canvas: document.getElementById('gl'), duration: DURATION, count: COUNT, size: SIZE, reduceMotion: reduceMotion });
+          });
+        });
+        return;
+      }
       var ctx = document.getElementById('c').getContext('2d');
 
       function rand(a, b) { return a + Math.random() * (b - a); }
