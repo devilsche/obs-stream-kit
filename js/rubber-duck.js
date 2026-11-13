@@ -314,7 +314,8 @@
     var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.09), beak);
     bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; g.add(bill);
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
-    [-1, 1].forEach(function (s) {
+    // noWings: wer eigene Arme animiert (Messer-Ente), lässt die angelegten Flügel weg
+    if (!opts.noWings) [-1, 1].forEach(function (s) {
       var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat);
       w.position.set(-0.05, 0.12, s * 0.79); w.rotation.set(s * 0.15, s * 0.12, 0.35);
       g.add(w);
@@ -449,7 +450,7 @@
       capeMesh.userData.cape = { base: Float32Array.from(cpos), nrm: nrmArr, U: U, V: V };
       g.add(capeMesh);
     }
-    g.userData = { body: b, head: HC, headR: HR, decal: decal };
+    g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat };
     return g;
   }
 

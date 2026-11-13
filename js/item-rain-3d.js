@@ -401,8 +401,29 @@
           d.g.position.set(d.x + Math.sin(d.ph) * d.amp, -d.y, d.z);
           return true;
         }
+        if (d.sit > 0) {
+          // sitzt aufrecht am unteren Rand: Kippen klingt aus, nur der Umhang weht noch leicht
+          d.sit -= dt;
+          var damp = Math.exp(-dt * 10);
+          d.g.rotation.x *= damp; d.g.rotation.z *= damp; d.g.rotation.y += d.wy * 0.15 * dt;
+          if (RD && RD.flutter) RD.flutter(d.g, t / 1000, 0.35, d.ph);
+          d.g.position.set(d.x, -d.y, d.z);
+          if (d.sit <= 0) { d.bounced = true; d.vy = 40; d.vx = 0; d.wx = d.wy = d.wz = 0; }  // danach nach hinten weg
+          return true;
+        }
         d.vy = Math.min(d.vy + 900 * dt, 760);
         d.x += d.vx * dt; d.y += d.vy * dt;
+        if (kind === 'duck' && RD && !d.bounced && d.sit == null && d.y > FLOOR - d.sc * 1.1) {
+          // landet sie etwa aufrecht, bleibt sie kurz sitzen
+          var up = new THREE.Vector3(0, 1, 0).applyQuaternion(d.g.quaternion);
+          d.sit = up.y > 0.55 ? rand(1.2, 2.0) : 0;
+          if (d.sit > 0) {
+            d.y = FLOOR - d.sc * 1.1; d.vy = 0;
+            d.g.rotation.order = 'YXZ'; d.g.rotation.setFromQuaternion(d.g.quaternion, 'YXZ');
+            d.ph = d.ph || Math.random() * 6.28;
+            return true;
+          }
+        }
         if (!d.bounced && d.y > FLOOR - d.h) {
           d.bounced = true; d.y = FLOOR - d.h;
           d.vy = -d.vy * rand(0.25, 0.4); d.vx *= 0.6; d.wx *= 0.5; d.wy *= 0.5; d.wz *= 0.5;
@@ -413,7 +434,7 @@
         if (d.y > H + d.h * 2) { remove(d); return false; }
         d.g.rotation.x += d.wx * dt; d.g.rotation.y += d.wy * dt; d.g.rotation.z += d.wz * dt;
         // Umhang flattert im Fahrtwind: je schneller, desto mehr
-        if (RD && RD.flutter && kind === 'duck') RD.flutter(d.g, t / 1000, 0.4 + Math.min(1, d.vy / 600), d.ph || (d.ph = Math.random() * 6.28));
+        if (RD && RD.flutter && kind === 'duck') RD.flutter(d.g, t / 1000, 0.9 + 1.6 * Math.min(1, Math.abs(d.vy) / 600), d.ph || (d.ph = Math.random() * 6.28));
         var s = d.sc * (1 - 0.22 * d.back);
         d.g.scale.set(s, s, s);
         d.g.position.set(d.x, -d.y, d.z - 600 * d.back);

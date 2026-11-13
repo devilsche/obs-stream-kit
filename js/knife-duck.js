@@ -72,7 +72,7 @@
   // Gummiente (js/rubber-duck.js, mit Outfit) sitzt schräg zur Kamera, dazu böse
   // Brauen; Arme, Messer und Geste kommen wie beim Sticker dazu
   function rubberBody(parent, outfit) {
-    var g = root.RubberDuck.build({ outfit: outfit });
+    var g = root.RubberDuck.build({ outfit: outfit, noWings: true });
     var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
     if (!(outfit === 'batman')) {
       // aufgemalte Brauen: vorn (zum Schnabel) tief
@@ -86,7 +86,10 @@
     var wrap = new THREE.Group(); wrap.add(g);
     wrap.rotation.y = -Math.PI / 2 + 0.55;
     parent.add(wrap);
-    return phys(0xf6bd16, { roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.4, envMapIntensity: 0.4, emissive: 0x2a1400 });
+    // Arme: in Uniform in Anzugfarbe, sonst Gummi-Gelb
+    var arm = phys(0xf6bd16, { roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.4, envMapIntensity: 0.4, emissive: 0x2a1400 });
+    if (outfit && outfit !== 'none' && g.userData.wingMat) return g.userData.wingMat;
+    return arm;
   }
 
   function build(style, outfit) {
