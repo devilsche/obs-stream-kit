@@ -2,7 +2,8 @@
  * Toon-Shading (zwei Gelbtöne), dicke dunkelorange Kontur, ein Blob aus Kopf
  * und Körper, böse Brauen. Ablauf wie das GIF, gekürzt auf ~4 s: aufploppen →
  * Messer ruckt hoch vor das Gesicht (federt nach) → Glanzstern an der Spitze →
- * der andere Flügel zieht quer über den Hals (Cut-Throat) und bleibt am Kinn →
+ * der andere Flügel setzt am Hals an, Starre, zieht langsam quer rüber
+ * (Cut-Throat, mit Kratzen der Klinge) und bleibt am Kinn →
  * böser Blick, blauer Ring pulsiert → Messer runter → weg. Animiert „auf
  * Zweien“ (Pose steht 1/15 s). Ton als Dateien (assets/sounds/knife-draw.mp3,
  * knife-glint.mp3, knife-swipe.mp3); fehlt eine, bleibt es an der Stelle still.
@@ -151,8 +152,8 @@
     var unit = (opts.height || 430) / 2.9;
     holder.position.set(opts.x || 960, -(opts.y || 700), 0);
     var vol = opts.volume == null ? 0.7 : opts.volume, base = opts.soundBase || '../assets/sounds/';
-    var cues = [[sound(base + 'knife-draw.mp3', vol), 0.35], [sound(base + 'knife-glint.mp3', vol), 0.7], [sound(base + 'knife-swipe.mp3', vol), 1.15]];
-    var fired = [], TOTAL = 4.1, t0 = null;
+    var cues = [[sound(base + 'knife-draw.mp3', vol), 0.35], [sound(base + 'knife-glint.mp3', vol), 0.7], [sound(base + 'knife-swipe.mp3', vol), 1.65]];
+    var fired = [], TOTAL = 4.75, t0 = null;
 
     function frame(ts) {
       if (t0 === null) t0 = ts;
@@ -160,20 +161,22 @@
       if (opts.freeze == null) cues.forEach(function (c, i) { if (!fired[i] && real >= c[1]) { fired[i] = true; c[0].play(); } });
       // „auf Zweien“: Posen springen in 1/15-s-Schritten
       var t = Math.floor(real * 15) / 15;
-      var s = unit * Math.max(0, Math.min(back(t / 0.3), 1 - ease((t - 3.7) / 0.35)));
+      var s = unit * Math.max(0, Math.min(back(t / 0.3), 1 - ease((t - 4.35) / 0.35)));
       holder.scale.set(s, s, s);
-      // Messer ruckt hoch (mit Nachfedern), ab 3.2 wieder runter
-      var k = t < 0.35 ? 0 : t < 3.2 ? back((t - 0.35) / 0.22) : 1 - ease((t - 3.2) / 0.35);
+      // Messer ruckt hoch (mit Nachfedern), ab 3.85 wieder runter
+      var k = t < 0.35 ? 0 : t < 3.85 ? back((t - 0.35) / 0.22) : 1 - ease((t - 3.85) / 0.35);
       m.knife.position.set(lerp(LOW.x, UP.x, k), lerp(LOW.y, UP.y, k), lerp(LOW.z, UP.z, k));
       m.knife.rotation.set(0, 0, lerp(LOW.rot, UP.rot, k));
       m.hand.position.set(m.knife.position.x - 0.06, m.knife.position.y - 0.12, m.knife.position.z + 0.08);
-      // Cut-Throat: 1.05 an den Hals, 1.15–1.45 quer rüber, bleibt am Kinn; ab 3.2 zurück
-      var a = ease((t - 1.0) / 0.12), b = ease((t - 1.15) / 0.3), r = ease((t - 3.2) / 0.3);
+      // Cut-Throat: 1.1 an den Hals, starrt kurz, 1.65–2.85 langsam quer rüber,
+      // bleibt am Kinn; ab 3.85 zurück
+      var a = ease((t - 1.1) / 0.2), b = clamp01((t - 1.65) / 1.2), r = ease((t - 3.85) / 0.3);
+      b = b * b * (3 - 2 * b) * 0.25 + b * 0.75;   // fast gleichmäßig, weich an den Enden
       var P = { x: lerp(lerp(REST.x, SW0.x, a), SW1.x, b), y: lerp(lerp(REST.y, SW0.y, a), SW1.y, b), rot: lerp(lerp(REST.rot, SW0.rot, a), SW1.rot, b) };
       P = { x: lerp(P.x, REST.x, r), y: lerp(P.y, REST.y, r), rot: lerp(P.rot, REST.rot, r) };
       // immer knapp vor der Körperoberfläche
       m.swipe.position.set(P.x, P.y, 1.06 * Math.sqrt(Math.max(0, 1 - Math.pow(P.x / 1.1, 2))) + 0.14); m.swipe.rotation.set(0, 0, P.rot);
-      // Seitenblick zum Messer, nach der Geste zurück nach vorn
+      // Seitenblick zum Messer, zur Geste wieder starr nach vorn
       var look = ease((t - 0.45) / 0.1) * (1 - ease((t - 1.1) / 0.1));
       m.eyes.forEach(function (e) { e.position.x = e.userData.x0 - 0.07 * look; });
       var anger = ease((t - 0.35) / 0.2);
@@ -182,7 +185,7 @@
       var gs = (t >= 0.7 && t < 1.05) ? Math.sin(((t - 0.7) / 0.35) * Math.PI) : 0;
       m.star.visible = gs > 0.02; m.star.scale.set(0.65 * gs, 0.65 * gs, 1); m.star.material.rotation = gs * 0.6;
       // blauer Ring pulsiert beim Hochreißen und bei der Geste
-      var r1 = clamp01((t - 0.35) / 0.6), r2 = clamp01((t - 1.2) / 0.6), rr = r2 > 0 ? r2 : r1;
+      var r1 = clamp01((t - 0.35) / 0.6), r2 = clamp01((t - 1.65) / 0.8), rr = r2 > 0 ? r2 : r1;
       m.ring.material.opacity = (rr > 0 && rr < 1) ? (1 - rr) * 0.9 : 0;
       var rs = 1.15 + rr * 0.5; m.ring.scale.set(rs, rs, rs);
       renderer.render(scene, cam);

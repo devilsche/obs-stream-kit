@@ -7,4 +7,4 @@ Lautheit angeglichen (ffmpeg loudnorm -16 LUFS).
 |---|---|
 | `knife-draw.mp3` | „unsheath_sword.wav“ von Qat – https://freesound.org/people/Qat/sounds/107589/ |
 | `knife-glint.mp3` | „ShiningRinging“ von NoisyRedFox – https://freesound.org/people/NoisyRedFox/sounds/759840/ |
-| `knife-swipe.mp3` | „Woosh_Anime 5“ von CAT-FOX_ALEX – https://freesound.org/people/CAT-FOX_ALEX/sounds/879256/ |
+| `knife-swipe.mp3` | „knife sharpen - slow 02.wav“ von Anthousai – https://freesound.org/people/Anthousai/sounds/336588/ (auf 1,45 s gekürzt, ausgeblendet) |
