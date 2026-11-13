@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rubber duck viewer</title>
+  <style>
+    /* Testseite: die 3D-Gummiente aus dem Party-Regen (js/item-rain-3d.js) groß
+       und frei drehbar – ziehen, Pfeiltasten, Mausrad bzw. +/− zum Zoomen */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 2; }
+    main { display: flex; flex-direction: column; height: 100%; }
+    header { padding: 14px 20px 6px; }
+    h1 { font-size: 20px; margin: 0; }
+    .lead { color: var(--muted); margin: 2px 0 0; }
+    .stage { position: relative; flex: 1; min-height: 320px; margin: 10px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+    .stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    .stage canvas:active { cursor: grabbing; }
+    .stage canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 10px; padding: 0 20px 18px; align-items: center; }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 8px 14px; font: inherit; cursor: pointer; min-height: 36px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .hint { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#controls">Skip to controls</a>
+  <main>
+    <header>
+      <h1>Rubber duck viewer</h1>
+      <p class="lead">The duck from the party rain (<code>effects/item-rain.html?kind=duck</code>). Drag to rotate, scroll to zoom.</p>
+    </header>
+    <div class="stage">
+      <canvas id="view" tabindex="0" role="img" aria-label="3D rubber duck. Use arrow keys to rotate, plus and minus to zoom."></canvas>
+    </div>
+    <div class="controls" id="controls">
+      <button type="button" id="reset">Reset view</button>
+      <button type="button" id="spin" aria-pressed="false">Auto-rotate</button>
+      <button type="button" id="pink" aria-pressed="false">Pink duck</button>
+      <span class="hint">Keys: arrows rotate, + / − zoom</span>
+    </div>
+  </main>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/item-rain-3d.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var THREE = window.THREE, canvas = document.getElementById('view');
+      var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      var scene = new THREE.Scene();
+      var cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+      // gleiches Licht wie im Regen
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a30, 0.75));
+      var key = new THREE.DirectionalLight(0xffffff, 1.05); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
+      var rim = new THREE.DirectionalLight(0xfff2cc, 0.35); rim.position.set(1, -0.3, 0.6); scene.add(rim);
+
+      var tpl = window.ItemRain3D.duckTemplate(), holder = new THREE.Group(), duck = null;
+      scene.add(holder);
+      function setDuck(pink) {
+        if (duck) holder.remove(duck);
+        duck = pink ? tpl.pink() : tpl.yellow();
+        holder.add(duck);
+      }
+      setDuck(false);
+
+      var yaw = -0.6, pitch = 0.25, dist = 7, spin = false;
+      function reset() { yaw = -0.6; pitch = 0.25; dist = 7; }
+      function clampView() { pitch = Math.max(-1.5, Math.min(1.5, pitch)); dist = Math.max(3, Math.min(14, dist)); }
+
+      function resize() {
+        var w = canvas.clientWidth, h = canvas.clientHeight;
+        renderer.setSize(w, h, false);
+        cam.aspect = w / Math.max(1, h); cam.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', resize);
+
+      // Ziehen dreht die Ente (Maus, Stift, Touch)
+      var drag = null;
+      canvas.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        yaw += (e.clientX - drag.x) * 0.01; pitch += (e.clientY - drag.y) * 0.01;
+        drag = { x: e.clientX, y: e.clientY }; clampView();
+      });
+      canvas.addEventListener('pointerup', function () { drag = null; });
+      canvas.addEventListener('pointercancel', function () { drag = null; });
+      canvas.addEventListener('wheel', function (e) { e.preventDefault(); dist *= e.deltaY > 0 ? 1.1 : 0.9; clampView(); }, { passive: false });
+      canvas.addEventListener('keydown', function (e) {
+        var used = true;
+        if (e.key === 'ArrowLeft') yaw -= 0.15;
+        else if (e.key === 'ArrowRight') yaw += 0.15;
+        else if (e.key === 'ArrowUp') pitch -= 0.15;
+        else if (e.key === 'ArrowDown') pitch += 0.15;
+        else if (e.key === '+' || e.key === '=') dist *= 0.9;
+        else if (e.key === '-') dist *= 1.1;
+        else used = false;
+        if (used) { e.preventDefault(); clampView(); }
+      });
+      document.getElementById('reset').addEventListener('click', reset);
+      var spinBtn = document.getElementById('spin'), pinkBtn = document.getElementById('pink');
+      spinBtn.addEventListener('click', function () { spin = !spin; spinBtn.setAttribute('aria-pressed', String(spin)); });
+      pinkBtn.addEventListener('click', function () {
+        var on = pinkBtn.getAttribute('aria-pressed') !== 'true';
+        pinkBtn.setAttribute('aria-pressed', String(on)); setDuck(on);
+      });
+
+      var last = null;
+      function frame(ts) {
+        var dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+        if (spin && !reduce) yaw += dt * 0.6;
+        holder.rotation.set(pitch, yaw, 0);
+        cam.position.set(0, 0, dist); cam.lookAt(0, 0, 0);
+        renderer.render(scene, cam);
+        requestAnimationFrame(frame);
+      }
+      resize();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
