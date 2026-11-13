@@ -8,7 +8,8 @@
     /* Messer-Ente im Utya-Sticker-Stil (js/knife-duck.js, 3D mit three.js r128,
        Toon-Shading), ~4 s, Ton aus assets/sounds/knife-*.mp3.
        ?x= Mitte in px (960), ?y= Mitte in px (ohne: sitzt auf dem unteren Rand),
-       ?height= Größe in px (430),
+       ?height= Größe in px (430), ?style=sticker|rubber (Utya-Toon oder
+       sitzende 3D-Gummiente),
        ?volume=0..1 (0.7, 0 = stumm). Startet beim Laden – in OBS
        „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -19,6 +20,7 @@
 <body>
   <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
   <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/item-rain-3d.js"></script>
   <script src="../js/knife-duck.js"></script>
   <script>
     (function () {
@@ -27,6 +29,7 @@
       function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
       window.KnifeDuck.start({
         canvas: document.getElementById('gl'),
+        style: q.get('style') === 'rubber' ? 'rubber' : 'sticker',
         x: num('x', 960), y: q.get('y') !== null ? num('y', 700) : null, height: num('height', 430),
         volume: Math.max(0, Math.min(1, num('volume', 0.7))),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),

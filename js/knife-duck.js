@@ -9,7 +9,8 @@
  * wird weich ein- und ausgeblendet. Ton als Dateien (assets/sounds/knife-draw.mp3,
  * knife-glint.mp3, knife-swipe.mp3); fehlt eine, bleibt es an der Stelle still.
  *
- *   KnifeDuck.start({ canvas, x, y, height, volume, freeze, soundBase })
+ *   KnifeDuck.start({ canvas, style, x, y, height, volume, freeze, soundBase })
+ *   style: 'sticker' (Standard, Utya-Toon) oder 'rubber' (sitzende 3D-Gummiente)
  *   freeze: Sekunde, auf der der Ablauf stehen bleibt (zum Prüfen, ?t=)
  */
 (function (root) {
@@ -51,15 +52,61 @@
   function ell(rx, ry, rz, seg) { var g = new THREE.SphereGeometry(1, seg || 40, Math.round((seg || 40) * 0.7)); g.scale(rx, ry, rz); return g; }
 
   // ── Modell (Einheiten: Ente ~2.7 hoch, schaut nach +z) ──
-  function build() {
+  // Umgebung zum Spiegeln (Stahl, Gummiglanz): heller Himmel, dunkler Boden, zwei Lichtstreifen
+  function envMap(renderer) {
+    var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+    var x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, '#b9c6d6'); g.addColorStop(0.55, '#5a6470'); g.addColorStop(1, '#1d2026');
+    x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+    x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(60, 40, 120, 30); x.fillRect(330, 60, 90, 24);
+    var tex = new THREE.CanvasTexture(c);
+    tex.mapping = THREE.EquirectangularReflectionMapping;
+    tex.encoding = THREE.sRGBEncoding;
+    var pm = new THREE.PMREMGenerator(renderer), rt = pm.fromEquirectangular(tex);
+    pm.dispose();
+    return rt.texture;
+  }
+  function phys(hex, o) { var m = new THREE.MeshPhysicalMaterial(Object.assign({ color: hex }, o)); m.color.convertSRGBToLinear(); return m; }
+
+  // Gummiente (Modell aus js/item-rain-3d.js): sitzt, schräg zur Kamera,
+  // böse Brauen; Arme, Messer und Geste kommen wie beim Sticker dazu
+  function rubberBody(parent) {
+    var IR = root.ItemRain3D, E = IR.ellipsoid;
+    var yel = phys(0xffcf1f, { roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.18 });
+    var beak = phys(0xff7a12, { roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.15 });
+    var beakLow = phys(0xe0580a, { roughness: 0.4, clearcoat: 0.6 });
+    var eye = phys(0x111111, { roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 });
+    var g = new THREE.Group();
+    function add(gm, mat, x, y, z, rx, ry, rz) { var m = new THREE.Mesh(gm, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; }
+    add(IR.duckBody(), yel, 0, 0, 0);
+    add(E(0.42, 0.34, 0.42, 28), yel, 0.55, 0.42, 0);
+    add(E(0.56, 0.54, 0.54, 44), yel, 0.62, 0.86, 0);
+    add(E(0.38, 0.13, 0.3, 28), beak, 1.2, 0.82, 0, 0, 0, -0.12);
+    add(E(0.31, 0.09, 0.25, 24), beakLow, 1.14, 0.7, 0, 0, 0, -0.05);
+    [-1, 1].forEach(function (s) {
+      add(E(0.085, 0.1, 0.07, 16), eye, 1.0, 1.06, s * 0.36, 0, s * 0.6, 0);
+      add(E(0.03, 0.03, 0.025, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), 1.06, 1.1, s * 0.39);
+      // böse Braue: vorn (zum Schnabel) tief, hinten hoch
+      add(E(0.17, 0.035, 0.05, 16), eye, 0.96, 1.21, s * 0.37, 0, s * 0.6, -0.5);
+    });
+    g.rotation.y = -Math.PI / 2 + 0.55;
+    parent.add(g);
+    return yel;
+  }
+
+  function build(style) {
+    var rubber = style === 'rubber';
     var duck = new THREE.Group();
     var yel = toon(COL.yellow, COL.shade), beakM = toon(COL.beak, COL.beakShade), blk = flat(COL.black), wht = flat(0xffffff);
     function part(geo, mat, x, y, z, line, parent) {
       var m = new THREE.Mesh(geo, mat); m.position.set(x, y, z);
       (parent || duck).add(m);
-      if (line) outline(m, line, COL.line);
+      if (line && !rubber) outline(m, line, COL.line);
       return m;
     }
+    var eyes = [], brows = [];
+    if (rubber) yel = rubberBody(duck);
+    else {
     // Kopf-Körper-Blob als Drehkörper: unten breit, leichte Taille, großer Kopf
     // Umriss als eine glatte Polarkurve: großer Kopf, weiche Delle am Hals,
     // flacher Boden – keine Knicke, keine Stufen in der Kontur
@@ -85,14 +132,12 @@
     part(ell(0.36, 0.15, 0.27, 32), beakM, 0, 0.03, 0, 0.04, beak);
     part(ell(0.28, 0.1, 0.2, 28), beakM, 0, -0.11, -0.04, 0.035, beak);
     // Augen mit Lichtpunkt (Pupillen wandern beim Seitenblick)
-    var eyes = [];
     [-1, 1].forEach(function (s) {
       var e = part(ell(0.15, 0.19, 0.08, 20), blk, s * 0.38, 0.92, 0.94, 0);
       var c = new THREE.Mesh(ell(0.05, 0.055, 0.02, 10), wht); c.position.set(-0.04, 0.06, 0.07); e.add(c);
       e.userData.x0 = s * 0.38; eyes.push(e);
     });
     // böse Brauen: dicke Balken, innen tief
-    var brows = [];
     [-1, 1].forEach(function (s) {
       var b = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.38, 12), blk);
       b.position.set(s * 0.38, 1.2, 0.92); b.rotation.set(0, 0, Math.PI / 2 + s * 0.45);
@@ -104,6 +149,7 @@
       var f = part(ell(0.24, 0.07, 0.2, 24), feet, sd * 0.32, -0.74, 0.62, 0.035);
       f.rotation.y = sd * 0.35;
     });
+    }
     // Flügel: links (Bild) hält das Messer, rechts macht die Geste und bleibt am Kinn
     var swipe = part(ell(0.36, 0.17, 0.2, 24), yel, 0.6, -0.1, 0.84, 0.04);
     var hand = part(ell(0.26, 0.2, 0.2, 24), yel, -0.55, 0.0, 0.9, 0.04);
@@ -114,14 +160,18 @@
     var bladeGeo = new THREE.ExtrudeGeometry(bs, { depth: 0.04, bevelEnabled: true, bevelThickness: 0.015, bevelSize: 0.015, bevelSegments: 1, curveSegments: 20 });
     bladeGeo.translate(0, 0.12, -0.02);
     bladeGeo.computeVertexNormals();
-    var blade = new THREE.Mesh(bladeGeo, toon(COL.blade, COL.bladeShade)); knife.add(blade);
-    // Kontur: dieselbe Form gleichmäßig breiter (großer Rand), dunkel, direkt dahinter
-    var lineGeo = new THREE.ExtrudeGeometry(bs, { depth: 0.01, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.055, bevelSegments: 3, curveSegments: 20 });
-    lineGeo.translate(0, 0.12, -0.05);
-    knife.add(new THREE.Mesh(lineGeo, flat(COL.bladeLine)));
+    var blade = new THREE.Mesh(bladeGeo, rubber ? phys(0xdfe6ee, { metalness: 1, roughness: 0.15 }) : toon(COL.blade, COL.bladeShade)); knife.add(blade);
+    if (!rubber) {
+      // Kontur: dieselbe Form gleichmäßig breiter (großer Rand), dunkel, direkt dahinter
+      var lineGeo = new THREE.ExtrudeGeometry(bs, { depth: 0.01, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.055, bevelSegments: 3, curveSegments: 20 });
+      lineGeo.translate(0, 0.12, -0.05);
+      knife.add(new THREE.Mesh(lineGeo, flat(COL.bladeLine)));
+    }
     var shine = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.95), wht); shine.position.set(0.1, 0.62, 0.05); shine.rotation.z = -0.04; knife.add(shine);
-    var handle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.45, 16), toon(COL.handle, 0x23262d));
-    handle.position.y = -0.14; knife.add(handle); outline(handle, 0.03, 0x111317);
+    var handle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.45, 16), rubber ? phys(0x5a3519, { roughness: 0.55, clearcoat: 0.4 }) : toon(COL.handle, 0x23262d));
+    handle.position.y = -0.14; knife.add(handle);
+    if (!rubber) outline(handle, 0.03, 0x111317);
+    if (rubber) knife.scale.set(0.8, 0.8, 0.8);
     // Glanzstern (vierzackig)
     var sc = document.createElement('canvas'); sc.width = sc.height = 128;
     var sx = sc.getContext('2d'); sx.fillStyle = '#fff';
@@ -131,14 +181,22 @@
     // blauer Ring am Boden
     var ring = new THREE.Mesh(new THREE.RingGeometry(0.92, 1.0, 64), new THREE.MeshBasicMaterial({ color: COL.ring, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
     ring.rotation.x = -Math.PI / 2 + 0.25; ring.position.y = -1.0;
-    duck.add(ring);
+    if (!rubber) duck.add(ring);
     return { duck: duck, knife: knife, hand: hand, swipe: swipe, eyes: eyes, brows: brows, star: star, ring: ring };
   }
 
-  // Messer: tief schräg vor dem Bauch ↔ senkrecht vor der linken Gesichtshälfte
-  var LOW = { x: -0.42, y: -0.45, z: 1.15, rot: -0.9 }, UP = { x: -0.42, y: 0.1, z: 1.25, rot: 0.06 };
-  // Geste: Flügel startet unten links am Hals, zieht nach rechts, bleibt am Kinn
-  var SW0 = { x: -0.2, y: 0.38, rot: 0.1 }, SW1 = { x: 0.48, y: 0.42, rot: 0.25 }, REST = { x: 0.62, y: -0.1, rot: 0.6 };
+  // Posen je Stil. Messer: tief schräg vor dem Bauch ↔ senkrecht vor dem Gesicht;
+  // es liegt vor dem Flügel, der die Geste macht (der zieht zwischen Messer und Ente
+  // durch). Geste: Flügel setzt links am Hals an, zieht nach rechts, bleibt am Kinn.
+  // bottom = Unterkante in Einheiten, size = Höhe in Einheiten
+  var STYLE = {
+    sticker: { LOW: { x: -0.42, y: -0.45, z: 1.5, rot: -0.9 }, UP: { x: -0.42, y: 0.1, z: 1.65, rot: 0.06 },
+               SW0: { x: -0.2, y: 0.38, rot: 0.1 }, SW1: { x: 0.48, y: 0.42, rot: 0.25 }, REST: { x: 0.62, y: -0.1, rot: 0.6 },
+               swipeZ: function (x) { return 1.06 * Math.sqrt(Math.max(0, 1 - Math.pow(x / 1.1, 2))) + 0.14; }, bottom: 0.83, size: 2.9 },
+    rubber:  { LOW: { x: -0.55, y: -0.3, z: 1.4, rot: -0.9 }, UP: { x: 0.05, y: 0.35, z: 1.7, rot: 0.06 },
+               SW0: { x: 0.08, y: 0.48, rot: 0.1 }, SW1: { x: 0.82, y: 0.5, rot: 0.25 }, REST: { x: 0.9, y: 0.02, rot: 0.6 },
+               swipeZ: function () { return 1.25; }, bottom: 0.53, size: 2.1 }
+  };
 
   function sound(src, volume) {
     var a = new Audio(src); a.preload = 'auto'; a.volume = volume;
@@ -153,13 +211,23 @@
     var scene = new THREE.Scene();
     var cam = new THREE.OrthographicCamera(0, W, 0, -H, -3000, 3000); cam.position.z = 1500;
 
-    var m = build(), holder = new THREE.Group();
+    var styleName = opts.style === 'rubber' ? 'rubber' : 'sticker', ST = STYLE[styleName];
+    var LOW = ST.LOW, UP = ST.UP, SW0 = ST.SW0, SW1 = ST.SW1, REST = ST.REST;
+    if (styleName === 'rubber') {
+      // echtes Licht für das glänzende Gummi (Sticker hat flache Toon-Farben)
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      scene.environment = envMap(renderer);
+      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a30, 0.75));
+      var key = new THREE.DirectionalLight(0xffffff, 1.05); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
+      var rim = new THREE.DirectionalLight(0xfff2cc, 0.35); rim.position.set(1, -0.3, 0.6); scene.add(rim);
+    }
+    var m = build(styleName), holder = new THREE.Group();
     holder.add(m.duck); scene.add(holder);
-    m.duck.rotation.y = 0.15;
-    var unit = (opts.height || 430) / 2.9;
+    if (styleName === 'sticker') m.duck.rotation.y = 0.15;
+    var unit = (opts.height || 430) / ST.size;
     holder.scale.set(unit, unit, unit);
     // ohne y: sitzt 50 px über dem unteren Bildrand (Unterseite der Kontur bei ~0.83 Einheiten)
-    var y = opts.y != null ? opts.y : H - 0.83 * unit - 50;
+    var y = opts.y != null ? opts.y : H - ST.bottom * unit - 50;
     holder.position.set(opts.x || 960, -y, 0);
     var vol = opts.volume == null ? 0.7 : opts.volume, base = opts.soundBase || '../assets/sounds/';
     var cues = [[sound(base + 'knife-draw.mp3', vol), 0.35], [sound(base + 'knife-glint.mp3', vol), 0.7], [sound(base + 'knife-swipe.mp3', vol), 1.65]];
@@ -186,7 +254,7 @@
       var P = { x: lerp(lerp(REST.x, SW0.x, a), SW1.x, b), y: lerp(lerp(REST.y, SW0.y, a), SW1.y, b), rot: lerp(lerp(REST.rot, SW0.rot, a), SW1.rot, b) };
       P = { x: lerp(P.x, REST.x, r), y: lerp(P.y, REST.y, r), rot: lerp(P.rot, REST.rot, r) };
       // immer knapp vor der Körperoberfläche
-      m.swipe.position.set(P.x, P.y, 1.06 * Math.sqrt(Math.max(0, 1 - Math.pow(P.x / 1.1, 2))) + 0.14); m.swipe.rotation.set(0, 0, P.rot);
+      m.swipe.position.set(P.x, P.y, ST.swipeZ(P.x)); m.swipe.rotation.set(0, 0, P.rot);
       // Seitenblick zum Messer, zur Geste wieder starr nach vorn
       var look = ease((t - 0.45) / 0.1) * (1 - ease((t - 1.1) / 0.1));
       m.eyes.forEach(function (e) { e.position.x = e.userData.x0 - 0.07 * look; });
