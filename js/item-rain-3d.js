@@ -393,5 +393,6 @@
     requestAnimationFrame(frame);
   }
 
-  root.ItemRain3D = { start: start };
+  // Bauteile der Ente auch für andere Effekte (js/knife-duck.js)
+  root.ItemRain3D = { start: start, duckBody: bodyGeometry, ellipsoid: ellipsoid };
 })(typeof window !== 'undefined' ? window : this);
