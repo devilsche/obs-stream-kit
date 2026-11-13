@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Knife Duck</title>
   <style>
-    /* Messer-Ente (js/knife-duck.js, 3D mit three.js r128), ~4,4 s mit Ton.
+    /* Messer-Ente im Utya-Sticker-Stil (js/knife-duck.js, 3D mit three.js r128,
+       Toon-Shading), ~4 s, Ton aus assets/sounds/knife-*.mp3.
        ?x=&y= Mitte in px (Standard 960/700), ?height= Größe in px (430),
-       ?volume=0..1 (0.6, 0 = stumm). Startet beim Laden – in OBS
+       ?volume=0..1 (0.7, 0 = stumm). Startet beim Laden – in OBS
        „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
@@ -17,7 +18,6 @@
 <body>
   <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
   <script src="../js/vendor/three-r128.min.js"></script>
-  <script src="../js/item-rain-3d.js"></script>
   <script src="../js/knife-duck.js"></script>
   <script>
     (function () {
@@ -27,7 +27,7 @@
       window.KnifeDuck.start({
         canvas: document.getElementById('gl'),
         x: num('x', 960), y: num('y', 700), height: num('height', 430),
-        volume: Math.max(0, Math.min(1, num('volume', 0.6))),
+        volume: Math.max(0, Math.min(1, num('volume', 0.7))),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
         // ?t=Sekunde hält den Ablauf an dieser Stelle an (zum Prüfen)
         freeze: q.get('t') !== null ? num('t', 0) : null
