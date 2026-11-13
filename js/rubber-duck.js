@@ -75,12 +75,14 @@
     function shape(x, y, z, up) {
       var t = (x + 1) / 2, w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
       // Unterschnabel etwas kürzer und schmaler als der kräftige Oberschnabel
-      return up ? new THREE.Vector3(x * len, y * thick, z * w) : new THREE.Vector3(x * len * 0.88 - len * 0.06, y * thick * 0.85, z * w * 0.9);
+      return up ? new THREE.Vector3(x * len, y * thick, z * w) : new THREE.Vector3(x * len * 0.9 - len * 0.1 * (1 - (x + 1) / 2) * 0, y * thick * 0.85, z * w * 0.92);
     }
     function wedge(v, up) {
       var dx = v.x - Hx, r = Math.sqrt(dx * dx + v.y * v.y), phi = Math.atan2(v.y, dx);
       if (up && phi < 0) phi = 0; if (!up && phi > 0) phi = 0;
-      var a = Math.abs(phi), na = open + a * (Math.PI - open) / Math.PI;
+      // am Kopf liegen die Schnabelhälften aufeinander, der Spalt öffnet sich erst zur Spitze
+      var f = Math.max(0, Math.min(1, (dx / (len * 1.85) - 0.22) / 0.7)), op = open * f * f * (3 - 2 * f);
+      var a = Math.abs(phi), na = op + a * (Math.PI - op) / Math.PI;
       var np = up ? na : -na;
       return new THREE.Vector3(Hx + r * Math.cos(np), r * Math.sin(np), v.z);
     }
@@ -285,7 +287,7 @@
     var b = new THREE.Mesh(body(), yellow); g.add(b);
     // Schnabel: ein Teil, leicht geöffnet
     // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
-    var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.06), beak);
+    var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.09), beak);
     bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; g.add(bill);
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     [-1, 1].forEach(function (s) {
