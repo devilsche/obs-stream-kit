@@ -255,8 +255,13 @@
       for (var x = x0 + 3; x < x1 - 1; x += 4) d += 'M' + f1(x) + ' ' + f1(y + 0.5) + ' l0 ' + f1(h - 1);
       el('path', { 'class': 'tw-mini__rib', d: d }, g);
     }
+    // wie tief die Krempe auf dem Kopf sitzt (Anteil des Kopfradius ab Scheitel):
+    // übergestülpt bis knapp über die Augen, Baskenmütze flach, Eimer am tiefsten
+    var HAT_DEPTH = [0.58, 0.58, 0.46, 0.64, 0, 0.36, 0.6, 0.5];
     function miniHat(g, type, hc, top, r) {
-      var w = r * 1.05, t = top + 4;
+      var dep = HAT_DEPTH[type] || 0.5, t = top + r * dep;
+      // Krempe so breit wie der Kopf auf dieser Höhe, etwas darüber
+      var w = r * (Math.sqrt(Math.max(0, 1 - Math.pow(1 - dep, 2))) + 0.12);
       switch (type) {
         case 1: // Zipfelmütze: langer, zur Seite hängender Zipfel
           el('path', { 'class': hc, d: 'M' + f1(-w) + ' ' + f1(t) + ' Q' + f1(-w * 0.6) + ' ' + f1(t - 22) + ' ' + f1(w * 0.3) + ' ' + f1(t - 26) + ' Q' + f1(w * 1.4) + ' ' + f1(t - 28) + ' ' + f1(w * 1.7) + ' ' + f1(t - 10) +
