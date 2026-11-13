@@ -361,7 +361,7 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
 | `effects/lens-flare.html` | Lens Flare — `?n=1…7` wählt die Variante | Videolänge |
-| `effects/item-rain.html` | Regen aus gezeichneten Dingen für `!party`: `?kind=sushi` (Maki mit Lachs, Gurke oder Tamago, Nigiri mit Lachs oder Garnele) oder `?kind=duck` (Gummientchen); etwa 1,5 × so groß wie die hängenden Weihnachtskugeln, drehen und wenden sich im Fallen, hüpfen unten kurz auf, blenden an den Rändern weich aus; `duration` (ms, Standard 22000), `count` (Standard 120). Startet beim Laden – in OBS „Shutdown source when not visible“ an | ~22s |
+| `effects/item-rain.html` | Regen aus gezeichneten Dingen für `!party`: `?kind=sushi` (Maki als echter Zylinder – beim Wenden kippt die Rolle, Stirnseite mit körnigem Reis und Füllung aus Lachs, Gurke oder Tamago, Nori-Wand mit Fasern und Naht; Nigiri als gewölbter Reisballen mit Fischscheibe, Lachs mit Fettlinien oder Garnele mit Schwanz) oder `?kind=duck` (Gummientchen mit gewölbtem Rumpf, Hals, Kopf, zweiteiligem Schnabel und Glanzlichtern); alles mit Licht von oben links; etwa 1,5 × so groß wie die hängenden Weihnachtskugeln, drehen und wenden sich im Fallen, hüpfen unten kurz auf, blenden an den Rändern weich aus; `duration` (ms, Standard 22000), `count` (Standard 120). Startet beim Laden – in OBS „Shutdown source when not visible“ an | ~22s |
 
 ### Wetter (`weather.html`)
 

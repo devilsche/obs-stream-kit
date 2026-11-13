@@ -31,108 +31,193 @@
       function rand(a, b) { return a + Math.random() * (b - a); }
       function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
 
-      // ── Sushi: Maki (Nori-Ring, Reis, Füllung) und Nigiri (Reisbett, Fischscheibe) ──
-      var MAKI = [
-        { fill: '#f07a52', vein: '#ffd1bf', kind: 'salmon' },
-        { fill: '#6dbb4a', vein: '#d9f2c4', kind: 'cucumber' },
-        { fill: '#f4c430', vein: '#ffe58a', kind: 'tamago' }
-      ];
-      var NIGIRI = [
-        { top: '#f0784e', stripe: '#ffe0d2' },  // Lachs
-        { top: '#f39a6b', stripe: '#ffffff' }   // Garnele
-      ];
-      function grains(r, n) {
+      // ── Hilfen: Verläufe für Licht von oben links (in Teil-Koordinaten, ±0.5) ──
+      function radial(x, y, r, stops) {
+        var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        stops.forEach(function (st) { g.addColorStop(st[0], st[1]); });
+        return g;
+      }
+      function linear(x0, y0, x1, y1, stops) {
+        var g = ctx.createLinearGradient(x0, y0, x1, y1);
+        stops.forEach(function (st) { g.addColorStop(st[0], st[1]); });
+        return g;
+      }
+      // Reiskörner: am Rand dicht und konturiert, innen lockerer (fest je Teil)
+      function grains(n) {
         var out = [];
-        for (var i = 0; i < n; i++) { var a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * r; out.push([Math.cos(a) * d, Math.sin(a) * d, Math.random() * 6.283]); }
+        for (var i = 0; i < n; i++) {
+          var edge = i < n * 0.6, a = Math.random() * 6.283;
+          var d = edge ? 0.86 + Math.random() * 0.14 : Math.sqrt(Math.random()) * 0.8;
+          out.push([Math.cos(a) * d, Math.sin(a) * d, Math.random() * 6.283, 0.8 + Math.random() * 0.5, Math.random()]);
+        }
         return out;
       }
-      function makeSushi() {
-        if (Math.random() < 0.62) {
-          var m = pick(MAKI);
-          return { draw: drawMaki, look: m, grains: grains(0.3, 18) };
-        }
-        return { draw: drawNigiri, look: pick(NIGIRI), grains: grains(0.36, 14) };
-      }
-      function drawMaki(p, back) {
-        var r = 0.5;
-        // Nori außen, mit leichtem Glanz
-        ctx.fillStyle = '#1f2b22'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.fill();
-        ctx.strokeStyle = 'rgba(120,160,120,.35)'; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.arc(0, 0, r - 0.02, 3.6, 5.2); ctx.stroke();
-        // Reis
-        ctx.fillStyle = '#f6f3ea'; ctx.beginPath(); ctx.arc(0, 0, r * 0.84, 0, 6.283); ctx.fill();
-        ctx.fillStyle = '#e4ded0';
-        p.shape.grains.forEach(function (g) {
-          ctx.save(); ctx.translate(g[0] * 1.3, g[1] * 1.3); ctx.rotate(g[2]);
-          ctx.beginPath(); ctx.ellipse(0, 0, 0.04, 0.018, 0, 0, 6.283); ctx.fill(); ctx.restore();
+      function drawGrains(list, cx, cy, rx, ry, size) {
+        list.forEach(function (g) {
+          var x = cx + g[0] * rx, y = cy + g[1] * ry;
+          ctx.save(); ctx.translate(x, y); ctx.rotate(g[2]); ctx.scale(1, Math.max(0.35, ry / Math.max(rx, 0.001)));
+          ctx.fillStyle = g[4] < 0.5 ? '#ffffff' : '#ece6d6';
+          ctx.beginPath(); ctx.ellipse(0, 0, size * g[3], size * 0.45 * g[3], 0, 0, 6.283); ctx.fill();
+          ctx.strokeStyle = 'rgba(150,140,115,.35)'; ctx.lineWidth = size * 0.18; ctx.stroke();
+          ctx.restore();
         });
-        // Füllung
-        ctx.fillStyle = p.shape.look.fill; ctx.beginPath(); ctx.arc(0.02, -0.01, r * 0.36, 0, 6.283); ctx.fill();
-        var lk = p.shape.look;
-        ctx.strokeStyle = lk.vein; ctx.fillStyle = lk.vein; ctx.lineWidth = 0.022; ctx.lineCap = 'round';
-        if (lk.kind === 'salmon') {
-          // geschwungene Fettlinien
-          ctx.beginPath(); ctx.arc(-0.12, 0.1, 0.16, -1.2, 0.1); ctx.stroke();
-          ctx.beginPath(); ctx.arc(-0.06, 0.16, 0.2, -1.1, -0.1); ctx.stroke();
-        } else if (lk.kind === 'cucumber') {
-          // helles Fruchtfleisch mit Kernen
-          ctx.beginPath(); ctx.arc(0.02, -0.01, 0.1, 0, 6.283); ctx.fill();
-          ctx.fillStyle = '#5a9a3a';
-          [[-0.03, -0.03], [0.05, -0.02], [0.0, 0.04], [0.06, 0.04]].forEach(function (k) { ctx.beginPath(); ctx.ellipse(k[0], k[1], 0.015, 0.008, 0.6, 0, 6.283); ctx.fill(); });
-        } else {
-          // Omelett-Schichten
-          for (var i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-0.13, i * 0.06 - 0.01); ctx.lineTo(0.17, i * 0.06 - 0.01); ctx.stroke(); }
-        }
-      }
-      function drawNigiri(p, back) {
-        // Reisbett unten
-        ctx.fillStyle = '#f6f3ea';
-        ctx.beginPath(); ctx.ellipse(0, 0.08, 0.48, 0.26, 0, 0, 6.283); ctx.fill();
-        ctx.fillStyle = '#e4ded0';
-        p.shape.grains.forEach(function (g) {
-          ctx.save(); ctx.translate(g[0] * 1.3, 0.1 + g[1] * 0.6); ctx.rotate(g[2]);
-          ctx.beginPath(); ctx.ellipse(0, 0, 0.04, 0.018, 0, 0, 6.283); ctx.fill(); ctx.restore();
-        });
-        // Fischscheibe drüber, mit Fettstreifen
-        ctx.fillStyle = p.shape.look.top;
-        ctx.beginPath(); ctx.moveTo(-0.52, 0.02); ctx.quadraticCurveTo(-0.5, -0.26, 0, -0.27); ctx.quadraticCurveTo(0.5, -0.26, 0.54, 0.0);
-        ctx.quadraticCurveTo(0, -0.06, -0.52, 0.02); ctx.fill();
-        ctx.strokeStyle = p.shape.look.stripe; ctx.lineWidth = 0.03; ctx.globalAlpha *= 0.85;
-        for (var i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 0.16 - 0.04, -0.22); ctx.quadraticCurveTo(i * 0.16 + 0.04, -0.12, i * 0.16 - 0.02, -0.05); ctx.stroke(); }
-        ctx.globalAlpha /= 0.85;
-        // Glanz
-        ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(-0.2, -0.18, 0.12, 0.035, -0.2, 0, 6.283); ctx.fill();
       }
 
-      // ── Gummientchen: Körper, Kopf, Schnabel, Flügel, Auge mit Glanz ──
-      function makeDuck() { return { draw: drawDuck, hue: Math.random() < 0.15 ? '#ffb2d0' : '#ffd23f' }; }
-      function drawDuck(p, back) {
-        var body = p.shape.hue;
-        // Körper (Badewannen-Ente: rundlich, Schwanz hinten hoch)
-        ctx.fillStyle = body;
+      // ── Sushi ──
+      // Maki: kurzer Zylinder (Durchmesser 1, Höhe 0.42). Beim Wenden kippt die
+      // Achse: Stirnseite (Reis + Füllung) als Ellipse, darunter die Nori-Wand.
+      var MAKI = [
+        { fill: '#f0784e', dark: '#c4492a', vein: 'rgba(255,225,210,.9)', kind: 'salmon' },
+        { fill: '#79c257', dark: '#3f8a2c', vein: '#e1f4cf', kind: 'cucumber' },
+        { fill: '#f6cb3a', dark: '#d79a12', vein: 'rgba(255,240,170,.9)', kind: 'tamago' }
+      ];
+      var NIGIRI = [
+        { kind: 'salmon', a: '#ff9a6e', b: '#e2582f', c: '#b8401f' },
+        { kind: 'shrimp', a: '#ffb08a', b: '#f0663e', c: '#c94a2a' }
+      ];
+      function makeSushi() {
+        if (Math.random() < 0.6) return { draw: drawMaki, selfTilt: true, look: pick(MAKI), grains: grains(46), seam: rand(-0.3, 0.3) };
+        return { draw: drawNigiri, look: pick(NIGIRI), grains: grains(40) };
+      }
+      function drawMaki(p) {
+        var R = 0.5, HH = 0.42, t = p.flip;
+        var c = Math.cos(t), sn = Math.sin(t), ry = R * Math.max(0.06, Math.abs(c)), d = HH * sn / 2;
+        // die sichtbare Stirnseite liegt vorn (zum Betrachter), die Wand dahinter
+        var fy = -d, by = d;
+        // Wand: Rechteck zwischen beiden Ellipsen + hintere Ellipse, zylindrisch schattiert
+        ctx.fillStyle = linear(-R, 0, R, 0, [[0, '#0d140f'], [0.3, '#2c3d2e'], [0.42, '#3e5440'], [0.7, '#1a251c'], [1, '#090d0a']]);
         ctx.beginPath();
-        ctx.moveTo(-0.46, 0.0);
-        ctx.quadraticCurveTo(-0.52, -0.22, -0.36, -0.2);
-        ctx.quadraticCurveTo(-0.2, 0.02, 0.06, -0.02);
-        ctx.quadraticCurveTo(0.42, -0.02, 0.44, 0.14);
-        ctx.quadraticCurveTo(0.42, 0.36, 0.0, 0.36);
-        ctx.quadraticCurveTo(-0.4, 0.36, -0.46, 0.0);
+        ctx.ellipse(0, by, R, ry, 0, 0, 6.283);
+        ctx.rect(-R, Math.min(fy, by), 2 * R, Math.abs(by - fy));
         ctx.fill();
-        // Kopf
+        // Nori-Struktur: feine Längsfasern und Naht
+        if (Math.abs(d) > 0.04) {
+          ctx.strokeStyle = 'rgba(90,120,90,.25)'; ctx.lineWidth = 0.008;
+          for (var x = -0.42; x <= 0.42; x += 0.07) { ctx.beginPath(); ctx.moveTo(x, fy); ctx.lineTo(x, by); ctx.stroke(); }
+          ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 0.014;
+          ctx.beginPath(); ctx.moveTo(p.shape.seam, fy); ctx.lineTo(p.shape.seam, by); ctx.stroke();
+        }
+        // Stirnseite: dünner Nori-Rand, Reisring, Füllung
+        ctx.fillStyle = '#16211a'; ctx.beginPath(); ctx.ellipse(0, fy, R, ry, 0, 0, 6.283); ctx.fill();
+        var rr = R * 0.9, rry = ry * 0.9;
+        ctx.fillStyle = radial(-0.12, fy - rry * 0.3, 0.6, [[0, '#ffffff'], [0.6, '#f3efe4'], [1, '#d9d2c0']]);
+        ctx.beginPath(); ctx.ellipse(0, fy, rr, rry, 0, 0, 6.283); ctx.fill();
+        drawGrains(p.shape.grains, 0, fy, rr * 0.95, rry * 0.95, 0.034);
+        var lk = p.shape.look, fx = 0.03, fr = 0.19, fry = fr * (ry / R);
+        // Füllung leicht vertieft: dunkler Rand innen
+        ctx.fillStyle = radial(fx - 0.05, fy - fry * 0.4, fr * 1.4, [[0, lk.fill], [1, lk.dark]]);
+        ctx.beginPath(); ctx.ellipse(fx, fy, fr, fry, 0, 0, 6.283); ctx.fill();
+        ctx.save(); ctx.beginPath(); ctx.ellipse(fx, fy, fr, fry, 0, 0, 6.283); ctx.clip();
+        ctx.translate(fx, fy); ctx.scale(1, fry / fr);
+        ctx.strokeStyle = lk.vein; ctx.fillStyle = lk.vein; ctx.lineWidth = 0.02; ctx.lineCap = 'round';
+        if (lk.kind === 'salmon') {
+          for (var k = -2; k <= 2; k++) { ctx.beginPath(); ctx.arc(-0.22, 0.2 + k * 0.03, 0.2 + k * 0.06, -1.3, -0.1); ctx.stroke(); }
+        } else if (lk.kind === 'cucumber') {
+          ctx.beginPath(); ctx.arc(0, 0, 0.11, 0, 6.283); ctx.fill();
+          ctx.fillStyle = '#5c9a3c';
+          [[-0.04, -0.03], [0.04, -0.03], [0.0, 0.05], [0.06, 0.03], [-0.06, 0.03]].forEach(function (q) { ctx.beginPath(); ctx.ellipse(q[0], q[1], 0.016, 0.009, 0.7, 0, 6.283); ctx.fill(); });
+        } else {
+          ctx.strokeStyle = 'rgba(200,140,10,.45)';
+          for (var i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(-0.2, i * 0.06); ctx.lineTo(0.2, i * 0.06); ctx.stroke(); }
+        }
+        ctx.restore();
+        // Glanz auf der Stirnseite
+        ctx.fillStyle = 'rgba(255,255,255,.35)';
+        ctx.beginPath(); ctx.ellipse(-0.2, fy - rry * 0.55, 0.12, Math.max(0.01, rry * 0.12), -0.2, 0, 6.283); ctx.fill();
+      }
+      // Nigiri: gewölbter Reisballen, darüber eine Fischscheibe mit Fettlinien und Glanz
+      function drawNigiri(p) {
+        var lk = p.shape.look;
+        // Reisballen (Seitenansicht leicht von oben): Licht oben links, Schatten unten
+        ctx.fillStyle = radial(-0.15, -0.05, 0.75, [[0, '#ffffff'], [0.55, '#f1ecdf'], [1, '#c9c0aa']]);
+        ctx.beginPath(); ctx.ellipse(0, 0.06, 0.47, 0.25, 0, 0, 6.283); ctx.fill();
+        drawGrains(p.shape.grains, 0, 0.07, 0.45, 0.23, 0.032);
+        ctx.fillStyle = 'rgba(80,70,50,.18)';
+        ctx.beginPath(); ctx.ellipse(0.04, 0.24, 0.38, 0.06, 0, 0, 6.283); ctx.fill();
+        // Fischscheibe: hängt vorn und hinten etwas über, Dicke als dunklere Unterkante
+        function slice() {
+          ctx.beginPath();
+          ctx.moveTo(-0.56, 0.06);
+          ctx.bezierCurveTo(-0.58, -0.2, -0.2, -0.3, 0.05, -0.28);
+          ctx.bezierCurveTo(0.35, -0.27, 0.6, -0.16, 0.58, 0.04);
+          ctx.bezierCurveTo(0.3, -0.02, -0.25, -0.02, -0.56, 0.06);
+          ctx.closePath();
+        }
+        ctx.save(); ctx.translate(0, 0.035); slice(); ctx.fillStyle = lk.c; ctx.fill(); ctx.restore();
+        slice();
+        ctx.fillStyle = linear(0, -0.3, 0, 0.05, [[0, lk.a], [0.6, lk.b], [1, lk.c]]);
+        ctx.fill();
+        ctx.save(); slice(); ctx.clip();
+        if (lk.kind === 'salmon') {
+          // weiße Fettlinien, schräg und geschwungen
+          ctx.strokeStyle = 'rgba(255,236,226,.85)'; ctx.lineWidth = 0.024; ctx.lineCap = 'round';
+          for (var i = -4; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(i * 0.13 - 0.1, -0.32); ctx.quadraticCurveTo(i * 0.13 + 0.06, -0.15, i * 0.13 - 0.04, 0.06); ctx.stroke(); }
+        } else {
+          // Garnele: rot-weiße Bänder
+          ctx.fillStyle = 'rgba(255,255,255,.75)';
+          for (var j = -3; j <= 3; j++) { ctx.beginPath(); ctx.ellipse(j * 0.16, -0.12, 0.035, 0.2, 0.15, 0, 6.283); ctx.fill(); }
+        }
+        ctx.restore();
+        if (lk.kind === 'shrimp') {
+          // Schwanz am Ende
+          ctx.fillStyle = linear(0.5, -0.2, 0.75, -0.05, [[0, '#ff6a3d'], [1, '#c23a1c']]);
+          ctx.beginPath(); ctx.moveTo(0.5, -0.12); ctx.lineTo(0.74, -0.24); ctx.lineTo(0.7, -0.04); ctx.lineTo(0.76, 0.06); ctx.lineTo(0.52, -0.02); ctx.closePath(); ctx.fill();
+        }
+        // Glanzstreif oben
+        ctx.fillStyle = 'rgba(255,255,255,.45)';
+        ctx.beginPath(); ctx.ellipse(-0.12, -0.22, 0.22, 0.03, -0.12, 0, 6.283); ctx.fill();
+      }
+
+      // ── Gummientchen: gewölbter Körper und Kopf, Licht von oben links ──
+      function makeDuck() {
+        var pink = Math.random() < 0.12;
+        return { draw: drawDuck, hi: pink ? '#ffe1ec' : '#fff6b0', mid: pink ? '#ffa9c9' : '#ffd21f', low: pink ? '#d9688f' : '#d99a00' };
+      }
+      // Rumpf: rund mit flacher Unterseite, Schwanz hinten hochgezogen, Brust vorn
+      function duckBody() {
+        ctx.beginPath();
+        ctx.moveTo(-0.44, -0.14);                                   // Schwanzspitze
+        ctx.bezierCurveTo(-0.36, -0.06, -0.24, -0.02, -0.06, -0.02);
+        ctx.bezierCurveTo(0.12, -0.04, 0.3, -0.02, 0.38, 0.08);       // Brust
+        ctx.bezierCurveTo(0.46, 0.18, 0.4, 0.32, 0.22, 0.34);
+        ctx.lineTo(-0.24, 0.34);                                    // flache Unterseite
+        ctx.bezierCurveTo(-0.44, 0.33, -0.5, 0.18, -0.48, 0.04);
+        ctx.bezierCurveTo(-0.47, -0.04, -0.47, -0.1, -0.44, -0.14);
+        ctx.closePath();
+      }
+      function drawDuck(p) {
+        var sh = p.shape;
+        // Körper
+        duckBody();
+        ctx.fillStyle = radial(-0.08, 0.04, 0.62, [[0, sh.hi], [0.45, sh.mid], [1, sh.low]]);
+        ctx.fill();
+        // Eigenschatten unten (Bauch) und Kante zur Unterseite
+        ctx.save(); duckBody(); ctx.clip();
+        ctx.fillStyle = 'rgba(150,80,0,.25)'; ctx.beginPath(); ctx.ellipse(0.0, 0.4, 0.55, 0.14, 0, 0, 6.283); ctx.fill();
+        ctx.restore();
+        // Hals: verbindet Rumpf und Kopf
+        ctx.fillStyle = radial(0.1, -0.1, 0.25, [[0, sh.hi], [0.6, sh.mid], [1, sh.low]]);
+        ctx.beginPath(); ctx.ellipse(0.16, -0.04, 0.15, 0.1, 0, 0, 6.283); ctx.fill();
+        // Flügel: erhabene Kante mit Licht oben, Schatten unten
+        ctx.fillStyle = radial(-0.1, 0.05, 0.3, [[0, sh.hi], [1, sh.mid]]);
+        ctx.beginPath(); ctx.moveTo(-0.26, 0.04); ctx.bezierCurveTo(-0.1, -0.04, 0.12, 0.0, 0.14, 0.12); ctx.bezierCurveTo(0.02, 0.22, -0.18, 0.2, -0.26, 0.04); ctx.fill();
+        ctx.strokeStyle = 'rgba(170,100,0,.45)'; ctx.lineWidth = 0.018; ctx.stroke();
+        // Kopf: Kugel mit Glanz
+        ctx.fillStyle = radial(0.1, -0.3, 0.27, [[0, sh.hi], [0.5, sh.mid], [1, sh.low]]);
         ctx.beginPath(); ctx.arc(0.16, -0.2, 0.2, 0, 6.283); ctx.fill();
-        // Schatten unten
-        ctx.fillStyle = 'rgba(180,110,0,.25)';
-        ctx.beginPath(); ctx.ellipse(0.0, 0.26, 0.38, 0.08, 0, 0, 6.283); ctx.fill();
-        // Schnabel
-        ctx.fillStyle = '#ff8a1e';
-        ctx.beginPath(); ctx.moveTo(0.32, -0.2); ctx.quadraticCurveTo(0.52, -0.22, 0.54, -0.14); ctx.quadraticCurveTo(0.46, -0.08, 0.32, -0.12); ctx.closePath(); ctx.fill();
-        // Flügel
-        ctx.strokeStyle = 'rgba(200,130,0,.6)'; ctx.lineWidth = 0.03; ctx.lineCap = 'round';
-        ctx.beginPath(); ctx.moveTo(-0.22, 0.06); ctx.quadraticCurveTo(-0.02, 0.0, 0.1, 0.12); ctx.quadraticCurveTo(-0.08, 0.22, -0.22, 0.06); ctx.stroke();
-        // Auge
-        ctx.fillStyle = '#1b1b1b'; ctx.beginPath(); ctx.arc(0.22, -0.25, 0.04, 0, 6.283); ctx.fill();
-        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0.235, -0.265, 0.014, 0, 6.283); ctx.fill();
-        // Glanz
-        ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.ellipse(-0.12, 0.06, 0.12, 0.04, -0.3, 0, 6.283); ctx.fill();
+        // Schnabel: Ober- und Unterschnabel, Verlauf
+        ctx.fillStyle = linear(0.32, -0.26, 0.56, -0.1, [[0, '#ffae4a'], [1, '#e8650c']]);
+        ctx.beginPath(); ctx.moveTo(0.31, -0.22); ctx.bezierCurveTo(0.42, -0.27, 0.55, -0.22, 0.56, -0.16); ctx.bezierCurveTo(0.48, -0.15, 0.38, -0.15, 0.31, -0.15); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#d4560a';
+        ctx.beginPath(); ctx.moveTo(0.31, -0.15); ctx.bezierCurveTo(0.4, -0.15, 0.5, -0.15, 0.53, -0.13); ctx.bezierCurveTo(0.46, -0.08, 0.36, -0.09, 0.31, -0.12); ctx.closePath(); ctx.fill();
+        // Auge mit Glanz
+        ctx.fillStyle = '#141414'; ctx.beginPath(); ctx.ellipse(0.22, -0.27, 0.035, 0.045, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0.232, -0.287, 0.013, 0, 6.283); ctx.fill();
+        // Glanzlichter (Gummi)
+        ctx.fillStyle = 'rgba(255,255,255,.7)';
+        ctx.beginPath(); ctx.ellipse(0.08, -0.33, 0.06, 0.025, -0.6, 0, 6.283); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.45)';
+        ctx.beginPath(); ctx.ellipse(-0.22, 0.1, 0.12, 0.03, -0.2, 0, 6.283); ctx.fill();
       }
 
       // ── Teilchen: fallen, drehen sich, wenden um die Hochachse, hüpfen unten kurz ──
@@ -173,11 +258,12 @@
           if (p.bounced) p.fade -= dt / 0.9;
           if (p.fade <= 0 || p.y > H + p.s) return false;
           // Wenden: Breite folgt cos(flip), danach gespiegelt
-          var c = Math.cos(p.flip), sx = Math.max(0.12, Math.abs(c));
+          // (Maki kippt selbst als Zylinder)
+          var c = Math.cos(p.flip), sx = p.shape.selfTilt ? 1 : Math.max(0.12, Math.abs(c));
           ctx.save();
           ctx.globalAlpha = Math.max(0, Math.min(1, p.fade)) * edgeAlpha(p.x) * Math.min(1, (p.y + 120) / 120);
-          ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(p.s * sx * (c < 0 ? -1 : 1), p.s);
-          p.shape.draw(p, c < 0);
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(p.s * sx * (!p.shape.selfTilt && c < 0 ? -1 : 1), p.s);
+          p.shape.draw(p);
           ctx.restore();
           return true;
         });
