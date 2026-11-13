@@ -30,6 +30,12 @@
     { c: [0.5, 1.05, 0], r: [0.62, 0.6, 0.6], k: 0.2 }       // Kopf
   ];
   var FLOOR = -0.55;
+  // nur Rumpf (Bauch, Brust, Schwanz) – für Teile, die nicht über den Kopf dürfen
+  function sdTrunk(p) {
+    var d = sdEll(p, PARTS[0].c, PARTS[0].r);
+    for (var i = 1; i < 4; i++) d = smin(d, sdEll(p, PARTS[i].c, PARTS[i].r), PARTS[i].k);
+    return d;
+  }
   function sdDuck(p) {
     var d = sdEll(p, PARTS[0].c, PARTS[0].r);
     for (var i = 1; i < PARTS.length; i++) d = smin(d, sdEll(p, PARTS[i].c, PARTS[i].r), PARTS[i].k);
@@ -67,7 +73,7 @@
   // Gaumen hinter der oberen Lippe nach hinten zum Mundwinkel und wieder vor zur
   // unteren Lippe, zur Tiefe hin dunkler. Alles EINE Geometrie.
   function billGeometry(len, wid, thick, open) {
-    var Hx = -0.85 * len, LIP = 0.032, COLS = 48, ROWS = 16, S = 10;
+    var Hx = -0.85 * len, LIP = 0.018, COLS = 48, ROWS = 16, S = 10;
     var lip = new THREE.Color(0xf2650f).convertSRGBToLinear();
     var mouthHi = new THREE.Color(0x6a1c06).convertSRGBToLinear(), mouthLo = new THREE.Color(0x1e0601).convertSRGBToLinear();
     var pos = [], col = [], idx = [];
@@ -122,7 +128,8 @@
     var grid = [];
     for (var c = 0; c <= COLS; c++) {
       var a = inU[c], b = inL[c];
-      var t = new THREE.Vector3(Hx + (Math.max(a.x, Hx) - Hx) * 0.22, (a.y + b.y) / 2, a.z * 0.65);
+      // Rachen fast so breit wie der Mund, damit das Innere bis an den Lippenrand reicht
+      var t = new THREE.Vector3(Hx + (Math.max(a.x, Hx) - Hx) * 0.22, (a.y + b.y) / 2, a.z * 0.95);
       var colm = [];
       for (var k = 0; k <= S; k++) {
         var u = k / S, w0 = (1 - u) * (1 - u), w1 = 2 * (1 - u) * u, w2 = u * u;
@@ -167,17 +174,22 @@
   function suitMaterial(base, o) {
     var m = vinyl(base, { emissive: 0x2a1400 });
     if (!o.suit) return m;
+    // Brust-Emblem: von vorn (+x) auf die Körperoberfläche projiziert, liegt also drauf
+    var emb = o.chest ? emblemTex(o.chest) : null, embAt = o.chest ? surface(new THREE.Vector3(1, -0.18, 0)) : null;
+    var embSize = o.chest === 'star' ? 0.24 : 0.46;
     var HC = PARTS[5].c, HR = PARTS[5].r;
     m.onBeforeCompile = function (sh) {
       var u = {
         uSuit: col(o.suit), uStripe: col(o.stripe || o.suit), uStripe2: col(o.stripe2 || o.stripe || o.suit),
         uBelt: col(o.belt || o.suit), uBriefs: col(o.briefs || o.suit), uCowl: col(o.cowl || base),
         uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? o.beltY : -9, o.briefs ? 1 : 0),
-        uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2])
+        uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2]),
+        uEmb: emb || new THREE.Texture(), uEmbOn: emb ? 1 : 0,
+        uEmbAt: new THREE.Vector3(embAt ? embAt.p.x : 0, embAt ? embAt.p.y : 0, 0), uEmbSize: embSize
       };
       Object.keys(u).forEach(function (k) { sh.uniforms[k] = { value: u[k] }; });
       sh.vertexShader = 'varying vec3 vDuck;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vDuck = position;');
-      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR; uniform vec4 uS; uniform float uCowlOn;\n' +
+      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt; uniform vec4 uS; uniform float uCowlOn, uEmbOn, uEmbSize; uniform sampler2D uEmb;\n' +
         sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
           'vec3 cc = diffuse;\n' +
           'float inHead = length((vDuck - uHC) / uHR);\n' +
@@ -192,6 +204,11 @@
           // Maske: Kopf oberhalb der Schnabellinie und hinten
           'float cowl = uCowlOn * (1.0 - step(1.12, inHead)) * max(step(uHC.y - 0.06, vDuck.y), step(vDuck.x, uHC.x - 0.12));\n' +
           'cc = mix(cc, uCowl, cowl);\n' +
+          // Emblem vorn auf der Brust (nur Vorderseite, Projektion entlang x)
+          'vec2 euv = vec2(-vDuck.z / uEmbSize + 0.5, (vDuck.y - uEmbAt.y) / uEmbSize + 0.5);\n' +
+          'if (uEmbOn > 0.5 && vDuck.x > uEmbAt.x - 0.35 && euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) {\n' +
+          '  vec4 et = texture2D(uEmb, euv); cc = mix(cc, pow(et.rgb, vec3(2.2)), et.a);\n' +
+          '}\n' +
           'vec4 diffuseColor = vec4( cc, opacity );');
     };
     return m;
@@ -319,29 +336,31 @@
     });
 
     // Helm (THW gelb, Feuerwehr silber mit Nackenschutz) mit Schild vorn
-    // Helm sitzt oben auf dem Kopf, nicht über den Augen
-    var HELMET_UP = 0.17;
+    // Helm wie ein Schutzhelm oben auf dem Kopf: Rand auf Stirnhöhe über den Augen
+    // (Augen bei ~HC.y+0.23), Kuppel etwas flacher als der Kopf
     if (o.helmet) {
       var hm = o.helmet.metal ? vinyl(o.helmet.color, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.0 }) : vinyl(o.helmet.color, { roughness: 0.35, clearcoat: 0.8 });
-      var dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.52), hm);
-      dome.scale.set(HR[0] * 1.07, HR[1] * 1.07, HR[2] * 1.07); dome.position.copy(HC).add(new THREE.Vector3(-0.02, HELMET_UP, 0)); dome.rotation.z = 0.12;
-      g.add(dome);
-      var brim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.05, 10, 64), hm);
-      brim.scale.set(HR[0] * 1.08, HR[2] * 1.08, 1); brim.rotation.set(Math.PI / 2, 0, 0); brim.position.copy(HC).add(new THREE.Vector3(-0.04, HELMET_UP - 0.04, 0)); brim.rotation.y = 0.12;
-      g.add(brim);
+      var RIM_Y = HC.y + 0.33, tilt = 0.1;
+      var rimR = HR[0] * Math.sqrt(Math.max(0.2, 1 - Math.pow((RIM_Y - HC.y) / HR[1], 2))) + 0.07;
+      var helmet = new THREE.Group(); helmet.position.set(HC.x - 0.03, RIM_Y, 0); helmet.rotation.z = tilt; g.add(helmet);
+      var dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.5), hm);
+      dome.scale.set(rimR, 0.42, rimR * HR[2] / HR[0]); helmet.add(dome);
+      var brim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.045, 10, 64), hm);
+      brim.scale.set(rimR + 0.03, (rimR + 0.03) * HR[2] / HR[0], 1); brim.rotation.x = Math.PI / 2; helmet.add(brim);
+      // Kamm oben (typisch für Schutzhelme)
+      var ridge = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12), hm);
+      ridge.scale.set(rimR * 0.95, 0.44, 0.07); helmet.add(ridge);
       if (o.helmet.neck) {
-        // Nackenschutz hinten (phi 0 liegt bei −x, also am Hinterkopf)
-        var neckG = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.45, Math.PI * 0.25), hm);
-        neckG.scale.set(HR[0] * 1.12, HR[1] * 1.12, HR[2] * 1.12); neckG.position.copy(HC).add(new THREE.Vector3(0, HELMET_UP - 0.06, 0)); neckG.material = hm; neckG.material.side = THREE.DoubleSide;
-        g.add(neckG);
+        // Nackenschutz hinten (phi 0 liegt bei −x)
+        var neckG = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.5, Math.PI * 0.2), hm);
+        neckG.material.side = THREE.DoubleSide;
+        neckG.scale.set(rimR + 0.05, 0.5, (rimR + 0.05) * HR[2] / HR[0]); helmet.add(neckG);
       }
       if (o.helmetLabel) {
-        var lab = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.13), new THREE.MeshStandardMaterial({ map: textTex(o.helmetLabel, '#1d2b5e', '#ffffff'), transparent: true, roughness: 0.4 }));
-        // vorn auf dem Helm (Helm sitzt 0.06 höher, Radius 1.07)
-        var ld = new THREE.Vector3(0.9, 0.42, 0).normalize();
-        var lp = headPoint(ld, 1.09).add(new THREE.Vector3(-0.02, HELMET_UP, 0));
-        lab.position.copy(lp); lab.lookAt(lp.clone().add(ld));
-        g.add(lab);
+        var lab = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12), new THREE.MeshStandardMaterial({ map: textTex(o.helmetLabel, '#1d2b5e', '#ffffff'), transparent: true, roughness: 0.4 }));
+        var la = 0.55, lp = new THREE.Vector3(Math.cos(la) * rimR * 1.01, Math.sin(la) * 0.42 * 1.01, 0);
+        lab.position.copy(lp); lab.lookAt(lp.clone().add(new THREE.Vector3(Math.cos(la) / rimR, Math.sin(la) / 0.42, 0).normalize()));
+        helmet.add(lab);
       }
     }
     // Polizeimütze: Band, oben breiter Deckel, schwarzer Schirm, Stern
@@ -366,18 +385,33 @@
         ear.rotation.set(s * 0.25, 0, 0.1); g.add(ear);
       });
     }
-    // Umhang: Tuch am Kragen, fällt über Rücken und Schwanz bis knapp über den
-    // Boden, unten breiter; folgt der Körperform mit etwas Abstand
+    // Umhang: setzt oben am Rücken direkt hinter dem Hals an, liegt über Rücken und
+    // Schwanz (Oberseite des Rumpfs ohne Kopf/Hals), wölbt sich zu den Seiten herab,
+    // reicht über die Schwanzspitze hinaus und fällt dahinter herab; unten breiter
     if (o.cape) {
-      var U = 26, V = 18, cpos = [], cidx = [];
+      var U = 28, V = 30, cpos = [], cidx = [];
+      var topAt = function (x) {             // Rücken-Oberseite (Mittellinie) des Rumpfs bei x
+        var q = new THREE.Vector3(x, 1.6, 0), lo = -0.6, hi = 1.6, hit = false;
+        for (var yy = 1.6; yy > -0.6; yy -= 0.04) { q.y = yy; if (sdTrunk(q) < 0) { hit = true; lo = yy; hi = yy + 0.04; break; } }
+        if (!hit) return null;
+        for (var it = 0; it < 18; it++) { var m = (lo + hi) / 2; q.y = m; if (sdTrunk(q) < 0) lo = m; else hi = m; }
+        return lo;
+      };
+      var lastTop = 0.5;
       for (var vv = 0; vv <= V; vv++) {
-        var tv = vv / V, yh = 0.58 - tv * 1.08;                 // Kragen → knapp über dem Boden
-        var half = 0.75 + 0.55 * tv;                           // halbe Breite (rad), unten breiter
+        var tv = vv / V;
+        var drape = Math.min(1, tv / 0.75), fall = Math.max(0, (tv - 0.75) / 0.25);
+        var xc = -0.18 - drape * 1.12 - fall * 0.06;   // Ansatz direkt hinter dem Hinterkopf
+        var tp = fall > 0 ? null : topAt(xc);
+        if (tp !== null) lastTop = tp;
+        var half = 0.3 + 0.6 * tv;              // halbe Breite (z), oben schmal am Hals
         for (var uu = 0; uu <= U; uu++) {
-          var phi = Math.PI + (uu / U * 2 - 1) * half;          // um die Rückenmitte (−x)
-          var sp = surfaceAt(yh, phi);
-          var off = 0.05 + 0.1 * tv;                            // unten etwas weiter weg
-          cpos.push(sp.p.x + sp.n.x * off, sp.p.y + sp.n.y * off - 0.03 * tv, sp.p.z + sp.n.z * off);
+          var z = (uu / U * 2 - 1) * half;
+          var y = lastTop + 0.06 - 0.9 * z * z - fall * 0.9;
+          // nie in den Rumpf schneiden: so weit anheben, bis Abstand da ist (nicht über den Kopf)
+          var q = new THREE.Vector3(xc, y, z);
+          for (var k = 0; k < 40 && sdTrunk(q) < 0.045; k++) q.y += 0.02;
+          cpos.push(q.x, q.y, q.z);
         }
       }
       for (var a = 0; a < V; a++) for (var c = 0; c < U; c++) {
@@ -388,12 +422,6 @@
       cg.setAttribute('position', new THREE.Float32BufferAttribute(cpos, 3));
       cg.setIndex(cidx); cg.computeVertexNormals();
       g.add(new THREE.Mesh(cg, vinyl(o.cape, { side: THREE.DoubleSide, roughness: 0.6, clearcoat: 0.1 })));
-    }
-    // Brust-Emblem
-    if (o.chest) {
-      var at = surface(new THREE.Vector3(1, -0.18, 0));
-      var sz = o.chest === 'star' ? 0.22 : 0.42;
-      g.add(decalPlane(emblemTex(o.chest), sz, sz, at));
     }
     g.userData = { body: b, head: HC, headR: HR, decal: decal };
     return g;
