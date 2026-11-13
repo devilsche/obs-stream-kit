@@ -159,6 +159,84 @@
       icicles.push({ x: ix, w: 7 + rnd() * 8, max: 30 + rnd() * 110, grow: 1, tip: 0, node: el('path', { 'class': 'tw-ice-i' }, gIcicles) });
     }
 
+    // ── Zeichner für Schnee und Beiwerk (Schneemann und Minis) ──
+    // Kugel aus gerolltem Schnee: Umriss leicht unregelmäßig, oben/unten
+    // abgeplattet (flat.top/flat.bot = Anteil des Radius), Struktur und Glanz
+    function lumpD(cx, cy, r, rf, flat) {
+      flat = flat || {};
+      var n = 30, pts = [], p1 = rf() * 6.283, p2 = rf() * 6.283;
+      for (var i = 0; i < n; i++) {
+        var a = i / n * 6.283, k = 1 + 0.024 * Math.sin(3 * a + p1) + 0.016 * Math.sin(5 * a + p2) + (rf() - 0.5) * 0.016;
+        var x = cx + Math.cos(a) * r * k, y = cy + Math.sin(a) * r * k * 0.98;
+        if (flat.bot && y > cy + r * flat.bot) y = cy + r * flat.bot + (y - cy - r * flat.bot) * 0.15;
+        if (flat.top && y < cy - r * flat.top) y = cy - r * flat.top + (y - cy + r * flat.top) * 0.15;
+        pts.push([x, y]);
+      }
+      // geschlossene Catmull-Rom-Kurve
+      var d = 'M' + f1(pts[0][0]) + ' ' + f1(pts[0][1]);
+      for (var j = 0; j < n; j++) {
+        var a0 = pts[(j - 1 + n) % n], b0 = pts[j], c0 = pts[(j + 1) % n], d0 = pts[(j + 2) % n];
+        d += ' C' + f1(b0[0] + (c0[0] - a0[0]) / 6) + ' ' + f1(b0[1] + (c0[1] - a0[1]) / 6) + ' ' +
+             f1(c0[0] - (d0[0] - b0[0]) / 6) + ' ' + f1(c0[1] - (d0[1] - b0[1]) / 6) + ' ' + f1(c0[0]) + ' ' + f1(c0[1]);
+      }
+      return d + ' Z';
+    }
+    function snowBall(g, cx, cy, r, rf, flat, small) {
+      el('path', { 'class': small ? 'tw-mini__ball' : 'tw-sm-ball', d: lumpD(cx, cy, r, rf, flat) }, g);
+      // Kernschatten unten rechts, weiche Kante zum Licht
+      el('path', { 'class': 'tw-snow-shade', d: lumpD(cx + r * 0.05, cy + r * 0.04, r * 0.97, rf, flat) }, g);
+      // Rollspuren und Körnung
+      var marks = small ? 3 : 7;
+      for (var m = 0; m < marks; m++) {
+        var a = 0.5 + rf() * 2.2, rr = r * (0.3 + rf() * 0.32), w = r * (0.1 + rf() * 0.14);
+        var x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr * 0.9;
+        el('path', { 'class': 'tw-snow-roll', d: 'M' + f1(x - w) + ' ' + f1(y) + ' Q' + f1(x) + ' ' + f1(y + w * 0.25) + ' ' + f1(x + w) + ' ' + f1(y - w * 0.1) }, g);
+      }
+      for (var q = 0; q < (small ? 4 : 14); q++) {
+        var aa = rf() * 6.283, d0 = Math.sqrt(rf()) * r * 0.82;
+        el('circle', { 'class': 'tw-snow-grain', cx: f1(cx + Math.cos(aa) * d0), cy: f1(cy + Math.sin(aa) * d0), r: f1((small ? 0.7 : 1) * (0.8 + rf() * 1.4)) }, g);
+      }
+      el('ellipse', { 'class': 'tw-snow-gloss', cx: f1(cx - r * 0.34), cy: f1(cy - r * 0.38), rx: f1(r * 0.3), ry: f1(r * 0.18), transform: 'rotate(-30 ' + f1(cx - r * 0.34) + ' ' + f1(cy - r * 0.38) + ')' }, g);
+    }
+    // Kohlestück: unregelmäßiges Vieleck mit Glanzpunkt
+    function pebble(g, x, y, r, rf, cls) {
+      var d = '', n = 7, p0 = rf() * 6.283;
+      for (var i = 0; i < n; i++) {
+        var a = p0 + i / n * 6.283, k = 0.75 + rf() * 0.4;
+        d += (i ? ' L' : 'M') + f1(x + Math.cos(a) * r * k) + ' ' + f1(y + Math.sin(a) * r * k * 0.9);
+      }
+      el('path', { 'class': 'tw-sm-coal' + (cls ? ' ' + cls : ''), d: d + ' Z' }, g);
+      el('circle', { 'class': 'tw-coal-hi', cx: f1(x - r * 0.3), cy: f1(y - r * 0.35), r: f1(r * 0.28) }, g);
+    }
+    // Möhre: spitz zulaufend, leicht nach unten gebogen, mit Querrillen
+    function carrot(g, x, y, len, w) {
+      el('path', { 'class': 'tw-sm-nose', d: 'M' + x + ' ' + (y - w / 2) + ' Q' + f1(x + len * 0.55) + ' ' + f1(y - w * 0.3) + ' ' + (x + len) + ' ' + f1(y + w * 0.55) +
+                   ' Q' + f1(x + len * 0.5) + ' ' + f1(y + w * 0.75) + ' ' + x + ' ' + (y + w / 2) + ' Z' }, g);
+      var rid = '';
+      for (var i = 1; i <= 4; i++) {
+        var t = i / 5.2, cx = x + len * t, hw = w / 2 * (1 - t) + 0.4, cy = y + w * 0.12 + t * t * w * 0.45;
+        rid += ' M' + f1(cx - 1) + ' ' + f1(cy - hw) + ' l2 ' + f1(hw * 1.1);
+      }
+      el('path', { 'class': 'tw-sm-ridge', d: rid }, g);
+    }
+    // Zweig als Arm: Ast verjüngt sich, zwei Seitentriebe, Knick in der Mitte
+    function branchD(x0, y0, x1, y1, w0, w1, bend) {
+      var dx = x1 - x0, dy = y1 - y0, l = Math.hypot(dx, dy), nx = -dy / l, ny = dx / l;
+      var mx = (x0 + x1) / 2 + nx * bend, my = (y0 + y1) / 2 + ny * bend;
+      return 'M' + f1(x0 + nx * w0) + ' ' + f1(y0 + ny * w0) + ' Q' + f1(mx + nx * (w0 + w1) / 2) + ' ' + f1(my + ny * (w0 + w1) / 2) + ' ' + f1(x1 + nx * w1) + ' ' + f1(y1 + ny * w1) +
+             ' L' + f1(x1 - nx * w1) + ' ' + f1(y1 - ny * w1) + ' Q' + f1(mx - nx * (w0 + w1) / 2) + ' ' + f1(my - ny * (w0 + w1) / 2) + ' ' + f1(x0 - nx * w0) + ' ' + f1(y0 - ny * w0) + ' Z';
+    }
+    function twigArm(g, x, y, side, rf, k) {
+      k = k || 1;
+      var ex = x + side * 74 * k, ey = y - 46 * k, mx = x + side * 44 * k, my = y - 26 * k;
+      el('path', { 'class': 'tw-sm-arm', d: branchD(x, y, ex, ey, 3.4 * k, 0.9 * k, side * 4 * k) }, g);
+      el('path', { 'class': 'tw-sm-arm', d: branchD(mx, my, mx + side * 10 * k, my - 30 * k, 1.8 * k, 0.6 * k, -side * 2 * k) }, g);
+      el('path', { 'class': 'tw-sm-arm', d: branchD(ex - side * 10 * k, ey + 6 * k, ex + side * 12 * k, ey + 4 * k, 1.2 * k, 0.4 * k, 0) }, g);
+      // Finger an der Spitze
+      el('path', { 'class': 'tw-sm-arm', d: branchD(ex, ey, ex + side * 8 * k, ey - 12 * k, 0.9 * k, 0.3 * k, 0) }, g);
+      el('path', { 'class': 'tw-sm-arm', d: branchD(ex, ey, ex + side * 13 * k, ey - 3 * k, 0.9 * k, 0.3 * k, 0) }, g);
+    }
+
     // ── Schneemann: 8 Teile, eins pro Sub; Xmas: Mütze + Lichterkette ──
     var gSmBody = el('g', { 'class': 'tw-sm-body tw-dim' }, gSm);
     var smParts = [];
@@ -167,31 +245,51 @@
       build(g);
       smParts.push(g);
     }
-    smPart(1, function (g) { el('circle', { 'class': 'tw-sm-ball', cx: 0, cy: -70, r: 74 }, g); });
-    smPart(2, function (g) { el('circle', { 'class': 'tw-sm-ball', cx: 0, cy: -180, r: 54 }, g); });
-    smPart(3, function (g) { el('circle', { 'class': 'tw-sm-ball', cx: 0, cy: -262, r: 40 }, g); });
-    smPart(4, function (g) {
-      el('circle', { 'class': 'tw-sm-coal', cx: -14, cy: -272, r: 5 }, g);
-      el('circle', { 'class': 'tw-sm-coal', cx: 14, cy: -272, r: 5 }, g);
-      [-16, -8, 0, 8, 16].forEach(function (dx, i) { el('circle', { 'class': 'tw-sm-coal', cx: dx, cy: -246 - Math.abs(i - 2) * 3, r: 3 }, g); });
+    // Aufbau wie gerollter Schnee: Kugeln leicht klumpig und dort abgeplattet,
+    // wo sie aufeinander sitzen; Licht von oben links, Kontaktschatten darunter
+    seed = 41;
+    smPart(1, function (g) {
+      el('ellipse', { 'class': 'tw-sm-groundshade', cx: 6, cy: 2, rx: 88, ry: 11 }, g);
+      snowBall(g, 0, -70, 74, rnd, { top: 0.82, bot: 0.92 });
     });
-    smPart(5, function (g) { el('path', { 'class': 'tw-sm-nose', d: 'M-2 -266 L40 -258 L-2 -254 Z' }, g); });
+    smPart(2, function (g) {
+      el('ellipse', { 'class': 'tw-sm-contact', cx: 3, cy: -128, rx: 46, ry: 10 }, g);
+      snowBall(g, 0, -180, 54, rnd, { top: 0.84, bot: 0.9 });
+    });
+    smPart(3, function (g) {
+      el('ellipse', { 'class': 'tw-sm-contact', cx: 2, cy: -224, rx: 32, ry: 7 }, g);
+      snowBall(g, 0, -262, 40, rnd, { bot: 0.9 });
+    });
+    smPart(4, function (g) {
+      pebble(g, -14, -272, 5.4, rnd);
+      pebble(g, 14, -272, 5.4, rnd);
+      [-17, -9, 0, 9, 17].forEach(function (dx, i) { pebble(g, dx, -245 - Math.abs(i - 2) * 3.2, 3.1, rnd); });
+    });
+    smPart(5, function (g) { carrot(g, -3, -261, 44, 7); });
     smPart(6, function (g) {
-      [-200, -176, -152].forEach(function (y) { el('circle', { 'class': 'tw-sm-coal tw-sm-btn', cx: 0, cy: y, r: 6 }, g); });
-      el('path', { 'class': 'tw-sm-arm', d: 'M-48 -190 L-118 -236 M-96 -222 L-112 -252' }, g);
-      var r = el('g', { 'class': 'tw-sm-armr' }, g);
-      el('path', { 'class': 'tw-sm-arm', d: 'M48 -190 L118 -236 M96 -222 L114 -250' }, r);
+      [-200, -176, -152].forEach(function (y) { pebble(g, 0, y, 6, rnd, 'tw-sm-btn'); });
+      twigArm(g, -46, -192, -1, rnd);
+      twigArm(el('g', { 'class': 'tw-sm-armr' }, g), 46, -192, 1, rnd);
     });
     smPart(7, function (g) {
-      el('path', { 'class': 'tw-sm-scarf', d: 'M-42 -232 Q0 -214 42 -232 L44 -218 Q0 -200 -44 -218 Z' }, g);
-      el('path', { 'class': 'tw-sm-scarf', d: 'M18 -222 L32 -168 L16 -166 L8 -220 Z' }, g);
-      el('rect', { 'class': 'tw-sm-scarf2', x: 18, y: -190, width: 14, height: 6, transform: 'rotate(14 25 -187)' }, g);
+      // Strickschal: Wulst um den Hals, Ende hängt vorne mit Streifen und Fransen
+      el('path', { 'class': 'tw-sm-scarf', d: 'M-43 -233 Q-20 -222 0 -222 Q22 -222 43 -234 Q47 -226 44 -217 Q22 -204 0 -204 Q-24 -204 -45 -218 Q-47 -226 -43 -233 Z' }, g);
+      el('path', { 'class': 'tw-sm-fold', d: 'M-40 -224 Q-18 -214 2 -214 Q24 -214 41 -225' }, g);
+      el('path', { 'class': 'tw-sm-scarf', d: 'M14 -216 Q22 -196 24 -170 L40 -173 Q36 -198 28 -219 Z' }, g);
+      el('path', { 'class': 'tw-sm-scarf2', d: 'M19.5 -200 L35 -203 L36.3 -197 L21 -194 Z M22.5 -185 L38.2 -188 L39 -182 L23.4 -179 Z' }, g);
+      el('path', { 'class': 'tw-sm-fringe', d: 'M25 -170 l-1 9 M29 -171 l0 9 M33 -172 l1 9 M37 -172 l2 8' }, g);
+      for (var k = -38; k <= 38; k += 7) el('path', { 'class': 'tw-sm-knit', d: 'M' + k + ' ' + (-226 + Math.abs(k) * 0.12) + ' l2 8' }, g);
     });
     smPart(8, function (g) {
+      // Zylinder leicht schräg, Krempe in Aufsicht, Glanzkante links
       var h = el('g', { 'class': 'tw-sm-hatg' }, g);
-      el('rect', { 'class': 'tw-sm-hat', x: -44, y: -300, width: 88, height: 10, rx: 4 }, h);
-      el('rect', { 'class': 'tw-sm-hat', x: -30, y: -362, width: 60, height: 64, rx: 6 }, h);
-      el('rect', { 'class': 'tw-sm-band', x: -30, y: -312, width: 60, height: 10 }, h);
+      var t = el('g', { transform: 'rotate(-7 0 -298)' }, h);
+      el('ellipse', { 'class': 'tw-sm-hat', cx: 0, cy: -296, rx: 47, ry: 9 }, t);
+      el('path', { 'class': 'tw-sm-hat', d: 'M-29 -298 L-31 -360 Q0 -366 31 -360 L29 -298 Q0 -292 -29 -298 Z' }, t);
+      el('ellipse', { 'class': 'tw-sm-hattop', cx: 0, cy: -360, rx: 31, ry: 5.5 }, t);
+      el('path', { 'class': 'tw-sm-band', d: 'M-29.4 -310 L29.4 -310 L29 -298 Q0 -292 -29 -298 Z' }, t);
+      el('path', { 'class': 'tw-sm-hathi', d: 'M-24 -302 L-25.5 -356' }, t);
+      el('path', { 'class': 'tw-sm-brimhi', d: 'M-44 -293 Q0 -284 44 -293' }, t);
     }, 'tw-sm-tophat');
     // Lichterkette um Bauch und Sockel (ab Bauch), Mütze (ab Kopf)
     var gSmLights = el('g', { 'class': 'tw-sm-xmas tw-sm-lights' }, gSmBody);
@@ -300,14 +398,28 @@
       var g = el('g', { 'class': 'tw-mini' + (animate ? ' tw-mini--new' : '') }, fly);
       // danach weg, sonst spielt ein späterer Scheinwerfer das Aufploppen erneut ab
       if (animate) setTimeout(function () { g.classList.remove('tw-mini--new'); }, 1100);
-      el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -20, r: 22 }, g);
-      el('circle', { 'class': 'tw-mini__ball', cx: 0, cy: -54, r: 15 }, g);
-      el('circle', { 'class': 'tw-sm-coal', cx: -5, cy: -57, r: 2.4 }, g);
-      el('circle', { 'class': 'tw-sm-coal', cx: 5, cy: -57, r: 2.4 }, g);
-      el('path', { 'class': 'tw-sm-nose', d: 'M0 -53 L14 -50 L0 -48 Z' }, g);
+      var mr = Math.random;
+      el('ellipse', { 'class': 'tw-sm-contact', cx: 1, cy: -37, rx: 15, ry: 3.5 }, g);
+      snowBall(g, 0, -20, 22, mr, { top: 0.84, bot: 0.9 }, true);
+      snowBall(g, 0, -54, 15, mr, { bot: 0.9 }, true);
+      twigArm(g, -17, -28, -1, mr, 0.24);
+      twigArm(g, 17, -28, 1, mr, 0.24);
+      pebble(g, -5, -57, 2.3, mr);
+      pebble(g, 5, -57, 2.3, mr);
+      carrot(g, -1, -51.5, 15, 3.4);
       var hatG = el('g', { 'class': 'tw-mini__hatg' }, g);
-      el('path', { 'class': 'tw-mini__hat' + (1 + Math.floor((root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, 1) : (i % 4) / 4) * 4)), d: 'M-16 -64 Q0 -98 16 -64 Z' }, hatG);
-      el('circle', { 'class': 'tw-mini__pom', cx: 0, cy: -83, r: 5 }, hatG);
+      // Strickmütze: Kuppel, gerippter Umschlag, flauschiger Bommel
+      var hc = 'tw-mini__hat' + (1 + Math.floor((root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, 1) : (i % 4) / 4) * 4));
+      el('path', { 'class': hc, d: 'M-14.5 -64 Q-15 -86 0 -88 Q15 -86 14.5 -64 Z' }, hatG);
+      el('path', { 'class': 'tw-mini__hatshade', d: 'M5 -87 Q15 -84 14.5 -64 L8 -64 Q10 -78 5 -87 Z' }, hatG);
+      el('rect', { 'class': hc, x: -16, y: -68, width: 32, height: 7, rx: 3 }, hatG);
+      el('path', { 'class': 'tw-mini__rib', d: 'M-12 -67.5 l0 6 M-8 -67.5 l0 6 M-4 -67.5 l0 6 M0 -67.5 l0 6 M4 -67.5 l0 6 M8 -67.5 l0 6 M12 -67.5 l0 6' }, hatG);
+      // Bommel: Wollbausch aus kleinen Flusen um einen Kern
+      for (var pk = 0; pk < 8; pk++) {
+        var pa = pk / 8 * 6.283;
+        el('circle', { 'class': 'tw-mini__pom', cx: f1(Math.cos(pa) * 4.2), cy: f1(-90 + Math.sin(pa) * 4.2), r: 2.4 }, hatG);
+      }
+      el('circle', { 'class': 'tw-mini__pom tw-mini__pom--core', cx: 0, cy: -90, r: 4.8 }, hatG);
       // Schneehügel vor dem Mini (Sturm, Lawine)
       var mound = el('path', { 'class': 'tw-mini__mound' }, outer);
       minis[i] = { outer: outer, inner: g, fly: fly, hatG: hatG, mound: mound, x: slot[0], k: slot[1], depth: slot[2], rot: slot[3], label: name,

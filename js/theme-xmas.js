@@ -215,6 +215,11 @@
      ['ornGr', '#b8f5cf', '#2ecc71', '#0e5a2c'], ['ornO', '#ffd2a8', '#ff8a1f', '#7a3a06']].forEach(function (c) {
       grad('radialGradient', c[0], { cx: 0.35, cy: 0.3 }, [[0, c[1]], [0.5, c[2]], [1, c[3]]]);
     });
+    // Schneemänner: Kernschatten, Kontaktschatten, Möhre
+    grad('radialGradient', 'snowShadeG', { cx: 0.32, cy: 0.27, r: 0.86 }, [[0, '#7f98bb', 0], [0.6, '#7f98bb', 0], [0.85, '#7390b6', 0.28], [1, '#5d7aa3', 0.55]]);
+    grad('radialGradient', 'contactG', {}, [[0, '#4f6a90', 0.55], [0.6, '#5d7aa3', 0.25], [1, '#5d7aa3', 0]]);
+    grad('linearGradient', 'carrotG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#ffa04a'], [0.5, '#f07c1e'], [1, '#b8540f']]);
+    grad('linearGradient', 'hatG', { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, '#3a3a46'], [0.3, '#24242c'], [1, '#121216']]);
     // Adventskranz: Kerzenwachs, Flamme, Lichtschein
     grad('linearGradient', 'candleG', { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, '#7c1219'], [0.35, '#d63a3f'], [0.6, '#c42a31'], [1, '#6a0f15']]);
     grad('radialGradient', 'flameG', { cx: 0.5, cy: 0.72, r: 0.6 }, [[0, '#fffbe6'], [0.35, '#ffd86b'], [0.75, '#ff9a2a'], [1, '#ff6a10', 0]]);

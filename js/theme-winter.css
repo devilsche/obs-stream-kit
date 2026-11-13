@@ -165,13 +165,27 @@
 
 /* ── Schneemann ── */
 .tw-sm-ball { fill: url(#tw-ballG); }
-.tw-sm-coal { fill: #23262b; }
-.tw-sm-nose { fill: #f07c1e; }
-.tw-sm-arm { fill: none; stroke: #5a3a22; stroke-width: 5; stroke-linecap: round; }
+.tw-sm-coal { fill: #1e2024; }
+.tw-coal-hi { fill: #ffffff; opacity: 0.28; }
+.tw-sm-nose { fill: url(#tw-carrotG); }
+.tw-sm-ridge { fill: none; stroke: #a9500f; stroke-width: 0.9; stroke-linecap: round; opacity: 0.8; }
+.tw-sm-arm { fill: #5b3b22; stroke: #3f2714; stroke-width: 0.6; stroke-linejoin: round; }
 .tw-sm-scarf { fill: #c4302b; }
 .tw-sm-scarf2 { fill: #f2b705; }
-.tw-sm-hat { fill: #1f1f26; }
+.tw-sm-fold { fill: none; stroke: #8e1d1a; stroke-width: 2; stroke-linecap: round; opacity: 0.6; }
+.tw-sm-knit { fill: none; stroke: #e35a52; stroke-width: 1.4; stroke-linecap: round; opacity: 0.7; }
+.tw-sm-fringe { fill: none; stroke: #c4302b; stroke-width: 2; stroke-linecap: round; }
+.tw-sm-hat { fill: url(#tw-hatG); }
+.tw-sm-hattop { fill: #2c2c36; }
+.tw-sm-hathi { fill: none; stroke: #ffffff; stroke-width: 3; stroke-linecap: round; opacity: 0.12; }
+.tw-sm-brimhi { fill: none; stroke: #ffffff; stroke-width: 1.5; opacity: 0.12; }
 .tw-sm-band { fill: #5e2a79; }
+/* Schnee der Kugeln: Kern- und Kontaktschatten, Rollspuren, Körnung, Glanz */
+.tw-snow-shade { fill: url(#tw-snowShadeG); pointer-events: none; }
+.tw-sm-contact, .tw-sm-groundshade { fill: url(#tw-contactG); }
+.tw-snow-roll { fill: none; stroke: #c3d2e5; stroke-width: 1.6; stroke-linecap: round; opacity: 0.7; }
+.tw-snow-grain { fill: #b7c8de; opacity: 0.55; }
+.tw-snow-gloss { fill: #ffffff; opacity: 0.55; }
 .tw-sm-part { display: none; transform-box: fill-box; transform-origin: 50% 100%; }
 .tw-sm-part.is-on { display: inline; }
 .tw-sm-part.is-new { animation: twPop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
@@ -217,7 +231,10 @@
 .tw-mini--new { animation: twPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 .tw-mini__ball { fill: url(#tw-ballG); }
 .tw-mini__hat1 { fill: #c4302b; } .tw-mini__hat2 { fill: #2a64b8; } .tw-mini__hat3 { fill: #2e9e5b; } .tw-mini__hat4 { fill: #8e4bb8; }
-.tw-mini__pom { fill: #ffffff; }
+.tw-mini__pom { fill: #e9eef5; }
+.tw-mini__pom--core { fill: #ffffff; }
+.tw-mini__hatshade { fill: #000000; opacity: 0.18; }
+.tw-mini__rib { fill: none; stroke: #000000; stroke-width: 0.9; opacity: 0.22; }
 /* Tornado: Hut fliegt davon (Richtung über --tw-hat-dir), nach der Landung sitzt er wieder */
 .tw-mini__hatg { transform-box: fill-box; transform-origin: 50% 100%; }
 .tw-mini__hatg.is-blown { animation: twHatBlow 1.4s ease-in forwards; }
