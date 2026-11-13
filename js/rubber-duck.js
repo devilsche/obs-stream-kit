@@ -408,7 +408,7 @@
       var collar = [];
       for (var uu0 = 0; uu0 <= U; uu0++) {
         var sp = surfaceAt(COLLAR_Y, Math.PI + (uu0 / U * 2 - 1) * 1.2, 0.42);
-        collar.push(sp.p.clone().addScaledVector(sp.n, 0.035));
+        collar.push(sp.p.clone().addScaledVector(sp.n, 0.012));
       }
       var lastTop = 0.5;
       for (var vv = 0; vv <= V; vv++) {
@@ -419,13 +419,14 @@
         toCollar = toCollar * toCollar * (3 - 2 * toCollar);
         for (var uu = 0; uu <= U; uu++) {
           var z = (uu / U * 2 - 1) * half;
-          var q = new THREE.Vector3(xc, lastTop + 0.06 - 0.9 * z * z - Math.max(0, tv - 0.8) * 0.4, z);
+          var q = new THREE.Vector3(xc, lastTop + 0.025 - 0.9 * z * z - Math.max(0, tv - 0.8) * 0.4, z);
           q.lerp(collar[uu], toCollar);
           // nie in den Rumpf schneiden: so weit anheben, bis Abstand da ist
-          for (var k = 0; k < 40 && sdTrunk(q) < 0.045; k++) q.y += 0.02;
+          for (var k = 0; k < 60 && sdTrunk(q) < 0.02; k++) q.y += 0.01;
           // in der Mitte nach unten hin leicht vom Rücken weg bauschen (liegt nicht an)
           var mid = 1 - Math.pow(uu / U * 2 - 1, 2);
-          q.y += 0.07 * tv * mid; q.x -= 0.05 * tv * mid;
+          var tb = Math.max(0, (tv - 0.35) / 0.65);  // am Nacken anliegend, erst weiter hinten bauschig
+          q.y += 0.07 * tb * mid; q.x -= 0.05 * tb * mid;
           cpos.push(q.x, q.y, q.z);
         }
       }

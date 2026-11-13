@@ -11,7 +11,7 @@
  *
  *   KnifeDuck.start({ canvas, style, x, y, height, volume, freeze, soundBase })
  *   style: 'sticker' (Standard, Utya-Toon) oder 'rubber' (sitzende 3D-Gummiente,
- *   js/rubber-duck.js; outfit: none|thw|police|fire|batman|superman)
+ *   js/rubber-duck.js; outfit: none|thw|police|fire|batman|superman|mix)
  *   freeze: Sekunde, auf der der Ablauf stehen bleibt (zum Prüfen, ?t=)
  */
 (function (root) {
@@ -217,7 +217,12 @@
       var key = new THREE.DirectionalLight(0xfff4e0, 0.8); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
       var rim = new THREE.DirectionalLight(0xffe2a8, 0.25); rim.position.set(1, -0.3, 0.6); scene.add(rim);
     }
-    var m = build(styleName, opts.outfit), holder = new THREE.Group();
+    var outfit = opts.outfit;
+    if (outfit === 'mix' && root.RubberDuck) {      // je Auftritt ein zufälliges Outfit (ohne „none“)
+      var keys = Object.keys(root.RubberDuck.OUTFITS).filter(function (k) { return k !== 'none'; });
+      outfit = keys[Math.floor(Math.random() * keys.length)];
+    }
+    var m = build(styleName, outfit), holder = new THREE.Group();
     holder.add(m.duck); scene.add(holder);
     if (styleName === 'sticker') m.duck.rotation.y = 0.15;
     var unit = (opts.height || 430) / ST.size;
