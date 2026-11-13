@@ -32,7 +32,7 @@
   <main>
     <header>
       <h1>Rubber duck viewer</h1>
-      <p class="lead">The duck from the party rain (<code>effects/item-rain.html?kind=duck</code>). Drag to rotate, scroll to zoom.</p>
+      <p class="lead">The rubber duck model used by the party rain and the knife duck (<code>js/rubber-duck.js</code>). Drag to rotate, scroll to zoom.</p>
     </header>
     <div class="stage">
       <canvas id="view" tabindex="0" role="img" aria-label="3D rubber duck. Use arrow keys to rotate, plus and minus to zoom."></canvas>
@@ -45,7 +45,7 @@
     </div>
   </main>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/js/item-rain-3d.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
   <script>
     (function () {
       'use strict';
@@ -56,16 +56,26 @@
       renderer.outputEncoding = THREE.sRGBEncoding;
       var scene = new THREE.Scene();
       var cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-      // gleiches Licht wie im Regen
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a30, 0.75));
-      var key = new THREE.DirectionalLight(0xffffff, 1.05); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
-      var rim = new THREE.DirectionalLight(0xfff2cc, 0.35); rim.position.set(1, -0.3, 0.6); scene.add(rim);
+      // weiches, warmes Licht und eine einfache Umgebung zum Spiegeln (Vinyl)
+      (function () {
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        x.fillStyle = 'rgba(255,255,255,.9)'; x.fillRect(60, 40, 120, 30); x.fillRect(330, 60, 90, 24);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+      })();
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x6a4a20, 0.5));
+      var key = new THREE.DirectionalLight(0xfff4e0, 0.85); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
+      var rim = new THREE.DirectionalLight(0xffe2a8, 0.3); rim.position.set(1, -0.3, 0.6); scene.add(rim);
 
-      var tpl = window.ItemRain3D.duckTemplate(), holder = new THREE.Group(), duck = null;
+      var holder = new THREE.Group(), duck = null;
       scene.add(holder);
       function setDuck(pink) {
         if (duck) holder.remove(duck);
-        duck = pink ? tpl.pink() : tpl.yellow();
+        duck = window.RubberDuck.build({ color: pink ? 0xff9fc2 : null });
+        duck.position.set(-0.12, -0.55, 0);   // Mitte der Ente in den Drehpunkt
         holder.add(duck);
       }
       setDuck(false);
