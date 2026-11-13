@@ -338,10 +338,16 @@
       }
       return RD.clone ? RD.clone(duckCache[key]) : duckCache[key].clone();
     }
+    // outfit 'random' = einmal je Aufruf ein Outfit (ohne „none“), alle Enten gleich
+    var fixedOutfit = opts.outfit;
+    if (fixedOutfit === 'random' && RD) {
+      var pool = RD.OUTFITS.filter(function (k) { return k !== 'none'; });
+      fixedOutfit = pool[Math.floor(Math.random() * pool.length)];
+    }
     function makeItem() {
       if (kind === 'sushi' || rise) return tpl.make();
       if (RD) {
-        var o = opts.outfit === 'mix' ? RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)] : (opts.outfit || 'none');
+        var o = opts.outfit === 'mix' ? RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)] : (fixedOutfit || 'none');
         return { g: duckOf(o, o === 'none' && Math.random() < 0.12), len: 2.7 };
       }
       return { g: Math.random() < 0.12 ? tpl.pink() : tpl.yellow(), len: 2.6 };
