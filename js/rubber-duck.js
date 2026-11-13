@@ -69,8 +69,8 @@
   // Schnabel wie ein echter offener Entenschnabel: zwei gewölbte Schalen (Ober-
   // und Unterschnabel), die nur hinten im Mundwinkel zusammenhängen, vorn leicht
   // geöffnet (Keil mit Winkel 2·open um das Scharnier). Jede Schale hat eine
-  // gerundete Lippe (Wandstärke), dazwischen nur ein flacher, dunkler Schwung von
-  // der oberen zur unteren Lippe über die ganze Breite. Alles EINE Geometrie.
+  // gerundete Lippe (Wandstärke), dazwischen eine zusammenhängende Mundhöhle von der
+  // oberen Lippe über den Rachen (am Kopf etwas breiter) zur unteren. EINE Geometrie.
   function billGeometry(len, wid, thick, open) {
     var Hx = -0.85 * len, LIP = 0.018, COLS = 48, ROWS = 16, S = 10;
     var lip = new THREE.Color(0xf2650f).convertSRGBToLinear();
@@ -131,8 +131,9 @@
       // Rachen fast so breit wie der Mund, damit das Innere bis an den Lippenrand reicht
       // Rachen so breit wie der breitere der beiden Ränder: am Mundwinkel volle Schnabelbreite
       var zt = Math.abs(a.z) > Math.abs(b.z) ? a.z : b.z;
-      // nur ein kleiner Schwung: tiefster Punkt dicht hinter den Lippen, nicht bis zum Mundwinkel
-      var t = new THREE.Vector3((a.x + b.x) / 2 - len * 0.12, (a.y + b.y) / 2, zt);
+      // Rachen reicht nach hinten bis zum Kopf; dort etwas breiter als der Schnabel, damit
+      // man von vorn kein Gelb des Kopfes durch den Mund sieht
+      var t = new THREE.Vector3(Hx + (Math.max(a.x, Hx) - Hx) * 0.22, (a.y + b.y) / 2, zt * 1.07);
       var colm = [];
       for (var k = 0; k <= S; k++) {
         var u = k / S, w0 = (1 - u) * (1 - u), w1 = 2 * (1 - u) * u, w2 = u * u;
