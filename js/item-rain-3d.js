@@ -1,5 +1,6 @@
 /* Party-Regen in echtem 3D (three.js r128, js/vendor/three-r128.min.js) für
- * effects/item-rain.html: Gummientchen (kind=duck) oder Sushi (kind=sushi).
+ * effects/item-rain.html: Gummientchen (kind=duck), Sushi (kind=sushi) – beide
+ * fallen – oder Luftballons (kind=balloon), die von unten aufsteigen.
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
  *
@@ -250,6 +251,46 @@
     return { make: function () { return Math.random() < 0.6 ? maki() : nigiri(); } };
   }
 
+  // ── Luftballons: Drehkörper (oben breit, unten zum Knoten schmal), Knoten,
+  // Schnur; glänzendes Latex. Modell-Einheiten: Ballon ~1.9 hoch, 1.64 breit ──
+  var BALLOON_COLORS = [0xe8202a, 0x1f6fe0, 0xffc81a, 0x22a85a, 0xff7a1a, 0xff5fa8, 0x8e4bd6, 0xd4a017];
+  function buildBalloonTemplate() {
+    var prof = [[0.0, -1.0], [0.06, -0.98], [0.2, -0.88], [0.42, -0.66], [0.62, -0.38], [0.76, -0.08],
+                [0.82, 0.2], [0.78, 0.48], [0.64, 0.74], [0.42, 0.92], [0.18, 1.0], [0.0, 1.02]];
+    var body = new THREE.LatheGeometry(prof.map(function (p) { return new THREE.Vector2(p[0], p[1]); }), 48);
+    body.computeVertexNormals();
+    var knot = new THREE.CylinderGeometry(0.05, 0.11, 0.12, 16);
+    var mats = BALLOON_COLORS.map(function (c) {
+      var m = new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.22, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08 });
+      m.color.convertSRGBToLinear();
+      return m;
+    });
+    var stringMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7 });
+    // Schnur: drei Glieder, jedes leicht geschwungen; sie hängen aneinander und
+    // pendeln zeitversetzt (siehe start → swing)
+    var SEG = 0.62;
+    var seg = new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, 0, 0), new THREE.Vector3(0.05, -SEG * 0.35, 0.01), new THREE.Vector3(-0.04, -SEG * 0.7, -0.01), new THREE.Vector3(0, -SEG, 0)
+    ]), 16, 0.012, 6, false);
+    return {
+      make: function () {
+        var mat = mats[Math.floor(Math.random() * mats.length)];
+        var g = new THREE.Group();
+        var b = new THREE.Mesh(body, mat);
+        g.add(b);
+        var k = new THREE.Mesh(knot, mat); k.position.y = -1.04; g.add(k);
+        var parent = g, pivots = [];
+        for (var i = 0; i < 3; i++) {
+          var pv = new THREE.Group();
+          pv.position.y = i === 0 ? -1.1 : -SEG;
+          pv.add(new THREE.Mesh(seg, stringMat));
+          parent.add(pv); pivots.push(pv); parent = pv;
+        }
+        return { g: g, len: 1.9, pivots: pivots };
+      }
+    };
+  }
+
   function start(opts) {
     var W = 1920, H = 1080, FLOOR = H - 26;
     var canvas = opts.canvas, reduce = !!opts.reduceMotion;
@@ -272,11 +313,12 @@
     rim.position.set(1, -0.3, 0.6);
     scene.add(rim);
 
-    var kind = opts.kind === 'sushi' ? 'sushi' : 'duck';
-    var tpl = kind === 'sushi' ? buildSushiTemplate() : buildDuckTemplate();
+    var kind = opts.kind === 'sushi' || opts.kind === 'balloon' ? opts.kind : 'duck';
+    var rise = kind === 'balloon';
+    var tpl = kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
     function makeItem() {
-      if (kind === 'sushi') return tpl.make();
+      if (kind === 'sushi' || rise) return tpl.make();
       return { g: Math.random() < 0.12 ? tpl.pink() : tpl.yellow(), len: 2.6 };
     }
     var size = opts.size || 96, count = opts.count || 120, duration = opts.duration || 22000;
@@ -285,14 +327,23 @@
 
     function spawn() {
       var k = rand(0.8, 1.2), it = makeItem(), g = it.g;
-      // jedes Teil etwa `size` groß
-      var sc = size * k / it.len;
+      // jedes Teil etwa `size` groß (Ballons etwas größer)
+      var sc = size * k * (rise ? 1.5 : 1) / it.len;
       g.scale.set(sc, sc, sc);
-      g.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
+      if (rise) g.rotation.set(rand(-0.15, 0.15), rand(0, 6.28), rand(-0.2, 0.2));
+      else g.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
       scene.add(g);
+      if (rise) {
+        // Ballons: steigen von unten auf, pendeln leicht, drehen sich langsam
+        ducks.push({ g: g, sc: sc, rise: true, x: rand(margin, W - margin), y: H + rand(160, 320), vy: -rand(130, 230), z: rand(-300, 300),
+                     ph: rand(0, 6.28), sw: rand(0.6, 1.2), amp: rand(18, 40), wy: reduce ? 0 : rand(-0.6, 0.6), h: size * k,
+                     pivots: it.pivots, sph: rand(0, 6.28), sf: rand(2.2, 3.4) });
+        spawned++;
+        return;
+      }
       ducks.push({ g: g, sc: sc, x: rand(margin, W - margin), y: rand(-200, -80), vx: rand(-30, 30), vy: rand(60, 160),
                    wx: reduce ? 0 : rand(-2.2, 2.2), wy: reduce ? 0 : rand(-2.6, 2.6), wz: reduce ? 0 : rand(-2.2, 2.2),
-                   bounced: false, back: 0, h: size * k * 0.5 });
+                   bounced: false, back: 0, h: size * k * 0.5, z: rand(-300, 300) });
       spawned++;
     }
     function remove(d) { scene.remove(d.g); }
@@ -304,6 +355,21 @@
       var want = Math.min(count, Math.floor(count * (t / spawnEnd) * (1 + 0.25 * Math.sin(t / 900))));
       while (spawned < want) spawn();
       ducks = ducks.filter(function (d) {
+        if (d.rise) {
+          d.ph += dt * d.sw;
+          d.y += d.vy * dt;
+          if (d.y < -d.h * 3.5) { remove(d); return false; }
+          d.g.rotation.y += d.wy * dt;
+          d.g.rotation.z = Math.sin(d.ph) * 0.12;
+          // Schnur wackelt: jedes Glied etwas später und weiter als das obere
+          d.sph += dt * d.sf;
+          if (!reduce) d.pivots.forEach(function (pv, i) {
+            pv.rotation.z = Math.sin(d.sph - i * 0.9) * (0.12 + i * 0.1) - Math.sin(d.ph) * 0.1;
+            pv.rotation.x = Math.sin(d.sph * 0.7 - i * 1.1) * (0.08 + i * 0.06);
+          });
+          d.g.position.set(d.x + Math.sin(d.ph) * d.amp, -d.y, d.z);
+          return true;
+        }
         d.vy = Math.min(d.vy + 900 * dt, 760);
         d.x += d.vx * dt; d.y += d.vy * dt;
         if (!d.bounced && d.y > FLOOR - d.h) {
@@ -317,7 +383,7 @@
         d.g.rotation.x += d.wx * dt; d.g.rotation.y += d.wy * dt; d.g.rotation.z += d.wz * dt;
         var s = d.sc * (1 - 0.22 * d.back);
         d.g.scale.set(s, s, s);
-        d.g.position.set(d.x, -d.y, -400 * d.back);
+        d.g.position.set(d.x, -d.y, d.z - 600 * d.back);
         return true;
       });
       renderer.render(scene, cam);
