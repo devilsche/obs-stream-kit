@@ -72,22 +72,37 @@
   // böse Brauen; Arme, Messer und Geste kommen wie beim Sticker dazu
   function rubberBody(parent) {
     var IR = root.ItemRain3D, E = IR.ellipsoid;
-    var yel = phys(0xffcf1f, { roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.18 });
-    var beak = phys(0xff7a12, { roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.15 });
-    var beakLow = phys(0xe0580a, { roughness: 0.4, clearcoat: 0.6 });
-    var eye = phys(0x111111, { roughness: 0.15, clearcoat: 1, clearcoatRoughness: 0.05 });
+    // Vinyl: warmes, sattes Gelb, seidenmatt, leicht durchscheinend (warmes Eigenleuchten)
+    var yel = phys(0xf4b710, { roughness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.45, envMapIntensity: 0.35, emissive: 0x3a1c00 });
+    var beak = phys(0xf26b10, { roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4, envMapIntensity: 0.3, emissive: 0x2a0a00 });
+    var beakLow = phys(0xd2500c, { roughness: 0.55, envMapIntensity: 0.25 });
+    var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
+    var white = new THREE.MeshBasicMaterial({ color: 0xffffff });
     var g = new THREE.Group();
     function add(gm, mat, x, y, z, rx, ry, rz) { var m = new THREE.Mesh(gm, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; }
     add(IR.duckBody(), yel, 0, 0, 0);
     add(E(0.42, 0.34, 0.42, 28), yel, 0.55, 0.42, 0);
-    add(E(0.56, 0.54, 0.54, 44), yel, 0.62, 0.86, 0);
+    var HC = new THREE.Vector3(0.62, 0.86, 0), HR = 0.56;
+    add(E(HR, 0.54, 0.54, 48), yel, HC.x, HC.y, HC.z);
     add(E(0.38, 0.13, 0.3, 28), beak, 1.2, 0.82, 0, 0, 0, -0.12);
     add(E(0.31, 0.09, 0.25, 24), beakLow, 1.14, 0.7, 0, 0, 0, -0.05);
+    // aufgemalt: flache Form auf der Kopfoberfläche, entlang der Normalen ausgerichtet
+    function decal(geo, mat, dir, tilt) {
+      var n = dir.clone().normalize(), m = new THREE.Mesh(geo, mat);
+      m.position.copy(HC).addScaledVector(n, HR * 0.985);
+      m.lookAt(m.position.clone().add(n));
+      m.rotateZ(tilt || 0);
+      g.add(m);
+      return m;
+    }
     [-1, 1].forEach(function (s) {
-      add(E(0.085, 0.1, 0.07, 16), eye, 1.0, 1.06, s * 0.36, 0, s * 0.6, 0);
-      add(E(0.03, 0.03, 0.025, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), 1.06, 1.1, s * 0.39);
-      // böse Braue: vorn (zum Schnabel) tief, hinten hoch
-      add(E(0.17, 0.035, 0.05, 16), eye, 0.96, 1.21, s * 0.37, 0, s * 0.6, -0.5);
+      var eDir = new THREE.Vector3(0.62, 0.32, s * 0.72);
+      decal(E(0.075, 0.095, 0.012, 20), paint, eDir, 0);
+      // Lichtpunkt oben vorn im Auge
+      decal(E(0.024, 0.028, 0.014, 10), white, new THREE.Vector3(0.66, 0.4, s * 0.66), 0);
+      // böse Braue: geschwungener Strich, vorn (zum Schnabel) tief
+      var bDir = new THREE.Vector3(0.5, 0.66, s * 0.6);
+      decal(E(0.16, 0.038, 0.012, 20), paint, bDir, -s * 0.55);
     });
     g.rotation.y = -Math.PI / 2 + 0.55;
     parent.add(g);
@@ -217,9 +232,10 @@
       // echtes Licht für das glänzende Gummi (Sticker hat flache Toon-Farben)
       renderer.outputEncoding = THREE.sRGBEncoding;
       scene.environment = envMap(renderer);
-      scene.add(new THREE.HemisphereLight(0xffffff, 0x8a6a30, 0.75));
-      var key = new THREE.DirectionalLight(0xffffff, 1.05); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
-      var rim = new THREE.DirectionalLight(0xfff2cc, 0.35); rim.position.set(1, -0.3, 0.6); scene.add(rim);
+      // weicheres, wärmeres Licht: Vinyl statt Hochglanz
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x6a4a20, 0.5));
+      var key = new THREE.DirectionalLight(0xfff4e0, 0.8); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
+      var rim = new THREE.DirectionalLight(0xffe2a8, 0.25); rim.position.set(1, -0.3, 0.6); scene.add(rim);
     }
     var m = build(styleName), holder = new THREE.Group();
     holder.add(m.duck); scene.add(holder);
