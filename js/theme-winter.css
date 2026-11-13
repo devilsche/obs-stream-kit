@@ -20,6 +20,7 @@
 .tw[data-tree="0"] .tw-treebox,
 .tw[data-baubles="0"] .tw-baubles,
 .tw[data-gifts="0"] .tw-gifts,
+.tw[data-wreath="0"] .tw-wreath,
 .tw[data-snowman="0"] .tw-sm,
 .tw[data-minis="0"] .tw-minis,
 .tw[data-icicles="0"] .tw-ice,
@@ -304,4 +305,49 @@
 .tw-sm-body.is-washed .tw-sm-btn, .tw-sm-body.is-washed [data-step="5"], .tw-sm-body.is-washed .tw-sm-hatg { visibility: hidden; }
 .tw-sm-body.is-back .tw-sm-btn, .tw-sm-body.is-back [data-step="5"], .tw-sm-body.is-back .tw-sm-hatg {
   transform-box: fill-box; transform-origin: 50% 100%; animation: twPop 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+/* Adventskranz (js/theme-xmas.js): nachts gedimmt wie die Deko, aber je
+   brennender Kerze heller (--tw-wlit 0..1); Flammen flackern, neigen sich mit
+   dem Wind (--tw-flame-lean), gehen aus und zünden weich wieder an */
+.tw-wbody { filter: brightness(calc(1 - 0.35 * var(--tw-night, 0) * (1 - 0.75 * var(--tw-wlit, 0)))); }
+.tw-wglow { opacity: calc(var(--tw-wlit, 0) * (0.25 + 0.75 * var(--tw-night, 0))); mix-blend-mode: screen; transition: opacity 1.2s ease; }
+.tw-wbase { fill: none; stroke: #1b4026; stroke-width: 22; }
+.tw-sprig { fill: none; stroke-width: 1.9; stroke-linecap: round; }
+.tw-cone-scale { fill: none; stroke: #3a210d; stroke-width: 1.1; stroke-linecap: round; }
+.tw-berry { fill: #b3141f; stroke: #5e0a10; stroke-width: 0.6; }
+.tw-wbow { fill: #c0202a; stroke: #7a0f16; stroke-width: 1; }
+.tw-wbow-knot { fill: #a51a23; }
+.tw-candle-top { fill: #e45a5e; }
+.tw-candle-pool { fill: #f3a0a0; opacity: 0.7; }
+.tw-drip { fill: #d84146; }
+.tw-wick { fill: none; stroke: #1c1410; stroke-width: 1.6; stroke-linecap: round; }
+.tw-wick--new { stroke: #e9e2d0; }
+.tw-flame { opacity: 0; transition: opacity 0.9s ease; }
+.tw-flame.is-lit { opacity: 1; }
+.tw-flame-lean { transform-box: fill-box; transform-origin: 50% 100%; transform: rotate(var(--tw-flame-lean, 0deg)); }
+.tw-flame-grow { transform-box: fill-box; transform-origin: 50% 100%; transform: scale(0.2); transition: transform 0.9s ease; }
+.tw-flame.is-lit .tw-flame-grow { transform: scale(1); }
+.tw-flame-fl { transform-box: fill-box; transform-origin: 50% 100%; animation: twFlicker 1.7s ease-in-out infinite; }
+.tw-flame--1 .tw-flame-fl { animation-duration: 1.4s; animation-delay: -0.6s; }
+.tw-flame--2 .tw-flame-fl { animation-duration: 1.9s; animation-delay: -1.1s; }
+.tw-flame--3 .tw-flame-fl { animation-duration: 1.55s; animation-delay: -0.3s; }
+.tw-flame-i { fill: #fffbe8; opacity: 0.9; }
+.tw-flame-b { fill: #5aa0ff; opacity: 0.55; }
+.tw-cglow { opacity: calc(0.45 + 0.55 * var(--tw-night, 0)); mix-blend-mode: screen; }
+.tw-smoke { fill: none; stroke: #d9d9d9; stroke-width: 2.4; stroke-linecap: round; opacity: 0; }
+.tw-smoke.is-puff { animation: twSmoke 2.6s ease-out forwards; }
+@keyframes twFlicker {
+  0%, 100% { transform: scale(1, 1) skewX(0deg); }
+  22% { transform: scale(0.94, 1.07) skewX(2deg); }
+  47% { transform: scale(1.04, 0.93) skewX(-1.5deg); }
+  71% { transform: scale(0.97, 1.04) skewX(1deg); }
+}
+@keyframes twSmoke {
+  0% { opacity: 0.75; transform: translateY(0) scaleY(0.3); }
+  100% { opacity: 0; transform: translateY(-26px) scaleY(1.2); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tw-flame-fl { animation: none; }
+  .tw-smoke.is-puff { animation: none; }
 }

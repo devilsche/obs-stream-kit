@@ -164,7 +164,8 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
     except Exception:
         log.exception("weather: theme failed for tenant %s", tenant_id)
         theme, xmas, snow = "none", "off", {"level": 0, "top": []}
-    state.update(theme=theme, xmas=xmas, snowCover=snow["level"], snowTop=snow["top"])
+    state.update(theme=theme, xmas=xmas, snowCover=snow["level"], snowTop=snow["top"],
+                 advent=weather_theme.advent_burn(today))
     LAST_THEME[tenant_id] = theme
     LAST_XMAS[tenant_id] = xmas
     # Herbst, Frühling, Sommer: Laub, Garten, Hitze nach dem wirksamen Wetter

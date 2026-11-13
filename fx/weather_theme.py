@@ -39,6 +39,16 @@ def advent1(year: int) -> date:
     return d + timedelta(days=(6 - d.weekday()) % 7)
 
 
+def advent_burn(today: date) -> list:
+    """Brenntage der vier Adventskerzen: Tage seit ihrem Adventssonntag, -1 = noch
+    nicht angezündet. Januar und Februar gehören zur Vorjahres-Saison."""
+    season = today.year - 1 if today.month <= 2 else today.year
+    first = advent1(season)
+    if today.month < 11 and today.month > 2:
+        return [-1] * 4
+    return [(today - first).days - 7 * i if (today - first).days >= 7 * i else -1 for i in range(4)]
+
+
 def _mmdd(text, year):
     m, d = (int(x) for x in str(text).split("-"))
     return date(year, m, d)

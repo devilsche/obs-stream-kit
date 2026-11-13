@@ -164,6 +164,14 @@
     bits:    { w: 40, h: 32, box: '#2a64b8', rib: '#ffffff' },
     raid:    { w: 66, h: 50, box: '#e8772e', rib: '#ffffff' }
   };
+  // ── Adventskranz links vom Baum (Baum-Koordinaten): Ring in Aufsicht,
+  // Kerzen im Uhrzeigersinn ab hinten links; je Brenntag ein Stück kürzer ──
+  var WR = { x: -150, y: 484, rx: 70, ry: 26 };
+  // leicht gedreht, damit keine Kerze genau vor einer anderen steht
+  var CANDLE_A = [-160, -70, 20, 110];
+  var CANDLE_H = 74, CANDLE_W = 14;
+  function candleH(days) { return days < 0 ? CANDLE_H : CANDLE_H * Math.max(0.25, 1 - 0.026 * days); }
+
   function giftScale(type, amount) {
     amount = amount || 1;
     if (type === 'giftsub') return Math.min(1.6, 1 + Math.log(amount) / Math.LN2 / 6);
@@ -207,6 +215,12 @@
      ['ornGr', '#b8f5cf', '#2ecc71', '#0e5a2c'], ['ornO', '#ffd2a8', '#ff8a1f', '#7a3a06']].forEach(function (c) {
       grad('radialGradient', c[0], { cx: 0.35, cy: 0.3 }, [[0, c[1]], [0.5, c[2]], [1, c[3]]]);
     });
+    // Adventskranz: Kerzenwachs, Flamme, Lichtschein
+    grad('linearGradient', 'candleG', { x1: 0, y1: 0, x2: 1, y2: 0 }, [[0, '#7c1219'], [0.35, '#d63a3f'], [0.6, '#c42a31'], [1, '#6a0f15']]);
+    grad('radialGradient', 'flameG', { cx: 0.5, cy: 0.72, r: 0.6 }, [[0, '#fffbe6'], [0.35, '#ffd86b'], [0.75, '#ff9a2a'], [1, '#ff6a10', 0]]);
+    grad('radialGradient', 'cglowG', {}, [[0, '#ffd27a', 0.75], [0.4, '#ffb347', 0.3], [1, '#ff9a2a', 0]]);
+    grad('radialGradient', 'wglowG', {}, [[0, '#ffc977', 0.55], [0.5, '#ffad4a', 0.22], [1, '#ff9a2a', 0]]);
+    grad('radialGradient', 'coneG', { cx: 0.4, cy: 0.35 }, [[0, '#a8743f'], [1, '#4a2c14']]);
     TIER_D.forEach(function (p, i) { var cp = el('clipPath', { id: pfx + 'tierClip' + i }, d); el('path', { d: p }, cp); });
   }
 
@@ -331,6 +345,137 @@
       el('path', { 'class': 'tw-drift', d: 'M-170 540 Q-120 470 -60 410 Q-10 318 50 316 Q120 292 200 305 Q280 288 350 316 Q410 318 460 410 Q520 470 570 540 Z' }, gDriftBox);
     }
     var counterEl = el('text', { 'class': 'tw-counter', x: 200, y: 536, 'text-anchor': 'middle' }, gTreeShk);
+
+    // ── Adventskranz: Zweige hinten, Kerzen, Zweige vorne, Flammen obenauf ──
+    cfg.seed(11);
+    var gWreathBox = el('g', { 'class': 'tw-wreath' }, gTreeShk);
+    var gWreath = el('g', {}, gWreathBox);
+    el('ellipse', { 'class': 'tw-wglow', cx: WR.x, cy: WR.y + 6, rx: 190, ry: 70, fill: 'url(#' + pfx + 'wglowG)' }, gWreath);
+    var gWBody = el('g', { 'class': 'tw-wbody' }, gWreath);
+    var gWBack = el('g', {}, gWBody), gWCand = el('g', {}, gWBody), gWFront = el('g', {}, gWBody);
+    var gWFlames = el('g', {}, gWreath);
+    var NEEDLE = ['#1d4529', '#285a33', '#33693c', '#1a3d24'];
+    function sprig(parent, x, y, ang, len) {
+      var c = Math.cos(ang), sn = Math.sin(ang), d = 'M' + f1(x) + ' ' + f1(y) + ' l' + f1(c * len) + ' ' + f1(sn * len * 0.45);
+      for (var t = 0.15; t < 1; t += 0.12) {
+        var px = x + c * len * t, py = y + sn * len * t * 0.45, nl = 7 * (1.1 - t);
+        [-1, 1].forEach(function (side) {
+          var a = ang + side * (0.9 + rnd() * 0.3);
+          d += ' M' + f1(px) + ' ' + f1(py) + ' l' + f1(Math.cos(a) * nl) + ' ' + f1(Math.sin(a) * nl * 0.6 - 1.5);
+        });
+      }
+      el('path', { 'class': 'tw-sprig', stroke: NEEDLE[Math.floor(rnd() * NEEDLE.length)], d: d }, parent);
+    }
+    function ringPt(a, r) { return [WR.x + WR.rx * r * Math.cos(a), WR.y + WR.ry * r * Math.sin(a)]; }
+    // Unterbau dunkel, darauf Zweige rundum (je zwei Lagen), hinten zuerst
+    // Strohring als Unterbau (mit Loch in der Mitte), darauf dicht Tannenzweige
+    el('ellipse', { 'class': 'tw-wbase', cx: WR.x, cy: WR.y + 3, rx: WR.rx, ry: WR.ry }, gWBack);
+    for (var wi = 0; wi < 130; wi++) {
+      var wa = wi / 130 * Math.PI * 2 + rnd() * 0.05, wr = 0.72 + rnd() * 0.56, wp = ringPt(wa, wr);
+      var tang = wa + Math.PI / 2 * (rnd() < 0.5 ? 1 : -1) + (rnd() - 0.5) * 0.8;
+      sprig(Math.sin(wa) < -0.1 ? gWBack : gWFront, wp[0], wp[1] - 4 + rnd() * 6, tang, 20 + rnd() * 12);
+    }
+    // Zapfen, Beeren, Schleife vorne
+    [[-0.4, 0.95], [2.0, 1.05], [-2.6, 0.9], [1.1, 1.08]].forEach(function (c) {
+      var cp = ringPt(c[0], c[1]), g = el('g', { transform: 'translate(' + f1(cp[0]) + ' ' + f1(cp[1]) + ') rotate(' + f1(c[0] * 30) + ')' }, Math.sin(c[0]) < -0.1 ? gWBack : gWFront);
+      el('ellipse', { rx: 9, ry: 6, fill: 'url(#' + pfx + 'coneG)' }, g);
+      el('path', { 'class': 'tw-cone-scale', d: 'M-6 -2 Q-3 0 -6 2 M-2 -4 Q1 0 -2 4 M2 -4 Q5 0 2 4 M6 -2 Q8 0 6 2' }, g);
+    });
+    for (var bi = 0; bi < 9; bi++) {
+      var ba = rnd() * Math.PI * 2, bp = ringPt(ba, 0.85 + rnd() * 0.35);
+      var bg = Math.sin(ba) < -0.1 ? gWBack : gWFront;
+      for (var bk = 0; bk < 3; bk++) el('circle', { 'class': 'tw-berry', cx: f1(bp[0] + (bk - 1) * 3.6), cy: f1(bp[1] + (bk === 1 ? -3 : 0)), r: 2.8 }, bg);
+    }
+    var bow = el('g', { transform: 'translate(' + WR.x + ' ' + (WR.y + WR.ry + 6) + ')' }, gWFront);
+    el('path', { 'class': 'tw-wbow', d: 'M0 0 Q-16 -12 -20 -2 Q-18 8 0 0 Z M0 0 Q16 -12 20 -2 Q18 8 0 0 Z' }, bow);
+    el('path', { 'class': 'tw-wbow', d: 'M-2 1 L-9 18 L-5 16 L-3 20 Z M2 1 L9 18 L5 16 L3 20 Z' }, bow);
+    el('circle', { 'class': 'tw-wbow-knot', r: 4 }, bow);
+    if (snow) {
+      for (var si = 0; si < 7; si++) {
+        var sp = ringPt(-Math.PI + si / 6 * Math.PI * 2 + 0.3, 1.0);
+        el('ellipse', { 'class': 'tw-gsnow', cx: f1(sp[0]), cy: f1(sp[1] - 5), rx: f1(8 + rnd() * 6), ry: 3.5 }, Math.sin(-Math.PI + si / 6 * Math.PI * 2 + 0.3) < -0.1 ? gWBack : gWFront);
+      }
+    }
+    // Kerzen: hintere vor den vorderen zeichnen; Höhe aus den Brenntagen
+    var candles = CANDLE_A.map(function (deg, i) {
+      var a = deg * Math.PI / 180, cp = ringPt(a, 0.78);
+      return { i: i, x: cp[0], y: cp[1] + 2, days: -1, out: 0, delay: 0.3 + rnd() * 0.9 };
+    });
+    candles.slice().sort(function (a, b) { return a.y - b.y; }).forEach(function (c) {
+      c.g = el('g', { 'class': 'tw-candle' }, gWCand);
+      c.flame = el('g', { 'class': 'tw-flame tw-flame--' + c.i }, gWFlames);
+      c.glow = el('circle', { 'class': 'tw-cglow', r: 30, fill: 'url(#' + pfx + 'cglowG)' }, c.flame);
+      c.lean = el('g', { 'class': 'tw-flame-lean' }, c.flame);
+      var fl = el('g', { 'class': 'tw-flame-fl' }, el('g', { 'class': 'tw-flame-grow' }, c.lean));
+      el('path', { 'class': 'tw-flame-o', fill: 'url(#' + pfx + 'flameG)', d: 'M0 0 C-7 -4 -6 -14 0 -26 C6 -14 7 -4 0 0 Z' }, fl);
+      el('path', { 'class': 'tw-flame-i', d: 'M0 -2 C-3 -5 -3 -10 0 -15 C3 -10 3 -5 0 -2 Z' }, fl);
+      el('ellipse', { 'class': 'tw-flame-b', cx: 0, cy: -2, rx: 2.6, ry: 2 }, fl);
+      c.smokePos = el('g', {}, gWFlames);
+      c.smoke = el('path', { 'class': 'tw-smoke', d: 'M0 0 C-5 -10 5 -18 0 -28 C-5 -38 4 -46 -1 -58' }, c.smokePos);
+    });
+    function drawCandle(c) {
+      var h = candleH(c.days), top = c.y - h, w = CANDLE_W, g = c.g;
+      clear(g);
+      el('rect', { x: f1(c.x - w / 2), y: f1(top), width: w, height: f1(h), fill: 'url(#' + pfx + 'candleG)' }, g);
+      // Brennmulde oben, Wachsrand etwas heller
+      el('ellipse', { 'class': 'tw-candle-top', cx: f1(c.x), cy: f1(top), rx: w / 2, ry: 3 }, g);
+      el('ellipse', { 'class': 'tw-candle-pool', cx: f1(c.x), cy: f1(top + 0.6), rx: f1(w / 2 - 2.2), ry: 1.8 }, g);
+      // Wachsnasen: je länger sie brennt, desto mehr
+      var drips = c.days < 0 ? 0 : Math.min(4, 1 + Math.floor(c.days / 6));
+      for (var k = 0; k < drips; k++) {
+        var dx = c.x - w / 2 + 2 + (k * 5.3 + c.i * 3) % (w - 4), dl = 5 + ((k * 7 + c.i * 5) % 11);
+        el('path', { 'class': 'tw-drip', d: 'M' + f1(dx - 1.8) + ' ' + f1(top) + ' l0 ' + dl + ' a1.8 1.8 0 0 0 3.6 0 l0 ' + (-dl) + ' Z' }, g);
+      }
+      el('path', { 'class': 'tw-wick' + (c.days < 0 ? ' tw-wick--new' : ''), d: 'M' + f1(c.x) + ' ' + f1(top) + ' q1 -4 0 -7' }, g);
+      c.flame.setAttribute('transform', 'translate(' + f1(c.x) + ' ' + f1(top - 6) + ')');
+      c.smokePos.setAttribute('transform', 'translate(' + f1(c.x) + ' ' + f1(top - 8) + ')');
+    }
+    candles.forEach(drawCandle);
+    function showFlame(c, lit) {
+      if (c.shownLit === lit) return;
+      c.shownLit = lit;
+      c.flame.classList.toggle('is-lit', lit);
+    }
+    function puff(c) {
+      c.smoke.classList.remove('is-puff');
+      void c.smoke.getBoundingClientRect();
+      c.smoke.classList.add('is-puff');
+    }
+    // Wind: Flammen neigen sich mit; starke Böe, Sturm oder Windhose pusten sie aus
+    var wLean = 0, wKick = 0, wNight = -1, wLitDrawn = -1, candlesOn = true;
+    function blowOut(hold) {
+      candles.forEach(function (c) {
+        if (c.days < 0) return;
+        if (c.shownLit && !c.out) puff(c);
+        c.out = Math.max(c.out, hold + c.delay * 2);
+      });
+    }
+    function stepWreath(dt) {
+      var storm = cfg.storm ? cfg.storm(TX + WR.x * TK) : false;
+      var w = cfg.wind ? cfg.wind() : 0;
+      if (storm) blowOut(3);
+      wKick *= Math.exp(-dt * 1.6);
+      var target = w * 14 + wKick;
+      wLean += (target - wLean) * Math.min(1, dt * 4);
+      gWreathBox.style.setProperty('--tw-flame-lean', f1(reduceMotion ? 0 : wLean) + 'deg');
+      var litN = 0;
+      candles.forEach(function (c) {
+        if (c.out > 0) c.out = Math.max(0, c.out - dt);
+        var lit = candlesOn && c.days >= 0 && c.out <= 0 && !c.unlit;
+        showFlame(c, lit);
+        if (lit) litN++;
+      });
+      if (litN !== wLitDrawn) { wLitDrawn = litN; gWreathBox.style.setProperty('--tw-wlit', (litN / 4).toFixed(2)); }
+    }
+    function setAdvent(list) {
+      if (!Array.isArray(list)) return;
+      candles.forEach(function (c, i) {
+        var d = typeof list[i] === 'number' ? list[i] : -1;
+        if (d === c.days) return;
+        c.days = d;
+        drawCandle(c);
+      });
+    }
 
     // Oberkante des Hügels je x (Baum-Koordinaten), damit kein Geschenk schwebt
     var groundY = (function () {
@@ -569,7 +714,8 @@
       return xmas === 'on' || xmas === 'farewell';
     }
     function resetAnimAttrs() {
-      [gTree, gMoundBox, gGifts, gBaubles, gLights, counterEl].forEach(function (n) {
+      candles.forEach(function (c) { c.unlit = false; });
+      [gTree, gMoundBox, gGifts, gBaubles, gLights, counterEl, gWreath].forEach(function (n) {
         if (n) { n.removeAttribute('transform'); n.removeAttribute('opacity'); }
       });
       orns.forEach(function (o) { if (o) { o.outer.removeAttribute('transform'); o.outer.removeAttribute('opacity'); } });
@@ -619,6 +765,10 @@
         setTo(g.outer, (1 - kg) * 520, 0, kg);
       });
       counterEl.setAttribute('opacity', clamp01((t - 9) / 0.8).toFixed(3));
+      // Kranz rutscht von links herein, danach brennen die Kerzen nacheinander an
+      var kw = ease((t - 6.6) / 1.2);
+      setTo(gWreath, -(1 - kw) * 320, 0, kw);
+      candles.forEach(function (c) { c.unlit = t < 8.4 + 0.35 * c.i; });
     }
     function renderFarewell(t) {
       var os = anim.orns, n = os.length;
@@ -641,6 +791,14 @@
         var st = 6.6 + 1.2 * j / Math.max(1, anim.gifts.length), kk = ease((t - st) / 0.9);
         setTo(g.outer, kk * 520, 0, 1 - kk);
       });
+      // Kerzen werden ausgepustet (letzte zuerst), dann geht der Kranz mit den Geschenken
+      candles.forEach(function (c) {
+        var off = t >= 3.4 + 0.35 * (3 - c.i);
+        if (off && !c.unlit && c.shownLit) puff(c);
+        c.unlit = off;
+      });
+      var kw = ease((t - 6.8) / 1.4);
+      setTo(gWreath, -kw * 320, 0, 1 - kw);
       var kt = ease((t - 6.4) / 2.2);
       setTo(gTree, 0, kt * 280, 1 - kt);
       setTo(gMoundBox, 0, 0, 1 - clamp01((t - 7.8) / 1));
@@ -747,6 +905,7 @@
       },
       step: function (dt) {
         if (effects.length) runEffects(dt);
+        stepWreath(dt);
         if (!anim) return;
         anim.t += dt;
         (anim.type === 'setup' ? renderSetup : renderFarewell)(Math.min(anim.t, anim.dur));
@@ -754,6 +913,13 @@
       },
       start: start,
       flood: flood,
+      // Brenntage der vier Adventskerzen vom Server (weather_theme.advent_burn)
+      advent: setAdvent,
+      // Böe {dir, k}: Flammen neigen sich, ab k ≥ 1.1 gehen sie aus
+      gust: function (dir, k) {
+        wKick = (dir < 0 ? -1 : 1) * Math.min(2, k || 1) * 22;
+        if ((k || 1) >= 1.1) blowOut(2.5);
+      },
       busy: function () { return anim ? anim.type : null; },
       totals: function () { return { ornaments: ornTotal, gifts: giftTotal }; },
       bulbs: B

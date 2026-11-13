@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from fx.weather_theme import (advent1, early_start, init_schema, load_early, mark, status, theme_for,
+from fx.weather_theme import (advent1, advent_burn, early_start, init_schema, load_early, mark, status, theme_for,
                               xmas_window)
 
 
@@ -21,6 +21,17 @@ def test_first_advent():
     assert advent1(2026) == date(2026, 11, 29)
     assert advent1(2025) == date(2025, 11, 30)
     assert advent1(2022) == date(2022, 11, 27)
+
+
+def test_advent_burn_days_per_candle():
+    # 2026: 1. Advent 29.11., dann 6.12., 13.12., 20.12.
+    assert advent_burn(date(2026, 11, 28)) == [-1, -1, -1, -1]
+    assert advent_burn(date(2026, 11, 29)) == [0, -1, -1, -1]
+    assert advent_burn(date(2026, 12, 8)) == [9, 2, -1, -1]
+    assert advent_burn(date(2026, 12, 24)) == [25, 18, 11, 4]
+    # Januar gehört zur Vorjahres-Saison
+    assert advent_burn(date(2027, 1, 2)) == [34, 27, 20, 13]
+    assert advent_burn(date(2026, 6, 1)) == [-1, -1, -1, -1]
 
 
 def test_window_and_season():

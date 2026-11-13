@@ -137,7 +137,14 @@
       mound: { cls: 'tw-mound', d: 'M-80 540 Q-48 504 22 506 Q104 492 200 498 Q298 490 378 504 Q448 506 480 540 Z' },
       tag: function (text, x, y, long) { tag(text, x, y, false, long); },
       board: function (title, rows) { showBoard(title, rows); },
-      onSync: function () { syncMinis(); }
+      onSync: function () { syncMinis(); },
+      // Adventskranz: Wind neigt die Flammen, Sturm und Windhose pusten sie aus
+      wind: function () { return S.on ? liveWind() : 0; },
+      storm: function (x) {
+        if (!S.on) return false;
+        var near = tws ? tws.near(x) : null;
+        return stormy(liveWind()) || (!!near && Math.abs(near.x - x) < 260);
+      }
     });
     var treeToScreen = X.toScreen;
     function stringAlong(parent, d, step, baseRot, size, small) { return X.bulbs.stringAlong(parent, d, step, baseRot, size, small, true); }
@@ -819,6 +826,7 @@
       p = p || {};
       var dir = p.dir === 1 || p.dir === -1 ? p.dir : (Math.random() < 0.5 ? -1 : 1), gk = p.k > 0 ? p.k : 1;
       rootEl.style.setProperty('--tw-gust-dir', (dir * gk).toFixed(2));
+      X.gust(dir, gk);
       rootEl.dataset.gust = '1';
       clearTimeout(gustTimer);
       gustTimer = setTimeout(function () { rootEl.dataset.gust = '0'; }, 1700);
@@ -1010,7 +1018,7 @@
     showSnowman(0);
     syncXmas();
 
-    var PART_KEYS = ['lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover'];
+    var PART_KEYS = ['lights', 'tree', 'baubles', 'gifts', 'wreath', 'snowman', 'minis', 'icicles', 'cover'];
     return {
       load: function (deco) {
         if (!deco) return;
@@ -1049,6 +1057,7 @@
         fxEl.dataset.on = S.on ? '1' : '0';
         dirty = true;
         X.update(S.on, S.xmas, S.partsOn);
+        X.advent(s.advent);
       },
       command: function (cmd, p) {
         p = p || {};

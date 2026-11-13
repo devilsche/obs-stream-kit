@@ -260,11 +260,11 @@
       var KEYS = ['place', 'testbg', 'mood', 'kdlow', 'kdhigh', 'kdtest', 'fallback', 'lock', 'wind', 'veil',
                   'aurorakd', 'frost', 'frostrate', 'sound', 'volume', 'thunder', 'ambient', 'siren', 'sbaction', 'sbws',
                   'theme', 'xmasfrom', 'xmasto', 'snowrate', 'leafrate', 'shakeneed', 'shakewin',
-                  'lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover',
+                  'lights', 'tree', 'baubles', 'gifts', 'wreath', 'snowman', 'minis', 'icicles', 'cover',
                   'garland', 'branch', 'pile', 'leaves', 'pumpkins', 'meadow', 'bugs', 'beach', 'umbrella'];
       // Deko-Teile, die einzeln abschaltbar sind (fehlt = an); branch gilt
       // für den Herbst-Ast und den Kirschzweig im Frühling
-      var PARTS = ['lights', 'tree', 'baubles', 'gifts', 'snowman', 'minis', 'icicles', 'cover',
+      var PARTS = ['lights', 'tree', 'baubles', 'gifts', 'wreath', 'snowman', 'minis', 'icicles', 'cover',
                    'garland', 'branch', 'pile', 'leaves', 'pumpkins', 'meadow', 'bugs', 'beach', 'umbrella'];
       function fromUrl() {
         var out = {};
@@ -288,7 +288,7 @@
       // Felder, die sich ändern, ohne dass das Bild anders aussieht
       var SIG_SKIP = { until: 1, transition: 1, source: 1, temp: 1, freezing: 1,
                        frost: 1, frostTop: 1, frostOn: 1,
-                       theme: 1, xmas: 1, snowCover: 1, snowTop: 1, seasonLevels: 1, seasonTop: 1 };
+                       theme: 1, xmas: 1, snowCover: 1, snowTop: 1, seasonLevels: 1, seasonTop: 1, advent: 1 };
       // Wind aus dem Schalter: auto = Wind der Lage (live: echter Wind),
       // random = wechselt von selbst, Zahl = fest
       function withWind(state) {
@@ -334,7 +334,7 @@
         theme.update({ theme: state.theme || 'none', xmas: state.xmas || 'off',
                        snowCover: typeof state.snowCover === 'number' ? state.snowCover : 0,
                        snowTop: state.snowTop || [], heat: state.heat || 0, night: state.night || 0,
-                       parts: parts });
+                       advent: state.advent, parts: parts });
         var ss = {};
         for (var k in state) ss[k] = state[k];
         ss.theme = state.theme || 'none';

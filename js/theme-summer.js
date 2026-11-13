@@ -26,7 +26,7 @@
   'use strict';
 
   var PART_KEYS = ['beach', 'umbrella'];
-  var XMAS_KEYS = ['lights', 'tree', 'gifts'];
+  var XMAS_KEYS = ['lights', 'tree', 'gifts', 'wreath'];
   // Baum am Strand: rechts neben der Bildmitte, Fuß im Sand
   var TREE_X = 1470, TREE_Y = 520, TREE_K = 0.95;
   var MAX_C = 12;
@@ -106,7 +106,14 @@
       },
       tag: function (text, x, y, long) { B.tag(text, x, y, false, long); },
       board: function (title, rows) { B.board(title, rows); },
-      onSync: function () { syncCastles(); }
+      onSync: function () { syncCastles(); },
+      // Adventskranz: Wind neigt die Flammen, Sturm und Windhose pusten sie aus
+      wind: function () { return B.on ? B.windBase : 0; },
+      storm: function (x) {
+        if (!B.on) return false;
+        var near = tws.near(x);
+        return stormy() || (!!near && Math.abs(near.x - x) < 260);
+      }
     });
     // Hügel unter dem Baum macht Hitze und Schnee wie der übrige Strand mit
     (function () {
@@ -1033,6 +1040,7 @@
     function gust(p) {
       var dir = B.gust(800, p), gk = B.gustK;
       B.vars({ '--ts-gust-dir': (dir * gk).toFixed(2) });
+      X.gust(dir, gk);
       B.pulse('gust', 1600);
       if (!B.on || B.reduceMotion || !B.partOn('beach') || !B.front) return;
       for (var i = 0; i < 70 * gk; i++) {
@@ -1479,6 +1487,7 @@
         xRoot.style.setProperty('--tw-night', B.night.toFixed(3));
         xmas = s.xmas || 'off';
         X.update(B.on, xmas, xp);
+        X.advent(s.advent);
       },
       command: function (cmd, p) {
         p = p || {};

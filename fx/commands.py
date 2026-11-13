@@ -217,6 +217,7 @@ EFFECTS = {
             "tree": _flag,
             "baubles": _flag,
             "gifts": _flag,
+            "wreath": _flag,
             "snowman": _flag,
             "minis": _flag,
             "icicles": _flag,
