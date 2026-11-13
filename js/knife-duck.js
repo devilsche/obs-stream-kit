@@ -263,6 +263,8 @@
       var r1 = clamp01((t - 0.35) / 0.6), r2 = clamp01((t - 1.65) / 0.8), rr = r2 > 0 ? r2 : r1;
       m.ring.material.opacity = (rr > 0 && rr < 1) ? (1 - rr) * 0.9 : 0;
       var rs = 1.15 + rr * 0.5; m.ring.scale.set(rs, rs, rs);
+      // Umhang (Gummiente mit Batman/Superman) weht leicht
+      if (styleName === 'rubber' && root.RubberDuck.flutter) root.RubberDuck.flutter(m.duck, real, 0.35, 0);
       renderer.render(scene, cam);
       if (opts.freeze != null || real < TOTAL + 0.2) requestAnimationFrame(frame);
       else renderer.clear();

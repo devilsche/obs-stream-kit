@@ -336,7 +336,7 @@
         inner.position.set(-0.12, -0.55, 0);   // um die Mitte der Ente drehen
         duckCache[key] = new THREE.Group().add(inner);
       }
-      return duckCache[key].clone();
+      return RD.clone ? RD.clone(duckCache[key]) : duckCache[key].clone();
     }
     function makeItem() {
       if (kind === 'sushi' || rise) return tpl.make();
@@ -406,6 +406,8 @@
         if (d.bounced) d.back = Math.min(1, d.back + dt / 0.7);
         if (d.y > H + d.h * 2) { remove(d); return false; }
         d.g.rotation.x += d.wx * dt; d.g.rotation.y += d.wy * dt; d.g.rotation.z += d.wz * dt;
+        // Umhang flattert im Fahrtwind: je schneller, desto mehr
+        if (RD && RD.flutter && kind === 'duck') RD.flutter(d.g, t / 1000, 0.4 + Math.min(1, d.vy / 600), d.ph || (d.ph = Math.random() * 6.28));
         var s = d.sc * (1 - 0.22 * d.back);
         d.g.scale.set(s, s, s);
         d.g.position.set(d.x, -d.y, d.z - 600 * d.back);
