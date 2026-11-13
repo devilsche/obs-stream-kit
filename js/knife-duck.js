@@ -5,7 +5,8 @@
  * der andere Flügel setzt am Hals an, Starre, zieht langsam quer rüber
  * (Cut-Throat, mit Kratzen der Klinge) und bleibt am Kinn →
  * böser Blick, blauer Ring pulsiert → Messer runter → weg. Animiert „auf
- * Zweien“ (Pose steht 1/15 s). Ton als Dateien (assets/sounds/knife-draw.mp3,
+ * Zweien“ (Pose steht 1/15 s). Sitzt standardmäßig auf dem unteren Bildrand und
+ * wird weich ein- und ausgeblendet. Ton als Dateien (assets/sounds/knife-draw.mp3,
  * knife-glint.mp3, knife-swipe.mp3); fehlt eine, bleibt es an der Stelle still.
  *
  *   KnifeDuck.start({ canvas, x, y, height, volume, freeze, soundBase })
@@ -150,7 +151,10 @@
     holder.add(m.duck); scene.add(holder);
     m.duck.rotation.y = 0.15;
     var unit = (opts.height || 430) / 2.9;
-    holder.position.set(opts.x || 960, -(opts.y || 700), 0);
+    holder.scale.set(unit, unit, unit);
+    // ohne y: sitzt auf dem unteren Bildrand (Unterseite der Kontur bei ~0.83 Einheiten)
+    var y = opts.y != null ? opts.y : H - 0.83 * unit;
+    holder.position.set(opts.x || 960, -y, 0);
     var vol = opts.volume == null ? 0.7 : opts.volume, base = opts.soundBase || '../assets/sounds/';
     var cues = [[sound(base + 'knife-draw.mp3', vol), 0.35], [sound(base + 'knife-glint.mp3', vol), 0.7], [sound(base + 'knife-swipe.mp3', vol), 1.65]];
     var fired = [], TOTAL = 4.75, t0 = null;
@@ -161,8 +165,9 @@
       if (opts.freeze == null) cues.forEach(function (c, i) { if (!fired[i] && real >= c[1]) { fired[i] = true; c[0].play(); } });
       // „auf Zweien“: Posen springen in 1/15-s-Schritten
       var t = Math.floor(real * 15) / 15;
-      var s = unit * Math.max(0, Math.min(back(t / 0.3), 1 - ease((t - 4.35) / 0.35)));
-      holder.scale.set(s, s, s);
+      // weich ein- und ausblenden (Deckkraft der Fläche, CSS-Variable --fade)
+      var fade = Math.max(0, Math.min(ease(real / 0.25), 1 - ease((real - 4.3) / 0.45)));
+      opts.canvas.style.setProperty('--fade', fade.toFixed(3));
       // Messer ruckt hoch (mit Nachfedern), ab 3.85 wieder runter
       var k = t < 0.35 ? 0 : t < 3.85 ? back((t - 0.35) / 0.22) : 1 - ease((t - 3.85) / 0.35);
       m.knife.position.set(lerp(LOW.x, UP.x, k), lerp(LOW.y, UP.y, k), lerp(LOW.z, UP.z, k));

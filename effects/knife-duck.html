@@ -7,12 +7,13 @@
   <style>
     /* Messer-Ente im Utya-Sticker-Stil (js/knife-duck.js, 3D mit three.js r128,
        Toon-Shading), ~4 s, Ton aus assets/sounds/knife-*.mp3.
-       ?x=&y= Mitte in px (Standard 960/700), ?height= Größe in px (430),
+       ?x= Mitte in px (960), ?y= Mitte in px (ohne: sitzt auf dem unteren Rand),
+       ?height= Größe in px (430),
        ?volume=0..1 (0.7, 0 = stumm). Startet beim Laden – in OBS
        „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
-    canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+    canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; opacity: var(--fade, 0); }
   </style>
 </head>
 <body>
@@ -26,7 +27,7 @@
       function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
       window.KnifeDuck.start({
         canvas: document.getElementById('gl'),
-        x: num('x', 960), y: num('y', 700), height: num('height', 430),
+        x: num('x', 960), y: q.get('y') !== null ? num('y', 700) : null, height: num('height', 430),
         volume: Math.max(0, Math.min(1, num('volume', 0.7))),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
         // ?t=Sekunde hält den Ablauf an dieser Stelle an (zum Prüfen)
