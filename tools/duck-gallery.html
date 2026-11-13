@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rubber duck outfits</title>
+  <style>
+    /* Galerie aller Gummienten-Outfits (js/rubber-duck.js + js/rubber-duck-outfits.js):
+       eine WebGL-Fläche hinter dem Raster, jede Kachel wird per Scissor in ihren Bereich gezeichnet */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 3; }
+    #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; }
+    header { padding: 18px 20px 4px; max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0; }
+    .lead { color: var(--muted); margin: 4px 0 0; }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; max-width: 1400px; margin: 0 auto; }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; min-height: 34px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    label { color: var(--muted); }
+    input[type=search] { background: var(--panel); color: var(--text); border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 10px; font: inherit; min-height: 34px; }
+    .count { color: var(--muted); margin-left: auto; }
+    main { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+    .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+    .tile[hidden] { display: none; }
+    .stage { aspect-ratio: 1 / 1; width: 100%; }
+    .meta { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
+    .meta h2 { font-size: 16px; margin: 0; }
+    .cat { color: var(--muted); font-size: 13px; }
+    .param { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
+    .meta a { color: var(--text); font-size: 13px; padding: 4px 0; min-height: 24px; display: inline-block; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#ducks">Skip to the ducks</a>
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <header>
+    <h1>Rubber duck outfits</h1>
+    <p class="lead">Every outfit of the 3D rubber duck. Use them as <code>?outfit=&lt;name&gt;</code> on the duck rain (<code>effects/item-rain.html?kind=duck</code>) and the knife duck (<code>effects/knife-duck.html?style=rubber</code>); <code>mix</code> picks one per duck, <code>random</code> one per call.</p>
+  </header>
+  <div class="filters" role="group" aria-label="Filter outfits">
+    <span id="cats"></span>
+    <label for="q">Search</label>
+    <input type="search" id="q" autocomplete="off">
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+  <main>
+    <ul class="grid" id="ducks"></ul>
+  </main>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck-outfits.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var THREE = window.THREE, RD = window.RubberDuck;
+      var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var CATS = { all: 'All', classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities' };
+
+      // ── Kacheln ──
+      var list = document.getElementById('ducks'), tiles = [];
+      RD.OUTFITS.forEach(function (k) {
+        var inf = RD.info(k), li = document.createElement('li');
+        li.className = 'tile'; li.dataset.cat = inf.cat; li.dataset.key = k;
+        var st = document.createElement('div'); st.className = 'stage'; st.setAttribute('role', 'img'); st.setAttribute('aria-label', 'Rubber duck in the ' + inf.label + ' outfit');
+        var meta = document.createElement('div'); meta.className = 'meta';
+        var h = document.createElement('h2'); h.textContent = inf.label;
+        var c = document.createElement('span'); c.className = 'cat'; c.textContent = CATS[inf.cat] || inf.cat;
+        var p = document.createElement('code'); p.className = 'param'; p.textContent = 'outfit=' + k;
+        var a = document.createElement('a'); a.href = 'duck-viewer?outfit=' + encodeURIComponent(k); a.textContent = 'Open in viewer';
+        meta.append(h, c, p, a); li.append(st, meta); list.appendChild(li);
+        tiles.push({ key: k, li: li, stage: st, label: inf.label.toLowerCase(), duck: null, yaw: -0.6 + (tiles.length % 5) * 0.08, hover: false });
+        var t = tiles[tiles.length - 1];
+        li.addEventListener('pointerenter', function () { t.hover = true; });
+        li.addEventListener('pointerleave', function () { t.hover = false; });
+        li.addEventListener('focusin', function () { t.hover = true; });
+        li.addEventListener('focusout', function () { t.hover = false; });
+      });
+
+      // ── Filter ──
+      var cat = 'all', cats = document.getElementById('cats'), q = document.getElementById('q'), count = document.getElementById('count');
+      Object.keys(CATS).forEach(function (c) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = CATS[c]; b.setAttribute('aria-pressed', String(c === cat));
+        b.addEventListener('click', function () {
+          cat = c; Array.prototype.forEach.call(cats.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); apply();
+        });
+        cats.appendChild(b); cats.appendChild(document.createTextNode(' '));
+      });
+      q.addEventListener('input', apply);
+      function apply() {
+        var s = q.value.trim().toLowerCase(), n = 0;
+        tiles.forEach(function (t) {
+          var show = (cat === 'all' || t.li.dataset.cat === cat) && (!s || t.label.indexOf(s) >= 0 || t.key.indexOf(s) >= 0);
+          t.li.hidden = !show; if (show) n++;
+        });
+        count.textContent = n + ' of ' + tiles.length + ' outfits';
+      }
+      apply();
+
+      // ── WebGL: eine Fläche, je Kachel ein eigener Ausschnitt ──
+      var canvas = document.getElementById('gl');
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.setScissorTest(true);
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 1, 0.1, 100);
+      cam.position.set(0, 0.35, 6.4); cam.lookAt(0, 0.15, 0);
+      (function () {
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+      })();
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x6a4a20, 0.5));
+      var key = new THREE.DirectionalLight(0xfff4e0, 0.85); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
+      var holder = new THREE.Group(); scene.add(holder);
+
+      function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); }
+      window.addEventListener('resize', resize); resize();
+
+      var last = null;
+      function frame(ts) {
+        var dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+        var H = window.innerHeight, W = window.innerWidth, built = 0;
+        renderer.setScissor(0, 0, W, H); renderer.clear();
+        tiles.forEach(function (t) {
+          if (t.li.hidden) return;
+          var r = t.stage.getBoundingClientRect();
+          if (r.bottom < 0 || r.top > H || r.right < 0 || r.left > W) return;
+          // Enten erst bauen, wenn sie zu sehen sind (höchstens zwei pro Bild)
+          if (!t.duck) {
+            if (built >= 2) return;
+            built++;
+            t.duck = new THREE.Group();
+            var d = RD.build({ outfit: t.key }); d.position.set(-0.12, -0.55, 0); t.duck.add(d);
+          }
+          if (!reduce) t.yaw += dt * (t.hover ? 1.4 : 0.35);
+          t.duck.rotation.set(0.12, t.yaw, 0);
+          if (!reduce) RD.flutter(t.duck, ts / 1000, 0.35, t.yaw);
+          if (holder.children[0]) holder.remove(holder.children[0]);
+          holder.add(t.duck);
+          var y = H - r.bottom;
+          renderer.setViewport(r.left, y, r.width, r.height); renderer.setScissor(r.left, y, r.width, r.height);
+          cam.aspect = r.width / r.height; cam.updateProjectionMatrix();
+          renderer.render(scene, cam);
+        });
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

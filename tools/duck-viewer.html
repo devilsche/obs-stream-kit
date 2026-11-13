@@ -45,14 +45,7 @@
       <button type="button" id="spin" aria-pressed="false">Auto-rotate</button>
       <button type="button" id="pink" aria-pressed="false">Pink duck</button>
       <label for="outfit">Outfit</label>
-      <select id="outfit">
-        <option value="none">Plain</option>
-        <option value="thw">THW</option>
-        <option value="police">Police</option>
-        <option value="fire">Fire brigade</option>
-        <option value="batman">Batman</option>
-        <option value="superman">Superman</option>
-      </select>
+      <select id="outfit"></select>
       <label for="wind">Wind</label>
       <input type="range" id="wind" min="0" max="1.5" step="0.05" value="0.4">
       <span class="hint">Keys: arrows rotate, + / − zoom</span>
@@ -60,6 +53,7 @@
   </main>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck-outfits.js"></script>
   <script>
     (function () {
       'use strict';
@@ -87,6 +81,19 @@
       var holder = new THREE.Group(), duck = null;
       scene.add(holder);
       var pinkOn = false, outfit = 'none';
+      // Outfit-Auswahl aus js/rubber-duck(-outfits).js, nach Kategorie gruppiert; ?outfit= wählt vor
+      var CATS = { classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities' };
+      (function () {
+        var sel = document.getElementById('outfit'), groups = {};
+        Object.keys(CATS).forEach(function (c) { var og = document.createElement('optgroup'); og.label = CATS[c]; groups[c] = og; sel.appendChild(og); });
+        window.RubberDuck.OUTFITS.forEach(function (k) {
+          var inf = window.RubberDuck.info(k), op = document.createElement('option');
+          op.value = k; op.textContent = inf.label; (groups[inf.cat] || groups.classic).appendChild(op);
+        });
+        var want = new URLSearchParams(location.search).get('outfit');
+        if (want && window.RubberDuck.OUTFITS.indexOf(want) >= 0) outfit = want;
+        sel.value = outfit;
+      })();
       function setDuck() {
         if (duck) holder.remove(duck);
         duck = window.RubberDuck.build({ color: pinkOn ? 0xff9fc2 : null, outfit: outfit });

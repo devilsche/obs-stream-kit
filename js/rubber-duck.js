@@ -166,49 +166,102 @@
   // suit = Rumpf unterhalb der Kragenlinie, stripes = Reflexstreifen (y, Breite),
   // belt = Gürtel, briefs = Höschen unten, cowl = Maske über Kopf/Augen.
   var OUTFITS = {
-    none: {},
-    thw: { suit: 0x1d2b5e, stripe: 0xf2c500, stripes: [0.18, -0.12], helmet: { color: 0xf2c500 }, helmetLabel: 'THW' },
-    police: { suit: 0x1e3c72, stripe: 0xd8dde6, stripes: [-0.05], cap: true, chest: 'star' },
-    fire: { suit: 0x1a2340, stripe: 0xf2d000, stripe2: 0xc9ced6, stripes: [0.2, -0.1], helmet: { color: 0xd9dde2, metal: true, neck: true } },
-    batman: { suit: 0x4a4e57, collar: 0.8, belt: 0xe2b62a, beltY: -0.3, cowl: 0x1a1b20, cape: 0x1a1b20, ears: true, chest: 'bat', eyes: 'white' },
-    superman: { suit: 0x1f4fb5, belt: 0xf2c500, beltY: -0.3, briefs: 0xc8151b, cape: 0xc8151b, chest: 'super' }
+    none: { label: 'Plain', cat: 'classic' },
+    thw: { label: 'THW', cat: 'classic', suit: 0x1d2b5e, stripe: 0xf2c500, stripes: [0.18, -0.12], helmet: { color: 0xf2c500 }, helmetLabel: 'THW' },
+    police: { label: 'Police', cat: 'classic', suit: 0x1e3c72, stripe: 0xd8dde6, stripes: [-0.05], cap: true, chest: 'star' },
+    fire: { label: 'Fire brigade', cat: 'classic', suit: 0x1a2340, stripe: 0xf2d000, stripe2: 0xc9ced6, stripes: [0.2, -0.1], helmet: { color: 0xd9dde2, metal: true, neck: true } },
+    batman: { label: 'Batman', cat: 'heroes', suit: 0x4a4e57, collar: 0.8, belt: 0xe2b62a, beltY: -0.3, cowl: 0x1a1b20, cape: 0x1a1b20, ears: true, chest: 'bat', eyes: 'white' },
+    superman: { label: 'Superman', cat: 'heroes', suit: 0x1f4fb5, belt: 0xf2c500, beltY: -0.3, briefs: 0xc8151b, cape: 0xc8151b, chest: 'super' }
   };
   function col(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
   // Vinyl-Material mit Uniform-Zonen
+  // Muster (Shader, Modell-Koordinaten): Nummer je Art, Farben c1/c2, Maßstab s
+  var PATTERNS = { hstripes: 1, dots: 2, web: 3, fur: 4, bandage: 5, ribs: 6, tiedye: 7, camo: 8, suspenders: 9 };
+  var PAT_GLSL = [
+    'float dh31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }',
+    'float dnoise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+    ' return mix(mix(mix(dh31(i), dh31(i + vec3(1,0,0)), f.x), mix(dh31(i + vec3(0,1,0)), dh31(i + vec3(1,1,0)), f.x), f.y),',
+    '            mix(mix(dh31(i + vec3(0,0,1)), dh31(i + vec3(1,0,1)), f.x), mix(dh31(i + vec3(0,1,1)), dh31(i + vec3(1,1,1)), f.x), f.y), f.z); }',
+    'vec4 duckPat(vec3 p, float t, vec3 c1, vec3 c2, float s, vec3 cur) {',
+    '  if (t < 0.5) return vec4(cur, 0.0);',
+    '  if (t < 1.5) { return vec4(mix(c1, c2, step(0.5, fract(p.y * s))), 1.0); }',
+    '  if (t < 2.5) { float d = length(fract(p * s) - 0.5); return vec4(c2, 1.0 - smoothstep(0.17, 0.21, d)); }',
+    '  if (t < 3.5) { vec3 d = p - vec3(1.0, 0.1, 0.0); float r = length(d); float th = atan(d.z, d.y);',
+    '    float sp = abs(fract(th * 12.0 / 6.2832) - 0.5) * 6.2832 / 12.0 * r; float rg = abs(fract(r * s) - 0.5) / s;',
+    '    return vec4(c2, max(1.0 - smoothstep(0.007, 0.014, sp), 1.0 - smoothstep(0.007, 0.014, rg))); }',
+    '  if (t < 4.5) { float n = dnoise(p * s) * 0.65 + dnoise(p * s * 3.1) * 0.35; return vec4(mix(c1, c2, n), 1.0); }',
+    '  if (t < 5.5) { float v = fract((p.y * 0.9 + p.z * 0.35 + p.x * 0.15) * s + dnoise(p * 6.0) * 0.35);',
+    '    vec3 cl = mix(c1, c1 * 0.82, dnoise(p * s * 2.0)); return vec4(mix(cl, c2, smoothstep(0.82, 0.9, v)), 1.0); }',
+    '  if (t < 6.5) { float front = smoothstep(0.25, 0.4, p.x); float inR = step(-0.3, p.y) * step(p.y, 0.48);',
+    '    float rib = 1.0 - smoothstep(0.12, 0.17, abs(fract(p.y * s) - 0.5));',
+    '    float side = step(0.08, abs(p.z)) * (1.0 - smoothstep(0.55, 0.62, abs(p.z)));',
+    '    float stern = 1.0 - smoothstep(0.035, 0.05, abs(p.z)); return vec4(c2, front * inR * max(rib * side, stern)); }',
+    '  if (t < 7.5) { float a = atan(p.z, p.y - 0.1) / 6.2832; float r = length(vec2(p.y - 0.1, p.z));',
+    '    vec3 c = 0.5 + 0.5 * cos(6.2832 * (a * 2.0 + r * s + vec3(0.0, 0.33, 0.67))); return vec4(pow(c, vec3(2.2)), 1.0); }',
+    '  if (t < 8.5) { float n = dnoise(p * s), n2 = dnoise(p * s * 1.7 + 7.0);',
+    '    if (n > 0.6) return vec4(c1, 1.0); if (n2 > 0.62) return vec4(c2, 1.0); return vec4(cur, 0.0); }',
+    '  if (t < 9.5) { return vec4(c2, (1.0 - smoothstep(0.045, 0.055, abs(abs(p.z) - 0.3))) * step(0.0, p.x + 0.2)); }',
+    '  return vec4(cur, 0.0);',
+    '}'
+  ].join('\n');
+  // Vinyl-Material mit Uniform-Zonen. Reihenfolge: Anzug → Muster (Anzug/Haut) → Streifen,
+  // Gürtel, Höschen → Maske (cowl) → Haar → Muster (alles) → Augenbinde → Gesicht → Emblem
   function suitMaterial(base, o) {
-    var m = vinyl(base, { emissive: 0x2a1400 });
-    if (!o.suit) return m;
+    var m = vinyl(base, Object.assign({ emissive: o.skin != null ? 0x080604 : 0x2a1400 }, o.mat || {}));
+    if (o.ghost) { m.transparent = true; m.opacity = 0.8; m.depthWrite = true; }
+    if (!(o.suit || o.cowl || o.pattern || o.mask || o.face || o.hair || o.chest || o.briefs)) return m;
     // Brust-Emblem: von vorn (+x) auf die Körperoberfläche projiziert, liegt also drauf
-    var emb = o.chest ? emblemTex(o.chest) : null, embAt = o.chest ? surface(new THREE.Vector3(1, -0.18, 0)) : null;
-    var embSize = o.chest === 'star' ? 0.24 : 0.46;
-    var HC = PARTS[5].c, HR = PARTS[5].r;
+    var emb = o.chest ? emblemTex(o.chest) : null, embAt = o.chest ? surface(new THREE.Vector3(1, o.chestY != null ? o.chestY : -0.18, 0)) : null;
+    var embSize = o.chestSize || (o.chest === 'star' ? 0.24 : 0.46);
+    var HC = PARTS[5].c, HR = PARTS[5].r, pt = o.pattern || {};
+    var zone = { suit: 0, all: 1, skin: 2 }[pt.zone || (o.suit ? 'suit' : 'all')];
     m.onBeforeCompile = function (sh) {
       var u = {
-        uSuit: col(o.suit), uStripe: col(o.stripe || o.suit), uStripe2: col(o.stripe2 || o.stripe || o.suit),
-        uBelt: col(o.belt || o.suit), uBriefs: col(o.briefs || o.suit), uCowl: col(o.cowl || base),
-        uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? o.beltY : -9, o.briefs ? 1 : 0),
+        uSuit: col(o.suit || base), uStripe: col(o.stripe || o.suit || base), uStripe2: col(o.stripe2 || o.stripe || o.suit || base),
+        uBelt: col(o.belt || o.suit || base), uBriefs: col(o.briefs || o.suit || base), uCowl: col(o.cowl || base),
+        uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? (o.beltY != null ? o.beltY : -0.3) : -9, o.briefs ? 1 : 0),
+        uSuitOn: o.suit ? 1 : 0, uBriefsY: o.briefsY != null ? o.briefsY : -0.36,
         uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2]),
         uEmb: emb || new THREE.Texture(), uEmbOn: emb ? 1 : 0,
         uEmbAt: new THREE.Vector3(embAt ? embAt.p.x : 0, embAt ? embAt.p.y : 0, 0), uEmbSize: embSize,
-        uCollar: o.collar || 0.55
+        uCollar: o.collar || 0.55,
+        uPat: PATTERNS[pt.type] || 0, uPatC1: col(pt.c1 != null ? pt.c1 : base), uPatC2: col(pt.c2 != null ? pt.c2 : 0x000000),
+        uPatS: pt.scale || 6, uPatZone: zone, uPatY: new THREE.Vector2(pt.y ? pt.y[0] : -9, pt.y ? pt.y[1] : 9),
+        uMask: col(o.mask || 0), uMaskOn: o.mask != null ? 1 : 0,
+        uFace: col(o.face || 0), uFaceOn: o.face != null ? 1 : 0, uFaceX: o.faceX != null ? o.faceX : 0.25,
+        uHair: col(o.hair || 0), uHairOn: o.hair != null ? 1 : 0, uHairY: HC[1] + (o.hairY != null ? o.hairY : 0.36), uPeak: o.hairPeak || 0
       };
       Object.keys(u).forEach(function (k) { sh.uniforms[k] = { value: u[k] }; });
       sh.vertexShader = 'varying vec3 vDuck;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vDuck = position;');
-      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt; uniform vec4 uS; uniform float uCowlOn, uEmbOn, uEmbSize, uCollar; uniform sampler2D uEmb;\n' +
+      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt, uPatC1, uPatC2, uMask, uFace, uHair; uniform vec4 uS; uniform vec2 uPatY;' +
+        ' uniform float uCowlOn, uEmbOn, uEmbSize, uCollar, uSuitOn, uBriefsY, uPat, uPatS, uPatZone, uMaskOn, uFaceOn, uFaceX, uHairOn, uHairY, uPeak; uniform sampler2D uEmb;\n' + PAT_GLSL + '\n' +
         sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
           'vec3 cc = diffuse;\n' +
           'float inHead = length((vDuck - uHC) / uHR);\n' +
-          // Kragenlinie: unterhalb y≈0.55 und nicht im Kopf → Uniform
-          'float suitOn = (1.0 - step(uCollar, vDuck.y)) * step(0.97, inHead);\n' +
+          'float headM = 1.0 - step(1.12, inHead);\n' +
+          // Kragenlinie: unterhalb uCollar und nicht im Kopf → Anzug
+          'float suitOn = uSuitOn * (1.0 - step(uCollar, vDuck.y)) * step(0.97, inHead);\n' +
           'cc = mix(cc, uSuit, suitOn);\n' +
+          'float inY = step(uPatY.x, vDuck.y) * step(vDuck.y, uPatY.y);\n' +
+          'if (uPatZone < 0.5 || uPatZone > 1.5) { float pz = uPatZone < 0.5 ? suitOn : 1.0 - suitOn; vec4 pt = duckPat(vDuck, uPat, uPatC1, uPatC2, uPatS, cc); cc = mix(cc, pt.rgb, pt.a * pz * inY); }\n' +
           'float aa = 0.012;\n' +
           'cc = mix(cc, uStripe, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.x))));\n' +
           'cc = mix(cc, uStripe2, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.y))));\n' +
           'cc = mix(cc, uBelt, suitOn * (1.0 - smoothstep(0.04 - aa, 0.04 + aa, abs(vDuck.y - uS.z))));\n' +
-          'cc = mix(cc, uBriefs, suitOn * uS.w * (1.0 - smoothstep(-0.36 - aa, -0.36 + aa, vDuck.y)));\n' +
+          'cc = mix(cc, uBriefs, step(0.97, inHead) * uS.w * (1.0 - smoothstep(uBriefsY - aa, uBriefsY + aa, vDuck.y)));\n' +
           // Maske: Kopf oberhalb der Schnabellinie und hinten
-          'float cowl = uCowlOn * (1.0 - step(1.12, inHead)) * max(step(uHC.y - 0.06, vDuck.y), step(vDuck.x, uHC.x - 0.12));\n' +
+          'float cowl = uCowlOn * headM * max(step(uHC.y - 0.06, vDuck.y), step(vDuck.x, uHC.x - 0.12));\n' +
           'cc = mix(cc, uCowl, cowl);\n' +
+          // Haar: oben ab Stirnlinie (mit Spitze vorn) und am Hinterkopf
+          'float hl = uHairY - uPeak * exp(-vDuck.z * vDuck.z * 25.0) * step(uHC.x, vDuck.x);\n' +
+          'hl -= 0.6 * clamp(uHC.x + 0.05 - vDuck.x, 0.0, 0.75);\n' +
+          'float hair = uHairOn * headM * smoothstep(hl - 0.012, hl + 0.012, vDuck.y);\n' +
+          'cc = mix(cc, uHair, hair);\n' +
+          'if (uPatZone > 0.5 && uPatZone < 1.5) { vec4 pt = duckPat(vDuck, uPat, uPatC1, uPatC2, uPatS, cc); cc = mix(cc, pt.rgb, pt.a * inY); }\n' +
+          // Augenbinde rund um den Kopf auf Augenhöhe
+          'cc = mix(cc, uMask, uMaskOn * headM * (1.0 - smoothstep(0.085, 0.1, abs(vDuck.y - (uHC.y + 0.22)))));\n' +
+          // Gesicht: vorderer Kopfteil oberhalb des Schnabels (Gesichtsplatte, Maske)
+          'cc = mix(cc, uFace, uFaceOn * headM * smoothstep(uHC.x + uFaceX - 0.01, uHC.x + uFaceX + 0.01, vDuck.x) * step(uHC.y - 0.16, vDuck.y));\n' +
           // Emblem vorn auf der Brust (nur Vorderseite, Projektion entlang x)
           'vec2 euv = vec2(-vDuck.z / uEmbSize + 0.5, (vDuck.y - uEmbAt.y) / uEmbSize + 0.5);\n' +
           'if (uEmbOn > 0.5 && vDuck.x > uEmbAt.x - 0.35 && euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) {\n' +
@@ -260,10 +313,12 @@
       x.save(); x.translate(w / 2, h / 2 + 4); x.scale(s, 1); x.fillText(text, 0, 0); x.restore();
     });
   }
+  var EMBLEMS = {};   // weitere Embleme: EMBLEMS[name] = function (ctx2d, size)
   function emblemTex(kind) {
     return canvasTex(256, 256, function (x, w) {
       var c = w / 2;
-      if (kind === 'bat') {
+      if (EMBLEMS[kind]) EMBLEMS[kind](x, w);
+      else if (kind === 'bat') {
         // gelbes Oval, schwarzer Rand, Fledermaus-Silhouette
         x.fillStyle = '#111'; x.beginPath(); x.ellipse(c, c, 124, 80, 0, 0, Math.PI * 2); x.fill();
         x.fillStyle = '#f2c51e'; x.beginPath(); x.ellipse(c, c, 114, 70, 0, 0, Math.PI * 2); x.fill();
@@ -302,9 +357,12 @@
     opts = opts || {};
     var o = OUTFITS[opts.outfit] || OUTFITS.none;
     var g = new THREE.Group();
-    var yellow = suitMaterial(opts.color != null ? opts.color : 0xf6bd16, o);
-    var wingMat = o.suit ? vinyl(o.suit) : yellow;
-    var beak = vinyl(0xffffff, { emissive: 0x200800, vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 0.12, clearcoat: 0.15, roughness: 0.6 });
+    var skin = o.skin != null ? o.skin : (opts.color != null ? opts.color : 0xf6bd16);
+    var yellow = suitMaterial(skin, o);
+    var wingMat = o.wing != null ? vinyl(o.wing, o.wingOpts) : (o.suit ? vinyl(o.suit) : yellow);
+    var beak = o.bill != null ? vinyl(o.bill, { side: THREE.DoubleSide, envMapIntensity: 0.12, clearcoat: 0.15, roughness: 0.6 })
+      : vinyl(0xffffff, { emissive: 0x200800, vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 0.12, clearcoat: 0.15, roughness: 0.6 });
+    if (o.ghost) { beak.transparent = true; beak.opacity = 0.85; }
     var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
     var white = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
@@ -312,7 +370,7 @@
     // Schnabel: ein Teil, leicht geöffnet
     // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
     var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.09), beak);
-    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; g.add(bill);
+    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; if (!o.noBill) g.add(bill);
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     // noWings: wer eigene Arme animiert (Messer-Ente), lässt die angelegten Flügel weg
     if (!opts.noWings) [-1, 1].forEach(function (s) {
@@ -332,12 +390,36 @@
       m.lookAt(m.position.clone().add(n));
       g.add(m); return m;
     }
+    var eyeCol = o.eyeColor != null ? new THREE.MeshBasicMaterial({ color: o.eyeColor }) : null;
+    if (eyeCol) eyeCol.color.convertSRGBToLinear();
     [-1, 1].forEach(function (s) {
-      if (o.eyes === 'white') {
-        // Maske: weiße, schmale Augenschlitze
-        var sl = decal(ell(0.1, 0.05, 0.012, 20), white, new THREE.Vector3(0.8, 0.36, s * 0.5));
+      var ed = new THREE.Vector3(0.8, 0.36, s * 0.5), e2;
+      if (o.eyes === 'none') return;
+      if (o.eyes === 'white' || o.eyes === 'glow') {
+        // Maske: schmale Augenschlitze (weiß bzw. leuchtend in eyeColor)
+        var sl = decal(ell(0.1, 0.05, 0.012, 20), o.eyes === 'glow' ? (eyeCol || white) : white, ed);
         sl.rotateZ(s * -0.35);
+      } else if (o.eyes === 'lens') {
+        // große Maskenlinsen: schwarzer Rand, weiße Fläche
+        e2 = decal(ell(0.17, 0.13, 0.012, 24), paint, ed); e2.rotateZ(s * -0.3);
+        e2 = decal(ell(0.145, 0.105, 0.012, 24), white, ed, (o.cowl || o.face != null || o.pattern ? 1.012 : 0.995) + 0.004); e2.rotateZ(s * -0.3);
+      } else if (o.eyes === 'x') {
+        [0.6, -0.6].forEach(function (r) { var xb = decal(new THREE.BoxGeometry(0.17, 0.035, 0.012), paint, ed); xb.rotateZ(r); });
+      } else if (o.eyes === 'big' || o.eyes === 'sockets') {
+        // große dunkle Ovale (Alien, Totenkopf, Geist)
+        e2 = decal(ell(o.eyes === 'big' ? 0.13 : 0.12, o.eyes === 'big' ? 0.17 : 0.13, 0.012, 24), paint, ed); e2.rotateZ(s * (o.eyes === 'big' ? -0.5 : 0));
+        if (o.eyes === 'big') decal(ell(0.03, 0.035, 0.014, 10), white, new THREE.Vector3(0.84, 0.46, s * 0.42), 1.003);
+        if (eyeCol) decal(ell(0.035, 0.035, 0.014, 10), eyeCol, ed, 1.004);
+      } else if (o.eyes === 'sleepy') {
+        e2 = decal(ell(0.09, 0.03, 0.012, 20), paint, ed); e2.rotateZ(s * -0.15);
       } else {
+        if (eyeCol) {
+          // farbige Iris mit Pupille
+          decal(ell(0.085, 0.105, 0.012, 20), eyeCol, ed);
+          decal(ell(0.045, 0.07, 0.013, 16), paint, ed, (o.cowl || o.face != null ? 1.012 : 0.995) + 0.002);
+          decal(ell(0.02, 0.024, 0.014, 10), white, new THREE.Vector3(0.84, 0.44, s * 0.44), 1.004);
+          return;
+        }
         decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.8, 0.36, s * 0.5));
         decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.84, 0.44, s * 0.44), 1.003);
       }
@@ -450,6 +532,14 @@
       capeMesh.userData.cape = { base: Float32Array.from(cpos), nrm: nrmArr, U: U, V: V };
       g.add(capeMesh);
     }
+    // Zubehör (Hüte, Haare, Brillen, Requisiten): ACC[name](ctx, opts), siehe js/rubber-duck-outfits.js
+    if (o.acc) {
+      var ctx = { g: g, o: o, HC: HC, HR: HR, headPoint: headPoint, decal: decal, paint: paint, white: white, skin: skin, body: yellow, wingMat: wingMat };
+      o.acc.forEach(function (a) {
+        var fn = ACC[a[0]];
+        if (fn) fn(ctx, a[1] || {});
+      });
+    }
     g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat };
     return g;
   }
@@ -486,5 +576,16 @@
     return c;
   }
 
-  root.RubberDuck = { build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: Object.keys(OUTFITS) };
+  var ACC = {};
+  var KEYS = Object.keys(OUTFITS);
+  // weitere Outfits anmelden (js/rubber-duck-outfits.js); die Namensliste bleibt dieselbe Liste
+  function addOutfits(defs) {
+    Object.keys(defs).forEach(function (k) { OUTFITS[k] = defs[k]; if (KEYS.indexOf(k) < 0) KEYS.push(k); });
+  }
+  function info(k) { var o = OUTFITS[k]; return o ? { key: k, label: o.label || k, cat: o.cat || 'classic', note: o.note || '' } : null; }
+  root.RubberDuck = {
+    build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
+    addOutfits: addOutfits, ACC: ACC, EMBLEMS: EMBLEMS,
+    util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
+  };
 })(typeof window !== 'undefined' ? window : this);
