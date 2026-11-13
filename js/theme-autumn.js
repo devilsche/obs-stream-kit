@@ -341,24 +341,67 @@
     // ── Pilze nach Regen: solange es nass ist, wachsen nach und nach Fliegen-
     // pilze und Steinpilze aus dem Laub (bis zu 7), nach dem Abtrocknen
     // vergehen sie nach 2–4 min; ein Feuer an der Stelle lässt sie welken ──
-    var shrooms = [], shroomAcc = 0;
+    // Wachsen: der Pilz schiebt sich mit geschlossenem Hut von unten durch die
+    // Laubdecke (unterhalb der Oberfläche abgeschnitten), die Blätter um ihn
+    // heben sich an, ein Blatt auf dem Hut rutscht ab, dann öffnet sich der Hut
+    var shrooms = [], shroomAcc = 0, shroomId = 0;
+    var SHROOM_LEAF = 'M0 -3.2 Q4.5 -2.4 6 0 Q4.5 2.4 0 3.2 Q-4.5 2.4 -6 0 Q-4.5 -2.4 0 -3.2 Z';
     function makeShroom(x) {
-      var fly = Math.random() < 0.55, g = el('g', {}, gShrooms), s = 1.1 + Math.random() * 0.5;
-      var inner = el('g', { transform: 'scale(' + s.toFixed(2) + ')' }, g);
+      var fly = Math.random() < 0.55, s = 1.1 + Math.random() * 0.5;
+      var g = el('g', {}, gShrooms), cid = 'ta-shclip-' + (++shroomId);
+      var cp = el('clipPath', { id: cid }, g);
+      el('rect', { x: -60, y: -140, width: 120, height: 142 }, cp);
+      var clip = el('g', { 'clip-path': 'url(#' + cid + ')' }, g);
+      var riser = el('g', {}, clip);
+      var inner = el('g', { transform: 'scale(' + s.toFixed(2) + ')' }, riser);
+      var capY = fly ? -26 : -19, cap = el('g', {}, null);
       if (fly) {
         el('path', { 'class': 'ta-shroom-stem', d: 'M-5 0 Q-6 -14 -4 -26 L4 -26 Q6 -14 5 0 Z' }, inner);
         el('path', { 'class': 'ta-shroom-ring', d: 'M-6 -18 Q0 -14 6 -18 L5 -21 Q0 -18 -5 -21 Z' }, inner);
-        el('path', { 'class': 'ta-shroom-gills', d: 'M-16 -26 Q0 -21 16 -26 Z' }, inner);
-        el('path', { 'class': 'ta-shroom-red', d: 'M-17 -26 Q-17 -44 0 -45 Q17 -44 17 -26 Q0 -22 -17 -26 Z' }, inner);
+        inner.appendChild(cap);
+        el('path', { 'class': 'ta-shroom-gills', d: 'M-16 -26 Q0 -21 16 -26 Z' }, cap);
+        el('path', { 'class': 'ta-shroom-red', d: 'M-17 -26 Q-17 -44 0 -45 Q17 -44 17 -26 Q0 -22 -17 -26 Z' }, cap);
         [[-9, -33, 2.2], [-2, -40, 1.8], [6, -36, 2.4], [11, -30, 1.6], [-12, -29, 1.4], [1, -31, 1.5]].forEach(function (d) {
-          el('circle', { 'class': 'ta-shroom-dot', cx: d[0], cy: d[1], r: d[2] }, inner);
+          el('circle', { 'class': 'ta-shroom-dot', cx: d[0], cy: d[1], r: d[2] }, cap);
         });
       } else {
         el('path', { 'class': 'ta-shroom-stem ta-shroom-stem--porcini', d: 'M-8 0 Q-11 -10 -6 -20 L6 -20 Q11 -10 8 0 Z' }, inner);
-        el('path', { 'class': 'ta-shroom-brown', d: 'M-15 -19 Q-15 -36 0 -37 Q15 -36 15 -19 Q0 -15 -15 -19 Z' }, inner);
-        el('ellipse', { 'class': 'ta-shroom-sheen', cx: -5, cy: -30, rx: 4, ry: 2.2 }, inner);
+        inner.appendChild(cap);
+        el('path', { 'class': 'ta-shroom-brown', d: 'M-15 -19 Q-15 -36 0 -37 Q15 -36 15 -19 Q0 -15 -15 -19 Z' }, cap);
+        el('ellipse', { 'class': 'ta-shroom-sheen', cx: -5, cy: -30, rx: 4, ry: 2.2 }, cap);
       }
-      return { g: g, x: x, grow: 0, dry: 0, life: 120 + Math.random() * 120, gone: false };
+      // ein Blatt liegt auf dem Hut und rutscht beim Aufgehen ab
+      var topLeaf = el('path', { 'class': 'ta-shroom-leaf', d: SHROOM_LEAF, fill: PALETTE[Math.floor(Math.random() * PALETTE.length)] }, inner);
+      var tlSide = Math.random() < 0.5 ? -1 : 1, tlTop = fly ? -45 : -37;
+      // Laub rund um den Fuß, vor dem Stiel; hebt sich, solange der Pilz drückt
+      var heave = [];
+      for (var i = 0; i < 6; i++) {
+        var lx = (i - 2.5) * 6.5 + (Math.random() - 0.5) * 4, side = lx < 0 ? -1 : 1;
+        var node = el('path', { 'class': 'ta-shroom-leaf', d: SHROOM_LEAF, fill: PALETTE[Math.floor(Math.random() * PALETTE.length)] }, g);
+        heave.push({ node: node, x: lx, y: 1 + Math.random() * 2, rot: (Math.random() - 0.5) * 40, side: side, k: 0.9 + Math.random() * 0.5 });
+      }
+      return { g: g, riser: riser, cap: cap, capY: capY, topLeaf: topLeaf, tlSide: tlSide, tlTop: tlTop, heave: heave,
+               h: (fly ? 46 : 38) * s, x: x, grow: 0, dry: 0, life: 120 + Math.random() * 120, gone: false };
+    }
+    function drawShroom(m, dying) {
+      var t = m.grow;
+      // 0–0.55: herausschieben (Hut geschlossen), 0.45–1: Hut öffnet sich
+      var up = dying ? 1 : 1 - Math.pow(1 - Math.min(1, t / 0.55), 2);
+      var open = dying ? 1 : clamp01((t - 0.45) / 0.55);
+      m.riser.setAttribute('transform', 'translate(0 ' + f1((1 - up) * (m.h + 4)) + ')' +
+                           (dying ? ' scale(1 ' + (0.65 + 0.35 * t).toFixed(3) + ')' : ''));
+      var sx = 0.62 + 0.38 * open, sy = 1.18 - 0.18 * open;
+      m.cap.setAttribute('transform', 'translate(0 ' + m.capY + ') scale(' + sx.toFixed(3) + ' ' + sy.toFixed(3) + ') translate(0 ' + (-m.capY) + ')');
+      // Blatt auf dem Hut: liegt, kippt ab 0.5 zur Seite und fällt
+      var slip = clamp01((t - 0.5) / 0.35);
+      m.topLeaf.setAttribute('transform', 'translate(' + f1(m.tlSide * slip * 16) + ' ' + f1(m.tlTop - 1 + slip * slip * 30) + ') rotate(' + f1(m.tlSide * (10 + slip * 70)) + ')');
+      m.topLeaf.setAttribute('opacity', (dying ? 0 : 1 - clamp01((slip - 0.7) / 0.3)).toFixed(2));
+      // Laub am Fuß: hebt sich beim Durchbrechen, sinkt danach etwas zur Seite
+      var push = dying ? 0.3 : Math.sin(Math.PI * Math.min(1, t / 0.6)) * 0.9 + 0.3 * up;
+      m.heave.forEach(function (h) {
+        var lift = push * (5 - Math.abs(h.x) * 0.15) * h.k;
+        h.node.setAttribute('transform', 'translate(' + f1(h.x + h.side * push * 3) + ' ' + f1(h.y - Math.max(0, lift)) + ') rotate(' + f1(h.rot + h.side * push * 25) + ') scale(' + h.k.toFixed(2) + ')');
+      });
     }
     function stepShrooms(dt) {
       if (!B.on || !B.partOn('pile')) return;
@@ -376,10 +419,11 @@
       shrooms = shrooms.filter(function (m) {
         if (W8.wet < 0.1) m.dry += dt;
         var dying = m.dry > m.life || fireAt(m.x) || flooded(m.x);
-        m.grow = dying ? Math.max(0, m.grow - dt / 2.5) : Math.min(1, m.grow + dt / 3);
+        // Wachsen dauert ~7 s, Welken ~2.5 s
+        m.grow = dying ? Math.max(0, m.grow - dt / 2.5) : Math.min(1, m.grow + dt / 7);
         if (dying && m.grow <= 0) { m.g.parentNode.removeChild(m.g); return false; }
-        var e = m.grow < 1 ? 1 - Math.pow(1 - m.grow, 3) : 1;
-        m.g.setAttribute('transform', 'translate(' + f1(m.x) + ' ' + f1(surface(m.x) + 6) + ') scale(' + (e * (dying ? 1 : 1)).toFixed(3) + ' ' + e.toFixed(3) + ')');
+        m.g.setAttribute('transform', 'translate(' + f1(m.x) + ' ' + f1(surface(m.x) + 6) + ')');
+        drawShroom(m, dying);
         m.g.setAttribute('opacity', dying ? Math.min(1, m.grow * 1.5).toFixed(2) : '1');
         return true;
       });

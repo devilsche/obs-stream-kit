@@ -695,3 +695,6 @@
   65% { transform: translate(calc(var(--ts-gust-dir, 1) * 2px), -18px); }
 }
 .ts[data-gust="1"] .tss-flag { animation-duration: 0.25s; }
+
+/* Pilze: Laubstücke am Fuß und auf dem Hut (Farbe je Blatt aus der Herbstpalette) */
+.ta-shroom-leaf { stroke: #5a2a10; stroke-width: 0.6; stroke-opacity: 0.6; }
