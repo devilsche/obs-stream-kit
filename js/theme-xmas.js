@@ -531,11 +531,13 @@
       });
     }
     var wLift = 0;
+    // so viele Pixel liegt die Unterkante der Scheibe unter der Schneeoberfläche
+    var WREATH_SINK = 27;
     function stepWreath(dt) {
       // auf der Schneedecke stehen, weder schweben noch versinken
       var gy = cfg.snowAt ? cfg.snowAt(TX + WR.x * TK) : null;
       // Scheibe liegt immer auf der Schneedecke (wenig Schnee: nach unten, viel: nach oben)
-      var lift = gy === null ? 0 : (gy + 2 - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK;
+      var lift = gy === null ? 0 : (gy + WREATH_SINK - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK;
       if (Math.abs(lift - wLift) > 0.5) { wLift = lift; gWreathBox.setAttribute('transform', 'translate(0 ' + f1(lift) + ')'); }
       var storm = cfg.storm ? cfg.storm(TX + WR.x * TK) : false;
       var w = cfg.wind ? cfg.wind() : 0;
