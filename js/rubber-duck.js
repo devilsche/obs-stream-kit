@@ -21,11 +21,12 @@
   function smin(a, b, k) { var h = Math.max(0, Math.min(1, 0.5 + 0.5 * (b - a) / k)); return b + (a - b) * h - k * h * (1 - h); }
   // Teile des Rumpfs (Mitte, Radien)
   var PARTS = [
-    { c: [0.0, 0.0, 0], r: [1.0, 0.66, 0.78], k: 0 },        // Bauch
-    { c: [0.42, 0.08, 0], r: [0.62, 0.6, 0.64], k: 0.25 },   // Brust
-    { c: [-0.88, 0.32, 0], r: [0.36, 0.4, 0.4], k: 0.3 },    // Schwanz (hinten hoch)
-    { c: [-1.12, 0.62, 0], r: [0.16, 0.2, 0.2], k: 0.22 },   // Schwanzspitze
-    { c: [0.48, 0.55, 0], r: [0.42, 0.42, 0.42], k: 0.22 },  // Hals
+    // Rumpf 10 % breiter (z) – wirkt flacher, wie eine echte Badeente
+    { c: [0.0, 0.0, 0], r: [1.0, 0.66, 0.86], k: 0 },        // Bauch
+    { c: [0.42, 0.08, 0], r: [0.62, 0.6, 0.7], k: 0.25 },    // Brust
+    { c: [-0.88, 0.32, 0], r: [0.36, 0.4, 0.44], k: 0.3 },   // Schwanz (hinten hoch)
+    { c: [-1.12, 0.62, 0], r: [0.16, 0.2, 0.22], k: 0.22 },  // Schwanzspitze
+    { c: [0.48, 0.55, 0], r: [0.42, 0.42, 0.46], k: 0.22 },  // Hals
     { c: [0.5, 1.05, 0], r: [0.62, 0.6, 0.6], k: 0.2 }       // Kopf
   ];
   var FLOOR = -0.55;
@@ -59,15 +60,38 @@
   function body() { return BODY || (BODY = bodyGeometry()); }
 
   function ell(rx, ry, rz, seg) { var g = new THREE.SphereGeometry(1, seg || 32, Math.round((seg || 32) * 0.7)); g.scale(rx, ry, rz); return g; }
-  // Schnabel: breit, vorn rund, flach, leicht nach oben geschwungen
-  function billGeometry(len, wid, thick, lift) {
-    var g = new THREE.SphereGeometry(1, 48, 24), p = g.attributes.position;
+  // Schnabel aus EINEM Stück, klappt in der Mitte auf: die untere Hälfte dreht
+  // sich um ein Scharnier hinten nach unten; die Fläche, die sich dabei zwischen
+  // Ober- und Unterkante aufspannt, ist das Maul (dunkel). len/wid/thick in
+  // Einheiten, open = Öffnungswinkel (rad)
+  function billGeometry(len, wid, thick, open) {
+    var g = new THREE.SphereGeometry(1, 48, 32), p = g.attributes.position, oy = [];
+    var hx = -0.85, ca = Math.cos(open), sa = Math.sin(open);
     for (var i = 0; i < p.count; i++) {
       var x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      var t = (x + 1) / 2;                       // 0 hinten (Kopf) … 1 Spitze
-      var w = wid * (0.75 + 0.35 * Math.sin(Math.PI * Math.min(1, t * 1.2)));
-      p.setXYZ(i, x * len, y * thick + lift * t * t, z * w);
+      oy.push(y);
+      var t = (x + 1) / 2;                                  // 0 hinten (Kopf) … 1 Spitze
+      var w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
+      // erst in die flache Schnabelform, dann den Unterschnabel um das Scharnier drehen
+      var X = x * len, Y = y * thick * (y < 0 ? 1.5 : 1), Hx = hx * len;   // Unterschnabel etwas dicker
+      if (y < -0.001) {                                     // Unterschnabel klappt nach unten
+        var dx = X - Hx, nx = Hx + dx * ca + Y * sa, ny = -dx * sa + Y * ca;
+        X = nx; Y = ny;
+      } else Y += 0.03 * t * t;                             // Oberschnabel leicht hochgeschwungen
+      p.setXYZ(i, X, Y, z * w);
     }
+    g.setAttribute('oy', new THREE.Float32BufferAttribute(oy, 1));
+    g = g.toNonIndexed();
+    var q = g.attributes.oy, cols = [];
+    var lip = new THREE.Color(0xf2650f).convertSRGBToLinear(), inner = new THREE.Color(0x7a2206).convertSRGBToLinear();
+    for (var f = 0; f < q.count; f += 3) {
+      var a = q.getX(f), b = q.getX(f + 1), c = q.getX(f + 2);
+      var band = Math.min(a, b, c) < -0.001 && Math.max(a, b, c) > -0.001;
+      var cc = band ? inner : lip;
+      for (var k = 0; k < 3; k++) cols.push(cc.r, cc.g, cc.b);
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    g.deleteAttribute('oy');
     g.computeVertexNormals();
     return g;
   }
@@ -78,43 +102,231 @@
     return m;
   }
 
+  // ── Outfits ──
+  // Uniform als Farbzonen auf dem Körper (Shader, Modell-Koordinaten):
+  // suit = Rumpf unterhalb der Kragenlinie, stripes = Reflexstreifen (y, Breite),
+  // belt = Gürtel, briefs = Höschen unten, cowl = Maske über Kopf/Augen.
+  var OUTFITS = {
+    none: {},
+    thw: { suit: 0x1d2b5e, stripe: 0xf2c500, stripes: [0.18, -0.12], helmet: { color: 0xf2c500 }, helmetLabel: 'THW', back: 'THW', backColor: '#f2c500' },
+    police: { suit: 0x1e3c72, stripe: 0xd8dde6, stripes: [-0.05], cap: true, back: 'POLIZEI', backColor: '#ffffff', chest: 'star' },
+    fire: { suit: 0x1a2340, stripe: 0xf2d000, stripe2: 0xc9ced6, stripes: [0.2, -0.1], helmet: { color: 0xd9dde2, metal: true, neck: true }, back: 'FEUERWEHR', backColor: '#f2d000' },
+    batman: { suit: 0x4a4e57, belt: 0xe2b62a, beltY: -0.3, cowl: 0x1a1b20, cape: 0x1a1b20, ears: true, chest: 'bat', eyes: 'white' },
+    superman: { suit: 0x1f4fb5, belt: 0xf2c500, beltY: -0.3, briefs: 0xc8151b, cape: 0xc8151b, chest: 'super' }
+  };
+  function col(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
+  // Vinyl-Material mit Uniform-Zonen
+  function suitMaterial(base, o) {
+    var m = vinyl(base, { emissive: 0x2a1400 });
+    if (!o.suit) return m;
+    var HC = PARTS[5].c, HR = PARTS[5].r;
+    m.onBeforeCompile = function (sh) {
+      var u = {
+        uSuit: col(o.suit), uStripe: col(o.stripe || o.suit), uStripe2: col(o.stripe2 || o.stripe || o.suit),
+        uBelt: col(o.belt || o.suit), uBriefs: col(o.briefs || o.suit), uCowl: col(o.cowl || base),
+        uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? o.beltY : -9, o.briefs ? 1 : 0),
+        uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2])
+      };
+      Object.keys(u).forEach(function (k) { sh.uniforms[k] = { value: u[k] }; });
+      sh.vertexShader = 'varying vec3 vDuck;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vDuck = position;');
+      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR; uniform vec4 uS; uniform float uCowlOn;\n' +
+        sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
+          'vec3 cc = diffuse;\n' +
+          'float inHead = length((vDuck - uHC) / uHR);\n' +
+          // Kragenlinie: unterhalb y≈0.55 und nicht im Kopf → Uniform
+          'float suitOn = (1.0 - step(0.55, vDuck.y)) * step(0.97, inHead);\n' +
+          'cc = mix(cc, uSuit, suitOn);\n' +
+          'float aa = 0.012;\n' +
+          'cc = mix(cc, uStripe, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.x))));\n' +
+          'cc = mix(cc, uStripe2, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.y))));\n' +
+          'cc = mix(cc, uBelt, suitOn * (1.0 - smoothstep(0.04 - aa, 0.04 + aa, abs(vDuck.y - uS.z))));\n' +
+          'cc = mix(cc, uBriefs, suitOn * uS.w * (1.0 - smoothstep(-0.36 - aa, -0.36 + aa, vDuck.y)));\n' +
+          // Maske: Kopf oberhalb der Schnabellinie und hinten
+          'float cowl = uCowlOn * (1.0 - step(1.12, inHead)) * max(step(uHC.y - 0.06, vDuck.y), step(vDuck.x, uHC.x - 0.12));\n' +
+          'cc = mix(cc, uCowl, cowl);\n' +
+          'vec4 diffuseColor = vec4( cc, opacity );');
+    };
+    return m;
+  }
+  // Punkt + Normale auf der Körperoberfläche in Richtung dir (vom Inneren aus)
+  function surface(dir) {
+    var v = dir.clone().normalize(), q = new THREE.Vector3(), lo = 0, hi = 2.4;
+    for (var it = 0; it < 30; it++) { var mid = (lo + hi) / 2; q.copy(CENTER).addScaledVector(v, mid); if (sdDuck(q) < 0) lo = mid; else hi = mid; }
+    q.copy(CENTER).addScaledVector(v, lo);
+    var e = 0.002, n = new THREE.Vector3(
+      sdDuck(new THREE.Vector3(q.x + e, q.y, q.z)) - sdDuck(new THREE.Vector3(q.x - e, q.y, q.z)),
+      sdDuck(new THREE.Vector3(q.x, q.y + e, q.z)) - sdDuck(new THREE.Vector3(q.x, q.y - e, q.z)),
+      sdDuck(new THREE.Vector3(q.x, q.y, q.z + e)) - sdDuck(new THREE.Vector3(q.x, q.y, q.z - e))).normalize();
+    return { p: q, n: n };
+  }
+  // gezeichnete Textur (Schriftzug, Emblem)
+  function canvasTex(w, h, draw) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    draw(c.getContext('2d'), w, h);
+    var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4;
+    return t;
+  }
+  function textTex(text, color, bg) {
+    return canvasTex(512, 128, function (x, w, h) {
+      if (bg) { x.fillStyle = bg; x.beginPath(); x.roundRect ? x.roundRect(8, 8, w - 16, h - 16, 22) : x.rect(8, 8, w - 16, h - 16); x.fill(); }
+      x.fillStyle = color; x.font = '900 ' + Math.round(h * 0.62) + 'px "Arial Black", "Helvetica Neue", Arial, sans-serif';
+      x.textAlign = 'center'; x.textBaseline = 'middle';
+      var s = Math.min(1, (w - 40) / x.measureText(text).width);
+      x.save(); x.translate(w / 2, h / 2 + 4); x.scale(s, 1); x.fillText(text, 0, 0); x.restore();
+    });
+  }
+  function emblemTex(kind) {
+    return canvasTex(256, 256, function (x, w) {
+      var c = w / 2;
+      if (kind === 'bat') {
+        // gelbes Oval, schwarzer Rand, Fledermaus-Silhouette
+        x.fillStyle = '#111'; x.beginPath(); x.ellipse(c, c, 124, 80, 0, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#f2c51e'; x.beginPath(); x.ellipse(c, c, 114, 70, 0, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#111'; x.beginPath();
+        x.moveTo(c, c - 8); x.lineTo(c - 8, c - 30); x.lineTo(c - 12, c - 12);
+        x.quadraticCurveTo(c - 40, c - 34, c - 96, c - 20); x.quadraticCurveTo(c - 70, c - 8, c - 74, c + 14);
+        x.quadraticCurveTo(c - 52, c + 2, c - 40, c + 22); x.quadraticCurveTo(c - 22, c + 6, c, c + 44);
+        x.quadraticCurveTo(c + 22, c + 6, c + 40, c + 22); x.quadraticCurveTo(c + 52, c + 2, c + 74, c + 14);
+        x.quadraticCurveTo(c + 70, c - 8, c + 96, c - 20); x.quadraticCurveTo(c + 40, c - 34, c + 12, c - 12);
+        x.lineTo(c + 8, c - 30); x.closePath(); x.fill();
+      } else if (kind === 'super') {
+        // Rauten-Schild: roter Rand, gelbe Fläche, rotes S
+        function shield(sc) { x.beginPath(); x.moveTo(c - 110 * sc, c - 70 * sc); x.lineTo(c - 70 * sc, c - 108 * sc); x.lineTo(c + 70 * sc, c - 108 * sc); x.lineTo(c + 110 * sc, c - 70 * sc); x.lineTo(c, c + 112 * sc); x.closePath(); }
+        x.fillStyle = '#c8151b'; shield(1); x.fill();
+        x.fillStyle = '#f2c500'; shield(0.84); x.fill();
+        x.fillStyle = '#c8151b'; x.font = '900 150px "Arial Black", Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.save(); x.translate(c, c - 12); x.scale(1.15, 0.9); x.fillText('S', 0, 0); x.restore();
+      } else if (kind === 'star') {
+        // Polizeistern (achtzackig, gold)
+        x.fillStyle = '#d9b23a'; x.beginPath();
+        for (var i = 0; i < 16; i++) { var a = i / 16 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 54 : 110; x.lineTo(c + Math.cos(a) * r, c + Math.sin(a) * r); }
+        x.closePath(); x.fill();
+        x.fillStyle = '#1e3c72'; x.beginPath(); x.arc(c, c, 40, 0, Math.PI * 2); x.fill();
+        x.fillStyle = '#d9b23a'; x.beginPath(); x.arc(c, c, 24, 0, Math.PI * 2); x.fill();
+      }
+    });
+  }
+  function decalPlane(tex, w, h, at) {
+    var m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.5, polygonOffset: true, polygonOffsetFactor: -2 }));
+    m.position.copy(at.p).addScaledVector(at.n, 0.015);
+    m.lookAt(m.position.clone().add(at.n));
+    return m;
+  }
+
   function build(opts) {
     opts = opts || {};
+    var o = OUTFITS[opts.outfit] || OUTFITS.none;
     var g = new THREE.Group();
-    var yellow = vinyl(opts.color != null ? opts.color : 0xf6bd16, { emissive: 0x2a1400 });
-    var beak = vinyl(0xf2650f, { emissive: 0x200800 });
-    var beakIn = vinyl(0xb83c0a, { roughness: 0.7 });
+    var yellow = suitMaterial(opts.color != null ? opts.color : 0xf6bd16, o);
+    var wingMat = o.suit ? vinyl(o.suit) : yellow;
+    var beak = vinyl(0xffffff, { emissive: 0x200800, vertexColors: true });
     var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
     var white = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
     var b = new THREE.Mesh(body(), yellow); g.add(b);
-    // Schnabel offen: Oberschnabel etwas angehoben, Unterschnabel kleiner und tiefer
-    var up = new THREE.Mesh(billGeometry(0.4, 0.3, 0.1, 0.05), beak);
-    up.position.set(1.12, 0.98, 0); up.rotation.z = -0.08; g.add(up);
-    var low = new THREE.Mesh(billGeometry(0.32, 0.24, 0.07, 0.0), beak);
-    low.position.set(1.06, 0.83, 0); low.rotation.z = -0.28; g.add(low);
-    var mouth = new THREE.Mesh(ell(0.2, 0.06, 0.2, 20), beakIn); mouth.position.set(1.0, 0.9, 0); g.add(mouth);
-    // Flügel, leicht angelegt (in den Körper gegossen)
+    // Schnabel: ein Teil, leicht geöffnet
+    var bill = new THREE.Mesh(billGeometry(0.42, 0.3, 0.11, 0.2), beak);
+    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; g.add(bill);
+    // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     [-1, 1].forEach(function (s) {
-      var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), yellow);
-      w.position.set(-0.05, 0.12, s * 0.72); w.rotation.set(s * 0.15, s * 0.12, 0.35);
+      var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat);
+      w.position.set(-0.05, 0.12, s * 0.79); w.rotation.set(s * 0.15, s * 0.12, 0.35);
       g.add(w);
     });
     // aufgemalte Augen: flach auf dem Kopf, entlang der Normalen
-    var HC = new THREE.Vector3(PARTS[5].c[0], PARTS[5].c[1], 0);
+    var HC = new THREE.Vector3(PARTS[5].c[0], PARTS[5].c[1], 0), HR = PARTS[5].r;
+    function headPoint(dir, rad) {
+      var n = dir.clone().normalize();
+      return HC.clone().add(new THREE.Vector3(n.x * HR[0], n.y * HR[1], n.z * HR[2]).multiplyScalar(rad || 1));
+    }
     function decal(geo, mat, dir, rad) {
       var n = dir.clone().normalize(), m = new THREE.Mesh(geo, mat);
-      m.position.copy(HC).add(new THREE.Vector3(n.x * PARTS[5].r[0], n.y * PARTS[5].r[1], n.z * PARTS[5].r[2]).multiplyScalar(rad || 0.995));
+      m.position.copy(headPoint(dir, rad || (o.cowl ? 1.012 : 0.995)));
       m.lookAt(m.position.clone().add(n));
       g.add(m); return m;
     }
     [-1, 1].forEach(function (s) {
-      decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.55, 0.38, s * 0.74));
-      decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.6, 0.46, s * 0.68), 1.003);
+      if (o.eyes === 'white') {
+        // Maske: weiße, schmale Augenschlitze
+        var sl = decal(ell(0.1, 0.05, 0.012, 20), white, new THREE.Vector3(0.55, 0.38, s * 0.74));
+        sl.rotateZ(s * -0.35);
+      } else {
+        decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.55, 0.38, s * 0.74));
+        decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.6, 0.46, s * 0.68), 1.003);
+      }
     });
-    g.userData = { body: b, head: HC, headR: PARTS[5].r, decal: decal };
+
+    // Helm (THW gelb, Feuerwehr silber mit Nackenschutz) mit Schild vorn
+    if (o.helmet) {
+      var hm = o.helmet.metal ? vinyl(o.helmet.color, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.0 }) : vinyl(o.helmet.color, { roughness: 0.35, clearcoat: 0.8 });
+      var dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.52), hm);
+      dome.scale.set(HR[0] * 1.07, HR[1] * 1.07, HR[2] * 1.07); dome.position.copy(HC).add(new THREE.Vector3(-0.02, 0.06, 0)); dome.rotation.z = 0.12;
+      g.add(dome);
+      var brim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.05, 10, 64), hm);
+      brim.scale.set(HR[0] * 1.08, HR[2] * 1.08, 1); brim.rotation.set(Math.PI / 2, 0, 0); brim.position.copy(HC).add(new THREE.Vector3(-0.04, 0.02, 0)); brim.rotation.y = 0.12;
+      g.add(brim);
+      if (o.helmet.neck) {
+        // Nackenschutz hinten (phi 0 liegt bei −x, also am Hinterkopf)
+        var neckG = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.45, Math.PI * 0.25), hm);
+        neckG.scale.set(HR[0] * 1.12, HR[1] * 1.12, HR[2] * 1.12); neckG.position.copy(HC); neckG.material = hm; neckG.material.side = THREE.DoubleSide;
+        g.add(neckG);
+      }
+      if (o.helmetLabel) {
+        var lab = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.13), new THREE.MeshStandardMaterial({ map: textTex(o.helmetLabel, '#1d2b5e', '#ffffff'), transparent: true, roughness: 0.4 }));
+        // vorn auf dem Helm (Helm sitzt 0.06 höher, Radius 1.07)
+        var ld = new THREE.Vector3(0.9, 0.42, 0).normalize();
+        var lp = headPoint(ld, 1.09).add(new THREE.Vector3(-0.02, 0.06, 0));
+        lab.position.copy(lp); lab.lookAt(lp.clone().add(ld));
+        g.add(lab);
+      }
+    }
+    // Polizeimütze: Band, oben breiter Deckel, schwarzer Schirm, Stern
+    if (o.cap) {
+      var capM = vinyl(o.suit), black = vinyl(0x111318, { roughness: 0.2, clearcoat: 1 });
+      var band2 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.18, 48), black);
+      band2.position.copy(HC).add(new THREE.Vector3(-0.02, 0.4, 0)); band2.rotation.z = 0.12; g.add(band2);
+      var top = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.5, 0.2, 48), capM);
+      top.position.copy(HC).add(new THREE.Vector3(-0.04, 0.58, 0)); top.rotation.z = 0.12; g.add(top);
+      var visor = new THREE.Mesh(ell(0.3, 0.04, 0.42, 32), black);
+      visor.position.copy(HC).add(new THREE.Vector3(0.48, 0.32, 0)); visor.rotation.z = -0.25; g.add(visor);
+      var badge = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ map: emblemTex('star'), transparent: true, metalness: 0.5, roughness: 0.35 }));
+      var bp = HC.clone().add(new THREE.Vector3(0.5, 0.47, 0)); badge.position.copy(bp); badge.lookAt(bp.clone().add(new THREE.Vector3(1, 0.2, 0)));
+      g.add(badge);
+    }
+    // Fledermaus-Ohren auf der Maske
+    if (o.ears) {
+      var cowlM = vinyl(o.cowl, { roughness: 0.4 });
+      [-1, 1].forEach(function (s) {
+        var ear = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.38, 24), cowlM);
+        ear.position.copy(headPoint(new THREE.Vector3(0.05, 0.85, s * 0.5), 0.92)).add(new THREE.Vector3(0, 0.12, 0));
+        ear.rotation.set(s * 0.25, 0, 0.1); g.add(ear);
+      });
+    }
+    // Umhang: halbe Röhre über den Rücken, vom Hals bis zum Boden, leicht ausgestellt
+    if (o.cape) {
+      var cg = new THREE.CylinderGeometry(0.62, 0.95, 1.15, 40, 8, true, Math.PI * 0.5, Math.PI);
+      var cp = cg.attributes.position;
+      for (var i = 0; i < cp.count; i++) { var yy = cp.getY(i); cp.setX(i, cp.getX(i) + Math.sin((yy + 0.6) * 4) * 0.015); }
+      cg.computeVertexNormals();
+      var cape = new THREE.Mesh(cg, vinyl(o.cape, { side: THREE.DoubleSide, roughness: 0.55 }));
+      cape.position.set(-0.05, 0.02, 0); cape.rotation.z = 0.08;
+      g.add(cape);
+    }
+    // Brust-Emblem und Schriftzug hinten
+    if (o.chest) {
+      var at = surface(new THREE.Vector3(1, -0.18, 0));
+      var sz = o.chest === 'star' ? 0.22 : 0.42;
+      g.add(decalPlane(emblemTex(o.chest), sz, sz, at));
+    }
+    if (o.back) {
+      var bk = surface(new THREE.Vector3(-0.85, 0.12, 0));
+      var plate = decalPlane(textTex(o.back, o.backColor), 0.68, 0.17, bk);
+      plate.position.addScaledVector(bk.n, 0.04);
+      g.add(plate);
+    }
+    g.userData = { body: b, head: HC, headR: HR, decal: decal };
     return g;
   }
 
-  root.RubberDuck = { build: build, sdDuck: sdDuck, OUTFITS: ['none'] };
+  root.RubberDuck = { build: build, sdDuck: sdDuck, OUTFITS: Object.keys(OUTFITS) };
 })(typeof window !== 'undefined' ? window : this);
