@@ -60,40 +60,60 @@
   function body() { return BODY || (BODY = bodyGeometry()); }
 
   function ell(rx, ry, rz, seg) { var g = new THREE.SphereGeometry(1, seg || 32, Math.round((seg || 32) * 0.7)); g.scale(rx, ry, rz); return g; }
-  // Schnabel aus EINEM Stück, klappt in der Mitte auf: die untere Hälfte dreht
-  // sich um ein Scharnier hinten nach unten; die Fläche, die sich dabei zwischen
-  // Ober- und Unterkante aufspannt, ist das Maul (dunkel). len/wid/thick in
-  // Einheiten, open = Öffnungswinkel (rad)
+  // Schnabel wie ein echter offener Entenschnabel: zwei gewölbte Schalen (Ober-
+  // und Unterschnabel), die nur hinten im Mundwinkel zusammenhängen. Vorn klafft
+  // der Mund (Keil mit Winkel 2·open um das Scharnier); die Innenseiten – Gaumen
+  // und Schnabelboden – sind als dunkle Flächen zum Mundwinkel hin geschlossen.
+  // Alles in EINER Geometrie. len/wid/thick in Einheiten, open in rad.
   function billGeometry(len, wid, thick, open) {
-    var g = new THREE.SphereGeometry(1, 48, 32), p = g.attributes.position, oy = [];
-    var hx = -0.85, ca = Math.cos(open), sa = Math.sin(open);
-    for (var i = 0; i < p.count; i++) {
-      var x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-      oy.push(y);
-      var t = (x + 1) / 2;                                  // 0 hinten (Kopf) … 1 Spitze
-      var w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
-      // erst in die flache Schnabelform, dann den Unterschnabel um das Scharnier drehen
-      var X = x * len, Y = y * thick * (y < 0 ? 1.5 : 1), Hx = hx * len;   // Unterschnabel etwas dicker
-      if (y < -0.001) {                                     // Unterschnabel klappt nach unten
-        var dx = X - Hx, nx = Hx + dx * ca + Y * sa, ny = -dx * sa + Y * ca;
-        X = nx; Y = ny;
-      } else Y += 0.03 * t * t;                             // Oberschnabel leicht hochgeschwungen
-      p.setXYZ(i, X, Y, z * w);
+    var Hx = -0.85 * len;
+    var lip = new THREE.Color(0xf2650f).convertSRGBToLinear(), inner = new THREE.Color(0x2e0a02).convertSRGBToLinear();
+    var pos = [], nor = [], col = [], idx = [];
+    // Punkt in Schnabelform (flach, vorn rund) und um das Scharnier aufgeklappt
+    function shape(x, y, z) {
+      var t = (x + 1) / 2, w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
+      // Unterschnabel etwas kürzer und schmaler als der kräftige Oberschnabel
+      return y < 0 ? new THREE.Vector3(x * len * 0.88 - len * 0.06, y * thick * 0.85, z * w * 0.9) : new THREE.Vector3(x * len, y * thick, z * w);
     }
-    g.setAttribute('oy', new THREE.Float32BufferAttribute(oy, 1));
-    g = g.toNonIndexed();
-    var q = g.attributes.oy, cols = [];
-    var lip = new THREE.Color(0xf2650f).convertSRGBToLinear(), inner = new THREE.Color(0x7a2206).convertSRGBToLinear();
-    for (var f = 0; f < q.count; f += 3) {
-      var a = q.getX(f), b = q.getX(f + 1), c = q.getX(f + 2);
-      var band = Math.min(a, b, c) < -0.001 && Math.max(a, b, c) > -0.001;
-      var cc = band ? inner : lip;
-      for (var k = 0; k < 3; k++) cols.push(cc.r, cc.g, cc.b);
+    function wedge(v, up) {
+      var dx = v.x - Hx, r = Math.sqrt(dx * dx + v.y * v.y), phi = Math.atan2(v.y, dx);
+      if (up && phi < 0) phi = 0; if (!up && phi > 0) phi = 0;
+      var a = Math.abs(phi), na = open + a * (Math.PI - open) / Math.PI;
+      var np = up ? na : -na;
+      return new THREE.Vector3(Hx + r * Math.cos(np), r * Math.sin(np), v.z);
     }
-    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
-    g.deleteAttribute('oy');
-    g.computeVertexNormals();
-    return g;
+    function addHalf(up) {
+      var g = new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, up ? 0 : Math.PI / 2, Math.PI / 2);
+      var p = g.attributes.position, base = pos.length / 3;
+      for (var i = 0; i < p.count; i++) {
+        var v = wedge(shape(p.getX(i), p.getY(i), p.getZ(i)), up);
+        pos.push(v.x, v.y, v.z); nor.push(0, 0, 0); col.push(lip.r, lip.g, lip.b);
+      }
+      var ix = g.index.array;
+      for (var k = 0; k < ix.length; k++) idx.push(base + ix[k]);
+      // Rand an der Mundöffnung (Äquator der Halbkugel) → Innenfläche zum Mundwinkel
+      var ring = [], rows = 16, cols = 48;
+      var eqRow = up ? rows : 0;
+      for (var c = 0; c <= cols; c++) ring.push(base + eqRow * (cols + 1) + c);
+      // Mulde: Fächer-Mitte liegt in der Schale (Gaumen nach oben, Boden nach unten gewölbt)
+      var hinge = pos.length / 3;
+      var mid = wedge(new THREE.Vector3(Hx + len * 0.55, 0, 0), up);
+      pos.push(mid.x, mid.y + (up ? 1 : -1) * thick * 0.55, 0); nor.push(0, 0, 0); col.push(inner.r, inner.g, inner.b);
+      // Innenfläche: Kopie des Randes in Innenfarbe, Fächer zum Mundwinkel
+      var start2 = pos.length / 3;
+      ring.forEach(function (ri) { pos.push(pos[ri * 3], pos[ri * 3 + 1], pos[ri * 3 + 2]); nor.push(0, 0, 0); col.push(inner.r, inner.g, inner.b); });
+      for (var c2 = 0; c2 < cols; c2++) {
+        if (up) idx.push(hinge, start2 + c2 + 1, start2 + c2); else idx.push(hinge, start2 + c2, start2 + c2 + 1);
+      }
+    }
+    addHalf(true); addHalf(false);
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    return geo;
   }
   function vinyl(hex, o) {
     var m = new THREE.MeshPhysicalMaterial(Object.assign({ color: hex, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.4, envMapIntensity: 0.4 }, o || {}));
@@ -108,9 +128,9 @@
   // belt = Gürtel, briefs = Höschen unten, cowl = Maske über Kopf/Augen.
   var OUTFITS = {
     none: {},
-    thw: { suit: 0x1d2b5e, stripe: 0xf2c500, stripes: [0.18, -0.12], helmet: { color: 0xf2c500 }, helmetLabel: 'THW', back: 'THW', backColor: '#f2c500' },
-    police: { suit: 0x1e3c72, stripe: 0xd8dde6, stripes: [-0.05], cap: true, back: 'POLIZEI', backColor: '#ffffff', chest: 'star' },
-    fire: { suit: 0x1a2340, stripe: 0xf2d000, stripe2: 0xc9ced6, stripes: [0.2, -0.1], helmet: { color: 0xd9dde2, metal: true, neck: true }, back: 'FEUERWEHR', backColor: '#f2d000' },
+    thw: { suit: 0x1d2b5e, stripe: 0xf2c500, stripes: [0.18, -0.12], helmet: { color: 0xf2c500 }, helmetLabel: 'THW' },
+    police: { suit: 0x1e3c72, stripe: 0xd8dde6, stripes: [-0.05], cap: true, chest: 'star' },
+    fire: { suit: 0x1a2340, stripe: 0xf2d000, stripe2: 0xc9ced6, stripes: [0.2, -0.1], helmet: { color: 0xd9dde2, metal: true, neck: true } },
     batman: { suit: 0x4a4e57, belt: 0xe2b62a, beltY: -0.3, cowl: 0x1a1b20, cape: 0x1a1b20, ears: true, chest: 'bat', eyes: 'white' },
     superman: { suit: 0x1f4fb5, belt: 0xf2c500, beltY: -0.3, briefs: 0xc8151b, cape: 0xc8151b, chest: 'super' }
   };
@@ -153,6 +173,19 @@
     var v = dir.clone().normalize(), q = new THREE.Vector3(), lo = 0, hi = 2.4;
     for (var it = 0; it < 30; it++) { var mid = (lo + hi) / 2; q.copy(CENTER).addScaledVector(v, mid); if (sdDuck(q) < 0) lo = mid; else hi = mid; }
     q.copy(CENTER).addScaledVector(v, lo);
+    var e = 0.002, n = new THREE.Vector3(
+      sdDuck(new THREE.Vector3(q.x + e, q.y, q.z)) - sdDuck(new THREE.Vector3(q.x - e, q.y, q.z)),
+      sdDuck(new THREE.Vector3(q.x, q.y + e, q.z)) - sdDuck(new THREE.Vector3(q.x, q.y - e, q.z)),
+      sdDuck(new THREE.Vector3(q.x, q.y, q.z + e)) - sdDuck(new THREE.Vector3(q.x, q.y, q.z - e))).normalize();
+    return { p: q, n: n };
+  }
+  // Oberfläche auf Höhe y in Richtung phi (waagrecht von der Körperachse aus)
+  function surfaceAt(y, phi) {
+    var dir = new THREE.Vector3(-Math.cos(phi), 0, Math.sin(phi)).multiplyScalar(-1);
+    var o0 = new THREE.Vector3(0.1, y, 0), q = new THREE.Vector3(), lo = 0, hi = 2.0;
+    if (sdDuck(o0) > 0) return { p: o0.clone(), n: dir.clone() };
+    for (var it = 0; it < 28; it++) { var mid = (lo + hi) / 2; q.copy(o0).addScaledVector(dir, mid); if (sdDuck(q) < 0) lo = mid; else hi = mid; }
+    q.copy(o0).addScaledVector(dir, lo);
     var e = 0.002, n = new THREE.Vector3(
       sdDuck(new THREE.Vector3(q.x + e, q.y, q.z)) - sdDuck(new THREE.Vector3(q.x - e, q.y, q.z)),
       sdDuck(new THREE.Vector3(q.x, q.y + e, q.z)) - sdDuck(new THREE.Vector3(q.x, q.y - e, q.z)),
@@ -219,13 +252,14 @@
     var g = new THREE.Group();
     var yellow = suitMaterial(opts.color != null ? opts.color : 0xf6bd16, o);
     var wingMat = o.suit ? vinyl(o.suit) : yellow;
-    var beak = vinyl(0xffffff, { emissive: 0x200800, vertexColors: true });
+    var beak = vinyl(0xffffff, { emissive: 0x200800, vertexColors: true, side: THREE.DoubleSide, envMapIntensity: 0.12, clearcoat: 0.15, roughness: 0.6 });
     var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
     var white = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
     var b = new THREE.Mesh(body(), yellow); g.add(b);
     // Schnabel: ein Teil, leicht geöffnet
-    var bill = new THREE.Mesh(billGeometry(0.42, 0.3, 0.11, 0.2), beak);
+    // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
+    var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.14, 0.11), beak);
     bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; g.add(bill);
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     [-1, 1].forEach(function (s) {
@@ -257,25 +291,27 @@
     });
 
     // Helm (THW gelb, Feuerwehr silber mit Nackenschutz) mit Schild vorn
+    // Helm sitzt oben auf dem Kopf, nicht über den Augen
+    var HELMET_UP = 0.17;
     if (o.helmet) {
       var hm = o.helmet.metal ? vinyl(o.helmet.color, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.0 }) : vinyl(o.helmet.color, { roughness: 0.35, clearcoat: 0.8 });
       var dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.52), hm);
-      dome.scale.set(HR[0] * 1.07, HR[1] * 1.07, HR[2] * 1.07); dome.position.copy(HC).add(new THREE.Vector3(-0.02, 0.06, 0)); dome.rotation.z = 0.12;
+      dome.scale.set(HR[0] * 1.07, HR[1] * 1.07, HR[2] * 1.07); dome.position.copy(HC).add(new THREE.Vector3(-0.02, HELMET_UP, 0)); dome.rotation.z = 0.12;
       g.add(dome);
       var brim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.05, 10, 64), hm);
-      brim.scale.set(HR[0] * 1.08, HR[2] * 1.08, 1); brim.rotation.set(Math.PI / 2, 0, 0); brim.position.copy(HC).add(new THREE.Vector3(-0.04, 0.02, 0)); brim.rotation.y = 0.12;
+      brim.scale.set(HR[0] * 1.08, HR[2] * 1.08, 1); brim.rotation.set(Math.PI / 2, 0, 0); brim.position.copy(HC).add(new THREE.Vector3(-0.04, HELMET_UP - 0.04, 0)); brim.rotation.y = 0.12;
       g.add(brim);
       if (o.helmet.neck) {
         // Nackenschutz hinten (phi 0 liegt bei −x, also am Hinterkopf)
         var neckG = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.45, Math.PI * 0.25), hm);
-        neckG.scale.set(HR[0] * 1.12, HR[1] * 1.12, HR[2] * 1.12); neckG.position.copy(HC); neckG.material = hm; neckG.material.side = THREE.DoubleSide;
+        neckG.scale.set(HR[0] * 1.12, HR[1] * 1.12, HR[2] * 1.12); neckG.position.copy(HC).add(new THREE.Vector3(0, HELMET_UP - 0.06, 0)); neckG.material = hm; neckG.material.side = THREE.DoubleSide;
         g.add(neckG);
       }
       if (o.helmetLabel) {
         var lab = new THREE.Mesh(new THREE.PlaneGeometry(0.42, 0.13), new THREE.MeshStandardMaterial({ map: textTex(o.helmetLabel, '#1d2b5e', '#ffffff'), transparent: true, roughness: 0.4 }));
         // vorn auf dem Helm (Helm sitzt 0.06 höher, Radius 1.07)
         var ld = new THREE.Vector3(0.9, 0.42, 0).normalize();
-        var lp = headPoint(ld, 1.09).add(new THREE.Vector3(-0.02, 0.06, 0));
+        var lp = headPoint(ld, 1.09).add(new THREE.Vector3(-0.02, HELMET_UP, 0));
         lab.position.copy(lp); lab.lookAt(lp.clone().add(ld));
         g.add(lab);
       }
@@ -302,27 +338,34 @@
         ear.rotation.set(s * 0.25, 0, 0.1); g.add(ear);
       });
     }
-    // Umhang: halbe Röhre über den Rücken, vom Hals bis zum Boden, leicht ausgestellt
+    // Umhang: Tuch am Kragen, fällt über Rücken und Schwanz bis knapp über den
+    // Boden, unten breiter; folgt der Körperform mit etwas Abstand
     if (o.cape) {
-      var cg = new THREE.CylinderGeometry(0.62, 0.95, 1.15, 40, 8, true, Math.PI * 0.5, Math.PI);
-      var cp = cg.attributes.position;
-      for (var i = 0; i < cp.count; i++) { var yy = cp.getY(i); cp.setX(i, cp.getX(i) + Math.sin((yy + 0.6) * 4) * 0.015); }
-      cg.computeVertexNormals();
-      var cape = new THREE.Mesh(cg, vinyl(o.cape, { side: THREE.DoubleSide, roughness: 0.55 }));
-      cape.position.set(-0.05, 0.02, 0); cape.rotation.z = 0.08;
-      g.add(cape);
+      var U = 26, V = 18, cpos = [], cidx = [];
+      for (var vv = 0; vv <= V; vv++) {
+        var tv = vv / V, yh = 0.58 - tv * 1.08;                 // Kragen → knapp über dem Boden
+        var half = 0.75 + 0.55 * tv;                           // halbe Breite (rad), unten breiter
+        for (var uu = 0; uu <= U; uu++) {
+          var phi = Math.PI + (uu / U * 2 - 1) * half;          // um die Rückenmitte (−x)
+          var sp = surfaceAt(yh, phi);
+          var off = 0.05 + 0.1 * tv;                            // unten etwas weiter weg
+          cpos.push(sp.p.x + sp.n.x * off, sp.p.y + sp.n.y * off - 0.03 * tv, sp.p.z + sp.n.z * off);
+        }
+      }
+      for (var a = 0; a < V; a++) for (var c = 0; c < U; c++) {
+        var i0 = a * (U + 1) + c;
+        cidx.push(i0, i0 + U + 1, i0 + 1, i0 + 1, i0 + U + 1, i0 + U + 2);
+      }
+      var cg = new THREE.BufferGeometry();
+      cg.setAttribute('position', new THREE.Float32BufferAttribute(cpos, 3));
+      cg.setIndex(cidx); cg.computeVertexNormals();
+      g.add(new THREE.Mesh(cg, vinyl(o.cape, { side: THREE.DoubleSide, roughness: 0.6, clearcoat: 0.1 })));
     }
-    // Brust-Emblem und Schriftzug hinten
+    // Brust-Emblem
     if (o.chest) {
       var at = surface(new THREE.Vector3(1, -0.18, 0));
       var sz = o.chest === 'star' ? 0.22 : 0.42;
       g.add(decalPlane(emblemTex(o.chest), sz, sz, at));
-    }
-    if (o.back) {
-      var bk = surface(new THREE.Vector3(-0.85, 0.12, 0));
-      var plate = decalPlane(textTex(o.back, o.backColor), 0.68, 0.17, bk);
-      plate.position.addScaledVector(bk.n, 0.04);
-      g.add(plate);
     }
     g.userData = { body: b, head: HC, headR: HR, decal: decal };
     return g;
