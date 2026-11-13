@@ -34,6 +34,9 @@
   // Drehen mitwandern (Warzen, Streifen der Bischofsmütze)
   var VARIETIES = ['classic', 'hokkaido', 'turban', 'butternut', 'warty', 'striped', 'ghost'];
   var SHAPE = { hokkaido: 'scale(1.08 0.84)', turban: 'scale(1.12 0.72)', warty: 'scale(0.8 0.82)', striped: 'scale(0.86 0.9)' };
+  // Breite der Aufstandsfläche je Sorte (Gartenkürbis = 1), für Schatten und Lichtschein
+  var FOOT = { classic: 1, hokkaido: 1.08, turban: 1.12, butternut: 0.72, warty: 0.8, striped: 0.86, ghost: 1 };
+  function footOf(v) { return FOOT[v] || 1; }
   // Butternut: Birnenform (Bauch unten, Hals oben), keine Wülste
   var BUTTERNUT = 'M0 -60 C9 -60 10 -50 11 -40 C12 -32 30 -30 30 -14 C30 -2 18 1 0 1 C-18 1 -30 -2 -30 -14 C-30 -30 -12 -32 -11 -40 C-10 -50 -9 -60 0 -60 Z';
 
@@ -44,9 +47,11 @@
     opts = opts || {};
     var v = VARIETIES.indexOf(opts.variety) >= 0 ? opts.variety : 'classic', seed = opts.seed || 0.37;
     var rr = function (k) { var x = Math.sin((seed * 9301 + k * 49297) % 233280) * 10000; return x - Math.floor(x); };
-    el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40 }, body);
-    var vg = el('g', SHAPE[v] ? { transform: SHAPE[v] } : {}, body);
     var butternut = v === 'butternut';
+    // Lichtschein in der Form der Sorte (Butternut: schmal und hoch)
+    if (butternut) el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -27, rx: 40, ry: 42 }, body);
+    else el('ellipse', { 'class': 'ta-pk-light', cx: 0, cy: -30, rx: 56, ry: 40, transform: SHAPE[v] || '' }, body);
+    var vg = el('g', SHAPE[v] ? { transform: SHAPE[v] } : {}, body);
     // dunkle Kontur: genau der Umriss (mit Mulde am Stiel), nur ihr Rand bleibt
     // sichtbar und trennt den Kürbis vom gleichfarbigen Laub
     el('path', { 'class': 'ta-pk-edge', d: butternut ? BUTTERNUT : segment(-RX * 1.03, RX * 1.03) }, vg);
@@ -73,7 +78,8 @@
     }
     if (butternut) el('ellipse', { 'class': 'ta-pk-sheen', cx: -15, cy: -20, rx: 5, ry: 9, transform: 'rotate(-18 -15 -20)' }, vg);
     else el('ellipse', { 'class': 'ta-pk-sheen', cx: -22, cy: -42, rx: 7, ry: 13, transform: 'rotate(-18 -22 -42)' }, vg);
-    if (opts.shade) el('ellipse', { 'class': 'ta-pk-shade', cx: 0, cy: -30, rx: 43, ry: 31, 'fill-opacity': opts.shade.toFixed(2) }, vg);
+    // Tiefenschleier genau im Umriss (ein Oval stünde bei der Butternut seitlich über)
+    if (opts.shade) el('path', { 'class': 'ta-pk-shade', d: butternut ? BUTTERNUT : segment(-RX * 1.03, RX * 1.03), 'fill-opacity': opts.shade.toFixed(2) }, vg);
     // Bischofsmütze: bunte Kappe oben auf dem gestauchten Körper, Streifen drehen mit
     var top = vg, stemShift = '';
     if (v === 'turban') {
@@ -175,5 +181,5 @@
   // Sorte je Name (gleiche Rechnung wie pumpkin_kind im Server): Gartenkürbis
   // am häufigsten, die anderen gleich oft
   function varietyOf(r) { return r < 0.28 ? 'classic' : VARIETIES[1 + Math.min(5, Math.floor((r - 0.28) / 0.72 * 6))]; }
-  root.Pumpkin = { build: build, pose: pose, turn: turn, varietyOf: varietyOf, VARIETIES: VARIETIES };
+  root.Pumpkin = { build: build, pose: pose, turn: turn, varietyOf: varietyOf, footOf: footOf, VARIETIES: VARIETIES };
 })(typeof window !== 'undefined' ? window : this);

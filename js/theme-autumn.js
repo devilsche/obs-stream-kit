@@ -574,14 +574,16 @@
       // Zwischenebene zum Anheben/Aufschwimmen (Fuß bei 0/0)
       var lift = el('g', {}, g);
       var inner = el('g', { 'class': 'ta-pk-inner' }, lift);
-      var shadow = el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: f1(44 * sx), ry: f1(7 * scale) }, inner);
+      // Schatten so breit wie die Aufstandsfläche der Sorte (Butternut schmal, Bischofsmütze breit)
+      var foot = root.Pumpkin.footOf(variety);
+      var shadow = el('ellipse', { 'class': 'ta-pk-shadow', cx: 0, cy: 0, rx: f1(44 * sx * foot), ry: f1(7 * scale * Math.min(1, 0.6 + 0.4 * foot)) }, inner);
       // beim Zurückrollen dreht nur der Körper, der Schatten bleibt flach
       var spin = el('g', { 'class': 'ta-pk-spin' }, inner);
       var body = el('g', { transform: 'rotate(' + f1(tilt) + ' 0 -30) scale(' + sx.toFixed(2) + ' ' + sy.toFixed(2) + ')' }, spin);
       // Körper aus 10 Wülsten (js/pumpkin.js), dreht sich um die Stielachse;
       // dunkler Schleier über den hinteren Kürbissen gibt Tiefe
       var model = root.Pumpkin.build(body, { shade: 0.42 * depth, cap: true, variety: variety, seed: nr(9) });
-      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, model: model, variety: variety, ratio: (61 * sy) / (84 * sx),
+      return { node: g, inner: inner, lift: lift, shadow: shadow, spin: spin, model: model, variety: variety, ratio: (61 * sy) / (84 * sx * foot),
                label: name, slot: slot, h: 80 * sy, x: PK_X[slot], y: H, dy: 0, depth: depth,
                ly: 0, lx: 0, rot: 0, vy: 0, mode: null, shown: '' };
     }
