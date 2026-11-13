@@ -98,6 +98,12 @@
       b.position.set(s * 0.38, 1.2, 0.92); b.rotation.set(0, 0, Math.PI / 2 + s * 0.45);
       duck.add(b); b.userData.s = s; brows.push(b);
     });
+    // kleine Watschelfüße vorn unter dem Bauch
+    var feet = toon(COL.beak, COL.beakShade);
+    [-1, 1].forEach(function (sd) {
+      var f = part(ell(0.24, 0.07, 0.2, 24), feet, sd * 0.32, -0.74, 0.62, 0.035);
+      f.rotation.y = sd * 0.35;
+    });
     // Flügel: links (Bild) hält das Messer, rechts macht die Geste und bleibt am Kinn
     var swipe = part(ell(0.36, 0.17, 0.2, 24), yel, 0.6, -0.1, 0.84, 0.04);
     var hand = part(ell(0.26, 0.2, 0.2, 24), yel, -0.55, 0.0, 0.9, 0.04);
@@ -152,8 +158,8 @@
     m.duck.rotation.y = 0.15;
     var unit = (opts.height || 430) / 2.9;
     holder.scale.set(unit, unit, unit);
-    // ohne y: sitzt auf dem unteren Bildrand (Unterseite der Kontur bei ~0.83 Einheiten)
-    var y = opts.y != null ? opts.y : H - 0.83 * unit;
+    // ohne y: sitzt 50 px über dem unteren Bildrand (Unterseite der Kontur bei ~0.83 Einheiten)
+    var y = opts.y != null ? opts.y : H - 0.83 * unit - 50;
     holder.position.set(opts.x || 960, -y, 0);
     var vol = opts.volume == null ? 0.7 : opts.volume, base = opts.soundBase || '../assets/sounds/';
     var cues = [[sound(base + 'knife-draw.mp3', vol), 0.35], [sound(base + 'knife-glint.mp3', vol), 0.7], [sound(base + 'knife-swipe.mp3', vol), 1.65]];
