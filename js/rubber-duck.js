@@ -61,19 +61,21 @@
 
   function ell(rx, ry, rz, seg) { var g = new THREE.SphereGeometry(1, seg || 32, Math.round((seg || 32) * 0.7)); g.scale(rx, ry, rz); return g; }
   // Schnabel wie ein echter offener Entenschnabel: zwei gewölbte Schalen (Ober-
-  // und Unterschnabel), die nur hinten im Mundwinkel zusammenhängen. Vorn klafft
-  // der Mund (Keil mit Winkel 2·open um das Scharnier); die Innenseiten – Gaumen
-  // und Schnabelboden – sind als dunkle Flächen zum Mundwinkel hin geschlossen.
-  // Alles in EINER Geometrie. len/wid/thick in Einheiten, open in rad.
+  // und Unterschnabel), die nur hinten im Mundwinkel zusammenhängen, vorn leicht
+  // geöffnet (Keil mit Winkel 2·open um das Scharnier). Jede Schale hat eine
+  // gerundete Lippe (Wandstärke), dazwischen eine zusammenhängende Mundhöhle: vom
+  // Gaumen hinter der oberen Lippe nach hinten zum Mundwinkel und wieder vor zur
+  // unteren Lippe, zur Tiefe hin dunkler. Alles EINE Geometrie.
   function billGeometry(len, wid, thick, open) {
-    var Hx = -0.85 * len;
-    var lip = new THREE.Color(0xf2650f).convertSRGBToLinear(), inner = new THREE.Color(0x2e0a02).convertSRGBToLinear();
-    var pos = [], nor = [], col = [], idx = [];
-    // Punkt in Schnabelform (flach, vorn rund) und um das Scharnier aufgeklappt
-    function shape(x, y, z) {
+    var Hx = -0.85 * len, LIP = 0.032, COLS = 48, ROWS = 16, S = 10;
+    var lip = new THREE.Color(0xf2650f).convertSRGBToLinear();
+    var mouthHi = new THREE.Color(0x6a1c06).convertSRGBToLinear(), mouthLo = new THREE.Color(0x1e0601).convertSRGBToLinear();
+    var pos = [], col = [], idx = [];
+    function vtx(v, c) { pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b); return pos.length / 3 - 1; }
+    function shape(x, y, z, up) {
       var t = (x + 1) / 2, w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
       // Unterschnabel etwas kürzer und schmaler als der kräftige Oberschnabel
-      return y < 0 ? new THREE.Vector3(x * len * 0.88 - len * 0.06, y * thick * 0.85, z * w * 0.9) : new THREE.Vector3(x * len, y * thick, z * w);
+      return up ? new THREE.Vector3(x * len, y * thick, z * w) : new THREE.Vector3(x * len * 0.88 - len * 0.06, y * thick * 0.85, z * w * 0.9);
     }
     function wedge(v, up) {
       var dx = v.x - Hx, r = Math.sqrt(dx * dx + v.y * v.y), phi = Math.atan2(v.y, dx);
@@ -82,34 +84,58 @@
       var np = up ? na : -na;
       return new THREE.Vector3(Hx + r * Math.cos(np), r * Math.sin(np), v.z);
     }
-    function addHalf(up) {
-      var g = new THREE.SphereGeometry(1, 48, 16, 0, Math.PI * 2, up ? 0 : Math.PI / 2, Math.PI / 2);
-      var p = g.attributes.position, base = pos.length / 3;
-      for (var i = 0; i < p.count; i++) {
-        var v = wedge(shape(p.getX(i), p.getY(i), p.getZ(i)), up);
-        pos.push(v.x, v.y, v.z); nor.push(0, 0, 0); col.push(lip.r, lip.g, lip.b);
-      }
+    // äußere Schale; liefert die Punkte des Mundrands (Äquator) in Reihenfolge
+    function shell(up) {
+      var g = new THREE.SphereGeometry(1, COLS, ROWS, 0, Math.PI * 2, up ? 0 : Math.PI / 2, Math.PI / 2);
+      var p = g.attributes.position, base = pos.length / 3, rim = [];
+      for (var i = 0; i < p.count; i++) vtx(wedge(shape(p.getX(i), p.getY(i), p.getZ(i), up), up), lip);
       var ix = g.index.array;
       for (var k = 0; k < ix.length; k++) idx.push(base + ix[k]);
-      // Rand an der Mundöffnung (Äquator der Halbkugel) → Innenfläche zum Mundwinkel
-      var ring = [], rows = 16, cols = 48;
-      var eqRow = up ? rows : 0;
-      for (var c = 0; c <= cols; c++) ring.push(base + eqRow * (cols + 1) + c);
-      // Mulde: Fächer-Mitte liegt in der Schale (Gaumen nach oben, Boden nach unten gewölbt)
-      var hinge = pos.length / 3;
-      var mid = wedge(new THREE.Vector3(Hx + len * 0.55, 0, 0), up);
-      pos.push(mid.x, mid.y + (up ? 1 : -1) * thick * 0.55, 0); nor.push(0, 0, 0); col.push(inner.r, inner.g, inner.b);
-      // Innenfläche: Kopie des Randes in Innenfarbe, Fächer zum Mundwinkel
-      var start2 = pos.length / 3;
-      ring.forEach(function (ri) { pos.push(pos[ri * 3], pos[ri * 3 + 1], pos[ri * 3 + 2]); nor.push(0, 0, 0); col.push(inner.r, inner.g, inner.b); });
-      for (var c2 = 0; c2 < cols; c2++) {
-        if (up) idx.push(hinge, start2 + c2 + 1, start2 + c2); else idx.push(hinge, start2 + c2, start2 + c2 + 1);
+      var row = up ? ROWS : 0;
+      for (var c = 0; c <= COLS; c++) { var j = base + row * (COLS + 1) + c; rim.push(new THREE.Vector3(pos[j * 3], pos[j * 3 + 1], pos[j * 3 + 2])); }
+      return rim;
+    }
+    var rimU = shell(true), rimL = shell(false);
+    // Lippe: Rand um LIP nach innen (zur Schnabelmitte) und leicht in die Schale versetzt
+    function inset(rim, up) {
+      var cx = 0, cz = 0; rim.forEach(function (v) { cx += v.x; cz += v.z; }); cx /= rim.length; cz /= rim.length;
+      return rim.map(function (v) {
+        var d = new THREE.Vector3(cx - v.x, 0, cz - v.z); var L = d.length() || 1; d.multiplyScalar(Math.min(LIP, L * 0.5) / L);
+        return new THREE.Vector3(v.x + d.x, v.y + (up ? LIP * 0.45 : -LIP * 0.45), v.z + d.z);
+      });
+    }
+    var inU = inset(rimU, true), inL = inset(rimL, false);
+    function strip(a, b, ca, cb, flip) {
+      var ia = a.map(function (v) { return vtx(v, ca); }), ib = b.map(function (v) { return vtx(v, cb); });
+      for (var c = 0; c < a.length - 1; c++) {
+        if (flip) idx.push(ia[c], ia[c + 1], ib[c], ib[c], ia[c + 1], ib[c + 1]);
+        else idx.push(ia[c], ib[c], ia[c + 1], ib[c], ib[c + 1], ia[c + 1]);
       }
     }
-    addHalf(true); addHalf(false);
+    // gerundete Lippen (orange), außen → innen
+    strip(rimU, inU, lip, lip, false);
+    strip(rimL, inL, lip, lip, true);
+    // Mundhöhle: je Randpunkt eine Kurve von der oberen Lippe über den Rachen
+    // (nach hinten zum Mundwinkel) zur unteren Lippe
+    var grid = [];
+    for (var c = 0; c <= COLS; c++) {
+      var a = inU[c], b = inL[c];
+      var t = new THREE.Vector3(Hx + (Math.max(a.x, Hx) - Hx) * 0.22, (a.y + b.y) / 2, a.z * 0.65);
+      var colm = [];
+      for (var k = 0; k <= S; k++) {
+        var u = k / S, w0 = (1 - u) * (1 - u), w1 = 2 * (1 - u) * u, w2 = u * u;
+        var v = new THREE.Vector3(a.x * w0 + t.x * w1 + b.x * w2, a.y * w0 + t.y * w1 + b.y * w2, a.z * w0 + t.z * w1 + b.z * w2);
+        var depth = Math.sin(Math.PI * u);
+        colm.push(vtx(v, mouthHi.clone().lerp(mouthLo, depth)));
+      }
+      grid.push(colm);
+    }
+    for (var c2 = 0; c2 < COLS; c2++) for (var k2 = 0; k2 < S; k2++) {
+      var p00 = grid[c2][k2], p01 = grid[c2][k2 + 1], p10 = grid[c2 + 1][k2], p11 = grid[c2 + 1][k2 + 1];
+      idx.push(p00, p01, p10, p10, p01, p11);
+    }
     var geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
@@ -259,7 +285,7 @@
     var b = new THREE.Mesh(body(), yellow); g.add(b);
     // Schnabel: ein Teil, leicht geöffnet
     // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
-    var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.14, 0.11), beak);
+    var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.06), beak);
     bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; g.add(bill);
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     [-1, 1].forEach(function (s) {
