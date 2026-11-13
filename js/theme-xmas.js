@@ -166,7 +166,8 @@
   };
   // ── Adventskranz links vom Baum (Baum-Koordinaten): Ring in Aufsicht,
   // Kerzen im Uhrzeigersinn ab hinten links; je Brenntag ein Stück kürzer ──
-  var WR = { x: -160, y: 466, rx: 70, ry: 26 };
+  // flacher Blickwinkel wie der Rest der Szene (Schnee, Baum von der Seite)
+  var WR = { x: -160, y: 478, rx: 70, ry: 13 };
   // leicht gedreht, damit keine Kerze genau vor einer anderen steht
   var CANDLE_A = [-160, -70, 20, 110];
   var CANDLE_H = 74, CANDLE_W = 14;
@@ -402,14 +403,14 @@
     var gWBack = el('g', {}, gWBody), gWCand = el('g', {}, gWBody), gWFront = el('g', {}, gWBody);
     var gWFlames = el('g', {}, gWreath);
     // Baumscheibe als Unterlage: Oberseite mit Jahresringen, Rinde als Seitenband
-    var SL = { cx: WR.x, cy: WR.y + 6, rx: WR.rx + 22, ry: WR.ry + 10, th: 18 };
+    var SL = { cx: WR.x, cy: WR.y + 5, rx: WR.rx + 22, ry: WR.ry + 5, th: 15 };
     function sliceSide() {
       var l = SL.cx - SL.rx, r = SL.cx + SL.rx;
       return 'M' + f1(l) + ' ' + f1(SL.cy) + ' L' + f1(l) + ' ' + f1(SL.cy + SL.th) + ' A' + SL.rx + ' ' + SL.ry + ' 0 0 0 ' + f1(r) + ' ' + f1(SL.cy + SL.th) +
              ' L' + f1(r) + ' ' + f1(SL.cy) + ' A' + SL.rx + ' ' + SL.ry + ' 0 0 1 ' + f1(l) + ' ' + f1(SL.cy) + ' Z';
     }
     var gSlice = el('g', { 'class': 'tw-wslice' }, gWBody);
-    el('ellipse', { 'class': 'tw-wslice-shadow', cx: SL.cx + 6, cy: SL.cy + SL.th + 2, rx: SL.rx + 10, ry: SL.ry * 0.7 }, gSlice);
+    el('ellipse', { 'class': 'tw-wslice-shadow', cx: SL.cx + 4, cy: SL.cy + SL.th + SL.ry - 2, rx: SL.rx + 6, ry: 5 }, gSlice);
     el('path', { 'class': 'tw-wslice-bark', d: sliceSide() }, gSlice);
     var barkD = '';
     for (var bx = -0.92; bx <= 0.93; bx += 0.115) {
@@ -533,8 +534,8 @@
     function stepWreath(dt) {
       // auf der Schneedecke stehen, weder schweben noch versinken
       var gy = cfg.snowAt ? cfg.snowAt(TX + WR.x * TK) : null;
-      // Scheibe steht immer auf der Schneedecke und sinkt ein Stück ein (wenig Schnee: nach unten, viel: nach oben)
-      var lift = gy === null ? 0 : (gy + 7 - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK;
+      // Scheibe liegt immer auf der Schneedecke (wenig Schnee: nach unten, viel: nach oben)
+      var lift = gy === null ? 0 : (gy + 2 - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK;
       if (Math.abs(lift - wLift) > 0.5) { wLift = lift; gWreathBox.setAttribute('transform', 'translate(0 ' + f1(lift) + ')'); }
       var storm = cfg.storm ? cfg.storm(TX + WR.x * TK) : false;
       var w = cfg.wind ? cfg.wind() : 0;
