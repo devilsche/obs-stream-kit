@@ -388,3 +388,12 @@
 /* Geschenke: Innenschatten der Schlaufen, Glanz am Knoten */
 .tw-gift-loop { fill: #000000; opacity: 0.22; }
 .tw-gift-knot { fill: #ffffff; opacity: 0.35; }
+
+/* Baumscheibe unter dem Adventskranz */
+.tw-wslice-shadow { fill: #1d2b3d; opacity: 0.28; }
+.tw-wslice-bark { fill: #4a2f1b; stroke: #2e1c0f; stroke-width: 1; }
+.tw-wslice-furrow { fill: none; stroke: #2a190c; stroke-width: 1.6; stroke-linecap: round; opacity: 0.75; }
+.tw-wslice-top { fill: #6b4527; }
+.tw-wslice-sap { fill: #d8ae76; }
+.tw-wslice-ring { fill: none; stroke: #a87a46; stroke-width: 1.1; opacity: 0.8; }
+.tw-wslice-crack { fill: none; stroke: #7a522c; stroke-width: 1.2; stroke-linecap: round; }

@@ -166,7 +166,7 @@
   };
   // ── Adventskranz links vom Baum (Baum-Koordinaten): Ring in Aufsicht,
   // Kerzen im Uhrzeigersinn ab hinten links; je Brenntag ein Stück kürzer ──
-  var WR = { x: -150, y: 484, rx: 70, ry: 26 };
+  var WR = { x: -160, y: 466, rx: 70, ry: 26 };
   // leicht gedreht, damit keine Kerze genau vor einer anderen steht
   var CANDLE_A = [-160, -70, 20, 110];
   var CANDLE_H = 74, CANDLE_W = 14;
@@ -401,6 +401,38 @@
     var gWBody = el('g', { 'class': 'tw-wbody' }, gWreath);
     var gWBack = el('g', {}, gWBody), gWCand = el('g', {}, gWBody), gWFront = el('g', {}, gWBody);
     var gWFlames = el('g', {}, gWreath);
+    // Baumscheibe als Unterlage: Oberseite mit Jahresringen, Rinde als Seitenband
+    var SL = { cx: WR.x, cy: WR.y + 6, rx: WR.rx + 22, ry: WR.ry + 10, th: 18 };
+    function sliceSide() {
+      var l = SL.cx - SL.rx, r = SL.cx + SL.rx;
+      return 'M' + f1(l) + ' ' + f1(SL.cy) + ' L' + f1(l) + ' ' + f1(SL.cy + SL.th) + ' A' + SL.rx + ' ' + SL.ry + ' 0 0 0 ' + f1(r) + ' ' + f1(SL.cy + SL.th) +
+             ' L' + f1(r) + ' ' + f1(SL.cy) + ' A' + SL.rx + ' ' + SL.ry + ' 0 0 1 ' + f1(l) + ' ' + f1(SL.cy) + ' Z';
+    }
+    var gSlice = el('g', { 'class': 'tw-wslice' }, gWBody);
+    el('ellipse', { 'class': 'tw-wslice-shadow', cx: SL.cx + 6, cy: SL.cy + SL.th + 2, rx: SL.rx + 10, ry: SL.ry * 0.7 }, gSlice);
+    el('path', { 'class': 'tw-wslice-bark', d: sliceSide() }, gSlice);
+    var barkD = '';
+    for (var bx = -0.92; bx <= 0.93; bx += 0.115) {
+      var yb = SL.cy + SL.ry * Math.sqrt(1 - bx * bx);
+      barkD += ' M' + f1(SL.cx + bx * SL.rx) + ' ' + f1(yb + 2) + ' l' + f1((rnd() - 0.5) * 2) + ' ' + f1(SL.th - 3 - rnd() * 4);
+    }
+    el('path', { 'class': 'tw-wslice-furrow', d: barkD }, gSlice);
+    el('ellipse', { 'class': 'tw-wslice-top', cx: SL.cx, cy: SL.cy, rx: SL.rx, ry: SL.ry }, gSlice);
+    el('ellipse', { 'class': 'tw-wslice-sap', cx: SL.cx, cy: SL.cy, rx: SL.rx - 4, ry: SL.ry - 1.6 }, gSlice);
+    [0.18, 0.34, 0.5, 0.64, 0.78, 0.9].forEach(function (k, i) {
+      el('ellipse', { 'class': 'tw-wslice-ring', cx: f1(SL.cx + 3 * (1 - k)), cy: f1(SL.cy - 1 * (1 - k)), rx: f1((SL.rx - 6) * k * (1 + (i % 2 ? 0.02 : -0.015))), ry: f1((SL.ry - 2) * k) }, gSlice);
+    });
+    el('path', { 'class': 'tw-wslice-crack', d: 'M' + f1(SL.cx + 4) + ' ' + f1(SL.cy) + ' l' + f1(SL.rx * 0.45) + ' ' + f1(SL.ry * 0.25) + ' l' + f1(SL.rx * 0.2) + ' 1' }, gSlice);
+    if (snow) {
+      // Schnee bleibt auf dem freien Rand der Scheibe liegen
+      el('path', { 'class': 'tw-gsnow', d: 'M' + f1(SL.cx - SL.rx + 2) + ' ' + f1(SL.cy + 1) + ' Q' + f1(SL.cx - SL.rx + 6) + ' ' + f1(SL.cy - SL.ry * 0.7) + ' ' + f1(SL.cx - SL.rx * 0.55) + ' ' + f1(SL.cy - SL.ry * 0.9) +
+                   ' Q' + f1(SL.cx - SL.rx * 0.75) + ' ' + f1(SL.cy - SL.ry * 0.35) + ' ' + f1(SL.cx - SL.rx + 2) + ' ' + f1(SL.cy + 1) + ' Z' }, gSlice);
+      el('path', { 'class': 'tw-gsnow', d: 'M' + f1(SL.cx + SL.rx - 2) + ' ' + f1(SL.cy + 1) + ' Q' + f1(SL.cx + SL.rx - 4) + ' ' + f1(SL.cy - SL.ry * 0.6) + ' ' + f1(SL.cx + SL.rx * 0.6) + ' ' + f1(SL.cy - SL.ry * 0.88) +
+                   ' Q' + f1(SL.cx + SL.rx * 0.8) + ' ' + f1(SL.cy - SL.ry * 0.3) + ' ' + f1(SL.cx + SL.rx - 2) + ' ' + f1(SL.cy + 1) + ' Z' }, gSlice);
+      el('path', { 'class': 'tw-gsnow', d: 'M' + f1(SL.cx - SL.rx * 0.5) + ' ' + f1(SL.cy + SL.ry * 0.86) + ' Q' + f1(SL.cx) + ' ' + f1(SL.cy + SL.ry * 1.12) + ' ' + f1(SL.cx + SL.rx * 0.45) + ' ' + f1(SL.cy + SL.ry * 0.88) +
+                   ' Q' + f1(SL.cx) + ' ' + f1(SL.cy + SL.ry * 0.95) + ' ' + f1(SL.cx - SL.rx * 0.5) + ' ' + f1(SL.cy + SL.ry * 0.86) + ' Z' }, gSlice);
+    }
+    gWBody.insertBefore(gSlice, gWBack);
     var NEEDLE = ['#1d4529', '#285a33', '#33693c', '#1a3d24'];
     function sprig(parent, x, y, ang, len) {
       var c = Math.cos(ang), sn = Math.sin(ang), d = 'M' + f1(x) + ' ' + f1(y) + ' l' + f1(c * len) + ' ' + f1(sn * len * 0.45);
@@ -501,7 +533,7 @@
     function stepWreath(dt) {
       // auf der Schneedecke stehen statt darin zu versinken
       var gy = cfg.snowAt ? cfg.snowAt(TX + WR.x * TK) : null;
-      var lift = gy === null ? 0 : Math.min(0, (gy + 10 - (TY + (WR.y + WR.ry + 12) * TK)) / TK);
+      var lift = gy === null ? 0 : Math.min(0, (gy + 8 - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK);
       if (Math.abs(lift - wLift) > 0.5) { wLift = lift; gWreathBox.setAttribute('transform', 'translate(0 ' + f1(lift) + ')'); }
       var storm = cfg.storm ? cfg.storm(TX + WR.x * TK) : false;
       var w = cfg.wind ? cfg.wind() : 0;
