@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Item Rain</title>
+  <style>
+    /* Regen aus gezeichneten Dingen (Party-Effekt): ?kind=sushi|duck,
+       ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
+       Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="1920" height="1080" aria-hidden="true"></canvas>
+  <script>
+    (function () {
+      'use strict';
+      var W = 1920, H = 1080, FLOOR = H - 26, EDGE = 90;
+      var params = new URLSearchParams(location.search);
+      var KIND = params.get('kind') === 'duck' ? 'duck' : 'sushi';
+      var DURATION = Math.max(6000, parseInt(params.get('duration'), 10) || 22000);
+      var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var COUNT = Math.max(5, parseInt(params.get('count'), 10) || 120) * (reduceMotion ? 0.4 : 1);
+      // etwa 1,5 × so groß wie die hängenden Weihnachtskugeln (~64 px)
+      var SIZE = 96;
+      var ctx = document.getElementById('c').getContext('2d');
+
+      function rand(a, b) { return a + Math.random() * (b - a); }
+      function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+
+      // ── Sushi: Maki (Nori-Ring, Reis, Füllung) und Nigiri (Reisbett, Fischscheibe) ──
+      var MAKI = [
+        { fill: '#f07a52', vein: '#ffd1bf', kind: 'salmon' },
+        { fill: '#6dbb4a', vein: '#d9f2c4', kind: 'cucumber' },
+        { fill: '#f4c430', vein: '#ffe58a', kind: 'tamago' }
+      ];
+      var NIGIRI = [
+        { top: '#f0784e', stripe: '#ffe0d2' },  // Lachs
+        { top: '#f39a6b', stripe: '#ffffff' }   // Garnele
+      ];
+      function grains(r, n) {
+        var out = [];
+        for (var i = 0; i < n; i++) { var a = Math.random() * 6.283, d = Math.sqrt(Math.random()) * r; out.push([Math.cos(a) * d, Math.sin(a) * d, Math.random() * 6.283]); }
+        return out;
+      }
+      function makeSushi() {
+        if (Math.random() < 0.62) {
+          var m = pick(MAKI);
+          return { draw: drawMaki, look: m, grains: grains(0.3, 18) };
+        }
+        return { draw: drawNigiri, look: pick(NIGIRI), grains: grains(0.36, 14) };
+      }
+      function drawMaki(p, back) {
+        var r = 0.5;
+        // Nori außen, mit leichtem Glanz
+        ctx.fillStyle = '#1f2b22'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.283); ctx.fill();
+        ctx.strokeStyle = 'rgba(120,160,120,.35)'; ctx.lineWidth = 0.03; ctx.beginPath(); ctx.arc(0, 0, r - 0.02, 3.6, 5.2); ctx.stroke();
+        // Reis
+        ctx.fillStyle = '#f6f3ea'; ctx.beginPath(); ctx.arc(0, 0, r * 0.84, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#e4ded0';
+        p.shape.grains.forEach(function (g) {
+          ctx.save(); ctx.translate(g[0] * 1.3, g[1] * 1.3); ctx.rotate(g[2]);
+          ctx.beginPath(); ctx.ellipse(0, 0, 0.04, 0.018, 0, 0, 6.283); ctx.fill(); ctx.restore();
+        });
+        // Füllung
+        ctx.fillStyle = p.shape.look.fill; ctx.beginPath(); ctx.arc(0.02, -0.01, r * 0.36, 0, 6.283); ctx.fill();
+        var lk = p.shape.look;
+        ctx.strokeStyle = lk.vein; ctx.fillStyle = lk.vein; ctx.lineWidth = 0.022; ctx.lineCap = 'round';
+        if (lk.kind === 'salmon') {
+          // geschwungene Fettlinien
+          ctx.beginPath(); ctx.arc(-0.12, 0.1, 0.16, -1.2, 0.1); ctx.stroke();
+          ctx.beginPath(); ctx.arc(-0.06, 0.16, 0.2, -1.1, -0.1); ctx.stroke();
+        } else if (lk.kind === 'cucumber') {
+          // helles Fruchtfleisch mit Kernen
+          ctx.beginPath(); ctx.arc(0.02, -0.01, 0.1, 0, 6.283); ctx.fill();
+          ctx.fillStyle = '#5a9a3a';
+          [[-0.03, -0.03], [0.05, -0.02], [0.0, 0.04], [0.06, 0.04]].forEach(function (k) { ctx.beginPath(); ctx.ellipse(k[0], k[1], 0.015, 0.008, 0.6, 0, 6.283); ctx.fill(); });
+        } else {
+          // Omelett-Schichten
+          for (var i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(-0.13, i * 0.06 - 0.01); ctx.lineTo(0.17, i * 0.06 - 0.01); ctx.stroke(); }
+        }
+      }
+      function drawNigiri(p, back) {
+        // Reisbett unten
+        ctx.fillStyle = '#f6f3ea';
+        ctx.beginPath(); ctx.ellipse(0, 0.08, 0.48, 0.26, 0, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#e4ded0';
+        p.shape.grains.forEach(function (g) {
+          ctx.save(); ctx.translate(g[0] * 1.3, 0.1 + g[1] * 0.6); ctx.rotate(g[2]);
+          ctx.beginPath(); ctx.ellipse(0, 0, 0.04, 0.018, 0, 0, 6.283); ctx.fill(); ctx.restore();
+        });
+        // Fischscheibe drüber, mit Fettstreifen
+        ctx.fillStyle = p.shape.look.top;
+        ctx.beginPath(); ctx.moveTo(-0.52, 0.02); ctx.quadraticCurveTo(-0.5, -0.26, 0, -0.27); ctx.quadraticCurveTo(0.5, -0.26, 0.54, 0.0);
+        ctx.quadraticCurveTo(0, -0.06, -0.52, 0.02); ctx.fill();
+        ctx.strokeStyle = p.shape.look.stripe; ctx.lineWidth = 0.03; ctx.globalAlpha *= 0.85;
+        for (var i = -2; i <= 2; i++) { ctx.beginPath(); ctx.moveTo(i * 0.16 - 0.04, -0.22); ctx.quadraticCurveTo(i * 0.16 + 0.04, -0.12, i * 0.16 - 0.02, -0.05); ctx.stroke(); }
+        ctx.globalAlpha /= 0.85;
+        // Glanz
+        ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(-0.2, -0.18, 0.12, 0.035, -0.2, 0, 6.283); ctx.fill();
+      }
+
+      // ── Gummientchen: Körper, Kopf, Schnabel, Flügel, Auge mit Glanz ──
+      function makeDuck() { return { draw: drawDuck, hue: Math.random() < 0.15 ? '#ffb2d0' : '#ffd23f' }; }
+      function drawDuck(p, back) {
+        var body = p.shape.hue;
+        // Körper (Badewannen-Ente: rundlich, Schwanz hinten hoch)
+        ctx.fillStyle = body;
+        ctx.beginPath();
+        ctx.moveTo(-0.46, 0.0);
+        ctx.quadraticCurveTo(-0.52, -0.22, -0.36, -0.2);
+        ctx.quadraticCurveTo(-0.2, 0.02, 0.06, -0.02);
+        ctx.quadraticCurveTo(0.42, -0.02, 0.44, 0.14);
+        ctx.quadraticCurveTo(0.42, 0.36, 0.0, 0.36);
+        ctx.quadraticCurveTo(-0.4, 0.36, -0.46, 0.0);
+        ctx.fill();
+        // Kopf
+        ctx.beginPath(); ctx.arc(0.16, -0.2, 0.2, 0, 6.283); ctx.fill();
+        // Schatten unten
+        ctx.fillStyle = 'rgba(180,110,0,.25)';
+        ctx.beginPath(); ctx.ellipse(0.0, 0.26, 0.38, 0.08, 0, 0, 6.283); ctx.fill();
+        // Schnabel
+        ctx.fillStyle = '#ff8a1e';
+        ctx.beginPath(); ctx.moveTo(0.32, -0.2); ctx.quadraticCurveTo(0.52, -0.22, 0.54, -0.14); ctx.quadraticCurveTo(0.46, -0.08, 0.32, -0.12); ctx.closePath(); ctx.fill();
+        // Flügel
+        ctx.strokeStyle = 'rgba(200,130,0,.6)'; ctx.lineWidth = 0.03; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-0.22, 0.06); ctx.quadraticCurveTo(-0.02, 0.0, 0.1, 0.12); ctx.quadraticCurveTo(-0.08, 0.22, -0.22, 0.06); ctx.stroke();
+        // Auge
+        ctx.fillStyle = '#1b1b1b'; ctx.beginPath(); ctx.arc(0.22, -0.25, 0.04, 0, 6.283); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(0.235, -0.265, 0.014, 0, 6.283); ctx.fill();
+        // Glanz
+        ctx.fillStyle = 'rgba(255,255,255,.45)'; ctx.beginPath(); ctx.ellipse(-0.12, 0.06, 0.12, 0.04, -0.3, 0, 6.283); ctx.fill();
+      }
+
+      // ── Teilchen: fallen, drehen sich, wenden um die Hochachse, hüpfen unten kurz ──
+      var parts = [], spawned = 0, t0 = null, last = null;
+      var SPAWN_END = DURATION * 0.62;
+      function spawn() {
+        var k = rand(0.8, 1.2);
+        parts.push({
+          shape: KIND === 'duck' ? makeDuck() : makeSushi(),
+          x: rand(40, W - 40), y: rand(-160, -60), s: SIZE * k,
+          vx: rand(-40, 40), vy: rand(60, 160),
+          rot: rand(0, 6.283), vr: reduceMotion ? 0 : rand(-2.4, 2.4),
+          flip: rand(0, 6.283), vf: reduceMotion ? 0 : rand(1.5, 4.5),
+          bounced: false, fade: 1
+        });
+        spawned++;
+      }
+      function edgeAlpha(x) {
+        var d = Math.min(x, W - x);
+        return d >= EDGE ? 1 : Math.max(0, d / EDGE);
+      }
+      function frame(ts) {
+        if (t0 === null) { t0 = ts; last = ts; }
+        var t = ts - t0, dt = Math.min(0.05, (ts - last) / 1000);
+        last = ts;
+        // gleichmäßig über die ersten ~60 % verteilt, in kleinen Wellen
+        var want = Math.min(COUNT, Math.floor(COUNT * (t / SPAWN_END) * (1 + 0.25 * Math.sin(t / 900))));
+        while (spawned < want) spawn();
+        ctx.clearRect(0, 0, W, H);
+        parts = parts.filter(function (p) {
+          p.vy = Math.min(p.vy + 900 * dt, 760);
+          p.x += p.vx * dt; p.y += p.vy * dt;
+          p.rot += p.vr * dt; p.flip += p.vf * dt;
+          if (!p.bounced && p.y > FLOOR - p.s * 0.3) {
+            p.bounced = true; p.y = FLOOR - p.s * 0.3;
+            p.vy = -p.vy * rand(0.25, 0.4); p.vx *= 0.6; p.vr *= 0.5;
+          }
+          if (p.bounced) p.fade -= dt / 0.9;
+          if (p.fade <= 0 || p.y > H + p.s) return false;
+          // Wenden: Breite folgt cos(flip), danach gespiegelt
+          var c = Math.cos(p.flip), sx = Math.max(0.12, Math.abs(c));
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, p.fade)) * edgeAlpha(p.x) * Math.min(1, (p.y + 120) / 120);
+          ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.scale(p.s * sx * (c < 0 ? -1 : 1), p.s);
+          p.shape.draw(p, c < 0);
+          ctx.restore();
+          return true;
+        });
+        if (t < DURATION || parts.length) requestAnimationFrame(frame);
+        else ctx.clearRect(0, 0, W, H);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
