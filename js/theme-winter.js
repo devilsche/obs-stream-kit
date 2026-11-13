@@ -241,6 +241,75 @@
       el('path', { 'class': 'tw-sm-arm', d: branchD(ex, ey, ex + side * 13 * k, ey - 3 * k, 0.9 * k, 0.3 * k, 0) }, g);
     }
 
+    // ── Mützen der Minis: Form je Name; top = Scheitel des Kopfes, r = Kopfradius ──
+    var MINI_HATS = 8;
+    function pomPom(g, x, y, k) {
+      for (var pk = 0; pk < 8; pk++) {
+        var pa = pk / 8 * 6.283;
+        el('circle', { 'class': 'tw-mini__pom', cx: f1(x + Math.cos(pa) * 4.2 * k), cy: f1(y + Math.sin(pa) * 4.2 * k), r: f1(2.4 * k) }, g);
+      }
+      el('circle', { 'class': 'tw-mini__pom tw-mini__pom--core', cx: f1(x), cy: f1(y), r: f1(4.8 * k) }, g);
+    }
+    function ribs(g, x0, x1, y, h) {
+      var d = '';
+      for (var x = x0 + 3; x < x1 - 1; x += 4) d += 'M' + f1(x) + ' ' + f1(y + 0.5) + ' l0 ' + f1(h - 1);
+      el('path', { 'class': 'tw-mini__rib', d: d }, g);
+    }
+    function miniHat(g, type, hc, top, r) {
+      var w = r * 1.05, t = top + 4;
+      switch (type) {
+        case 1: // Zipfelmütze: langer, zur Seite hängender Zipfel
+          el('path', { 'class': hc, d: 'M' + f1(-w) + ' ' + f1(t) + ' Q' + f1(-w * 0.6) + ' ' + f1(t - 22) + ' ' + f1(w * 0.3) + ' ' + f1(t - 26) + ' Q' + f1(w * 1.4) + ' ' + f1(t - 28) + ' ' + f1(w * 1.7) + ' ' + f1(t - 10) +
+                       ' Q' + f1(w * 1.1) + ' ' + f1(t - 18) + ' ' + f1(w * 0.5) + ' ' + f1(t - 16) + ' Q' + f1(w) + ' ' + f1(t - 8) + ' ' + f1(w) + ' ' + f1(t) + ' Z' }, g);
+          el('rect', { 'class': hc, x: f1(-w - 1), y: f1(t - 4), width: f1(2 * w + 2), height: 7, rx: 3 }, g);
+          el('rect', { 'class': 'tw-mini__band', x: f1(-w - 1), y: f1(t - 4), width: f1(2 * w + 2), height: 7, rx: 3 }, g);
+          pomPom(g, w * 1.7, t - 8, 0.8);
+          break;
+        case 2: // kleiner Zylinder
+          el('ellipse', { 'class': 'tw-sm-hat', cx: 0, cy: f1(t), rx: f1(w + 5), ry: 3.2 }, g);
+          el('path', { 'class': 'tw-sm-hat', d: 'M' + f1(-w * 0.7) + ' ' + f1(t) + ' L' + f1(-w * 0.74) + ' ' + f1(t - 22) + ' L' + f1(w * 0.74) + ' ' + f1(t - 22) + ' L' + f1(w * 0.7) + ' ' + f1(t) + ' Z' }, g);
+          el('rect', { 'class': hc, x: f1(-w * 0.71), y: f1(t - 5), width: f1(w * 1.42), height: 4 }, g);
+          el('ellipse', { 'class': 'tw-sm-hattop', cx: 0, cy: f1(t - 22), rx: f1(w * 0.74), ry: 2 }, g);
+          break;
+        case 3: // Eimer, verkehrt herum, mit Henkel
+          el('path', { 'class': 'tw-mini__bucket', d: 'M' + f1(-w - 1) + ' ' + f1(t) + ' L' + f1(-w * 0.7) + ' ' + f1(t - 20) + ' L' + f1(w * 0.7) + ' ' + f1(t - 20) + ' L' + f1(w + 1) + ' ' + f1(t) + ' Z' }, g);
+          el('path', { 'class': 'tw-mini__bucket-rim', d: 'M' + f1(-w - 2) + ' ' + f1(t) + ' L' + f1(w + 2) + ' ' + f1(t) + ' M' + f1(-w * 0.8) + ' ' + f1(t - 9) + ' L' + f1(w * 0.8) + ' ' + f1(t - 9) }, g);
+          el('path', { 'class': 'tw-mini__bucket-handle', d: 'M' + f1(-w * 0.88) + ' ' + f1(t - 6) + ' Q0 ' + f1(t + 8) + ' ' + f1(w * 0.88) + ' ' + f1(t - 6) }, g);
+          break;
+        case 4: // Ohrenschützer: Bügel über den Kopf, Puscheln an den Seiten
+          el('path', { 'class': 'tw-mini__band-wire', d: 'M' + f1(-r * 0.95) + ' ' + f1(top + r * 0.75) + ' Q0 ' + f1(top - 8) + ' ' + f1(r * 0.95) + ' ' + f1(top + r * 0.75) }, g);
+          pomPom(g, -r * 0.98, top + r * 0.8, 1.05);
+          pomPom(g, r * 0.98, top + r * 0.8, 1.05);
+          el('circle', { 'class': hc, cx: f1(-r * 0.98), cy: f1(top + r * 0.8), r: 3.2 }, g);
+          el('circle', { 'class': hc, cx: f1(r * 0.98), cy: f1(top + r * 0.8), r: 3.2 }, g);
+          break;
+        case 5: // Baskenmütze, schräg, mit Stielchen
+          el('path', { 'class': hc, d: 'M' + f1(-w - 2) + ' ' + f1(t - 1) + ' Q' + f1(-w - 4) + ' ' + f1(t - 13) + ' ' + f1(w * 0.2) + ' ' + f1(t - 14) + ' Q' + f1(w + 8) + ' ' + f1(t - 12) + ' ' + f1(w + 5) + ' ' + f1(t - 3) + ' Q0 ' + f1(t + 3) + ' ' + f1(-w - 2) + ' ' + f1(t - 1) + ' Z' }, g);
+          el('path', { 'class': 'tw-mini__hatshade', d: 'M' + f1(-w) + ' ' + f1(t - 1) + ' Q0 ' + f1(t + 3) + ' ' + f1(w + 5) + ' ' + f1(t - 3) + ' Q0 ' + f1(t - 1) + ' ' + f1(-w) + ' ' + f1(t - 1) + ' Z' }, g);
+          el('path', { 'class': 'tw-mini__stalk', d: 'M' + f1(w * 0.2) + ' ' + f1(t - 14) + ' l1 -4' }, g);
+          break;
+        case 6: // Inka-Mütze mit Ohrenklappen und Bändeln
+          el('path', { 'class': hc, d: 'M' + f1(-w) + ' ' + f1(t + 8) + ' L' + f1(-w) + ' ' + f1(t - 6) + ' Q' + f1(-w) + ' ' + f1(t - 20) + ' 0 ' + f1(t - 21) + ' Q' + f1(w) + ' ' + f1(t - 20) + ' ' + f1(w) + ' ' + f1(t - 6) + ' L' + f1(w) + ' ' + f1(t + 8) + ' L' + f1(w * 0.62) + ' ' + f1(t) + ' L' + f1(-w * 0.62) + ' ' + f1(t) + ' Z' }, g);
+          el('path', { 'class': 'tw-mini__stripe', d: 'M' + f1(-w) + ' ' + f1(t - 8) + ' L' + f1(-w * 0.6) + ' ' + f1(t - 12) + ' L' + f1(-w * 0.2) + ' ' + f1(t - 8) + ' L' + f1(w * 0.2) + ' ' + f1(t - 12) + ' L' + f1(w * 0.6) + ' ' + f1(t - 8) + ' L' + f1(w) + ' ' + f1(t - 12) }, g);
+          el('path', { 'class': 'tw-mini__string', d: 'M' + f1(-w) + ' ' + f1(t + 8) + ' l-1 9 M' + f1(w) + ' ' + f1(t + 8) + ' l1 9' }, g);
+          el('circle', { 'class': 'tw-mini__pom', cx: f1(-w - 1), cy: f1(t + 18), r: 2 }, g);
+          el('circle', { 'class': 'tw-mini__pom', cx: f1(w + 1), cy: f1(t + 18), r: 2 }, g);
+          break;
+        case 7: // Schirmmütze
+          el('path', { 'class': hc, d: 'M' + f1(-w) + ' ' + f1(t) + ' Q' + f1(-w) + ' ' + f1(t - 15) + ' 0 ' + f1(t - 15) + ' Q' + f1(w) + ' ' + f1(t - 15) + ' ' + f1(w) + ' ' + f1(t) + ' Z' }, g);
+          el('path', { 'class': hc, d: 'M' + f1(w * 0.2) + ' ' + f1(t - 1) + ' Q' + f1(w + 10) + ' ' + f1(t - 3) + ' ' + f1(w + 13) + ' ' + f1(t + 1) + ' Q' + f1(w + 6) + ' ' + f1(t + 3) + ' ' + f1(w * 0.2) + ' ' + f1(t + 2) + ' Z' }, g);
+          el('path', { 'class': 'tw-mini__hatshade', d: 'M' + f1(w * 0.2) + ' ' + f1(t + 1) + ' Q' + f1(w + 6) + ' ' + f1(t + 3) + ' ' + f1(w + 13) + ' ' + f1(t + 1) + ' Q' + f1(w + 6) + ' ' + f1(t + 4) + ' ' + f1(w * 0.2) + ' ' + f1(t + 3) + ' Z' }, g);
+          el('circle', { 'class': hc, cx: 0, cy: f1(t - 15), r: 1.8 }, g);
+          break;
+        default: // Strickmütze mit Umschlag und Bommel
+          el('path', { 'class': hc, d: 'M' + f1(-w) + ' ' + f1(t) + ' Q' + f1(-w) + ' ' + f1(t - 22) + ' 0 ' + f1(t - 24) + ' Q' + f1(w) + ' ' + f1(t - 22) + ' ' + f1(w) + ' ' + f1(t) + ' Z' }, g);
+          el('path', { 'class': 'tw-mini__hatshade', d: 'M' + f1(w * 0.35) + ' ' + f1(t - 23) + ' Q' + f1(w) + ' ' + f1(t - 20) + ' ' + f1(w) + ' ' + f1(t) + ' L' + f1(w * 0.55) + ' ' + f1(t) + ' Q' + f1(w * 0.7) + ' ' + f1(t - 14) + ' ' + f1(w * 0.35) + ' ' + f1(t - 23) + ' Z' }, g);
+          el('rect', { 'class': hc, x: f1(-w - 1.5), y: f1(t - 4), width: f1(2 * w + 3), height: 7, rx: 3 }, g);
+          ribs(g, -w - 1.5, w + 1.5, t - 4, 7);
+          pomPom(g, 0, t - 26, 1);
+      }
+    }
+
     // ── Schneemann: 8 Teile, eins pro Sub; Xmas: Mütze + Lichterkette ──
     var gSmBody = el('g', { 'class': 'tw-sm-body tw-dim' }, gSm);
     var smParts = [];
@@ -403,27 +472,28 @@
       // danach weg, sonst spielt ein späterer Scheinwerfer das Aufploppen erneut ab
       if (animate) setTimeout(function () { g.classList.remove('tw-mini--new'); }, 1100);
       var mr = Math.random;
-      el('ellipse', { 'class': 'tw-sm-contact', cx: 1, cy: -37, rx: 15, ry: 3.5 }, g);
-      snowBall(g, 0, -20, 22, mr, { top: 0.84, bot: 0.9 }, true);
-      snowBall(g, 0, -54, 15, mr, { bot: 0.9 }, true);
-      twigArm(g, -17, -28, -1, mr, 0.24);
-      twigArm(g, 17, -28, 1, mr, 0.24);
-      pebble(g, -5, -57, 2.3, mr);
-      pebble(g, 5, -57, 2.3, mr);
-      carrot(g, -1, -51.5, 15, 3.4);
-      var hatG = el('g', { 'class': 'tw-mini__hatg' }, g);
-      // Strickmütze: Kuppel, gerippter Umschlag, flauschiger Bommel
-      var hc = 'tw-mini__hat' + (1 + Math.floor((root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, 1) : (i % 4) / 4) * 4));
-      el('path', { 'class': hc, d: 'M-14.5 -64 Q-15 -86 0 -88 Q15 -86 14.5 -64 Z' }, hatG);
-      el('path', { 'class': 'tw-mini__hatshade', d: 'M5 -87 Q15 -84 14.5 -64 L8 -64 Q10 -78 5 -87 Z' }, hatG);
-      el('rect', { 'class': hc, x: -16, y: -68, width: 32, height: 7, rx: 3 }, hatG);
-      el('path', { 'class': 'tw-mini__rib', d: 'M-12 -67.5 l0 6 M-8 -67.5 l0 6 M-4 -67.5 l0 6 M0 -67.5 l0 6 M4 -67.5 l0 6 M8 -67.5 l0 6 M12 -67.5 l0 6' }, hatG);
-      // Bommel: Wollbausch aus kleinen Flusen um einen Kern
-      for (var pk = 0; pk < 8; pk++) {
-        var pa = pk / 8 * 6.283;
-        el('circle', { 'class': 'tw-mini__pom', cx: f1(Math.cos(pa) * 4.2), cy: f1(-90 + Math.sin(pa) * 4.2), r: 2.4 }, hatG);
+      // Aussehen fest aus dem Namen: Körper, Mütze (Form + Farbe), Schal, Knöpfe, Nase
+      var nr = function (k) { return root.ThemeSeasons ? root.ThemeSeasons.nameRand(name, k) : ((i * 7 + k * 13) % 10) / 10; };
+      var rb = 22 * (0.9 + 0.2 * nr(6)), rh = 15 * (0.88 + 0.24 * nr(7));
+      var by = -rb * 0.9, hy = by - rb * 0.86 - rh * 0.8;
+      el('ellipse', { 'class': 'tw-sm-contact', cx: 1, cy: f1(by - rb * 0.78), rx: f1(rh), ry: 3.5 }, g);
+      snowBall(g, 0, by, rb, mr, { top: 0.84, bot: 0.9 }, true);
+      snowBall(g, 0, hy, rh, mr, { bot: 0.9 }, true);
+      twigArm(g, -rb * 0.78, by - rb * 0.36, -1, mr, 0.24);
+      twigArm(g, rb * 0.78, by - rb * 0.36, 1, mr, 0.24);
+      if (nr(8) < 0.5) [0.15, -0.25].forEach(function (f) { pebble(g, 0, by + rb * f, 2, mr); });
+      pebble(g, -rh * 0.33, hy - rh * 0.2, 2.3, mr);
+      pebble(g, rh * 0.33, hy - rh * 0.2, 2.3, mr);
+      carrot(g, -1, hy + rh * 0.17, 10 + nr(10) * 9, 3.4);
+      var hc = 'tw-mini__hat' + (1 + Math.floor(nr(1) * 8));
+      // Schal bei gut der Hälfte, Farbe eigen
+      if (nr(5) < 0.55) {
+        var sc = 'tw-mini__hat' + (1 + Math.floor(nr(11) * 8)), ny = hy + rh * 0.86;
+        el('path', { 'class': sc, d: 'M' + f1(-rh * 0.95) + ' ' + f1(ny - 2) + ' Q0 ' + f1(ny + 4) + ' ' + f1(rh * 0.95) + ' ' + f1(ny - 2) + ' L' + f1(rh) + ' ' + f1(ny + 3) + ' Q0 ' + f1(ny + 9) + ' ' + f1(-rh) + ' ' + f1(ny + 3) + ' Z' }, g);
+        el('path', { 'class': sc, d: 'M' + f1(rh * 0.35) + ' ' + f1(ny + 3) + ' l3 13 l5 -1 l-2 -13 Z' }, g);
       }
-      el('circle', { 'class': 'tw-mini__pom tw-mini__pom--core', cx: 0, cy: -90, r: 4.8 }, hatG);
+      var hatG = el('g', { 'class': 'tw-mini__hatg' }, g);
+      miniHat(hatG, Math.floor(nr(3) * MINI_HATS), hc, hy - rh, rh);
       // Schneehügel vor dem Mini (Sturm, Lawine)
       var mound = el('path', { 'class': 'tw-mini__mound' }, outer);
       minis[i] = { outer: outer, inner: g, fly: fly, hatG: hatG, mound: mound, x: slot[0], k: slot[1], depth: slot[2], rot: slot[3], label: name,

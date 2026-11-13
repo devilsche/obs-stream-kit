@@ -238,6 +238,15 @@
 .tw-mini--new { animation: twPop 0.7s cubic-bezier(0.3, 1.6, 0.5, 1) both; }
 .tw-mini__ball { fill: url(#tw-ballG); }
 .tw-mini__hat1 { fill: #c4302b; } .tw-mini__hat2 { fill: #2a64b8; } .tw-mini__hat3 { fill: #2e9e5b; } .tw-mini__hat4 { fill: #8e4bb8; }
+.tw-mini__hat5 { fill: #e08a1e; } .tw-mini__hat6 { fill: #e6c229; } .tw-mini__hat7 { fill: #1f8a8a; } .tw-mini__hat8 { fill: #d4588c; }
+.tw-mini__band { fill: #ffffff; opacity: 0.85; }
+.tw-mini__band-wire { fill: none; stroke: #3b3f46; stroke-width: 2.2; stroke-linecap: round; }
+.tw-mini__bucket { fill: #9aa6b2; stroke: #5f6b77; stroke-width: 0.8; }
+.tw-mini__bucket-rim { fill: none; stroke: #6c7884; stroke-width: 1.6; stroke-linecap: round; }
+.tw-mini__bucket-handle { fill: none; stroke: #4f5a65; stroke-width: 1.2; }
+.tw-mini__stalk { fill: none; stroke: #333; stroke-width: 1.4; stroke-linecap: round; }
+.tw-mini__stripe { fill: none; stroke: #ffffff; stroke-width: 1.6; stroke-linejoin: round; opacity: 0.8; }
+.tw-mini__string { fill: none; stroke: #f2f2f2; stroke-width: 1; }
 .tw-mini__pom { fill: #e9eef5; }
 .tw-mini__pom--core { fill: #ffffff; }
 .tw-mini__hatshade { fill: #000000; opacity: 0.18; }
