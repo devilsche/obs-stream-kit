@@ -140,6 +140,7 @@
       onSync: function () { syncMinis(); },
       // Adventskranz: Wind neigt die Flammen, Sturm und Windhose pusten sie aus
       wind: function () { return S.on ? liveWind() : 0; },
+      snowAt: function (x) { return !S || S.partsOn.cover === false ? null : surface(x); },
       storm: function (x) {
         if (!S.on) return false;
         var near = tws ? tws.near(x) : null;
@@ -156,7 +157,10 @@
     seed = 19;
     var icicles = [];
     for (var ix = 14; ix < W; ix += 34 + rnd() * 26) {
-      icicles.push({ x: ix, w: 7 + rnd() * 8, max: 30 + rnd() * 110, grow: 1, tip: 0, node: el('path', { 'class': 'tw-ice-i' }, gIcicles) });
+      var icg = el('g', {}, gIcicles);
+      icicles.push({ x: ix, w: 7 + rnd() * 8, max: 30 + rnd() * 110, grow: 1, tip: 0, ph: rnd() * 6.283, rip: 3 + rnd() * 3, bend: (rnd() - 0.5) * 6,
+                     node: el('path', { 'class': 'tw-ice-i' }, icg), hi: el('path', { 'class': 'tw-ice-hi' }, icg),
+                     drop: el('circle', { 'class': 'tw-ice-drop', r: 0 }, icg) });
     }
 
     // ── Zeichner für Schnee und Beiwerk (Schneemann und Minis) ──
@@ -486,10 +490,20 @@
         var len = ic.max * clamp01(s / 0.7) * ic.grow;     // bei 70 % Schnee voll
         var top = ridgeY(ic.x, s) - 2;
         ic.tip = top + len;
-        ic.node.setAttribute('d', len < 2 ? '' :
-          'M' + f1(ic.x - ic.w) + ' ' + f1(top) +
-          ' Q' + f1(ic.x - ic.w * 0.3) + ' ' + f1(top + len * 0.5) + ' ' + f1(ic.x) + ' ' + f1(top + len) +
-          ' Q' + f1(ic.x + ic.w * 0.3) + ' ' + f1(top + len * 0.5) + ' ' + f1(ic.x + ic.w) + ' ' + f1(top) + ' Z');
+        if (len < 2) { ic.node.setAttribute('d', ''); ic.hi.setAttribute('d', ''); ic.drop.setAttribute('r', 0); return; }
+        // Zapfen mit Wülsten (gefrorene Tropfschübe), leicht krumm, spitz
+        var L = '', R = '', n = Math.max(4, Math.round(len / 7));
+        for (var k = 0; k <= n; k++) {
+          var t = k / n, wv = ic.w * Math.pow(1 - t, 0.85) * (1 + 0.16 * Math.sin(t * ic.rip * 6.283 + ic.ph)) + 0.3;
+          var cx = ic.x + ic.bend * t * t, yy = top + len * t;
+          L += (k ? ' L' : 'M') + f1(cx - wv) + ' ' + f1(yy);
+          R = ' L' + f1(cx + wv) + ' ' + f1(yy) + R;
+        }
+        ic.node.setAttribute('d', L + R + ' Z');
+        ic.hi.setAttribute('d', 'M' + f1(ic.x - ic.w * 0.45) + ' ' + f1(top + 2) + ' Q' + f1(ic.x - ic.w * 0.2) + ' ' + f1(top + len * 0.5) + ' ' + f1(ic.x + ic.bend * 0.5) + ' ' + f1(top + len * 0.85));
+        ic.drop.setAttribute('cx', f1(ic.x + ic.bend));
+        ic.drop.setAttribute('cy', f1(top + len + 1.5));
+        ic.drop.setAttribute('r', len > 40 ? 1.8 : 0);
       });
     }
     var lastVars = '';

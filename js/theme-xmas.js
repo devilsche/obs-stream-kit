@@ -203,7 +203,7 @@
     el('feGaussianBlur', { stdDeviation: 6, result: 'b' }, sg);
     var mg = el('feMerge', {}, sg);
     el('feMergeNode', { 'in': 'b' }, mg); el('feMergeNode', { 'in': 'SourceGraphic' }, mg);
-    grad('linearGradient', 'treeG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#2f7a4a'], [1, '#14472b']]);
+    grad('linearGradient', 'treeG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#1a4d2f'], [1, '#0d2e1b']]);
     grad('linearGradient', 'moundG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#dfe9f6'], [0.18, '#f4f8ff'], [1, '#f4f8ff']]);
     grad('linearGradient', 'capG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#e9d58a'], [1, '#a8892c']]);
     grad('linearGradient', 'iceG', { x1: 0, y1: 0, x2: 0, y2: 1 }, [[0, '#ffffff', 0.95], [0.6, '#bfe6ff', 0.85], [1, '#8ccfff', 0.7]]);
@@ -215,6 +215,7 @@
      ['ornGr', '#b8f5cf', '#2ecc71', '#0e5a2c'], ['ornO', '#ffd2a8', '#ff8a1f', '#7a3a06']].forEach(function (c) {
       grad('radialGradient', c[0], { cx: 0.35, cy: 0.3 }, [[0, c[1]], [0.5, c[2]], [1, c[3]]]);
     });
+    grad('linearGradient', 'giftShadeG', { x1: 0, y1: 0, x2: 1, y2: 0.3 }, [[0, '#ffffff', 0.1], [0.45, '#ffffff', 0], [1, '#000000', 0.3]]);
     // Schneemänner: Kernschatten, Kontaktschatten, Möhre
     grad('radialGradient', 'snowShadeG', { cx: 0.32, cy: 0.27, r: 0.86 }, [[0, '#7f98bb', 0], [0.6, '#7f98bb', 0], [0.85, '#7390b6', 0.28], [1, '#5d7aa3', 0.55]]);
     grad('radialGradient', 'contactG', {}, [[0, '#4f6a90', 0.55], [0.6, '#5d7aa3', 0.25], [1, '#5d7aa3', 0]]);
@@ -256,6 +257,42 @@
       return out;
     }
     return { bulb: bulb, stringAlong: stringAlong };
+  }
+
+  // ── Tannenäste: je Stufe Reihen hängender Zweige, untere überdecken obere;
+  // Unterkante mit Nadelspitzen, Oberkante heller (Licht von oben) ──
+  function boughD(rx, ry, tx, ty, lift, rnd) {
+    var dx = tx - rx, dy = ty - ry, len = Math.hypot(dx, dy), nx = dy / len, ny = -dx / len;
+    if (ny > 0) { nx = -nx; ny = -ny; }   // Normale zeigt nach oben
+    var th = 7 + len * 0.1;
+    var d = 'M' + f1(rx) + ' ' + f1(ry - th * 0.5) + ' Q' + f1(rx + dx * 0.5 + nx * lift) + ' ' + f1(ry + dy * 0.5 + ny * lift - th * 0.4) + ' ' + f1(tx) + ' ' + f1(ty);
+    // Unterkante zurück zur Wurzel, gezackt
+    var n = Math.max(4, Math.round(len / 7));
+    for (var i = 1; i <= n; i++) {
+      var t = 1 - i / n, bx = rx + dx * t + nx * lift * 0.5 * Math.sin(Math.PI * t), by = ry + dy * t + ny * lift * 0.5 * Math.sin(Math.PI * t) + th * 0.5;
+      var tooth = (4 + rnd() * 5) * (0.5 + t * 0.7);
+      d += ' L' + f1(bx + dx / len * 3) + ' ' + f1(by + tooth) + ' L' + f1(bx) + ' ' + f1(by);
+    }
+    return d + ' Z';
+  }
+  var BOUGH_SHADES = ['tw-bough--a', 'tw-bough--b', 'tw-bough--c'];
+  function buildBoughs(g, tier, rnd) {
+    var ax = tier[0], ay = tier[1], by = tier[2], hw = tier[3], rows = Math.round((by - ay) / 24);
+    for (var j = 0; j < rows; j++) {
+      var f = (j + 0.75) / rows, y = ay + (by - ay) * f - 6, w = hw * f;
+      var droop = 6 + 10 * f;
+      [-1, 1].forEach(function (side) {
+        var tx = ax + side * (w * 1.04 + 2), ty = y + droop + rnd() * 4;
+        el('path', { 'class': 'tw-bough ' + BOUGH_SHADES[Math.floor(rnd() * 3)], d: boughD(ax + side * w * 0.12, y - 4, tx, ty, 5 + rnd() * 4, rnd) }, g);
+      });
+      // nach vorn hängende Zweige füllen die Mitte
+      var front = Math.max(0, Math.round(w / 34));
+      for (var k = 0; k < front; k++) {
+        var px = ax + (k + 0.5 - front / 2) * (w * 1.6 / Math.max(1, front)) + (rnd() - 0.5) * 8;
+        var sd = px < ax ? -1 : 1;
+        el('path', { 'class': 'tw-bough ' + BOUGH_SHADES[Math.floor(rnd() * 3)], d: boughD(px - sd * 6, y + 2, px + sd * (16 + rnd() * 10), y + droop + 4 + rnd() * 4, 3 + rnd() * 3, rnd) }, g);
+      }
+    }
   }
 
   /* cfg:
@@ -306,10 +343,15 @@
     var gTreeBox = el('g', { 'class': 'tw-treebox' }, gTreeShk);
     var gTree = el('g', {}, gTreeBox);
     var gTreeBody = el('g', { 'class': 'tw-dim' }, gTree);
-    el('rect', { 'class': 'tw-trunk', x: 182, y: 405, width: 36, height: 112 }, gTreeBody);
-    // Stufen von unten nach oben, Schnee jeweils direkt danach
+    // Stamm: nach oben schmaler, Rinde in Längsrissen
+    el('path', { 'class': 'tw-trunk', d: 'M180 517 Q184 470 187 405 L213 405 Q216 470 220 517 Q200 522 180 517 Z' }, gTreeBody);
+    el('path', { 'class': 'tw-bark', d: 'M190 420 Q189 460 188 510 M199 412 Q200 450 198 515 M208 425 Q210 470 211 512 M194 445 l-2 18 M205 470 l2 20' }, gTreeBody);
+    // Stufen von unten nach oben, Schnee jeweils direkt danach; die dunkle
+    // Grundform bleibt als Schatten zwischen den Ästen
+    cfg.seed(5);
     [0, 1, 2].forEach(function (i) {
       el('path', { 'class': 'tw-tree-g', d: TIER_D[i] }, gTreeBody);
+      buildBoughs(el('g', { 'class': 'tw-boughs' }, gTreeBody), TIERS[2 - i], rnd);
       if (!snow) return;
       el('path', { 'class': 'tw-frost', d: TIER_D[i] }, gTreeBody);
       el('path', { 'class': 'tw-ridge-snow', 'clip-path': 'url(#' + pfx + 'tierClip' + i + ')', d: TIER_RIDGE[i] }, gTreeBody);
@@ -455,7 +497,12 @@
         c.out = Math.max(c.out, hold + c.delay * 2);
       });
     }
+    var wLift = 0;
     function stepWreath(dt) {
+      // auf der Schneedecke stehen statt darin zu versinken
+      var gy = cfg.snowAt ? cfg.snowAt(TX + WR.x * TK) : null;
+      var lift = gy === null ? 0 : Math.min(0, (gy + 10 - (TY + (WR.y + WR.ry + 12) * TK)) / TK);
+      if (Math.abs(lift - wLift) > 0.5) { wLift = lift; gWreathBox.setAttribute('transform', 'translate(0 ' + f1(lift) + ')'); }
       var storm = cfg.storm ? cfg.storm(TX + WR.x * TK) : false;
       var w = cfg.wind ? cfg.wind() : 0;
       if (storm) blowOut(3);
@@ -670,13 +717,20 @@
       var pos = el('g', { transform: 'translate(' + slot[0] + ' ' + f1(baseY) + ')' }, outer);
       var g = el('g', { 'class': 'tw-gift' + (animate ? ' tw-gift--new' : '') }, pos);
       el('rect', { x: f1(-w / 2), y: f1(-h), width: f1(w), height: f1(h), rx: 3, fill: look.box }, g);
-      el('rect', { x: f1(-w / 2), y: f1(-h), width: f1(w), height: f1(h * 0.18), fill: 'rgba(255,255,255,.12)' }, g);
+      el('rect', { x: f1(-w / 2), y: f1(-h), width: f1(w), height: f1(h), fill: 'url(#' + pfx + 'giftShadeG)' }, g);
+      el('rect', { x: f1(-w / 2), y: f1(-h), width: f1(w), height: f1(h * 0.14), fill: 'rgba(255,255,255,.14)' }, g);
       el('rect', { x: f1(-4 * k), y: f1(-h), width: f1(8 * k), height: f1(h), fill: look.rib }, g);
       el('rect', { x: f1(-w / 2), y: f1(-h * 0.58), width: f1(w), height: f1(7 * k), fill: look.rib }, g);
       if (snow) el('rect', { 'class': 'tw-gsnow', x: f1(-w / 2 - 1), y: f1(-h - 7 * k), width: f1(w + 2), height: f1(9 * k), rx: 4 }, g);
-      el('ellipse', { cx: f1(-9 * k), cy: f1(-h - 5 * k), rx: f1(10 * k), ry: f1(6 * k), fill: look.rib, transform: 'rotate(-25 ' + f1(-9 * k) + ' ' + f1(-h - 5 * k) + ')' }, g);
-      el('ellipse', { cx: f1(9 * k), cy: f1(-h - 5 * k), rx: f1(10 * k), ry: f1(6 * k), fill: look.rib, transform: 'rotate(25 ' + f1(9 * k) + ' ' + f1(-h - 5 * k) + ')' }, g);
+      // Schleife: zwei Schlaufen mit Innenschatten, Bänder, Knoten
+      [-1, 1].forEach(function (sd) {
+        var bx = sd * 9 * k, byy = -h - 5 * k, rot = 'rotate(' + (sd * 25) + ' ' + f1(bx) + ' ' + f1(byy) + ')';
+        el('ellipse', { cx: f1(bx), cy: f1(byy), rx: f1(10 * k), ry: f1(6 * k), fill: look.rib, transform: rot }, g);
+        el('ellipse', { 'class': 'tw-gift-loop', cx: f1(bx + sd * 1.5 * k), cy: f1(byy + 0.5 * k), rx: f1(5 * k), ry: f1(2.6 * k), transform: rot }, g);
+        el('path', { d: 'M0 ' + f1(-h - 2 * k) + ' l' + f1(sd * 7 * k) + ' ' + f1(9 * k) + ' l' + f1(sd * 2 * k) + ' ' + f1(-3 * k) + ' Z', fill: look.rib }, g);
+      });
       el('circle', { cx: 0, cy: f1(-h - 3 * k), r: f1(4 * k), fill: look.rib }, g);
+      el('circle', { 'class': 'tw-gift-knot', cx: f1(-1.2 * k), cy: f1(-h - 4.2 * k), r: f1(1.6 * k) }, g);
       var label = giftLabel(gift);
       gifts[i] = { outer: outer, inner: g, label: label, x: slot[0], y: baseY - h - 18 * k, order: giftNext, base: baseY, gh: h, fl: 0, flShown: '' };
       giftNext++;

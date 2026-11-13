@@ -82,7 +82,12 @@
 
 /* ── Baum ── */
 .tw-tree-g { fill: url(#tw-treeG); }
-.tw-trunk { fill: #5a3a22; }
+.tw-trunk { fill: #4e321d; }
+.tw-bark { fill: none; stroke: #2f1d10; stroke-width: 1.6; stroke-linecap: round; opacity: 0.7; }
+.tw-bough { stroke-width: 1.2; stroke-linejoin: round; }
+.tw-bough--a { fill: #1f5c37; stroke: #2f7a4a; }
+.tw-bough--b { fill: #24683f; stroke: #358654; }
+.tw-bough--c { fill: #1b5231; stroke: #2a6f44; }
 .tw-garland { fill: none; stroke: #e8c45a; stroke-width: 3; stroke-dasharray: 2 5; stroke-linecap: round; }
 .tw-star { fill: #ffd23f; stroke: #fff6c8; stroke-width: 2; filter: url(#tw-starGlow); }
 .tw-star-rays { fill: #fff3b0; transform-box: fill-box; transform-origin: center; animation: twSpin 14s linear infinite; }
@@ -94,7 +99,7 @@
 .tw-snowcap--3 { transform-origin: 50% 35%; }
 .tw-snowcap--2 { transform-origin: 50% 30%; }
 .tw-snowcap--1 { transform-origin: 50% 31%; }
-.tw-frost { fill: #ffffff; opacity: calc(0.38 * var(--tw-snow)); }
+.tw-frost { fill: #ffffff; opacity: calc(0.2 * var(--tw-snow)); }
 .tw-ridge-snow { fill: none; stroke: #f4f8ff; stroke-linejoin: round; stroke-width: calc(5px + 10px * var(--tw-snow)); opacity: var(--tw-light); }
 .tw-starhat { fill: #f4f8ff; opacity: var(--tw-hat); }
 .tw-gsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--tw-snow)); }
@@ -157,7 +162,9 @@
 .tw-bsnow { fill: #f4f8ff; transform-box: fill-box; transform-origin: 50% 100%; transform: scaleY(var(--tw-cap)); opacity: var(--tw-light); }
 
 /* ── Eiszapfen und Schneedecke ── */
-.tw-ice-i { fill: url(#tw-iceG); stroke: rgba(255, 255, 255, 0.7); stroke-width: 1; }
+.tw-ice-i { fill: url(#tw-iceG); stroke: rgba(170, 215, 245, 0.8); stroke-width: 0.8; stroke-linejoin: round; }
+.tw-ice-hi { fill: none; stroke: #ffffff; stroke-width: 1.4; stroke-linecap: round; opacity: 0.75; }
+.tw-ice-drop { fill: #d8f0ff; opacity: 0.85; }
 .tw-ridge { fill: #f4f9ff; }
 .tw-ridge-shade { fill: #cfe0f2; }
 .tw-cover-snow { fill: #f2f7fd; }
@@ -368,3 +375,7 @@
   .tw-flame-fl { animation: none; }
   .tw-smoke.is-puff { animation: none; }
 }
+
+/* Geschenke: Innenschatten der Schlaufen, Glanz am Knoten */
+.tw-gift-loop { fill: #000000; opacity: 0.22; }
+.tw-gift-knot { fill: #ffffff; opacity: 0.35; }
