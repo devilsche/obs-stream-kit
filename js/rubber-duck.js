@@ -230,11 +230,13 @@
     return { p: q, n: n };
   }
   // Oberfläche auf Höhe y in Richtung phi (waagrecht von der Körperachse aus)
-  function surfaceAt(y, phi) {
+  function surfaceAt(y, phi, cx) {
     var dir = new THREE.Vector3(-Math.cos(phi), 0, Math.sin(phi)).multiplyScalar(-1);
-    var o0 = new THREE.Vector3(0.1, y, 0), q = new THREE.Vector3(), lo = 0, hi = 2.0;
+    var o0 = new THREE.Vector3(cx != null ? cx : 0.1, y, 0), q = new THREE.Vector3(), lo = 0, hi = 2.0;
     if (sdDuck(o0) > 0) return { p: o0.clone(), n: dir.clone() };
-    for (var it = 0; it < 28; it++) { var mid = (lo + hi) / 2; q.copy(o0).addScaledVector(dir, mid); if (sdDuck(q) < 0) lo = mid; else hi = mid; }
+    // in kleinen Schritten bis zum ERSTEN Austritt (sonst landet man z. B. hinter dem Hals am Schwanz)
+    for (var st = 0.01; st <= 2.0; st += 0.01) { q.copy(o0).addScaledVector(dir, st); if (sdDuck(q) > 0) { lo = st - 0.01; hi = st; break; } }
+    for (var it = 0; it < 20; it++) { var mid = (lo + hi) / 2; q.copy(o0).addScaledVector(dir, mid); if (sdDuck(q) < 0) lo = mid; else hi = mid; }
     q.copy(o0).addScaledVector(dir, lo);
     var e = 0.002, n = new THREE.Vector3(
       sdDuck(new THREE.Vector3(q.x + e, q.y, q.z)) - sdDuck(new THREE.Vector3(q.x - e, q.y, q.z)),
@@ -405,13 +407,13 @@
       // Kragen: Punkte rund um den Nacken (hintere Hälfte), knapp über der Haut
       var collar = [];
       for (var uu0 = 0; uu0 <= U; uu0++) {
-        var sp = surfaceAt(COLLAR_Y, Math.PI + (uu0 / U * 2 - 1) * 1.2);
+        var sp = surfaceAt(COLLAR_Y, Math.PI + (uu0 / U * 2 - 1) * 1.2, 0.42);
         collar.push(sp.p.clone().addScaledVector(sp.n, 0.035));
       }
       var lastTop = 0.5;
       for (var vv = 0; vv <= V; vv++) {
         var tv = vv / V;
-        var xc = -0.2 - tv * 0.85;
+        var xc = -0.2 - tv * 0.62;              // endet vor der Schwanzspitze
         var tp = topAt(xc); if (tp !== null) lastTop = tp;
         var half = 0.38 + 0.5 * tv, toCollar = 1 - Math.min(1, tv / 0.3);
         toCollar = toCollar * toCollar * (3 - 2 * toCollar);
