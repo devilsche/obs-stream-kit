@@ -314,11 +314,36 @@
     scene.add(rim);
 
     var kind = opts.kind === 'sushi' || opts.kind === 'balloon' ? opts.kind : 'duck';
+    if (kind === 'duck' && root.RubberDuck) {
+      // Umgebung zum Spiegeln für das Vinyl der Gummiente
+      var ec = document.createElement('canvas'); ec.width = 512; ec.height = 256;
+      var ex = ec.getContext('2d'), eg = ex.createLinearGradient(0, 0, 0, 256);
+      eg.addColorStop(0, '#ffffff'); eg.addColorStop(0.45, '#c9d2dc'); eg.addColorStop(0.55, '#6a7280'); eg.addColorStop(1, '#25282e');
+      ex.fillStyle = eg; ex.fillRect(0, 0, 512, 256);
+      var et = new THREE.CanvasTexture(ec); et.mapping = THREE.EquirectangularReflectionMapping; et.encoding = THREE.sRGBEncoding;
+      var epm = new THREE.PMREMGenerator(renderer); scene.environment = epm.fromEquirectangular(et).texture; epm.dispose();
+    }
     var rise = kind === 'balloon';
     var tpl = kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
+    // Enten: neue Gummiente (js/rubber-duck.js) mit Outfit; je Outfit einmal gebaut,
+    // danach geklont (teilt Geometrie und Material). outfit 'mix' = zufällig je Ente
+    var RD = root.RubberDuck, duckCache = {};
+    function duckOf(outfit, pink) {
+      var key = outfit + (pink ? ':pink' : '');
+      if (!duckCache[key]) {
+        var inner = RD.build({ outfit: outfit, color: pink ? 0xff9fc2 : null });
+        inner.position.set(-0.12, -0.55, 0);   // um die Mitte der Ente drehen
+        duckCache[key] = new THREE.Group().add(inner);
+      }
+      return duckCache[key].clone();
+    }
     function makeItem() {
       if (kind === 'sushi' || rise) return tpl.make();
+      if (RD) {
+        var o = opts.outfit === 'mix' ? RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)] : (opts.outfit || 'none');
+        return { g: duckOf(o, o === 'none' && Math.random() < 0.12), len: 2.7 };
+      }
       return { g: Math.random() < 0.12 ? tpl.pink() : tpl.yellow(), len: 2.6 };
     }
     var size = opts.size || 96, count = opts.count || 120, duration = opts.duration || 22000;

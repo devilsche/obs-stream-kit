@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Item Rain</title>
   <style>
-    /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon,
+    /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix),
        ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -16,6 +16,7 @@
 <body>
   <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
   <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/rubber-duck.js"></script>
   <script src="../js/item-rain-3d.js"></script>
   <script>
     (function () {
@@ -24,6 +25,8 @@
       var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       window.ItemRain3D.start({
         kind: ['duck', 'balloon'].indexOf(params.get('kind')) >= 0 ? params.get('kind') : 'sushi',
+        // Enten-Outfit: none, thw, police, fire, batman, superman oder mix (zufällig je Ente)
+        outfit: params.get('outfit') || 'none',
         canvas: document.getElementById('gl'),
         duration: Math.max(6000, parseInt(params.get('duration'), 10) || 22000),
         count: Math.max(5, parseInt(params.get('count'), 10) || (params.get('kind') === 'balloon' ? 60 : 120)) * (reduceMotion ? 0.4 : 1),

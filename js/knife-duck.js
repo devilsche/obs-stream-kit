@@ -10,7 +10,8 @@
  * knife-glint.mp3, knife-swipe.mp3); fehlt eine, bleibt es an der Stelle still.
  *
  *   KnifeDuck.start({ canvas, style, x, y, height, volume, freeze, soundBase })
- *   style: 'sticker' (Standard, Utya-Toon) oder 'rubber' (sitzende 3D-Gummiente)
+ *   style: 'sticker' (Standard, Utya-Toon) oder 'rubber' (sitzende 3D-Gummiente,
+ *   js/rubber-duck.js; outfit: none|thw|police|fire|batman|superman)
  *   freeze: Sekunde, auf der der Ablauf stehen bleibt (zum Prüfen, ?t=)
  */
 (function (root) {
@@ -68,48 +69,27 @@
   }
   function phys(hex, o) { var m = new THREE.MeshPhysicalMaterial(Object.assign({ color: hex }, o)); m.color.convertSRGBToLinear(); return m; }
 
-  // Gummiente (Modell aus js/item-rain-3d.js): sitzt, schräg zur Kamera,
-  // böse Brauen; Arme, Messer und Geste kommen wie beim Sticker dazu
-  function rubberBody(parent) {
-    var IR = root.ItemRain3D, E = IR.ellipsoid;
-    // Vinyl: warmes, sattes Gelb, seidenmatt, leicht durchscheinend (warmes Eigenleuchten)
-    var yel = phys(0xf4b710, { roughness: 0.55, clearcoat: 0.3, clearcoatRoughness: 0.45, envMapIntensity: 0.35, emissive: 0x3a1c00 });
-    var beak = phys(0xf26b10, { roughness: 0.5, clearcoat: 0.3, clearcoatRoughness: 0.4, envMapIntensity: 0.3, emissive: 0x2a0a00 });
-    var beakLow = phys(0xd2500c, { roughness: 0.55, envMapIntensity: 0.25 });
+  // Gummiente (js/rubber-duck.js, mit Outfit) sitzt schräg zur Kamera, dazu böse
+  // Brauen; Arme, Messer und Geste kommen wie beim Sticker dazu
+  function rubberBody(parent, outfit) {
+    var g = root.RubberDuck.build({ outfit: outfit });
     var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
-    var white = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    var g = new THREE.Group();
-    function add(gm, mat, x, y, z, rx, ry, rz) { var m = new THREE.Mesh(gm, mat); m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; }
-    add(IR.duckBody(), yel, 0, 0, 0);
-    add(E(0.42, 0.34, 0.42, 28), yel, 0.55, 0.42, 0);
-    var HC = new THREE.Vector3(0.62, 0.86, 0), HR = 0.56;
-    add(E(HR, 0.54, 0.54, 48), yel, HC.x, HC.y, HC.z);
-    add(E(0.38, 0.13, 0.3, 28), beak, 1.2, 0.82, 0, 0, 0, -0.12);
-    add(E(0.31, 0.09, 0.25, 24), beakLow, 1.14, 0.7, 0, 0, 0, -0.05);
-    // aufgemalt: flache Form auf der Kopfoberfläche, entlang der Normalen ausgerichtet
-    function decal(geo, mat, dir, tilt) {
-      var n = dir.clone().normalize(), m = new THREE.Mesh(geo, mat);
-      m.position.copy(HC).addScaledVector(n, HR * 0.985);
-      m.lookAt(m.position.clone().add(n));
-      m.rotateZ(tilt || 0);
-      g.add(m);
-      return m;
+    if (!(outfit === 'batman')) {
+      // aufgemalte Brauen: vorn (zum Schnabel) tief
+      [-1, 1].forEach(function (s) {
+        var b = g.userData.decal(new THREE.SphereGeometry(1, 20, 14).scale(0.17, 0.04, 0.012), paint, new THREE.Vector3(0.48, 0.7, s * 0.6), outfit === 'thw' || outfit === 'fire' || outfit === 'police' ? 1.0 : 0.995);
+        b.rotateZ(-s * 0.55);
+      });
     }
-    [-1, 1].forEach(function (s) {
-      var eDir = new THREE.Vector3(0.62, 0.32, s * 0.72);
-      decal(E(0.075, 0.095, 0.012, 20), paint, eDir, 0);
-      // Lichtpunkt oben vorn im Auge
-      decal(E(0.024, 0.028, 0.014, 10), white, new THREE.Vector3(0.66, 0.4, s * 0.66), 0);
-      // böse Braue: geschwungener Strich, vorn (zum Schnabel) tief
-      var bDir = new THREE.Vector3(0.5, 0.66, s * 0.6);
-      decal(E(0.16, 0.038, 0.012, 20), paint, bDir, -s * 0.55);
-    });
-    g.rotation.y = -Math.PI / 2 + 0.55;
-    parent.add(g);
-    return yel;
+    // Kopf etwa dorthin, wo Messer und Geste ihn erwarten
+    g.position.set(0.12, -0.19, 0);
+    var wrap = new THREE.Group(); wrap.add(g);
+    wrap.rotation.y = -Math.PI / 2 + 0.55;
+    parent.add(wrap);
+    return phys(0xf6bd16, { roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.4, envMapIntensity: 0.4, emissive: 0x2a1400 });
   }
 
-  function build(style) {
+  function build(style, outfit) {
     var rubber = style === 'rubber';
     var duck = new THREE.Group();
     var yel = toon(COL.yellow, COL.shade), beakM = toon(COL.beak, COL.beakShade), blk = flat(COL.black), wht = flat(0xffffff);
@@ -120,7 +100,7 @@
       return m;
     }
     var eyes = [], brows = [];
-    if (rubber) yel = rubberBody(duck);
+    if (rubber) yel = rubberBody(duck, outfit || 'none');
     else {
     // Kopf-Körper-Blob als Drehkörper: unten breit, leichte Taille, großer Kopf
     // Umriss als eine glatte Polarkurve: großer Kopf, weiche Delle am Hals,
@@ -210,7 +190,7 @@
                swipeZ: function (x) { return 1.06 * Math.sqrt(Math.max(0, 1 - Math.pow(x / 1.1, 2))) + 0.14; }, bottom: 0.83, size: 2.9 },
     rubber:  { LOW: { x: -0.55, y: -0.3, z: 1.4, rot: -0.9 }, UP: { x: 0.05, y: 0.35, z: 1.7, rot: 0.06 },
                SW0: { x: 0.08, y: 0.48, rot: 0.1 }, SW1: { x: 0.82, y: 0.5, rot: 0.25 }, REST: { x: 0.9, y: 0.02, rot: 0.6 },
-               swipeZ: function () { return 1.25; }, bottom: 0.53, size: 2.1 }
+               swipeZ: function () { return 1.3; }, bottom: 0.76, size: 2.4 }
   };
 
   function sound(src, volume) {
@@ -237,7 +217,7 @@
       var key = new THREE.DirectionalLight(0xfff4e0, 0.8); key.position.set(-0.8, 1.2, 1.4); scene.add(key);
       var rim = new THREE.DirectionalLight(0xffe2a8, 0.25); rim.position.set(1, -0.3, 0.6); scene.add(rim);
     }
-    var m = build(styleName), holder = new THREE.Group();
+    var m = build(styleName, opts.outfit), holder = new THREE.Group();
     holder.add(m.duck); scene.add(holder);
     if (styleName === 'sticker') m.duck.rotation.y = 0.15;
     var unit = (opts.height || 430) / ST.size;
