@@ -77,7 +77,7 @@
     if (!(outfit === 'batman')) {
       // aufgemalte Brauen: vorn (zum Schnabel) tief
       [-1, 1].forEach(function (s) {
-        var b = g.userData.decal(new THREE.SphereGeometry(1, 20, 14).scale(0.17, 0.04, 0.012), paint, new THREE.Vector3(0.48, 0.7, s * 0.6), outfit === 'thw' || outfit === 'fire' || outfit === 'police' ? 1.0 : 0.995);
+        var b = g.userData.decal(new THREE.SphereGeometry(1, 20, 14).scale(0.17, 0.04, 0.012), paint, new THREE.Vector3(0.72, 0.7, s * 0.42), outfit === 'thw' || outfit === 'fire' || outfit === 'police' ? 1.0 : 0.995);
         b.rotateZ(-s * 0.55);
       });
     }

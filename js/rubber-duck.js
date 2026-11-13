@@ -81,7 +81,8 @@
     function shape(x, y, z, up) {
       var t = (x + 1) / 2, w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
       // Unterschnabel etwas kürzer und schmaler als der kräftige Oberschnabel
-      return up ? new THREE.Vector3(x * len, y * thick, z * w) : new THREE.Vector3(x * len * 0.9 - len * 0.1 * (1 - (x + 1) / 2) * 0, y * thick * 0.85, z * w * 0.92);
+      // Unterschnabel am Kopf so breit und lang wie der Oberschnabel, zur Spitze etwas kürzer/schmaler
+      return up ? new THREE.Vector3(x * len, y * thick, z * w) : new THREE.Vector3(x * len - len * 0.12 * t * t, y * thick * 0.85, z * w * (1 - 0.1 * t));
     }
     function wedge(v, up) {
       var dx = v.x - Hx, r = Math.sqrt(dx * dx + v.y * v.y), phi = Math.atan2(v.y, dx);
@@ -129,7 +130,9 @@
     for (var c = 0; c <= COLS; c++) {
       var a = inU[c], b = inL[c];
       // Rachen fast so breit wie der Mund, damit das Innere bis an den Lippenrand reicht
-      var t = new THREE.Vector3(Hx + (Math.max(a.x, Hx) - Hx) * 0.22, (a.y + b.y) / 2, a.z * 0.95);
+      // Rachen so breit wie der breitere der beiden Ränder: am Mundwinkel volle Schnabelbreite
+      var zt = Math.abs(a.z) > Math.abs(b.z) ? a.z : b.z;
+      var t = new THREE.Vector3(Hx + (Math.max(a.x, Hx) - Hx) * 0.22, (a.y + b.y) / 2, zt);
       var colm = [];
       for (var k = 0; k <= S; k++) {
         var u = k / S, w0 = (1 - u) * (1 - u), w1 = 2 * (1 - u) * u, w2 = u * u;
@@ -327,11 +330,11 @@
     [-1, 1].forEach(function (s) {
       if (o.eyes === 'white') {
         // Maske: weiße, schmale Augenschlitze
-        var sl = decal(ell(0.1, 0.05, 0.012, 20), white, new THREE.Vector3(0.55, 0.38, s * 0.74));
+        var sl = decal(ell(0.1, 0.05, 0.012, 20), white, new THREE.Vector3(0.8, 0.36, s * 0.5));
         sl.rotateZ(s * -0.35);
       } else {
-        decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.55, 0.38, s * 0.74));
-        decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.6, 0.46, s * 0.68), 1.003);
+        decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.8, 0.36, s * 0.5));
+        decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.84, 0.44, s * 0.44), 1.003);
       }
     });
 
