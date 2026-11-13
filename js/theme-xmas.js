@@ -531,9 +531,10 @@
     }
     var wLift = 0;
     function stepWreath(dt) {
-      // auf der Schneedecke stehen statt darin zu versinken
+      // auf der Schneedecke stehen, weder schweben noch versinken
       var gy = cfg.snowAt ? cfg.snowAt(TX + WR.x * TK) : null;
-      var lift = gy === null ? 0 : Math.min(0, (gy + 8 - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK);
+      // Scheibe steht immer auf der Schneedecke und sinkt ein Stück ein (wenig Schnee: nach unten, viel: nach oben)
+      var lift = gy === null ? 0 : (gy + 7 - (TY + (SL.cy + SL.ry + SL.th) * TK)) / TK;
       if (Math.abs(lift - wLift) > 0.5) { wLift = lift; gWreathBox.setAttribute('transform', 'translate(0 ' + f1(lift) + ')'); }
       var storm = cfg.storm ? cfg.storm(TX + WR.x * TK) : false;
       var w = cfg.wind ? cfg.wind() : 0;
