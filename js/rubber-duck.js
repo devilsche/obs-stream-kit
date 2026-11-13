@@ -420,6 +420,9 @@
           q.lerp(collar[uu], toCollar);
           // nie in den Rumpf schneiden: so weit anheben, bis Abstand da ist
           for (var k = 0; k < 40 && sdTrunk(q) < 0.045; k++) q.y += 0.02;
+          // in der Mitte nach unten hin leicht vom Rücken weg bauschen (liegt nicht an)
+          var mid = 1 - Math.pow(uu / U * 2 - 1, 2);
+          q.y += 0.07 * tv * mid; q.x -= 0.05 * tv * mid;
           cpos.push(q.x, q.y, q.z);
         }
       }
@@ -431,8 +434,15 @@
       cg.setAttribute('position', new THREE.Float32BufferAttribute(cpos, 3));
       cg.setIndex(cidx); cg.computeVertexNormals();
       var capeMesh = new THREE.Mesh(cg, vinyl(o.cape, { side: THREE.DoubleSide, roughness: 0.6, clearcoat: 0.1 }));
-      // Ruheform merken: zum Flattern wird um sie herum ausgelenkt
-      capeMesh.userData.cape = { base: Float32Array.from(cpos), nrm: Float32Array.from(cg.attributes.normal.array), U: U, V: V };
+      // Ruheform merken: zum Flattern wird um sie herum ausgelenkt. Die Richtung je Punkt
+      // zeigt sicher vom Körper weg (Flächennormalen können je nach Reihenfolge nach innen zeigen)
+      var nrmArr = Float32Array.from(cg.attributes.normal.array), pp = new THREE.Vector3(), pn = new THREE.Vector3();
+      for (var ni = 0; ni < nrmArr.length; ni += 3) {
+        pp.set(cpos[ni], cpos[ni + 1], cpos[ni + 2]);
+        pn.set(pp.x + nrmArr[ni] * 0.03, pp.y + nrmArr[ni + 1] * 0.03, pp.z + nrmArr[ni + 2] * 0.03);
+        if (sdTrunk(pn) < sdTrunk(pp)) { nrmArr[ni] = -nrmArr[ni]; nrmArr[ni + 1] = -nrmArr[ni + 1]; nrmArr[ni + 2] = -nrmArr[ni + 2]; }
+      }
+      capeMesh.userData.cape = { base: Float32Array.from(cpos), nrm: nrmArr, U: U, V: V };
       g.add(capeMesh);
     }
     g.userData = { body: b, head: HC, headR: HR, decal: decal };
@@ -451,7 +461,8 @@
         for (var u = 0; u <= U; u++) {
           var i = (v * (U + 1) + u) * 3, uu = u / U * 2 - 1;
           var wave = Math.sin(time * 7 + tv * 6 - uu * 1.5 + ph) * 0.07 + Math.sin(time * 11.3 + tv * 9 + uu * 2.6 + ph * 1.7) * 0.03;
-          var off = free * (wave + 0.05);
+          // nur nach außen schwingen (nach innen läge der Stoff im Körper und wirkte angeklebt)
+          var off = free * (Math.abs(wave) + 0.06);
           arr[i] = c.base[i] + c.nrm[i] * off - free * 0.08;          // nach hinten wehen
           arr[i + 1] = c.base[i + 1] + c.nrm[i + 1] * off + free * 0.06; // leicht anheben
           arr[i + 2] = c.base[i + 2] + c.nrm[i + 2] * off;
