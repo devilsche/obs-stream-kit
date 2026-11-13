@@ -169,7 +169,7 @@
     thw: { suit: 0x1d2b5e, stripe: 0xf2c500, stripes: [0.18, -0.12], helmet: { color: 0xf2c500 }, helmetLabel: 'THW' },
     police: { suit: 0x1e3c72, stripe: 0xd8dde6, stripes: [-0.05], cap: true, chest: 'star' },
     fire: { suit: 0x1a2340, stripe: 0xf2d000, stripe2: 0xc9ced6, stripes: [0.2, -0.1], helmet: { color: 0xd9dde2, metal: true, neck: true } },
-    batman: { suit: 0x4a4e57, belt: 0xe2b62a, beltY: -0.3, cowl: 0x1a1b20, cape: 0x1a1b20, ears: true, chest: 'bat', eyes: 'white' },
+    batman: { suit: 0x4a4e57, collar: 0.8, belt: 0xe2b62a, beltY: -0.3, cowl: 0x1a1b20, cape: 0x1a1b20, ears: true, chest: 'bat', eyes: 'white' },
     superman: { suit: 0x1f4fb5, belt: 0xf2c500, beltY: -0.3, briefs: 0xc8151b, cape: 0xc8151b, chest: 'super' }
   };
   function col(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
@@ -188,16 +188,17 @@
         uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? o.beltY : -9, o.briefs ? 1 : 0),
         uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2]),
         uEmb: emb || new THREE.Texture(), uEmbOn: emb ? 1 : 0,
-        uEmbAt: new THREE.Vector3(embAt ? embAt.p.x : 0, embAt ? embAt.p.y : 0, 0), uEmbSize: embSize
+        uEmbAt: new THREE.Vector3(embAt ? embAt.p.x : 0, embAt ? embAt.p.y : 0, 0), uEmbSize: embSize,
+        uCollar: o.collar || 0.55
       };
       Object.keys(u).forEach(function (k) { sh.uniforms[k] = { value: u[k] }; });
       sh.vertexShader = 'varying vec3 vDuck;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vDuck = position;');
-      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt; uniform vec4 uS; uniform float uCowlOn, uEmbOn, uEmbSize; uniform sampler2D uEmb;\n' +
+      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt; uniform vec4 uS; uniform float uCowlOn, uEmbOn, uEmbSize, uCollar; uniform sampler2D uEmb;\n' +
         sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
           'vec3 cc = diffuse;\n' +
           'float inHead = length((vDuck - uHC) / uHR);\n' +
           // Kragenlinie: unterhalb y≈0.55 und nicht im Kopf → Uniform
-          'float suitOn = (1.0 - step(0.55, vDuck.y)) * step(0.97, inHead);\n' +
+          'float suitOn = (1.0 - step(uCollar, vDuck.y)) * step(0.97, inHead);\n' +
           'cc = mix(cc, uSuit, suitOn);\n' +
           'float aa = 0.012;\n' +
           'cc = mix(cc, uStripe, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.x))));\n' +
@@ -343,26 +344,27 @@
     // (Augen bei ~HC.y+0.23), Kuppel etwas flacher als der Kopf
     if (o.helmet) {
       var hm = o.helmet.metal ? vinyl(o.helmet.color, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.0 }) : vinyl(o.helmet.color, { roughness: 0.35, clearcoat: 0.8 });
-      var RIM_Y = HC.y + 0.33, tilt = 0.1;
-      var rimR = HR[0] * Math.sqrt(Math.max(0.2, 1 - Math.pow((RIM_Y - HC.y) / HR[1], 2))) + 0.07;
+      // Rand liegt direkt auf dem Kopf auf (Kopfradius auf dieser Höhe + Wandstärke)
+      var RIM_Y = HC.y + 0.29, tilt = 0.1;
+      var rimR = HR[0] * Math.sqrt(Math.max(0.2, 1 - Math.pow((RIM_Y - HC.y) / HR[1], 2))) + 0.025;
       var helmet = new THREE.Group(); helmet.position.set(HC.x - 0.03, RIM_Y, 0); helmet.rotation.z = tilt; g.add(helmet);
       var dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.5), hm);
-      dome.scale.set(rimR, 0.42, rimR * HR[2] / HR[0]); helmet.add(dome);
+      dome.scale.set(rimR, 0.37, rimR * HR[2] / HR[0]); helmet.add(dome);
       var brim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.045, 10, 64), hm);
-      brim.scale.set(rimR + 0.03, (rimR + 0.03) * HR[2] / HR[0], 1); brim.rotation.x = Math.PI / 2; helmet.add(brim);
+      brim.scale.set(rimR + 0.02, (rimR + 0.02) * HR[2] / HR[0], 1); brim.rotation.x = Math.PI / 2; helmet.add(brim);
       // Kamm oben (typisch für Schutzhelme)
       var ridge = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12), hm);
-      ridge.scale.set(rimR * 0.95, 0.44, 0.07); helmet.add(ridge);
+      ridge.scale.set(rimR * 0.95, 0.39, 0.06); helmet.add(ridge);
       if (o.helmet.neck) {
         // Nackenschutz hinten (phi 0 liegt bei −x)
         var neckG = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.5, Math.PI * 0.2), hm);
         neckG.material.side = THREE.DoubleSide;
-        neckG.scale.set(rimR + 0.05, 0.5, (rimR + 0.05) * HR[2] / HR[0]); helmet.add(neckG);
+        neckG.scale.set(rimR + 0.04, 0.45, (rimR + 0.04) * HR[2] / HR[0]); helmet.add(neckG);
       }
       if (o.helmetLabel) {
         var lab = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12), new THREE.MeshStandardMaterial({ map: textTex(o.helmetLabel, '#1d2b5e', '#ffffff'), transparent: true, roughness: 0.4 }));
-        var la = 0.55, lp = new THREE.Vector3(Math.cos(la) * rimR * 1.01, Math.sin(la) * 0.42 * 1.01, 0);
-        lab.position.copy(lp); lab.lookAt(lp.clone().add(new THREE.Vector3(Math.cos(la) / rimR, Math.sin(la) / 0.42, 0).normalize()));
+        var la = 0.55, lp = new THREE.Vector3(Math.cos(la) * rimR * 1.01, Math.sin(la) * 0.37 * 1.01, 0);
+        lab.position.copy(lp); lab.lookAt(lp.clone().add(new THREE.Vector3(Math.cos(la) / rimR, Math.sin(la) / 0.37, 0).normalize()));
         helmet.add(lab);
       }
     }
@@ -388,11 +390,10 @@
         ear.rotation.set(s * 0.25, 0, 0.1); g.add(ear);
       });
     }
-    // Umhang: setzt oben am Rücken direkt hinter dem Hals an, liegt über Rücken und
-    // Schwanz (Oberseite des Rumpfs ohne Kopf/Hals), wölbt sich zu den Seiten herab,
-    // reicht über die Schwanzspitze hinaus und fällt dahinter herab; unten breiter
+    // Umhang: oben ein Kragen um den Nacken (dort, wo hinten die Maske endet), von dort
+    // über den Rücken bis etwa zur Schwanzwurzel; wölbt sich zu den Seiten herab
     if (o.cape) {
-      var U = 28, V = 30, cpos = [], cidx = [];
+      var U = 28, V = 24, cpos = [], cidx = [], COLLAR_Y = 0.74;
       var topAt = function (x) {             // Rücken-Oberseite (Mittellinie) des Rumpfs bei x
         var q = new THREE.Vector3(x, 1.6, 0), lo = -0.6, hi = 1.6, hit = false;
         for (var yy = 1.6; yy > -0.6; yy -= 0.04) { q.y = yy; if (sdTrunk(q) < 0) { hit = true; lo = yy; hi = yy + 0.04; break; } }
@@ -400,19 +401,24 @@
         for (var it = 0; it < 18; it++) { var m = (lo + hi) / 2; q.y = m; if (sdTrunk(q) < 0) lo = m; else hi = m; }
         return lo;
       };
+      // Kragen: Punkte rund um den Nacken (hintere Hälfte), knapp über der Haut
+      var collar = [];
+      for (var uu0 = 0; uu0 <= U; uu0++) {
+        var sp = surfaceAt(COLLAR_Y, Math.PI + (uu0 / U * 2 - 1) * 1.2);
+        collar.push(sp.p.clone().addScaledVector(sp.n, 0.035));
+      }
       var lastTop = 0.5;
       for (var vv = 0; vv <= V; vv++) {
         var tv = vv / V;
-        var drape = Math.min(1, tv / 0.75), fall = Math.max(0, (tv - 0.75) / 0.25);
-        var xc = -0.18 - drape * 1.12 - fall * 0.06;   // Ansatz direkt hinter dem Hinterkopf
-        var tp = fall > 0 ? null : topAt(xc);
-        if (tp !== null) lastTop = tp;
-        var half = 0.3 + 0.6 * tv;              // halbe Breite (z), oben schmal am Hals
+        var xc = -0.2 - tv * 0.85;
+        var tp = topAt(xc); if (tp !== null) lastTop = tp;
+        var half = 0.38 + 0.5 * tv, toCollar = 1 - Math.min(1, tv / 0.3);
+        toCollar = toCollar * toCollar * (3 - 2 * toCollar);
         for (var uu = 0; uu <= U; uu++) {
           var z = (uu / U * 2 - 1) * half;
-          var y = lastTop + 0.06 - 0.9 * z * z - fall * 0.9;
-          // nie in den Rumpf schneiden: so weit anheben, bis Abstand da ist (nicht über den Kopf)
-          var q = new THREE.Vector3(xc, y, z);
+          var q = new THREE.Vector3(xc, lastTop + 0.06 - 0.9 * z * z - Math.max(0, tv - 0.8) * 0.4, z);
+          q.lerp(collar[uu], toCollar);
+          // nie in den Rumpf schneiden: so weit anheben, bis Abstand da ist
           for (var k = 0; k < 40 && sdTrunk(q) < 0.045; k++) q.y += 0.02;
           cpos.push(q.x, q.y, q.z);
         }
