@@ -26,11 +26,14 @@
 
   // ── Toon: zwei feste Farbstufen (Licht/Schatten) nach Lichteinfall ──
   function toon(light, dark) {
+    // Grenze Licht/Schatten über ~1 Pixel weich (fwidth), sonst treppig
     var m = new THREE.ShaderMaterial({
+      extensions: { derivatives: true },
       uniforms: { cLight: { value: new THREE.Color(light) }, cDark: { value: new THREE.Color(dark) }, lightDir: { value: new THREE.Vector3(-0.55, 0.65, 0.55).normalize() } },
       vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       fragmentShader: 'uniform vec3 cLight; uniform vec3 cDark; uniform vec3 lightDir; varying vec3 vN;' +
-        'void main(){ float d = dot(normalize(vN), lightDir); gl_FragColor = vec4(d > -0.05 ? cLight : cDark, 1.0); }'
+        'void main(){ float d = dot(normalize(vN), lightDir); float w = fwidth(d) * 1.2;' +
+        ' gl_FragColor = vec4(mix(cDark, cLight, smoothstep(-0.05 - w, -0.05 + w, d)), 1.0); }'
     });
     return m;
   }
@@ -56,14 +59,16 @@
       return m;
     }
     // Kopf-Körper-Blob als Drehkörper: unten breit, leichte Taille, großer Kopf
-    // Umriss = weiche Vereinigung aus Kopfkreis (groß) und Körperellipse (unten)
+    // Umriss als eine glatte Polarkurve: großer Kopf, weiche Delle am Hals,
+    // flacher Boden – keine Knicke, keine Stufen in der Kontur
     var prof = [];
-    for (var y = -1.0; y <= 1.76; y += 0.02) {
-      var rH = Math.sqrt(Math.max(0, 1.04 * 1.04 - (y - 0.7) * (y - 0.7)));
-      var rB = 0.98 * Math.sqrt(Math.max(0, 1 - Math.pow((y + 0.3) / 0.72, 2)));
-      // weiches Maximum: Übergang ohne Knick (keine Konturlinie an der Taille)
-      var k = 4, r = Math.max(rH, rB, Math.log(Math.exp(k * rH) + Math.exp(k * rB)) / k - 0.12);
-      prof.push(new THREE.Vector2(Math.max(0.001, r), y));
+    for (var i = 0; i <= 120; i++) {
+      var th = -Math.PI / 2 + Math.PI * i / 120;
+      // weiche Delle am Hals (knapp über der Mitte), Kopf oben voll, Boden flacher
+      var R = 1 + 0.07 * Math.sin(th) - 0.1 * Math.exp(-Math.pow((th - 0.12) / 0.32, 2));
+      var y = 0.36 + 1.3 * R * Math.sin(th);
+      if (y < -0.7) y = -0.7 + (y + 0.7) * 0.45;
+      prof.push(new THREE.Vector2(Math.max(0.0005, 1.05 * R * Math.cos(th)), y));
     }
     prof[0].x = 0; prof[prof.length - 1].x = 0;
     var blobGeo = new THREE.LatheGeometry(prof, 128);
@@ -102,7 +107,10 @@
     bladeGeo.translate(0, 0.12, -0.02);
     bladeGeo.computeVertexNormals();
     var blade = new THREE.Mesh(bladeGeo, toon(COL.blade, COL.bladeShade)); knife.add(blade);
-    outline(blade, 0.03, COL.bladeLine);
+    // Kontur: dieselbe Form gleichmäßig breiter (großer Rand), dunkel, direkt dahinter
+    var lineGeo = new THREE.ExtrudeGeometry(bs, { depth: 0.01, bevelEnabled: true, bevelThickness: 0.005, bevelSize: 0.055, bevelSegments: 3, curveSegments: 20 });
+    lineGeo.translate(0, 0.12, -0.05);
+    knife.add(new THREE.Mesh(lineGeo, flat(COL.bladeLine)));
     var shine = new THREE.Mesh(new THREE.PlaneGeometry(0.05, 0.95), wht); shine.position.set(0.1, 0.62, 0.05); shine.rotation.z = -0.04; knife.add(shine);
     var handle = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.085, 0.45, 16), toon(COL.handle, 0x23262d));
     handle.position.y = -0.14; knife.add(handle); outline(handle, 0.03, 0x111317);
@@ -132,7 +140,8 @@
   function start(opts) {
     var W = 1920, H = 1080;
     var renderer = new THREE.WebGLRenderer({ canvas: opts.canvas, alpha: true, antialias: true });
-    renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.setClearColor(0x000000, 0);
+    // doppelte Auflösung, der Browser skaliert herunter: glatte Kanten
+    renderer.setPixelRatio(2); renderer.setSize(W, H, false); renderer.setClearColor(0x000000, 0);
     var scene = new THREE.Scene();
     var cam = new THREE.OrthographicCamera(0, W, 0, -H, -3000, 3000); cam.position.z = 1500;
 
