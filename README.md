@@ -2024,7 +2024,7 @@ Alle URLs unter `http://localhost:9000/widgets/steam/<datei>.html`.
 | `now-playing.html` | Bottom-Left-Card mit Avatar + Spiel + Live-Counter | `pollMs`, `livePlayers=0\|1`, `playersPollMs` |
 | `popup.html` | Combined slide-in (Now-Playing + Achievement) mit Rare-Glow | `nowPollMs`, `achPollMs`, `durationMs`, `gapMs`, `rarePct` |
 | `achievement-popup.html` | Pop-up nur für Achievements, separat von Now-Playing | `duration`, `gap`, `pollMs`, `rarePct` |
-| `achievement-feed.html` | Rotierender Feed der letzten N Unlocks | `limit`, `rotateMs`, `refreshMs`, `rarePct`, `header` |
+| `achievement-feed.html` | Rotierender Feed der letzten N Unlocks; ohne Unlocks (z. B. keiner in den letzten `sinceDays` Tagen) komplett unsichtbar, auch die Überschrift | `limit`, `sinceDays`, `rotateMs`, `refreshMs`, `rarePct`, `header` |
 | `games-ticker.html` | Library/Co-op/Multiplayer-Rotator inkl. "Wanna play?"-Modus | `kind=all\|coop\|multiplayer`, `sort=playtime\|recent\|random\|name`, `playedSinceDays`, `rotateMs`, `cyclePauseMs`, `minPlaytime`, `limit`, `headerTitle` |
 
 Demo + Größenempfehlungen: `http://localhost:9000/widgets/steam/index.html`
