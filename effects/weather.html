@@ -361,6 +361,29 @@
       var deferredStep = null;   // setup, bis der Server aufs Xmas-Thema umgestellt hat
       var played = {}, pending = null, readySince = null;
       var obsActive = true;   // ohne Auskunft von OBS: als live annehmen
+      // Stream oder Aufnahme läuft? null = unbekannt (fehlende Berechtigung)
+      var obsStreaming = null;
+      function obsLive() { return obsActive && obsStreaming !== false; }
+      if (window.obsstudio) {
+        try {
+          window.obsstudio.getStatus(function (st) {
+            if (st && typeof st.streaming === 'boolean') obsStreaming = st.streaming || !!st.recording;
+          });
+        } catch (e) { /* ohne Berechtigung: nur obsActive zählt */ }
+        ['obsStreamingStarted', 'obsRecordingStarted'].forEach(function (ev) {
+          window.addEventListener(ev, function () { obsStreaming = true; });
+        });
+        window.addEventListener('obsStreamingStopped', function () {
+          try {
+            window.obsstudio.getStatus(function (st) { obsStreaming = !!(st && st.recording); });
+          } catch (e) { obsStreaming = false; }
+        });
+        window.addEventListener('obsRecordingStopped', function () {
+          try {
+            window.obsstudio.getStatus(function (st) { obsStreaming = !!(st && st.streaming); });
+          } catch (e) { obsStreaming = false; }
+        });
+      }
       window.addEventListener('obsSourceActiveChanged', function (e) {
         obsActive = !!(e.detail && e.detail.active);
         readySince = null;
@@ -444,6 +467,9 @@
          'theme', 'xmasfrom', 'xmasto', 'snowrate', 'leafrate'].forEach(function (k) {
           if (settings[k] !== undefined) q.set(k, settings[k]);
         });
+        // in OBS: ohne Stream (bzw. Source nicht im Programm) steht die Zeit für
+        // Garten, Laub und Strand still
+        if (window.obsstudio) q.set('live', obsLive() ? '1' : '0');
         fetch(apiBase + 'weather/state?' + q.toString(), { cache: 'no-store' })
           .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
           .then(function (data) {

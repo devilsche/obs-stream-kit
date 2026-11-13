@@ -18,7 +18,10 @@ angetrieben vom wirksamen Wetter. Ein JSON-Stand je Tenant:
   2 %/min, sinkt bei Regen mit 10 %/min und nachts mit 3 %/min; `splash` −5
   (Rangliste), `cool` (Mods) kühlt ganz ab.
 
-Fortgeschrieben wird nur das aktive Thema. DAO im sqlite-Stil.
+Fortgeschrieben wird nur das aktive Thema, und nur während gestreamt wird:
+`paused` (Overlay meldet: kein Stream) hält die Zeit an, und eine Lücke ohne
+Abruf (OBS zu) zählt höchstens `max_gap` Sekunden. Sonst trocknet der Garten
+über Nacht aus. DAO im sqlite-Stil.
 """
 import datetime
 import json
@@ -179,16 +182,21 @@ def load(conn, tenant_id) -> dict:
     return _out(_get(conn, tenant_id) or _fresh(None))
 
 
-def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0, flowers=None) -> dict:
+def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0, flowers=None,
+            paused: bool = False, max_gap=None) -> dict:
     """w: wirksames Wetter {wind, rain, snow, heat, sun, night, blizzard} (je 0..1),
-    optional temp (°C, nur bei echtem Wetter)."""
+    optional temp (°C, nur bei echtem Wetter). paused: Zeit steht (kein Stream);
+    max_gap: so viele Sekunden zählt eine Lücke zwischen zwei Abrufen höchstens."""
     data = _get(conn, tenant_id)
     if data is None:
         _put(conn, tenant_id, _fresh(now))
         return _out(_fresh(now))
     last = data.get("at")
     last = now if last is None else last
-    m = max(0.0, now - last) / 60
+    gap = 0.0 if paused else max(0.0, now - last)
+    if max_gap is not None:
+        gap = min(gap, max_gap)
+    m = gap / 60
     lv = data["levels"]
     before = dict(lv)
     doused = False

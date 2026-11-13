@@ -422,9 +422,16 @@ def test_season_actions_report_results_and_levels(conn, monkeypatch):
     monkeypatch.setattr(ep.time, "time", lambda: clock[0])
     c = _client(conn)
     _state(c, "?theme=autumn&lock=clear")
+    # das Overlay fragt laufend ab; Lücken zählen nur bis SEASON_MAX_GAP
+    for _ in range(10):
+        clock[0] += 60
+        st = _state(c, "?theme=autumn&lock=clear")
+    assert st["seasonLevels"]["leaves"] == pytest.approx(10)
+    # ohne Stream (live=0) steht die Zeit
     clock[0] += 600
-    st = _state(c, "?theme=autumn&lock=clear")
-    assert st["seasonLevels"]["leaves"] == 10
+    assert _state(c, "?theme=autumn&lock=clear&live=0")["seasonLevels"]["leaves"] == pytest.approx(10)
+    clock[0] += 3600
+    assert _state(c, "?theme=autumn&lock=clear")["seasonLevels"]["leaves"] == pytest.approx(12)
     c.get("/s/t/api/fx/weather?cmd=rake&name=Mia")
     cmd = c.get("/s/t/api/fx/weather/poll?since=0").json["commands"][-1]
     assert cmd["params"]["done"] == 5

@@ -40,8 +40,13 @@ def _sky(now, lat, lon) -> dict:
 TRANSITION_FAST = 4
 
 
-def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
-    """opts: geparste Settings (place, lock, mood, kdlow, kdhigh, kdtest, fallback)."""
+# so viele Sekunden zählt eine Abruf-Lücke (OBS zu) höchstens für Garten, Laub, Strand
+SEASON_MAX_GAP = 120
+
+
+def resolve(conn, tenant_id: int, opts: dict, now=None, paused: bool = False) -> dict:
+    """opts: geparste Settings (place, lock, mood, kdlow, kdhigh, kdtest, fallback).
+    paused: das Overlay meldet, dass nicht gestreamt wird (Jahreszeiten stehen still)."""
     now = time.time() if now is None else now
     base, source, loc = None, "fallback", None
     try:
@@ -178,7 +183,8 @@ def resolve(conn, tenant_id: int, opts: dict, now=None) -> dict:
              "temp": base.get("temp") if source == "api" else None},
             opts.get("leafrate", 1.0) if theme == "autumn" else 1.0,
             # Frühling: Wasser je Blume für die Blumen im Bild
-            flowers=weather_followers.load(conn, tenant_id, limit=24)["names"] if theme == "spring" else None)
+            flowers=weather_followers.load(conn, tenant_id, limit=24)["names"] if theme == "spring" else None,
+            paused=paused, max_gap=SEASON_MAX_GAP)
     except Exception:
         log.exception("weather: season failed for tenant %s", tenant_id)
         season = {"levels": {}, "top": {}}

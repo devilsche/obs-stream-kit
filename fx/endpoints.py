@@ -501,6 +501,8 @@ def weather_state_route(token):
             val = settings[key](raw)
             if val is not None:
                 opts[key] = val
-    state = _with_conn(lambda conn: weather_state.resolve(conn, g.tenant_id, opts))
+    # live=0: OBS meldet, dass nicht gestreamt wird → Garten & Co. trocknen nicht
+    paused = request.args.get("live") == "0"
+    state = _with_conn(lambda conn: weather_state.resolve(conn, g.tenant_id, opts, paused=paused))
     weather_state.LAST_OPTS[g.tenant_id] = dict(opts)
     return _no_store(jsonify({"state": state, "now": time.time()}))

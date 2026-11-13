@@ -18,6 +18,16 @@ def conn():
 W = {"wind": 0, "rain": 0, "heat": 0, "sun": 0, "night": 0}
 
 
+def test_no_drying_while_paused_or_offline(conn):
+    advance(conn, 1, 0, "spring", W, flowers=["a"])
+    # kein Stream: Zeit steht
+    assert advance(conn, 1, 3600, "spring", W, flowers=["a"], paused=True)["levels"]["water"] == 60
+    # OBS über Nacht zu: die Lücke zählt höchstens max_gap (2 %/min × 3 min)
+    lv = advance(conn, 1, 3600 + 8 * 3600, "spring", W, flowers=["a"], max_gap=180)["levels"]
+    assert lv["water"] == pytest.approx(54)
+    assert lv["deadFlowers"] == []
+
+
 def test_blizzard_blows_leaves_away(conn):
     advance(conn, 1, 0, "autumn", W)
     advance(conn, 1, 1800, "autumn", {**W, "wind": 1})                     # 3 %/min × 30 min = 90
