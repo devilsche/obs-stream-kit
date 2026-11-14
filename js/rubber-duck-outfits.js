@@ -629,6 +629,26 @@
   EMB.num1337 = function (x, w) { x.fillStyle = '#f4f4f4'; x.fillRect(20, 80, w - 40, 96); text(x, w, '1337', '#141414', '900 92px "Arial Black", Arial, sans-serif', 0.9); };
   EMB.skull = function (x, w) { drawSkull(x, w / 2, w / 2, 2.6, '#f1ede0'); };
 
+  // Anzeigenamen der Bausteine (Duck-Editor)
+  Object.assign(RD.ACC_LABELS || {}, {
+    afro: 'Afro', angelwings: 'Angel wings', antennae: 'Antennae', astro: 'Space helmet', backpack: 'Backpack',
+    ballchain: 'Ball and chain', beard: 'Beard', beer: 'Beer mug', beewings: 'Bee wings', bolts: 'Neck bolts',
+    bowtie: 'Bow tie', broom: 'Broom', brows: 'Eyebrows', buttons: 'Buttons', chain: 'Chain', claws: 'Claws',
+    clownwig: 'Clown wig', cowboy: 'Cowboy hat', crown: 'Crown', ears: 'Ears', eyepatch: 'Eye patch',
+    eyepatches: 'Eye patches', fangs: 'Fangs', flattop: 'Flat top hair', football: 'Football', glasses: 'Glasses',
+    halfmic: 'Mic stand', halo: 'Halo', hammer: 'Hammer', headband: 'Headband', headmirror: 'Head mirror',
+    headset: 'Headset', highcollar: 'High collar', hood: 'Hood', horns: 'Horns', katana: 'Katana',
+    knighthelm: 'Knight helmet', leaves: 'Leaves', longhair: 'Long hair', mane: 'Mane', mustache: 'Moustache',
+    neckerchief: 'Neckerchief', necklace: 'Necklace', palette: 'Paint palette', pan: 'Pan', parrot: 'Parrot',
+    pompadour: 'Pompadour', prisonercap: 'Prisoner cap', pubghelm: 'Level 3 helmet', pumpkinhead: 'Pumpkin head',
+    rednose: 'Red nose', ruffle: 'Ruffle collar', santa: 'Santa hat', scarf: 'Scarf', scepter: 'Sceptre',
+    scythe: 'Scythe', shield: 'Shield', stethoscope: 'Stethoscope', stinger: 'Stinger', stitches: 'Stitches',
+    tiara: 'Tiara', tie: 'Tie', toque: 'Chef hat', tricorn: 'Tricorn', trident: 'Trident', tufts: 'Hair tufts',
+    tyrolean: 'Tyrolean hat', unihorn: 'Unicorn horn', vest: 'Vest', vikinghelm: 'Viking helmet', wand: 'Magic wand',
+    wildhair: 'Wild hair', wingears: 'Winged ears', wingedhelm: 'Winged helmet', witch: 'Witch hat',
+    wizard: 'Wizard hat'
+  });
+
   // ════════ Outfits ════════
   // cat: heroes | horror | jobs | fun | celebs
   RD.addOutfits({

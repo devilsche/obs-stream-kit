@@ -54,6 +54,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck-outfits.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
   <script>
     (function () {
       'use strict';
@@ -82,14 +83,15 @@
       scene.add(holder);
       var pinkOn = false, outfit = 'none';
       // Outfit-Auswahl aus js/rubber-duck(-outfits).js, nach Kategorie gruppiert; ?outfit= wählt vor
-      var CATS = { classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities' };
+      var CATS = { classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities', custom: 'Custom' };
       (function () {
         var sel = document.getElementById('outfit'), groups = {};
-        Object.keys(CATS).forEach(function (c) { var og = document.createElement('optgroup'); og.label = CATS[c]; groups[c] = og; sel.appendChild(og); });
+        Object.keys(CATS).forEach(function (c) { var og = document.createElement('optgroup'); og.label = CATS[c]; groups[c] = og; });
         window.RubberDuck.OUTFITS.forEach(function (k) {
           var inf = window.RubberDuck.info(k), op = document.createElement('option');
-          op.value = k; op.textContent = inf.label; (groups[inf.cat] || groups.classic).appendChild(op);
+          op.value = k; op.textContent = inf.label; (groups[inf.cat] || groups.custom).appendChild(op);
         });
+        Object.keys(groups).forEach(function (c) { if (groups[c].children.length) sel.appendChild(groups[c]); });
         var want = new URLSearchParams(location.search).get('outfit');
         if (want && window.RubberDuck.OUTFITS.indexOf(want) >= 0) outfit = want;
         sel.value = outfit;

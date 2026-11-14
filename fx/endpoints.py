@@ -13,12 +13,12 @@ import logging
 import sqlite3
 import time
 
-from flask import Blueprint, current_app, g, jsonify, abort, request
+from flask import Blueprint, Response, current_app, g, jsonify, abort, request
 
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, commands, duck_outfits, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -506,3 +506,13 @@ def weather_state_route(token):
     state = _with_conn(lambda conn: weather_state.resolve(conn, g.tenant_id, opts, paused=paused))
     weather_state.LAST_OPTS[g.tenant_id] = dict(opts)
     return _no_store(jsonify({"state": state, "now": time.time()}))
+
+
+@bp_fx.route("/s/<token>/api/fx/ducks/custom.js")
+def duck_outfits_js(token):
+    """Outfits aus dem Duck-Editor (global) als Script für Regen, Messer-Ente und Tools."""
+    if g.tenant_id is None:
+        abort(404)
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    resp = Response(duck_outfits.script(duck_outfits.load(root)), mimetype="application/javascript")
+    return _no_store(resp)

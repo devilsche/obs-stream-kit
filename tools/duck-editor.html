@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rubber duck editor</title>
+  <style>
+    /* Duck-Editor: Outfits der Gummiente umbauen oder neu zusammenstellen.
+       Teile (Schnabel, Flügel, Augen, Helm, Zubehör) verschieben/drehen/skalieren/färben,
+       aufgemalte Zonen (Anzug, Maske, Gürtel, Emblem …) über Felder. Speichern = sofort live. */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --danger: #ff8a80; --ok: #9be59b; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 5; }
+    header { padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 20px; margin: 0; }
+    header p { margin: 0; color: var(--muted); }
+    header a { color: var(--text); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; height: calc(100vh - 52px); }
+    .stage { position: relative; min-height: 360px; }
+    #view { display: block; width: 100%; height: 100%; touch-action: none; }
+    .hint { position: absolute; left: 12px; bottom: 10px; margin: 0; color: var(--muted); font-size: 12px; background: rgba(20, 26, 38, 0.8); padding: 4px 8px; border-radius: 6px; }
+    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; }
+    section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+    h2 { font-size: 15px; margin: 0 0 8px; }
+    h3 { font-size: 13px; margin: 10px 0 6px; color: var(--muted); font-weight: 600; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .row > label { min-width: 84px; color: var(--muted); }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; min-height: 30px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.primary { background: var(--accent); color: #1b1300; border-color: var(--accent); font-weight: 700; }
+    button.primary:hover { background: #ffd24a; }
+    button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+    button.ghost { background: transparent; border-color: var(--line); }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    input, select, textarea { background: #0e131c; color: var(--text); border: 1px solid #4a5570; border-radius: 6px; padding: 4px 6px; font: inherit; min-height: 30px; box-sizing: border-box; }
+    input[type=number] { width: 74px; }
+    input[type=color] { width: 44px; padding: 2px; }
+    input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+    input[type=checkbox] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+    select { max-width: 100%; }
+    .grow { flex: 1; min-width: 0; }
+    .parts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .parts button { font-size: 13px; }
+    .muted { color: var(--muted); }
+    .origin { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+    .xyz { display: grid; grid-template-columns: 84px repeat(3, 1fr); gap: 6px; align-items: center; margin: 6px 0; }
+    .xyz > span { color: var(--muted); }
+    .xyz input { width: 100%; }
+    .axis { font-size: 11px; color: var(--muted); text-align: center; }
+    fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 4px 10px 8px; }
+    legend { color: var(--muted); padding: 0 4px; }
+    .field { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 5px 0; }
+    .field > label { min-width: 96px; color: var(--muted); }
+    .field .x { margin-left: auto; padding: 2px 8px; min-height: 26px; }
+    #status { min-height: 20px; margin: 8px 0 0; }
+    #status.ok { color: var(--ok); }
+    #status.err { color: var(--danger); }
+    .sticky { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    [hidden] { display: none !important; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; height: auto; }
+      .stage { height: 55vh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#panel">Skip to the editor controls</a>
+  <header>
+    <h1>Rubber duck editor</h1>
+    <p>Saved outfits go live at once in the duck rain, the knife duck, the gallery and the viewer. <a href="duck-gallery">All outfits</a></p>
+  </header>
+  <div class="layout">
+    <div class="stage">
+      <canvas id="view" role="img" aria-label="3D preview of the rubber duck being edited. Click a part to select it; drag empty space to orbit, scroll to zoom."></canvas>
+      <p class="hint">Click a part to select it · drag to orbit · scroll to zoom · W move, E turn, R size · Ctrl+Z undo</p>
+    </div>
+    <div class="panel" id="panel">
+      <section aria-labelledby="h-outfit">
+        <h2 id="h-outfit">Outfit</h2>
+        <div class="row">
+          <label for="pick">Outfit</label>
+          <select id="pick" class="grow"></select>
+        </div>
+        <div class="row">
+          <span class="origin" id="origin"></span>
+          <button type="button" id="dup">Copy as new outfit</button>
+          <button type="button" id="blank" class="ghost">New plain duck</button>
+        </div>
+        <div class="row" id="keyRow" hidden>
+          <label for="key">URL name</label>
+          <input id="key" class="grow" autocomplete="off" aria-describedby="keyHelp">
+          <span id="keyHelp" class="muted">Used as <code>outfit=&lt;name&gt;</code>: lowercase letters, digits, dashes.</span>
+        </div>
+        <div class="row">
+          <label for="label">Display name</label>
+          <input id="label" class="grow" maxlength="40" autocomplete="off">
+        </div>
+      </section>
+
+      <section aria-labelledby="h-parts">
+        <h2 id="h-parts">Parts</h2>
+        <div class="parts" id="parts" role="group" aria-label="Select a part"></div>
+        <div class="row">
+          <label for="addAcc">Add</label>
+          <select id="addAcc" class="grow"></select>
+          <button type="button" id="addBtn">Add part</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-sel" id="selBox" hidden>
+        <h2 id="h-sel">Selected: <span id="selName"></span></h2>
+        <div class="row" role="group" aria-label="Drag handle mode">
+          <button type="button" data-mode="translate" aria-pressed="true">Move (W)</button>
+          <button type="button" data-mode="rotate" aria-pressed="false">Turn (E)</button>
+          <button type="button" data-mode="scale" aria-pressed="false">Size (R)</button>
+        </div>
+        <div class="xyz" aria-hidden="true"><span></span><span class="axis">X (front)</span><span class="axis">Y (up)</span><span class="axis">Z (side)</span></div>
+        <div class="xyz"><span id="l-p">Offset</span><input type="number" step="0.01" data-v="p" data-i="0" aria-label="Offset X"><input type="number" step="0.01" data-v="p" data-i="1" aria-label="Offset Y"><input type="number" step="0.01" data-v="p" data-i="2" aria-label="Offset Z"></div>
+        <div class="xyz"><span id="l-r">Turn (°)</span><input type="number" step="1" data-v="r" data-i="0" aria-label="Turn X in degrees"><input type="number" step="1" data-v="r" data-i="1" aria-label="Turn Y in degrees"><input type="number" step="1" data-v="r" data-i="2" aria-label="Turn Z in degrees"></div>
+        <div class="xyz"><span id="l-s">Size</span><input type="number" step="0.05" min="0.05" data-v="s" data-i="0" aria-label="Size X"><input type="number" step="0.05" min="0.05" data-v="s" data-i="1" aria-label="Size Y"><input type="number" step="0.05" min="0.05" data-v="s" data-i="2" aria-label="Size Z"></div>
+        <div class="row">
+          <label for="uni">Overall size</label>
+          <input type="range" id="uni" min="0.2" max="3" step="0.01">
+          <output id="uniOut" for="uni"></output>
+        </div>
+        <div class="row">
+          <label for="pcol">Colour</label>
+          <input type="color" id="pcol">
+          <button type="button" id="pcolReset" class="ghost">Original colour</button>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="phide">
+          <label for="phide">Hidden</label>
+        </div>
+        <div id="accOpts"></div>
+        <div class="row">
+          <button type="button" id="pReset" class="ghost">Reset this part</button>
+          <button type="button" id="pRemove" class="danger">Remove part</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-look">
+        <h2 id="h-look">Painted look</h2>
+        <p class="muted">Body colour, suit, mask, belt, emblem and more are painted onto the duck.</p>
+        <div id="look"></div>
+        <div class="row">
+          <label for="addProp">Add</label>
+          <select id="addProp" class="grow"></select>
+          <button type="button" id="addPropBtn">Add setting</button>
+        </div>
+      </section>
+
+      <div class="sticky">
+        <div class="row">
+          <button type="button" id="save" class="primary">Save and go live</button>
+          <button type="button" id="undo" class="ghost">Undo</button>
+          <button type="button" id="redo" class="ghost">Redo</button>
+          <button type="button" id="drop" class="danger">Reset to original</button>
+        </div>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-OrbitControls.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-TransformControls.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck-outfits.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var THREE = window.THREE, RD = window.RubberDuck;
+      var $ = function (id) { return document.getElementById(id); };
+      var CATS = { classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities', custom: 'Custom' };
+      var ORIGIN_TXT = { code: 'Original', changed: 'Changed (saved)', 'new': 'Own outfit (saved)', unsaved: 'New, not saved yet' };
+
+      // ── Was die Felder bedeuten (aufgemalte Zonen, siehe suitMaterial in js/rubber-duck.js) ──
+      var COLOR_KEYS = { skin: 1, suit: 1, cowl: 1, cape: 1, wing: 1, bill: 1, eyeColor: 1, belt: 1, briefs: 1, stripe: 1, stripe2: 1, mask: 1, face: 1, hair: 1, color: 1, c1: 1, c2: 1, inner: 1, tip: 1, c: 1 };
+      var EMBLEM_LIST = ['bat', 'super', 'star'].concat(Object.keys(RD.EMBLEMS));
+      var ENUMS = {
+        eyes: ['', 'white', 'glow', 'lens', 'x', 'big', 'sockets', 'sleepy', 'none'],
+        chest: EMBLEM_LIST, type: RD.PATTERNS, zone: ['suit', 'skin', 'all']
+      };
+      var PROPS = [
+        ['skin', 'Body colour', 0xf6bd16], ['suit', 'Suit colour', 0x1e3c72], ['collar', 'Suit neckline height', 0.55],
+        ['cowl', 'Mask (head) colour', 0x1a1b20], ['mask', 'Eye band colour', 0x141414], ['face', 'Face plate colour', 0xd9a93a], ['faceX', 'Face plate depth', 0.2],
+        ['hair', 'Painted hair colour', 0x141414], ['hairY', 'Hairline height', 0.35], ['hairPeak', 'Widow\'s peak', 0.1],
+        ['belt', 'Belt colour', 0x5a3a22], ['beltY', 'Belt height', -0.2], ['briefs', 'Briefs colour', 0xc8151b], ['briefsY', 'Briefs height', -0.2],
+        ['stripe', 'Stripe colour', 0xf2c500], ['stripes', 'Stripe heights', [0.1]],
+        ['chest', 'Chest emblem', 'star'], ['chestY', 'Emblem height', -0.18], ['chestSize', 'Emblem size', 0.4],
+        ['eyes', 'Eye style', 'white'], ['eyeColor', 'Eye colour', 0xffffff], ['bill', 'Bill colour', 0xf28a1e], ['noBill', 'No bill', true],
+        ['wing', 'Wing colour', 0xf6bd16], ['cape', 'Cape colour', 0xc8151b], ['ears', 'Bat ears', true], ['cap', 'Police cap', true],
+        ['helmet', 'Helmet', { color: 0xf2c500, metal: false, neck: false }], ['helmetLabel', 'Helmet label', 'THW'],
+        ['pattern', 'Pattern', { type: 'dots', c1: 0xffffff, c2: 0x141414, scale: 8, zone: 'suit' }],
+        ['mat', 'Material', { metalness: 0.5, roughness: 0.3 }], ['ghost', 'See-through', true]
+      ];
+      var PROP_LABEL = {}; PROPS.forEach(function (p) { PROP_LABEL[p[0]] = p[1]; });
+      var SKIP_KEYS = { label: 1, cat: 1, note: 1, acc: 1, xf: 1 };
+
+      // ── Zustand ──
+      var st = { key: null, def: null, isNew: false, sel: null, dirty: false, hist: [], fut: [] };
+      function clone(v) { return JSON.parse(JSON.stringify(v)); }
+      function hex(n) { return '#' + ('000000' + (n >>> 0).toString(16)).slice(-6); }
+      function num(v, d) { var n = parseFloat(v); return isFinite(n) ? n : d; }
+      function round(n, k) { var f = Math.pow(10, k); return Math.round(n * f) / f; }
+      function status(t, kind) { var s = $('status'); s.textContent = t || ''; s.className = kind || ''; }
+
+      // ── Szene ──
+      var canvas = $('view');
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.setClearColor(0x232b3c);
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 1, 0.05, 100);
+      cam.position.set(3.2, 1.6, 5.6);
+      (function () {
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+      })();
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x6a4a20, 0.5));
+      var keyL = new THREE.DirectionalLight(0xfff4e0, 0.85); keyL.position.set(-0.8, 1.2, 1.4); scene.add(keyL);
+      var grid = new THREE.GridHelper(4, 16, 0x56607a, 0x384057); grid.position.y = -0.56; scene.add(grid);
+      var orbit = new THREE.OrbitControls(cam, canvas);
+      orbit.target.set(0.15, 0.45, 0); orbit.enableDamping = true; orbit.update();
+      var tc = new THREE.TransformControls(cam, canvas);
+      tc.setSize(0.8);
+      scene.add(tc);
+      var duck = null, selGrp = null;
+
+      function resize() {
+        var r = canvas.getBoundingClientRect();
+        renderer.setSize(Math.max(1, r.width), Math.max(1, r.height), false);
+        cam.aspect = Math.max(1, r.width) / Math.max(1, r.height); cam.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', resize);
+      (function loop() { orbit.update(); renderer.render(scene, cam); requestAnimationFrame(loop); })();
+
+      // ── Teile-Zugriff: xf liegt bei Zubehör in dessen Optionen, sonst in def.xf ──
+      function accIndex(id) { return id && id.indexOf('acc:') === 0 ? +id.slice(4) : -1; }
+      function getXf(id, create) {
+        var i = accIndex(id), d = st.def;
+        if (i >= 0) {
+          var a = d.acc && d.acc[i]; if (!a) return null;
+          if (!a[1]) { if (!create) return null; a[1] = {}; }
+          if (!a[1].xf && create) a[1].xf = {};
+          return a[1].xf || null;
+        }
+        if (!d.xf) { if (!create) return null; d.xf = {}; }
+        if (!d.xf[id] && create) d.xf[id] = {};
+        return d.xf[id] || null;
+      }
+      function cleanXf(id) {
+        var xf = getXf(id, false); if (!xf) return;
+        ['p', 'r'].forEach(function (k) { if (xf[k] && xf[k].every(function (v) { return !v; })) delete xf[k]; });
+        if (xf.s && xf.s.every(function (v) { return v === 1; })) delete xf.s;
+        if (!xf.hide) delete xf.hide;
+        if (Object.keys(xf).length) return;
+        var i = accIndex(id);
+        if (i >= 0) delete st.def.acc[i][1].xf; else { delete st.def.xf[id]; if (!Object.keys(st.def.xf).length) delete st.def.xf; }
+      }
+
+      // ── Ente neu bauen ──
+      function rebuild() {
+        var keepSel = st.sel;
+        tc.detach();
+        if (duck) scene.remove(duck);
+        var tmp = '__editor__';
+        var reg = {}; reg[tmp] = st.def;
+        RD.addOutfits(reg);
+        duck = RD.build({ outfit: tmp });
+        // Arbeitskopie nicht in Listen auftauchen lassen
+        var i = RD.OUTFITS.indexOf(tmp); if (i >= 0) RD.OUTFITS.splice(i, 1);
+        scene.add(duck);
+        renderParts();
+        select(keepSel && findPart(keepSel) ? keepSel : null);
+      }
+      function findPart(id) {
+        var ps = (duck && duck.userData.parts) || [];
+        for (var i = 0; i < ps.length; i++) if (ps[i].userData.part.id === id) return ps[i];
+        return null;
+      }
+
+      // ── Verlauf ──
+      function snapshot() { return JSON.stringify(st.def); }
+      var lastSnap = null;
+      function commit() {
+        var s = snapshot();
+        if (s === lastSnap) return;
+        if (lastSnap !== null) { st.hist.push(lastSnap); if (st.hist.length > 200) st.hist.shift(); st.fut = []; }
+        lastSnap = s; st.dirty = true; updateButtons();
+      }
+      function change(fn, noRebuild) { fn(); commit(); if (noRebuild) { renderParts(); syncSel(); } else rebuild(); renderLook(); }
+      function undo() { if (!st.hist.length) return; st.fut.push(lastSnap); lastSnap = st.hist.pop(); st.def = JSON.parse(lastSnap); st.dirty = true; rebuild(); renderLook(); updateButtons(); }
+      function redo() { if (!st.fut.length) return; st.hist.push(lastSnap); lastSnap = st.fut.pop(); st.def = JSON.parse(lastSnap); st.dirty = true; rebuild(); renderLook(); updateButtons(); }
+
+      // ── Outfit laden ──
+      function fillPick() {
+        var sel = $('pick'); sel.textContent = '';
+        var groups = {};
+        Object.keys(CATS).forEach(function (c) { var og = document.createElement('optgroup'); og.label = CATS[c]; groups[c] = og; });
+        RD.OUTFITS.forEach(function (k) {
+          var inf = RD.info(k); if (!inf) return;
+          var op = document.createElement('option'); op.value = k; op.textContent = inf.label + (RD.origin(k) !== 'code' ? ' *' : '');
+          (groups[inf.cat] || groups.custom).appendChild(op);
+        });
+        Object.keys(groups).forEach(function (c) { if (groups[c].children.length) sel.appendChild(groups[c]); });
+        if (st.key && !st.isNew) sel.value = st.key;
+      }
+      function load(key) {
+        st.key = key; st.isNew = false; st.def = RD.def(key) || {}; st.sel = null;
+        st.hist = []; st.fut = []; lastSnap = snapshot(); st.dirty = false;
+        $('keyRow').hidden = true; $('label').value = st.def.label || key; $('pick').value = key;
+        try { history.replaceState(null, '', '?outfit=' + encodeURIComponent(key)); } catch (e) { /* egal */ }
+        rebuild(); renderLook(); updateButtons();
+      }
+      function startNew(def, label) {
+        st.isNew = true; st.key = null; st.def = def; st.def.label = label; st.def.cat = 'custom'; st.sel = null;
+        st.hist = []; st.fut = []; lastSnap = null; commit();
+        $('keyRow').hidden = false; $('key').value = ''; $('label').value = label;
+        $('pick').value = '';
+        rebuild(); renderLook(); updateButtons();
+        $('key').focus();
+      }
+      function confirmLeave() { return !st.dirty || window.confirm('Discard the unsaved changes?'); }
+      $('pick').addEventListener('change', function () {
+        if (!confirmLeave()) { $('pick').value = st.key || ''; return; }
+        load($('pick').value);
+      });
+      $('dup').addEventListener('click', function () { var d = clone(st.def); delete d.note; startNew(d, (st.def.label || st.key || 'Duck') + ' copy'); });
+      $('blank').addEventListener('click', function () { if (confirmLeave()) startNew({}, 'My duck'); });
+      $('label').addEventListener('change', function () { change(function () { st.def.label = $('label').value.trim() || undefined; }, true); });
+      $('key').addEventListener('input', function () {
+        var v = $('key').value.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^[^a-z]+/, '').slice(0, 32);
+        if (v !== $('key').value) $('key').value = v;
+        $('key').removeAttribute('aria-invalid');
+      });
+      window.addEventListener('beforeunload', function (e) { if (st.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+      // ── Teile-Liste ──
+      function renderParts() {
+        var box = $('parts'); box.textContent = '';
+        ((duck && duck.userData.parts) || []).forEach(function (p) {
+          var id = p.userData.part.id, b = document.createElement('button'); b.type = 'button';
+          var xf = getXf(id, false);
+          b.textContent = p.userData.part.label + (xf && xf.hide ? ' (hidden)' : '');
+          b.setAttribute('aria-pressed', String(st.sel === id));
+          b.addEventListener('click', function () { select(st.sel === id ? null : id); });
+          box.appendChild(b);
+        });
+        if (!box.children.length) { var m = document.createElement('span'); m.className = 'muted'; m.textContent = 'No parts yet. Add one below.'; box.appendChild(m); }
+      }
+      (function () {
+        var sel = $('addAcc');
+        Object.keys(RD.ACC).map(function (k) { return [k, RD.ACC_LABELS[k] || k]; })
+          .sort(function (a, b) { return a[1].localeCompare(b[1]); })
+          .forEach(function (e) { var o = document.createElement('option'); o.value = e[0]; o.textContent = e[1]; sel.appendChild(o); });
+      })();
+      $('addBtn').addEventListener('click', function () {
+        var name = $('addAcc').value;
+        change(function () { (st.def.acc = st.def.acc || []).push([name, {}]); st.sel = 'acc:' + (st.def.acc.length - 1); });
+        if (!findPart(st.sel)) status('This part needs settings to show up — see the fields below.', 'err');
+      });
+
+      // ── Auswahl ──
+      function select(id) {
+        st.sel = id;
+        selGrp = id ? findPart(id) : null;
+        if (selGrp) tc.attach(selGrp); else tc.detach();
+        Array.prototype.forEach.call($('parts').children, function (b, i) {
+          var p = duck.userData.parts[i]; if (p) b.setAttribute('aria-pressed', String(p.userData.part.id === id));
+        });
+        $('selBox').hidden = !id;
+        if (id) { $('selName').textContent = selGrp ? selGrp.userData.part.label : id; syncSel(); }
+      }
+      function syncSel() {
+        if (!st.sel) return;
+        var xf = getXf(st.sel, false) || {};
+        var p = xf.p || [0, 0, 0], r = xf.r || [0, 0, 0], s = xf.s || [1, 1, 1];
+        document.querySelectorAll('#selBox input[data-v]').forEach(function (inp) {
+          var arr = { p: p, r: r, s: s }[inp.dataset.v]; inp.value = round(arr[+inp.dataset.i], inp.dataset.v === 'r' ? 1 : 3);
+        });
+        var u = round((s[0] + s[1] + s[2]) / 3, 2); $('uni').value = u; $('uniOut').textContent = u.toFixed(2) + '×';
+        $('pcol').value = xf.c != null ? hex(xf.c) : guessColor();
+        $('phide').checked = !!xf.hide;
+        var i = accIndex(st.sel);
+        $('pRemove').hidden = i < 0;
+        renderAccOpts(i);
+      }
+      function guessColor() {
+        var c = null;
+        if (selGrp) selGrp.traverse(function (m) { if (!c && m.isMesh && m.material && m.material.color && !m.material.map) c = m.material.color.clone().convertLinearToSRGB(); });
+        return c ? '#' + c.getHexString() : '#ffffff';
+      }
+      // aus dem Anfasser zurück in die Daten
+      function readGroup() {
+        if (!selGrp) return;
+        var pv = selGrp.userData.part.pivot, xf = getXf(st.sel, true), D = 180 / Math.PI;
+        xf.p = [round(selGrp.position.x - pv.x, 3), round(selGrp.position.y - pv.y, 3), round(selGrp.position.z - pv.z, 3)];
+        xf.r = [round(selGrp.rotation.x * D, 1), round(selGrp.rotation.y * D, 1), round(selGrp.rotation.z * D, 1)];
+        xf.s = [round(selGrp.scale.x, 3), round(selGrp.scale.y, 3), round(selGrp.scale.z, 3)];
+        cleanXf(st.sel);
+      }
+      tc.addEventListener('dragging-changed', function (e) {
+        orbit.enabled = !e.value;
+        if (!e.value) { readGroup(); commit(); syncSel(); }
+      });
+      tc.addEventListener('objectChange', function () { readGroup(); syncSel(); });
+      function setMode(m) {
+        tc.setMode(m);
+        document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === m)); });
+      }
+      document.querySelectorAll('[data-mode]').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
+      // Felder → Daten → Teil (ohne Neubau)
+      function applySel() { if (selGrp) RD.applyXf(selGrp, getXf(st.sel, false)); }
+      document.querySelectorAll('#selBox input[data-v]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          var v = inp.dataset.v, i = +inp.dataset.i, xf = getXf(st.sel, true);
+          var arr = xf[v] || (v === 's' ? [1, 1, 1] : [0, 0, 0]);
+          arr[i] = v === 's' ? Math.max(0.05, num(inp.value, 1)) : num(inp.value, 0);
+          xf[v] = arr; cleanXf(st.sel); applySel(); commit(); syncSel();
+        });
+      });
+      $('uni').addEventListener('input', function () {
+        var xf = getXf(st.sel, true), u = num($('uni').value, 1), s = xf.s || [1, 1, 1], avg = (s[0] + s[1] + s[2]) / 3 || 1;
+        xf.s = s.map(function (v) { return round(v / avg * u, 3); });
+        $('uniOut').textContent = u.toFixed(2) + '×';
+        applySel();
+      });
+      $('uni').addEventListener('change', function () { cleanXf(st.sel); commit(); syncSel(); });
+      $('pcol').addEventListener('input', function () { getXf(st.sel, true).c = parseInt($('pcol').value.slice(1), 16); applySel(); });
+      $('pcol').addEventListener('change', function () { commit(); });
+      $('pcolReset').addEventListener('click', function () { var xf = getXf(st.sel, false); if (xf) { delete xf.c; cleanXf(st.sel); applySel(); commit(); syncSel(); } });
+      $('phide').addEventListener('change', function () { getXf(st.sel, true).hide = $('phide').checked; cleanXf(st.sel); applySel(); commit(); renderParts(); });
+      $('pReset').addEventListener('click', function () {
+        change(function () {
+          var i = accIndex(st.sel);
+          if (i >= 0) { if (st.def.acc[i][1]) delete st.def.acc[i][1].xf; } else if (st.def.xf) { delete st.def.xf[st.sel]; if (!Object.keys(st.def.xf).length) delete st.def.xf; }
+        });
+      });
+      $('pRemove').addEventListener('click', function () {
+        var i = accIndex(st.sel); if (i < 0) return;
+        change(function () { st.def.acc.splice(i, 1); if (!st.def.acc.length) delete st.def.acc; st.sel = null; });
+      });
+
+      // ── Felder für Werte (Zubehör-Optionen und aufgemalter Look) ──
+      // Farbe: bekannter Farbschlüssel oder großer Ganzzahlwert; Listen als "a, b"; Objekte verschachtelt
+      function isColor(k, v) { return typeof v === 'number' && (COLOR_KEYS[k] || (v >= 4096 && v === Math.floor(v))); }
+      function fieldFor(obj, k, onChange, opts) {
+        opts = opts || {};
+        var v = obj[k], id = 'f' + Math.random().toString(36).slice(2, 9);
+        var wrap = document.createElement('div'); wrap.className = 'field';
+        var lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = opts.label || PROP_LABEL[k] || k;
+        var inp;
+        if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
+          var fs = document.createElement('fieldset'), lg = document.createElement('legend'); lg.textContent = opts.label || PROP_LABEL[k] || k;
+          fs.appendChild(lg);
+          Object.keys(v).forEach(function (kk) { fs.appendChild(fieldFor(v, kk, onChange, { removable: true })); });
+          if (opts.removable) fs.appendChild(removeBtn(obj, k, onChange, lg.textContent));
+          return fs;
+        }
+        if (ENUMS[k] && (typeof v === 'string' || v == null)) {
+          inp = document.createElement('select');
+          ENUMS[k].forEach(function (e) { var o = document.createElement('option'); o.value = e; o.textContent = e || 'normal'; inp.appendChild(o); });
+          inp.value = v || '';
+          inp.addEventListener('change', function () { onChange(function () { if (inp.value) obj[k] = inp.value; else delete obj[k]; }); });
+        } else if (isColor(k, v)) {
+          inp = document.createElement('input'); inp.type = 'color'; inp.value = hex(v);
+          inp.addEventListener('change', function () { onChange(function () { obj[k] = parseInt(inp.value.slice(1), 16); }); });
+        } else if (typeof v === 'boolean') {
+          inp = document.createElement('input'); inp.type = 'checkbox'; inp.checked = v;
+          inp.addEventListener('change', function () { onChange(function () { obj[k] = inp.checked; }); });
+        } else if (typeof v === 'number') {
+          inp = document.createElement('input'); inp.type = 'number'; inp.step = Math.abs(v) >= 2 ? '1' : '0.01'; inp.value = v;
+          inp.addEventListener('change', function () { onChange(function () { obj[k] = num(inp.value, v); }); });
+        } else if (Array.isArray(v) && v.every(function (x) { return typeof x === 'number'; })) {
+          inp = document.createElement('input'); inp.value = v.join(', '); inp.className = 'grow'; inp.setAttribute('aria-describedby', id + 'h');
+          var hlp = document.createElement('span'); hlp.id = id + 'h'; hlp.className = 'muted'; hlp.textContent = 'numbers, comma separated';
+          inp.addEventListener('change', function () { onChange(function () { obj[k] = inp.value.split(',').map(function (x) { return num(x, 0); }); }); });
+          wrap.append(lab, inp, hlp);
+          inp.id = id;
+          if (opts.removable !== false) wrap.appendChild(removeBtn(obj, k, onChange, lab.textContent));
+          return wrap;
+        } else {
+          inp = document.createElement('input'); inp.className = 'grow'; inp.value = typeof v === 'string' ? v : JSON.stringify(v);
+          inp.addEventListener('change', function () { onChange(function () { var t = inp.value; if (typeof v !== 'string') { try { t = JSON.parse(t); } catch (e) { /* bleibt Text */ } } obj[k] = t; }); });
+        }
+        inp.id = id;
+        wrap.append(lab, inp);
+        if (opts.removable !== false) wrap.appendChild(removeBtn(obj, k, onChange, lab.textContent));
+        return wrap;
+      }
+      function removeBtn(obj, k, onChange, name) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'ghost x'; b.textContent = 'Remove';
+        b.setAttribute('aria-label', 'Remove ' + name);
+        b.addEventListener('click', function () { onChange(function () { delete obj[k]; }); });
+        return b;
+      }
+      function renderAccOpts(i) {
+        var box = $('accOpts'); box.textContent = '';
+        if (i < 0 || !st.def.acc || !st.def.acc[i]) return;
+        var a = st.def.acc[i]; a[1] = a[1] || {};
+        var h = document.createElement('h3'); h.textContent = 'Part settings'; box.appendChild(h);
+        var keys = Object.keys(a[1]).filter(function (k) { return k !== 'xf'; });
+        keys.forEach(function (k) { box.appendChild(fieldFor(a[1], k, function (fn) { change(fn); })); });
+        // freie Option ergänzen (z. B. color, style)
+        var row = document.createElement('div'); row.className = 'field';
+        var id = 'ao' + i, lab = document.createElement('label'); lab.htmlFor = id; lab.textContent = 'New setting';
+        var inp = document.createElement('input'); inp.id = id; inp.placeholder = ''; inp.setAttribute('aria-describedby', id + 'h'); inp.className = 'grow';
+        var hlp = document.createElement('span'); hlp.id = id + 'h'; hlp.className = 'muted'; hlp.textContent = 'e.g. color, style';
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = 'Add';
+        b.addEventListener('click', function () {
+          var k = inp.value.trim(); if (!/^[a-zA-Z][a-zA-Z0-9]*$/.test(k) || k === 'xf') { inp.setAttribute('aria-invalid', 'true'); return; }
+          change(function () { a[1][k] = COLOR_KEYS[k] ? 0xffffff : ''; });
+        });
+        row.append(lab, inp, b, hlp); box.appendChild(row);
+      }
+      function renderLook() {
+        var box = $('look'); box.textContent = '';
+        Object.keys(st.def).filter(function (k) { return !SKIP_KEYS[k]; }).forEach(function (k) {
+          box.appendChild(fieldFor(st.def, k, function (fn) { change(fn); }));
+        });
+        var sel = $('addProp'); sel.textContent = '';
+        PROPS.filter(function (p) { return !(p[0] in st.def); }).forEach(function (p) {
+          var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; sel.appendChild(o);
+        });
+        $('addPropBtn').disabled = !sel.options.length;
+      }
+      $('addPropBtn').addEventListener('click', function () {
+        var k = $('addProp').value, p = PROPS.filter(function (x) { return x[0] === k; })[0]; if (!p) return;
+        change(function () { st.def[k] = clone(p[2]); });
+      });
+
+      // ── Speichern / Zurücksetzen ──
+      function updateButtons() {
+        $('undo').disabled = !st.hist.length; $('redo').disabled = !st.fut.length;
+        var org = st.isNew ? 'unsaved' : RD.origin(st.key);
+        $('origin').textContent = ORIGIN_TXT[org] + (st.dirty && !st.isNew ? ', edited' : '');
+        $('drop').hidden = st.isNew || org === 'code';
+        $('drop').textContent = org === 'new' ? 'Delete outfit' : 'Reset to original';
+        $('save').disabled = !st.dirty && !st.isNew;
+      }
+      function api(method, url, body) {
+        return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status)); return d; }); });
+      }
+      $('save').addEventListener('click', function () {
+        var key = st.isNew ? $('key').value.trim() : st.key;
+        if (!/^[a-z][a-z0-9-]{0,31}$/.test(key || '')) { $('key').setAttribute('aria-invalid', 'true'); $('key').focus(); status('Please enter a URL name (lowercase letters, digits, dashes).', 'err'); return; }
+        if (st.isNew && RD.info(key) && !window.confirm('An outfit called "' + key + '" exists already. Replace it?')) return;
+        var def = clone(st.def);
+        status('Saving …');
+        api('POST', '/app/api/ducks/outfits', { key: key, def: def }).then(function () {
+          var reg = {}; reg[key] = clone(def); RD.applyCustom(reg);
+          st.key = key; st.isNew = false; st.dirty = false; $('keyRow').hidden = true;
+          fillPick(); $('pick').value = key;
+          try { history.replaceState(null, '', '?outfit=' + encodeURIComponent(key)); } catch (e) { /* egal */ }
+          updateButtons();
+          status('Saved. Live as outfit=' + key + ' (new duck rains and knife ducks pick it up on their next start).', 'ok');
+        }).catch(function (e) { status('Not saved: ' + e.message, 'err'); });
+      });
+      $('drop').addEventListener('click', function () {
+        var org = RD.origin(st.key);
+        if (!window.confirm(org === 'new' ? 'Delete the outfit "' + st.key + '" for good?' : 'Throw away the saved changes and go back to the original "' + st.key + '"?')) return;
+        api('DELETE', '/app/api/ducks/outfits/' + encodeURIComponent(st.key)).then(function () {
+          var k = st.key; RD.dropCustom(k); st.dirty = false;
+          fillPick();
+          load(RD.info(k) ? k : RD.OUTFITS[0]);
+          status(org === 'new' ? 'Deleted.' : 'Back to the original.', 'ok');
+        }).catch(function (e) { status('Failed: ' + e.message, 'err'); });
+      });
+      $('undo').addEventListener('click', undo);
+      $('redo').addEventListener('click', redo);
+
+      // ── Klick in die Szene wählt ein Teil ──
+      var ray = new THREE.Raycaster(), down = null;
+      canvas.addEventListener('pointerdown', function (e) { down = [e.clientX, e.clientY]; });
+      canvas.addEventListener('pointerup', function (e) {
+        if (!down || tc.dragging || tc.axis || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+        var r = canvas.getBoundingClientRect();
+        ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
+        var hits = ray.intersectObject(duck, true), id = null;
+        for (var i = 0; i < hits.length && !id; i++) {
+          for (var o = hits[i].object; o && o !== duck; o = o.parent) if (o.userData.part && o.visible) { id = o.userData.part.id; break; }
+          if (!id && hits[i].object === duck.userData.body) break;
+        }
+        select(id);
+      });
+
+      // ── Tastatur ──
+      document.addEventListener('keydown', function (e) {
+        var t = e.target, typing = t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA');
+        if ((e.ctrlKey || e.metaKey) && !typing && e.key.toLowerCase() === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
+        if ((e.ctrlKey || e.metaKey) && !typing && e.key.toLowerCase() === 'y') { e.preventDefault(); redo(); return; }
+        if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.key === 'w' || e.key === 'W') setMode('translate');
+        else if (e.key === 'e' || e.key === 'E') setMode('rotate');
+        else if (e.key === 'r' || e.key === 'R') setMode('scale');
+        else if (e.key === 'Escape' && st.sel) select(null);
+      });
+
+      // ── Start ──
+      fillPick();
+      resize();
+      var want = new URLSearchParams(location.search).get('outfit');
+      load(want && RD.info(want) ? want : 'police');
+      $('pick').value = st.key;
+    })();
+  </script>
+</body>
+</html>

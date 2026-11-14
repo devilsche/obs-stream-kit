@@ -367,16 +367,36 @@
     var white = new THREE.MeshBasicMaterial({ color: 0xffffff });
 
     var b = new THREE.Mesh(body(), yellow); g.add(b);
+    // Jedes Teil (Schnabel, Flügel, Augen, Helm, Zubehör …) landet in einer eigenen Gruppe mit
+    // Drehpunkt in seiner Mitte; o.xf[id] bzw. acc-Option xf verschiebt/dreht/skaliert/färbt es
+    // (Duck-Editor, tools/duck-editor.html). Ein Fehler in einem Teil kostet nur dieses Teil.
+    var xfs = o.xf || {}, parts = [];
+    function part(id, label, fn, xf) {
+      var n0 = g.children.length;
+      try { fn(); } catch (e) { if (root.console) root.console.warn('rubber-duck: part ' + id + ' failed', e); }
+      var kids = g.children.slice(n0);
+      if (!kids.length) return null;
+      var grp = new THREE.Group(), box = new THREE.Box3(), c = new THREE.Vector3();
+      kids.forEach(function (k) { box.expandByObject(k); });
+      if (!box.isEmpty()) box.getCenter(c);
+      kids.forEach(function (k) { grp.add(k); k.position.sub(c); });
+      grp.name = id; grp.userData.part = { id: id, label: label, pivot: c.clone() };
+      g.add(grp); parts.push(grp);
+      applyXf(grp, xf || xfs[id]);
+      return grp;
+    }
     // Schnabel: ein Teil, leicht geöffnet
     // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
     var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.09), beak);
-    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; if (!o.noBill) g.add(bill);
+    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; if (!o.noBill) part('bill', 'Bill', function () { g.add(bill); });
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     // noWings: wer eigene Arme animiert (Messer-Ente), lässt die angelegten Flügel weg
     if (!opts.noWings) [-1, 1].forEach(function (s) {
-      var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat);
-      w.position.set(-0.05, 0.12, s * 0.79); w.rotation.set(s * 0.15, s * 0.12, 0.35);
-      g.add(w);
+      part(s < 0 ? 'wingR' : 'wingL', s < 0 ? 'Right wing' : 'Left wing', function () {
+        var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat);
+        w.position.set(-0.05, 0.12, s * 0.79); w.rotation.set(s * 0.15, s * 0.12, 0.35);
+        g.add(w);
+      });
     });
     // aufgemalte Augen: flach auf dem Kopf, entlang der Normalen
     var HC = new THREE.Vector3(PARTS[5].c[0], PARTS[5].c[1], 0), HR = PARTS[5].r;
@@ -392,7 +412,7 @@
     }
     var eyeCol = o.eyeColor != null ? new THREE.MeshBasicMaterial({ color: o.eyeColor }) : null;
     if (eyeCol) eyeCol.color.convertSRGBToLinear();
-    [-1, 1].forEach(function (s) {
+    part('eyes', 'Eyes', function () { [-1, 1].forEach(function (s) {
       var ed = new THREE.Vector3(0.8, 0.36, s * 0.5), e2;
       if (o.eyes === 'none') return;
       if (o.eyes === 'white' || o.eyes === 'glow') {
@@ -423,12 +443,12 @@
         decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.8, 0.36, s * 0.5));
         decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.84, 0.44, s * 0.44), 1.003);
       }
-    });
+    }); });
 
     // Helm (THW gelb, Feuerwehr silber mit Nackenschutz) mit Schild vorn
     // Helm wie ein Schutzhelm oben auf dem Kopf: Rand auf Stirnhöhe über den Augen
     // (Augen bei ~HC.y+0.23), Kuppel etwas flacher als der Kopf
-    if (o.helmet) {
+    if (o.helmet) part('helmet', 'Helmet', function () {
       var hm = o.helmet.metal ? vinyl(o.helmet.color, { metalness: 0.7, roughness: 0.3, envMapIntensity: 1.0 }) : vinyl(o.helmet.color, { roughness: 0.35, clearcoat: 0.8 });
       // Rand liegt direkt auf dem Kopf auf (Kopfradius auf dieser Höhe + Wandstärke)
       var RIM_Y = HC.y + 0.29, tilt = 0.1;
@@ -453,9 +473,9 @@
         lab.position.copy(lp); lab.lookAt(lp.clone().add(new THREE.Vector3(Math.cos(la) / rimR, Math.sin(la) / 0.37, 0).normalize()));
         helmet.add(lab);
       }
-    }
+    });
     // Polizeimütze: Band, oben breiter Deckel, schwarzer Schirm, Stern
-    if (o.cap) {
+    if (o.cap) part('cap', 'Police cap', function () {
       var capM = vinyl(o.suit), black = vinyl(0x111318, { roughness: 0.2, clearcoat: 1 });
       var band2 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.18, 48), black);
       band2.position.copy(HC).add(new THREE.Vector3(-0.02, 0.4, 0)); band2.rotation.z = 0.12; g.add(band2);
@@ -466,19 +486,19 @@
       var badge = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ map: emblemTex('star'), transparent: true, metalness: 0.5, roughness: 0.35 }));
       var bp = HC.clone().add(new THREE.Vector3(0.5, 0.47, 0)); badge.position.copy(bp); badge.lookAt(bp.clone().add(new THREE.Vector3(1, 0.2, 0)));
       g.add(badge);
-    }
+    });
     // Fledermaus-Ohren auf der Maske
-    if (o.ears) {
+    if (o.ears) part('ears', 'Bat ears', function () {
       var cowlM = vinyl(o.cowl, { roughness: 0.4 });
       [-1, 1].forEach(function (s) {
         var ear = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.38, 24), cowlM);
         ear.position.copy(headPoint(new THREE.Vector3(0.05, 0.85, s * 0.5), 0.92)).add(new THREE.Vector3(0, 0.12, 0));
         ear.rotation.set(s * 0.25, 0, 0.1); g.add(ear);
       });
-    }
+    });
     // Umhang: oben ein Kragen um den Nacken (dort, wo hinten die Maske endet), von dort
     // über den Rücken bis etwa zur Schwanzwurzel; wölbt sich zu den Seiten herab
-    if (o.cape) {
+    if (o.cape) part('cape', 'Cape', function () {
       var U = 28, V = 24, cpos = [], cidx = [], COLLAR_Y = 0.74;
       var topAt = function (x) {             // Rücken-Oberseite (Mittellinie) des Rumpfs bei x
         var q = new THREE.Vector3(x, 1.6, 0), lo = -0.6, hi = 1.6, hit = false;
@@ -531,16 +551,16 @@
       }
       capeMesh.userData.cape = { base: Float32Array.from(cpos), nrm: nrmArr, U: U, V: V };
       g.add(capeMesh);
-    }
+    });
     // Zubehör (Hüte, Haare, Brillen, Requisiten): ACC[name](ctx, opts), siehe js/rubber-duck-outfits.js
     if (o.acc) {
       var ctx = { g: g, o: o, HC: HC, HR: HR, headPoint: headPoint, decal: decal, paint: paint, white: white, skin: skin, body: yellow, wingMat: wingMat };
-      o.acc.forEach(function (a) {
-        var fn = ACC[a[0]];
-        if (fn) fn(ctx, a[1] || {});
+      o.acc.forEach(function (a, i) {
+        var fn = ACC[a[0]], ao = a[1] || {};
+        if (fn) part('acc:' + i, ACC_LABELS[a[0]] || a[0], function () { fn(ctx, ao); }, ao.xf);
       });
     }
-    g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat };
+    g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat, parts: parts };
     return g;
   }
 
@@ -576,8 +596,55 @@
     return c;
   }
 
+  // Teil-Anpassung aus dem Editor: p = Verschiebung, r = Drehung in Grad, s = Maßstab (x, y, z),
+  // c = Farbe (0xRRGGBB), hide = ausblenden. Relativ zur gebauten Lage, um die Teilmitte.
+  var DEG = Math.PI / 180;
+  function applyXf(grp, xf) {
+    var pv = grp.userData.part.pivot;
+    xf = xf || {};
+    var p = xf.p || [0, 0, 0], r = xf.r || [0, 0, 0], sc = xf.s || [1, 1, 1];
+    grp.position.set(pv.x + (+p[0] || 0), pv.y + (+p[1] || 0), pv.z + (+p[2] || 0));
+    grp.rotation.set((+r[0] || 0) * DEG, (+r[1] || 0) * DEG, (+r[2] || 0) * DEG);
+    grp.scale.set(+sc[0] || 1, +sc[1] || 1, +sc[2] || 1);
+    grp.visible = !xf.hide;
+    grp.traverse(function (m) {
+      if (!m.isMesh || !m.material || Array.isArray(m.material)) return;
+      if (!m.userData.origMat) m.userData.origMat = m.material;
+      if (xf.c == null) { m.material = m.userData.origMat; return; }
+      if (m.material === m.userData.origMat) m.material = m.userData.origMat.clone();
+      if (m.material.color) m.material.color.set(xf.c).convertSRGBToLinear();
+    });
+  }
+
   var ACC = {};
+  var ACC_LABELS = {};   // Anzeigenamen der Bausteine (Editor), von rubber-duck-outfits.js gefüllt
   var KEYS = Object.keys(OUTFITS);
+  // Outfits aus dem Duck-Editor (Server, /api/fx/ducks/custom.js): ersetzen ein Outfit aus dem
+  // Code oder kommen neu dazu. ORIG hält das Code-Original für "zurücksetzen".
+  var ORIG = {}, CUSTOM = {};
+  function jclone(v) { return JSON.parse(JSON.stringify(v)); }
+  function applyCustom(defs) {
+    Object.keys(defs || {}).forEach(function (k) {
+      var d = defs[k];
+      if (!d || typeof d !== 'object') return;
+      if (OUTFITS[k] && !CUSTOM[k] && !ORIG[k]) ORIG[k] = jclone(OUTFITS[k]);
+      if (!ORIG[k] && !d.cat) d.cat = 'custom';
+      CUSTOM[k] = true;
+      OUTFITS[k] = d;
+      if (KEYS.indexOf(k) < 0) KEYS.push(k);
+    });
+  }
+  // gespeichertes Outfit verwerfen: Code-Original zurück bzw. eigenes Outfit weg
+  function dropCustom(k) {
+    if (!CUSTOM[k]) return;
+    delete CUSTOM[k];
+    if (ORIG[k]) { OUTFITS[k] = ORIG[k]; delete ORIG[k]; return; }
+    delete OUTFITS[k];
+    var i = KEYS.indexOf(k); if (i >= 0) KEYS.splice(i, 1);
+  }
+  function origin(k) { return !OUTFITS[k] ? null : !CUSTOM[k] ? 'code' : ORIG[k] ? 'changed' : 'new'; }
+  function getDef(k) { return OUTFITS[k] ? jclone(OUTFITS[k]) : null; }
+  function original(k) { return ORIG[k] ? jclone(ORIG[k]) : (OUTFITS[k] && !CUSTOM[k] ? jclone(OUTFITS[k]) : null); }
   // weitere Outfits anmelden (js/rubber-duck-outfits.js); die Namensliste bleibt dieselbe Liste
   function addOutfits(defs) {
     Object.keys(defs).forEach(function (k) { OUTFITS[k] = defs[k]; if (KEYS.indexOf(k) < 0) KEYS.push(k); });
@@ -585,7 +652,8 @@
   function info(k) { var o = OUTFITS[k]; return o ? { key: k, label: o.label || k, cat: o.cat || 'classic', note: o.note || '' } : null; }
   root.RubberDuck = {
     build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
-    addOutfits: addOutfits, ACC: ACC, EMBLEMS: EMBLEMS,
+    addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
+    applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
     util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
   };
 })(typeof window !== 'undefined' ? window : this);

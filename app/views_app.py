@@ -9,7 +9,7 @@ from flask import (
     abort, send_from_directory,
 )
 
-from webcore.middleware import require_session, _get_conn
+from webcore.middleware import require_admin, require_session, _get_conn
 from core import credentials as core_creds
 
 
@@ -73,6 +73,11 @@ TOOLS = [
      "label": "Rubber duck outfits",
      "desc": "All rubber duck outfits side by side — heroes, horror, jobs, fun and celebrities — with their URL parameter.",
      "path": "tools/duck-gallery.html",
+     "admin_only": True},
+    {"key": "duck-editor",
+     "label": "Rubber duck editor",
+     "desc": "Rebuild any rubber duck outfit or make a new one: move, turn and resize hats and props, change colours. Saved outfits go live everywhere.",
+     "path": "tools/duck-editor.html",
      "admin_only": True},
     {"key": "pumpkin-turn",
      "label": "Pumpkin turn preview",
@@ -645,6 +650,34 @@ def dock_weather():
     return render_template("dock_weather.html", token=row["token"] if row else None, groups=groups,
                            place=(request.args.get("place") or "").strip()[:80],
                            who=(g.user.get("display_name") or "").strip())
+
+
+def _duck_root():
+    return current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+
+
+@bp_app.route("/app/api/ducks/outfits", methods=["POST"])
+@require_admin
+def duck_outfit_save():
+    """Duck-Editor: Outfit speichern (global, gilt sofort in Regen und Messer-Ente).
+    Nur JSON — ein fremdes Formular kann so keinen Request unterschieben."""
+    from fx import duck_outfits
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "JSON body expected"}), 400
+    err = duck_outfits.save(_duck_root(), body.get("key"), body.get("def"))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/ducks/outfits/<key>", methods=["DELETE"])
+@require_admin
+def duck_outfit_delete(key):
+    """Gespeichertes Outfit löschen: eigenes ist weg, umgebautes wieder im Original."""
+    from fx import duck_outfits
+    return jsonify({"ok": True, "deleted": duck_outfits.delete(_duck_root(), key)})
 
 
 def _visible_tools():

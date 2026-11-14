@@ -34,6 +34,7 @@
     .cat { color: var(--muted); font-size: 13px; }
     .param { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
     .meta a { color: var(--text); font-size: 13px; padding: 4px 0; min-height: 24px; display: inline-block; }
+    .links { display: flex; gap: 14px; }
   </style>
 </head>
 <body>
@@ -55,12 +56,13 @@
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck-outfits.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
   <script>
     (function () {
       'use strict';
       var THREE = window.THREE, RD = window.RubberDuck;
       var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-      var CATS = { all: 'All', classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities' };
+      var CATS = { all: 'All', classic: 'Classic', heroes: 'Heroes & villains', horror: 'Halloween & horror', jobs: 'Jobs & comedy', fun: 'Fun', celebs: 'Celebrities', custom: 'Custom' };
 
       // ── Kacheln ──
       var list = document.getElementById('ducks'), tiles = [];
@@ -73,7 +75,9 @@
         var c = document.createElement('span'); c.className = 'cat'; c.textContent = CATS[inf.cat] || inf.cat;
         var p = document.createElement('code'); p.className = 'param'; p.textContent = 'outfit=' + k;
         var a = document.createElement('a'); a.href = 'duck-viewer?outfit=' + encodeURIComponent(k); a.textContent = 'Open in viewer';
-        meta.append(h, c, p, a); li.append(st, meta); list.appendChild(li);
+        var e = document.createElement('a'); e.href = 'duck-editor?outfit=' + encodeURIComponent(k); e.textContent = 'Edit'; e.setAttribute('aria-label', 'Edit ' + inf.label);
+        var links = document.createElement('div'); links.className = 'links'; links.append(a, e);
+        meta.append(h, c, p, links); li.append(st, meta); list.appendChild(li);
         tiles.push({ key: k, li: li, stage: st, label: inf.label.toLowerCase(), duck: null, yaw: -0.6 + (tiles.length % 5) * 0.08, hover: false });
         var t = tiles[tiles.length - 1];
         li.addEventListener('pointerenter', function () { t.hover = true; });
@@ -85,6 +89,7 @@
       // ── Filter ──
       var cat = 'all', cats = document.getElementById('cats'), q = document.getElementById('q'), count = document.getElementById('count');
       Object.keys(CATS).forEach(function (c) {
+        if (c !== 'all' && !tiles.some(function (t) { return t.li.dataset.cat === c; })) return;
         var b = document.createElement('button'); b.type = 'button'; b.textContent = CATS[c]; b.setAttribute('aria-pressed', String(c === cat));
         b.addEventListener('click', function () {
           cat = c; Array.prototype.forEach.call(cats.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); apply();
