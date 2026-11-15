@@ -1006,6 +1006,27 @@
     tube([new V3(0.98, 0.915, -0.29), new V3(1.15, 0.94, -0.42), new V3(1.32, 0.99, -0.55)], 0.008, m, c.g).name = 'Grass blade';
   };
 
+  // Langschwert: aufrecht in der Flügelspitze, Klinge schräg nach oben
+  ACC.sword = function (c, a) {
+    var g2 = new THREE.Group(); g2.position.copy(held(c, 1).add(new V3(0.06, 0.02, 0.1))); g2.rotation.set(0.12, -0.7, -0.28); c.g.add(g2);
+    var bl = new THREE.Shape(); bl.moveTo(-0.045, 0); bl.lineTo(0.045, 0); bl.lineTo(0.04, 0.9); bl.lineTo(0, 1.04); bl.lineTo(-0.04, 0.9); bl.closePath();
+    var bg = new THREE.ExtrudeGeometry(bl, { depth: 0.012, bevelEnabled: true, bevelThickness: 0.006, bevelSize: 0.006, bevelSegments: 1 }); bg.translate(0, 0, -0.006);
+    var gold = metal(a.guard || 0xd9b23a);
+    add(g2, bg, metal(a.color || 0xe3e7ec, { roughness: 0.12 }), 0, 0.03).name = 'Blade';
+    add(g2, box(0.34, 0.045, 0.06), gold).name = 'Crossguard';
+    add(g2, cyl(0.024, 0.024, 0.2, 12), fabric(0x4a2c18, { roughness: 0.6 }), 0, -0.12).name = 'Grip';
+    add(g2, sph(0.045, 16), gold, 0, -0.25).name = 'Pommel';
+  };
+  // Wappenschild (spitz zulaufend) mit Kreuz, im anderen Flügel
+  ACC.kiteshield = function (c, a) {
+    var g2 = new THREE.Group(), h = held(c, -1); g2.position.set(h.x - 0.2, h.y + 0.1, h.z - 0.1); g2.rotation.set(0, PI - 0.6, 0.08); c.g.add(g2);
+    var sh = new THREE.Shape(); sh.moveTo(-0.27, 0.32); sh.lineTo(0.27, 0.32); sh.quadraticCurveTo(0.28, -0.12, 0, -0.42); sh.quadraticCurveTo(-0.28, -0.12, -0.27, 0.32);
+    var sg = new THREE.ExtrudeGeometry(sh, { depth: 0.035, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.015, bevelSegments: 2 });
+    add(g2, sg, M(a.color || 0xf4f2ea, { roughness: 0.4 })).name = 'Shield';
+    var cr = M(a.cross || 0xc8151b, { roughness: 0.4 });
+    add(g2, box(0.08, 0.6, 0.012), cr, 0, -0.01, 0.05).name = 'Cross upright';
+    add(g2, box(0.46, 0.08, 0.012), cr, 0, 0.13, 0.05).name = 'Cross bar';
+  };
   // ════════ Embleme ════════
   function drawStar(x, cx, cy, ro, ri) { x.beginPath(); for (var i = 0; i < 10; i++) { var a = i / 10 * PI * 2 - PI / 2, r = i % 2 ? ri : ro; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.closePath(); x.fill(); }
   function drawSkull(x, cx, cy, sc, col) {
@@ -1087,7 +1108,7 @@
     racestripes: 'Racing stripes', wheel: 'Steering wheel', bow: 'Bow and heart arrow', curls: 'Curls', tutu: 'Tutu',
     bun: 'Hair bun', exechood: 'Executioner hood', axe: 'Axe', biceps: 'Biceps', dumbbell: 'Dumbbell', donut: 'Donut',
     bra: 'Lace bra', lacepanties: 'Lace panties', garter: 'Garter belt', boa: 'Feather boa', lashes: 'Eyelashes',
-    openvest: 'Open vest', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass'
+    openvest: 'Open vest', sword: 'Sword', kiteshield: 'Kite shield', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass'
   });
 
   // ════════ Outfits ════════
@@ -1131,7 +1152,7 @@
     cowboy: { label: 'Cowboy', cat: 'jobs', suit: 0x3c5a8a, collar: 0.55, belt: 0x5a3a22, beltY: -0.22, chest: 'sheriff', chestSize: 0.24, chestY: 0.12, acc: [['cowboy'], ['neckerchief', { triangle: true }]] },
     astronaut: { label: 'Astronaut', cat: 'jobs', suit: 0xeef0f3, collar: 0.55, belt: 0x8d939b, beltY: -0.2, chest: 'mission', chestSize: 0.28, chestY: 0.1, acc: [['astro']] },
     ninja: { label: 'Ninja', cat: 'jobs', skin: 0x16161a, mask: 0xf6bd16, bill: 0x2a2a30, acc: [['headband', { tails: true, dy: 0.38 }], ['katana']] },
-    knight: { label: 'Knight', cat: 'jobs', skin: 0xb9bec6, mat: { metalness: 0.75, roughness: 0.3, envMapIntensity: 1.1 }, chest: 'cross', chestSize: 0.4, acc: [['knighthelm']] },
+    knight: { label: 'Knight', cat: 'jobs', skin: 0xb9bec6, mat: { metalness: 0.75, roughness: 0.3, envMapIntensity: 1.1 }, chest: 'cross', chestSize: 0.4, acc: [['knighthelm'], ['sword'], ['kiteshield']] },
     viking: { label: 'Viking', cat: 'jobs', suit: 0x6b4a2c, collar: 0.55, belt: 0x2a1e14, beltY: -0.2, acc: [['vikinghelm'], ['beard', { style: 'long', color: 0xd27a2c }], ['scarf', { color: 0x8a8378, thick: 0.12 }]] },
     king: { label: 'King', cat: 'jobs', suit: 0x7b1522, collar: 0.55, cape: 0x7b1522, acc: [['crown'], ['chain', { medal: true }], ['scepter'], ['scarf', { color: 0xfaf7ef, thick: 0.09 }]] },
     prisoner: { label: 'Prisoner', cat: 'jobs', suit: 0xf2f2f2, collar: 0.55, chest: 'num1337', chestSize: 0.42, chestY: 0.15, pattern: { type: 'hstripes', c1: 0xf2f2f2, c2: 0x141414, scale: 7, zone: 'suit' }, acc: [['prisonercap'], ['ballchain']] },
