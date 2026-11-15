@@ -404,8 +404,10 @@
       grp.add(inner);
       // Unterteile: alle Meshes des Teils in fester Reihenfolge, mit ihrer gebauten Lage
       var pieces = [];
+      var mirrors = [];
       inner.traverse(function (m) {
         if (!m.isMesh) return;
+        if (m.userData.mirrorOf) { mirrors.push(m); return; }   // Spiegelbild eines Stücks, folgt ihm
         m.userData.base = { p: m.position.toArray(), q: m.quaternion.toArray(), s: m.scale.toArray(), v: m.visible };
         hide(m.userData, 'baseGeo', m.geometry);
         pieces.push(m);
@@ -413,7 +415,7 @@
       gkey = gkey || id;
       grp.name = id;
       grp.userData.part = { id: id, gkey: gkey, label: label, pivot: c.clone(), xf: xf || xfs[id] || null, gxf: GPARTS[gkey] || null };
-      hide(grp.userData.part, 'inner', inner); hide(grp.userData.part, 'pieces', pieces);
+      hide(grp.userData.part, 'inner', inner); hide(grp.userData.part, 'pieces', pieces); hide(grp.userData.part, 'mirrors', mirrors);
       // Kasten der Griffpunkte für das ganze Teil (Raum der inneren Gruppe, gebaute Lage)
       inner.updateMatrixWorld(true);
       var lb = new THREE.Box3();
@@ -957,6 +959,23 @@
       var gp = sg.geo || so.geo ? Object.assign({}, sg.geo, so.geo) : null;
       deform(m, pieceSrc(m, gp), [bg[0] + bo[0], bg[1] + bo[1]], latSum(sg.l, so.l), L, P.lbox, inner);
       setMat(m, so.c != null ? so.c : xo.c != null ? xo.c : sg.c != null ? sg.c : xg.c);
+    });
+    mirrorPieces(grp, P);
+  }
+  // Spiegelbilder (userData.mirrorOf = Name des Stücks): an der Mittelebene der Ente (z = 0)
+  // gespiegelt, mit derselben Geometrie und Farbe – wandert das Teil zur Seite, geht das Bild gegenläufig
+  function mirrorPieces(grp, P) {
+    if (!P.mirrors || !P.mirrors.length) return;
+    grp.updateMatrix(); P.inner.updateMatrix();
+    var GI = new THREE.Matrix4().multiplyMatrices(grp.matrix, P.inner.matrix), GIi = GI.clone().invert(), Rz = new THREE.Matrix4().makeScale(1, 1, -1);
+    P.mirrors.forEach(function (mm) {
+      var src = (P.pieces || []).filter(function (p) { return p.name === mm.userData.mirrorOf; })[0];
+      if (!src) { mm.visible = false; return; }
+      mm.matrixAutoUpdate = false;
+      mm.matrix.copy(GIi).multiply(Rz).multiply(GI).multiply(pieceMatrix(src, P.inner));
+      mm.matrix.decompose(mm.position, mm.quaternion, mm.scale);
+      mm.matrixWorldNeedsUpdate = true;
+      mm.geometry = src.geometry; mm.material = src.material; mm.visible = src.visible;
     });
   }
   // ältere Aufrufer: nur die Outfit-Ebene setzen

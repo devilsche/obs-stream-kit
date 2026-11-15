@@ -186,6 +186,11 @@
         <div id="primBox" hidden>
           <h3 id="primTitle">Measurements</h3>
           <div id="primRows"></div>
+          <div class="row" id="shapeMirrorRow" hidden>
+            <input type="checkbox" id="shapeMirror" aria-describedby="shapeMirrorHelp">
+            <label for="shapeMirror">Mirror to the other side</label>
+          </div>
+          <p class="muted small" id="shapeMirrorHelp" hidden>Adds a mirror copy on the other side of the duck that follows every change. Move the shape (or the hose points) off the middle to see both.</p>
           <div class="row">
             <button type="button" id="primReset" class="ghost">Reset measurements</button>
           </div>
@@ -777,6 +782,9 @@
       function renderPrim() {
         var i = primIdx(), info = primInfo(), box = $('primRows');
         $('primBox').hidden = !info;
+        var ai = st.mode === 'outfit' ? accIndex(st.sel) : -1, shp = ai >= 0 && st.def.acc && st.def.acc[ai] && st.def.acc[ai][0] === 'shape';
+        $('shapeMirrorRow').hidden = $('shapeMirrorHelp').hidden = !shp;
+        if (shp) $('shapeMirror').checked = !!(st.def.acc[ai][1] || {}).mirror;
         if (!info) { box.textContent = ''; box.dataset.tag = ''; return; }
         $('primTitle').textContent = 'Measurements (' + PRIM_NAME[info.t] + ')';
         sliders(box, st.mode + '|' + st.sel + '|' + i + '|' + info.t, RD.primSpec(info), RD.primParams(info, geoNow(i)), 'pm-', function (k, v) {
@@ -784,6 +792,10 @@
           if (!primRaf) primRaf = requestAnimationFrame(function () { primRaf = 0; applySel(); placeHandles(); });
         }, function () { cleanXf(st.sel); commit(); });
       }
+      $('shapeMirror').addEventListener('change', function () {
+        var ai = accIndex(st.sel); if (ai < 0) return;
+        change(function () { var o = st.def.acc[ai][1] = st.def.acc[ai][1] || {}; if ($('shapeMirror').checked) o.mirror = true; else delete o.mirror; });
+      });
       $('primReset').addEventListener('click', function () {
         var i = primIdx(), sx = i == null ? null : subXf(i, false);
         if (sx) { delete sx.geo; cleanXf(st.sel); applySel(); commit(); syncSel(); placeHandles(); }

@@ -509,7 +509,7 @@
     var m = add(c.g, collarGeo(f), [out, inn]);
     m.name = 'Collar'; m.position.set(0.38, 0.82, 0); m.rotation.z = f.lean * PI / 180;
   };
-  // Freie Form (Duck-Editor „Add part“ → Shape): Quader, Zylinder, Kugel, Ring oder Schlauch;
+  // Freie Form (Duck-Editor „Add part“ → Shape): Quader, Zylinder, Kugel, Ring oder Schlauch, mirror = Spiegelbild;
   // Maße, Biegung, runde Ecken, Feder und Knickpunkte stellt der Editor über „Shape“ ein.
   var HOSE = { r: 0.03, taper: 1, round: 0.5, pts: [[0, 0, -0.3], [0.05, 0.12, -0.1], [0.05, -0.05, 0.1], [0, 0.1, 0.3]] };
   ACC.shape = function (c, a) {
@@ -523,6 +523,8 @@
       m = add(c.g, geo, M(a.color != null ? a.color : 0xf2b705));
     }
     m.name = 'Shape'; m.position.set(1.05, 0.15, 0);
+    // gespiegelt auf die andere Seite (folgt dem Original, siehe mirrorPieces in rubber-duck.js)
+    if (a.mirror) { var mm = add(c.g, m.geometry, m.material); mm.name = 'Shape (mirrored)'; mm.userData.mirrorOf = 'Shape'; }
   };
   ACC.necklace = function (c, a) {
     var m = metal(a.color || 0xc9ced6), t = add(c.g, torus(0.47, 0.022, 48), m); t.position.set(0.44, 0.6, 0); t.rotation.set(PI / 2, -0.28, 0);
