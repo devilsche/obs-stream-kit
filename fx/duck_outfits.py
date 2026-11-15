@@ -19,7 +19,7 @@ import threading
 KEY_RE = re.compile(r"^[a-z][a-z0-9-]{0,31}$")
 MAX_DEF_BYTES = 64 * 1024
 MAX_OUTFITS = 300
-MAX_DEPTH = 10
+MAX_DEPTH = 12
 PART_KEY_RE = re.compile(r"^(bill|wingL|wingR|eyes|helmet|cap|ears|cape|acc:[a-z][a-zA-Z0-9_-]{0,39})$")
 MAX_PARTS = 200
 

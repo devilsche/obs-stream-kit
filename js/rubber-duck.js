@@ -407,6 +407,7 @@
       inner.traverse(function (m) {
         if (!m.isMesh) return;
         m.userData.base = { p: m.position.toArray(), q: m.quaternion.toArray(), s: m.scale.toArray(), v: m.visible };
+        hide(m.userData, 'baseGeo', m.geometry);
         pieces.push(m);
       });
       gkey = gkey || id;
@@ -710,13 +711,15 @@
   }
   // Verformen aus der gebauten Geometrie: Griffpunkte des Unterteils (lp), Biegung (b),
   // Griffpunkte des ganzen Teils (L im Raum der inneren Gruppe, Kasten box)
-  function deform(m, b, lp, L, box, inner) {
+  // Verformen aus der Quell-Geometrie src (gebaut bzw. aus Grundform-Reglern neu erzeugt):
+  // Griffpunkte des Unterteils (lp), Biegung (b), Griffpunkte des ganzen Teils (L, Kasten box)
+  function deform(m, src, b, lp, L, box, inner) {
     if (m.userData.cape) return;                     // Umhang verformt sich selbst (flutter)
+    hide(m.userData, 'srcGeo', src);
     var bx = b ? +b[0] || 0 : 0, bz = b ? +b[1] || 0 : 0, any = bx || bz || lp || (L && box);
-    if (!m.userData.baseGeo) { if (!any) return; hide(m.userData, 'baseGeo', m.geometry); }
-    var src = m.userData.baseGeo;
-    if (!any) { if (m.geometry !== src) { m.geometry.dispose(); m.geometry = src; } return; }
-    var geo = m.geometry !== src ? m.geometry : src.clone();
+    if (!any) { m.geometry = src; return; }
+    var geo = m.userData.defGeo;
+    if (!geo || m.userData.defSrc !== src) { if (geo) geo.dispose(); geo = src.clone(); hide(m.userData, 'defGeo', geo); hide(m.userData, 'defSrc', src); }
     var bb = geoBox(src), hx = Math.max(Math.abs(bb.min[0]), Math.abs(bb.min[0] + bb.size[0])) || 1, hz = Math.max(Math.abs(bb.min[2]), Math.abs(bb.min[2] + bb.size[2])) || 1;
     var a0 = src.attributes.position.array, a = geo.attributes.position.array, d = [0, 0, 0];
     var M = null, Mi = null, v = new THREE.Vector3(), dv = new THREE.Vector3();
@@ -735,6 +738,201 @@
     }
     geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere(); geo.computeBoundingBox();
     m.geometry = geo;
+  }
+
+  // ── Grundformen: Stücke aus Quader, Zylinder, Kegel, Kugel, Ring lassen sich über ihre Maße
+  // neu bauen (Editor „Shape“), dazu Quader mit runden Ecken, Biegen als Bogen, Zylinder als Feder,
+  // Schlauch entlang von Knickpunkten. userData.prim = {t, p (Maße), a (Bau-Argumente), sc, off}:
+  // sc/off = nachträgliche Streckung/Verschiebung der gebauten Geometrie (z. B. ell()).
+  var PRIM_TYPES = {
+    BoxGeometry: ['box', ['width', 'height', 'depth', 'widthSegments', 'heightSegments', 'depthSegments']],
+    CylinderGeometry: ['cyl', ['radiusTop', 'radiusBottom', 'height', 'radialSegments', 'heightSegments', 'openEnded', 'thetaStart', 'thetaLength']],
+    ConeGeometry: ['cone', ['radius', 'height', 'radialSegments', 'heightSegments', 'openEnded', 'thetaStart', 'thetaLength']],
+    SphereGeometry: ['sphere', ['radius', 'widthSegments', 'heightSegments', 'phiStart', 'phiLength', 'thetaStart', 'thetaLength']],
+    TorusGeometry: ['torus', ['radius', 'tube', 'radialSegments', 'tubularSegments', 'arc']]
+  };
+  function primDetect(g) {
+    var T = PRIM_TYPES[g.type];
+    if (!T || !g.parameters) return null;
+    var args = T[1].map(function (k) { return g.parameters[k]; });
+    var ref = new (Function.prototype.bind.apply(THREE[g.type], [null].concat(args)))();
+    var a = g.attributes.position.array, r = ref.attributes.position.array, ok = a.length === r.length;
+    var sc = [1, 1, 1], off = [0, 0, 0];
+    if (ok) {
+      var A = geoBox(g), R = geoBox(ref);
+      for (var k = 0; k < 3; k++) { sc[k] = R.size[k] > 1e-9 ? A.size[k] / R.size[k] : 1; off[k] = A.min[k] - R.min[k] * sc[k]; }
+      for (var i = 0; i < a.length && ok; i++) { var w = r[i] * sc[i % 3] + off[i % 3]; if (Math.abs(a[i] - w) > 1e-4 * (1 + Math.abs(a[i]))) ok = false; }
+    }
+    ref.dispose();
+    if (!ok) return null;
+    var P = g.parameters, t = T[0], p;
+    if (t === 'box') p = { w: P.width, h: P.height, d: P.depth };
+    else if (t === 'cyl') p = { rTop: P.radiusTop, rBot: P.radiusBottom, len: P.height };
+    else if (t === 'cone') p = { rTop: 0, rBot: P.radius, len: P.height };
+    else if (t === 'sphere') p = { r: P.radius, part: P.thetaLength / DEG };
+    else p = { R: P.radius, tube: P.tube, arc: P.arc / DEG };
+    return { t: t === 'cone' ? 'cyl' : t, p: p, a: args, src: t, sc: sc, off: off };
+  }
+  function primOf(m) {
+    if (!m || m.userData.cape) return null;
+    if (m.userData.prim === undefined) { var info = null; try { info = primDetect(m.userData.baseGeo || m.geometry); } catch (e) { info = null; } m.userData.prim = info; }
+    return m.userData.prim;
+  }
+  // Regler je Grundform: {k, label, min, max, step, def}
+  function primSpec(info) {
+    if (!info) return [];
+    var p = info.p, L = [];
+    function sz(k, label, d) { L.push({ k: k, label: label, min: 0.005, max: Math.max(1, Math.ceil(d * 40) / 10), step: 0.005, def: d }); }
+    if (info.t === 'box') {
+      sz('w', 'Length (X)', p.w); sz('h', 'Height (Y)', p.h); sz('d', 'Depth (Z)', p.d);
+      L.push({ k: 'round', label: 'Round corners', min: 0, max: 0.3, step: 0.002, def: 0 });
+      L.push({ k: 'bend', label: 'Bend (°)', min: -360, max: 360, step: 1, def: 0 });
+    } else if (info.t === 'cyl') {
+      sz('rTop', 'Top radius', p.rTop); sz('rBot', 'Bottom radius', p.rBot); sz('len', 'Length', p.len);
+      L.push({ k: 'bend', label: 'Bend (°)', min: -360, max: 360, step: 1, def: 0 });
+      L.push({ k: 'bendDir', label: 'Bend direction (°)', min: 0, max: 360, step: 1, def: 0 });
+      L.push({ k: 'turns', label: 'Spring turns (0 = solid)', min: 0, max: 30, step: 0.5, def: 0 });
+      L.push({ k: 'wire', label: 'Spring wire', min: 0.003, max: 0.15, step: 0.001, def: Math.max(0.006, Math.round((p.rTop + p.rBot) * 0.12 * 1000) / 1000) });
+    } else if (info.t === 'sphere') {
+      sz('r', 'Radius', p.r);
+      L.push({ k: 'part', label: 'Cut off (° from top)', min: 10, max: 180, step: 1, def: p.part });
+    } else if (info.t === 'torus') {
+      sz('R', 'Ring radius', p.R); sz('tube', 'Thickness', p.tube);
+      L.push({ k: 'arc', label: 'Closed (°)', min: 10, max: 360, step: 1, def: p.arc });
+    } else if (info.t === 'hose') {
+      L.push({ k: 'r', label: 'Thickness', min: 0.004, max: 0.25, step: 0.001, def: p.r });
+      L.push({ k: 'taper', label: 'End thickness (×)', min: 0.05, max: 3, step: 0.01, def: p.taper });
+      L.push({ k: 'round', label: 'Round kinks', min: 0, max: 1, step: 0.01, def: p.round });
+      L.push({ k: 'turns', label: 'Coil turns (0 = smooth)', min: 0, max: 80, step: 0.5, def: 0 });
+      L.push({ k: 'coil', label: 'Coil width', min: 0.01, max: 0.4, step: 0.005, def: 0.06 });
+    }
+    return L;
+  }
+  function primParams(info, gp) {
+    var r = {}, sp = primSpec(info);
+    sp.forEach(function (s) { var v = gp && gp[s.k] != null ? +gp[s.k] : s.def; r[s.k] = isFinite(v) ? Math.min(s.max, Math.max(s.min, v)) : s.def; });
+    if (info.t === 'hose') r.pts = (gp && Array.isArray(gp.pts) && gp.pts.length >= 2 ? gp.pts : info.p.pts).map(function (q) { return v3(q, 0); });
+    return r;
+  }
+  // Bogen: entlang Achse ai biegen, Richtung dir (Einheitsvektor senkrecht dazu), Winkel in Grad
+  function bendGeo(g, ai, dir, deg) {
+    var th = deg * DEG; if (!th) return;
+    var bb = geoBox(g), L = bb.size[ai]; if (!L) return;
+    var c = bb.min[ai] + L / 2, R = L / th, a = g.attributes.position.array, v = new THREE.Vector3();
+    for (var i = 0; i < a.length; i += 3) {
+      v.set(a[i], a[i + 1], a[i + 2]);
+      var s = v.getComponent(ai) - c, d = v.dot(dir), ph = s / R;
+      var ns = (R - d) * Math.sin(ph), nd = R - (R - d) * Math.cos(ph);
+      v.addScaledVector(dir, nd - d); v.setComponent(ai, c + ns);
+      a[i] = v.x; a[i + 1] = v.y; a[i + 2] = v.z;
+    }
+    g.attributes.position.needsUpdate = true; g.computeVertexNormals();
+  }
+  function roundBox(g, hx, hy, hz, r) {
+    var a = g.attributes.position.array, n = g.attributes.normal.array, h = [hx - r, hy - r, hz - r];
+    for (var i = 0; i < a.length; i += 3) {
+      var q = [0, 1, 2].map(function (k) { return Math.max(-h[k], Math.min(h[k], a[i + k])); });
+      var d = [a[i] - q[0], a[i + 1] - q[1], a[i + 2] - q[2]], l = Math.hypot(d[0], d[1], d[2]);
+      if (l < 1e-9) continue;
+      for (var k = 0; k < 3; k++) { n[i + k] = d[k] / l; a[i + k] = q[k] + d[k] / l * r; }
+    }
+    g.attributes.position.needsUpdate = true; g.attributes.normal.needsUpdate = true;
+  }
+  // Linie durch Punkte (gleichmäßig nach Länge), für Schlauch und Feder
+  class PathCurve extends THREE.Curve {
+    constructor(pts) {
+      super(); this.pts = pts; this.acc = [0];
+      for (var i = 1; i < pts.length; i++) this.acc.push(this.acc[i - 1] + pts[i].distanceTo(pts[i - 1]));
+    }
+    getPoint(t, target) {
+      var o = target || new THREE.Vector3(), P = this.pts, A = this.acc, L = A[A.length - 1], s = Math.max(0, Math.min(1, t)) * L, i = 1;
+      while (i < A.length - 1 && A[i] < s) i++;
+      var seg = A[i] - A[i - 1], f = seg > 1e-9 ? (s - A[i - 1]) / seg : 0;
+      return o.copy(P[i - 1]).lerp(P[i], f);
+    }
+  }
+  function roundedPath(pts, k) {
+    var out = [pts[0].clone()];
+    for (var i = 1; i < pts.length - 1; i++) {
+      var a = pts[i - 1], b = pts[i], c = pts[i + 1], d = k * 0.5 * Math.min(a.distanceTo(b), b.distanceTo(c));
+      if (d < 1e-5) { out.push(b.clone()); continue; }
+      var p1 = b.clone().add(a.clone().sub(b).normalize().multiplyScalar(d)), p2 = b.clone().add(c.clone().sub(b).normalize().multiplyScalar(d));
+      for (var s = 0; s <= 10; s++) { var t = s / 10, u = 1 - t; out.push(new THREE.Vector3().addScaledVector(p1, u * u).addScaledVector(b, 2 * u * t).addScaledVector(p2, t * t)); }
+    }
+    out.push(pts[pts.length - 1].clone());
+    return out.filter(function (p, i) { return !i || p.distanceTo(out[i - 1]) > 1e-6; });
+  }
+  // Wendel um einen Pfad (Feder): Windungen, Weite, Draht
+  function coilGeo(curve, turns, width, r0, r1, wire) {
+    var n = Math.max(48, Math.ceil(turns * 40)), fr = curve.computeFrenetFrames(n, false), pts = [];
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, a = t * turns * Math.PI * 2, w = width != null ? width : r0 + (r1 - r0) * t;
+      pts.push(curve.getPointAt(t).addScaledVector(fr.normals[i], Math.cos(a) * w).addScaledVector(fr.binormals[i], Math.sin(a) * w));
+    }
+    return new THREE.TubeGeometry(new PathCurve(pts), n * 2, wire / 2, 10, false);
+  }
+  function makePrim(info, gp) {
+    var P = primParams(info, gp), g, A = info.a || [];
+    if (info.t === 'box') {
+      var mx = Math.max(P.w, P.h, P.d), rr = Math.min(P.round, P.w / 2, P.h / 2, P.d / 2);
+      if (rr || P.bend) {
+        var sg = function (v) { return Math.max(rr ? 6 : 1, Math.ceil(v / mx * 24)); };
+        g = new THREE.BoxGeometry(P.w, P.h, P.d, sg(P.w), sg(P.h), sg(P.d));
+        if (rr) roundBox(g, P.w / 2, P.h / 2, P.d / 2, rr);
+        if (P.bend) {
+          var dims = [P.w, P.h, P.d], ai = dims.indexOf(mx), di = dims.indexOf(Math.min.apply(null, dims));
+          if (di === ai) di = (ai + 1) % 3;
+          bendGeo(g, ai, new THREE.Vector3(di === 0 ? 1 : 0, di === 1 ? 1 : 0, di === 2 ? 1 : 0), P.bend);
+        }
+      } else g = new THREE.BoxGeometry(P.w, P.h, P.d, A[3], A[4], A[5]);
+    } else if (info.t === 'cyl') {
+      var cone = info.src === 'cone', rs = cone ? A[2] : A[3], hs = cone ? A[3] : A[4], oe = cone ? A[4] : A[5], ts = cone ? A[5] : A[6], tl = cone ? A[6] : A[7];
+      if (P.turns > 0) {
+        var axis = new PathCurve([new THREE.Vector3(0, -P.len / 2, 0), new THREE.Vector3(0, P.len / 2, 0)]);
+        g = coilGeo(axis, P.turns, null, P.rBot, P.rTop, P.wire);
+      } else g = new THREE.CylinderGeometry(P.rTop, P.rBot, P.len, rs || 32, P.bend ? Math.max(hs || 1, 32) : hs, oe, ts, tl);
+      if (P.bend) bendGeo(g, 1, new THREE.Vector3(Math.cos(P.bendDir * DEG), 0, Math.sin(P.bendDir * DEG)), P.bend);
+    } else if (info.t === 'sphere') {
+      g = new THREE.SphereGeometry(P.r, A[1], A[2], A[3], A[4], A[5], P.part * DEG);
+    } else if (info.t === 'torus') {
+      g = new THREE.TorusGeometry(P.R, P.tube, A[2], A[3], P.arc * DEG);
+    } else if (info.t === 'hose') {
+      var path = new PathCurve(roundedPath(P.pts.map(function (q) { return new THREE.Vector3(q[0], q[1], q[2]); }), P.round));
+      var len = path.acc[path.acc.length - 1] || 1;
+      if (P.turns > 0) g = coilGeo(path, P.turns, P.coil, 0, 0, P.r * 2);
+      else {
+        var ts2 = Math.max(48, Math.ceil(len / 0.01)), rad = 14;
+        g = new THREE.TubeGeometry(path, ts2, P.r, rad, false);
+        if (P.taper !== 1) {
+          var pa = g.attributes.position.array, cp = new THREE.Vector3();
+          for (var i2 = 0; i2 <= ts2; i2++) {
+            path.getPointAt(i2 / ts2, cp); var f = 1 + (P.taper - 1) * i2 / ts2;
+            for (var j2 = 0; j2 <= rad; j2++) { var n2 = (i2 * (rad + 1) + j2) * 3; pa[n2] = cp.x + (pa[n2] - cp.x) * f; pa[n2 + 1] = cp.y + (pa[n2 + 1] - cp.y) * f; pa[n2 + 2] = cp.z + (pa[n2 + 2] - cp.z) * f; }
+          }
+          g.computeVertexNormals();
+        }
+      }
+    }
+    var sc = info.sc || [1, 1, 1], off = info.off || [0, 0, 0];
+    if (sc[0] !== 1 || sc[1] !== 1 || sc[2] !== 1) g.scale(sc[0], sc[1], sc[2]);
+    if (off[0] || off[1] || off[2]) g.translate(off[0], off[1], off[2]);
+    g.computeBoundingBox(); g.computeBoundingSphere();
+    return g;
+  }
+  // Quell-Geometrie eines Stücks: Grundform-Maße (geo) aus beiden Ebenen, sonst die gebaute
+  function pieceSrc(m, gp) {
+    var base = m.userData.baseGeo || m.geometry;
+    var has = gp && Object.keys(gp).length, info = has ? primOf(m) : null;
+    if (!info) { if (m.userData.primGeo) { m.userData.primGeo.dispose(); hide(m.userData, 'primGeo', null); hide(m.userData, 'primKey', null); } return base; }
+    var key = JSON.stringify(gp);
+    if (m.userData.primKey !== key || !m.userData.primGeo) {
+      var g = null;
+      try { g = makePrim(info, gp); } catch (e) { if (root.console) root.console.warn('rubber-duck: shape failed', e); }
+      if (!g) return base;
+      if (m.userData.primGeo) m.userData.primGeo.dispose();
+      hide(m.userData, 'primGeo', g); hide(m.userData, 'primKey', key);
+    }
+    return m.userData.primGeo;
   }
   function applyPart(grp) {
     var P = grp.userData.part, xo = P.xf || {}, xg = P.gxf || {}, pv = P.pivot, inner = P.inner;
@@ -756,7 +954,8 @@
       m.scale.set(b.s[0] * sgs[0] * sos[0], b.s[1] * sgs[1] * sos[1], b.s[2] * sgs[2] * sos[2]);
       m.visible = b.v && !so.hide && !sg.hide;
       var bg = v3(sg.b, 0), bo = v3(so.b, 0);
-      deform(m, [bg[0] + bo[0], bg[1] + bo[1]], latSum(sg.l, so.l), L, P.lbox, inner);
+      var gp = sg.geo || so.geo ? Object.assign({}, sg.geo, so.geo) : null;
+      deform(m, pieceSrc(m, gp), [bg[0] + bo[0], bg[1] + bo[1]], latSum(sg.l, so.l), L, P.lbox, inner);
       setMat(m, so.c != null ? so.c : xo.c != null ? xo.c : sg.c != null ? sg.c : xg.c);
     });
   }
@@ -826,6 +1025,7 @@
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
     applyPart: applyPart, readPiece: readPiece, pieceKey: pieceKey, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
     FORMS: FORMS, formOf: formOf, latRest: latRest, geoBox: geoBox,
+    primOf: primOf, primSpec: primSpec, primParams: primParams, makePrim: makePrim,
     util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -122,3 +122,10 @@ def test_custom_js_endpoint(tmp_path):
 
 def test_custom_js_needs_a_token(tmp_path):
     assert _client(str(tmp_path), tenant_id=None).get("/s/t/api/fx/ducks/custom.js").status_code == 404
+
+
+def test_hose_points_fit(tmp_path):
+    geo = {"pts": [[0, 0, -0.3], [0.05, 0.12, -0.1], [0, 0.1, 0.3]], "turns": 12, "r": 0.02}
+    d = {"acc": [["shape", {"kind": "hose", "xf": {"sub": {"Shape": {"geo": geo}}}}]]}
+    assert do.save(str(tmp_path), "hose", d) is None
+    assert do.save_part(str(tmp_path), "acc:shape", {"sub": {"Shape": {"geo": geo}}}) is None
