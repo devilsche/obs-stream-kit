@@ -1080,6 +1080,17 @@
   EMB.num10 = function (x, w) { text(x, w, '10', '#141414', '900 170px "Arial Black", Arial, sans-serif', 0.9); };
   EMB.num1337 = function (x, w) { x.fillStyle = '#f4f4f4'; x.fillRect(20, 80, w - 40, 96); text(x, w, '1337', '#141414', '900 92px "Arial Black", Arial, sans-serif', 0.9); };
   EMB.skull = function (x, w) { drawSkull(x, w / 2, w / 2, 2.6, '#f1ede0'); };
+  // Shirt-Aufdruck „POCHINKI“ (PUBG, Erangel) mit Fadenkreuz
+  EMB.pochinki = function (x, w) {
+    var c = w / 2; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.strokeStyle = '#f2b705'; x.lineWidth = 6; x.beginPath(); x.arc(c, c - 46, 40, 0, PI * 2); x.stroke();
+    x.beginPath(); x.moveTo(c - 58, c - 46); x.lineTo(c - 18, c - 46); x.moveTo(c + 18, c - 46); x.lineTo(c + 58, c - 46);
+    x.moveTo(c, c - 104); x.lineTo(c, c - 64); x.moveTo(c, c - 28); x.lineTo(c, c + 12); x.stroke();
+    x.fillStyle = '#f2b705'; x.beginPath(); x.arc(c, c - 46, 5, 0, PI * 2); x.fill();
+    x.fillStyle = '#f4f4f4'; x.font = '900 52px "Arial Black", Arial, sans-serif';
+    x.save(); x.translate(c, c + 44); x.scale(Math.min(1, 240 / x.measureText('POCHINKI').width), 1); x.fillText('POCHINKI', 0, 0); x.restore();
+    x.fillStyle = '#c9ced6'; x.font = '700 24px Arial, sans-serif'; x.fillText('E R A N G E L', c, c + 90);
+  };
   EMB.heart = function (x, w) {
     var c = w / 2; x.fillStyle = '#d8233a'; x.beginPath(); x.moveTo(c, c + 100);
     x.bezierCurveTo(c - 20, c + 70, c - 110, c + 30, c - 110, c - 30); x.bezierCurveTo(c - 110, c - 95, c - 25, c - 105, c, c - 50);
@@ -1175,6 +1186,7 @@
     racer: { label: 'Racing driver', cat: 'fun', suit: 0xf4f4f4, collar: 0.55, wing: 0x1a1a1c, acc: [['racehelm'], ['racestripes'], ['wheel']] },
     cupid: { label: 'Cupid', cat: 'fun', skin: 0xf7c6d6, briefs: 0xfafafa, briefsY: -0.22, chest: 'heart', chestSize: 0.22, chestY: 0.1, acc: [['curls'], ['angelwings', { size: 0.7 }], ['bow']] },
     tutu: { label: 'Tutu', cat: 'fun', suit: 0xf4a6c8, collar: 0.55, hair: 0x6b4a2c, hairY: 0.42, acc: [['bun'], ['tiara'], ['tutu']] },
+    pochinki: { label: 'Pochinki', cat: 'fun', suit: 0x5f646b, collar: 0.55, chest: 'pochinki', chestSize: 0.62, chestY: 0.02, acc: [['pan']] },
     muscle: { label: 'Muscle duck', cat: 'fun', skin: 0xe9a13b, muscles: true, pattern: { type: 'abs', c2: 0x8a4a10, zone: 'skin' }, acc: [['headband', { color: 0xc8151b, dy: 0.36 }], ['brows'], ['biceps'], ['dumbbell']] },
     fat: { label: 'Fat duck', cat: 'fun', girth: 1.5, acc: [['donut']] },
     lingerie: { label: 'Lace lingerie', cat: 'fun', bill: 0xd8152a, acc: [['bra'], ['lacepanties'], ['garter'], ['boa'], ['lashes']] },
