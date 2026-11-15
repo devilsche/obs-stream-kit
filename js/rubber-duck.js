@@ -30,15 +30,36 @@
     { c: [0.5, 1.05, 0], r: [0.62, 0.6, 0.6], k: 0.2 }       // Kopf
   ];
   var FLOOR = -0.55;
+  // Körperform je Outfit (gilt während build): girth = Körperbreite (1 normal, >1 fett: breiter,
+  // Bauch vorn, Doppelkinn, Pausbacken; <1 schlanker), muscles = Brustmuskeln. Weitere Formen
+  // (Kinn, Backen, Brustmuskeln) hängen hinter dem Kopf an und gehören nicht zum Rumpf.
+  var CUR = PARTS, CUR_KEY = '';
+  function shapeFor(o) {
+    var G = Math.max(0.7, Math.min(1.8, +o.girth || 1)), mu = !!o.muscles;
+    if (G === 1 && !mu) return { key: '', parts: PARTS };
+    var f = G - 1, P = PARTS.map(function (q) { return { c: q.c.slice(), r: q.r.slice(), k: q.k }; });
+    P[0].c[0] += 0.12 * f; P[0].r[0] *= 1 + 0.4 * f; P[0].r[1] *= 1 + 0.15 * f; P[0].r[2] *= 1 + f;
+    P[1].r[0] *= 1 + 0.35 * f; P[1].r[2] *= 1 + 0.8 * f;
+    if (f > 0.05) {
+      var sc = Math.min(1, f / 0.35);
+      P.push({ c: [0.92, 0.66, 0], r: [0.3 * sc, 0.19 * sc, 0.4 * sc], k: 0.14 });
+      [-1, 1].forEach(function (s) { P.push({ c: [0.74, 0.88, s * 0.46], r: [0.24 * sc, 0.2 * sc, 0.2 * sc], k: 0.12 }); });
+    }
+    if (mu) {
+      P[1].r[1] *= 1.05; P[1].r[2] *= 1.12;
+      [-1, 1].forEach(function (s) { P.push({ c: [0.9, 0.4, s * 0.23], r: [0.2, 0.16, 0.21], k: 0.08 }); });
+    }
+    return { key: G.toFixed(2) + (mu ? 'm' : ''), parts: P };
+  }
   // nur Rumpf (Bauch, Brust, Schwanz) – für Teile, die nicht über den Kopf dürfen
   function sdTrunk(p) {
-    var d = sdEll(p, PARTS[0].c, PARTS[0].r);
-    for (var i = 1; i < 4; i++) d = smin(d, sdEll(p, PARTS[i].c, PARTS[i].r), PARTS[i].k);
+    var d = sdEll(p, CUR[0].c, CUR[0].r);
+    for (var i = 1; i < 4; i++) d = smin(d, sdEll(p, CUR[i].c, CUR[i].r), CUR[i].k);
     return d;
   }
   function sdDuck(p) {
-    var d = sdEll(p, PARTS[0].c, PARTS[0].r);
-    for (var i = 1; i < PARTS.length; i++) d = smin(d, sdEll(p, PARTS[i].c, PARTS[i].r), PARTS[i].k);
+    var d = sdEll(p, CUR[0].c, CUR[0].r);
+    for (var i = 1; i < CUR.length; i++) d = smin(d, sdEll(p, CUR[i].c, CUR[i].r), CUR[i].k);
     // flacher Boden (weich abgeschnitten)
     var fl = FLOOR - p.y;
     var k = 0.08, h = Math.max(0, Math.min(1, 0.5 - 0.5 * (fl - d) / k));
@@ -62,8 +83,8 @@
     g.computeVertexNormals();
     return g;
   }
-  var BODY = null;
-  function body() { return BODY || (BODY = bodyGeometry()); }
+  var BODIES = {};
+  function body() { return BODIES[CUR_KEY] || (BODIES[CUR_KEY] = bodyGeometry()); }
 
   function ell(rx, ry, rz, seg) { var g = new THREE.SphereGeometry(1, seg || 32, Math.round((seg || 32) * 0.7)); g.scale(rx, ry, rz); return g; }
   // Schnabel wie ein echter offener Entenschnabel: zwei gewölbte Schalen (Ober-
@@ -197,7 +218,7 @@
   function col(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
   // Vinyl-Material mit Uniform-Zonen
   // Muster (Shader, Modell-Koordinaten): Nummer je Art, Farben c1/c2, Maßstab s
-  var PATTERNS = { hstripes: 1, dots: 2, web: 3, fur: 4, bandage: 5, ribs: 6, tiedye: 7, camo: 8, suspenders: 9 };
+  var PATTERNS = { hstripes: 1, dots: 2, web: 3, fur: 4, bandage: 5, ribs: 6, tiedye: 7, camo: 8, suspenders: 9, abs: 10 };
   var PAT_GLSL = [
     'float dh31(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }',
     'float dnoise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
@@ -222,6 +243,10 @@
     '  if (t < 8.5) { float n = dnoise(p * s), n2 = dnoise(p * s * 1.7 + 7.0);',
     '    if (n > 0.6) return vec4(c1, 1.0); if (n2 > 0.62) return vec4(c2, 1.0); return vec4(cur, 0.0); }',
     '  if (t < 9.5) { return vec4(c2, (1.0 - smoothstep(0.045, 0.055, abs(abs(p.z) - 0.3))) * step(0.0, p.x + 0.2)); }',
+    '  if (t < 10.5) { float fr = smoothstep(0.6, 0.75, p.x) * step(-0.3, p.y) * step(p.y, 0.24) * step(abs(p.z), 0.27);',
+    '    float v = 1.0 - smoothstep(0.01, 0.02, abs(p.z)), sd = 1.0 - smoothstep(0.01, 0.02, abs(abs(p.z) - 0.26));',
+    '    float hy = abs(fract((p.y + 0.3) / 0.135 + 0.5) - 0.5) * 0.135, h = 1.0 - smoothstep(0.008, 0.018, hy);',
+    '    return vec4(c2, fr * max(max(v, h), sd * 0.6) * 0.6); }',
     '  return vec4(cur, 0.0);',
     '}'
   ].join('\n');
@@ -374,7 +399,13 @@
     return m;
   }
 
+  // Körperform des Outfits nur für die Dauer des Baus setzen (surface/surfaceAt der Zubehörteile folgen ihr)
   function build(opts) {
+    var o = OUTFITS[(opts || {}).outfit] || OUTFITS.none, sh = shapeFor(o), prev = CUR, prevKey = CUR_KEY;
+    CUR = sh.parts; CUR_KEY = sh.key;
+    try { return buildDuck(opts); } finally { CUR = prev; CUR_KEY = prevKey; }
+  }
+  function buildDuck(opts) {
     opts = opts || {};
     var o = OUTFITS[opts.outfit] || OUTFITS.none;
     var g = new THREE.Group();
@@ -439,7 +470,7 @@
     if (!opts.noWings) [-1, 1].forEach(function (s) {
       part(s < 0 ? 'wingR' : 'wingL', s < 0 ? 'Right wing' : 'Left wing', function () {
         var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat); w.name = 'Wing';
-        w.position.set(-0.05, 0.12, s * 0.79); w.rotation.set(s * 0.15, s * 0.12, 0.35);
+        w.position.set(-0.05, 0.12, s * (0.79 + 0.78 * ((+o.girth || 1) - 1))); w.rotation.set(s * 0.15, s * 0.12, 0.35);
         g.add(w);
       });
     });

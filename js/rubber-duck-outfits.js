@@ -540,7 +540,8 @@
   };
 
   // ════════ Requisiten ════════
-  function held(c, s) { return new V3(0.38, 0.08, s * 0.92); }
+  // Flügelspitze; bei breitem Körper (girth) entsprechend weiter außen
+  function held(c, s) { return new V3(0.38, 0.08, s * (0.92 + 0.78 * ((+c.o.girth || 1) - 1))); }
   ACC.claws = function (c) {
     var m = metal(0xdfe3e8, { roughness: 0.15 });
     [-1, 1].forEach(function (s) { for (var i = 0; i < 3; i++) { var b = held(c, s).add(new V3(0, -0.04 + i * 0.07, s * 0.02)); tube([b, b.clone().add(new V3(0.3, 0.04, s * 0.02)), b.clone().add(new V3(0.6, 0.1, s * 0.03))], 0.014, m, c.g); } });
@@ -740,17 +741,17 @@
   // Halsband mit Nieten und Ring vorn
   ACC.studcollar = function (c, a) {
     var lea = M(a.color || 0x111113, { roughness: 0.3, clearcoat: 1 }), st = metal(0xdfe3e8, { roughness: 0.15 });
-    // Band als Ring um den Hals (folgt der Oberfläche), 0.09 hoch
+    // Band als Ring um den Hals (folgt der Oberfläche), 0.09 hoch; unterhalb von y ≈ 0.68 liefe der Ring hinten über den Rücken
     var pos = [], idx = [], N = 48;
     for (var j = 0; j <= N; j++) {
-      var a0 = neck(0.6, j / N * PI * 2), q = a0.p.clone().addScaledVector(a0.n, 0.025);
+      var a0 = neck(0.7, j / N * PI * 2), q = a0.p.clone().addScaledVector(a0.n, 0.025);
       pos.push(q.x, q.y - 0.045, q.z, q.x, q.y + 0.045, q.z);
       if (j) { var k = j * 2; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
     }
     var bg = new THREE.BufferGeometry(); bg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); bg.setIndex(idx); bg.computeVertexNormals();
     add(c.g, bg, dbl(lea)).name = 'Band';
-    for (var i = -5; i <= 5; i++) { if (!i) continue; var at = neck(0.6, i * 0.26), sp = add(c.g, cone(0.03, 0.07, 10), st); sp.position.copy(at.p).addScaledVector(at.n, 0.06); along(sp, at.n); }
-    var f = neck(0.56, 0), r = add(c.g, torus(0.06, 0.014, 24), st); r.position.copy(f.p).addScaledVector(f.n, 0.04).add(new V3(0, -0.07, 0)); r.rotation.y = PI / 2; r.name = 'Ring';
+    for (var i = -5; i <= 5; i++) { if (!i) continue; var at = neck(0.7, i * 0.26), sp = add(c.g, cone(0.03, 0.07, 10), st); sp.position.copy(at.p).addScaledVector(at.n, 0.06); along(sp, at.n); }
+    var f = neck(0.68, 0), r = add(c.g, torus(0.06, 0.014, 24), st); r.position.copy(f.p).addScaledVector(f.n, 0.04).add(new V3(0, -0.07, 0)); r.rotation.y = PI / 2; r.name = 'Ring';
   };
   // Brustgurte über Kreuz mit Metallring in der Mitte
   ACC.harness = function (c, a) {
@@ -849,6 +850,162 @@
     add(g2, bg, metal(a.color || 0x9aa0a8, { roughness: 0.3 }), 0.02, 1.25).name = 'Blade';
   };
 
+  // ════════ Mucki, fette Ente, Spitzen-Dessous, Lucky Luke ════════
+  // Band rund um den Körper zwischen Höhe y0 und y1, folgt der Oberfläche; uv: u rundum (ru-mal), v quer.
+  // ph0/ph1 = Winkelbereich (0 = vorn), cx = Achse, von der aus gemessen wird
+  function ringBand(c, y0, y1, mat, off, opt) {
+    opt = opt || {};
+    var N = opt.n || 72, R = 4, ph0 = opt.ph0 || 0, ph1 = opt.ph1 != null ? opt.ph1 : PI * 2, cx = opt.cx != null ? opt.cx : 0.1;
+    var pos = [], uv = [], idx = [];
+    for (var r = 0; r <= R; r++) {
+      var y = y0 + (y1 - y0) * r / R;
+      for (var i = 0; i <= N; i++) {
+        var at = U.surfaceAt(y, ph0 + (ph1 - ph0) * i / N, cx), q = at.p.clone().addScaledVector(at.n, off || 0.02);
+        pos.push(q.x, q.y, q.z); uv.push(i / N * (opt.ru || 1), r / R);
+      }
+    }
+    for (r = 0; r < R; r++) for (i = 0; i < N; i++) { var a0 = r * (N + 1) + i, b0 = a0 + N + 1; idx.push(a0, a0 + 1, b0, a0 + 1, b0 + 1, b0); }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx); g.computeVertexNormals();
+    var m = new THREE.Mesh(g, dbl(mat)); c.g.add(m); return m;
+  }
+  // viele kleine Formen zu EINEM Stück zusammenfassen: items = [{ geo, p, r (Euler), s }]
+  function merged(items) {
+    var pos = [], nrm = [], o = new THREE.Object3D();
+    items.forEach(function (it) {
+      var g = it.geo.index ? it.geo.toNonIndexed() : it.geo.clone();
+      o.position.copy(it.p); o.rotation.copy(it.r || new THREE.Euler()); o.scale.setScalar(1);
+      if (it.s) o.scale.copy(it.s);
+      o.updateMatrix(); g.applyMatrix4(o.matrix);
+      pos.push.apply(pos, g.attributes.position.array); nrm.push.apply(nrm, g.attributes.normal.array);
+    });
+    var out = new THREE.BufferGeometry();
+    out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); out.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    return out;
+  }
+  function rnd(i) { var x = Math.sin(i * 12.9898) * 43758.5453; return x - Math.floor(x); }
+  // Spitze: durchbrochenes Muster (Löcher, Blüten, Bogenkante oben) als Alpha-Textur
+  var LACE = {};
+  function laceTex(col) {
+    if (LACE[col]) return LACE[col];
+    var t = U.canvasTex(256, 128, function (x, w, h) {
+      x.fillStyle = col; x.fillRect(0, 0, w, h);
+      x.globalCompositeOperation = 'destination-out';
+      for (var r = 0; r < 6; r++) for (var i = 0; i < 13; i++) { x.beginPath(); x.arc(i * 21 + (r % 2) * 10.5, 22 + r * 19, 6.5, 0, PI * 2); x.fill(); }
+      for (i = 0; i < 8; i++) { x.beginPath(); x.arc(i * 32 + 16, 0, 13, 0, PI); x.fill(); }   // Bogenkante
+      x.globalCompositeOperation = 'source-over';
+      [[64, 70], [192, 70]].forEach(function (f) { for (var k = 0; k < 6; k++) { var an = k / 6 * PI * 2; x.beginPath(); x.ellipse(f[0] + Math.cos(an) * 11, f[1] + Math.sin(an) * 11, 8, 5, an, 0, PI * 2); x.fill(); } });
+    });
+    t.wrapS = THREE.RepeatWrapping;
+    return (LACE[col] = t);
+  }
+  function lace(col) { return new THREE.MeshStandardMaterial({ map: laceTex(col), alphaTest: 0.5, roughness: 0.6, side: THREE.DoubleSide }); }
+
+  // Bizeps-Polster auf beiden Flügeln
+  ACC.biceps = function (c) {
+    [-1, 1].forEach(function (s) {
+      var b = add(c.g, ell(0.2, 0.13, 0.09, 24), c.wingMat, 0.02, 0.2, s * 0.86, s * 0.15, s * 0.12, 0.35);
+      b.name = s < 0 ? 'Right biceps' : 'Left biceps';
+    });
+  };
+  // Hantel in der Flügelspitze
+  ACC.dumbbell = function (c, a) {
+    var h = held(c, 1).add(new V3(0.05, 0, 0.14)), m = metal(a.color || 0x3a3b40, { roughness: 0.4 });
+    add(c.g, cyl(0.025, 0.025, 0.62, 12), metal(0xc3c8cf), h.x, h.y, h.z, 0, 0, PI / 2).name = 'Bar';
+    [-1, 1].forEach(function (s) { [0, 1].forEach(function (k) { add(c.g, cyl(0.14 - k * 0.03, 0.14 - k * 0.03, 0.05, 32), m, h.x + s * (0.24 - k * 0.055), h.y, h.z, 0, 0, PI / 2).name = 'Weight'; }); });
+  };
+  // Donut mit Zuckerguss und Streuseln
+  ACC.donut = function (c, a) {
+    var g2 = new THREE.Group(); g2.position.copy(held(c, 1).add(new V3(0.14, 0.1, 0.0))); g2.rotation.set(PI / 2 - 0.5, 0, 0.2); c.g.add(g2);
+    add(g2, torus(0.12, 0.065, 32), fabric(0xd9a05b, { roughness: 0.8 })).name = 'Dough';
+    var ic = add(g2, torus(0.12, 0.062, 32), M(a.color || 0xf28cb8, { roughness: 0.35, clearcoat: 0.6 }), 0, 0, 0.018); ic.scale.z = 0.75; ic.name = 'Icing';
+    [0xffffff, 0x3fb0e6, 0xf2d000].forEach(function (col, j) {
+      var items = [];
+      for (var i = 0; i < 6; i++) { var an = (i * 3 + j) / 18 * PI * 2, rr = 0.12 + (rnd(i + j * 7) - 0.5) * 0.06; items.push({ geo: box(0.035, 0.01, 0.01), p: new V3(Math.cos(an) * rr, Math.sin(an) * rr, 0.075), r: new THREE.Euler(0, 0, an * 3) }); }
+      add(g2, merged(items), M(col)).name = 'Sprinkles';
+    });
+  };
+  // BH: zwei Körbchen aus Spitze mit rotem Saum, Träger über die Schultern, Schleife in der Mitte
+  ACC.bra = function (c, a) {
+    var lm = lace(a.color || '#111111'), trim = M(a.trim || 0xc8102e, { roughness: 0.4 });
+    lm.map.repeat.set(3, 1);
+    [-1, 1].forEach(function (s) {
+      var at = front(0.12, s * 0.27), cup = add(c.g, new THREE.SphereGeometry(1, 32, 12, 0, PI * 2, 0, PI / 2), lm);
+      cup.scale.set(0.21, 0.1, 0.21); cup.position.copy(at.p).addScaledVector(at.n, -0.035); along(cup, at.n); cup.name = s < 0 ? 'Right cup' : 'Left cup';
+      var t = add(c.g, torus(0.21, 0.014, 40), trim); facing(t, at.p.clone().addScaledVector(at.n, -0.03), at.n); t.name = 'Trim';
+      strap(c, [new V3(1, 0.3, s * 0.3), new V3(0.6, 0.6, s * 0.48), new V3(0, 0.7, s * 0.5), new V3(-0.7, 0.5, s * 0.42)], 0.035, trim, 0.015).name = s < 0 ? 'Right strap' : 'Left strap';
+    });
+    var mid = front(0.1, 0), bw = add(c.g, merged([{ geo: cone(0.04, 0.08, 4), p: new V3(0, 0, -0.04), r: new THREE.Euler(PI / 2, 0, 0) }, { geo: cone(0.04, 0.08, 4), p: new V3(0, 0, 0.04), r: new THREE.Euler(-PI / 2, 0, 0) }, { geo: sph(0.022, 10), p: new V3(0, 0, 0) }]), trim);
+    bw.position.copy(mid.p).addScaledVector(mid.n, 0.04); bw.name = 'Bow';
+  };
+  // Spitzenhöschen rund um die Hüfte mit rotem Bund
+  ACC.lacepanties = function (c, a) {
+    var lm = lace(a.color || '#111111'); lm.map.repeat.set(9, 1);
+    ringBand(c, -0.47, -0.25, lm, 0.018, { ru: 9 }).name = 'Lace';
+    ringBand(c, -0.27, -0.24, M(a.trim || 0xc8102e, { roughness: 0.4 }), 0.022).name = 'Waistband';
+  };
+  // Strapsgürtel: Spitzenband in der Taille, vier rote Bänder nach unten
+  ACC.garter = function (c, a) {
+    var lm = lace(a.color || '#111111'); lm.map.repeat.set(9, 1);
+    ringBand(c, -0.16, -0.05, lm, 0.02, { ru: 9 }).name = 'Belt';
+    var red = M(a.trim || 0xc8102e, { roughness: 0.4 });
+    [-0.38, -0.14, 0.14, 0.38].forEach(function (z, i) { strap(c, [new V3(1, -0.45, z), new V3(1, -0.8, z * 1.05), new V3(1, -1.3, z * 1.1)], 0.03, red, 0.03).name = 'Strap ' + (i + 1); });
+  };
+  // Federboa um den Hals, vorn hängen zwei Enden herunter (ein Stück aus vielen Flusen)
+  ACC.boa = function (c, a) {
+    var items = [], N = 150;
+    function fluff(p, i) { var k = 0.7 + rnd(i) * 0.6; items.push({ geo: cone(0.022, 0.13, 5), p: p, r: new THREE.Euler(rnd(i + 3) * 6.3, rnd(i + 5) * 6.3, rnd(i + 7) * 6.3), s: new V3(k, k, k) }); }
+    for (var i = 0; i < N; i++) { var at = neck(0.72 + (rnd(i + 11) - 0.5) * 0.06, i / N * PI * 2); fluff(at.p.clone().addScaledVector(at.n, 0.05 + rnd(i + 13) * 0.03), i); }
+    [-1, 1].forEach(function (s) { for (var j = 0; j < 30; j++) { var at = front(0.42 - j * 0.012, s * (0.48 + j * 0.006)); fluff(at.p.clone().addScaledVector(at.n, 0.05 + rnd(j + 17) * 0.03), 300 + j + (s > 0 ? 50 : 0)); } });
+    add(c.g, merged(items), fabric(a.color || 0xd8102e, { roughness: 1 })).name = 'Boa';
+  };
+  // lange Wimpern über beiden Augen
+  ACC.lashes = function (c, a) {
+    var items = [];
+    [-1, 1].forEach(function (s) {
+      var o = onHead(c, new V3(0.8, 0.36, s * 0.5), 1.0), up = new V3(0, 1, 0).addScaledVector(o.n, -o.n.y).normalize(), side = new V3().crossVectors(o.n, up);
+      for (var k = -1; k <= 1; k++) {
+        var dir = o.n.clone().multiplyScalar(0.6).add(up).addScaledVector(side, k * 0.5).normalize(), base = o.p.clone().addScaledVector(up, 0.095).addScaledVector(side, k * 0.04);
+        var q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), dir);
+        items.push({ geo: cone(0.012, 0.09, 8), p: base.addScaledVector(dir, 0.045), r: new THREE.Euler().setFromQuaternion(q) });
+      }
+    });
+    add(c.g, merged(items), a.color != null ? M(a.color) : c.paint).name = 'Lashes';
+  };
+  // offene Weste: rundum, vorn offen
+  ACC.openvest = function (c, a) {
+    ringBand(c, -0.05, 0.5, fabric(a.color || 0x141414, { roughness: 0.7 }), 0.025, { ph0: 0.55, ph1: PI * 2 - 0.55, n: 64, cx: 0.3 }).name = 'Vest';
+  };
+  // Stirnlocke: drei Haarspitzen fallen unter der Hutkrempe in die Stirn
+  ACC.forelock = function (c, a) {
+    var m = fabric(a.color || 0x141414, { roughness: 0.7 }), items = [];
+    [-0.12, 0, 0.12].forEach(function (z, i) {
+      var o = onHead(c, new V3(0.8, 0.5, z), 1.0), dir = new V3(0.45, -1, z * 1.5).normalize();
+      var q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 1, 0), dir);
+      items.push({ geo: cone(0.055, 0.2 - Math.abs(z) * 0.4, 12), p: o.p.clone().addScaledVector(o.n, 0.03).addScaledVector(dir, 0.07), r: new THREE.Euler().setFromQuaternion(q) });
+    });
+    add(c.g, merged(items), m).name = 'Forelock';
+  };
+  // Revolvergürtel mit Patronen, Schnalle und Holster samt Revolver an der Seite
+  ACC.gunbelt = function (c, a) {
+    var lea = fabric(a.color || 0x6b4a2c, { roughness: 0.6 }), gold = metal(0xd9b23a);
+    ringBand(c, -0.24, -0.13, lea, 0.03).name = 'Belt';
+    var fb = front(-0.6, 0), bk = add(c.g, box(0.14, 0.11, 0.03), gold); facing(bk, fb.p.clone().addScaledVector(fb.n, 0.05), fb.n); bk.name = 'Buckle';
+    var items = [];
+    [-1.1, -0.9, -0.7, -0.5, -0.3, 0.3, 0.5, 0.7, 0.9, 1.1].forEach(function (ph) { var at = U.surfaceAt(-0.185, ph, 0.1); items.push({ geo: cyl(0.016, 0.016, 0.08, 8), p: at.p.clone().addScaledVector(at.n, 0.05) }); });
+    add(c.g, merged(items), gold).name = 'Cartridges';
+    var hs = U.surfaceAt(-0.32, -1.25, 0.1), hg = new THREE.Group(); hg.position.copy(hs.p).addScaledVector(hs.n, 0.07); hg.lookAt(hg.position.clone().add(hs.n)); c.g.add(hg);
+    add(hg, box(0.13, 0.26, 0.06), lea).name = 'Holster';
+    add(hg, box(0.06, 0.14, 0.05), fabric(0x3a2414, { roughness: 0.5 }), 0.03, 0.17, 0, 0, 0, -0.35).name = 'Grip';
+    add(hg, cyl(0.035, 0.035, 0.06, 12), metal(0x6a6e75), 0, 0.12, 0, PI / 2).name = 'Cylinder';
+  };
+  // Grashalm im Mundwinkel
+  ACC.grass = function (c, a) {
+    var m = fabric(a.color || 0x9ab83a, { roughness: 0.8 });
+    tube([new V3(0.98, 0.915, -0.29), new V3(1.15, 0.94, -0.42), new V3(1.32, 0.99, -0.55)], 0.008, m, c.g).name = 'Grass blade';
+  };
+
   // ════════ Embleme ════════
   function drawStar(x, cx, cy, ro, ri) { x.beginPath(); for (var i = 0; i < 10; i++) { var a = i / 10 * PI * 2 - PI / 2, r = i % 2 ? ri : ro; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.closePath(); x.fill(); }
   function drawSkull(x, cx, cy, sc, col) {
@@ -928,7 +1085,9 @@
     wizard: 'Wizard hat', loincloth: 'Loincloth', club: 'Club', tailcoat: 'Tailcoat', tray: 'Serving tray',
     zipper: 'Mouth zipper', studcollar: 'Studded collar', harness: 'Chest harness', whip: 'Whip', racehelm: 'Racing helmet',
     racestripes: 'Racing stripes', wheel: 'Steering wheel', bow: 'Bow and heart arrow', curls: 'Curls', tutu: 'Tutu',
-    bun: 'Hair bun', exechood: 'Executioner hood', axe: 'Axe'
+    bun: 'Hair bun', exechood: 'Executioner hood', axe: 'Axe', biceps: 'Biceps', dumbbell: 'Dumbbell', donut: 'Donut',
+    bra: 'Lace bra', lacepanties: 'Lace panties', garter: 'Garter belt', boa: 'Feather boa', lashes: 'Eyelashes',
+    openvest: 'Open vest', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass'
   });
 
   // ════════ Outfits ════════
@@ -948,6 +1107,7 @@
     robin: { label: 'Robin', cat: 'heroes', suit: 0xc8151b, collar: 0.55, briefs: 0x1f7a2e, briefsY: -0.15, belt: 0xf2c500, beltY: -0.13, mask: 0x141414, eyes: 'white', hair: 0x141414, hairY: 0.32, cape: 0xf2c500, chest: 'robin', chestSize: 0.24, chestY: 0.15 },
     groot: { label: 'Groot', cat: 'heroes', skin: 0x7a5434, bill: 0x6b4a2c, pattern: { type: 'fur', c1: 0x5e4029, c2: 0x9a7048, scale: 7, zone: 'all' }, acc: [['leaves']] },
     joker: { label: 'Joker', cat: 'heroes', skin: 0xf1ede4, suit: 0x5b2a86, collar: 0.55, stripe: 0x2f8f3e, stripes: [0.3], bill: 0xc8151b, hair: 0x2fa84a, hairY: 0.3, acc: [['tufts'], ['bowtie', { color: 0x2f8f3e }]] },
+    luckyluke: { label: 'Lucky Luke', cat: 'heroes', suit: 0xf7cf1a, collar: 0.55, briefs: 0x2c4f8a, briefsY: -0.12, acc: [['cowboy', { color: 0xf4f2ea }], ['forelock'], ['neckerchief', { color: 0xc8151b }], ['openvest'], ['gunbelt'], ['grass']] },
 
     // ── Halloween & Horror ──
     vampire: { label: 'Vampire', cat: 'horror', skin: 0xe9e6ea, suit: 0x141418, collar: 0.55, cape: 0x141418, hair: 0x0d0d0f, hairY: 0.3, hairPeak: 0.16, eyeColor: 0xb3121e, acc: [['highcollar', { inner: 0x9a0f18 }], ['fangs']] },
@@ -994,6 +1154,9 @@
     racer: { label: 'Racing driver', cat: 'fun', suit: 0xf4f4f4, collar: 0.55, wing: 0x1a1a1c, acc: [['racehelm'], ['racestripes'], ['wheel']] },
     cupid: { label: 'Cupid', cat: 'fun', skin: 0xf7c6d6, briefs: 0xfafafa, briefsY: -0.22, chest: 'heart', chestSize: 0.22, chestY: 0.1, acc: [['curls'], ['angelwings', { size: 0.7 }], ['bow']] },
     tutu: { label: 'Tutu', cat: 'fun', suit: 0xf4a6c8, collar: 0.55, hair: 0x6b4a2c, hairY: 0.42, acc: [['bun'], ['tiara'], ['tutu']] },
+    muscle: { label: 'Muscle duck', cat: 'fun', skin: 0xe9a13b, muscles: true, pattern: { type: 'abs', c2: 0x8a4a10, zone: 'skin' }, acc: [['headband', { color: 0xc8151b, dy: 0.36 }], ['brows'], ['biceps'], ['dumbbell']] },
+    fat: { label: 'Fat duck', cat: 'fun', girth: 1.5, acc: [['donut']] },
+    lingerie: { label: 'Lace lingerie', cat: 'fun', bill: 0xd8152a, acc: [['bra'], ['lacepanties'], ['garter'], ['boa'], ['lashes']] },
 
     // ── Berühmtheiten ──
     elvis: { label: 'Elvis', cat: 'celebs', suit: 0xf7f5ef, collar: 0.5, belt: 0xe2b62a, beltY: -0.22, pattern: { type: 'dots', c2: 0xe2b62a, scale: 10, zone: 'suit', y: [-0.18, 0.5] }, acc: [['pompadour'], ['glasses', { lens: 0x7a5a20, opacity: 0.8, frame: 'gold' }], ['highcollar', { color: 0xf7f5ef }]] },
