@@ -662,12 +662,16 @@
   // Unterteil-Schlüssel: Name (bleibt gleich, auch wenn ein Outfit Stücke weglässt), sonst Index
   function pieceKey(m, i) { return m.name || String(i); }
   function subOf(xf, k) { return (xf && xf.sub && xf.sub[k]) || {}; }
+  // Farbe setzen; bei mehreren Materialien (z. B. Kragen außen/Futter) nur das erste (außen)
   function setMat(m, c) {
-    if (!m.material || Array.isArray(m.material)) return;
+    if (!m.material) return;
     if (!m.userData.origMat) hide(m.userData, 'origMat', m.material);
     if (c == null) { m.material = m.userData.origMat; return; }
-    if (m.material === m.userData.origMat) m.material = m.userData.origMat.clone();
-    if (m.material.color) m.material.color.set(c).convertSRGBToLinear();
+    var arr = Array.isArray(m.material);
+    if (m.material === m.userData.origMat) m.material = arr ? m.material.slice() : m.material.clone();
+    var t = arr ? m.material[0] : m.material;
+    if (arr && t === m.userData.origMat[0]) t = m.material[0] = t.clone();
+    if (t && t.color) t.color.set(c).convertSRGBToLinear();
   }
   // Griffpunkte: 3×3×3 Gitter über einem Kasten, l = 81 Zahlen (Verschiebung je Punkt, x/y/z),
   // Punkt-Index = i·9 + j·3 + k (i entlang x, j entlang y, k entlang z). Quadratische

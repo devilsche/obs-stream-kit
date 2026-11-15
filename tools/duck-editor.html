@@ -624,7 +624,7 @@
       }
       function guessColor() {
         var c = null, o = selObj();
-        if (o) o.traverse(function (m) { if (!c && m.isMesh && m.material && m.material.color && !m.material.map) c = m.material.color.clone().convertLinearToSRGB(); });
+        if (o) o.traverse(function (m) { var mt = m.isMesh && (Array.isArray(m.material) ? m.material[0] : m.material); if (!c && mt && mt.color && !mt.map) c = mt.color.clone().convertLinearToSRGB(); });
         return c ? '#' + c.getHexString() : '#ffffff';
       }
       // aus dem Anfasser zurück in die Daten
