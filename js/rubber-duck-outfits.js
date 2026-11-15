@@ -701,14 +701,15 @@
     [[0.09, 0.62, 0.08], [-0.1, 0.7, 0.05], [0.03, 0.78, -0.11], [0.1, 0.46, -0.05]].forEach(function (k) { add(g2, sph(0.05, 10), m, k[0], k[1], k[2]); });
   };
   // Frack: weiße Hemdbrust vorn, zwei Schöße hinten
+  // Schöße farbig abgesetzt (color), damit sie auf dunklem Anzug zu sehen sind; Satin-Glanz
   ACC.tailcoat = function (c, a) {
-    var m = dbl(fabric(a.color || 0x141418, { roughness: 0.6 }));
+    var m = dbl(M(a.color || 0x7a1626, { roughness: 0.35, clearcoat: 0.6 }));
     var sh = frontRibbon(c, [0.32, 0.2, 0.1, 0.0, -0.1, -0.18], [0.12, 0.15, 0.16, 0.16, 0.14, 0.09], fabric(a.shirt || 0xfafafa, { roughness: 0.6 }));
     sh.name = 'Shirt front';
     [-1, 1].forEach(function (s) {
       var at = U.surfaceAt(0.12, PI + s * 0.32, 0.1);
       var t = add(c.g, rag(0.28, 0.46, 2, 0.0, 0.1), m);
-      t.position.copy(at.p).addScaledVector(at.n, 0.02); t.rotation.set(0, s * 0.32 + PI, 0.12);
+      t.position.copy(at.p).addScaledVector(at.n, 0.03); t.rotation.set(0, s * 0.32 + PI, 0.12);
       t.name = s < 0 ? 'Right tail' : 'Left tail';
     });
   };
