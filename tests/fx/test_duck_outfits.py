@@ -129,3 +129,12 @@ def test_hose_points_fit(tmp_path):
     d = {"acc": [["shape", {"kind": "hose", "xf": {"sub": {"Shape": {"geo": geo}}}}]]}
     assert do.save(str(tmp_path), "hose", d) is None
     assert do.save_part(str(tmp_path), "acc:shape", {"sub": {"Shape": {"geo": geo}}}) is None
+
+
+def test_painted_parts_and_cape_form_fit(tmp_path):
+    lat = [0.0] * 81
+    lat[0] = -0.3
+    d = {"suit": 1, "cape": 2, "chest": "bat", "chestZ": 0.3, "chestRot": 20, "collarDip": 0.2, "collarV": 1,
+         "beltW": 0.08, "stripeW": 0.06, "xf": {"cape": {"form": {"len": 1.4, "flare": 2}, "l": lat}}}
+    assert do.save(str(tmp_path), "caped", d) is None
+    assert do.save_part(str(tmp_path), "cape", {"form": {"billow": 2}, "l": lat}) is None

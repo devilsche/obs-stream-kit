@@ -47,6 +47,7 @@
     .grow { flex: 1; min-width: 0; }
     .parts { display: flex; flex-wrap: wrap; gap: 6px; }
     .parts button { font-size: 13px; }
+    .parts button.painted { border-style: dashed; }
     .muted { color: var(--muted); }
     .small { font-size: 12px; margin: 4px 0; }
     output { min-width: 44px; font-variant-numeric: tabular-nums; }
@@ -81,7 +82,7 @@
   <div class="layout">
     <div class="stage">
       <canvas id="view" role="img" aria-label="3D preview of the rubber duck being edited. Click a part to select it, double-click to select one piece of it; drag empty space to orbit, scroll to zoom."></canvas>
-      <p class="hint">Click a part to select it · double-click a piece of it · drag to orbit · scroll to zoom · W move, E turn, R size · Esc back · Ctrl+Z undo</p>
+      <p class="hint">Click a part (or a painted emblem, neckline, belt …) to select it · double-click a piece of it · drag to orbit · scroll to zoom · W move, E turn, R size · Esc back · Ctrl+Z undo</p>
     </div>
     <div class="panel" id="panel">
       <section aria-labelledby="h-mode">
@@ -237,6 +238,23 @@
         </div>
       </section>
 
+      <section aria-labelledby="h-paint" id="paintBox" hidden>
+        <h2 id="h-paint">Selected: <span id="paintName"></span></h2>
+        <p class="muted small" id="paintHelp"></p>
+        <div class="row" id="paintStripeRow" hidden>
+          <label for="paintStripe">Stripe</label>
+          <select id="paintStripe"><option value="0">First stripe</option><option value="1">Second stripe</option></select>
+        </div>
+        <div id="paintRows"></div>
+        <div class="row" id="paintColRow">
+          <label for="paintCol">Colour</label>
+          <input type="color" id="paintCol">
+        </div>
+        <div class="row">
+          <button type="button" id="paintRemove" class="danger">Remove</button>
+        </div>
+      </section>
+
       <section aria-labelledby="h-look" id="lookBox">
         <h2 id="h-look">Painted look</h2>
         <p class="muted">Body colour, suit, mask, belt, emblem and more are painted onto the duck.</p>
@@ -288,6 +306,8 @@
         ['belt', 'Belt colour', 0x5a3a22], ['beltY', 'Belt height', -0.2], ['briefs', 'Briefs colour', 0xc8151b], ['briefsY', 'Briefs height', -0.2],
         ['stripe', 'Stripe colour', 0xf2c500], ['stripes', 'Stripe heights', [0.1]],
         ['chest', 'Chest emblem', 'star'], ['chestY', 'Emblem height', -0.18], ['chestSize', 'Emblem size', 0.4],
+        ['chestZ', 'Emblem sideways', 0.2], ['chestRot', 'Emblem turn (°)', 15], ['collarDip', 'Neckline dip at the front', 0.2], ['collarV', 'Neckline round (0) or V (1)', 1],
+        ['beltW', 'Belt width', 0.06], ['stripeW', 'Stripe width', 0.06],
         ['eyes', 'Eye style', 'white'], ['eyeColor', 'Eye colour', 0xffffff], ['bill', 'Bill colour', 0xf28a1e], ['noBill', 'No bill', true],
         ['wing', 'Wing colour', 0xf6bd16], ['cape', 'Cape colour', 0xc8151b], ['ears', 'Bat ears', true], ['cap', 'Police cap', true],
         ['helmet', 'Helmet', { color: 0xf2c500, metal: false, neck: false }], ['helmetLabel', 'Helmet label', 'THW'],
@@ -412,7 +432,7 @@
         scene.add(duck);
         if (st.mode === 'ws') { keepSel = wsPartId(); ghost(keepSel); }
         renderParts();
-        select(keepSel && findPart(keepSel) ? keepSel : null, keepPiece, true);
+        select(keepSel && (keepSel.indexOf('paint:') === 0 ? paintHas(keepSel.slice(6)) : findPart(keepSel)) ? keepSel : null, keepPiece, true);
       }
       function findPart(id) {
         var ps = (duck && duck.userData.parts) || [];
@@ -570,6 +590,15 @@
           b.addEventListener('click', function () { select(st.sel === id && st.piece == null ? null : id); });
           box.appendChild(b);
         });
+        // aufgemalte Teile (gestrichelt): Emblem, Kragen, Gürtel …
+        if (st.mode === 'outfit') PAINT.forEach(function (P) {
+          if (!P.has(st.def)) return;
+          var id = 'paint:' + P.k, b = document.createElement('button'); b.type = 'button'; b.className = 'painted';
+          b.textContent = P.label; b.title = 'Painted on'; b.dataset.part = id;
+          b.setAttribute('aria-pressed', String(st.sel === id));
+          b.addEventListener('click', function () { select(st.sel === id ? null : id); });
+          box.appendChild(b);
+        });
         if (!box.children.length) { var m = document.createElement('span'); m.className = 'muted'; m.textContent = 'No parts yet. Add one below.'; box.appendChild(m); }
       }
       (function () {
@@ -599,14 +628,17 @@
       }
       function select(id, piece, keepHandle) {
         st.sel = id;
-        selGrp = id ? findPart(id) : null;
+        st.paint = id && id.indexOf('paint:') === 0 ? id.slice(6) : null;
+        selGrp = id && !st.paint ? findPart(id) : null;
         st.piece = selGrp && piece != null && piece < pieces().length ? piece : null;
         if (!keepHandle) st.h = null;
         attachTc();
         placeHandles();
         Array.prototype.forEach.call($('parts').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.part === id)); });
-        $('selBox').hidden = !id;
-        if (id) syncSel();
+        $('selBox').hidden = !id || !!st.paint;
+        $('paintBox').hidden = !st.paint;
+        if (id && !st.paint) syncSel();
+        if (st.paint) syncPaint();
       }
       function renderPieces() {
         var box = $('pieces'); box.textContent = '';
@@ -665,9 +697,12 @@
       }
       tc.addEventListener('dragging-changed', function (e) {
         orbit.enabled = !e.value;
+        if (!e.value && st.paint) { placePaint(); commit(); renderLook(); syncPaint(); return; }
         if (!e.value) { readGroup(); applySel(); commit(); syncSel(); placeHandles(); }
       });
-      tc.addEventListener('objectChange', function () { readGroup(); if (st.h != null) { applySel(); placeHandles(); syncLat(); } else syncSel(); });
+      tc.addEventListener('objectChange', function () {
+        if (st.paint) { RD.paintSet(st.def, st.paint, pmark.position, st.stripe); livePaint(); syncPaint(); return; }
+        readGroup(); if (st.h != null) { applySel(); placeHandles(); syncLat(); } else syncSel(); });
       function setMode(m) {
         tc.setMode(m);
         document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === m)); });
@@ -723,7 +758,8 @@
       function formName() {
         if (!st.sel || st.piece != null) return null;
         var n = null;
-        if (st.mode === 'ws') n = st.gkey && st.gkey.indexOf('acc:') === 0 ? st.gkey.slice(4) : null;
+        if (st.mode === 'ws') n = st.gkey === 'cape' ? 'cape' : st.gkey && st.gkey.indexOf('acc:') === 0 ? st.gkey.slice(4) : null;
+        else if (st.sel === 'cape') n = 'cape';
         else { var i = accIndex(st.sel); n = i >= 0 && st.def.acc && st.def.acc[i] ? st.def.acc[i][0] : null; }
         return n && RD.FORMS[n] ? n : null;
       }
@@ -806,6 +842,79 @@
       //    beim Schlauch stattdessen seine Knickpunkte ──
       var hGroup = new THREE.Group(), hMat = new THREE.MeshBasicMaterial({ color: 0xf2b705, depthTest: false }), hMatSel = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false });
       var hGeo = new THREE.SphereGeometry(0.028, 12, 8), hDots = [];
+
+      // ── Aufgemalte Teile (Emblem, Kragen, Gürtel, Höschen, Streifen, Haaransatz, Gesichtsplatte) ──
+      // wählbar wie Teile; ein Punkt-Anfasser verschiebt sie (nur die sinnvollen Achsen), Regler für den Rest.
+      // Live über RD.updatePaint (ohne Neubau), gespeichert in den gewohnten Feldern des Outfits.
+      function rng(k, label, min, max, step, def) { return { k: k, label: label, min: min, max: max, step: step, def: def }; }
+      var PAINT = [
+        { k: 'chest', label: 'Chest emblem', axes: 'xyz', col: null, keys: ['chest', 'chestY', 'chestZ', 'chestRot', 'chestSize'], rm: 'Remove emblem',
+          help: 'Drag the yellow point over the body to move the emblem up, down and sideways. Turn and size with the sliders.',
+          has: function (d) { return !!d.chest; },
+          spec: [rng('chestSize', 'Size', 0.05, 1.2, 0.01, 0.46), rng('chestRot', 'Turn (°)', -180, 180, 1, 0), rng('chestY', 'Height', -1.5, 1.5, 0.01, -0.18), rng('chestZ', 'Sideways', -2, 2, 0.01, 0)] },
+        { k: 'collar', label: 'Neckline', axes: 'y', col: 'suit', keys: ['suit', 'collar', 'collarDip', 'collarV'], rm: 'Remove suit',
+          help: 'The edge of the painted suit at the neck. Drag the arrow up or down; cut it deeper at the front, round or as a V.',
+          has: function (d) { return !!d.suit; },
+          spec: [rng('collar', 'Height', -0.5, 1.6, 0.01, 0.55), rng('collarDip', 'Dip at the front', 0, 0.8, 0.01, 0), rng('collarV', 'Round or V', 0, 1, 0.01, 0)] },
+        { k: 'belt', label: 'Belt', axes: 'y', col: 'belt', keys: ['belt', 'beltY', 'beltW'], rm: 'Remove belt',
+          help: 'Drag the arrow to move the belt up or down.',
+          has: function (d) { return !!(d.belt && d.suit); },
+          spec: [rng('beltY', 'Height', -0.55, 1, 0.01, -0.3), rng('beltW', 'Width', 0.01, 0.3, 0.005, 0.04)] },
+        { k: 'briefs', label: 'Briefs', axes: 'y', col: 'briefs', keys: ['briefs', 'briefsY'], rm: 'Remove briefs',
+          help: 'Drag the arrow to move the top edge of the briefs.',
+          has: function (d) { return !!d.briefs; },
+          spec: [rng('briefsY', 'Height', -0.55, 1, 0.01, -0.36)] },
+        { k: 'stripes', label: 'Stripes', axes: 'y', col: 'stripe', keys: ['stripe', 'stripe2', 'stripes', 'stripeW'], rm: 'Remove stripes',
+          help: 'Pick a stripe, then drag the arrow to move it.',
+          has: function (d) { return !!(d.suit && d.stripes && d.stripes.length); },
+          spec: [rng('s0', 'First stripe height', -0.55, 1, 0.01, 0), rng('s1', 'Second stripe height', -0.55, 1, 0.01, 0), rng('stripeW', 'Width', 0.01, 0.3, 0.005, 0.045)] },
+        { k: 'hair', label: 'Hairline', axes: 'y', col: 'hair', keys: ['hair', 'hairY', 'hairPeak'], rm: 'Remove painted hair',
+          help: 'Drag the arrow to move the hairline on the forehead.',
+          has: function (d) { return d.hair != null; },
+          spec: [rng('hairY', 'Height', -0.5, 0.6, 0.01, 0.36), rng('hairPeak', 'Widow\'s peak', 0, 0.4, 0.01, 0)] },
+        { k: 'face', label: 'Face plate', axes: 'x', col: 'face', keys: ['face', 'faceX'], rm: 'Remove face plate',
+          help: 'Drag the arrow forward or back to make the face plate smaller or larger.',
+          has: function (d) { return d.face != null; },
+          spec: [rng('faceX', 'Depth', -0.6, 0.6, 0.01, 0.25)] }
+      ];
+      function paintDef(k) { return PAINT.filter(function (P) { return P.k === k; })[0]; }
+      function paintHas(k) { var P = paintDef(k); return !!(P && st.mode === 'outfit' && P.has(st.def)); }
+      st.stripe = 0;
+      var pmark = new THREE.Mesh(new THREE.SphereGeometry(0.035, 16, 12), hMat); pmark.renderOrder = 11; pmark.visible = false; scene.add(pmark);
+      function placePaint() { if (!st.paint || tc.dragging) return; pmark.position.copy(duck.localToWorld(RD.paintAt(st.def, st.paint, st.stripe))); }
+      function livePaint() { if (!RD.updatePaint(duck, st.def)) rebuild(); }
+      function paintVals(P) {
+        var v = {}, d = st.def;
+        P.spec.forEach(function (sp) {
+          var x = sp.k === 's0' || sp.k === 's1' ? (d.stripes || [])[+sp.k.slice(1)] : d[sp.k];
+          if (sp.k === 'chestSize' && x == null) x = d.chest === 'star' ? 0.24 : 0.46;
+          v[sp.k] = x != null && isFinite(+x) ? +x : sp.def;
+        });
+        return v;
+      }
+      function syncPaint() {
+        var P = paintDef(st.paint); if (!P) return;
+        var d = st.def, two = P.k === 'stripes' && d.stripes && d.stripes.length > 1;
+        if (!two) st.stripe = 0;
+        $('paintName').textContent = P.label + ' (painted)';
+        $('paintHelp').textContent = P.help;
+        $('paintStripeRow').hidden = !two; $('paintStripe').value = String(st.stripe);
+        var spec = P.spec.filter(function (sp) { return sp.k !== 's1' || two; });
+        sliders($('paintRows'), 'paint|' + P.k + '|' + spec.length, spec, paintVals(P), 'pt-', function (k, v) {
+          if (k === 's0' || k === 's1') { d.stripes = (d.stripes || [0]).slice(); d.stripes[+k.slice(1)] = v; } else d[k] = v;
+          livePaint(); placePaint();
+        }, function () { commit(); renderLook(); });
+        $('paintColRow').hidden = !P.col;
+        if (P.col) $('paintCol').value = hex(d[P.col] != null ? d[P.col] : (P.col === 'stripe' ? d.suit || 0 : 0));
+        $('paintRemove').textContent = P.rm;
+      }
+      $('paintStripe').addEventListener('change', function () { st.stripe = +$('paintStripe').value || 0; placePaint(); });
+      $('paintCol').addEventListener('input', function () { var P = paintDef(st.paint); if (!P || !P.col) return; st.def[P.col] = parseInt($('paintCol').value.slice(1), 16); livePaint(); });
+      $('paintCol').addEventListener('change', function () { commit(); renderLook(); });
+      $('paintRemove').addEventListener('click', function () {
+        var P = paintDef(st.paint); if (!P) return;
+        change(function () { P.keys.forEach(function (k) { delete st.def[k]; }); st.sel = null; });
+      });
       var hLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xf2b705, transparent: true, opacity: 0.55, depthTest: false }));
       hLines.renderOrder = 9; hGroup.add(hLines); hGroup.visible = false; scene.add(hGroup);
       function dots(n) {
@@ -822,7 +931,7 @@
           if (!P.lbox) return null;
           return { kind: 'lat', n: 27, space: P.inner, box: P.lbox, axis: 2, other: (other && other.l) || null };
         }
-        var m = pieces()[st.piece]; if (!m || m.userData.cape) return null;
+        var m = pieces()[st.piece]; if (!m) return null;
         duck.updateMatrixWorld(true);
         var e = m.matrixWorld.elements, axis = 0, best = -1;
         for (var a = 0; a < 3; a++) { var z = Math.abs(e[a * 4 + 2]) / (Math.hypot(e[a * 4], e[a * 4 + 1], e[a * 4 + 2]) || 1); if (z > best) { best = z; axis = a; } }
@@ -865,6 +974,12 @@
         hLines.geometry.setFromPoints(seg);
       }
       function attachTc() {
+        if (st.paint) {
+          var PD = paintDef(st.paint); setMode('translate');
+          tc.showX = PD.axes.indexOf('x') >= 0; tc.showY = PD.axes.indexOf('y') >= 0; tc.showZ = PD.axes.indexOf('z') >= 0;
+          placePaint(); pmark.visible = true; tc.attach(pmark); return;
+        }
+        tc.showX = tc.showY = tc.showZ = true; pmark.visible = false;
         var target = !selGrp ? null : st.h != null && st.lat ? hDots[st.h] : st.piece != null ? pieces()[st.piece] : st.mode === 'ws' ? selGrp.userData.part.inner : selGrp;
         if (st.h != null && st.lat) setMode('translate');
         if (target) tc.attach(target); else tc.detach();
@@ -1137,8 +1252,12 @@
             for (var m = mesh; m && m !== o && idx < 0; m = m.parent) idx = ps.indexOf(m);
             return { id: o.userData.part.id, piece: idx >= 0 ? idx : null };
           }
-          // der Körper verdeckt (in der Werkstatt ist er nur blass, dort weiter hindurch)
-          if (st.mode === 'outfit' && mesh === duck.userData.body) break;
+          // der Körper verdeckt (in der Werkstatt ist er nur blass, dort weiter hindurch);
+          // auf ihm liegen die aufgemalten Teile (Emblem, Kragen, Gürtel …)
+          if (st.mode === 'outfit' && mesh === duck.userData.body) {
+            var z = RD.paintZone(st.def, duck.worldToLocal(hits[i].point.clone()));
+            return z ? { id: 'paint:' + z.kind, stripe: z.i || 0 } : null;
+          }
         }
         return null;
       }
@@ -1148,12 +1267,12 @@
         var hi = pickHandle(e);
         if (hi != null) { setHandle(hi); return; }
         var h = pick(e);
-        if (h) { if (h.id !== st.sel) select(h.id); } else if (st.mode === 'outfit') select(null);
+        if (h) { if (h.stripe != null) st.stripe = h.stripe; if (h.id !== st.sel || h.stripe != null) select(h.id); } else if (st.mode === 'outfit') select(null);
       });
       canvas.addEventListener('dblclick', function (e) {
         if (tc.axis || pickHandle(e) != null) return;
         var h = pick(e);
-        if (h) select(h.id, h.piece);
+        if (h && h.id.indexOf('paint:') !== 0) select(h.id, h.piece);
       });
 
       // ── Tastatur ──

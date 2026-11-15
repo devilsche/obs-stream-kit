@@ -252,48 +252,65 @@
   ].join('\n');
   // Vinyl-Material mit Uniform-Zonen. Reihenfolge: Anzug → Muster (Anzug/Haut) → Streifen,
   // Gürtel, Höschen → Maske (cowl) → Haar → Muster (alles) → Augenbinde → Gesicht → Emblem
+  // Brust-Emblem: Punkt auf der Körperoberfläche in Richtung (1, chestY, chestZ), projiziert entlang der
+  // waagrechten Normale dort (vorn genau +x), gedreht um chestRot Grad; liefert Lage und Achsen
+  function emblemFrame(o) {
+    var at = surface(new THREE.Vector3(1, o.chestY != null ? +o.chestY : -0.18, +o.chestZ || 0));
+    var n = new THREE.Vector3(at.n.x, 0, at.n.z); if (n.lengthSq() < 1e-6) n.set(1, 0, 0); n.normalize();
+    var t1 = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), n).normalize(), t2 = new THREE.Vector3().crossVectors(n, t1);
+    var r = (+o.chestRot || 0) * Math.PI / 180, cs = Math.cos(r), sn = Math.sin(r);
+    var u = t1.clone().multiplyScalar(cs).addScaledVector(t2, sn), v = t2.clone().multiplyScalar(cs).addScaledVector(t1, -sn);
+    return { p: at.p, n: n, u: u, v: v, size: +o.chestSize || (o.chest === 'star' ? 0.24 : 0.46) };
+  }
+  // Werte der aufgemalten Zonen (Uniforms); aus dem Editor ohne Neubau nachziehbar (updatePaint)
+  function paintUniforms(base, o, emb) {
+    var HC = PARTS[5].c, HR = PARTS[5].r, pt = o.pattern || {}, ef = o.chest ? emblemFrame(o) : null;
+    var zone = { suit: 0, all: 1, skin: 2 }[pt.zone || (o.suit ? 'suit' : 'all')];
+    return {
+      uSuit: col(o.suit || base), uStripe: col(o.stripe || o.suit || base), uStripe2: col(o.stripe2 || o.stripe || o.suit || base),
+      uBelt: col(o.belt || o.suit || base), uBriefs: col(o.briefs || o.suit || base), uCowl: col(o.cowl || base),
+      uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? (o.beltY != null ? o.beltY : -0.3) : -9, o.briefs ? 1 : 0),
+      uSuitOn: o.suit ? 1 : 0, uBriefsY: o.briefsY != null ? o.briefsY : -0.36,
+      uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2]),
+      uEmb: emb || new THREE.Texture(), uEmbOn: emb ? 1 : 0,
+      uEmbAt: ef ? ef.p.clone() : new THREE.Vector3(), uEmbU: ef ? ef.u : new THREE.Vector3(0, 0, -1), uEmbV: ef ? ef.v : new THREE.Vector3(0, 1, 0),
+      uEmbN: ef ? ef.n : new THREE.Vector3(1, 0, 0), uEmbSize: ef ? ef.size : 0.46,
+      uCollar: o.collar || 0.55, uDip: +o.collarDip || 0, uCut: Math.min(1, Math.max(0, +o.collarV || 0)),
+      uBeltW: o.beltW != null ? +o.beltW : 0.04, uStripeW: o.stripeW != null ? +o.stripeW : 0.045,
+      uPat: PATTERNS[pt.type] || 0, uPatC1: col(pt.c1 != null ? pt.c1 : base), uPatC2: col(pt.c2 != null ? pt.c2 : 0x000000),
+      uPatS: pt.scale || 6, uPatZone: zone, uPatY: new THREE.Vector2(pt.y ? pt.y[0] : -9, pt.y ? pt.y[1] : 9),
+      uMask: col(o.mask || 0), uMaskOn: o.mask != null ? 1 : 0,
+      uFace: col(o.face || 0), uFaceOn: o.face != null ? 1 : 0, uFaceX: o.faceX != null ? o.faceX : 0.25,
+      uHair: col(o.hair || 0), uHairOn: o.hair != null ? 1 : 0, uHairY: HC[1] + (o.hairY != null ? o.hairY : 0.36), uPeak: o.hairPeak || 0
+    };
+  }
   function suitMaterial(base, o) {
     var m = vinyl(base, Object.assign({ emissive: o.skin != null ? 0x080604 : 0x2a1400 }, o.mat || {}));
     if (o.ghost) { m.transparent = true; m.opacity = 0.8; m.depthWrite = true; }
     if (!(o.suit || o.cowl || o.pattern || o.mask || o.face || o.hair || o.chest || o.briefs)) return m;
-    // Brust-Emblem: von vorn (+x) auf die Körperoberfläche projiziert, liegt also drauf
-    var emb = o.chest ? emblemTex(o.chest) : null, embAt = o.chest ? surface(new THREE.Vector3(1, o.chestY != null ? o.chestY : -0.18, 0)) : null;
-    var embSize = o.chestSize || (o.chest === 'star' ? 0.24 : 0.46);
-    var HC = PARTS[5].c, HR = PARTS[5].r, pt = o.pattern || {};
-    var zone = { suit: 0, all: 1, skin: 2 }[pt.zone || (o.suit ? 'suit' : 'all')];
+    var emb = o.chest ? emblemTex(o.chest) : null, u = paintUniforms(base, o, emb);
+    hide(m.userData, 'paint', { u: u, chest: o.chest || null, base: base });
     m.onBeforeCompile = function (sh) {
-      var u = {
-        uSuit: col(o.suit || base), uStripe: col(o.stripe || o.suit || base), uStripe2: col(o.stripe2 || o.stripe || o.suit || base),
-        uBelt: col(o.belt || o.suit || base), uBriefs: col(o.briefs || o.suit || base), uCowl: col(o.cowl || base),
-        uS: new THREE.Vector4(o.stripes ? o.stripes[0] : -9, o.stripes && o.stripes[1] != null ? o.stripes[1] : -9, o.belt ? (o.beltY != null ? o.beltY : -0.3) : -9, o.briefs ? 1 : 0),
-        uSuitOn: o.suit ? 1 : 0, uBriefsY: o.briefsY != null ? o.briefsY : -0.36,
-        uCowlOn: o.cowl ? 1 : 0, uHC: new THREE.Vector3(HC[0], HC[1], HC[2]), uHR: new THREE.Vector3(HR[0], HR[1], HR[2]),
-        uEmb: emb || new THREE.Texture(), uEmbOn: emb ? 1 : 0,
-        uEmbAt: new THREE.Vector3(embAt ? embAt.p.x : 0, embAt ? embAt.p.y : 0, 0), uEmbSize: embSize,
-        uCollar: o.collar || 0.55,
-        uPat: PATTERNS[pt.type] || 0, uPatC1: col(pt.c1 != null ? pt.c1 : base), uPatC2: col(pt.c2 != null ? pt.c2 : 0x000000),
-        uPatS: pt.scale || 6, uPatZone: zone, uPatY: new THREE.Vector2(pt.y ? pt.y[0] : -9, pt.y ? pt.y[1] : 9),
-        uMask: col(o.mask || 0), uMaskOn: o.mask != null ? 1 : 0,
-        uFace: col(o.face || 0), uFaceOn: o.face != null ? 1 : 0, uFaceX: o.faceX != null ? o.faceX : 0.25,
-        uHair: col(o.hair || 0), uHairOn: o.hair != null ? 1 : 0, uHairY: HC[1] + (o.hairY != null ? o.hairY : 0.36), uPeak: o.hairPeak || 0
-      };
       Object.keys(u).forEach(function (k) { sh.uniforms[k] = { value: u[k] }; });
+      m.userData.paint.sh = sh;
       sh.vertexShader = 'varying vec3 vDuck;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vDuck = position;');
-      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt, uPatC1, uPatC2, uMask, uFace, uHair; uniform vec4 uS; uniform vec2 uPatY;' +
-        ' uniform float uCowlOn, uEmbOn, uEmbSize, uCollar, uSuitOn, uBriefsY, uPat, uPatS, uPatZone, uMaskOn, uFaceOn, uFaceX, uHairOn, uHairY, uPeak; uniform sampler2D uEmb;\n' + PAT_GLSL + '\n' +
+      sh.fragmentShader = 'varying vec3 vDuck; uniform vec3 uSuit, uStripe, uStripe2, uBelt, uBriefs, uCowl, uHC, uHR, uEmbAt, uEmbU, uEmbV, uEmbN, uPatC1, uPatC2, uMask, uFace, uHair; uniform vec4 uS; uniform vec2 uPatY;' +
+        ' uniform float uCowlOn, uEmbOn, uEmbSize, uCollar, uDip, uCut, uBeltW, uStripeW, uSuitOn, uBriefsY, uPat, uPatS, uPatZone, uMaskOn, uFaceOn, uFaceX, uHairOn, uHairY, uPeak; uniform sampler2D uEmb;\n' + PAT_GLSL + '\n' +
         sh.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );',
           'vec3 cc = diffuse;\n' +
           'float inHead = length((vDuck - uHC) / uHR);\n' +
           'float headM = 1.0 - step(1.12, inHead);\n' +
-          // Kragenlinie: unterhalb uCollar und nicht im Kopf → Anzug
-          'float suitOn = uSuitOn * (1.0 - step(uCollar, vDuck.y)) * step(0.97, inHead);\n' +
+          // Kragenlinie: unterhalb uCollar und nicht im Kopf → Anzug; vorn um uDip tiefer ausgeschnitten (rund bzw. V)
+          'float cz = clamp(abs(vDuck.z) / 0.4, 0.0, 1.0);\n' +
+          'float cline = uCollar - uDip * smoothstep(0.2, 0.8, vDuck.x) * mix(1.0 - cz * cz, 1.0 - cz, uCut);\n' +
+          'float suitOn = uSuitOn * (1.0 - step(cline, vDuck.y)) * step(0.97, inHead);\n' +
           'cc = mix(cc, uSuit, suitOn);\n' +
           'float inY = step(uPatY.x, vDuck.y) * step(vDuck.y, uPatY.y);\n' +
           'if (uPatZone < 0.5 || uPatZone > 1.5) { float pz = uPatZone < 0.5 ? suitOn : 1.0 - suitOn; vec4 pt = duckPat(vDuck, uPat, uPatC1, uPatC2, uPatS, cc); cc = mix(cc, pt.rgb, pt.a * pz * inY); }\n' +
           'float aa = 0.012;\n' +
-          'cc = mix(cc, uStripe, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.x))));\n' +
-          'cc = mix(cc, uStripe2, suitOn * (1.0 - smoothstep(0.045 - aa, 0.045 + aa, abs(vDuck.y - uS.y))));\n' +
-          'cc = mix(cc, uBelt, suitOn * (1.0 - smoothstep(0.04 - aa, 0.04 + aa, abs(vDuck.y - uS.z))));\n' +
+          'cc = mix(cc, uStripe, suitOn * (1.0 - smoothstep(uStripeW - aa, uStripeW + aa, abs(vDuck.y - uS.x))));\n' +
+          'cc = mix(cc, uStripe2, suitOn * (1.0 - smoothstep(uStripeW - aa, uStripeW + aa, abs(vDuck.y - uS.y))));\n' +
+          'cc = mix(cc, uBelt, suitOn * (1.0 - smoothstep(uBeltW - aa, uBeltW + aa, abs(vDuck.y - uS.z))));\n' +
           'cc = mix(cc, uBriefs, step(0.97, inHead) * uS.w * (1.0 - smoothstep(uBriefsY - aa, uBriefsY + aa, vDuck.y)));\n' +
           // Maske: Kopf oberhalb der Schnabellinie und hinten
           'float cowl = uCowlOn * headM * max(step(uHC.y - 0.06, vDuck.y), step(vDuck.x, uHC.x - 0.12));\n' +
@@ -308,9 +325,9 @@
           'cc = mix(cc, uMask, uMaskOn * headM * (1.0 - smoothstep(0.085, 0.1, abs(vDuck.y - (uHC.y + 0.22)))));\n' +
           // Gesicht: vorderer Kopfteil oberhalb des Schnabels (Gesichtsplatte, Maske)
           'cc = mix(cc, uFace, uFaceOn * headM * smoothstep(uHC.x + uFaceX - 0.01, uHC.x + uFaceX + 0.01, vDuck.x) * step(uHC.y - 0.16, vDuck.y));\n' +
-          // Emblem vorn auf der Brust (nur Vorderseite, Projektion entlang x)
-          'vec2 euv = vec2(-vDuck.z / uEmbSize + 0.5, (vDuck.y - uEmbAt.y) / uEmbSize + 0.5);\n' +
-          'if (uEmbOn > 0.5 && vDuck.x > uEmbAt.x - 0.35 && euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) {\n' +
+          // Emblem: Projektion entlang der waagrechten Normale am Emblem-Punkt (nur diese Seite)
+          'vec3 ed = vDuck - uEmbAt; vec2 euv = vec2(dot(ed, uEmbU), dot(ed, uEmbV)) / uEmbSize + 0.5;\n' +
+          'if (uEmbOn > 0.5 && dot(ed, uEmbN) > -0.35 && euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) {\n' +
           '  vec4 et = texture2D(uEmb, euv); cc = mix(cc, pow(et.rgb, vec3(2.2)), et.a);\n' +
           '}\n' +
           'vec4 diffuseColor = vec4( cc, opacity );');
@@ -450,7 +467,7 @@
       // Kasten der Griffpunkte für das ganze Teil (Raum der inneren Gruppe, gebaute Lage)
       inner.updateMatrixWorld(true);
       var lb = new THREE.Box3();
-      pieces.forEach(function (m) { if (!m.userData.cape) lb.expandByObject(m); });
+      pieces.forEach(function (m) { lb.expandByObject(m); });
       if (!lb.isEmpty()) grp.userData.part.lbox = { min: lb.min.toArray(), size: lb.getSize(new THREE.Vector3()).toArray() };
       g.add(grp); parts.push(grp);
       applyPart(grp);
@@ -592,7 +609,8 @@
     // Umhang: oben ein Kragen um den Nacken (dort, wo hinten die Maske endet), von dort
     // über den Rücken bis etwa zur Schwanzwurzel; wölbt sich zu den Seiten herab
     if (o.cape) part('cape', 'Cape', function () {
-      var U = 28, V = 24, cpos = [], cidx = [], COLLAR_Y = 0.74;
+      var cf = formOf('cape', Object.assign({}, (GPARTS.cape || {}).form, (xfs.cape || {}).form));
+      var U = 28, V = 24, cpos = [], cidx = [], COLLAR_Y = 0.74 + cf.collar;
       var topAt = function (x) {             // Rücken-Oberseite (Mittellinie) des Rumpfs bei x
         var q = new THREE.Vector3(x, 1.6, 0), lo = -0.6, hi = 1.6, hit = false;
         for (var yy = 1.6; yy > -0.6; yy -= 0.04) { q.y = yy; if (sdTrunk(q) < 0) { hit = true; lo = yy; hi = yy + 0.04; break; } }
@@ -603,26 +621,26 @@
       // Kragen: Punkte rund um den Nacken (hintere Hälfte), knapp über der Haut
       var collar = [];
       for (var uu0 = 0; uu0 <= U; uu0++) {
-        var sp = surfaceAt(COLLAR_Y, Math.PI + (uu0 / U * 2 - 1) * 1.2, 0.42);
+        var sp = surfaceAt(COLLAR_Y, Math.PI + (uu0 / U * 2 - 1) * cf.around, 0.42);
         collar.push(sp.p.clone().addScaledVector(sp.n, 0.012));
       }
       var lastTop = 0.5;
       for (var vv = 0; vv <= V; vv++) {
         var tv = vv / V;
-        var xc = -0.2 - tv * 0.62;              // endet vor der Schwanzspitze
+        var xc = -0.2 - tv * 0.62 * cf.len;     // Länge 1: endet vor der Schwanzspitze
         var tp = topAt(xc); if (tp !== null) lastTop = tp;
-        var half = 0.38 + 0.5 * tv, toCollar = 1 - Math.min(1, tv / 0.3);
+        var half = 0.38 * cf.top + 0.5 * cf.flare * tv, toCollar = 1 - Math.min(1, tv / 0.3);
         toCollar = toCollar * toCollar * (3 - 2 * toCollar);
         for (var uu = 0; uu <= U; uu++) {
           var z = (uu / U * 2 - 1) * half;
-          var q = new THREE.Vector3(xc, lastTop + 0.025 - 0.9 * z * z - Math.max(0, tv - 0.8) * 0.4, z);
+          var q = new THREE.Vector3(xc, lastTop + 0.025 - 0.9 * cf.wrap * z * z - Math.max(0, tv - 0.8) * 0.4 - Math.max(0, -1.05 - xc) * 0.9, z);
           q.lerp(collar[uu], toCollar);
           // nie in den Rumpf schneiden: so weit anheben, bis Abstand da ist
           for (var k = 0; k < 60 && sdTrunk(q) < 0.02; k++) q.y += 0.01;
           // in der Mitte nach unten hin leicht vom Rücken weg bauschen (liegt nicht an)
           var mid = 1 - Math.pow(uu / U * 2 - 1, 2);
           var tb = Math.max(0, (tv - 0.35) / 0.65);  // am Nacken anliegend, erst weiter hinten bauschig
-          q.y += 0.07 * tb * mid; q.x -= 0.05 * tb * mid;
+          q.y += 0.07 * cf.billow * tb * mid; q.x -= 0.05 * cf.billow * tb * mid;
           cpos.push(q.x, q.y, q.z);
         }
       }
@@ -759,7 +777,7 @@
   // Verformen aus der Quell-Geometrie src (gebaut bzw. aus Grundform-Reglern neu erzeugt):
   // Griffpunkte des Unterteils (lp), Biegung (b), Griffpunkte des ganzen Teils (L, Kasten box)
   function deform(m, src, b, lp, L, box, inner) {
-    if (m.userData.cape) return;                     // Umhang verformt sich selbst (flutter)
+    if (m.userData.cape) { deformCape(m, b, lp, L, box, inner); return; }
     hide(m.userData, 'srcGeo', src);
     var bx = b ? +b[0] || 0 : 0, bz = b ? +b[1] || 0 : 0, any = bx || bz || lp || (L && box);
     if (!any) { m.geometry = src; return; }
@@ -783,6 +801,25 @@
     }
     geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere(); geo.computeBoundingBox();
     m.geometry = geo;
+  }
+
+  // Umhang: verformt wird seine Ruheform (base, um die er flattert), Quelle ist die gebaute Fläche
+  function deformCape(m, b, lp, L, box, inner) {
+    var c = m.userData.cape;
+    if (!m.userData.capeSrc) { var g0 = m.geometry.clone(); g0.computeBoundingBox(); hide(m.userData, 'capeSrc', g0); hide(m.userData, 'srcGeo', g0); }
+    var src = m.userData.capeSrc, a0 = src.attributes.position.array, a = m.geometry.attributes.position.array;
+    var bb = geoBox(src), hx = Math.max(Math.abs(bb.min[0]), Math.abs(bb.min[0] + bb.size[0])) || 1, hz = Math.max(Math.abs(bb.min[2]), Math.abs(bb.min[2] + bb.size[2])) || 1;
+    var bx = b ? +b[0] || 0 : 0, bz = b ? +b[1] || 0 : 0, d = [0, 0, 0], M = null, Mi = null, v = new THREE.Vector3(), dv = new THREE.Vector3();
+    if (L && box) { M = pieceMatrix(m, inner); Mi = new THREE.Matrix3().setFromMatrix4(M).invert(); }
+    for (var i = 0; i < a.length; i += 3) {
+      var x = a0[i], y = a0[i + 1], z = a0[i + 2];
+      if (lp) { latAt(bb, lp, x, y, z, d); x += d[0]; y += d[1]; z += d[2]; }
+      if (bx || bz) { var nx = a0[i] / hx, nz = a0[i + 2] / hz; y += bx * nx * nx + bz * nz * nz; }
+      if (M) { v.set(x, y, z).applyMatrix4(M); latAt(box, L, v.x, v.y, v.z, d); dv.set(d[0], d[1], d[2]).applyMatrix3(Mi); x += dv.x; y += dv.y; z += dv.z; }
+      a[i] = x; a[i + 1] = y; a[i + 2] = z;
+    }
+    c.base = Float32Array.from(a);
+    m.geometry.attributes.position.needsUpdate = true; m.geometry.computeVertexNormals(); m.geometry.computeBoundingSphere(); m.geometry.computeBoundingBox();
   }
 
   // ── Grundformen: Stücke aus Quader, Zylinder, Kegel, Kugel, Ring lassen sich über ihre Maße
@@ -1043,6 +1080,17 @@
   var ACC = {};
   // Form-Regler je Baustein (Editor): [{k, label, min, max, step, def}], vom Baustein über form gelesen
   var FORMS = {};
+  // Umhang (Teil „cape“): Länge, Breite am Hals, Weite unten, Kragenhöhe, wie weit um den Hals,
+  // wie stark er sich um die Seiten legt, wie bauschig er absteht
+  FORMS.cape = [
+    { k: 'len', label: 'Length', min: 0.3, max: 1.8, step: 0.01, def: 1 },
+    { k: 'top', label: 'Width at the neck', min: 0.3, max: 2, step: 0.01, def: 1 },
+    { k: 'flare', label: 'Width at the bottom', min: 0, max: 2.5, step: 0.01, def: 1 },
+    { k: 'collar', label: 'Collar height', min: -0.25, max: 0.3, step: 0.01, def: 0 },
+    { k: 'around', label: 'Around the neck', min: 0.5, max: 1.6, step: 0.01, def: 1.2 },
+    { k: 'wrap', label: 'Wrap around the sides', min: 0, max: 2.5, step: 0.01, def: 1 },
+    { k: 'billow', label: 'Billow', min: 0, max: 4, step: 0.05, def: 1 }
+  ];
   function formOf(name, f) {
     var r = {}; f = f || {};
     (FORMS[name] || []).forEach(function (s) { var v = +f[s.k]; r[s.k] = isFinite(v) && f[s.k] != null ? Math.min(s.max, Math.max(s.min, v)) : s.def; });
@@ -1081,8 +1129,82 @@
     Object.keys(defs).forEach(function (k) { OUTFITS[k] = defs[k]; if (KEYS.indexOf(k) < 0) KEYS.push(k); });
   }
   function info(k) { var o = OUTFITS[k]; return o ? { key: k, label: o.label || k, cat: o.cat || 'classic', note: o.note || '' } : null; }
+  // ── Aufgemalte Teile im Editor (Emblem, Kragen, Gürtel, Höschen, Streifen, Haaransatz, Gesichtsplatte) ──
+  // kind: chest | collar | belt | briefs | stripes (i = 0/1) | hair | face. Alles in Modell-Koordinaten.
+  function withShape(o, fn) { var sh = shapeFor(o), pc = CUR, pk = CUR_KEY; CUR = sh.parts; CUR_KEY = sh.key; try { return fn(); } finally { CUR = pc; CUR_KEY = pk; } }
+  function rnd3(v) { return Math.round(v * 1000) / 1000; }
+  function lineY(o, kind, i) {
+    if (kind === 'collar') return o.collar || 0.55;
+    if (kind === 'belt') return o.beltY != null ? +o.beltY : -0.3;
+    if (kind === 'briefs') return o.briefsY != null ? +o.briefsY : -0.36;
+    if (kind === 'stripes') return o.stripes && o.stripes[i || 0] != null ? +o.stripes[i || 0] : 0;
+    return 0;
+  }
+  // Ankerpunkt (für den Anfasser im Editor)
+  function paintAt(o, kind, i) {
+    return withShape(o, function () {
+      var H = PARTS[5];
+      if (kind === 'chest') return emblemFrame(o).p.clone();
+      if (kind === 'hair' || kind === 'face') {
+        if (kind === 'face') { var x = H.c[0] + (o.faceX != null ? +o.faceX : 0.25), tx = (x - H.c[0]) / H.r[0]; return new THREE.Vector3(x, H.c[1] + H.r[1] * Math.sqrt(Math.max(0.02, 1 - tx * tx)), 0); }
+        var y = H.c[1] + (o.hairY != null ? +o.hairY : 0.36), ty = (y - H.c[1]) / H.r[1];
+        return new THREE.Vector3(H.c[0] + H.r[0] * Math.sqrt(Math.max(0.02, 1 - ty * ty)), y, 0);
+      }
+      var yl = lineY(o, kind, i) - (kind === 'collar' ? +o.collarDip || 0 : 0);
+      return surfaceAt(yl, 0, 0.1).p.clone();
+    });
+  }
+  // Wert aus einem (gezogenen) Punkt setzen; ändert o
+  function paintSet(o, kind, p, i) {
+    var H = PARTS[5];
+    if (kind === 'chest') {
+      var d = p.clone().sub(CENTER); d.x = Math.max(0.08, d.x);
+      o.chestY = rnd3(Math.max(-3, Math.min(3, d.y / d.x))); o.chestZ = rnd3(Math.max(-3, Math.min(3, d.z / d.x)));
+      if (!o.chestZ) delete o.chestZ;
+    } else if (kind === 'face') o.faceX = rnd3(Math.max(-0.6, Math.min(0.6, p.x - H.c[0])));
+    else if (kind === 'hair') o.hairY = rnd3(Math.max(-0.5, Math.min(0.6, p.y - H.c[1])));
+    else {
+      var y = rnd3(Math.max(-0.55, Math.min(1.6, p.y + (kind === 'collar' ? +o.collarDip || 0 : 0))));
+      if (kind === 'collar') o.collar = y; else if (kind === 'belt') o.beltY = y; else if (kind === 'briefs') o.briefsY = y;
+      else if (kind === 'stripes') { o.stripes = (o.stripes || [0]).slice(); o.stripes[i || 0] = y; }
+    }
+  }
+  // was liegt an diesem Punkt der Körperoberfläche? → { kind, i } oder null
+  function paintZone(o, p) {
+    return withShape(o, function () {
+      var H = PARTS[5], hp = new THREE.Vector3((p.x - H.c[0]) / H.r[0], (p.y - H.c[1]) / H.r[1], (p.z - H.c[2]) / H.r[2]).length(), near = 0.05;
+      if (o.chest) {
+        var ef = emblemFrame(o), d = p.clone().sub(ef.p), u = d.dot(ef.u) / ef.size + 0.5, v = d.dot(ef.v) / ef.size + 0.5;
+        if (d.dot(ef.n) > -0.35 && u > 0 && u < 1 && v > 0 && v < 1) return { kind: 'chest' };
+      }
+      if (hp < 1.12) {
+        if (o.face != null && Math.abs(p.x - H.c[0] - (o.faceX != null ? +o.faceX : 0.25)) < near && p.y > H.c[1] - 0.16) return { kind: 'face' };
+        if (o.hair != null && Math.abs(p.y - H.c[1] - (o.hairY != null ? +o.hairY : 0.36)) < near * 1.5) return { kind: 'hair' };
+        if (hp < 0.9) return null;          // tief im Kopf: kein Kragen (der Anzug endet am Kopf)
+      }
+      if (o.suit) {
+        var cz = Math.min(1, Math.abs(p.z) / 0.4), fr = Math.max(0, Math.min(1, (p.x - 0.2) / 0.6)); fr = fr * fr * (3 - 2 * fr);
+        var cut = Math.min(1, Math.max(0, +o.collarV || 0)), cl = (o.collar || 0.55) - (+o.collarDip || 0) * fr * ((1 - cz * cz) * (1 - cut) + (1 - cz) * cut);
+        if (Math.abs(p.y - cl) < near) return { kind: 'collar' };
+        if (o.belt && Math.abs(p.y - lineY(o, 'belt')) < Math.max(near, (o.beltW != null ? +o.beltW : 0.04) + 0.01)) return { kind: 'belt' };
+        for (var k = 0; o.stripes && k < Math.min(2, o.stripes.length); k++) if (Math.abs(p.y - o.stripes[k]) < Math.max(near, (o.stripeW != null ? +o.stripeW : 0.045) + 0.01)) return { kind: 'stripes', i: k };
+      }
+      if (o.briefs && Math.abs(p.y - lineY(o, 'briefs')) < near) return { kind: 'briefs' };
+      return null;
+    });
+  }
+  // Werte der Bemalung ohne Neubau nachziehen; false = Neubau nötig (anderes Emblem, keine Bemalung)
+  function updatePaint(duck, o, color) {
+    var b = duck && duck.userData.body, P = b && b.material && b.material.userData.paint;
+    if (!P || (P.chest || null) !== (o.chest || null)) return false;
+    var nu = withShape(o, function () { return paintUniforms(o.skin != null ? o.skin : (color != null ? color : P.base), o, o.chest ? P.u.uEmb : null); });
+    Object.keys(nu).forEach(function (k) { P.u[k] = nu[k]; if (P.sh && P.sh.uniforms[k]) P.sh.uniforms[k].value = nu[k]; });
+    return true;
+  }
+
   root.RubberDuck = {
     build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
+    paintAt: paintAt, paintSet: paintSet, paintZone: paintZone, updatePaint: updatePaint,
     addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
     applyPart: applyPart, readPiece: readPiece, pieceKey: pieceKey, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
