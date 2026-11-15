@@ -75,7 +75,8 @@
     var Hx = -0.85 * len, LIP = 0.018, COLS = 48, ROWS = 16, S = 10;
     var lip = new THREE.Color(0xf2650f).convertSRGBToLinear();
     var mouthHi = new THREE.Color(0x6a1c06).convertSRGBToLinear(), mouthLo = new THREE.Color(0x1e0601).convertSRGBToLinear();
-    var pos = [], col = [], idx = [];
+    // Ober- und Unterschnabel getrennt (idxU/idxL), damit sie einzeln bearbeitbar sind
+    var pos = [], col = [], idxU = [], idxL = [], idx = idxU;
     function vtx(v, c) { pos.push(v.x, v.y, v.z); col.push(c.r, c.g, c.b); return pos.length / 3 - 1; }
     function shape(x, y, z, up) {
       var t = (x + 1) / 2, w = wid * (0.72 + 0.38 * Math.sin(Math.PI * Math.min(1, t * 1.15)));
@@ -94,6 +95,7 @@
     }
     // äußere Schale; liefert die Punkte des Mundrands (Äquator) in Reihenfolge
     function shell(up) {
+      idx = up ? idxU : idxL;
       var g = new THREE.SphereGeometry(1, COLS, ROWS, 0, Math.PI * 2, up ? 0 : Math.PI / 2, Math.PI / 2);
       var p = g.attributes.position, base = pos.length / 3, rim = [];
       for (var i = 0; i < p.count; i++) vtx(wedge(shape(p.getX(i), p.getY(i), p.getZ(i), up), up), lip);
@@ -121,8 +123,8 @@
       }
     }
     // gerundete Lippen (orange), außen → innen
-    strip(rimU, inU, lip, lip, false);
-    strip(rimL, inL, lip, lip, true);
+    idx = idxU; strip(rimU, inU, lip, lip, false);
+    idx = idxL; strip(rimL, inL, lip, lip, true);
     // Mundhöhle: je Randpunkt eine Kurve von der oberen Lippe über den Rachen
     // (nach hinten zum Mundwinkel) zur unteren Lippe
     var grid = [];
@@ -145,14 +147,33 @@
     }
     for (var c2 = 0; c2 < COLS; c2++) for (var k2 = 0; k2 < S; k2++) {
       var p00 = grid[c2][k2], p01 = grid[c2][k2 + 1], p10 = grid[c2 + 1][k2], p11 = grid[c2 + 1][k2 + 1];
-      idx.push(p00, p01, p10, p10, p01, p11);
+      (k2 < S / 2 ? idxU : idxL).push(p00, p01, p10, p10, p01, p11);
     }
+    // Normalen am ganzen Schnabel (glatter Übergang im Rachen), dann in zwei Teile zerlegen;
+    // Ursprung am Mundwinkel (Hx), damit Drehen den Schnabel auf- und zuklappt
     var geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    geo.setIndex(idx);
+    geo.setIndex(idxU.concat(idxL));
     geo.computeVertexNormals();
-    return geo;
+    var nrm = geo.attributes.normal.array;
+    function subset(list) {
+      var map = {}, P = [], C = [], N = [], I = [];
+      list.forEach(function (i) {
+        if (map[i] === undefined) {
+          map[i] = P.length / 3;
+          P.push(pos[i * 3] - Hx, pos[i * 3 + 1], pos[i * 3 + 2]); C.push(col[i * 3], col[i * 3 + 1], col[i * 3 + 2]); N.push(nrm[i * 3], nrm[i * 3 + 1], nrm[i * 3 + 2]);
+        }
+        I.push(map[i]);
+      });
+      var gg = new THREE.BufferGeometry();
+      gg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      gg.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+      gg.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3));
+      gg.setIndex(I);
+      return gg;
+    }
+    geo.dispose();
+    return { upper: subset(idxU), lower: subset(idxL), hinge: Hx };
   }
   function vinyl(hex, o) {
     var m = new THREE.MeshPhysicalMaterial(Object.assign({ color: hex, roughness: 0.5, clearcoat: 0.35, clearcoatRoughness: 0.4, envMapIntensity: 0.4 }, o || {}));
@@ -398,8 +419,13 @@
     }
     // Schnabel: ein Teil, leicht geöffnet
     // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
-    var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.09), beak);
-    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; bill.name = 'Bill'; if (!o.noBill) part('bill', 'Bill', function () { g.add(bill); });
+    var bg = billGeometry(0.44, 0.33, 0.15, 0.09), bill = new THREE.Group();
+    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1;
+    var billU = new THREE.Mesh(bg.upper, beak), billL = new THREE.Mesh(bg.lower, beak);
+    billU.name = 'Upper bill'; billL.name = 'Lower bill';
+    billU.position.x = billL.position.x = bg.hinge;
+    bill.add(billU, billL);
+    if (!o.noBill) part('bill', 'Bill', function () { g.add(bill); });
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     // noWings: wer eigene Arme animiert (Messer-Ente), lässt die angelegten Flügel weg
     if (!opts.noWings) [-1, 1].forEach(function (s) {
@@ -615,7 +641,7 @@
   }
 
   // Teil-Anpassung aus dem Editor: p = Verschiebung, r = Drehung in Grad, s = Maßstab (x, y, z),
-  // c = Farbe (0xRRGGBB), hide = ausblenden, sub = dasselbe je Unterteil (Index → Anpassung),
+  // c = Farbe (0xRRGGBB), hide = ausblenden, sub = dasselbe je Unterteil (Name bzw. Index → Anpassung),
   // dort zusätzlich b = Biegung [vorn/hinten, seitlich]: Ränder heben (+) oder senken (−).
   // Zwei Ebenen: gxf = global umgebautes Teil (Part-Werkstatt), xf = Anpassung im Outfit; das
   // Outfit wirkt auf das global umgebaute Teil. Alles relativ zur gebauten Lage.
@@ -625,7 +651,9 @@
   function v3(a, d) { return a ? [+a[0] || 0, +a[1] || 0, +a[2] || 0] : [d, d, d]; }
   function sc3(a) { return a ? [+a[0] || 1, +a[1] || 1, +a[2] || 1] : [1, 1, 1]; }
   function rq(r) { var e = v3(r, 0); return new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0] * DEG, e[1] * DEG, e[2] * DEG)); }
-  function subOf(xf, i) { return (xf && xf.sub && xf.sub[i]) || {}; }
+  // Unterteil-Schlüssel: Name (bleibt gleich, auch wenn ein Outfit Stücke weglässt), sonst Index
+  function pieceKey(m, i) { return m.name || String(i); }
+  function subOf(xf, k) { return (xf && xf.sub && xf.sub[k]) || {}; }
   function setMat(m, c) {
     if (!m.material || Array.isArray(m.material)) return;
     if (!m.userData.origMat) hide(m.userData, 'origMat', m.material);
@@ -662,7 +690,7 @@
       inner.position.set(p[0], p[1], p[2]); inner.rotation.set(r[0] * DEG, r[1] * DEG, r[2] * DEG); inner.scale.set(s[0], s[1], s[2]);
     }
     (P.pieces || []).forEach(function (m, i) {
-      var b = m.userData.base, so = subOf(xo, i), sg = subOf(xg, i);
+      var b = m.userData.base, k = pieceKey(m, i), so = subOf(xo, k), sg = subOf(xg, k);
       var pg = v3(sg.p, 0), po = v3(so.p, 0), sgs = sc3(sg.s), sos = sc3(so.s);
       m.position.set(b.p[0] + pg[0] + po[0], b.p[1] + pg[1] + po[1], b.p[2] + pg[2] + po[2]);
       m.quaternion.fromArray(b.q).multiply(rq(sg.r)).multiply(rq(so.r));
@@ -678,7 +706,7 @@
   // Lage eines Unterteils (nach dem Ziehen) zurück in die Anpassung einer Ebene ('o' Outfit, 'g' global)
   function readPiece(grp, i, layer) {
     var P = grp.userData.part, m = P.pieces[i], b = m.userData.base;
-    var other = subOf(layer === 'o' ? P.gxf : P.xf, i), op = v3(other.p, 0), os = sc3(other.s);
+    var other = subOf(layer === 'o' ? P.gxf : P.xf, pieceKey(m, i)), op = v3(other.p, 0), os = sc3(other.s);
     var p = [m.position.x - b.p[0] - op[0], m.position.y - b.p[1] - op[1], m.position.z - b.p[2] - op[2]];
     var q0 = new THREE.Quaternion().fromArray(b.q), q;
     if (layer === 'o') q = q0.multiply(rq(other.r)).invert().multiply(m.quaternion);
@@ -730,7 +758,7 @@
     build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
     addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
-    applyPart: applyPart, readPiece: readPiece, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
+    applyPart: applyPart, readPiece: readPiece, pieceKey: pieceKey, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
     util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -100,6 +100,11 @@
           <select id="wsPick" class="grow"></select>
         </div>
         <div class="row">
+          <label for="wsHost">Show on</label>
+          <select id="wsHost" class="grow" aria-describedby="wsHostHelp"></select>
+        </div>
+        <p class="muted small" id="wsHostHelp">Some outfits give a part extra pieces (e.g. the fire brigade helmet has a neck guard). Pick one to see and edit them.</p>
+        <div class="row">
           <span class="origin" id="wsOrigin"></span>
           <span class="muted" id="wsUsed"></span>
         </div>
@@ -322,8 +327,9 @@
         var b = partXfObj(create); if (!b) return null;
         if (st.piece == null) return b;
         if (!b.sub) { if (!create) return null; b.sub = {}; }
-        if (!b.sub[st.piece] && create) b.sub[st.piece] = {};
-        return b.sub[st.piece] || null;
+        var k = pk(st.piece);
+        if (!b.sub[k] && create) b.sub[k] = {};
+        return b.sub[k] || null;
       }
       // Neutrales weglassen; true = nichts mehr drin
       function tidy(xf) {
@@ -452,8 +458,7 @@
       }
       function users(k) { return RD.OUTFITS.filter(function (o) { return uses(RD.def(o), k); }); }
       // Gast-Outfit, in dem das Teil gezeigt wird (ohne Outfit-Anpassungen: nur der globale Stand zählt)
-      function hostDef(k, list) {
-        var hk = FIXED_LABEL[k] && list.indexOf('classic') >= 0 ? 'classic' : list[0];
+      function hostDef(k, hk) {
         var d = hk ? RD.def(hk) : (k.indexOf('acc:') === 0 ? { acc: [[k.slice(4), {}]] } : {});
         delete d.xf; (d.acc || []).forEach(function (a) { if (a[1]) delete a[1].xf; });
         return d;
@@ -470,9 +475,14 @@
       }
       function loadPart(k) {
         if (st.gkey && st.gkey !== k) RD.setPartXf(st.gkey, st.gSaved);
-        var list = users(k);
+        var list = users(k), hs = $('wsHost');
+        // zuerst das Outfit, das zuletzt im Outfit-Modus offen war
+        var hk = list.indexOf(st.outfitKey) >= 0 ? st.outfitKey : list[0];
+        hs.textContent = '';
+        list.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = (RD.info(o) || {}).label || o; hs.appendChild(op); });
+        hs.disabled = !list.length; if (hk) hs.value = hk;
         st.gkey = k; st.gSaved = RD.partXf(k); st.gx = st.gSaved ? clone(st.gSaved) : {};
-        st.def = hostDef(k, list); st.sel = null; st.piece = null;
+        st.def = hostDef(k, hk); st.sel = null; st.piece = null;
         st.hist = []; st.fut = []; lastSnap = snapshot(); st.dirty = false;
         $('wsPick').value = k;
         $('wsUsed').textContent = list.length ? 'Used by ' + list.length + (list.length === 1 ? ' outfit' : ' outfits') : 'Not used by any outfit yet';
@@ -485,6 +495,8 @@
         loadPart($('wsPick').value);
       });
       $('wsGhost').addEventListener('change', function () { rebuild(); });
+      // anderes Gast-Outfit: nur die Anzeige wechselt, der Arbeitsstand bleibt
+      $('wsHost').addEventListener('change', function () { st.def = hostDef(st.gkey, $('wsHost').value); st.piece = null; rebuild(); });
       function setTab(m) {
         if (m === st.mode) return;
         if (!confirmLeave()) return;
@@ -532,6 +544,7 @@
         return 'Piece ' + (i + 1) + (g && GEO[g.type] ? ' (' + GEO[g.type] + ')' : '');
       }
       function pieces() { return selGrp ? selGrp.userData.part.pieces || [] : []; }
+      function pk(i) { var m = pieces()[i]; return m ? RD.pieceKey(m, i) : String(i); }
       function selObj() {
         if (!selGrp) return null;
         return st.piece != null ? pieces()[st.piece] || null : selGrp;
@@ -557,7 +570,7 @@
           box.appendChild(b);
         }
         mk('Whole part', null);
-        pieces().forEach(function (m, i) { var sx = base.sub && base.sub[i]; mk(pieceName(m, i) + (sx && sx.hide ? ' (hidden)' : ''), i); });
+        pieces().forEach(function (m, i) { var sx = base.sub && base.sub[RD.pieceKey(m, i)]; mk(pieceName(m, i) + (sx && sx.hide ? ' (hidden)' : ''), i); });
       }
       function syncSel() {
         if (!st.sel) return;
@@ -642,7 +655,7 @@
       $('phide').addEventListener('change', function () { curXf(true).hide = $('phide').checked; cleanXf(st.sel); applySel(); commit(); renderParts(); syncSel(); });
       $('pReset').addEventListener('click', function () {
         change(function () {
-          if (st.piece != null) { var b = partXfObj(false); if (b && b.sub) delete b.sub[st.piece]; cleanXf(st.sel); return; }
+          if (st.piece != null) { var b = partXfObj(false); if (b && b.sub) delete b.sub[pk(st.piece)]; cleanXf(st.sel); return; }
           if (st.mode === 'ws') { st.gx = {}; return; }
           var i = accIndex(st.sel);
           if (i >= 0) { if (st.def.acc[i][1]) delete st.def.acc[i][1].xf; } else if (st.def.xf) { delete st.def.xf[st.sel]; if (!Object.keys(st.def.xf).length) delete st.def.xf; }
