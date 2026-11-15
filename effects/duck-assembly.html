@@ -30,7 +30,7 @@
       function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
       window.DuckAssembly.start({
         canvas: document.getElementById('gl'),
-        by: (q.get('by') || '').replace(/^@/, '').trim(),
+        by: (q.get('by') || '').replace(/^@/, '').trim().replace(/.*%.*/, ''),
         names: window.DuckStage.names(q),
         count: num('count', 10),
         outfit: q.get('outfit') || 'mix',

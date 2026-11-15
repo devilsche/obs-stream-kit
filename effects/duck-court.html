@@ -8,7 +8,8 @@
     /* Enten-Gericht, Vollbild ~15 s (js/duck-court.js mit js/duck-stage.js, three.js r128).
        ?names=a,b,c Angeklagte (Chat-Namen, 3 bis 5 Enten; ohne Namen 3 ohne Schild),
        ?guilty= wer abgeführt wird: Nummer (1 = erste) oder Name, sonst zufällig,
-       ?verdict= Urteil (Guilty!), ?judge= Name am Richterpult, ?outfit=mix|<outfit> (Angeklagte),
+       ?verdict= Urteil (Guilty!), ?judge= Name am Richterpult, ?by= wer den Befehl gab (mit Namen: Richter,
+       ohne Namen: steht selbst vor Gericht), ?outfit=mix|<outfit> (Angeklagte),
        ?volume=0..1 (0.7), ?t= hält bei Sekunde t an (zum Prüfen).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,12 +30,16 @@
       'use strict';
       var q = new URLSearchParams(location.search);
       function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
+      // ?by= wer den Befehl gab: mit Namen ist er Richter, ohne steht er selbst vor Gericht
+      var names = window.DuckStage.names(q), by = (q.get('by') || '').replace(/^@/, '').trim().replace(/.*%.*/, '').slice(0, 25);
+      var judge = (q.get('judge') || '').replace(/^@/, '').trim().replace(/.*%.*/, '').slice(0, 25);
+      if (by && !names.length) names = [by]; else if (by && !judge) judge = by;
       window.DuckCourt.start({
         canvas: document.getElementById('gl'),
-        names: window.DuckStage.names(q),
+        names: names,
         guilty: q.get('guilty'),
         verdict: (q.get('verdict') || '').slice(0, 40),
-        judge: (q.get('judge') || '').replace(/^@/, '').trim().slice(0, 25),
+        judge: judge,
         outfit: q.get('outfit') || 'mix',
         volume: Math.max(0, Math.min(1, num('volume', 0.7))),
         freeze: q.get('t') !== null ? num('t', 0) : null

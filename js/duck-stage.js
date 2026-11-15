@@ -223,9 +223,12 @@
              tag: tag, bubble: bubble, wood: wood, canvasTex: canvasTex, roundRect: roundRect, sfx: sfx, run: run, outfits: outfits, FONT: FONT };
   }
 
-  // Namen aus ?names=a,b,c (Chat, z. B. von Streamer.bot), bereinigt
+  // Namen aus ?names=a,b,c bzw. „@a @b“ (Chat-Befehl über Streamer.bot), bereinigt; nicht ersetzte
+  // Platzhalter (%…%) fallen weg, doppelte auch
   function names(q, key) {
-    return (q.get(key || 'names') || '').split(',').map(function (s) { return s.trim().replace(/^@/, '').slice(0, 25); }).filter(Boolean);
+    var seen = {};
+    return (q.get(key || 'names') || '').split(/[\s,;]+/).map(function (s) { return s.trim().replace(/^@/, '').slice(0, 25); })
+      .filter(function (s) { var k = s.toLowerCase(); if (!s || s.indexOf('%') >= 0 || seen[k]) return false; seen[k] = 1; return true; });
   }
 
   root.DuckStage = { create: create, names: names, ease: ease, lerp: lerp, clamp01: clamp01, hash: hash };
