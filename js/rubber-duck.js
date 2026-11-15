@@ -457,11 +457,23 @@
     }
     var eyeCol = o.eyeColor != null ? new THREE.MeshBasicMaterial({ color: o.eyeColor }) : null;
     if (eyeCol) eyeCol.color.convertSRGBToLinear();
-    part('eyes', 'Eyes', function () { [-1, 1].forEach(function (s) {
+    part('eyes', 'Eyes', function () {
+      if (o.eyes === 'one') { oneEye(); return; }
+      [-1, 1].forEach(function (s) {
       var n0 = g.children.length;
       eyeSide(s);
       g.children.slice(n0).forEach(function (m, j) { m.name = (s < 0 ? 'Right eye' : 'Left eye') + (j ? ' ' + (j + 1) : ''); });
     }); });
+    // Zyklop: ein großes Auge mittig über dem Schnabel (Augapfel, Iris in eyeColor, Pupille, Glanzpunkt)
+    function oneEye() {
+      var ed = new THREE.Vector3(0.8, 0.42, 0), r0 = o.cowl || o.face != null || o.pattern ? 1.012 : 0.995, n0 = g.children.length;
+      decal(ell(0.2, 0.17, 0.012, 32), white, ed, r0);
+      decal(ell(0.105, 0.105, 0.012, 24), eyeCol || paint, ed, r0 + 0.003);
+      if (eyeCol) decal(ell(0.055, 0.06, 0.012, 20), paint, ed, r0 + 0.005);
+      decal(ell(0.028, 0.03, 0.014, 10), white, new THREE.Vector3(0.84, 0.5, -0.07), r0 + 0.008);
+      ['Eyeball', 'Iris', 'Pupil', 'Shine'].filter(function (x, i) { return eyeCol || i !== 2; })
+        .forEach(function (nm, j) { g.children[n0 + j].name = nm; });
+    }
     function eyeSide(s) {
       var ed = new THREE.Vector3(0.8, 0.36, s * 0.5), e2;
       if (o.eyes === 'none') return;
