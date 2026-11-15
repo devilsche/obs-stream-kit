@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Duck Assembly</title>
+  <style>
+    /* Enten-Versammlung, Vollbild ~12 s (js/duck-assembly.js mit js/duck-stage.js, three.js r128).
+       ?by=Name (wer einberufen hat: Banner + Anführer-Ente), ?names=a,b,c (Chat-Namen über den Enten),
+       ?count= Anzahl Enten ohne Namen (10, max. 16), ?outfit=mix|<outfit> (Teilnehmer), ?leader=<outfit> (king),
+       ?text= Rede in der Sprechblase, ?volume=0..1 (0.7), ?t= hält bei Sekunde t an (zum Prüfen).
+       Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; opacity: var(--fade, 0); }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="1080" role="img" aria-label="Duck assembly"></canvas>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/rubber-duck.js"></script>
+  <script src="../js/rubber-duck-outfits.js"></script>
+  <script src="../api/fx/ducks/custom.js"></script>
+  <script src="../js/duck-stage.js"></script>
+  <script src="../js/duck-assembly.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var q = new URLSearchParams(location.search);
+      function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
+      window.DuckAssembly.start({
+        canvas: document.getElementById('gl'),
+        by: (q.get('by') || '').replace(/^@/, '').trim(),
+        names: window.DuckStage.names(q),
+        count: num('count', 10),
+        outfit: q.get('outfit') || 'mix',
+        leader: q.get('leader') || 'king',
+        text: q.get('text') || '',
+        volume: Math.max(0, Math.min(1, num('volume', 0.7))),
+        freeze: q.get('t') !== null ? num('t', 0) : null
+      });
+    })();
+  </script>
+</body>
+</html>

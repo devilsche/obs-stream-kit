@@ -1027,6 +1027,25 @@
     add(g2, box(0.08, 0.6, 0.012), cr, 0, -0.01, 0.05).name = 'Cross upright';
     add(g2, box(0.46, 0.08, 0.012), cr, 0, 0.13, 0.05).name = 'Cross bar';
   };
+  // Richterperücke: weiße Lockenrollen über dem Kopf und seitlich herab (ein Stück)
+  ACC.judgewig = function (c, a) {
+    var items = [], k;
+    // Kappe über dem Oberkopf, quer gerippt (Lockenrollen)
+    items.push({ geo: new THREE.SphereGeometry(1, 40, 16, 0, PI * 2, 0, PI * 0.33), p: new V3(c.HC.x - 0.08, c.HC.y + 0.02, 0), s: new V3(c.HR[0] * 1.07, c.HR[1] * 1.07, c.HR[2] * 1.07) });
+    for (k = 0; k < 6; k++) { var o = onHead(c, new V3(-0.5 + k * 0.17, 1, 0), 1.04); items.push({ geo: cyl(0.05, 0.05, 0.62 - Math.abs(k - 2.5) * 0.08, 14), p: o.p.clone(), r: new THREE.Euler(PI / 2, 0, 0) }); }
+    [-1, 1].forEach(function (s) {
+      for (k = 0; k < 4; k++) { var o2 = onHead(c, new V3(-0.25, 0.25 - k * 0.32, s), 0.98); items.push({ geo: torus(0.075, 0.045, 24), p: o2.p.clone().addScaledVector(o2.n, 0.06), r: new THREE.Euler(0, PI / 2, 0) }); }
+    });
+    for (k = 0; k < 3; k++) items.push({ geo: torus(0.07, 0.045, 24), p: new V3(c.HC.x - c.HR[0] - 0.02, c.HC.y - 0.1 - k * 0.2, 0), r: new THREE.Euler(PI / 2, 0, 0) });
+    add(c.g, merged(items), fabric(a.color || 0xf1eee6, { roughness: 0.9 })).name = 'Wig';
+  };
+  // Holzhammer (Richter)
+  ACC.gavel = function (c, a) {
+    var g2 = new THREE.Group(); g2.position.copy(held(c, 1).add(new V3(0.08, 0.1, 0.12))); g2.rotation.set(0, 0, -0.5); c.g.add(g2);
+    var w = fabric(a.color || 0x6b3f1f, { roughness: 0.45 });
+    add(g2, cyl(0.025, 0.025, 0.55, 12), w, 0, 0.2).name = 'Handle';
+    add(g2, cyl(0.075, 0.075, 0.26, 20), w, 0, 0.5, 0, PI / 2).name = 'Head';
+  };
   // ════════ Embleme ════════
   function drawStar(x, cx, cy, ro, ri) { x.beginPath(); for (var i = 0; i < 10; i++) { var a = i / 10 * PI * 2 - PI / 2, r = i % 2 ? ri : ro; x.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } x.closePath(); x.fill(); }
   function drawSkull(x, cx, cy, sc, col) {
@@ -1119,7 +1138,7 @@
     racestripes: 'Racing stripes', wheel: 'Steering wheel', bow: 'Bow and heart arrow', curls: 'Curls', tutu: 'Tutu',
     bun: 'Hair bun', exechood: 'Executioner hood', axe: 'Axe', biceps: 'Biceps', dumbbell: 'Dumbbell', donut: 'Donut',
     bra: 'Lace bra', lacepanties: 'Lace panties', garter: 'Garter belt', boa: 'Feather boa', lashes: 'Eyelashes',
-    openvest: 'Open vest', sword: 'Sword', kiteshield: 'Kite shield', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass'
+    openvest: 'Open vest', sword: 'Sword', kiteshield: 'Kite shield', judgewig: 'Judge wig', gavel: 'Gavel', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass'
   });
 
   // ════════ Outfits ════════
@@ -1168,6 +1187,7 @@
     king: { label: 'King', cat: 'jobs', suit: 0x7b1522, collar: 0.55, cape: 0x7b1522, acc: [['crown'], ['chain', { medal: true }], ['scepter'], ['scarf', { color: 0xfaf7ef, thick: 0.09 }]] },
     prisoner: { label: 'Prisoner', cat: 'jobs', suit: 0xf2f2f2, collar: 0.55, chest: 'num1337', chestSize: 0.42, chestY: 0.15, pattern: { type: 'hstripes', c1: 0xf2f2f2, c2: 0x141414, scale: 7, zone: 'suit' }, acc: [['prisonercap'], ['ballchain']] },
     doctor: { label: 'Doctor', cat: 'jobs', suit: 0xf6f6f6, collar: 0.55, chest: 'redcross', chestSize: 0.18, chestY: 0.25, acc: [['headmirror'], ['stethoscope']] },
+    judge: { label: 'Judge', cat: 'jobs', suit: 0x141418, collar: 0.62, acc: [['judgewig'], ['bowtie', { color: 0xfafafa }], ['gavel']] },
     clown: { label: 'Clown', cat: 'jobs', suit: 0xf4f4f4, collar: 0.55, face: 0xffffff, faceX: 0.05, pattern: { type: 'dots', c2: 0xe6312e, scale: 5, zone: 'suit' }, acc: [['clownwig'], ['rednose'], ['ruffle', { colors: [0xffffff, 0xf2c500, 0x1f5fd0] }]] },
     santa: { label: 'Santa', cat: 'jobs', suit: 0xc8151b, collar: 0.55, belt: 0x141414, beltY: -0.18, stripe: 0xf4f4f4, stripes: [-0.42], acc: [['santa'], ['beard', { style: 'long' }], ['mustache', { style: 'walrus', color: 0xf4f4f4 }]] },
     bavarian: { label: 'Bavarian', cat: 'jobs', suit: 0xf4f4f4, collar: 0.55, briefs: 0x6b4a2c, briefsY: -0.05, pattern: { type: 'suspenders', c2: 0x6b4a2c, zone: 'suit', y: [-0.1, 0.6] }, acc: [['tyrolean'], ['beer']] },
