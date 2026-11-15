@@ -371,29 +371,40 @@
     // Drehpunkt in seiner Mitte; o.xf[id] bzw. acc-Option xf verschiebt/dreht/skaliert/färbt es
     // (Duck-Editor, tools/duck-editor.html). Ein Fehler in einem Teil kostet nur dieses Teil.
     var xfs = o.xf || {}, parts = [];
-    function part(id, label, fn, xf) {
+    function part(id, label, fn, xf, gkey) {
       var n0 = g.children.length;
       try { fn(); } catch (e) { if (root.console) root.console.warn('rubber-duck: part ' + id + ' failed', e); }
       var kids = g.children.slice(n0);
       if (!kids.length) return null;
-      var grp = new THREE.Group(), box = new THREE.Box3(), c = new THREE.Vector3();
+      var grp = new THREE.Group(), inner = new THREE.Group(), box = new THREE.Box3(), c = new THREE.Vector3();
       kids.forEach(function (k) { box.expandByObject(k); });
       if (!box.isEmpty()) box.getCenter(c);
-      kids.forEach(function (k) { grp.add(k); k.position.sub(c); });
-      grp.name = id; grp.userData.part = { id: id, label: label, pivot: c.clone() };
+      kids.forEach(function (k) { inner.add(k); k.position.sub(c); });
+      grp.add(inner);
+      // Unterteile: alle Meshes des Teils in fester Reihenfolge, mit ihrer gebauten Lage
+      var pieces = [];
+      inner.traverse(function (m) {
+        if (!m.isMesh) return;
+        m.userData.base = { p: m.position.toArray(), q: m.quaternion.toArray(), s: m.scale.toArray(), v: m.visible };
+        pieces.push(m);
+      });
+      gkey = gkey || id;
+      grp.name = id;
+      grp.userData.part = { id: id, gkey: gkey, label: label, pivot: c.clone(), xf: xf || xfs[id] || null, gxf: GPARTS[gkey] || null };
+      hide(grp.userData.part, 'inner', inner); hide(grp.userData.part, 'pieces', pieces);
       g.add(grp); parts.push(grp);
-      applyXf(grp, xf || xfs[id]);
+      applyPart(grp);
       return grp;
     }
     // Schnabel: ein Teil, leicht geöffnet
     // wie das Vorbild: kräftiger, runder Schnabel, nur leicht geöffnet
     var bill = new THREE.Mesh(billGeometry(0.44, 0.33, 0.15, 0.09), beak);
-    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; if (!o.noBill) part('bill', 'Bill', function () { g.add(bill); });
+    bill.position.set(1.1, 0.92, 0); bill.rotation.z = -0.1; bill.name = 'Bill'; if (!o.noBill) part('bill', 'Bill', function () { g.add(bill); });
     // Flügel, leicht angelegt (bei Uniform in Uniformfarbe, mit Streifen am Ärmel)
     // noWings: wer eigene Arme animiert (Messer-Ente), lässt die angelegten Flügel weg
     if (!opts.noWings) [-1, 1].forEach(function (s) {
       part(s < 0 ? 'wingR' : 'wingL', s < 0 ? 'Right wing' : 'Left wing', function () {
-        var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat);
+        var w = new THREE.Mesh(ell(0.5, 0.3, 0.12, 32), wingMat); w.name = 'Wing';
         w.position.set(-0.05, 0.12, s * 0.79); w.rotation.set(s * 0.15, s * 0.12, 0.35);
         g.add(w);
       });
@@ -413,6 +424,11 @@
     var eyeCol = o.eyeColor != null ? new THREE.MeshBasicMaterial({ color: o.eyeColor }) : null;
     if (eyeCol) eyeCol.color.convertSRGBToLinear();
     part('eyes', 'Eyes', function () { [-1, 1].forEach(function (s) {
+      var n0 = g.children.length;
+      eyeSide(s);
+      g.children.slice(n0).forEach(function (m, j) { m.name = (s < 0 ? 'Right eye' : 'Left eye') + (j ? ' ' + (j + 1) : ''); });
+    }); });
+    function eyeSide(s) {
       var ed = new THREE.Vector3(0.8, 0.36, s * 0.5), e2;
       if (o.eyes === 'none') return;
       if (o.eyes === 'white' || o.eyes === 'glow') {
@@ -443,7 +459,7 @@
         decal(ell(0.08, 0.1, 0.012, 20), paint, new THREE.Vector3(0.8, 0.36, s * 0.5));
         decal(ell(0.026, 0.03, 0.014, 10), white, new THREE.Vector3(0.84, 0.44, s * 0.44), 1.003);
       }
-    }); });
+    }
 
     // Helm (THW gelb, Feuerwehr silber mit Nackenschutz) mit Schild vorn
     // Helm wie ein Schutzhelm oben auf dem Kopf: Rand auf Stirnhöhe über den Augen
@@ -455,37 +471,37 @@
       var rimR = HR[0] * Math.sqrt(Math.max(0.2, 1 - Math.pow((RIM_Y - HC.y) / HR[1], 2))) + 0.025;
       var helmet = new THREE.Group(); helmet.position.set(HC.x - 0.03, RIM_Y, 0); helmet.rotation.z = tilt; g.add(helmet);
       var dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24, 0, Math.PI * 2, 0, Math.PI * 0.5), hm);
-      dome.scale.set(rimR, 0.37, rimR * HR[2] / HR[0]); helmet.add(dome);
+      dome.name = 'Dome'; dome.scale.set(rimR, 0.37, rimR * HR[2] / HR[0]); helmet.add(dome);
       var brim = new THREE.Mesh(new THREE.TorusGeometry(1, 0.045, 10, 64), hm);
-      brim.scale.set(rimR + 0.02, (rimR + 0.02) * HR[2] / HR[0], 1); brim.rotation.x = Math.PI / 2; helmet.add(brim);
+      brim.name = 'Brim'; brim.scale.set(rimR + 0.02, (rimR + 0.02) * HR[2] / HR[0], 1); brim.rotation.x = Math.PI / 2; helmet.add(brim);
       // Kamm oben (typisch für Schutzhelme)
       var ridge = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12), hm);
-      ridge.scale.set(rimR * 0.95, 0.39, 0.06); helmet.add(ridge);
+      ridge.name = 'Ridge'; ridge.scale.set(rimR * 0.95, 0.39, 0.06); helmet.add(ridge);
       if (o.helmet.neck) {
         // Nackenschutz hinten (phi 0 liegt bei −x)
         var neckG = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12, -Math.PI * 0.4, Math.PI * 0.8, Math.PI * 0.5, Math.PI * 0.2), hm);
-        neckG.material.side = THREE.DoubleSide;
+        neckG.material.side = THREE.DoubleSide; neckG.name = 'Neck guard';
         neckG.scale.set(rimR + 0.04, 0.45, (rimR + 0.04) * HR[2] / HR[0]); helmet.add(neckG);
       }
       if (o.helmetLabel) {
         var lab = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.12), new THREE.MeshStandardMaterial({ map: textTex(o.helmetLabel, '#1d2b5e', '#ffffff'), transparent: true, roughness: 0.4 }));
         var la = 0.55, lp = new THREE.Vector3(Math.cos(la) * rimR * 1.01, Math.sin(la) * 0.37 * 1.01, 0);
         lab.position.copy(lp); lab.lookAt(lp.clone().add(new THREE.Vector3(Math.cos(la) / rimR, Math.sin(la) / 0.37, 0).normalize()));
-        helmet.add(lab);
+        lab.name = 'Label'; helmet.add(lab);
       }
     });
     // Polizeimütze: Band, oben breiter Deckel, schwarzer Schirm, Stern
     if (o.cap) part('cap', 'Police cap', function () {
       var capM = vinyl(o.suit), black = vinyl(0x111318, { roughness: 0.2, clearcoat: 1 });
       var band2 = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.18, 48), black);
-      band2.position.copy(HC).add(new THREE.Vector3(-0.02, 0.4, 0)); band2.rotation.z = 0.12; g.add(band2);
+      band2.position.copy(HC).add(new THREE.Vector3(-0.02, 0.4, 0)); band2.rotation.z = 0.12; band2.name = 'Band'; g.add(band2);
       var top = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.5, 0.2, 48), capM);
-      top.position.copy(HC).add(new THREE.Vector3(-0.04, 0.58, 0)); top.rotation.z = 0.12; g.add(top);
+      top.position.copy(HC).add(new THREE.Vector3(-0.04, 0.58, 0)); top.rotation.z = 0.12; top.name = 'Crown'; g.add(top);
       var visor = new THREE.Mesh(ell(0.3, 0.04, 0.42, 32), black);
-      visor.position.copy(HC).add(new THREE.Vector3(0.48, 0.32, 0)); visor.rotation.z = -0.25; g.add(visor);
+      visor.position.copy(HC).add(new THREE.Vector3(0.48, 0.32, 0)); visor.rotation.z = -0.25; visor.name = 'Visor'; g.add(visor);
       var badge = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.2), new THREE.MeshStandardMaterial({ map: emblemTex('star'), transparent: true, metalness: 0.5, roughness: 0.35 }));
       var bp = HC.clone().add(new THREE.Vector3(0.5, 0.47, 0)); badge.position.copy(bp); badge.lookAt(bp.clone().add(new THREE.Vector3(1, 0.2, 0)));
-      g.add(badge);
+      badge.name = 'Star badge'; g.add(badge);
     });
     // Fledermaus-Ohren auf der Maske
     if (o.ears) part('ears', 'Bat ears', function () {
@@ -493,7 +509,7 @@
       [-1, 1].forEach(function (s) {
         var ear = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.38, 24), cowlM);
         ear.position.copy(headPoint(new THREE.Vector3(0.05, 0.85, s * 0.5), 0.92)).add(new THREE.Vector3(0, 0.12, 0));
-        ear.rotation.set(s * 0.25, 0, 0.1); g.add(ear);
+        ear.rotation.set(s * 0.25, 0, 0.1); ear.name = s < 0 ? 'Right ear' : 'Left ear'; g.add(ear);
       });
     });
     // Umhang: oben ein Kragen um den Nacken (dort, wo hinten die Maske endet), von dort
@@ -549,6 +565,7 @@
         pn.set(pp.x + nrmArr[ni] * 0.03, pp.y + nrmArr[ni + 1] * 0.03, pp.z + nrmArr[ni + 2] * 0.03);
         if (sdTrunk(pn) < sdTrunk(pp)) { nrmArr[ni] = -nrmArr[ni]; nrmArr[ni + 1] = -nrmArr[ni + 1]; nrmArr[ni + 2] = -nrmArr[ni + 2]; }
       }
+      capeMesh.name = 'Cape';
       capeMesh.userData.cape = { base: Float32Array.from(cpos), nrm: nrmArr, U: U, V: V };
       g.add(capeMesh);
     });
@@ -557,10 +574,11 @@
       var ctx = { g: g, o: o, HC: HC, HR: HR, headPoint: headPoint, decal: decal, paint: paint, white: white, skin: skin, body: yellow, wingMat: wingMat };
       o.acc.forEach(function (a, i) {
         var fn = ACC[a[0]], ao = a[1] || {};
-        if (fn) part('acc:' + i, ACC_LABELS[a[0]] || a[0], function () { fn(ctx, ao); }, ao.xf);
+        if (fn) part('acc:' + i, ACC_LABELS[a[0]] || a[0], function () { fn(ctx, ao); }, ao.xf, 'acc:' + a[0]);
       });
     }
-    g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat, parts: parts };
+    g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat };
+    hide(g.userData, 'parts', parts);
     return g;
   }
 
@@ -597,24 +615,82 @@
   }
 
   // Teil-Anpassung aus dem Editor: p = Verschiebung, r = Drehung in Grad, s = Maßstab (x, y, z),
-  // c = Farbe (0xRRGGBB), hide = ausblenden. Relativ zur gebauten Lage, um die Teilmitte.
+  // c = Farbe (0xRRGGBB), hide = ausblenden, sub = dasselbe je Unterteil (Index → Anpassung),
+  // dort zusätzlich b = Biegung [vorn/hinten, seitlich]: Ränder heben (+) oder senken (−).
+  // Zwei Ebenen: gxf = global umgebautes Teil (Part-Werkstatt), xf = Anpassung im Outfit; das
+  // Outfit wirkt auf das global umgebaute Teil. Alles relativ zur gebauten Lage.
   var DEG = Math.PI / 180;
-  function applyXf(grp, xf) {
-    var pv = grp.userData.part.pivot;
-    xf = xf || {};
-    var p = xf.p || [0, 0, 0], r = xf.r || [0, 0, 0], sc = xf.s || [1, 1, 1];
-    grp.position.set(pv.x + (+p[0] || 0), pv.y + (+p[1] || 0), pv.z + (+p[2] || 0));
-    grp.rotation.set((+r[0] || 0) * DEG, (+r[1] || 0) * DEG, (+r[2] || 0) * DEG);
-    grp.scale.set(+sc[0] || 1, +sc[1] || 1, +sc[2] || 1);
-    grp.visible = !xf.hide;
-    grp.traverse(function (m) {
-      if (!m.isMesh || !m.material || Array.isArray(m.material)) return;
-      if (!m.userData.origMat) m.userData.origMat = m.material;
-      if (xf.c == null) { m.material = m.userData.origMat; return; }
-      if (m.material === m.userData.origMat) m.material = m.userData.origMat.clone();
-      if (m.material.color) m.material.color.set(xf.c).convertSRGBToLinear();
+  // Verweise auf Three-Objekte nicht aufzählbar ablegen: clone() kopiert userData per JSON
+  function hide(obj, k, v) { Object.defineProperty(obj, k, { value: v, writable: true, configurable: true, enumerable: false }); }
+  function v3(a, d) { return a ? [+a[0] || 0, +a[1] || 0, +a[2] || 0] : [d, d, d]; }
+  function sc3(a) { return a ? [+a[0] || 1, +a[1] || 1, +a[2] || 1] : [1, 1, 1]; }
+  function rq(r) { var e = v3(r, 0); return new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0] * DEG, e[1] * DEG, e[2] * DEG)); }
+  function subOf(xf, i) { return (xf && xf.sub && xf.sub[i]) || {}; }
+  function setMat(m, c) {
+    if (!m.material || Array.isArray(m.material)) return;
+    if (!m.userData.origMat) hide(m.userData, 'origMat', m.material);
+    if (c == null) { m.material = m.userData.origMat; return; }
+    if (m.material === m.userData.origMat) m.material = m.userData.origMat.clone();
+    if (m.material.color) m.material.color.set(c).convertSRGBToLinear();
+  }
+  function bend(m, b) {
+    if (m.userData.cape) return;                     // Umhang verformt sich selbst (flutter)
+    var bx = b ? +b[0] || 0 : 0, bz = b ? +b[1] || 0 : 0;
+    if (!m.userData.baseGeo) { if (!bx && !bz) return; hide(m.userData, 'baseGeo', m.geometry); }
+    var src = m.userData.baseGeo;
+    if (!bx && !bz) { if (m.geometry !== src) { m.geometry.dispose(); m.geometry = src; } return; }
+    var geo = m.geometry !== src ? m.geometry : src.clone();
+    if (!src.boundingBox) src.computeBoundingBox();
+    var bb = src.boundingBox, hx = Math.max(Math.abs(bb.min.x), Math.abs(bb.max.x)) || 1, hz = Math.max(Math.abs(bb.min.z), Math.abs(bb.max.z)) || 1;
+    var a0 = src.attributes.position.array, a = geo.attributes.position.array;
+    for (var i = 0; i < a.length; i += 3) {
+      var x = a0[i] / hx, z = a0[i + 2] / hz;
+      a[i + 1] = a0[i + 1] + bx * x * x + bz * z * z;
+    }
+    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+    m.geometry = geo;
+  }
+  function applyPart(grp) {
+    var P = grp.userData.part, xo = P.xf || {}, xg = P.gxf || {}, pv = P.pivot, inner = P.inner;
+    var p = v3(xo.p, 0), r = v3(xo.r, 0), s = sc3(xo.s);
+    grp.position.set(pv.x + p[0], pv.y + p[1], pv.z + p[2]);
+    grp.rotation.set(r[0] * DEG, r[1] * DEG, r[2] * DEG);
+    grp.scale.set(s[0], s[1], s[2]);
+    grp.visible = !xo.hide && !xg.hide;
+    if (inner) {
+      p = v3(xg.p, 0); r = v3(xg.r, 0); s = sc3(xg.s);
+      inner.position.set(p[0], p[1], p[2]); inner.rotation.set(r[0] * DEG, r[1] * DEG, r[2] * DEG); inner.scale.set(s[0], s[1], s[2]);
+    }
+    (P.pieces || []).forEach(function (m, i) {
+      var b = m.userData.base, so = subOf(xo, i), sg = subOf(xg, i);
+      var pg = v3(sg.p, 0), po = v3(so.p, 0), sgs = sc3(sg.s), sos = sc3(so.s);
+      m.position.set(b.p[0] + pg[0] + po[0], b.p[1] + pg[1] + po[1], b.p[2] + pg[2] + po[2]);
+      m.quaternion.fromArray(b.q).multiply(rq(sg.r)).multiply(rq(so.r));
+      m.scale.set(b.s[0] * sgs[0] * sos[0], b.s[1] * sgs[1] * sos[1], b.s[2] * sgs[2] * sos[2]);
+      m.visible = b.v && !so.hide && !sg.hide;
+      var bg = v3(sg.b, 0), bo = v3(so.b, 0);
+      bend(m, [bg[0] + bo[0], bg[1] + bo[1]]);
+      setMat(m, so.c != null ? so.c : xo.c != null ? xo.c : sg.c != null ? sg.c : xg.c);
     });
   }
+  // ältere Aufrufer: nur die Outfit-Ebene setzen
+  function applyXf(grp, xf) { grp.userData.part.xf = xf || null; applyPart(grp); }
+  // Lage eines Unterteils (nach dem Ziehen) zurück in die Anpassung einer Ebene ('o' Outfit, 'g' global)
+  function readPiece(grp, i, layer) {
+    var P = grp.userData.part, m = P.pieces[i], b = m.userData.base;
+    var other = subOf(layer === 'o' ? P.gxf : P.xf, i), op = v3(other.p, 0), os = sc3(other.s);
+    var p = [m.position.x - b.p[0] - op[0], m.position.y - b.p[1] - op[1], m.position.z - b.p[2] - op[2]];
+    var q0 = new THREE.Quaternion().fromArray(b.q), q;
+    if (layer === 'o') q = q0.multiply(rq(other.r)).invert().multiply(m.quaternion);
+    else q = q0.invert().multiply(m.quaternion).multiply(rq(other.r).invert());
+    var e = new THREE.Euler().setFromQuaternion(q);
+    return { p: p, r: [e.x / DEG, e.y / DEG, e.z / DEG], s: [m.scale.x / (b.s[0] * os[0]), m.scale.y / (b.s[1] * os[1]), m.scale.z / (b.s[2] * os[2])] };
+  }
+  // global umgebaute Teile (Server: /api/fx/ducks/custom.js, Editor: Part-Werkstatt)
+  var GPARTS = {};
+  function applyParts(map) { Object.keys(map || {}).forEach(function (k) { if (map[k] && typeof map[k] === 'object') GPARTS[k] = map[k]; }); }
+  function setPartXf(k, xf) { if (xf) GPARTS[k] = xf; else delete GPARTS[k]; }
+  function partXf(k) { return GPARTS[k] ? JSON.parse(JSON.stringify(GPARTS[k])) : null; }
 
   var ACC = {};
   var ACC_LABELS = {};   // Anzeigenamen der Bausteine (Editor), von rubber-duck-outfits.js gefüllt
@@ -654,6 +730,7 @@
     build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
     addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
+    applyPart: applyPart, readPiece: readPiece, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
     util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
   };
 })(typeof window !== 'undefined' ? window : this);

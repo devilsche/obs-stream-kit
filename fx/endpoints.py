@@ -510,9 +510,10 @@ def weather_state_route(token):
 
 @bp_fx.route("/s/<token>/api/fx/ducks/custom.js")
 def duck_outfits_js(token):
-    """Outfits aus dem Duck-Editor (global) als Script für Regen, Messer-Ente und Tools."""
+    """Outfits und umgebaute Teile aus dem Duck-Editor (global) als Script für Regen, Messer-Ente und Tools."""
     if g.tenant_id is None:
         abort(404)
     root = current_app.config.get("_PROJECT_ROOT") or "."
-    resp = Response(duck_outfits.script(duck_outfits.load(root)), mimetype="application/javascript")
+    resp = Response(duck_outfits.script(duck_outfits.load(root), duck_outfits.load_parts(root)),
+                    mimetype="application/javascript")
     return _no_store(resp)

@@ -7,7 +7,9 @@
   <style>
     /* Duck-Editor: Outfits der Gummiente umbauen oder neu zusammenstellen.
        Teile (Schnabel, Flügel, Augen, Helm, Zubehör) verschieben/drehen/skalieren/färben,
-       aufgemalte Zonen (Anzug, Maske, Gürtel, Emblem …) über Felder. Speichern = sofort live. */
+       aufgemalte Zonen (Anzug, Maske, Gürtel, Emblem …) über Felder. Speichern = sofort live.
+       Unterteile (z. B. Schirm der Polizeimütze) einzeln, mit Biegung; Part-Werkstatt = Teil global
+       für alle Outfits umbauen. */
     :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --danger: #ff8a80; --ok: #9be59b; }
     html { background: var(--bg); }
     body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
@@ -21,7 +23,7 @@
     .stage { position: relative; min-height: 360px; }
     #view { display: block; width: 100%; height: 100%; touch-action: none; }
     .hint { position: absolute; left: 12px; bottom: 10px; margin: 0; color: var(--muted); font-size: 12px; background: rgba(20, 26, 38, 0.8); padding: 4px 8px; border-radius: 6px; }
-    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; }
+    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; scroll-padding-bottom: 150px; }
     section { border-bottom: 1px solid var(--line); padding: 12px 0; }
     h2 { font-size: 15px; margin: 0 0 8px; }
     h3 { font-size: 13px; margin: 10px 0 6px; color: var(--muted); font-weight: 600; }
@@ -46,6 +48,8 @@
     .parts { display: flex; flex-wrap: wrap; gap: 6px; }
     .parts button { font-size: 13px; }
     .muted { color: var(--muted); }
+    .small { font-size: 12px; margin: 4px 0; }
+    output { min-width: 44px; font-variant-numeric: tabular-nums; }
     .origin { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
     .xyz { display: grid; grid-template-columns: 84px repeat(3, 1fr); gap: 6px; align-items: center; margin: 6px 0; }
     .xyz > span { color: var(--muted); }
@@ -76,11 +80,36 @@
   </header>
   <div class="layout">
     <div class="stage">
-      <canvas id="view" role="img" aria-label="3D preview of the rubber duck being edited. Click a part to select it; drag empty space to orbit, scroll to zoom."></canvas>
-      <p class="hint">Click a part to select it · drag to orbit · scroll to zoom · W move, E turn, R size · Ctrl+Z undo</p>
+      <canvas id="view" role="img" aria-label="3D preview of the rubber duck being edited. Click a part to select it, double-click to select one piece of it; drag empty space to orbit, scroll to zoom."></canvas>
+      <p class="hint">Click a part to select it · double-click a piece of it · drag to orbit · scroll to zoom · W move, E turn, R size · Ctrl+Z undo</p>
     </div>
     <div class="panel" id="panel">
-      <section aria-labelledby="h-outfit">
+      <section aria-labelledby="h-mode">
+        <h2 id="h-mode">Mode</h2>
+        <div class="row" role="group" aria-labelledby="h-mode">
+          <button type="button" data-tab="outfit" aria-pressed="true">Outfits</button>
+          <button type="button" data-tab="ws" aria-pressed="false">Part workshop</button>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-ws" id="wsBox" hidden>
+        <h2 id="h-ws">Part workshop</h2>
+        <p class="muted">Changes here apply to every outfit that wears this part. An outfit can still change it on top.</p>
+        <div class="row">
+          <label for="wsPick">Part</label>
+          <select id="wsPick" class="grow"></select>
+        </div>
+        <div class="row">
+          <span class="origin" id="wsOrigin"></span>
+          <span class="muted" id="wsUsed"></span>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="wsGhost" checked>
+          <label for="wsGhost">Show the duck faintly</label>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-outfit" id="outfitBox">
         <h2 id="h-outfit">Outfit</h2>
         <div class="row">
           <label for="pick">Outfit</label>
@@ -102,7 +131,7 @@
         </div>
       </section>
 
-      <section aria-labelledby="h-parts">
+      <section aria-labelledby="h-parts" id="partsBox">
         <h2 id="h-parts">Parts</h2>
         <div class="parts" id="parts" role="group" aria-label="Select a part"></div>
         <div class="row">
@@ -114,6 +143,9 @@
 
       <section aria-labelledby="h-sel" id="selBox" hidden>
         <h2 id="h-sel">Selected: <span id="selName"></span></h2>
+        <h3 id="h-pieces">Pieces</h3>
+        <div class="parts" id="pieces" role="group" aria-labelledby="h-pieces"></div>
+        <p class="muted small">Pick a piece to change only that piece, or double-click it in the view.</p>
         <div class="row" role="group" aria-label="Drag handle mode">
           <button type="button" data-mode="translate" aria-pressed="true">Move (W)</button>
           <button type="button" data-mode="rotate" aria-pressed="false">Turn (E)</button>
@@ -133,6 +165,19 @@
           <input type="color" id="pcol">
           <button type="button" id="pcolReset" class="ghost">Original colour</button>
         </div>
+        <div id="bendBox">
+          <div class="row">
+            <label for="bendX">Bend front/back</label>
+            <input type="range" id="bendX" min="-0.3" max="0.3" step="0.005" aria-describedby="bendHelp">
+            <output id="bendXOut" for="bendX"></output>
+          </div>
+          <div class="row">
+            <label for="bendZ">Bend sides</label>
+            <input type="range" id="bendZ" min="-0.3" max="0.3" step="0.005" aria-describedby="bendHelp">
+            <output id="bendZOut" for="bendZ"></output>
+          </div>
+          <p class="muted small" id="bendHelp">Curves the piece: plus lifts its edges, minus lowers them (e.g. a cap visor).</p>
+        </div>
         <div class="row">
           <input type="checkbox" id="phide">
           <label for="phide">Hidden</label>
@@ -144,7 +189,7 @@
         </div>
       </section>
 
-      <section aria-labelledby="h-look">
+      <section aria-labelledby="h-look" id="lookBox">
         <h2 id="h-look">Painted look</h2>
         <p class="muted">Body colour, suit, mask, belt, emblem and more are painted onto the duck.</p>
         <div id="look"></div>
@@ -205,7 +250,10 @@
       var SKIP_KEYS = { label: 1, cat: 1, note: 1, acc: 1, xf: 1 };
 
       // ── Zustand ──
-      var st = { key: null, def: null, isNew: false, sel: null, dirty: false, hist: [], fut: [] };
+      // mode 'outfit': ein Outfit bearbeiten (st.def); mode 'ws': Part-Werkstatt, ein Teil global
+      // (st.gkey, Arbeitsstand st.gx, gespeicherter Stand st.gSaved; st.def = Gast-Outfit zum Zeigen).
+      // sel = Teil-ID, piece = Index des Unterteils oder null (ganzes Teil)
+      var st = { mode: 'outfit', key: null, def: null, isNew: false, sel: null, piece: null, dirty: false, hist: [], fut: [], gkey: null, gx: null, gSaved: null, outfitKey: null };
       function clone(v) { return JSON.parse(JSON.stringify(v)); }
       function hex(n) { return '#' + ('000000' + (n >>> 0).toString(16)).slice(-6); }
       function num(v, d) { var n = parseFloat(v); return isFinite(n) ? n : d; }
@@ -236,6 +284,8 @@
       var tc = new THREE.TransformControls(cam, canvas);
       tc.setSize(0.8);
       scene.add(tc);
+      // Rahmen um das Ausgewählte (Teil oder Unterteil)
+      var hl = new THREE.BoxHelper(undefined, 0xf2b705); hl.visible = false; scene.add(hl);
       var duck = null, selGrp = null;
 
       function resize() {
@@ -244,7 +294,12 @@
         cam.aspect = Math.max(1, r.width) / Math.max(1, r.height); cam.updateProjectionMatrix();
       }
       window.addEventListener('resize', resize);
-      (function loop() { orbit.update(); renderer.render(scene, cam); requestAnimationFrame(loop); })();
+      (function loop() {
+        orbit.update();
+        var o = selObj();
+        if (o) { hl.setFromObject(o); hl.visible = true; } else hl.visible = false;
+        renderer.render(scene, cam); requestAnimationFrame(loop);
+      })();
 
       // ── Teile-Zugriff: xf liegt bei Zubehör in dessen Optionen, sonst in def.xf ──
       function accIndex(id) { return id && id.indexOf('acc:') === 0 ? +id.slice(4) : -1; }
@@ -260,21 +315,40 @@
         if (!d.xf[id] && create) d.xf[id] = {};
         return d.xf[id] || null;
       }
-      function cleanXf(id) {
-        var xf = getXf(id, false); if (!xf) return;
-        ['p', 'r'].forEach(function (k) { if (xf[k] && xf[k].every(function (v) { return !v; })) delete xf[k]; });
+      // Anpassung des ganzen Teils in der aktuellen Ebene (Outfit bzw. global)
+      function partXfObj(create) { return st.mode === 'ws' ? st.gx : getXf(st.sel, create); }
+      // Anpassung dessen, was ausgewählt ist: ganzes Teil oder ein Unterteil (xf.sub[i])
+      function curXf(create) {
+        var b = partXfObj(create); if (!b) return null;
+        if (st.piece == null) return b;
+        if (!b.sub) { if (!create) return null; b.sub = {}; }
+        if (!b.sub[st.piece] && create) b.sub[st.piece] = {};
+        return b.sub[st.piece] || null;
+      }
+      // Neutrales weglassen; true = nichts mehr drin
+      function tidy(xf) {
+        ['p', 'r', 'b'].forEach(function (k) { if (xf[k] && xf[k].every(function (v) { return !v; })) delete xf[k]; });
         if (xf.s && xf.s.every(function (v) { return v === 1; })) delete xf.s;
         if (!xf.hide) delete xf.hide;
-        if (Object.keys(xf).length) return;
+        if (xf.sub) {
+          Object.keys(xf.sub).forEach(function (i) { if (!xf.sub[i] || tidy(xf.sub[i])) delete xf.sub[i]; });
+          if (!Object.keys(xf.sub).length) delete xf.sub;
+        }
+        return !Object.keys(xf).length;
+      }
+      function cleanXf(id) {
+        if (st.mode === 'ws') { tidy(st.gx); return; }
+        var xf = getXf(id, false); if (!xf || !tidy(xf)) return;
         var i = accIndex(id);
         if (i >= 0) delete st.def.acc[i][1].xf; else { delete st.def.xf[id]; if (!Object.keys(st.def.xf).length) delete st.def.xf; }
       }
 
       // ── Ente neu bauen ──
       function rebuild() {
-        var keepSel = st.sel;
+        var keepSel = st.sel, keepPiece = st.piece;
         tc.detach();
         if (duck) scene.remove(duck);
+        if (st.mode === 'ws') RD.setPartXf(st.gkey, st.gx);
         var tmp = '__editor__';
         var reg = {}; reg[tmp] = st.def;
         RD.addOutfits(reg);
@@ -282,17 +356,34 @@
         // Arbeitskopie nicht in Listen auftauchen lassen
         var i = RD.OUTFITS.indexOf(tmp); if (i >= 0) RD.OUTFITS.splice(i, 1);
         scene.add(duck);
+        if (st.mode === 'ws') { keepSel = wsPartId(); ghost(keepSel); }
         renderParts();
-        select(keepSel && findPart(keepSel) ? keepSel : null);
+        select(keepSel && findPart(keepSel) ? keepSel : null, keepPiece);
       }
       function findPart(id) {
         var ps = (duck && duck.userData.parts) || [];
         for (var i = 0; i < ps.length; i++) if (ps[i].userData.part.id === id) return ps[i];
         return null;
       }
+      // Werkstatt: das bearbeitete Teil in der Gast-Ente, der Rest blass oder ausgeblendet
+      function wsPartId() {
+        var ps = (duck && duck.userData.parts) || [];
+        for (var i = 0; i < ps.length; i++) if (ps[i].userData.part.gkey === st.gkey) return ps[i].userData.part.id;
+        return null;
+      }
+      function ghost(id) {
+        var target = id ? findPart(id) : null, show = $('wsGhost').checked;
+        duck.traverse(function (m) {
+          if (!m.isMesh) return;
+          for (var o = m; o; o = o.parent) if (o === target) return;
+          if (!show || !m.material || Array.isArray(m.material)) { m.visible = false; return; }
+          var mat = m.material.clone(); mat.transparent = true; mat.opacity = 0.14; mat.depthWrite = false; m.material = mat;
+        });
+      }
 
       // ── Verlauf ──
-      function snapshot() { return JSON.stringify(st.def); }
+      function snapshot() { return JSON.stringify(st.mode === 'ws' ? st.gx : st.def); }
+      function restore(s) { if (st.mode === 'ws') st.gx = JSON.parse(s); else st.def = JSON.parse(s); }
       var lastSnap = null;
       function commit() {
         var s = snapshot();
@@ -301,8 +392,8 @@
         lastSnap = s; st.dirty = true; updateButtons();
       }
       function change(fn, noRebuild) { fn(); commit(); if (noRebuild) { renderParts(); syncSel(); } else rebuild(); renderLook(); }
-      function undo() { if (!st.hist.length) return; st.fut.push(lastSnap); lastSnap = st.hist.pop(); st.def = JSON.parse(lastSnap); st.dirty = true; rebuild(); renderLook(); updateButtons(); }
-      function redo() { if (!st.fut.length) return; st.hist.push(lastSnap); lastSnap = st.fut.pop(); st.def = JSON.parse(lastSnap); st.dirty = true; rebuild(); renderLook(); updateButtons(); }
+      function undo() { if (!st.hist.length) return; st.fut.push(lastSnap); lastSnap = st.hist.pop(); restore(lastSnap); st.dirty = true; rebuild(); renderLook(); updateButtons(); }
+      function redo() { if (!st.fut.length) return; st.hist.push(lastSnap); lastSnap = st.fut.pop(); restore(lastSnap); st.dirty = true; rebuild(); renderLook(); updateButtons(); }
 
       // ── Outfit laden ──
       function fillPick() {
@@ -318,14 +409,14 @@
         if (st.key && !st.isNew) sel.value = st.key;
       }
       function load(key) {
-        st.key = key; st.isNew = false; st.def = RD.def(key) || {}; st.sel = null;
+        st.key = key; st.outfitKey = key; st.isNew = false; st.def = RD.def(key) || {}; st.sel = null; st.piece = null;
         st.hist = []; st.fut = []; lastSnap = snapshot(); st.dirty = false;
         $('keyRow').hidden = true; $('label').value = st.def.label || key; $('pick').value = key;
         try { history.replaceState(null, '', '?outfit=' + encodeURIComponent(key)); } catch (e) { /* egal */ }
         rebuild(); renderLook(); updateButtons();
       }
       function startNew(def, label) {
-        st.isNew = true; st.key = null; st.def = def; st.def.label = label; st.def.cat = 'custom'; st.sel = null;
+        st.isNew = true; st.key = null; st.def = def; st.def.label = label; st.def.cat = 'custom'; st.sel = null; st.piece = null;
         st.hist = []; st.fut = []; lastSnap = null; commit();
         $('keyRow').hidden = false; $('key').value = ''; $('label').value = label;
         $('pick').value = '';
@@ -347,15 +438,76 @@
       });
       window.addEventListener('beforeunload', function (e) { if (st.dirty) { e.preventDefault(); e.returnValue = ''; } });
 
+      // ── Part-Werkstatt ──
+      var FIXED = [['bill', 'Bill'], ['wingL', 'Left wing'], ['wingR', 'Right wing'], ['eyes', 'Eyes'], ['helmet', 'Helmet'], ['cap', 'Police cap'], ['ears', 'Bat ears'], ['cape', 'Cape']];
+      var FIXED_LABEL = {}; FIXED.forEach(function (f) { FIXED_LABEL[f[0]] = f[1]; });
+      function partLabel(k) { return FIXED_LABEL[k] || RD.ACC_LABELS[k.slice(4)] || k.slice(4); }
+      function uses(d, k) {
+        if (!d) return false;
+        if (k === 'bill') return !d.noBill;
+        if (k === 'wingL' || k === 'wingR') return true;
+        if (k === 'eyes') return d.eyes !== 'none';
+        if (k.indexOf('acc:') === 0) return (d.acc || []).some(function (a) { return a[0] === k.slice(4); });
+        return !!d[k];
+      }
+      function users(k) { return RD.OUTFITS.filter(function (o) { return uses(RD.def(o), k); }); }
+      // Gast-Outfit, in dem das Teil gezeigt wird (ohne Outfit-Anpassungen: nur der globale Stand zählt)
+      function hostDef(k, list) {
+        var hk = FIXED_LABEL[k] && list.indexOf('classic') >= 0 ? 'classic' : list[0];
+        var d = hk ? RD.def(hk) : (k.indexOf('acc:') === 0 ? { acc: [[k.slice(4), {}]] } : {});
+        delete d.xf; (d.acc || []).forEach(function (a) { if (a[1]) delete a[1].xf; });
+        return d;
+      }
+      function fillWsPick() {
+        var sel = $('wsPick'), keep = sel.value || st.gkey; sel.textContent = '';
+        var og1 = document.createElement('optgroup'); og1.label = 'Duck parts';
+        var og2 = document.createElement('optgroup'); og2.label = 'Accessories';
+        function opt(k, og) { var o = document.createElement('option'); o.value = k; o.textContent = partLabel(k) + (RD.partXf(k) ? ' *' : ''); og.appendChild(o); }
+        FIXED.forEach(function (f) { opt(f[0], og1); });
+        Object.keys(RD.ACC).sort(function (a, b) { return partLabel('acc:' + a).localeCompare(partLabel('acc:' + b)); }).forEach(function (a) { opt('acc:' + a, og2); });
+        sel.append(og1, og2);
+        if (keep) sel.value = keep;
+      }
+      function loadPart(k) {
+        if (st.gkey && st.gkey !== k) RD.setPartXf(st.gkey, st.gSaved);
+        var list = users(k);
+        st.gkey = k; st.gSaved = RD.partXf(k); st.gx = st.gSaved ? clone(st.gSaved) : {};
+        st.def = hostDef(k, list); st.sel = null; st.piece = null;
+        st.hist = []; st.fut = []; lastSnap = snapshot(); st.dirty = false;
+        $('wsPick').value = k;
+        $('wsUsed').textContent = list.length ? 'Used by ' + list.length + (list.length === 1 ? ' outfit' : ' outfits') : 'Not used by any outfit yet';
+        try { history.replaceState(null, '', '?part=' + encodeURIComponent(k)); } catch (e) { /* egal */ }
+        rebuild(); updateButtons();
+        if (!findPart(st.sel)) status('This part needs settings to show up and cannot be shown on its own.', 'err'); else status('');
+      }
+      $('wsPick').addEventListener('change', function () {
+        if (!confirmLeave()) { $('wsPick').value = st.gkey; return; }
+        loadPart($('wsPick').value);
+      });
+      $('wsGhost').addEventListener('change', function () { rebuild(); });
+      function setTab(m) {
+        if (m === st.mode) return;
+        if (!confirmLeave()) return;
+        if (st.mode === 'ws' && st.gkey) RD.setPartXf(st.gkey, st.gSaved);
+        st.mode = m; st.dirty = false;
+        document.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.tab === m)); });
+        $('wsBox').hidden = m !== 'ws';
+        ['outfitBox', 'partsBox', 'lookBox'].forEach(function (id) { $(id).hidden = m === 'ws'; });
+        status('');
+        if (m === 'ws') { fillWsPick(); loadPart(st.gkey || $('wsPick').value || 'cap'); } else { st.gkey = null; load(st.outfitKey && RD.info(st.outfitKey) ? st.outfitKey : 'police'); }
+      }
+      document.querySelectorAll('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+
       // ── Teile-Liste ──
       function renderParts() {
         var box = $('parts'); box.textContent = '';
         ((duck && duck.userData.parts) || []).forEach(function (p) {
           var id = p.userData.part.id, b = document.createElement('button'); b.type = 'button';
-          var xf = getXf(id, false);
+          var xf = st.mode === 'outfit' ? getXf(id, false) : null;
           b.textContent = p.userData.part.label + (xf && xf.hide ? ' (hidden)' : '');
+          b.dataset.part = id;
           b.setAttribute('aria-pressed', String(st.sel === id));
-          b.addEventListener('click', function () { select(st.sel === id ? null : id); });
+          b.addEventListener('click', function () { select(st.sel === id && st.piece == null ? null : id); });
           box.appendChild(b);
         });
         if (!box.children.length) { var m = document.createElement('span'); m.className = 'muted'; m.textContent = 'No parts yet. Add one below.'; box.appendChild(m); }
@@ -368,52 +520,86 @@
       })();
       $('addBtn').addEventListener('click', function () {
         var name = $('addAcc').value;
-        change(function () { (st.def.acc = st.def.acc || []).push([name, {}]); st.sel = 'acc:' + (st.def.acc.length - 1); });
+        change(function () { (st.def.acc = st.def.acc || []).push([name, {}]); st.sel = 'acc:' + (st.def.acc.length - 1); st.piece = null; });
         if (!findPart(st.sel)) status('This part needs settings to show up — see the fields below.', 'err');
       });
 
       // ── Auswahl ──
-      function select(id) {
+      var GEO = { SphereGeometry: 'round', CylinderGeometry: 'cylinder', ConeGeometry: 'cone', BoxGeometry: 'box', TorusGeometry: 'ring', PlaneGeometry: 'flat', CircleGeometry: 'disc', CapsuleGeometry: 'capsule', TubeGeometry: 'tube', LatheGeometry: 'shell', ExtrudeGeometry: 'shape' };
+      function pieceName(m, i) {
+        if (m.name) return m.name;
+        var g = m.userData.baseGeo || m.geometry;
+        return 'Piece ' + (i + 1) + (g && GEO[g.type] ? ' (' + GEO[g.type] + ')' : '');
+      }
+      function pieces() { return selGrp ? selGrp.userData.part.pieces || [] : []; }
+      function selObj() {
+        if (!selGrp) return null;
+        return st.piece != null ? pieces()[st.piece] || null : selGrp;
+      }
+      function select(id, piece) {
         st.sel = id;
         selGrp = id ? findPart(id) : null;
-        if (selGrp) tc.attach(selGrp); else tc.detach();
-        Array.prototype.forEach.call($('parts').children, function (b, i) {
-          var p = duck.userData.parts[i]; if (p) b.setAttribute('aria-pressed', String(p.userData.part.id === id));
-        });
+        st.piece = selGrp && piece != null && piece < pieces().length ? piece : null;
+        var target = !selGrp ? null : st.piece != null ? pieces()[st.piece] : st.mode === 'ws' ? selGrp.userData.part.inner : selGrp;
+        if (target) tc.attach(target); else tc.detach();
+        Array.prototype.forEach.call($('parts').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.part === id)); });
         $('selBox').hidden = !id;
-        if (id) { $('selName').textContent = selGrp ? selGrp.userData.part.label : id; syncSel(); }
+        if (id) syncSel();
+      }
+      function renderPieces() {
+        var box = $('pieces'); box.textContent = '';
+        if (!selGrp) return;
+        var base = partXfObj(false) || {};
+        function mk(text, i) {
+          var b = document.createElement('button'); b.type = 'button'; b.textContent = text;
+          b.setAttribute('aria-pressed', String(st.piece === i));
+          b.addEventListener('click', function () { select(st.sel, i); });
+          box.appendChild(b);
+        }
+        mk('Whole part', null);
+        pieces().forEach(function (m, i) { var sx = base.sub && base.sub[i]; mk(pieceName(m, i) + (sx && sx.hide ? ' (hidden)' : ''), i); });
       }
       function syncSel() {
         if (!st.sel) return;
-        var xf = getXf(st.sel, false) || {};
-        var p = xf.p || [0, 0, 0], r = xf.r || [0, 0, 0], s = xf.s || [1, 1, 1];
+        var xf = curXf(false) || {}, isPiece = st.piece != null;
+        var p = xf.p || [0, 0, 0], r = xf.r || [0, 0, 0], s = xf.s || [1, 1, 1], b = xf.b || [0, 0];
+        $('selName').textContent = (selGrp ? selGrp.userData.part.label : st.sel) + (isPiece ? ' – ' + pieceName(pieces()[st.piece], st.piece) : '');
+        renderPieces();
         document.querySelectorAll('#selBox input[data-v]').forEach(function (inp) {
           var arr = { p: p, r: r, s: s }[inp.dataset.v]; inp.value = round(arr[+inp.dataset.i], inp.dataset.v === 'r' ? 1 : 3);
         });
         var u = round((s[0] + s[1] + s[2]) / 3, 2); $('uni').value = u; $('uniOut').textContent = u.toFixed(2) + '×';
+        $('bendBox').hidden = !isPiece;
+        ['bendX', 'bendZ'].forEach(function (id, k) { $(id).value = b[k] || 0; $(id + 'Out').textContent = (+b[k] || 0).toFixed(3); });
         $('pcol').value = xf.c != null ? hex(xf.c) : guessColor();
         $('phide').checked = !!xf.hide;
-        var i = accIndex(st.sel);
+        var i = st.mode === 'outfit' && !isPiece ? accIndex(st.sel) : -1;
         $('pRemove').hidden = i < 0;
+        $('pReset').textContent = isPiece ? 'Reset this piece' : 'Reset this part';
         renderAccOpts(i);
       }
       function guessColor() {
-        var c = null;
-        if (selGrp) selGrp.traverse(function (m) { if (!c && m.isMesh && m.material && m.material.color && !m.material.map) c = m.material.color.clone().convertLinearToSRGB(); });
+        var c = null, o = selObj();
+        if (o) o.traverse(function (m) { if (!c && m.isMesh && m.material && m.material.color && !m.material.map) c = m.material.color.clone().convertLinearToSRGB(); });
         return c ? '#' + c.getHexString() : '#ffffff';
       }
       // aus dem Anfasser zurück in die Daten
       function readGroup() {
         if (!selGrp) return;
-        var pv = selGrp.userData.part.pivot, xf = getXf(st.sel, true), D = 180 / Math.PI;
-        xf.p = [round(selGrp.position.x - pv.x, 3), round(selGrp.position.y - pv.y, 3), round(selGrp.position.z - pv.z, 3)];
-        xf.r = [round(selGrp.rotation.x * D, 1), round(selGrp.rotation.y * D, 1), round(selGrp.rotation.z * D, 1)];
-        xf.s = [round(selGrp.scale.x, 3), round(selGrp.scale.y, 3), round(selGrp.scale.z, 3)];
+        var P = selGrp.userData.part, xf = curXf(true), D = 180 / Math.PI, v;
+        if (st.piece != null) v = RD.readPiece(selGrp, st.piece, st.mode === 'ws' ? 'g' : 'o');
+        else {
+          var o = st.mode === 'ws' ? P.inner : selGrp, pv = st.mode === 'ws' ? { x: 0, y: 0, z: 0 } : P.pivot;
+          v = { p: [o.position.x - pv.x, o.position.y - pv.y, o.position.z - pv.z], r: [o.rotation.x * D, o.rotation.y * D, o.rotation.z * D], s: o.scale.toArray() };
+        }
+        xf.p = v.p.map(function (n) { return round(n, 3); });
+        xf.r = v.r.map(function (n) { return round(n, 1); });
+        xf.s = v.s.map(function (n) { return round(n, 3); });
         cleanXf(st.sel);
       }
       tc.addEventListener('dragging-changed', function (e) {
         orbit.enabled = !e.value;
-        if (!e.value) { readGroup(); commit(); syncSel(); }
+        if (!e.value) { readGroup(); applySel(); commit(); syncSel(); }
       });
       tc.addEventListener('objectChange', function () { readGroup(); syncSel(); });
       function setMode(m) {
@@ -422,28 +608,42 @@
       }
       document.querySelectorAll('[data-mode]').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.mode); }); });
       // Felder → Daten → Teil (ohne Neubau)
-      function applySel() { if (selGrp) RD.applyXf(selGrp, getXf(st.sel, false)); }
+      function applySel() {
+        if (!selGrp) return;
+        var P = selGrp.userData.part;
+        if (st.mode === 'ws') { P.gxf = st.gx; P.xf = null; } else P.xf = getXf(st.sel, false);
+        RD.applyPart(selGrp);
+      }
       document.querySelectorAll('#selBox input[data-v]').forEach(function (inp) {
         inp.addEventListener('change', function () {
-          var v = inp.dataset.v, i = +inp.dataset.i, xf = getXf(st.sel, true);
+          var v = inp.dataset.v, i = +inp.dataset.i, xf = curXf(true);
           var arr = xf[v] || (v === 's' ? [1, 1, 1] : [0, 0, 0]);
           arr[i] = v === 's' ? Math.max(0.05, num(inp.value, 1)) : num(inp.value, 0);
           xf[v] = arr; cleanXf(st.sel); applySel(); commit(); syncSel();
         });
       });
       $('uni').addEventListener('input', function () {
-        var xf = getXf(st.sel, true), u = num($('uni').value, 1), s = xf.s || [1, 1, 1], avg = (s[0] + s[1] + s[2]) / 3 || 1;
+        var xf = curXf(true), u = num($('uni').value, 1), s = xf.s || [1, 1, 1], avg = (s[0] + s[1] + s[2]) / 3 || 1;
         xf.s = s.map(function (v) { return round(v / avg * u, 3); });
         $('uniOut').textContent = u.toFixed(2) + '×';
         applySel();
       });
       $('uni').addEventListener('change', function () { cleanXf(st.sel); commit(); syncSel(); });
-      $('pcol').addEventListener('input', function () { getXf(st.sel, true).c = parseInt($('pcol').value.slice(1), 16); applySel(); });
+      ['bendX', 'bendZ'].forEach(function (id, k) {
+        $(id).addEventListener('input', function () {
+          var xf = curXf(true), b = xf.b || [0, 0]; b[k] = round(num($(id).value, 0), 3); xf.b = b;
+          $(id + 'Out').textContent = b[k].toFixed(3); applySel();
+        });
+        $(id).addEventListener('change', function () { cleanXf(st.sel); applySel(); commit(); syncSel(); });
+      });
+      $('pcol').addEventListener('input', function () { curXf(true).c = parseInt($('pcol').value.slice(1), 16); applySel(); });
       $('pcol').addEventListener('change', function () { commit(); });
-      $('pcolReset').addEventListener('click', function () { var xf = getXf(st.sel, false); if (xf) { delete xf.c; cleanXf(st.sel); applySel(); commit(); syncSel(); } });
-      $('phide').addEventListener('change', function () { getXf(st.sel, true).hide = $('phide').checked; cleanXf(st.sel); applySel(); commit(); renderParts(); });
+      $('pcolReset').addEventListener('click', function () { var xf = curXf(false); if (xf) { delete xf.c; cleanXf(st.sel); applySel(); commit(); syncSel(); } });
+      $('phide').addEventListener('change', function () { curXf(true).hide = $('phide').checked; cleanXf(st.sel); applySel(); commit(); renderParts(); syncSel(); });
       $('pReset').addEventListener('click', function () {
         change(function () {
+          if (st.piece != null) { var b = partXfObj(false); if (b && b.sub) delete b.sub[st.piece]; cleanXf(st.sel); return; }
+          if (st.mode === 'ws') { st.gx = {}; return; }
           var i = accIndex(st.sel);
           if (i >= 0) { if (st.def.acc[i][1]) delete st.def.acc[i][1].xf; } else if (st.def.xf) { delete st.def.xf[st.sel]; if (!Object.keys(st.def.xf).length) delete st.def.xf; }
         });
@@ -544,6 +744,12 @@
       // ── Speichern / Zurücksetzen ──
       function updateButtons() {
         $('undo').disabled = !st.hist.length; $('redo').disabled = !st.fut.length;
+        if (st.mode === 'ws') {
+          $('wsOrigin').textContent = (st.gSaved ? 'Changed (saved)' : 'Original') + (st.dirty ? ', edited' : '');
+          $('drop').hidden = !st.gSaved; $('drop').textContent = 'Reset to original';
+          $('save').disabled = !st.dirty;
+          return;
+        }
         var org = st.isNew ? 'unsaved' : RD.origin(st.key);
         $('origin').textContent = ORIGIN_TXT[org] + (st.dirty && !st.isNew ? ', edited' : '');
         $('drop').hidden = st.isNew || org === 'code';
@@ -554,7 +760,18 @@
         return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' })
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status)); return d; }); });
       }
+      function savePart() {
+        var k = st.gkey, xf = clone(st.gx), empty = tidy(xf);
+        status('Saving …');
+        (empty ? api('DELETE', '/app/api/ducks/parts/' + encodeURIComponent(k)) : api('POST', '/app/api/ducks/parts', { key: k, xf: xf })).then(function () {
+          st.gSaved = empty ? null : xf; st.dirty = false;
+          RD.setPartXf(k, st.gx);
+          fillWsPick(); updateButtons();
+          status('Saved. Live in every outfit with the ' + partLabel(k).toLowerCase() + ' (new duck rains and knife ducks pick it up on their next start).', 'ok');
+        }).catch(function (e) { status('Not saved: ' + e.message, 'err'); });
+      }
       $('save').addEventListener('click', function () {
+        if (st.mode === 'ws') { savePart(); return; }
         var key = st.isNew ? $('key').value.trim() : st.key;
         if (!/^[a-z][a-z0-9-]{0,31}$/.test(key || '')) { $('key').setAttribute('aria-invalid', 'true'); $('key').focus(); status('Please enter a URL name (lowercase letters, digits, dashes).', 'err'); return; }
         if (st.isNew && RD.info(key) && !window.confirm('An outfit called "' + key + '" exists already. Replace it?')) return;
@@ -562,7 +779,7 @@
         status('Saving …');
         api('POST', '/app/api/ducks/outfits', { key: key, def: def }).then(function () {
           var reg = {}; reg[key] = clone(def); RD.applyCustom(reg);
-          st.key = key; st.isNew = false; st.dirty = false; $('keyRow').hidden = true;
+          st.key = key; st.outfitKey = key; st.isNew = false; st.dirty = false; $('keyRow').hidden = true;
           fillPick(); $('pick').value = key;
           try { history.replaceState(null, '', '?outfit=' + encodeURIComponent(key)); } catch (e) { /* egal */ }
           updateButtons();
@@ -570,6 +787,16 @@
         }).catch(function (e) { status('Not saved: ' + e.message, 'err'); });
       });
       $('drop').addEventListener('click', function () {
+        if (st.mode === 'ws') {
+          var k = st.gkey;
+          if (!window.confirm('Throw away the saved changes to the ' + partLabel(k).toLowerCase() + ' for all outfits?')) return;
+          api('DELETE', '/app/api/ducks/parts/' + encodeURIComponent(k)).then(function () {
+            RD.setPartXf(k, null); st.gSaved = null; st.dirty = false;
+            fillWsPick(); loadPart(k);
+            status('Back to the original.', 'ok');
+          }).catch(function (e) { status('Failed: ' + e.message, 'err'); });
+          return;
+        }
         var org = RD.origin(st.key);
         if (!window.confirm(org === 'new' ? 'Delete the outfit "' + st.key + '" for good?' : 'Throw away the saved changes and go back to the original "' + st.key + '"?')) return;
         api('DELETE', '/app/api/ducks/outfits/' + encodeURIComponent(st.key)).then(function () {
@@ -582,19 +809,37 @@
       $('undo').addEventListener('click', undo);
       $('redo').addEventListener('click', redo);
 
-      // ── Klick in die Szene wählt ein Teil ──
+      // ── Klick in die Szene: Teil wählen, Doppelklick: Unterteil ──
       var ray = new THREE.Raycaster(), down = null;
+      function pick(e) {
+        var r = canvas.getBoundingClientRect();
+        ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
+        var hits = ray.intersectObject(duck, true);
+        for (var i = 0; i < hits.length; i++) {
+          var mesh = hits[i].object;
+          if (!mesh.visible) continue;
+          for (var o = mesh; o && o !== duck; o = o.parent) {
+            if (!o.userData.part) continue;
+            if (!o.visible || (st.mode === 'ws' && o.userData.part.id !== st.sel)) break;
+            var ps = o.userData.part.pieces || [], idx = -1;
+            for (var m = mesh; m && m !== o && idx < 0; m = m.parent) idx = ps.indexOf(m);
+            return { id: o.userData.part.id, piece: idx >= 0 ? idx : null };
+          }
+          // der Körper verdeckt (in der Werkstatt ist er nur blass, dort weiter hindurch)
+          if (st.mode === 'outfit' && mesh === duck.userData.body) break;
+        }
+        return null;
+      }
       canvas.addEventListener('pointerdown', function (e) { down = [e.clientX, e.clientY]; });
       canvas.addEventListener('pointerup', function (e) {
         if (!down || tc.dragging || tc.axis || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
-        var r = canvas.getBoundingClientRect();
-        ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
-        var hits = ray.intersectObject(duck, true), id = null;
-        for (var i = 0; i < hits.length && !id; i++) {
-          for (var o = hits[i].object; o && o !== duck; o = o.parent) if (o.userData.part && o.visible) { id = o.userData.part.id; break; }
-          if (!id && hits[i].object === duck.userData.body) break;
-        }
-        select(id);
+        var h = pick(e);
+        if (h) { if (h.id !== st.sel) select(h.id); } else if (st.mode === 'outfit') select(null);
+      });
+      canvas.addEventListener('dblclick', function (e) {
+        if (tc.axis) return;
+        var h = pick(e);
+        if (h) select(h.id, h.piece);
       });
 
       // ── Tastatur ──
@@ -606,15 +851,17 @@
         if (e.key === 'w' || e.key === 'W') setMode('translate');
         else if (e.key === 'e' || e.key === 'E') setMode('rotate');
         else if (e.key === 'r' || e.key === 'R') setMode('scale');
-        else if (e.key === 'Escape' && st.sel) select(null);
+        else if (e.key === 'Escape' && st.sel) { if (st.piece != null) select(st.sel, null); else if (st.mode === 'outfit') select(null); }
       });
 
-      // ── Start ──
+      // ── Start: ?outfit=<name> oder ?part=<teil> (Werkstatt) ──
       fillPick();
+      fillWsPick();
       resize();
-      var want = new URLSearchParams(location.search).get('outfit');
-      load(want && RD.info(want) ? want : 'police');
-      $('pick').value = st.key;
+      var qs = new URLSearchParams(location.search), want = qs.get('outfit'), wantPart = qs.get('part');
+      st.outfitKey = want && RD.info(want) ? want : 'police';
+      if (wantPart && (FIXED_LABEL[wantPart] || RD.ACC[wantPart.slice(4)])) { st.gkey = wantPart; setTab('ws'); }
+      else { load(st.outfitKey); $('pick').value = st.key; }
     })();
   </script>
 </body>

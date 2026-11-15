@@ -680,6 +680,28 @@ def duck_outfit_delete(key):
     return jsonify({"ok": True, "deleted": duck_outfits.delete(_duck_root(), key)})
 
 
+@bp_app.route("/app/api/ducks/parts", methods=["POST"])
+@require_admin
+def duck_part_save():
+    """Part-Werkstatt: ein Teil global umbauen (gilt in jedem Outfit mit diesem Teil)."""
+    from fx import duck_outfits
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "JSON body expected"}), 400
+    err = duck_outfits.save_part(_duck_root(), body.get("key"), body.get("xf"))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/ducks/parts/<key>", methods=["DELETE"])
+@require_admin
+def duck_part_delete(key):
+    """Globalen Umbau eines Teils verwerfen: wieder wie im Code."""
+    from fx import duck_outfits
+    return jsonify({"ok": True, "deleted": duck_outfits.delete_part(_duck_root(), key)})
+
+
 def _visible_tools():
     """Tools the current user is allowed to see."""
     return [t for t in TOOLS
