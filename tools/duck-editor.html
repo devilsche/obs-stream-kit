@@ -81,7 +81,7 @@
   <div class="layout">
     <div class="stage">
       <canvas id="view" role="img" aria-label="3D preview of the rubber duck being edited. Click a part to select it, double-click to select one piece of it; drag empty space to orbit, scroll to zoom."></canvas>
-      <p class="hint">Click a part to select it · double-click a piece of it · drag to orbit · scroll to zoom · W move, E turn, R size · Ctrl+Z undo</p>
+      <p class="hint">Click a part to select it · double-click a piece of it · drag to orbit · scroll to zoom · W move, E turn, R size · Esc back · Ctrl+Z undo</p>
     </div>
     <div class="panel" id="panel">
       <section aria-labelledby="h-mode">
@@ -183,6 +183,32 @@
           </div>
           <p class="muted small" id="bendHelp">Curves the piece: plus lifts its edges, minus lowers them (e.g. a cap visor).</p>
         </div>
+        <div id="formBox" hidden>
+          <h3>Shape</h3>
+          <div id="formRows"></div>
+          <div class="row">
+            <button type="button" id="formReset" class="ghost">Reset shape</button>
+          </div>
+        </div>
+        <div id="latBox">
+          <h3>Shape handles</h3>
+          <div class="row">
+            <button type="button" id="latOn" aria-pressed="false" aria-describedby="latHelp">Show handles</button>
+            <input type="checkbox" id="latMirror" checked>
+            <label for="latMirror">Mirror left/right</label>
+          </div>
+          <p class="muted small" id="latHelp">Drag the yellow points in the view to reshape, like a box of clay. With the whole part selected the points span all its pieces, so pairs like ears stay matched. With mirroring on, points on the middle line stay on it.</p>
+          <div id="latEdit" hidden>
+            <div class="row">
+              <label for="latPick">Handle</label>
+              <select id="latPick" class="grow"></select>
+            </div>
+            <div class="xyz"><span>Handle offset</span><input type="number" step="0.01" data-h="0" aria-label="Handle offset X"><input type="number" step="0.01" data-h="1" aria-label="Handle offset Y"><input type="number" step="0.01" data-h="2" aria-label="Handle offset Z"></div>
+            <div class="row">
+              <button type="button" id="latReset" class="ghost">Reset handles</button>
+            </div>
+          </div>
+        </div>
         <div class="row">
           <input type="checkbox" id="phide">
           <label for="phide">Hidden</label>
@@ -258,7 +284,7 @@
       // mode 'outfit': ein Outfit bearbeiten (st.def); mode 'ws': Part-Werkstatt, ein Teil global
       // (st.gkey, Arbeitsstand st.gx, gespeicherter Stand st.gSaved; st.def = Gast-Outfit zum Zeigen).
       // sel = Teil-ID, piece = Index des Unterteils oder null (ganzes Teil)
-      var st = { mode: 'outfit', key: null, def: null, isNew: false, sel: null, piece: null, dirty: false, hist: [], fut: [], gkey: null, gx: null, gSaved: null, outfitKey: null };
+      var st = { mode: 'outfit', key: null, def: null, isNew: false, sel: null, piece: null, dirty: false, hist: [], fut: [], gkey: null, gx: null, gSaved: null, outfitKey: null, lat: false, h: null };
       function clone(v) { return JSON.parse(JSON.stringify(v)); }
       function hex(n) { return '#' + ('000000' + (n >>> 0).toString(16)).slice(-6); }
       function num(v, d) { var n = parseFloat(v); return isFinite(n) ? n : d; }
@@ -336,6 +362,8 @@
         ['p', 'r', 'b'].forEach(function (k) { if (xf[k] && xf[k].every(function (v) { return !v; })) delete xf[k]; });
         if (xf.s && xf.s.every(function (v) { return v === 1; })) delete xf.s;
         if (!xf.hide) delete xf.hide;
+        if (xf.l && !xf.l.some(function (v) { return v; })) delete xf.l;
+        if (xf.form && !Object.keys(xf.form).length) delete xf.form;
         if (xf.sub) {
           Object.keys(xf.sub).forEach(function (i) { if (!xf.sub[i] || tidy(xf.sub[i])) delete xf.sub[i]; });
           if (!Object.keys(xf.sub).length) delete xf.sub;
@@ -364,7 +392,7 @@
         scene.add(duck);
         if (st.mode === 'ws') { keepSel = wsPartId(); ghost(keepSel); }
         renderParts();
-        select(keepSel && findPart(keepSel) ? keepSel : null, keepPiece);
+        select(keepSel && findPart(keepSel) ? keepSel : null, keepPiece, true);
       }
       function findPart(id) {
         var ps = (duck && duck.userData.parts) || [];
@@ -549,12 +577,13 @@
         if (!selGrp) return null;
         return st.piece != null ? pieces()[st.piece] || null : selGrp;
       }
-      function select(id, piece) {
+      function select(id, piece, keepHandle) {
         st.sel = id;
         selGrp = id ? findPart(id) : null;
         st.piece = selGrp && piece != null && piece < pieces().length ? piece : null;
-        var target = !selGrp ? null : st.piece != null ? pieces()[st.piece] : st.mode === 'ws' ? selGrp.userData.part.inner : selGrp;
-        if (target) tc.attach(target); else tc.detach();
+        if (!keepHandle) st.h = null;
+        attachTc();
+        placeHandles();
         Array.prototype.forEach.call($('parts').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.part === id)); });
         $('selBox').hidden = !id;
         if (id) syncSel();
@@ -590,6 +619,8 @@
         $('pRemove').hidden = i < 0;
         $('pReset').textContent = isPiece ? 'Reset this piece' : 'Reset this part';
         renderAccOpts(i);
+        renderForm();
+        syncLat();
       }
       function guessColor() {
         var c = null, o = selObj();
@@ -599,6 +630,7 @@
       // aus dem Anfasser zurück in die Daten
       function readGroup() {
         if (!selGrp) return;
+        if (st.h != null) { readHandle(); return; }
         var P = selGrp.userData.part, xf = curXf(true), D = 180 / Math.PI, v;
         if (st.piece != null) v = RD.readPiece(selGrp, st.piece, st.mode === 'ws' ? 'g' : 'o');
         else {
@@ -612,9 +644,9 @@
       }
       tc.addEventListener('dragging-changed', function (e) {
         orbit.enabled = !e.value;
-        if (!e.value) { readGroup(); applySel(); commit(); syncSel(); }
+        if (!e.value) { readGroup(); applySel(); commit(); syncSel(); placeHandles(); }
       });
-      tc.addEventListener('objectChange', function () { readGroup(); syncSel(); });
+      tc.addEventListener('objectChange', function () { readGroup(); if (st.h != null) { applySel(); placeHandles(); syncLat(); } else syncSel(); });
       function setMode(m) {
         tc.setMode(m);
         document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.mode === m)); });
@@ -665,6 +697,158 @@
         var i = accIndex(st.sel); if (i < 0) return;
         change(function () { st.def.acc.splice(i, 1); if (!st.def.acc.length) delete st.def.acc; st.sel = null; });
       });
+
+      // ── Form-Regler (Bausteine mit RD.FORMS, z. B. Stehkragen): bauen das Teil neu ──
+      function formName() {
+        if (!st.sel || st.piece != null) return null;
+        var n = null;
+        if (st.mode === 'ws') n = st.gkey && st.gkey.indexOf('acc:') === 0 ? st.gkey.slice(4) : null;
+        else { var i = accIndex(st.sel); n = i >= 0 && st.def.acc && st.def.acc[i] ? st.def.acc[i][0] : null; }
+        return n && RD.FORMS[n] ? n : null;
+      }
+      function formNow(n) {
+        var P = selGrp ? selGrp.userData.part : null, g = st.mode === 'ws' ? st.gx.form : P && P.gxf && P.gxf.form;
+        var o = st.mode === 'ws' ? null : (getXf(st.sel, false) || {}).form;
+        return RD.formOf(n, Object.assign({}, g, o));
+      }
+      var formRaf = 0;
+      function renderForm() {
+        var n = formName(), box = $('formRows'), tag = n ? st.mode + '|' + st.sel + '|' + n : '';
+        $('formBox').hidden = !n;
+        if (!n) { box.textContent = ''; box.dataset.tag = ''; return; }
+        var f = formNow(n);
+        if (box.dataset.tag === tag) {
+          // nur Werte nachziehen (der gerade gezogene Regler bleibt, wie er ist)
+          RD.FORMS[n].forEach(function (sp) {
+            var inp = $('fm-' + sp.k); if (inp && inp !== document.activeElement) inp.value = f[sp.k];
+            if ($('fm-' + sp.k + 'Out')) $('fm-' + sp.k + 'Out').textContent = fmt(f[sp.k], sp.step);
+          });
+          return;
+        }
+        box.textContent = ''; box.dataset.tag = tag;
+        RD.FORMS[n].forEach(function (sp) {
+          var row = document.createElement('div'); row.className = 'row';
+          var lab = document.createElement('label'); lab.htmlFor = 'fm-' + sp.k; lab.textContent = sp.label;
+          var inp = document.createElement('input'); inp.type = 'range'; inp.id = 'fm-' + sp.k;
+          inp.min = sp.min; inp.max = sp.max; inp.step = sp.step; inp.value = f[sp.k];
+          var out = document.createElement('output'); out.id = 'fm-' + sp.k + 'Out'; out.htmlFor = inp.id; out.textContent = fmt(f[sp.k], sp.step);
+          inp.addEventListener('input', function () {
+            var b = partXfObj(true), v = num(inp.value, sp.def);
+            (b.form = b.form || {})[sp.k] = v; out.textContent = fmt(v, sp.step);
+            if (!formRaf) formRaf = requestAnimationFrame(function () { formRaf = 0; rebuild(); });
+          });
+          inp.addEventListener('change', function () { cleanXf(st.sel); commit(); });
+          row.append(lab, inp, out); box.appendChild(row);
+        });
+      }
+      function fmt(v, step) { var d = String(step).split('.')[1]; return (+v).toFixed(d ? d.length : 0); }
+      $('formReset').addEventListener('click', function () { change(function () { var b = partXfObj(false); if (b) { delete b.form; cleanXf(st.sel); } }); });
+
+      // ── Griffpunkte: 3×3×3 um das ganze Teil (Raum der inneren Gruppe) bzw. ein Unterteil ──
+      var hGroup = new THREE.Group(), hMat = new THREE.MeshBasicMaterial({ color: 0xf2b705, depthTest: false }), hMatSel = new THREE.MeshBasicMaterial({ color: 0xffffff, depthTest: false });
+      var hGeo = new THREE.SphereGeometry(0.028, 12, 8), hDots = [];
+      for (var hi0 = 0; hi0 < 27; hi0++) { var dot = new THREE.Mesh(hGeo, hMat); dot.renderOrder = 10; dot.userData.h = hi0; hGroup.add(dot); hDots.push(dot); }
+      var hLines = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xf2b705, transparent: true, opacity: 0.55, depthTest: false }));
+      hLines.renderOrder = 9; hGroup.add(hLines); hGroup.visible = false; scene.add(hGroup);
+      var HX = ['back', 'middle', 'front'], HY = ['bottom', 'middle', 'top'], HZ = ['right', 'centre', 'left'];
+      function hName(i) { var n = [HY[Math.floor(i / 3) % 3], HX[Math.floor(i / 9)], HZ[i % 3]].filter(function (w, k) { return k === 0 || w !== 'middle' && w !== 'centre'; }); var t = n.join(' '); return t.charAt(0).toUpperCase() + t.slice(1); }
+      (function () { var sel = $('latPick'); for (var i = 0; i < 27; i++) { var o = document.createElement('option'); o.value = i; o.textContent = hName(i); sel.appendChild(o); } })();
+      // Ziel der Griffpunkte: Raum, Kasten, Spiegel-Achse, Verschiebungen der anderen Ebene
+      function latTarget() {
+        if (!selGrp) return null;
+        var P = selGrp.userData.part, other = st.mode === 'ws' ? P.xf : P.gxf;
+        if (st.piece == null) {
+          if (!P.lbox) return null;
+          return { space: P.inner, box: P.lbox, axis: 2, other: (other && other.l) || null };
+        }
+        var m = pieces()[st.piece]; if (!m || m.userData.cape) return null;
+        duck.updateMatrixWorld(true);
+        var e = m.matrixWorld.elements, axis = 0, best = -1;
+        for (var a = 0; a < 3; a++) { var z = Math.abs(e[a * 4 + 2]) / (Math.hypot(e[a * 4], e[a * 4 + 1], e[a * 4 + 2]) || 1); if (z > best) { best = z; axis = a; } }
+        var os = other && other.sub && other.sub[pk(st.piece)];
+        return { space: m, box: RD.geoBox(m.userData.baseGeo || m.geometry), axis: axis, other: (os && os.l) || null };
+      }
+      function curLat(create) { var xf = curXf(create); if (!xf) return null; if (!xf.l && create) xf.l = new Array(81).fill(0); return xf.l || null; }
+      function hLocal(T, i, cur) {
+        var r = RD.latRest(T.box, i), n = i * 3;
+        return new THREE.Vector3(r[0] + (cur ? +cur[n] || 0 : 0) + (T.other ? +T.other[n] || 0 : 0), r[1] + (cur ? +cur[n + 1] || 0 : 0) + (T.other ? +T.other[n + 1] || 0 : 0), r[2] + (cur ? +cur[n + 2] || 0 : 0) + (T.other ? +T.other[n + 2] || 0 : 0));
+      }
+      function placeHandles() {
+        var T = st.lat ? latTarget() : null;
+        hGroup.visible = !!T;
+        if (!T) return;
+        duck.updateMatrixWorld(true);
+        var cur = curLat(false), W = [];
+        for (var i = 0; i < 27; i++) {
+          var w = T.space.localToWorld(hLocal(T, i, cur)); W.push(w);
+          if (!(tc.dragging && st.h === i)) hDots[i].position.copy(w);
+          hDots[i].material = st.h === i ? hMatSel : hMat;
+        }
+        var seg = [];
+        for (var a = 0; a < 27; a++) {
+          var ii = Math.floor(a / 9), jj = Math.floor(a / 3) % 3, kk = a % 3;
+          if (ii < 2) seg.push(W[a], W[a + 9]); if (jj < 2) seg.push(W[a], W[a + 3]); if (kk < 2) seg.push(W[a], W[a + 1]);
+        }
+        hLines.geometry.setFromPoints(seg);
+      }
+      function attachTc() {
+        var target = !selGrp ? null : st.h != null && st.lat ? hDots[st.h] : st.piece != null ? pieces()[st.piece] : st.mode === 'ws' ? selGrp.userData.part.inner : selGrp;
+        if (st.h != null && st.lat) setMode('translate');
+        if (target) tc.attach(target); else tc.detach();
+      }
+      function setHandle(i) { st.h = i; attachTc(); placeHandles(); syncLat(); }
+      function pickHandle(e) {
+        if (!hGroup.visible) return null;
+        var r = canvas.getBoundingClientRect();
+        ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
+        var hits = ray.intersectObjects(hDots, false);
+        return hits.length ? hits[0].object.userData.h : null;
+      }
+      // eine Verschiebung setzen (lokal, in der aktuellen Ebene), gespiegelt auf den Gegenpunkt
+      function setLat(i, d) {
+        var T = latTarget(); if (!T) return;
+        var l = curLat(true), ax = T.axis, c = [Math.floor(i / 9), Math.floor(i / 3) % 3, i % 3];
+        var mirror = $('latMirror').checked;
+        if (mirror && c[ax] === 1) d[ax] = -(T.other ? +T.other[i * 3 + ax] || 0 : 0);   // Punkt auf der Mitte bleibt auf der Mitte
+        for (var k = 0; k < 3; k++) l[i * 3 + k] = round(d[k], 3);
+        if (mirror && c[ax] !== 1) {
+          c[ax] = 2 - c[ax];
+          var j = c[0] * 9 + c[1] * 3 + c[2];
+          for (var k2 = 0; k2 < 3; k2++) l[j * 3 + k2] = round(k2 === ax ? -d[k2] : d[k2], 3);
+        }
+      }
+      function readHandle() {
+        var T = latTarget(); if (!T || st.h == null) return;
+        duck.updateMatrixWorld(true);
+        var loc = T.space.worldToLocal(hDots[st.h].position.clone()), r = RD.latRest(T.box, st.h), n = st.h * 3, o = T.other;
+        setLat(st.h, [loc.x - r[0] - (o ? +o[n] || 0 : 0), loc.y - r[1] - (o ? +o[n + 1] || 0 : 0), loc.z - r[2] - (o ? +o[n + 2] || 0 : 0)]);
+        cleanXf(st.sel);
+      }
+      function syncLat() {
+        var T = latTarget();
+        $('latOn').disabled = !T;
+        $('latOn').setAttribute('aria-pressed', String(st.lat && !!T));
+        $('latOn').textContent = st.lat ? 'Hide handles' : 'Show handles';
+        $('latEdit').hidden = !(st.lat && T);
+        if (!st.lat || !T) return;
+        $('latPick').value = st.h != null ? st.h : '';
+        var cur = curLat(false), n = (st.h || 0) * 3;
+        document.querySelectorAll('#latEdit input[data-h]').forEach(function (inp) {
+          inp.disabled = st.h == null;
+          if (inp !== document.activeElement) inp.value = st.h == null ? '' : round(cur ? +cur[n + +inp.dataset.h] || 0 : 0, 3);
+        });
+      }
+      $('latOn').addEventListener('click', function () { st.lat = !st.lat; if (!st.lat) st.h = null; attachTc(); placeHandles(); syncLat(); });
+      $('latPick').addEventListener('change', function () { setHandle(+$('latPick').value); });
+      document.querySelectorAll('#latEdit input[data-h]').forEach(function (inp) {
+        inp.addEventListener('change', function () {
+          if (st.h == null) return;
+          var cur = curLat(false), n = st.h * 3, d = [0, 1, 2].map(function (k) { return cur ? +cur[n + k] || 0 : 0; });
+          d[+inp.dataset.h] = num(inp.value, 0);
+          setLat(st.h, d); cleanXf(st.sel); applySel(); commit(); placeHandles(); syncLat();
+        });
+      });
+      $('latReset').addEventListener('click', function () { var xf = curXf(false); if (xf) { delete xf.l; cleanXf(st.sel); applySel(); commit(); placeHandles(); syncLat(); } });
 
       // ── Felder für Werte (Zubehör-Optionen und aufgemalter Look) ──
       // Farbe: bekannter Farbschlüssel oder großer Ganzzahlwert; Listen als "a, b"; Objekte verschachtelt
@@ -846,11 +1030,13 @@
       canvas.addEventListener('pointerdown', function (e) { down = [e.clientX, e.clientY]; });
       canvas.addEventListener('pointerup', function (e) {
         if (!down || tc.dragging || tc.axis || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 4) return;
+        var hi = pickHandle(e);
+        if (hi != null) { setHandle(hi); return; }
         var h = pick(e);
         if (h) { if (h.id !== st.sel) select(h.id); } else if (st.mode === 'outfit') select(null);
       });
       canvas.addEventListener('dblclick', function (e) {
-        if (tc.axis) return;
+        if (tc.axis || pickHandle(e) != null) return;
         var h = pick(e);
         if (h) select(h.id, h.piece);
       });
@@ -864,7 +1050,7 @@
         if (e.key === 'w' || e.key === 'W') setMode('translate');
         else if (e.key === 'e' || e.key === 'E') setMode('rotate');
         else if (e.key === 'r' || e.key === 'R') setMode('scale');
-        else if (e.key === 'Escape' && st.sel) { if (st.piece != null) select(st.sel, null); else if (st.mode === 'outfit') select(null); }
+        else if (e.key === 'Escape' && st.sel) { if (st.h != null) { st.h = null; attachTc(); placeHandles(); syncLat(); } else if (st.piece != null) select(st.sel, null); else if (st.mode === 'outfit') select(null); }
       });
 
       // ── Start: ?outfit=<name> oder ?part=<teil> (Werkstatt) ──

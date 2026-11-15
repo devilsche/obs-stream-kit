@@ -448,10 +448,64 @@
       (a.double ? [-0.14, 0.14] : [0]).forEach(function (z) { var at = front(y, z); add(c.g, sph(0.04, 12), m).position.copy(at.p).addScaledVector(at.n, 0.01); });
     });
   };
+  // Stehkragen als gebogenes Blatt um den Hals (vorn offen, immer spiegelgleich).
+  // Form-Regler (Duck-Editor): Höhe, wie weit herum, Weite unten/oben, Dicke, Oberkante
+  // nach außen einrollen, vordere Ecken als Spitzen verlängern, nach hinten kippen.
+  RD.FORMS.highcollar = [
+    { k: 'h', label: 'Height', min: 0.1, max: 0.9, step: 0.01, def: 0.42 },
+    { k: 'wrap', label: 'Wrap (°)', min: 90, max: 350, step: 1, def: 259 },
+    { k: 'neck', label: 'Neck width', min: 0.3, max: 0.8, step: 0.01, def: 0.46 },
+    { k: 'top', label: 'Top width', min: 0.3, max: 1.2, step: 0.01, def: 0.66 },
+    { k: 'thick', label: 'Thickness', min: 0, max: 0.1, step: 0.002, def: 0 },
+    { k: 'curl', label: 'Roll top edge', min: 0, max: 1, step: 0.01, def: 0 },
+    { k: 'tips', label: 'Front tips', min: 0, max: 0.6, step: 0.01, def: 0 },
+    { k: 'lean', label: 'Lean back (°)', min: -30, max: 45, step: 1, def: 10 }
+  ];
+  // Blatt: Profil (Radius, Höhe) entlang der Bogenlänge, Oberkante rollt mit curl nach außen;
+  // off = Abstand zur Mittelfläche (± halbe Dicke). Liefert Punkte [u][v] und die Rand-Normalen.
+  function collarSheet(f, off, U, V) {
+    var wrap = f.wrap * PI / 180, dr = f.top - f.neck, L0 = Math.hypot(f.h, dr), a0 = Math.atan2(f.h, dr), pts = [];
+    for (var u = 0; u <= U; u++) {
+      var tu = u / U, ph = PI + (tu - 0.5) * wrap, cx = Math.cos(ph), sz = Math.sin(ph);
+      var L = L0 + f.tips * Math.pow(Math.abs(2 * tu - 1), 3), s0 = L0 * 0.55, r = f.neck, y = -f.h / 2, row = [];
+      for (var v = 0; v <= V; v++) {
+        var s = L * v / V, t = Math.max(0, (s - s0) / Math.max(1e-6, L - s0)), al = a0 - f.curl * 1.7 * PI * t * t;
+        if (v) { var ds = L / V, am = a0 - f.curl * 1.7 * PI * Math.pow(Math.max(0, (s - ds / 2 - s0) / Math.max(1e-6, L - s0)), 2); r += Math.cos(am) * ds; y += Math.sin(am) * ds; }
+        var nr = Math.sin(al), ny = -Math.cos(al), rr = r + nr * off;
+        row.push(new V3(rr * cx, y + ny * off, rr * sz));
+      }
+      pts.push(row);
+    }
+    return pts;
+  }
+  function collarGeo(f, off, rims) {
+    var U = 64, V = 28, A = collarSheet(f, off, U, V), pos = [], idx = [];
+    function quad(p0, p1, p2, p3) { var n = pos.length / 3; [p0, p1, p2, p3].forEach(function (p) { pos.push(p.x, p.y, p.z); }); idx.push(n, n + 1, n + 2, n, n + 2, n + 3); }
+    if (!rims) {
+      A.forEach(function (row) { row.forEach(function (p) { pos.push(p.x, p.y, p.z); }); });
+      for (var u = 0; u < U; u++) for (var v = 0; v < V; v++) {
+        var a = u * (V + 1) + v, b = a + V + 1;
+        idx.push(a, a + 1, b, b, a + 1, b + 1);
+      }
+    } else {
+      // Ränder zwischen Außen- und Innenfläche (nur mit Dicke)
+      var B = collarSheet(f, -off, U, V);
+      for (var u2 = 0; u2 < U; u2++) { quad(A[u2][0], A[u2 + 1][0], B[u2 + 1][0], B[u2][0]); quad(A[u2][V], B[u2][V], B[u2 + 1][V], A[u2 + 1][V]); }
+      for (var v2 = 0; v2 < V; v2++) { quad(A[0][v2], B[0][v2], B[0][v2 + 1], A[0][v2 + 1]); quad(A[U][v2], A[U][v2 + 1], B[U][v2 + 1], B[U][v2]); }
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+    return g;
+  }
   ACC.highcollar = function (c, a) {
-    var geo = cyl(0.66, 0.46, 0.42, 40, true, PI * 0.78, PI * 1.44);
-    var out = add(c.g, geo, M(a.color || 0x141418, { roughness: 0.6 })), inn = add(c.g, geo, M(a.inner || a.color || 0x141418, { roughness: 0.6, side: THREE.BackSide }));
-    [out, inn].forEach(function (m) { m.position.set(0.38, 0.82, 0); m.rotation.z = 0.18; });
+    var f = RD.formOf('highcollar', a.form), t = f.thick / 2;
+    var col = a.color || 0x141418, side = t ? THREE.DoubleSide : THREE.FrontSide;
+    var out = add(c.g, collarGeo(f, t), M(col, { roughness: 0.6 }));
+    var inn = add(c.g, collarGeo(f, -t), M(a.inner || col, { roughness: 0.6, side: THREE.BackSide }));
+    out.name = 'Outside'; inn.name = 'Lining';
+    var ms = [out, inn];
+    if (t) { var rim = add(c.g, collarGeo(f, t, true), M(col, { roughness: 0.6, side: side })); rim.name = 'Edge'; ms.push(rim); }
+    ms.forEach(function (m) { m.position.set(0.38, 0.82, 0); m.rotation.z = f.lean * PI / 180; });
   };
   ACC.necklace = function (c, a) {
     var m = metal(a.color || 0xc9ced6), t = add(c.g, torus(0.47, 0.022, 48), m); t.position.set(0.44, 0.6, 0); t.rotation.set(PI / 2, -0.28, 0);

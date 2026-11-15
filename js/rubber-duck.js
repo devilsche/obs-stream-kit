@@ -413,6 +413,11 @@
       grp.name = id;
       grp.userData.part = { id: id, gkey: gkey, label: label, pivot: c.clone(), xf: xf || xfs[id] || null, gxf: GPARTS[gkey] || null };
       hide(grp.userData.part, 'inner', inner); hide(grp.userData.part, 'pieces', pieces);
+      // Kasten der Griffpunkte für das ganze Teil (Raum der inneren Gruppe, gebaute Lage)
+      inner.updateMatrixWorld(true);
+      var lb = new THREE.Box3();
+      pieces.forEach(function (m) { if (!m.userData.cape) lb.expandByObject(m); });
+      if (!lb.isEmpty()) grp.userData.part.lbox = { min: lb.min.toArray(), size: lb.getSize(new THREE.Vector3()).toArray() };
       g.add(grp); parts.push(grp);
       applyPart(grp);
       return grp;
@@ -600,7 +605,10 @@
       var ctx = { g: g, o: o, HC: HC, HR: HR, headPoint: headPoint, decal: decal, paint: paint, white: white, skin: skin, body: yellow, wingMat: wingMat };
       o.acc.forEach(function (a, i) {
         var fn = ACC[a[0]], ao = a[1] || {};
-        if (fn) part('acc:' + i, ACC_LABELS[a[0]] || a[0], function () { fn(ctx, ao); }, ao.xf, 'acc:' + a[0]);
+        // Form-Regler (FORMS): global umgebaut, darüber das Outfit
+        var gf = (GPARTS['acc:' + a[0]] || {}).form, of = (ao.xf || {}).form;
+        var ao2 = gf || of ? Object.assign({}, ao, { form: Object.assign({}, gf, of) }) : ao;
+        if (fn) part('acc:' + i, ACC_LABELS[a[0]] || a[0], function () { fn(ctx, ao2); }, ao.xf, 'acc:' + a[0]);
       });
     }
     g.userData = { body: b, head: HC, headR: HR, decal: decal, wingMat: wingMat };
@@ -661,21 +669,67 @@
     if (m.material === m.userData.origMat) m.material = m.userData.origMat.clone();
     if (m.material.color) m.material.color.set(c).convertSRGBToLinear();
   }
-  function bend(m, b) {
-    if (m.userData.cape) return;                     // Umhang verformt sich selbst (flutter)
-    var bx = b ? +b[0] || 0 : 0, bz = b ? +b[1] || 0 : 0;
-    if (!m.userData.baseGeo) { if (!bx && !bz) return; hide(m.userData, 'baseGeo', m.geometry); }
-    var src = m.userData.baseGeo;
-    if (!bx && !bz) { if (m.geometry !== src) { m.geometry.dispose(); m.geometry = src; } return; }
-    var geo = m.geometry !== src ? m.geometry : src.clone();
-    if (!src.boundingBox) src.computeBoundingBox();
-    var bb = src.boundingBox, hx = Math.max(Math.abs(bb.min.x), Math.abs(bb.max.x)) || 1, hz = Math.max(Math.abs(bb.min.z), Math.abs(bb.max.z)) || 1;
-    var a0 = src.attributes.position.array, a = geo.attributes.position.array;
-    for (var i = 0; i < a.length; i += 3) {
-      var x = a0[i] / hx, z = a0[i + 2] / hz;
-      a[i + 1] = a0[i + 1] + bx * x * x + bz * z * z;
+  // Griffpunkte: 3×3×3 Gitter über einem Kasten, l = 81 Zahlen (Verschiebung je Punkt, x/y/z),
+  // Punkt-Index = i·9 + j·3 + k (i entlang x, j entlang y, k entlang z). Quadratische
+  // Interpolation durch die Punkte: ein Punkt, der verschoben wird, nimmt die Fläche genau dort mit.
+  function lagr(t) { return [2 * (t - 0.5) * (t - 1), 4 * t * (1 - t), 2 * t * (t - 0.5)]; }
+  function latOn(l) { if (!l) return false; for (var i = 0; i < l.length; i++) if (l[i]) return true; return false; }
+  function latSum(a, b) {
+    if (!latOn(a)) return latOn(b) ? b : null;
+    if (!latOn(b)) return a;
+    var r = []; for (var i = 0; i < 81; i++) r.push((+a[i] || 0) + (+b[i] || 0)); return r;
+  }
+  function latRest(box, idx) {
+    var i = Math.floor(idx / 9), j = Math.floor(idx / 3) % 3, k = idx % 3;
+    return [box.min[0] + box.size[0] * i / 2, box.min[1] + box.size[1] * j / 2, box.min[2] + box.size[2] * k / 2];
+  }
+  function latAt(box, l, x, y, z, out) {
+    var wx = lagr(box.size[0] ? (x - box.min[0]) / box.size[0] : 0.5), wy = lagr(box.size[1] ? (y - box.min[1]) / box.size[1] : 0.5), wz = lagr(box.size[2] ? (z - box.min[2]) / box.size[2] : 0.5);
+    out[0] = out[1] = out[2] = 0;
+    for (var i = 0; i < 3; i++) for (var j = 0; j < 3; j++) {
+      var wij = wx[i] * wy[j];
+      if (!wij) continue;
+      for (var k = 0; k < 3; k++) {
+        var w = wij * wz[k], n = (i * 9 + j * 3 + k) * 3;
+        if (!w) continue;
+        out[0] += w * (+l[n] || 0); out[1] += w * (+l[n + 1] || 0); out[2] += w * (+l[n + 2] || 0);
+      }
     }
-    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere();
+    return out;
+  }
+  function geoBox(g) { if (!g.boundingBox) g.computeBoundingBox(); var b = g.boundingBox; return { min: b.min.toArray(), size: [b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z] }; }
+  // Lage eines Unterteils im Raum der inneren Gruppe
+  function pieceMatrix(m, inner) {
+    var M = new THREE.Matrix4();
+    for (var o = m; o && o !== inner; o = o.parent) { o.updateMatrix(); M.premultiply(o.matrix); }
+    return M;
+  }
+  // Verformen aus der gebauten Geometrie: Griffpunkte des Unterteils (lp), Biegung (b),
+  // Griffpunkte des ganzen Teils (L im Raum der inneren Gruppe, Kasten box)
+  function deform(m, b, lp, L, box, inner) {
+    if (m.userData.cape) return;                     // Umhang verformt sich selbst (flutter)
+    var bx = b ? +b[0] || 0 : 0, bz = b ? +b[1] || 0 : 0, any = bx || bz || lp || (L && box);
+    if (!m.userData.baseGeo) { if (!any) return; hide(m.userData, 'baseGeo', m.geometry); }
+    var src = m.userData.baseGeo;
+    if (!any) { if (m.geometry !== src) { m.geometry.dispose(); m.geometry = src; } return; }
+    var geo = m.geometry !== src ? m.geometry : src.clone();
+    var bb = geoBox(src), hx = Math.max(Math.abs(bb.min[0]), Math.abs(bb.min[0] + bb.size[0])) || 1, hz = Math.max(Math.abs(bb.min[2]), Math.abs(bb.min[2] + bb.size[2])) || 1;
+    var a0 = src.attributes.position.array, a = geo.attributes.position.array, d = [0, 0, 0];
+    var M = null, Mi = null, v = new THREE.Vector3(), dv = new THREE.Vector3();
+    if (L && box) { M = pieceMatrix(m, inner); Mi = new THREE.Matrix3().setFromMatrix4(M).invert(); }
+    for (var i = 0; i < a.length; i += 3) {
+      var x = a0[i], y = a0[i + 1], z = a0[i + 2];
+      if (lp) { latAt(bb, lp, x, y, z, d); x += d[0]; y += d[1]; z += d[2]; }
+      if (bx || bz) { var nx = a0[i] / hx, nz = a0[i + 2] / hz; y += bx * nx * nx + bz * nz * nz; }
+      if (M) {
+        v.set(x, y, z).applyMatrix4(M);
+        latAt(box, L, v.x, v.y, v.z, d);
+        dv.set(d[0], d[1], d[2]).applyMatrix3(Mi);
+        x += dv.x; y += dv.y; z += dv.z;
+      }
+      a[i] = x; a[i + 1] = y; a[i + 2] = z;
+    }
+    geo.attributes.position.needsUpdate = true; geo.computeVertexNormals(); geo.computeBoundingSphere(); geo.computeBoundingBox();
     m.geometry = geo;
   }
   function applyPart(grp) {
@@ -689,6 +743,7 @@
       p = v3(xg.p, 0); r = v3(xg.r, 0); s = sc3(xg.s);
       inner.position.set(p[0], p[1], p[2]); inner.rotation.set(r[0] * DEG, r[1] * DEG, r[2] * DEG); inner.scale.set(s[0], s[1], s[2]);
     }
+    var L = latSum(xg.l, xo.l);
     (P.pieces || []).forEach(function (m, i) {
       var b = m.userData.base, k = pieceKey(m, i), so = subOf(xo, k), sg = subOf(xg, k);
       var pg = v3(sg.p, 0), po = v3(so.p, 0), sgs = sc3(sg.s), sos = sc3(so.s);
@@ -697,7 +752,7 @@
       m.scale.set(b.s[0] * sgs[0] * sos[0], b.s[1] * sgs[1] * sos[1], b.s[2] * sgs[2] * sos[2]);
       m.visible = b.v && !so.hide && !sg.hide;
       var bg = v3(sg.b, 0), bo = v3(so.b, 0);
-      bend(m, [bg[0] + bo[0], bg[1] + bo[1]]);
+      deform(m, [bg[0] + bo[0], bg[1] + bo[1]], latSum(sg.l, so.l), L, P.lbox, inner);
       setMat(m, so.c != null ? so.c : xo.c != null ? xo.c : sg.c != null ? sg.c : xg.c);
     });
   }
@@ -721,6 +776,13 @@
   function partXf(k) { return GPARTS[k] ? JSON.parse(JSON.stringify(GPARTS[k])) : null; }
 
   var ACC = {};
+  // Form-Regler je Baustein (Editor): [{k, label, min, max, step, def}], vom Baustein über form gelesen
+  var FORMS = {};
+  function formOf(name, f) {
+    var r = {}; f = f || {};
+    (FORMS[name] || []).forEach(function (s) { var v = +f[s.k]; r[s.k] = isFinite(v) && f[s.k] != null ? Math.min(s.max, Math.max(s.min, v)) : s.def; });
+    return r;
+  }
   var ACC_LABELS = {};   // Anzeigenamen der Bausteine (Editor), von rubber-duck-outfits.js gefüllt
   var KEYS = Object.keys(OUTFITS);
   // Outfits aus dem Duck-Editor (Server, /api/fx/ducks/custom.js): ersetzen ein Outfit aus dem
@@ -759,6 +821,7 @@
     addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
     applyPart: applyPart, readPiece: readPiece, pieceKey: pieceKey, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
+    FORMS: FORMS, formOf: formOf, latRest: latRest, geoBox: geoBox,
     util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
   };
 })(typeof window !== 'undefined' ? window : this);

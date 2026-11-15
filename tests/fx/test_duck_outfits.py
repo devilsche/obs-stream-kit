@@ -89,6 +89,15 @@ def test_deep_sub_xf_in_acc_fits(tmp_path):
     assert do.save(str(tmp_path), "deep", d) is None
 
 
+def test_shape_handles_and_form_fit(tmp_path):
+    lat = [0.0] * 81
+    lat[79] = 0.2
+    d = {"acc": [["highcollar", {"xf": {"form": {"h": 0.6, "curl": 0.4}, "l": lat,
+                                        "sub": {"Outside": {"l": lat}}}}]]}
+    assert do.save(str(tmp_path), "vamp", d) is None
+    assert do.save_part(str(tmp_path), "acc:highcollar", {"form": {"thick": 0.04}, "sub": {"Lining": {"l": lat}}}) is None
+
+
 def _client(root, tenant_id=1):
     app = Flask(__name__)
     app.config["_PROJECT_ROOT"] = root
