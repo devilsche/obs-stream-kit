@@ -74,7 +74,7 @@
     if (gi < 0 || gi >= n) gi = Math.floor(Math.random() * Math.min(n, names.length || n));
     var defs = [];
     for (var k = 0; k < n; k++) {
-      var d = S.duck(opts.outfit || 'mix'), x0 = lerp(-4.6, 4.6, n > 1 ? k / (n - 1) : 0.5);
+      var d = S.duck(opts.outfit || 'mix', names[k]), x0 = lerp(-4.6, 4.6, n > 1 ? k / (n - 1) : 0.5);
       d.position.set(x0, 0, -0.9); S.face(d, 0.35, 1); d.userData.ph = k * 1.3; d.userData.home = d.position.clone();
       if (names[k]) { var tg = S.tag(names[k], { size: 0.95 }); tg.position.set(0, 2.85 + (k % 2) * 0.5, 0); d.add(tg); }
       scene.add(d); defs.push(d);

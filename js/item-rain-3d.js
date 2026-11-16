@@ -354,6 +354,7 @@
       if (kind === 'sushi' || kind === 'car' || rise) return tpl.make();
       if (RD) {
         var o = opts.outfit === 'mix' ? RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)] : (fixedOutfit || 'none');
+        if (opts.mine && Math.random() < 0.34) o = opts.mine;   // Outfit des Auslösers (!outfit)
         return { g: duckOf(o, o === 'none' && Math.random() < 0.12), len: 2.7 };
       }
       return { g: Math.random() < 0.12 ? tpl.pink() : tpl.yellow(), len: 2.6 };

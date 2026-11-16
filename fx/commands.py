@@ -280,6 +280,11 @@ EFFECTS = {
             "weather": ("to",),
         },
     },
+    # Begrüßungs-Ente (effects/duck-greet.html); Befehle kommen nur über /api/fx/ducks/greet
+    "duckgreet": {
+        "commands": (),
+        "settings": {},
+    },
     "rain": {
         "commands": ("strike", "gust", "set", "stop", "start", "reset"),
         "settings": {

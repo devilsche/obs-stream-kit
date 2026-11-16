@@ -10,6 +10,7 @@
        ?x= Mitte in px (960), ?y= Mitte in px (ohne: sitzt auf dem unteren Rand),
        ?height= Größe in px (430), ?style=sticker|rubber (Utya-Toon oder
        sitzende 3D-Gummiente), ?outfit= (Gummiente: none|thw|police|fire|batman|superman),
+       ?by= Chat-Name: hat er mit !outfit ein Outfit gewählt, kommt die Gummiente darin,
        ?volume=0..1 (0.7, 0 = stumm). Startet beim Laden – in OBS
        „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -29,10 +30,12 @@
       'use strict';
       var q = new URLSearchParams(location.search);
       function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
+      // ?by= wer !ente geschrieben hat: mit !outfit gewähltes Outfit geht vor (dann immer als Gummiente)
+      var mine = window.RubberDuck && RubberDuck.viewerOutfit ? RubberDuck.viewerOutfit(q.get('by')) : null;
       window.KnifeDuck.start({
         canvas: document.getElementById('gl'),
-        style: q.get('style') === 'rubber' ? 'rubber' : 'sticker',
-        outfit: q.get('outfit') || 'none',
+        style: mine || q.get('style') === 'rubber' ? 'rubber' : 'sticker',
+        outfit: mine || q.get('outfit') || 'none',
         x: num('x', 960), y: q.get('y') !== null ? num('y', 700) : null, height: num('height', 430),
         volume: Math.max(0, Math.min(1, num('volume', 0.7))),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),

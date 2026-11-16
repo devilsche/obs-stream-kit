@@ -4,7 +4,7 @@
  * (Hammerschlag, Gemurmel, Quaken, Pfiff – ohne Sounddateien).
  *
  *   var S = DuckStage.create({ canvas, volume });
- *   S.duck(outfit) → Gruppe (Ente sitzt auf dem Boden, schaut nach +x); S.face(obj, dx, dz)
+ *   S.duck(outfit, name) → Gruppe (Ente sitzt auf dem Boden, schaut nach +x); S.face(obj, dx, dz)
  *   S.tag(text) / S.bubble(text) → Sprite; S.wood(w, h, hex) → Textur; S.sfx.gavel() …
  *   S.run(TOTAL, function (t, real) { … }, { freeze })   // blendet am Anfang/Ende weich ein/aus
  */
@@ -261,7 +261,10 @@
 
     var outfits = RD.OUTFITS.filter(function (k) { return k !== 'none'; });
     // Ente auf dem Boden: Gruppe am Bodenpunkt, darin die Ente (Schnabel nach +x)
-    function duck(outfit) {
+    // name: Chat-Name; hat er sich mit !outfit eins ausgesucht, trägt die Ente das
+    function duck(outfit, name) {
+      var mine = name && RD.viewerOutfit ? RD.viewerOutfit(name) : null;
+      if (mine) outfit = mine;
       var o = outfit === 'mix' || outfit === 'random' || !outfit ? outfits[Math.floor(Math.random() * outfits.length)] : outfit;
       var g = new THREE.Group(), d = RD.build({ outfit: o }); d.position.y = 0.55; g.add(d);
       d.traverse(function (m) { if (m.isMesh) { m.castShadow = true; } });

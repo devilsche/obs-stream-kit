@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Item Rain</title>
   <style>
-    /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random),
+    /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random), ?by= Chat-Name (sein !outfit regnet zu einem Drittel mit),
        ?model= (Autos: mix|2002|e30|e30m3|e36|e46|e92m3),
        ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
@@ -32,6 +32,8 @@
         model: params.get('model') || 'mix',
         // Enten-Outfit: none, thw, police, fire, batman, superman oder mix (zufällig je Ente)
         outfit: params.get('outfit') || 'none',
+        // ?by= wer den Regen ausgelöst hat: mit !outfit gewähltes Outfit regnet zu einem Drittel mit
+        mine: window.RubberDuck && RubberDuck.viewerOutfit ? RubberDuck.viewerOutfit(params.get('by')) : null,
         canvas: document.getElementById('gl'),
         duration: Math.max(6000, parseInt(params.get('duration'), 10) || 22000),
         count: Math.max(5, parseInt(params.get('count'), 10) || (params.get('kind') === 'balloon' ? 60 : 120)) * (reduceMotion ? 0.4 : 1),

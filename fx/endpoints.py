@@ -18,7 +18,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, duck_outfits, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, commands, duck_outfits, duck_viewers, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -514,6 +514,44 @@ def duck_outfits_js(token):
     if g.tenant_id is None:
         abort(404)
     root = current_app.config.get("_PROJECT_ROOT") or "."
-    resp = Response(duck_outfits.script(duck_outfits.load(root), duck_outfits.load_parts(root)),
-                    mimetype="application/javascript")
-    return _no_store(resp)
+    js = duck_outfits.script(duck_outfits.load(root), duck_outfits.load_parts(root))
+    js += duck_viewers.script(duck_viewers.mapping(root, g.tenant_id))
+    return _no_store(Response(js, mimetype="application/javascript"))
+
+
+@bp_fx.route("/s/<token>/api/fx/ducks/outfit")
+def duck_viewer_outfit(token):
+    """!outfit [<name>|random]: Outfit des Zuschauers setzen/zeigen; GET, damit Streamer.bot
+    die einfache Fetch-URL nutzt. Antwort {say, outfit} für die Chat-Nachricht."""
+    if g.tenant_id is None:
+        abort(404)
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    user = (request.args.get("user") or "").strip()
+    if not user:
+        return _no_store(jsonify({"ok": False, "say": "", "outfit": None})), 400
+    out = duck_viewers.command(root, g.tenant_id, user, request.args.get("q") or "")
+    return _no_store(jsonify({"ok": True, **out}))
+
+
+# zuletzt begrüßt {(tenant, login): Zeit}; „First Words“ feuert je Stream einmal, das hier fängt Doppelte ab
+_GREETED = {}
+GREET_GAP = 3 * 3600
+
+
+@bp_fx.route("/s/<token>/api/fx/ducks/greet")
+def duck_greet(token):
+    """Erste Chat-Nachricht im Stream: Zuschauer mit Outfit bekommen eine Begrüßungs-Ente
+    (effects/duck-greet.html pollt /api/fx/duckgreet/poll)."""
+    if g.tenant_id is None:
+        abort(404)
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    user = (request.args.get("user") or "").strip().lstrip("@")
+    outfit = duck_viewers.outfit_of(root, g.tenant_id, user) if user else None
+    if not outfit:
+        return _no_store(jsonify({"ok": True, "greet": False}))
+    now, k = time.time(), (g.tenant_id, duck_viewers.login_of(user))
+    if now - _GREETED.get(k, 0) < GREET_GAP and not request.args.get("force"):
+        return _no_store(jsonify({"ok": True, "greet": False}))
+    _GREETED[k] = now
+    commands.push(g.tenant_id, "duckgreet", {"cmd": "greet", "params": {"name": user[:25], "outfit": outfit}})
+    return _no_store(jsonify({"ok": True, "greet": True, "outfit": outfit}))

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=400" />
+  <title>Duck Outfit Parade</title>
+  <style>
+    /* Outfit-Parade (js/duck-parade.js, three.js r128): alle Gummienten-Outfits watscheln als Laufband
+       von rechts nach links, jede mit Schild „Name · !outfit <name>“. Leinwand 1920×400.
+       ohne ?loop: einmal alle Outfits in ?t= Sekunden (60), danach leer (Chat-Befehl !outfits);
+       ?loop=1: endlos gemischt (BRB, Starting Soon), ?speed= px/s (110).
+       ?size= Höhe der Enten in px (170), ?at= hält bei Sekunde at an (zum Prüfen).
+       An den Rändern weich ausgeblendet. */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1920px; height: 400px; overflow: hidden; background: transparent; }
+    canvas {
+      position: absolute; inset: 0; width: 1920px; height: 400px;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
+      mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="400" role="img" aria-label="Parade of all duck outfits, pick one with !outfit and its name"></canvas>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/rubber-duck.js"></script>
+  <script src="../js/rubber-duck-outfits.js"></script>
+  <script src="../api/fx/ducks/custom.js"></script>
+  <script src="../js/duck-stage.js"></script>
+  <script src="../js/duck-parade.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var q = new URLSearchParams(location.search);
+      function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
+      window.DuckParade.start({
+        canvas: document.getElementById('gl'),
+        loop: q.get('loop') === '1',
+        t: num('t', 60), size: num('size', 170), speed: num('speed', 110),
+        reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+        freeze: q.get('at') !== null ? num('at', 0) : null
+      });
+    })();
+  </script>
+</body>
+</html>

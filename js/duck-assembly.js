@@ -64,7 +64,7 @@
     rim.rotation.x = Math.PI / 2; rim.position.set(PODIUM.x, 0.88, PODIUM.z); scene.add(rim);
 
     // ── Anführer-Ente ──
-    var leader = S.duck(opts.leader || 'king'); S.face(leader, 0.25, 1); scene.add(leader);
+    var leader = S.duck(opts.leader || 'king', opts.leader ? null : by); S.face(leader, 0.25, 1); scene.add(leader);
     if (by) { var lt = S.tag(by, { size: 1.15 }); lt.position.set(0, 3.0, 0); leader.add(lt); }
     function leaderBubble(text) { var b = S.bubble(text, { size: 2.6 }); b.position.set(0.6, 3.6, 0.2); b.visible = false; leader.add(b); return b; }
     // springt bei 0.9 aufs Podest
@@ -84,7 +84,7 @@
     function crowd(n, names, outfit) {
       var list = [];
       for (var k = 0; k < n; k++) {
-        var d = S.duck(outfit || 'mix'); d.userData.ph = k * 1.7; d.userData.name = names[k] || '';
+        var d = S.duck(outfit || 'mix', names[k]); d.userData.ph = k * 1.7; d.userData.name = names[k] || '';
         if (names[k]) { var tg = S.tag(names[k], { size: 0.95 }); tg.position.set(0, 2.85 + (k % 2) * 0.55, 0); d.add(tg); }
         scene.add(d); list.push(d);
       }

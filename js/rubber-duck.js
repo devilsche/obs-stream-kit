@@ -7,6 +7,7 @@
  *
  *   var duck = RubberDuck.build({ color, outfit });   // → THREE.Group
  *   RubberDuck.OUTFITS                                 // verfügbare Outfits
+ *   RubberDuck.viewerOutfit(name)                      // Outfit, das sich der Zuschauer mit !outfit ausgesucht hat (oder null)
  */
 (function (root) {
   'use strict';
@@ -1133,6 +1134,13 @@
   function addOutfits(defs) {
     Object.keys(defs).forEach(function (k) { OUTFITS[k] = defs[k]; if (KEYS.indexOf(k) < 0) KEYS.push(k); });
   }
+  // Outfit je Zuschauer (!outfit, Server: /api/fx/ducks/custom.js); Schlüssel = Login klein
+  var VIEWERS = {};
+  function setViewers(m) { VIEWERS = m && typeof m === 'object' ? m : {}; }
+  function viewerOutfit(name) {
+    var k = VIEWERS[String(name || '').replace(/^@/, '').trim().toLowerCase()];
+    return k && OUTFITS[k] ? k : null;
+  }
   function info(k) { var o = OUTFITS[k]; return o ? { key: k, label: o.label || k, cat: o.cat || 'classic', note: o.note || '' } : null; }
   // ── Aufgemalte Teile im Editor (Emblem, Kragen, Gürtel, Höschen, Streifen, Haaransatz, Gesichtsplatte) ──
   // kind: chest | collar | belt | briefs | stripes (i = 0/1) | hair | face. Alles in Modell-Koordinaten.
@@ -1208,7 +1216,7 @@
   }
 
   root.RubberDuck = {
-    build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
+    build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info, setViewers: setViewers, viewerOutfit: viewerOutfit,
     paintAt: paintAt, paintSet: paintSet, paintZone: paintZone, updatePaint: updatePaint,
     addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, HELD: HELD, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
