@@ -22,16 +22,16 @@
   // ws/rs Länge Windschutz-/Heckscheibe (waagrecht), roofF/roofR Dachkanten (Anteil von L ab hinten),
   // slant Neigung der Front, tumble Einzug der Fahrgastzelle oben
   var SPEC = {
-    '2002':  { L: 4.23, W: 1.59, H: 1.41, wb: 2.50, fo: 0.78, r: 0.33, nose: 0.74, cowl: 0.86, belt: 0.86, deck: 0.84, ws: 0.42, rs: 0.40, roofF: 0.62, roofR: 0.33, slant: 0.02, tumble: 0.16, chrome: true , round: 0.1 , plan: 0.2, side: 0.07 },
-    e30:     { L: 4.32, W: 1.65, H: 1.38, wb: 2.57, fo: 0.80, r: 0.34, nose: 0.76, cowl: 0.88, belt: 0.90, deck: 0.90, ws: 0.52, rs: 0.40, roofF: 0.6, roofR: 0.31, slant: 0.0, tumble: 0.14, chrome: true , plan: 0.08, side: 0.03 },
-    e30m3:   { L: 4.35, W: 1.68, H: 1.37, wb: 2.56, fo: 0.82, r: 0.35, nose: 0.74, cowl: 0.87, belt: 0.90, deck: 0.92, ws: 0.54, rs: 0.36, roofF: 0.6, roofR: 0.32, slant: 0.0, tumble: 0.14, wing: true, lip: true, wide: 0.05 , plan: 0.1, side: 0.03, flare: 0.09 },
-    e36:     { L: 4.43, W: 1.71, H: 1.34, wb: 2.70, fo: 0.83, r: 0.35, nose: 0.66, cowl: 0.86, belt: 0.92, deck: 0.92, ws: 0.70, rs: 0.52, roofF: 0.6, roofR: 0.3, slant: 0.1, tumble: 0.17, lip: true , round: 0.1 , plan: 0.18, side: 0.06 },
-    e46:     { L: 4.49, W: 1.76, H: 1.37, wb: 2.73, fo: 0.85, r: 0.36, nose: 0.68, cowl: 0.88, belt: 0.94, deck: 0.95, ws: 0.72, rs: 0.55, roofF: 0.6, roofR: 0.3, slant: 0.12, tumble: 0.18, rings: true , round: 0.13 , plan: 0.24, side: 0.09 },
-    e92m3:   { L: 4.62, W: 1.80, H: 1.42, wb: 2.76, fo: 0.90, r: 0.38, nose: 0.70, cowl: 0.92, belt: 1.0, deck: 1.0, ws: 0.76, rs: 0.6, roofF: 0.6, roofR: 0.29, slant: 0.14, tumble: 0.2, dome: true, quad: true, rings: true, lip: true , round: 0.12 , plan: 0.2, side: 0.08, flare: 0.05 }
+    '2002':  { L: 4.23, W: 1.59, H: 1.41, wb: 2.50, fo: 0.78, r: 0.33, nose: 0.74, cowl: 0.86, belt: 0.86, deck: 0.84, ws: 0.42, rs: 0.40, roofF: 0.62, roofR: 0.33, slant: 0.02, tumble: 0.16, chrome: true , round: 0.1 , plan: 0.2 },
+    e30:     { L: 4.32, W: 1.65, H: 1.38, wb: 2.57, fo: 0.80, r: 0.34, nose: 0.76, cowl: 0.88, belt: 0.90, deck: 0.90, ws: 0.52, rs: 0.40, roofF: 0.6, roofR: 0.31, slant: 0.0, tumble: 0.14, chrome: true , plan: 0.08 },
+    e30m3:   { L: 4.35, W: 1.68, H: 1.37, wb: 2.56, fo: 0.82, r: 0.35, nose: 0.74, cowl: 0.87, belt: 0.90, deck: 0.92, ws: 0.54, rs: 0.36, roofF: 0.6, roofR: 0.32, slant: 0.0, tumble: 0.14, wing: true, lip: true, wide: 0.05 , plan: 0.1, flare: 0.09 },
+    e36:     { L: 4.43, W: 1.71, H: 1.34, wb: 2.70, fo: 0.83, r: 0.35, nose: 0.66, cowl: 0.86, belt: 0.92, deck: 0.92, ws: 0.70, rs: 0.52, roofF: 0.6, roofR: 0.3, slant: 0.1, tumble: 0.17, lip: true , round: 0.1 , plan: 0.18 },
+    e46:     { L: 4.49, W: 1.76, H: 1.37, wb: 2.73, fo: 0.85, r: 0.36, nose: 0.68, cowl: 0.88, belt: 0.94, deck: 0.95, ws: 0.72, rs: 0.55, roofF: 0.6, roofR: 0.3, slant: 0.12, tumble: 0.18, rings: true , round: 0.13 , plan: 0.24 },
+    e92m3:   { L: 4.62, W: 1.80, H: 1.42, wb: 2.76, fo: 0.90, r: 0.38, nose: 0.70, cowl: 0.92, belt: 1.0, deck: 1.0, ws: 0.76, rs: 0.6, roofF: 0.6, roofR: 0.29, slant: 0.14, tumble: 0.2, dome: true, quad: true, rings: true, lip: true , round: 0.12 , plan: 0.2, flare: 0.05 }
   };
   var MODELS = Object.keys(SPEC);
   // typische Lackierungen je Modell: c Farbe, w Gewicht (häufiger), l Lackierung:
-  // stripes = drei Rennstreifen an der Flanke, race = dazu Startnummer im weißen Kreis, carbon = schwarzes Dach
+  // stripes = drei Rennstreifen an der Flanke, race = dazu Startnummer (2–99) im weißen Kreis auf beiden Türen, carbon = schwarzes Dach
   var COLORS = {
     '2002': [{ c: 0xe8742a, w: 4 }, { c: 0xf2f2ee, l: 'stripes', w: 2 }, { c: 0xd9cfae, w: 1 }, { c: 0x2f5d8a, w: 1 }],    // Inka, „Turbo“, Chamonix, Fjord
     e30: [{ c: 0xa8141c, w: 3 }, { c: 0xf2f2ee, w: 3 }, { c: 0x15161a, w: 1 }, { c: 0x1d3e7a, w: 1 }],                  // Henna, Alpinweiß, Diamantschwarz, Royalblau
@@ -162,18 +162,11 @@
       x.fillStyle = opt.bg != null ? hexStr(opt.bg) : '#ffffff'; x.fillRect(0, 0, w, h);
       if (opt.livery === 'stripes' || opt.livery === 'race') {
         // drei Rennstreifen (hellblau, dunkelblau, rot) über die Flanke, vorn schräg angeschnitten
+        // (Startnummer: eigenes Teil, siehe numberPlates)
         [['#5bb3e6', 0.47], ['#1f2a8a', 0.41], ['#d8231e', 0.35]].forEach(function (st) {
           var y0 = st[1], hgt = 0.05, x0 = 0.3, x1 = L - 0.45;
           x.fillStyle = st[0]; x.beginPath(); x.moveTo(X(x0), YY(y0 + hgt)); x.lineTo(X(x1 - 0.05), YY(y0 + hgt)); x.lineTo(X(x1 + 0.12), YY(y0 + hgt + 0.18)); x.lineTo(X(x1 + 0.17), YY(y0 + 0.18)); x.lineTo(X(x1), YY(y0)); x.lineTo(X(x0), YY(y0)); x.closePath(); x.fill();
         });
-      }
-      if (opt.livery === 'race') {
-        // Startnummer im weißen Kreis auf der Tür (nur spiegelgleiche Ziffern, eine Seite zeigt die Textur gespiegelt)
-        var cx = X((lo.xc + lo.xd) / 2 + 0.1), cy = YY(0.64), rr = 0.2 / H * h;
-        x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx, cy, rr * (W / L) / (h / H), rr, 0, 0, Math.PI * 2); x.fill();
-        x.strokeStyle = '#141414'; x.lineWidth = 4; x.stroke();
-        x.fillStyle = '#141414'; x.font = '900 ' + Math.round(rr * 1.3) + 'px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-        x.save(); x.translate(cx, cy + 2); x.scale((W / L) / (h / H), 1); x.fillText(opt.num || '8', 0, 0); x.restore();
       }
       x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 3;
       var d0 = lo.xc - 0.05, d1 = lo.xd + 0.25;
@@ -188,20 +181,15 @@
 
   // Umriss dicht abtasten (sonst haben lange Kanten keine Zwischenpunkte zum Verformen)
   function dense(shape, n) { return new THREE.Shape(shape.getSpacedPoints(n)); }
-  // Karosserie formen: Ecken von oben gerundet (plan), Seiten gewölbt (side), Kotflügel über den
-  // Rädern ausgestellt (flare). Nur z wird verändert, die Seiten-Texturen bleiben an ihrem Platz.
-  function sculpt(geo, s, W, y0, y1, x0, x1, wheels) {
+  // Karosserie formen: Ecken von oben gerundet (plan, hängt nur von der Länge ab: die Seitenflächen
+  // bestehen aus langen Dreiecken ohne Punkte in der Mitte, alles andere würde sie verbeulen).
+  // Ausgestellte Kotflügel sind eigene Teile (siehe buildModel). Nur z wird verändert.
+  function sculpt(geo, s, W, y0, y1, x0, x1) {
     var p = geo.attributes.position, half = W / 2, endL = Math.min(0.75, (x1 - x0) * 0.2);
     for (var i = 0; i < p.count; i++) {
       var x = p.getX(i), y = p.getY(i), z = p.getZ(i), az = Math.min(1.2, Math.abs(z) / half), f = 1;
       var e = Math.max(0, (x - (x1 - endL)) / endL, (x0 + endL - x) / endL);
-      f *= 1 - (s.plan || 0) * e * e * az * az;
-      var yy = Math.max(-1, Math.min(1, ((y - y0) / (y1 - y0)) * 2 - 1));
-      f *= 1 - (s.side || 0) * yy * yy * az;
-      if (s.flare && wheels) wheels.forEach(function (wx) {
-        var w = Math.max(0, 1 - Math.abs(x - wx) / (s.r * 1.9)), lowY = Math.max(0, 1 - Math.max(0, y - s.r * 1.6) / 0.25);
-        f *= 1 + s.flare * w * w * (3 - 2 * w) * lowY * az;
-      });
+      f *= 1 - (s.plan || 0) * e * e * Math.min(1, az * az);
       p.setZ(i, z * f);
     }
     smoothNormals(geo, 0.57);
@@ -235,22 +223,45 @@
   function build(model, color, livery) {
     if (!SPEC[model]) model = 'e30';
     if (!CACHE[model]) CACHE[model] = buildModel(model);
-    var car = CACHE[model].clone(), pk = model + ':' + color + ':' + (livery || ''), num = livery === 'race' ? (Math.random() < 0.5 ? '8' : '88') : '';
+    var car = CACHE[model].clone(), pk = model + ':' + color + ':' + (livery || '');
     function recolor(m) {
       if (!m || !m.userData.isPaint) return m;
-      var k = pk + ':' + num + ':' + m.uuid;
+      var k = pk + ':' + m.uuid;
       if (!PAINTS[k]) {
         PAINTS[k] = m.clone();
         if (m.userData.side === 'lower' && (livery === 'stripes' || livery === 'race')) {
           // Lackierung mit echten Farben in der Textur, Material weiß
-          PAINTS[k].map = lowerSideTex(SPEC[model], CACHE[model].userData.lo, { bg: color, livery: livery, num: num });
+          PAINTS[k].map = lowerSideTex(SPEC[model], CACHE[model].userData.lo, { bg: color, livery: livery });
         } else if (m.userData.roof && livery === 'carbon') PAINTS[k].color.copy(col(0x1a1b1e));
         else PAINTS[k].color.copy(col(color));
       }
       return PAINTS[k];
     }
     car.traverse(function (o) { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(recolor) : recolor(o.material); });
+    if (livery === 'race') numberPlates(car, model, String(2 + Math.floor(Math.random() * 98)));
     return car;
+  }
+  // Startnummer als eigenes Teil auf beiden Türen (weißer Kreis, schwarze Zahl, auf beiden Seiten lesbar)
+  var NUMS = {}, NUM_GEO = null;
+  function numberMat(n) {
+    if (NUMS[n]) return NUMS[n];
+    var t = canvasTex(256, 256, function (x, w) {
+      var c = w / 2; x.fillStyle = '#ffffff'; x.beginPath(); x.arc(c, c, 120, 0, Math.PI * 2); x.fill();
+      x.strokeStyle = '#141414'; x.lineWidth = 10; x.beginPath(); x.arc(c, c, 112, 0, Math.PI * 2); x.stroke();
+      x.fillStyle = '#141414'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '900 ' + (n.length > 1 ? 130 : 160) + 'px Arial, sans-serif';
+      x.fillText(n, c, c + 8);
+    });
+    return (NUMS[n] = new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.35, polygonOffset: true, polygonOffsetFactor: -2 }));
+  }
+  function numberPlates(car, model, n) {
+    var s = SPEC[model], lo = car.userData.lo, body = car.children[0], W = s.W + (s.wide || 0);
+    var x = (lo.xc + lo.xd) / 2 + 0.1, y = 0.64;
+    var half = W / 2;                                      // breiteste Stelle der gewölbten Flanke (sculpt), Scheibe liegt ganz außen
+    NUM_GEO = NUM_GEO || new THREE.CircleGeometry(0.21, 32);
+    [-1, 1].forEach(function (sd) {
+      var m = new THREE.Mesh(NUM_GEO, numberMat(n)); m.position.set(x, y, sd * (half + 0.015)); m.rotation.y = sd > 0 ? 0 : Math.PI;
+      m.name = 'Race number'; body.add(m);
+    });
   }
   function buildModel(model) {
     var s = SPEC[model], M = mats();
@@ -262,7 +273,14 @@
     // Unterteil: Seiten mit Fugen-Textur, Rest Lack
     var lg = new THREE.ExtrudeGeometry(dense(lo.shape, 260), { depth: W - 2 * bev, steps: 10, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 4 });
     lg.translate(0, 0, -(W - 2 * bev) / 2);
-    sculpt(lg, s, W, 0.1, Math.max(s.cowl, s.belt), -bev, s.L + bev, [lo.xr, lo.xf]);
+    sculpt(lg, s, W, 0.1, Math.max(s.cowl, s.belt), -bev, s.L + bev);
+    // ausgestellte Kotflügel: Bogen aus Lack über jedem Radlauf, steht seitlich ab
+    if (s.flare) [lo.xr, lo.xf].forEach(function (wx) {
+      [-1, 1].forEach(function (sd) {
+        var fl = add(body, new THREE.TorusGeometry(s.r + 0.1, 0.07, 10, 28, Math.PI), paint, wx, s.r, sd * (W / 2 - 0.01));
+        fl.scale.set(1, 1, 1 + s.flare * 12); fl.name = 'Flare';
+      });
+    });
     var sideLo = paint.clone(); sideLo.map = lowerSideTex(s, lo); sideLo.userData.side = 'lower';
     add(body, lg, [sideLo, paint]);
     // Fahrgastzelle: oben eingezogen (Tumblehome)
