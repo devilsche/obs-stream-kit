@@ -30,14 +30,23 @@
     e92m3:   { L: 4.62, W: 1.80, H: 1.42, wb: 2.76, fo: 0.90, r: 0.38, nose: 0.70, cowl: 0.92, belt: 1.0, deck: 1.0, ws: 0.76, rs: 0.6, roofF: 0.6, roofR: 0.29, slant: 0.14, tumble: 0.2, dome: true, quad: true, rings: true, lip: true , round: 0.12 , plan: 0.2, side: 0.08, flare: 0.05 }
   };
   var MODELS = Object.keys(SPEC);
+  // typische Lackierungen je Modell: c Farbe, w Gewicht (häufiger), l Lackierung:
+  // stripes = drei Rennstreifen an der Flanke, race = dazu Startnummer im weißen Kreis, carbon = schwarzes Dach
   var COLORS = {
-    '2002': [0xe8742a, 0xd9cfae, 0x2f5d8a, 0xb8bcc2],               // Inka, Chamonix, Fjord, Polaris
-    e30: [0xf2f2ee, 0xa8141c, 0x15161a, 0x1d3e7a],                  // Alpinweiß, Henna, Diamantschwarz, Royalblau
-    e30m3: [0xf2f2ee, 0xc8151b, 0x2a2c30],                          // Alpinweiß, Brillantrot, Schwarz
-    e36: [0xe6c21a, 0x2b3f8f, 0x1d2a6e, 0xf2f2ee],                  // Dakar, Estoril, Le Mans, Alpinweiß
-    e46: [0x2f7fc8, 0xb3121a, 0xe5b52a, 0xb8bcc2],                  // Laguna Seca, Imola, Phoenix, Silbergrau
-    e92m3: [0x8a1018, 0x1d3e8a, 0x15161a, 0xd8dade]                 // Melbourne, Interlagos, Jerez, Alpinweiß
+    '2002': [{ c: 0xe8742a, w: 4 }, { c: 0xf2f2ee, l: 'stripes', w: 2 }, { c: 0xd9cfae, w: 1 }, { c: 0x2f5d8a, w: 1 }],    // Inka, „Turbo“, Chamonix, Fjord
+    e30: [{ c: 0xa8141c, w: 3 }, { c: 0xf2f2ee, w: 3 }, { c: 0x15161a, w: 1 }, { c: 0x1d3e7a, w: 1 }],                  // Henna, Alpinweiß, Diamantschwarz, Royalblau
+    e30m3: [{ c: 0xf2f2ee, l: 'race', w: 4 }, { c: 0xf2f2ee, l: 'stripes', w: 2 }, { c: 0xc8151b, w: 1 }, { c: 0x2a2c30, w: 1 }],
+    e36: [{ c: 0xe6c21a, w: 4 }, { c: 0x2b3f8f, w: 3 }, { c: 0x1d2a6e, w: 1 }],                                        // Dakar, Estoril, Le Mans
+    e46: [{ c: 0x2f7fc8, w: 4 }, { c: 0xe5b52a, w: 3 }, { c: 0xb3121a, w: 1 }, { c: 0xb8bcc2, w: 1 }],                  // Laguna Seca, Phoenix, Imola, Silbergrau
+    e92m3: [{ c: 0x8a1018, l: 'carbon', w: 3 }, { c: 0x1d3e8a, l: 'carbon', w: 2 }, { c: 0xf2f2ee, l: 'carbon', w: 2 }, { c: 0x15161a, w: 1 }]   // Melbourne, Interlagos, Alpinweiß, Jerez
   };
+  function pickPaint(m) {
+    var list = COLORS[m] || COLORS.e30, sum = 0, r;
+    list.forEach(function (p) { sum += p.w || 1; }); r = Math.random() * sum;
+    for (var i = 0; i < list.length; i++) { r -= list[i].w || 1; if (r <= 0) return list[i]; }
+    return list[0];
+  }
+  function hexStr(h) { return '#' + ('000000' + h.toString(16)).slice(-6); }
 
   function col(hex) { return new THREE.Color(hex).convertSRGBToLinear(); }
   function canvasTex(w, h, draw) {
@@ -143,12 +152,29 @@
     return t;
   }
   // Seiten unten: Türfugen, Schutzleiste, Griffe, Blinker vorn
-  function lowerSideTex(s, lo) {
+  // opt.bg = Lackfarbe (sonst weiß, wird dann mit der Lackfarbe multipliziert), opt.livery = stripes|race
+  function lowerSideTex(s, lo, opt) {
+    opt = opt || {};
     var W = 1024, Hh = 256, L = s.L, H = s.H;
-    function X(x) { return x / L * W; } function Y(y) { return (1 - y / H) * Hh * (H / H); }
+    function X(x) { return x / L * W; }
     var t = canvasTex(W, Hh * 2, function (x, w, h) {
       function YY(y) { return (1 - y / H) * h; }
-      x.fillStyle = '#ffffff'; x.fillRect(0, 0, w, h);
+      x.fillStyle = opt.bg != null ? hexStr(opt.bg) : '#ffffff'; x.fillRect(0, 0, w, h);
+      if (opt.livery === 'stripes' || opt.livery === 'race') {
+        // drei Rennstreifen (hellblau, dunkelblau, rot) über die Flanke, vorn schräg angeschnitten
+        [['#5bb3e6', 0.47], ['#1f2a8a', 0.41], ['#d8231e', 0.35]].forEach(function (st) {
+          var y0 = st[1], hgt = 0.05, x0 = 0.3, x1 = L - 0.45;
+          x.fillStyle = st[0]; x.beginPath(); x.moveTo(X(x0), YY(y0 + hgt)); x.lineTo(X(x1 - 0.05), YY(y0 + hgt)); x.lineTo(X(x1 + 0.12), YY(y0 + hgt + 0.18)); x.lineTo(X(x1 + 0.17), YY(y0 + 0.18)); x.lineTo(X(x1), YY(y0)); x.lineTo(X(x0), YY(y0)); x.closePath(); x.fill();
+        });
+      }
+      if (opt.livery === 'race') {
+        // Startnummer im weißen Kreis auf der Tür (nur spiegelgleiche Ziffern, eine Seite zeigt die Textur gespiegelt)
+        var cx = X((lo.xc + lo.xd) / 2 + 0.1), cy = YY(0.64), rr = 0.2 / H * h;
+        x.fillStyle = '#ffffff'; x.beginPath(); x.ellipse(cx, cy, rr * (W / L) / (h / H), rr, 0, 0, Math.PI * 2); x.fill();
+        x.strokeStyle = '#141414'; x.lineWidth = 4; x.stroke();
+        x.fillStyle = '#141414'; x.font = '900 ' + Math.round(rr * 1.3) + 'px Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+        x.save(); x.translate(cx, cy + 2); x.scale((W / L) / (h / H), 1); x.fillText(opt.num || '8', 0, 0); x.restore();
+      }
       x.strokeStyle = 'rgba(0,0,0,0.45)'; x.lineWidth = 3;
       var d0 = lo.xc - 0.05, d1 = lo.xd + 0.25;
       x.beginPath(); x.moveTo(X(d0), YY(s.cowl - 0.02)); x.lineTo(X(d0), YY(0.24)); x.moveTo(X(d1), YY(s.belt - 0.02)); x.lineTo(X(d1), YY(0.24)); x.stroke();
@@ -204,15 +230,23 @@
   function rbox(w, h, d) { return new THREE.BoxGeometry(w, h, d); }
 
   // je Modell einmal gebaut (Geometrie geteilt), je Farbe nur die Lack-Materialien getauscht
+  // build(model, color, livery): livery = stripes | race | carbon (siehe COLORS)
   var CACHE = {}, PAINTS = {};
-  function build(model, color) {
+  function build(model, color, livery) {
     if (!SPEC[model]) model = 'e30';
     if (!CACHE[model]) CACHE[model] = buildModel(model);
-    var car = CACHE[model].clone(), pk = model + ':' + color;
+    var car = CACHE[model].clone(), pk = model + ':' + color + ':' + (livery || ''), num = livery === 'race' ? (Math.random() < 0.5 ? '8' : '88') : '';
     function recolor(m) {
       if (!m || !m.userData.isPaint) return m;
-      var k = pk + ':' + m.uuid;
-      if (!PAINTS[k]) { PAINTS[k] = m.clone(); PAINTS[k].color.copy(col(color)); }
+      var k = pk + ':' + num + ':' + m.uuid;
+      if (!PAINTS[k]) {
+        PAINTS[k] = m.clone();
+        if (m.userData.side === 'lower' && (livery === 'stripes' || livery === 'race')) {
+          // Lackierung mit echten Farben in der Textur, Material weiß
+          PAINTS[k].map = lowerSideTex(SPEC[model], CACHE[model].userData.lo, { bg: color, livery: livery, num: num });
+        } else if (m.userData.roof && livery === 'carbon') PAINTS[k].color.copy(col(0x1a1b1e));
+        else PAINTS[k].color.copy(col(color));
+      }
       return PAINTS[k];
     }
     car.traverse(function (o) { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(recolor) : recolor(o.material); });
@@ -229,7 +263,7 @@
     var lg = new THREE.ExtrudeGeometry(dense(lo.shape, 260), { depth: W - 2 * bev, steps: 10, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 4 });
     lg.translate(0, 0, -(W - 2 * bev) / 2);
     sculpt(lg, s, W, 0.1, Math.max(s.cowl, s.belt), -bev, s.L + bev, [lo.xr, lo.xf]);
-    var sideLo = paint.clone(); sideLo.map = lowerSideTex(s, lo);
+    var sideLo = paint.clone(); sideLo.map = lowerSideTex(s, lo); sideLo.userData.side = 'lower';
     add(body, lg, [sideLo, paint]);
     // Fahrgastzelle: oben eingezogen (Tumblehome)
     var cp = cabinPts(s, lo), csh = new THREE.Shape();
@@ -238,7 +272,8 @@
     cg.translate(0, 0, -(cw - 0.08) / 2);
     (function () { var p = cg.attributes.position, yb = cp[0][1]; for (var i = 0; i < p.count; i++) { var k = Math.max(0, (p.getY(i) - yb) / (s.H - yb)); p.setZ(i, p.getZ(i) * (1 - s.tumble * k)); } smoothNormals(cg, 0.57); })();
     var sideCab = paint.clone(); sideCab.map = cabinSideTex(s, cp);
-    add(body, cg, [sideCab, paint]);
+    var roof = paint.clone(); roof.userData.roof = true;
+    add(body, cg, [sideCab, roof]);
     // Windschutz- und Heckscheibe als Glasflächen auf den Schrägen
     // Fläche entlang a→b (Länge) und quer (z); Normale = (a→b) × z zeigt bei dieser Reihenfolge nach außen
     function pane(a, b, wid) {
@@ -318,13 +353,14 @@
     });
     // Mitte des Autos in den Ursprung
     body.position.set(-L / 2, -s.H / 2, 0);
+    car.userData.lo = { xc: lo.xc, xd: lo.xd, xf: lo.xf, xr: lo.xr };
     return car;
   }
 
   function random() {
-    var m = MODELS[Math.floor(Math.random() * MODELS.length)], c = COLORS[m];
-    return { model: m, color: c[Math.floor(Math.random() * c.length)] };
+    var m = MODELS[Math.floor(Math.random() * MODELS.length)], p = pickPaint(m);
+    return { model: m, color: p.c, livery: p.l || null };
   }
 
-  root.ToyCars = { build: build, MODELS: MODELS, COLORS: COLORS, SPEC: SPEC, random: random };
+  root.ToyCars = { build: build, MODELS: MODELS, COLORS: COLORS, SPEC: SPEC, random: random, pickPaint: pickPaint };
 })(typeof window !== 'undefined' ? window : this);

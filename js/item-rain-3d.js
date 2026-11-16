@@ -328,8 +328,8 @@
     // Autos: Modell je Auto zufällig (model=mix) oder fest, Farbe aus den typischen Lacken des Modells
     var TC = root.ToyCars, carModel = TC && TC.SPEC[opts.model] ? opts.model : 'mix';
     var tpl = kind === 'car' ? { make: function () {
-      var m = carModel === 'mix' ? TC.MODELS[Math.floor(Math.random() * TC.MODELS.length)] : carModel, cs = TC.COLORS[m];
-      return { g: TC.build(m, cs[Math.floor(Math.random() * cs.length)]), len: TC.SPEC[m].L };
+      var m = carModel === 'mix' ? TC.MODELS[Math.floor(Math.random() * TC.MODELS.length)] : carModel, p = TC.pickPaint(m);
+      return { g: TC.build(m, p.c, p.l), len: TC.SPEC[m].L };
     } } : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
     // Enten: neue Gummiente (js/rubber-duck.js) mit Outfit; je Outfit einmal gebaut,
