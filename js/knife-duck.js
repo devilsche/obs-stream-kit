@@ -72,7 +72,8 @@
   // Gummiente (js/rubber-duck.js, mit Outfit) sitzt schräg zur Kamera, dazu böse
   // Brauen; Arme, Messer und Geste kommen wie beim Sticker dazu
   function rubberBody(parent, outfit) {
-    var g = root.RubberDuck.build({ outfit: outfit, noWings: true });
+    // ohne Flügel und ohne gehaltene Requisiten (Schwert, Schild …): die Messer-Ente hat eigene Arme
+    var g = root.RubberDuck.build({ outfit: outfit, noWings: true, noProps: true });
     var paint = new THREE.MeshBasicMaterial({ color: 0x0b0b0b }); paint.color.convertSRGBToLinear();
     if (!(outfit === 'batman')) {
       // aufgemalte Brauen: vorn (zum Schnabel) tief

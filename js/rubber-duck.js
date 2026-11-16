@@ -668,6 +668,8 @@
     if (o.acc) {
       var ctx = { g: g, o: o, HC: HC, HR: HR, headPoint: headPoint, decal: decal, paint: paint, white: white, skin: skin, body: yellow, wingMat: wingMat };
       o.acc.forEach(function (a, i) {
+        // noProps: Requisiten, die die Ente in der Flügelspitze hält, weglassen (Messer-Ente hat eigene Arme)
+        if (opts.noProps && HELD[a[0]]) return;
         var fn = ACC[a[0]], ao = a[1] || {};
         // Form-Regler (FORMS): global umgebaut, darüber das Outfit
         var gf = (GPARTS['acc:' + a[0]] || {}).form, of = (ao.xf || {}).form;
@@ -1096,6 +1098,9 @@
     (FORMS[name] || []).forEach(function (s) { var v = +f[s.k]; r[s.k] = isFinite(v) && f[s.k] != null ? Math.min(s.max, Math.max(s.min, v)) : s.def; });
     return r;
   }
+  // Requisiten in der Flügelspitze bzw. vor dem Körper gehalten (build-Option noProps lässt sie weg)
+  var HELD = { claws: 1, hammer: 1, trident: 1, scythe: 1, broom: 1, palette: 1, scepter: 1, wand: 1, katana: 1, shield: 1,
+    beer: 1, halfmic: 1, club: 1, tray: 1, whip: 1, wheel: 1, bow: 1, dumbbell: 1, donut: 1, axe: 1, sword: 1, kiteshield: 1, gavel: 1 };
   var ACC_LABELS = {};   // Anzeigenamen der Bausteine (Editor), von rubber-duck-outfits.js gefüllt
   var KEYS = Object.keys(OUTFITS);
   // Outfits aus dem Duck-Editor (Server, /api/fx/ducks/custom.js): ersetzen ein Outfit aus dem
@@ -1205,7 +1210,7 @@
   root.RubberDuck = {
     build: build, flutter: flutter, clone: cloneDuck, sdDuck: sdDuck, OUTFITS: KEYS, info: info,
     paintAt: paintAt, paintSet: paintSet, paintZone: paintZone, updatePaint: updatePaint,
-    addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
+    addOutfits: addOutfits, ACC: ACC, ACC_LABELS: ACC_LABELS, HELD: HELD, EMBLEMS: EMBLEMS, PATTERNS: Object.keys(PATTERNS),
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
     applyPart: applyPart, readPiece: readPiece, pieceKey: pieceKey, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
     FORMS: FORMS, formOf: formOf, latRest: latRest, geoBox: geoBox,
