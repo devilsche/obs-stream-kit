@@ -100,7 +100,14 @@
       var d = clamp01(u) * tot;
       for (i = 0; i < L.length; i++) { if (d <= L[i] || i === L.length - 1) { var f = L[i] ? Math.min(1, d / L[i]) : 1; return { p: pts[i].clone().lerp(pts[i + 1], f), dir: pts[i + 1].clone().sub(pts[i]) }; } d -= L[i]; }
     }
-    var LANE = 1.7;                               // Laufweg vor der Anklagebank
+    // Abstände: eine Ente ist ~2,4 lang und ~1,7 breit. Polizei kommt auf eigenen Spuren vor der Bank,
+    // stellt sich vor die Verurteilte; abgeführt wird als Kolonne (Abstand 2,8) auf der Spur EXIT_Z
+    var LANE_IN = [2.4, 4.3], EXIT_Z = 3.0, GAP = 2.8, FORM = 1.0;
+    function abfuehren(obj, start, form, t) {
+      var p1 = clamp01((t - OUT[0]) / FORM), p2 = clamp01((t - OUT[0] - FORM) / (OUT[1] - OUT[0] - FORM));
+      if (p2 > 0) { obj.position.set(form.x + 22 * p2, 0, form.z); S.face(obj, 1, 0); S.waddle(obj, t, 1); }
+      else { obj.position.lerpVectors(start, form, ease(p1)); if (p1 < 1) S.face(obj, form.x - start.x, form.z - start.z); S.waddle(obj, t, p1 < 1 ? 1 : 0); }
+    }
     function walk(obj, pts, u, t) {
       var w = path(pts, u); obj.position.copy(w.p);
       if (u > 0 && u < 1) { S.face(obj, w.dir.x, w.dir.z); S.waddle(obj, t, 1); } else S.waddle(obj, t, 0);
@@ -134,21 +141,21 @@
       spot.material.opacity = lit * clamp01((t - 3.35) / 0.3);
       spot.position.set(G.position.x, 0.02, G.position.z);
       // Polizei herein (vor der Bank entlang), stellt sich schräg vor die Verurteilte; dann alle hinaus nach rechts
-      var H0 = G.userData.home, out = clamp01((t - OUT[0]) / (OUT[1] - OUT[0]));
+      var H0 = G.userData.home, out = t > OUT[0];
       cops.forEach(function (c, i) {
-        var slot = new THREE.Vector3(H0.x + c.userData.side * 1.3, 0, H0.z + 1.35);
+        var slot = new THREE.Vector3(H0.x + c.userData.side * 1.6, 0, H0.z + 2.4);
         var w = clamp01((t - IN[0] - i * 0.3) / (IN[1] - IN[0]));
-        if (out > 0) walk(c, [slot, new THREE.Vector3(slot.x, 0, LANE + 0.4), new THREE.Vector3(slot.x + 22, 0, LANE + 0.4)], out, t);
+        if (out) abfuehren(c, slot, new THREE.Vector3(H0.x + c.userData.side * GAP, 0, EXIT_Z), t);
         else {
-          walk(c, [new THREE.Vector3(18 + i * 1.6, 0, LANE + 0.4), new THREE.Vector3(slot.x, 0, LANE + 0.4), slot], ease(w), t);
-          if (w >= 1) S.face(c, -c.userData.side, -0.3);
+          walk(c, [new THREE.Vector3(18 + i * 1.6, 0, LANE_IN[i]), new THREE.Vector3(slot.x, 0, LANE_IN[i]), slot], ease(w), t);
+          if (w >= 1) S.face(c, -c.userData.side, -0.4);
         }
       });
       // Abführen
       defs.forEach(function (d, i) {
         var dd = d.userData.duck;
         if (d === G) {
-          if (out > 0) { walk(d, [H0, new THREE.Vector3(H0.x, 0, LANE + 0.4), new THREE.Vector3(H0.x + 22, 0, LANE + 0.4)], out, t); dd.rotation.z = -0.12; }
+          if (out) { abfuehren(d, H0, new THREE.Vector3(H0.x, 0, EXIT_Z), t); dd.rotation.z = -0.12; }
           else { d.position.copy(d.userData.home); var tr = t > 3.4 && t < OUT[0] ? 0.05 : 0; dd.rotation.x = Math.sin(t * 60) * tr; dd.position.y = 0.55; dd.rotation.z = t > 3.4 ? -0.1 : 0; }
         } else {
           // schauen hinterher (drehen sich nach rechts)
