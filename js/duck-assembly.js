@@ -161,13 +161,17 @@
       };
     } else if (mode === 'king') {
       // ── Wahl zum Enten-König ──
-      var n = Math.min(10, Math.max(names.length, Math.max(4, Math.min(10, opts.count || 8))));
+      // zwei versetzte Reihen mit Abstand (Ente von vorn ~1,7 breit), Mitte vor dem Podest frei;
+      // erst vordere Reihe, dann hintere, die neunte ganz vorn in der Mitte
+      var KS = 0.78;                                    // Kandidaten etwas kleiner, damit beide Reihen Platz haben
+      var KSLOTS = [[-2.4, 1.3], [2.4, 1.3], [-4.7, 1.1], [4.7, 1.1], [-3.6, -1.1], [3.6, -1.1], [-5.9, -1.3], [5.9, -1.3], [0, 2.5]];
+      var n = Math.min(9, Math.max(names.length, Math.max(4, Math.min(9, opts.count || 8))));
       var cands = crowd(n, names, opts.outfit), K = Math.floor(Math.random() * (Math.min(names.length, n) || n));
-      cands.forEach(function (d, k) { var x = lerp(-7.4, 7.4, n > 1 ? k / (n - 1) : 0.5); d.userData.slot = V(x + (Math.abs(x) < 2.2 ? Math.sign(x || 1) * 1.6 : 0), 0, -0.2 - Math.abs(x) * 0.12); d.userData.from = V((x < 0 ? -1 : 1) * 26, 0, 1.8); d.userData.t0 = 0.4 + (k % 5) * 0.15; d.position.copy(d.userData.from); });
-      var spot = new THREE.Mesh(new THREE.CircleGeometry(1.2, 40), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+      cands.forEach(function (d, k) { var sl = KSLOTS[k]; d.scale.setScalar(KS); d.userData.slot = V(sl[0], 0, sl[1]); d.userData.from = V((sl[0] < 0 ? -1 : 1) * 26, 0, sl[1] + 0.5); d.userData.t0 = 0.4 + (k % 5) * 0.18; d.position.copy(d.userData.from); });
+      var spot = new THREE.Mesh(new THREE.CircleGeometry(1.0, 40), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
       spot.rotation.x = -Math.PI / 2; spot.position.y = 0.03; spot.visible = false; scene.add(spot);
       var ask2 = leaderBubble(opts.text || 'Who shall wear the crown?');
-      var cr = S.crown(); cr.visible = false; scene.add(cr);
+      var cr = S.crown(); cr.scale.setScalar(KS); cr.visible = false; scene.add(cr);
       var kn = cands[K].userData.name;
       var res2 = S.plaque('LONG LIVE ' + (kn ? kn.toUpperCase() : 'THE DUCK') + '!', 'Ruler of all ducks', { size: 2.3 }); res2.position.set(0, 7.3, -12.4); res2.visible = false; scene.add(res2);
       var conf2 = S.confetti(-9, 9, -3, 2);
@@ -190,7 +194,7 @@
         var hi = -1; for (var h = 0; h < hops.length; h++) if (t >= hops[h]) hi = h;
         spot.visible = hi >= 0; if (hi >= 0) { var tgt = cands[seq[hi]].position; spot.position.x = tgt.x; spot.position.z = tgt.z; }
         var cp = clamp01((t - 7.5) / 1.1), head = cands[K].position;
-        cr.visible = t > 7.5; cr.position.set(head.x, lerp(10, 2.42, ease(cp)) + cands[K].userData.duck.position.y - 0.55, head.z + 0.1); cr.rotation.y = (1 - cp) * 6; cr.rotation.z = 0.1 * cp;
+        cr.visible = t > 7.5; cr.position.set(head.x, lerp(10, 2.42 * KS, ease(cp)) + (cands[K].userData.duck.position.y - 0.55) * KS, head.z + 0.08); cr.rotation.y = (1 - cp) * 6; cr.rotation.z = 0.1 * cp;
         pop(res2, t, 8.4, 3.6, 1600 / 420);
         conf2.update(t, 8.5);
       };
