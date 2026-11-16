@@ -1,7 +1,8 @@
 /* Begrüßungs-Ente (effects/duck-greet.html): wer sich mit !outfit ein Outfit ausgesucht hat, bekommt bei
  * der ersten Chat-Nachricht im Stream eine kleine Ente in diesem Outfit. Sie fällt unten herein,
- * federt, nickt mit Namensschild, quakt und watschelt zum nächsten Rand hinaus (~4,4 s).
- * Bis zu drei gleichzeitig nebeneinander, der Rest wartet; bei langer Schlange geht es schneller.
+ * federt, nickt mit Namensschild, quakt, hüpft und fällt unten wieder aus dem Bild (~4,4 s) – ohne seitlich zu
+ * laufen, damit sie keiner Nachbar-Ente in die Quere kommt. Bis zu drei gleichzeitig nebeneinander in festen
+ * Plätzen, der Rest wartet; bei langer Schlange geht es schneller.
  * Befehle kommen per Poll von /api/fx/duckgreet/poll (Server: /api/fx/ducks/greet).
  *
  *   DuckGreet.start({ canvas, x, size, volume, reduceMotion, poll, test, freeze })
@@ -56,16 +57,15 @@
       // Landung: kurz breit gedrückt
       var sq = t > 0.5 && t < 0.85 ? Math.sin((t - 0.5) / 0.35 * Math.PI) * 0.16 : 0;
       d.scale.set(k * (1 + sq), k * (1 - sq), k * (1 + sq));
-      var walk = clamp01((t - 2.9) / (DUR - 2.9)), xOff = walk * walk * 9.5 * e.out;
-      g.position.set(e.x + xOff, y, 0);
-      // schaut in die Kamera, zum Gehen dreht sie sich zum Rand
-      var turn = ease((t - 2.7) / 0.35);
-      S.face(d, (0.25 * -e.out) * (1 - turn) + e.out * turn, 1 - turn * 0.85);
+      // Abgang ohne seitlich zu laufen (kreuzt keine Nachbar-Ente): kleiner Hopser, dann nach unten aus dem Bild
+      var out = clamp01((t - 2.9) / (DUR - 2.9));
+      var hop = Math.sin(clamp01(out / 0.4) * Math.PI) * k * 0.9, sink = Math.pow(clamp01((out - 0.25) / 0.75), 2) * k * 4.4;
+      g.position.set(e.x, y + hop - sink, 0);
+      S.face(d, 0.25 * -e.out, 1);
       // Nicken (zweimal) und Quaken
       var nod = t > 1.0 && t < 2.5 ? Math.max(0, Math.sin((t - 1.0) / 0.75 * Math.PI * 2)) : 0;
       if (inner) inner.rotation.z = -nod * 0.22;
       S.talk(d, (t > 1.15 && t < 1.4) || (t > 1.9 && t < 2.15) ? 1 : 0);
-      if (t > 2.9) S.waddle(d, t, 1, 13);
     }
 
     function frame(ts) {

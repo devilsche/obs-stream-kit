@@ -109,9 +109,26 @@ def test_endpoints(tmp_path, monkeypatch):
     assert r["outfit"] == "luckyluke"
     js = c.get("/s/t/api/fx/ducks/custom.js").get_data(as_text=True)
     assert 'RubberDuck.setViewers({"bob":"luckyluke"})' in js
+    assert c.get("/s/t/api/fx/ducks/greet?user=Bob").get_json()["greet"] is False   # kam schon mit der Wahl
+    endpoints._GREETED.clear()                                                       # neuer Stream
     assert c.get("/s/t/api/fx/ducks/greet?user=Bob").get_json()["greet"] is True
     assert c.get("/s/t/api/fx/ducks/greet?user=bob").get_json()["greet"] is False   # schon begrüßt
     poll = c.get("/s/t/api/fx/duckgreet/poll?since=0").get_json()
-    assert [x["params"] for x in poll["commands"]] == [{"name": "Bob", "outfit": "luckyluke"}]
+    assert [x["params"] for x in poll["commands"]] == [{"name": "Bob", "outfit": "luckyluke"}] * 2
     assert c.get("/s/t/api/fx/ducks/outfit").status_code == 400
     assert _client(str(tmp_path), tenant_id=None).get("/s/t/api/fx/ducks/outfit?user=x").status_code == 404
+
+
+def test_outfit_change_always_greets(tmp_path, monkeypatch):
+    monkeypatch.setattr(dv, "catalog", lambda r: _CAT)
+    commands.reset_store()
+    endpoints._GREETED.clear()
+    c = _client(str(tmp_path))
+    c.get("/s/t/api/fx/ducks/outfit?user=Bob&q=knight")
+    assert c.get("/s/t/api/fx/ducks/greet?user=Bob").get_json()["greet"] is False   # kam schon mit der Wahl
+    endpoints._GREETED[(1, "bob")] -= 60                                               # 1 min später: neues Outfit
+    c.get("/s/t/api/fx/ducks/outfit?user=Bob&q=pirate")
+    c.get("/s/t/api/fx/ducks/outfit?user=Bob&q=king")                                 # gleich danach: kein Spam
+    c.get("/s/t/api/fx/ducks/outfit?user=Bob&q=")                                     # nur anzeigen: keine Ente
+    poll = c.get("/s/t/api/fx/duckgreet/poll?since=0").get_json()
+    assert [x["params"]["outfit"] for x in poll["commands"]] == ["knight", "pirate"]

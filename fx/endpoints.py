@@ -529,13 +529,27 @@ def duck_viewer_outfit(token):
     user = (request.args.get("user") or "").strip()
     if not user:
         return _no_store(jsonify({"ok": False, "say": "", "outfit": None})), 400
-    out = duck_viewers.command(root, g.tenant_id, user, request.args.get("q") or "")
+    q = request.args.get("q") or ""
+    out = duck_viewers.command(root, g.tenant_id, user, q)
+    if q.strip() and out.get("outfit"):
+        _push_greet(g.tenant_id, user, out["outfit"], CHANGE_GAP)
     return _no_store(jsonify({"ok": True, **out}))
+
+
+def _push_greet(tenant_id, user, outfit, gap) -> bool:
+    """Begrüßungs-Ente schicken, falls der Zuschauer nicht innerhalb von gap Sekunden schon eine bekam."""
+    now, k = time.time(), (tenant_id, duck_viewers.login_of(user))
+    if now - _GREETED.get(k, 0) < gap:
+        return False
+    _GREETED[k] = now
+    commands.push(tenant_id, "duckgreet", {"cmd": "greet", "params": {"name": user.lstrip("@")[:25], "outfit": outfit}})
+    return True
 
 
 # zuletzt begrüßt {(tenant, login): Zeit}; „First Words“ feuert je Stream einmal, das hier fängt Doppelte ab
 _GREETED = {}
 GREET_GAP = 3 * 3600
+CHANGE_GAP = 15      # neues Outfit gewählt: gleich begrüßen, nur nicht im Sekundentakt
 
 
 @bp_fx.route("/s/<token>/api/fx/ducks/greet")
@@ -549,9 +563,6 @@ def duck_greet(token):
     outfit = duck_viewers.outfit_of(root, g.tenant_id, user) if user else None
     if not outfit:
         return _no_store(jsonify({"ok": True, "greet": False}))
-    now, k = time.time(), (g.tenant_id, duck_viewers.login_of(user))
-    if now - _GREETED.get(k, 0) < GREET_GAP and not request.args.get("force"):
+    if not _push_greet(g.tenant_id, user, outfit, GREET_GAP):
         return _no_store(jsonify({"ok": True, "greet": False}))
-    _GREETED[k] = now
-    commands.push(g.tenant_id, "duckgreet", {"cmd": "greet", "params": {"name": user[:25], "outfit": outfit}})
     return _no_store(jsonify({"ok": True, "greet": True, "outfit": outfit}))
