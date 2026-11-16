@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS players (
     last_polled_at  TEXT,
     PRIMARY KEY (tenant_id, account_id)
 );
+-- Namenssuche über alle Tenants (player_name_join, get_player_names)
+CREATE INDEX IF NOT EXISTS players_account_idx ON players (account_id);
 
 -- Welche Accounts ein Tenant bewusst verfolgt (eigene Zweit-Accounts).
 -- Abgrenzung zu `players`: dort landet jeder, der in einem Match auftaucht;
@@ -1631,19 +1633,38 @@ def upsert_ranked_snapshots(conn, season_id: str, store: dict,
     return len(values)
 
 
+def player_name_join(alias: str, acc_expr: str, tenant_expr: str) -> str:
+    """LEFT JOIN, der `alias.name` fuer einen Account liefert — aus `players`
+    ALLER Tenants, der eigene Tenant zuerst, sonst der zuletzt abgefragte.
+
+    `players` fuellt der Poller je Tenant aus den Match-Rostern. Matches, die
+    ueber Daten eines anderen Tenants hereinkamen, haben ihre Lobby-Spieler nur
+    dort — mit Tenant-Filter fehlten dann Namen (Anzeige „account.abcd“).
+    Der Tenant-Ausdruck steht im Text VOR dem Account-Ausdruck (Reihenfolge
+    der ?-Platzhalter wie beim alten `ON p.tenant_id = ? AND p.account_id = ?`).
+    """
+    return (f"LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = {tenant_expr}) AS own "
+            f"FROM players px WHERE px.account_id = {acc_expr} AND px.name IS NOT NULL "
+            f"ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST "
+            f"LIMIT 1) {alias} ON TRUE")
+
+
 def get_player_names(conn, tenant_id: int, account_ids=None) -> dict:
-    """{account_id: name} — jeder, der je in einem Match des Tenants auftauchte.
+    """{account_id: name} — jeder, der je in einem Match auftauchte.
 
     `players` fuellt der Poller aus den Match-Rostern, deckt also die ganze
-    Lobby ab und nicht nur das eigene Squad.
+    Lobby ab. Gesucht wird ueber ALLE Tenants (der eigene zuerst): Matches aus
+    Daten eines anderen Tenants haben ihre Lobby-Spieler nur dort.
     """
     ids = [a for a in (account_ids or []) if a]
     if not ids:
         return {}
     with conn.cursor() as cur:
-        cur.execute("SELECT account_id, name FROM players "
-                    "WHERE tenant_id = %s AND account_id = ANY(%s)",
-                    (tenant_id, ids))
+        cur.execute("SELECT DISTINCT ON (account_id) account_id, name FROM players "
+                    "WHERE account_id = ANY(%s) AND name IS NOT NULL "
+                    "ORDER BY account_id, (tenant_id = %s) DESC, "
+                    "last_polled_at DESC NULLS LAST, first_seen_at DESC NULLS LAST",
+                    (ids, tenant_id))
         return {r["account_id"]: r["name"] for r in cur.fetchall()}
 
 

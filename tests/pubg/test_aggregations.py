@@ -809,6 +809,23 @@ def test_top_scorer_per_match_not_only_the_maximum():
     assert (best["name"], best["kills"], best["matchId"]) == ("Gegner1", 11, "ts3")
 
 
+def test_lobby_names_come_from_players_of_any_tenant(pg_compat):
+    """Matches aus Daten eines anderen Tenants: der Lobby-Spieler steht nur in
+    dessen `players`. Der Name muss trotzdem kommen (früher „account.abcd“)."""
+    conn = _setup()
+    t2 = pg_compat[2]
+    db_pg.upsert_player(conn.raw, t2, "account.FREMD", "NurBeiT2", "steam", 0)
+    insert_match(conn, "tsx", "Erangel_Main", "squad-fpp", False, 1800, "2026-05-01T18:00:00Z", None)
+    insert_participants(conn, "tsx", [_sc_part("account.A", "PEX_LuCKoR", 1)])
+    _ts_mapping(conn, "tsx", [("account.A", 1, 2, 0), ("account.FREMD", 2, 9, 0)])
+    assert compute_top_scorers_by_match(conn, T, ["tsx"])["tsx"]["name"] == "NurBeiT2"
+    assert db_pg.get_player_names(conn.raw, T, ["account.FREMD"]) == {"account.FREMD": "NurBeiT2"}
+    # der eigene Tenant hat Vorrang, wenn er den Spieler (z. B. unter neuem Namen) kennt
+    upsert_player(conn, "account.FREMD", "EigenerName", "steam", False)
+    assert compute_top_scorers_by_match(conn, T, ["tsx"])["tsx"]["name"] == "EigenerName"
+    assert db_pg.get_player_names(conn.raw, T, ["account.FREMD"]) == {"account.FREMD": "EigenerName"}
+
+
 def test_top_scorer_tie_is_broken_by_assists():
     conn = _setup()
     upsert_player(conn, "account.O1", "Gleich1", "steam", False)

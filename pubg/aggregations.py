@@ -1726,7 +1726,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
     members_rows = conn.execute("""
         SELECT mtm.account_id, mtm.slot, p.name
         FROM match_team_mapping mtm
-        LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id
+        LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = mtm.tenant_id) AS own FROM players px WHERE px.account_id = mtm.account_id AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
         WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?
         ORDER BY mtm.slot NULLS LAST, p.name
     """, (tenant_id, match_id, team_row["team_id"])).fetchall()
@@ -1997,7 +1997,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                 vrow = conn.execute("""
                     SELECT COALESCE(p.name, pa.name) AS n
                     FROM (SELECT NULL AS dummy) x
-                    LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+                    LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = ?) AS own FROM players px WHERE px.account_id = ? AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
                     LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
                           AND pa.account_id = ?
                 """, (tenant_id, e["target_account"],
@@ -2035,7 +2035,7 @@ def compute_match_detail(conn, tenant_id: int, my_account_id, match_id,
                     krow = conn.execute("""
                         SELECT COALESCE(p.name, pa.name) AS n
                         FROM (SELECT NULL AS dummy) x
-                        LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+                        LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = ?) AS own FROM players px WHERE px.account_id = ? AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
                         LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
                               AND pa.account_id = ?
                     """, (tenant_id, death_ev["actor_account"],
@@ -3998,7 +3998,7 @@ def compute_vehicle_stats(conn, tenant_id: int, my_account_id, range_key="sessio
         SELECT mtm.match_id, mtm.account_id, mtm.team_id,
                p.name AS player_name
         FROM match_team_mapping mtm
-        LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id
+        LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = mtm.tenant_id) AS own FROM players px WHERE px.account_id = mtm.account_id AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
         WHERE mtm.tenant_id = ? AND mtm.match_id IN ({ph})
     """, [tenant_id] + match_ids).fetchall()
     # match_id -> set(account_id) (gefiltert auf my_team)
@@ -4703,7 +4703,7 @@ def compute_strongest_opponent(conn, tenant_id: int, my_account_id,
           ON me.tenant_id = o.tenant_id AND me.match_id = o.match_id
          AND me.account_id = ?
         JOIN matches m ON m.tenant_id = o.tenant_id AND m.match_id = o.match_id
-        LEFT JOIN players p ON p.tenant_id = o.tenant_id AND p.account_id = o.account_id
+        LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = o.tenant_id) AS own FROM players px WHERE px.account_id = o.account_id AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
         WHERE o.tenant_id = ? AND o.match_id IN ({ph})
           AND o.kills IS NOT NULL
           AND (o.team_id IS NULL OR me.team_id IS NULL OR o.team_id <> me.team_id)
@@ -4743,8 +4743,7 @@ def compute_top_scorers_by_match(conn, tenant_id: int, match_ids) -> dict:
     rows = conn.execute(f"""
         SELECT o.match_id, o.account_id, o.kills, o.assists, p.name
         FROM match_team_mapping o
-        LEFT JOIN players p
-          ON p.tenant_id = o.tenant_id AND p.account_id = o.account_id
+        LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = o.tenant_id) AS own FROM players px WHERE px.account_id = o.account_id AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
         WHERE o.tenant_id = ? AND o.match_id IN ({ph})
           AND o.kills IS NOT NULL
         ORDER BY o.match_id ASC, o.kills DESC,
@@ -4959,10 +4958,12 @@ def compute_payday_stats(conn, tenant_id: int, my_account_id, range_key="all",
             f"GROUP BY actor_account", [mid, *squad]).fetchall():
             mate_loot[r["actor_account"]] = r["c"]
         # Account-ID -> Name. Fallback Account-ID-Kuerzung.
+        # Namen aus players aller Tenants, der eigene zuerst (siehe db_pg.player_name_join)
         names = {r["account_id"]: r["name"] for r in conn.execute(
-            f"SELECT account_id, name FROM players "
-            f"WHERE tenant_id = ? AND account_id IN ({ph})",
-            [tenant_id] + squad).fetchall()}
+            f"SELECT DISTINCT ON (account_id) account_id, name FROM players "
+            f"WHERE account_id IN ({ph}) AND name IS NOT NULL "
+            f"ORDER BY account_id, (tenant_id = ?) DESC, last_polled_at DESC NULLS LAST",
+            squad + [tenant_id]).fetchall()}
         mates = []
         for acc in squad:
             mates.append({
@@ -8067,7 +8068,7 @@ def compute_session_report(conn, tenant_id: int, my_account_id, range_from=None,
                 r = conn.execute("""
                     SELECT COALESCE(p.name, pa.name) AS n
                     FROM (SELECT NULL AS dummy) x
-                    LEFT JOIN players p ON p.tenant_id = ? AND p.account_id = ?
+                    LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = ?) AS own FROM players px WHERE px.account_id = ? AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
                     LEFT JOIN participants pa ON pa.tenant_id = ? AND pa.match_id = ?
                           AND pa.account_id = ?
                 """, (tenant_id, acc, tenant_id, match_id, acc)).fetchone()
@@ -8678,7 +8679,7 @@ def compute_landing_spots(conn, tenant_id: int, map_name, player_accs, pois_blob
         JOIN telemetry_events te
           ON te.match_id=b.match_id AND te.actor_account=b.actor_account
          AND te.timestamp_ms=b.ts AND te.event_type='Landing'
-        LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = ?
+        LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = ?) AS own FROM players px WHERE px.account_id = te.actor_account AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
         WHERE 1=1 {acc_clause}
     """, params).fetchall()
 

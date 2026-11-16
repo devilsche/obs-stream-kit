@@ -2,6 +2,7 @@ import datetime
 import json
 from urllib.parse import urlparse, parse_qs
 from pubg.db_pg import set_setting, get_setting
+from pubg import db_pg
 from core.db_compat import SqliteCompatConn
 from pubg.aggregations import (compute_session_stats, compute_last_match,
                                 compute_top_mates, compute_co_player,
@@ -661,7 +662,7 @@ class EndpointRegistry:
                 JOIN participants me ON me.match_id = te.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
                 JOIN participants pa ON pa.match_id = te.match_id AND pa.tenant_id = m.tenant_id
                     AND pa.team_id = me.team_id AND pa.account_id = te.actor_account
-                LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = m.tenant_id
+                LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = m.tenant_id) AS own FROM players px WHERE px.account_id = te.actor_account AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
                 WHERE te.event_type = 'Landing'
                   AND te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                   {where}
@@ -725,7 +726,7 @@ class EndpointRegistry:
                 JOIN participants me ON me.match_id = te.match_id AND me.tenant_id = m.tenant_id AND me.account_id = ?
                 JOIN participants pa ON pa.match_id = te.match_id AND pa.tenant_id = m.tenant_id
                     AND pa.team_id = me.team_id AND pa.account_id = te.actor_account
-                LEFT JOIN players p ON p.account_id = te.actor_account AND p.tenant_id = m.tenant_id
+                LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = m.tenant_id) AS own FROM players px WHERE px.account_id = te.actor_account AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE  -- Name aus players aller Tenants (siehe db_pg.player_name_join)
                 WHERE te.actor_x IS NOT NULL AND te.actor_y IS NOT NULL
                   {where}
             """, params).fetchall()
@@ -1188,9 +1189,8 @@ class EndpointRegistry:
                     map_name = "Baltic_Main"
                 team_mapping = get_team_mapping_for_match(
                     conn.raw, self.tenant_id, match_id)
-                names = {r["account_id"]: r["name"] for r in conn.execute(
-                    "SELECT account_id, name FROM players WHERE tenant_id = ?",
-                    (self.tenant_id,)).fetchall()}
+                # Namen der Lobby aus players aller Tenants (eigener zuerst)
+                names = db_pg.get_player_names(conn.raw, self.tenant_id, list(team_mapping))
                 result = build_replay_from_db(
                     db_rows, match_id, map_name, _map_meta(map_name),
                     team_mapping, names)
@@ -1228,12 +1228,8 @@ class EndpointRegistry:
 
         # Team-Mapping + Namen
         team_mapping = get_team_mapping_for_match(conn.raw, self.tenant_id, match_id)
-        names = {}
-        rows = conn.execute(
-            "SELECT account_id, name FROM players WHERE tenant_id = ?",
-            (self.tenant_id,)).fetchall()
-        for r in rows:
-            names[r["account_id"]] = r["name"]
+        # Namen der Lobby aus players aller Tenants (eigener zuerst)
+        names = db_pg.get_player_names(conn.raw, self.tenant_id, list(team_mapping))
         # Fehlende Namen aus dem Raw-Blob nachziehen
         for acc, nm in extract_player_names(raw).items():
             names.setdefault(acc, nm)
@@ -1372,12 +1368,12 @@ class EndpointRegistry:
             squad = [r["account_id"] for r in conn.execute(
                 "SELECT DISTINCT mtm.account_id, p.name "
                 "FROM match_team_mapping mtm "
-                "LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id "
+                "LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = mtm.tenant_id) AS own FROM players px WHERE px.account_id = mtm.account_id AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE "
                 "WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?",
                 (self.tenant_id, mid, team)).fetchall()]
             squad_names = [r["name"] for r in conn.execute(
                 "SELECT p.name FROM match_team_mapping mtm "
-                "LEFT JOIN players p ON p.account_id = mtm.account_id AND p.tenant_id = mtm.tenant_id "
+                "LEFT JOIN LATERAL (SELECT px.name, (px.tenant_id = mtm.tenant_id) AS own FROM players px WHERE px.account_id = mtm.account_id AND px.name IS NOT NULL ORDER BY own DESC, px.last_polled_at DESC NULLS LAST, px.first_seen_at DESC NULLS LAST LIMIT 1) p ON TRUE "
                 "WHERE mtm.tenant_id = ? AND mtm.match_id = ? AND mtm.team_id = ?",
                 (self.tenant_id, mid, team)).fetchall() if r["name"]]
             qsph = ",".join("?" * len(squad)) if squad else "''"
@@ -4093,14 +4089,8 @@ class EndpointRegistry:
         for r in rows:
             if r["actor_account"]:  accs.add(r["actor_account"])
             if r["target_account"]: accs.add(r["target_account"])
-        names = {}
-        if accs:
-            ph = ",".join("?" * len(accs))
-            for r in conn.execute(
-                f"SELECT account_id, name FROM players "
-                f"WHERE tenant_id = ? AND account_id IN ({ph})",
-                [self.tenant_id] + list(accs)).fetchall():
-                names[r["account_id"]] = r["name"]
+        # Namen aus players aller Tenants (eigener zuerst)
+        names = db_pg.get_player_names(conn.raw, self.tenant_id, list(accs)) if accs else {}
         out = []
         for r in rows:
             out.append({
