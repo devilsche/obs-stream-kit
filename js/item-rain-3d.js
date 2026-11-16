@@ -1,6 +1,7 @@
 /* Party-Regen in echtem 3D (three.js r128, js/vendor/three-r128.min.js) für
- * effects/item-rain.html: Gummientchen (kind=duck), Sushi (kind=sushi) – beide
- * fallen – oder Luftballons (kind=balloon), die von unten aufsteigen.
+ * effects/item-rain.html: Gummientchen (kind=duck), Sushi (kind=sushi), Spielzeugautos (kind=car,
+ * js/toy-cars.js, model=mix|2002|e30|e30m3|e36|e46|e92m3) – fallen – oder Luftballons (kind=balloon),
+ * die von unten aufsteigen.
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
  *
@@ -313,9 +314,9 @@
     rim.position.set(1, -0.3, 0.6);
     scene.add(rim);
 
-    var kind = opts.kind === 'sushi' || opts.kind === 'balloon' ? opts.kind : 'duck';
-    if (kind === 'duck' && root.RubberDuck) {
-      // Umgebung zum Spiegeln für das Vinyl der Gummiente
+    var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ? opts.kind : 'duck';
+    if ((kind === 'duck' && root.RubberDuck) || kind === 'car') {
+      // Umgebung zum Spiegeln für das Vinyl der Gummiente bzw. den Autolack
       var ec = document.createElement('canvas'); ec.width = 512; ec.height = 256;
       var ex = ec.getContext('2d'), eg = ex.createLinearGradient(0, 0, 0, 256);
       eg.addColorStop(0, '#ffffff'); eg.addColorStop(0.45, '#c9d2dc'); eg.addColorStop(0.55, '#6a7280'); eg.addColorStop(1, '#25282e');
@@ -324,7 +325,12 @@
       var epm = new THREE.PMREMGenerator(renderer); scene.environment = epm.fromEquirectangular(et).texture; epm.dispose();
     }
     var rise = kind === 'balloon';
-    var tpl = kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
+    // Autos: Modell je Auto zufällig (model=mix) oder fest, Farbe aus den typischen Lacken des Modells
+    var TC = root.ToyCars, carModel = TC && TC.SPEC[opts.model] ? opts.model : 'mix';
+    var tpl = kind === 'car' ? { make: function () {
+      var m = carModel === 'mix' ? TC.MODELS[Math.floor(Math.random() * TC.MODELS.length)] : carModel, cs = TC.COLORS[m];
+      return { g: TC.build(m, cs[Math.floor(Math.random() * cs.length)]), len: TC.SPEC[m].L };
+    } } : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
     // Enten: neue Gummiente (js/rubber-duck.js) mit Outfit; je Outfit einmal gebaut,
     // danach geklont (teilt Geometrie und Material). outfit 'mix' = zufällig je Ente
@@ -345,7 +351,7 @@
       fixedOutfit = pool[Math.floor(Math.random() * pool.length)];
     }
     function makeItem() {
-      if (kind === 'sushi' || rise) return tpl.make();
+      if (kind === 'sushi' || kind === 'car' || rise) return tpl.make();
       if (RD) {
         var o = opts.outfit === 'mix' ? RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)] : (fixedOutfit || 'none');
         return { g: duckOf(o, o === 'none' && Math.random() < 0.12), len: 2.7 };
@@ -359,7 +365,7 @@
     function spawn() {
       var k = rand(0.8, 1.2), it = makeItem(), g = it.g;
       // jedes Teil etwa `size` groß (Ballons etwas größer)
-      var sc = size * k * (rise ? 1.5 : 1) / it.len;
+      var sc = size * k * (rise ? 1.5 : kind === 'car' ? 1.7 : 1) / it.len;
       g.scale.set(sc, sc, sc);
       if (rise) g.rotation.set(rand(-0.15, 0.15), rand(0, 6.28), rand(-0.2, 0.2));
       else g.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));

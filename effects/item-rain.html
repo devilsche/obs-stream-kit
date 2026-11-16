@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Item Rain</title>
   <style>
-    /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random),
+    /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random),
+       ?model= (Autos: mix|2002|e30|e30m3|e36|e46|e92m3),
        ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -19,6 +20,7 @@
   <script src="../js/rubber-duck.js"></script>
   <script src="../js/rubber-duck-outfits.js"></script>
   <script src="../api/fx/ducks/custom.js"></script>
+  <script src="../js/toy-cars.js"></script>
   <script src="../js/item-rain-3d.js"></script>
   <script>
     (function () {
@@ -26,7 +28,8 @@
       var params = new URLSearchParams(location.search);
       var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       window.ItemRain3D.start({
-        kind: ['duck', 'balloon'].indexOf(params.get('kind')) >= 0 ? params.get('kind') : 'sushi',
+        kind: ['duck', 'balloon', 'car'].indexOf(params.get('kind')) >= 0 ? params.get('kind') : 'sushi',
+        model: params.get('model') || 'mix',
         // Enten-Outfit: none, thw, police, fire, batman, superman oder mix (zufällig je Ente)
         outfit: params.get('outfit') || 'none',
         canvas: document.getElementById('gl'),
