@@ -3,7 +3,8 @@
  *   einmal (!outfits): alle Outfits in t Sekunden, danach leer
  *   loop: endlos in gemischter Reihenfolge, nach jeder Runde wieder das Schild (BRB, Starting Soon)
  *
- *   DuckParade.start({ canvas, loop, t, size, speed, reduceMotion, freeze })
+ *   DuckParade.start({ canvas, loop, t, size, speed, reduceMotion, freeze, ping })
+ *   ping = URL, unter der sich die Parade meldet (/api/fx/ducks/parade, Begrüßungs-Enten weichen aus)
  *   size = Höhe der Ente in px, speed = px/s (nur loop; einmal ergibt sich das Tempo aus t)
  */
 (function (root) {
@@ -107,6 +108,12 @@
       items.forEach(function (o) { o.position.x -= dx; if (o.position.x < -GAP) drop(o); else rest.push(o); });
       items = rest; if (head !== Infinity) head -= dx;
       fill();
+    }
+    // der Begrüßungs-Ente sagen, dass unten das Laufband läuft (sie landet dann darüber)
+    function ping(sec) { if (opts.ping) fetch(opts.ping + '?sec=' + sec, { cache: 'no-store' }).catch(function () {}); }
+    if (opts.freeze == null) {
+      if (opts.loop) { ping(30); setInterval(function () { ping(30); }, 20000); }
+      else ping(Math.ceil(opts.t || 60));
     }
     fill();
     requestAnimationFrame(frame);

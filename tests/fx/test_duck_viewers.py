@@ -132,3 +132,13 @@ def test_outfit_change_always_greets(tmp_path, monkeypatch):
     c.get("/s/t/api/fx/ducks/outfit?user=Bob&q=")                                     # nur anzeigen: keine Ente
     poll = c.get("/s/t/api/fx/duckgreet/poll?since=0").get_json()
     assert [x["params"]["outfit"] for x in poll["commands"]] == ["knight", "pirate"]
+
+
+def test_parade_ping_reaches_greeting(tmp_path):
+    commands.reset_store()
+    c = _client(str(tmp_path))
+    assert c.get("/s/t/api/fx/ducks/parade?sec=60").get_json()["ok"] is True
+    assert c.get("/s/t/api/fx/ducks/parade?sec=0").status_code == 400
+    assert c.get("/s/t/api/fx/ducks/parade?sec=999").status_code == 400
+    poll = c.get("/s/t/api/fx/duckgreet/poll?since=0").get_json()
+    assert [(x["cmd"], x["params"]) for x in poll["commands"]] == [("parade", {"sec": 60})]

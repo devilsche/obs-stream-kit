@@ -5,7 +5,8 @@
  * Plätzen, der Rest wartet; bei langer Schlange geht es schneller.
  * Befehle kommen per Poll von /api/fx/duckgreet/poll (Server: /api/fx/ducks/greet).
  *
- *   DuckGreet.start({ canvas, x, size, volume, reduceMotion, poll, test, freeze })
+ *   DuckGreet.start({ canvas, x, size, shelf, volume, reduceMotion, poll, test, freeze })
+ *   shelf = Höhe in px, auf der Enten landen, solange unten die Outfit-Parade läuft (330)
  *   x = Mitte der ersten Ente in px, size = Höhe der Ente in px
  */
 (function (root) {
@@ -23,6 +24,8 @@
     var size = Math.max(80, Math.min(400, opts.size || 180)), k = size / U / 2.15;
     var x0 = (opts.x != null ? opts.x : 220) / U, dir = x0 * U > 960 ? -1 : 1;
     var GAP = size * 1.25 / U, GROUND = 0.12;
+    // läuft unten die Outfit-Parade (meldet sich über den Server), landen neue Enten auf einem Sims darüber
+    var SHELF = (opts.shelf != null ? opts.shelf : 330) / U, paradeUntil = 0;
     var queue = [], live = [], slotsUsed = [], running = false, last = null;
 
     function add(name, outfit) {
@@ -37,7 +40,8 @@
       var x = x0 + dir * slot * GAP, out = x * U < 960 ? -1 : 1;
       g.position.set(x, 13, 0); S.scene.add(g);
       var speed = queue.length > 4 ? 1.5 : 1;
-      live.push({ g: g, d: d, tag: tag, slot: slot, t0: now, x: x, out: out, speed: speed, q: [false, false] });
+      var shelf = now < paradeUntil;
+      live.push({ g: g, d: d, tag: tag, slot: slot, t0: now, x: x, out: out, speed: speed, q: [false, false], ground: shelf ? SHELF : GROUND, shelf: shelf });
       slotsUsed[slot] = true;
     }
     function freeSlot() { for (var i = 0; i < SLOTS; i++) if (!slotsUsed[i]) return i; return -1; }
@@ -48,19 +52,23 @@
       var fall = clamp01(t / 0.55), y;
       if (opts.reduceMotion) {
         var sc = Math.min(ease(t / 0.3), 1 - ease((t - DUR + 0.4) / 0.4));
-        g.scale.setScalar(Math.max(0.001, sc)); g.position.set(e.x, GROUND, 0); S.face(d, 0.25 * -e.out, 1);
+        g.scale.setScalar(Math.max(0.001, sc)); g.position.set(e.x, e.ground, 0); S.face(d, 0.25 * -e.out, 1);
         S.talk(d, t > 1.1 && t < 1.35 ? 1 : 0);
         return;
       }
-      if (t < 0.55) y = GROUND + 13 * (1 - fall * fall);
-      else y = GROUND + Math.max(0, Math.sin(clamp01((t - 0.55) / 0.35) * Math.PI) * 0.35 * (1 - clamp01((t - 0.55) / 0.5)));
+      var G0 = e.ground;
+      if (t < 0.55) y = G0 + 13 * (1 - fall * fall);
+      else y = G0 + Math.max(0, Math.sin(clamp01((t - 0.55) / 0.35) * Math.PI) * 0.35 * (1 - clamp01((t - 0.55) / 0.5)));
       // Landung: kurz breit gedrückt
       var sq = t > 0.5 && t < 0.85 ? Math.sin((t - 0.5) / 0.35 * Math.PI) * 0.16 : 0;
       d.scale.set(k * (1 + sq), k * (1 - sq), k * (1 + sq));
       // Abgang ohne seitlich zu laufen (kreuzt keine Nachbar-Ente): kleiner Hopser, dann nach unten aus dem Bild
       var out = clamp01((t - 2.9) / (DUR - 2.9));
       var hop = Math.sin(clamp01(out / 0.4) * Math.PI) * k * 0.9, sink = Math.pow(clamp01((out - 0.25) / 0.75), 2) * k * 4.4;
-      g.position.set(e.x, y + hop - sink, 0);
+      if (e.shelf) {   // auf dem Sims: nicht durch die Parade fallen, sondern nach dem Hopser wegploppen
+        g.position.set(e.x, y + hop, 0);
+        g.scale.setScalar(Math.max(0.001, 1 - ease((out - 0.35) / 0.4)));
+      } else g.position.set(e.x, y + hop - sink, 0);
       S.face(d, 0.25 * -e.out, 1);
       // Nicken (zweimal) und Quaken
       var nod = t > 1.0 && t < 2.5 ? Math.max(0, Math.sin((t - 1.0) / 0.75 * Math.PI * 2)) : 0;
@@ -93,7 +101,8 @@
     }
     function kick() { if (!running) { running = true; requestAnimationFrame(frame); } }
 
-    // Test: ?test=Name:outfit,Name2:outfit2
+    // Test: ?test=Name:outfit,Name2:outfit2 (mit ?parade=1 so, als liefe unten die Parade)
+    if (opts.testParade) paradeUntil = Infinity;
     (opts.test || []).forEach(function (p) { add(p[0], p[1]); });
     if (opts.freeze != null) { queue.forEach(function (it, i) { if (i < SLOTS) begin(it, i, 0); }); queue = []; kick(); }
 
@@ -107,7 +116,8 @@
             if (!j) return;
             if (epoch !== null && j.epoch !== epoch) since = null;
             epoch = j.epoch;
-            if (since != null) (j.commands || []).forEach(function (c) { if (c.cmd === 'greet' && c.params) add(c.params.name, c.params.outfit); });
+            if (since != null) (j.commands || []).forEach(function (c) { if (c.cmd === 'greet' && c.params) add(c.params.name, c.params.outfit);
+              if (c.cmd === 'parade' && c.params) paradeUntil = Math.max(paradeUntil, performance.now() / 1000 + (+c.params.sec || 0)); });
             since = j.seq;
           })
           .catch(function () {})

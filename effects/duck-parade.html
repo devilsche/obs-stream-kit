@@ -38,7 +38,8 @@
         loop: q.get('loop') === '1',
         t: num('t', 60), size: num('size', 170), speed: num('speed', 110),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
-        freeze: q.get('at') !== null ? num('at', 0) : null
+        freeze: q.get('at') !== null ? num('at', 0) : null,
+        ping: location.protocol === 'file:' ? null : '../api/fx/ducks/parade'
       });
     })();
   </script>

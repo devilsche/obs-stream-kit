@@ -546,6 +546,19 @@ def _push_greet(tenant_id, user, outfit, gap) -> bool:
     return True
 
 
+@bp_fx.route("/s/<token>/api/fx/ducks/parade")
+def duck_parade_ping(token):
+    """Outfit-Parade läuft sec Sekunden (effects/duck-parade.html meldet sich): Begrüßungs-Enten
+    landen solange oberhalb des Laufbands statt mittendrin."""
+    if g.tenant_id is None:
+        abort(404)
+    sec = request.args.get("sec", type=int) or 0
+    if not 1 <= sec <= 120:
+        return _no_store(jsonify({"ok": False})), 400
+    commands.push(g.tenant_id, "duckgreet", {"cmd": "parade", "params": {"sec": sec}})
+    return _no_store(jsonify({"ok": True}))
+
+
 # zuletzt begrüßt {(tenant, login): Zeit}; „First Words“ feuert je Stream einmal, das hier fängt Doppelte ab
 _GREETED = {}
 GREET_GAP = 3 * 3600

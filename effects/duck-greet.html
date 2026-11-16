@@ -10,7 +10,8 @@
        Dauerhafte Browser-Source (1920×1080), holt die Begrüßungen selbst ab (Streamer.bot: „First Words“
        → /api/fx/ducks/greet?user=%user%).
        ?x= Mitte der ersten Ente in px (220; über 960 reihen sich weitere nach links), ?size= Höhe in px (180),
-       ?volume=0..1 (0.5), ?test=Name:outfit,Name2:outfit2 spielt sofort ab, ?t= hält bei Sekunde t an. */
+       ?shelf= Höhe in px, auf der sie landen, solange unten die Outfit-Parade läuft (330),
+       ?volume=0..1 (0.5), ?test=Name:outfit,Name2:outfit2 spielt sofort ab (&parade=1: als liefe die Parade), ?t= hält bei Sekunde t an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
     canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
@@ -33,11 +34,11 @@
         .filter(function (p) { return p[0] && p[1] && window.RubberDuck.OUTFITS.indexOf(p[1]) >= 0; });
       window.DuckGreet.start({
         canvas: document.getElementById('gl'),
-        x: num('x', 220), size: num('size', 180),
+        x: num('x', 220), size: num('size', 180), shelf: num('shelf', 330),
         volume: Math.max(0, Math.min(1, num('volume', 0.5))),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
         poll: location.protocol === 'file:' ? null : '../api/fx/duckgreet/poll',
-        test: test,
+        test: test, testParade: q.get('parade') === '1',
         freeze: q.get('t') !== null ? num('t', 0) : null
       });
     })();
