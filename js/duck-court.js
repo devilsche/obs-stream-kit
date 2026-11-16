@@ -71,7 +71,8 @@
       if (isFinite(gn) && String(gn) === String(opts.guilty).trim()) gi = gn - 1;
       else names.forEach(function (nm, i) { if (nm.toLowerCase() === String(opts.guilty).replace(/^@/, '').toLowerCase()) gi = i; });
     }
-    if (gi < 0 || gi >= n) gi = Math.floor(Math.random() * Math.min(n, names.length || n));
+    // zufällig: unter den genannten, bei nur einem Namen (z. B. wer !court allein tippt) unter allen auf der Bank
+    if (gi < 0 || gi >= n) gi = Math.floor(Math.random() * Math.min(n, names.length > 1 ? names.length : n));
     var defs = [];
     for (var k = 0; k < n; k++) {
       var d = S.duck(opts.outfit || 'mix', names[k]), x0 = lerp(-4.6, 4.6, n > 1 ? k / (n - 1) : 0.5);
