@@ -152,6 +152,42 @@
         g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.03); g.gain.setValueAtTime(0.25, t + 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.75);
         o.connect(g); g.connect(master); o.start(t); l.start(t); o.stop(t + 0.8); l.stop(t + 0.8);
       },
+      // Trommelwirbel (sec Sekunden, zum Ende lauter) mit Beckenschlag
+      drumroll: function (sec) {
+        var c = ac(); if (!c) return; var t = c.currentTime;
+        for (var i = 0; i < sec * 22; i++) {
+          var tt = t + i / 22, n = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); n.buffer = noiseBuf(c, 0.06);
+          f.type = 'bandpass'; f.frequency.value = 900; f.Q.value = 0.8; env(c, g, tt, 0.003, 0.15 + 0.35 * i / (sec * 22), 0.05);
+          n.connect(f); f.connect(g); g.connect(master); n.start(tt);
+        }
+        var cy = c.createBufferSource(), hf = c.createBiquadFilter(), cg = c.createGain(); cy.buffer = noiseBuf(c, 1.6);
+        hf.type = 'highpass'; hf.frequency.value = 3000; env(c, cg, t + sec, 0.005, 0.6, 1.4); cy.connect(hf); hf.connect(cg); cg.connect(master); cy.start(t + sec);
+      },
+      // Tomate klatscht
+      splat: function () {
+        var c = ac(); if (!c) return; var t = c.currentTime;
+        var n = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); n.buffer = noiseBuf(c, 0.25);
+        f.type = 'lowpass'; f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(300, t + 0.2); env(c, g, t, 0.003, 0.8, 0.2);
+        n.connect(f); f.connect(g); g.connect(master); n.start(t);
+      },
+      // Kamera-Auslöser
+      shutter: function () {
+        var c = ac(); if (!c) return; var t = c.currentTime;
+        [0, 0.07].forEach(function (d) { var n = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); n.buffer = noiseBuf(c, 0.05);
+          f.type = 'highpass'; f.frequency.value = 2500; env(c, g, t + d, 0.002, 0.7, 0.04); n.connect(f); f.connect(g); g.connect(master); n.start(t + d); });
+      },
+      // Polonaise-Melodie (Rechteck, Bass im Wechsel), sec Sekunden
+      conga: function (sec) {
+        var c = ac(); if (!c) return; var t = c.currentTime, beat = 0.26;
+        var mel = [67, 0, 72, 0, 76, 74, 72, 0, 71, 0, 74, 0, 79, 77, 76, 0], bass = [48, 55, 48, 55, 47, 55, 47, 55];
+        function note(m, at, len, vol, type) { var o = c.createOscillator(), g = c.createGain(); o.type = type; o.frequency.value = 440 * Math.pow(2, (m - 69) / 12); env(c, g, at, 0.01, vol, len); o.connect(g); g.connect(master); o.start(at); o.stop(at + len + 0.05); }
+        for (var i = 0; i * beat < sec; i++) {
+          var at = t + i * beat, m = mel[i % mel.length];
+          if (m) note(m, at, beat * 0.8, 0.09, 'square');
+          if (i % 2 === 0) note(bass[(i / 2) % bass.length], at, beat * 1.6, 0.16, 'triangle');
+          if (i % 4 === 3) { var n = c.createBufferSource(), g2 = c.createGain(); n.buffer = noiseBuf(c, 0.05); env(c, g2, at, 0.002, 0.12, 0.04); n.connect(g2); g2.connect(master); n.start(at); }
+        }
+      },
       // kurzer Fanfaren-Akkord (Versammlung eröffnet)
       fanfare: function () {
         var c = ac(); if (!c) return; var t = c.currentTime;
@@ -161,6 +197,53 @@
         });
       }
     };
+  }
+
+  // Konfetti: viele kleine Papierstücke (InstancedMesh), fallen ab t0 aus der Höhe über x0..x1 und flattern
+  function confetti(scene, x0, x1, z0, z1, count) {
+    var N = count || 260, geo = new THREE.PlaneGeometry(0.16, 0.24), mat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+    var mesh = new THREE.InstancedMesh(geo, mat, N), cols = [0xf2b705, 0x8a4dad, 0xe6312e, 0x3fb04a, 0x2f7fd0, 0xffffff], c = new THREE.Color();
+    var P = [];
+    for (var i = 0; i < N; i++) {
+      P.push({ x: lerp(x0, x1, Math.random()), z: lerp(z0, z1, Math.random()), y: 9 + Math.random() * 4, d: Math.random() * 1.2, s: 0.6 + Math.random() * 0.8, ph: Math.random() * 6.3, r: Math.random() * 6.3 });
+      c.setHex(cols[i % cols.length]); mesh.setColorAt(i, c);
+    }
+    mesh.frustumCulled = false; mesh.visible = false; scene.add(mesh);
+    var o = new THREE.Object3D();
+    return { mesh: mesh, update: function (t, t0) {
+      var on = t >= t0; mesh.visible = on; if (!on) return;
+      for (var i = 0; i < N; i++) {
+        var p = P[i], tt = Math.max(0, t - t0 - p.d), y = Math.max(0.05, p.y - tt * 2.2 * p.s);
+        o.position.set(p.x + Math.sin(tt * 2 + p.ph) * 0.5, y, p.z + Math.cos(tt * 1.7 + p.ph) * 0.3);
+        o.rotation.set(tt * 3 * p.s + p.r, tt * 2 + p.ph, y > 0.06 ? tt * 4 : Math.PI / 2); o.updateMatrix(); mesh.setMatrixAt(i, o.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    } };
+  }
+  // Krone (Gold, Zacken mit roten Steinen)
+  function crown() {
+    var g = new THREE.Group(), gold = new THREE.MeshStandardMaterial({ color: 0xe2b62a, metalness: 0.85, roughness: 0.25 }), red = new THREE.MeshStandardMaterial({ color: 0xc8151b, metalness: 0.3, roughness: 0.2 });
+    var band = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.4, 0.26, 40, 1, true), gold); band.material.side = THREE.DoubleSide; g.add(band);
+    for (var i = 0; i < 8; i++) {
+      var a = i / 8 * Math.PI * 2, sp = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 12), gold); sp.position.set(Math.cos(a) * 0.41, 0.28, Math.sin(a) * 0.41); g.add(sp);
+      var st = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), red); st.position.set(Math.cos(a) * 0.43, 0.02, Math.sin(a) * 0.43); g.add(st);
+    }
+    return g;
+  }
+  // Plakette (Ergebnis, Ausrufe): goldener Rand, lila Fläche, große Schrift, optional zweite Zeile
+  function plaque(text, sub, opts) {
+    opts = opts || {};
+    var W = 1600, H = sub ? 420 : 300;
+    var tex = canvasTex(W, H, function (x) {
+      x.fillStyle = '#f2b705'; roundRect(x, 0, 0, W, H, 50); x.fill();
+      x.fillStyle = opts.bg || '#5e2a79'; roundRect(x, 16, 16, W - 32, H - 32, 40); x.fill();
+      x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = '#f2b705';
+      fitFont(x, text, '800', 150, W - 120); x.fillText(text, W / 2, sub ? 150 : H / 2 + 6);
+      if (sub) { x.fillStyle = '#ffffff'; fitFont(x, sub, '600', 90, W - 120); x.fillText(sub, W / 2, 315); }
+    });
+    var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }));
+    var k = opts.size || 3.2; s.scale.set(k * W / H, k, 1); s.renderOrder = 8;
+    return s;
   }
 
   function create(opts) {
@@ -213,6 +296,7 @@
         step(real);
         RD.flutter && scene.children.forEach(function (o) { if (o.userData.duck) RD.flutter(o.userData.duck, real, 0.25, o.userData.ph || 0); });
         renderer.render(scene, cam);
+        if (ro.after) ro.after(real);
         if (ro.freeze != null || real < TOTAL + 0.2) requestAnimationFrame(frame);
         else renderer.clear();
       }
@@ -220,7 +304,7 @@
     }
 
     return { renderer: renderer, scene: scene, cam: cam, key: key, duck: duck, face: face, waddle: waddle, talk: talk,
-             tag: tag, bubble: bubble, wood: wood, canvasTex: canvasTex, roundRect: roundRect, sfx: sfx, run: run, outfits: outfits, FONT: FONT };
+             tag: tag, bubble: bubble, plaque: plaque, crown: crown, confetti: function (a, b, c, d, n) { return confetti(scene, a, b, c, d, n); }, wood: wood, canvasTex: canvasTex, roundRect: roundRect, sfx: sfx, run: run, outfits: outfits, FONT: FONT };
   }
 
   // Namen aus ?names=a,b,c bzw. „@a @b“ (Chat-Befehl über Streamer.bot), bereinigt; nicht ersetzte

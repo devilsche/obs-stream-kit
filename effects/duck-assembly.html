@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Duck Assembly</title>
   <style>
-    /* Enten-Versammlung, Vollbild ~12 s (js/duck-assembly.js mit js/duck-stage.js, three.js r128).
-       ?by=Name (wer einberufen hat: Banner + Anführer-Ente), ?names=a,b,c (Chat-Namen über den Enten),
-       ?count= Anzahl Enten ohne Namen (10, max. 16), ?outfit=mix|<outfit> (Teilnehmer), ?leader=<outfit> (king),
-       ?text= Rede in der Sprechblase, ?volume=0..1 (0.7), ?t= hält bei Sekunde t an (zum Prüfen).
+    /* Enten-Versammlung, Vollbild (js/duck-assembly.js mit js/duck-stage.js, three.js r128).
+       ?mode=speech|vote|king|mutiny|conga|photo|random (ohne: speech, mit ?q= vote),
+       ?by=Name (wer einberufen hat: Banner + Anführer-Ente), ?names=a,b,c bzw. „@a @b“ (Chat-Namen),
+       Abstimmung: ?q= Frage („Pizza oder Döner?“ → Antworten Pizza/Döner, sonst Yes/No; ?a= ?b= überschreiben),
+       ?yes= ?no= Namen der Stimmen je Seite; ?count= Enten ohne Namen, ?outfit=mix|<outfit>, ?leader=<outfit> (king),
+       ?text= eigener Satz der Anführerin, ?volume=0..1 (0.7), ?t= hält bei Sekunde t an (zum Prüfen).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
@@ -28,14 +30,21 @@
       'use strict';
       var q = new URLSearchParams(location.search);
       function num(k, d) { var v = parseFloat(q.get(k)); return isNaN(v) ? d : v; }
+      var mode = (q.get('mode') || '').toLowerCase(), modes = ['king', 'mutiny', 'conga', 'photo', 'speech'];
+      if (mode === 'random') mode = modes[Math.floor(Math.random() * modes.length)];
+      if (!mode) mode = q.get('q') ? 'vote' : 'speech';
+      function clean(k, n) { return (q.get(k) || '').replace(/^@/, '').trim().replace(/.*%.*/, '').slice(0, n); }
       window.DuckAssembly.start({
         canvas: document.getElementById('gl'),
-        by: (q.get('by') || '').replace(/^@/, '').trim().replace(/.*%.*/, ''),
+        mode: mode,
+        by: clean('by', 25),
         names: window.DuckStage.names(q),
-        count: num('count', 10),
+        q: clean('q', 90), a: clean('a', 18), b: clean('b', 18),
+        yes: window.DuckStage.names(q, 'yes'), no: window.DuckStage.names(q, 'no'),
+        count: num('count', 0) || undefined,
         outfit: q.get('outfit') || 'mix',
         leader: q.get('leader') || 'king',
-        text: q.get('text') || '',
+        text: clean('text', 90),
         volume: Math.max(0, Math.min(1, num('volume', 0.7))),
         freeze: q.get('t') !== null ? num('t', 0) : null
       });
