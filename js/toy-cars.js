@@ -22,12 +22,12 @@
   // ws/rs Länge Windschutz-/Heckscheibe (waagrecht), roofF/roofR Dachkanten (Anteil von L ab hinten),
   // slant Neigung der Front, tumble Einzug der Fahrgastzelle oben
   var SPEC = {
-    '2002':  { L: 4.23, W: 1.59, H: 1.41, wb: 2.50, fo: 0.78, r: 0.33, nose: 0.74, cowl: 0.86, belt: 0.86, deck: 0.84, ws: 0.42, rs: 0.40, roofF: 0.62, roofR: 0.33, slant: 0.02, tumble: 0.16, chrome: true , round: 0.1 },
-    e30:     { L: 4.32, W: 1.65, H: 1.38, wb: 2.57, fo: 0.80, r: 0.34, nose: 0.76, cowl: 0.88, belt: 0.90, deck: 0.90, ws: 0.52, rs: 0.40, roofF: 0.6, roofR: 0.31, slant: 0.0, tumble: 0.14, chrome: true },
-    e30m3:   { L: 4.35, W: 1.68, H: 1.37, wb: 2.56, fo: 0.82, r: 0.35, nose: 0.74, cowl: 0.87, belt: 0.90, deck: 0.92, ws: 0.54, rs: 0.36, roofF: 0.6, roofR: 0.32, slant: 0.0, tumble: 0.14, wing: true, lip: true, wide: 0.05 },
-    e36:     { L: 4.43, W: 1.71, H: 1.34, wb: 2.70, fo: 0.83, r: 0.35, nose: 0.66, cowl: 0.86, belt: 0.92, deck: 0.92, ws: 0.70, rs: 0.52, roofF: 0.6, roofR: 0.3, slant: 0.1, tumble: 0.17, lip: true , round: 0.1 },
-    e46:     { L: 4.49, W: 1.76, H: 1.37, wb: 2.73, fo: 0.85, r: 0.36, nose: 0.68, cowl: 0.88, belt: 0.94, deck: 0.95, ws: 0.72, rs: 0.55, roofF: 0.6, roofR: 0.3, slant: 0.12, tumble: 0.18, rings: true , round: 0.13 },
-    e92m3:   { L: 4.62, W: 1.80, H: 1.42, wb: 2.76, fo: 0.90, r: 0.38, nose: 0.70, cowl: 0.92, belt: 1.0, deck: 1.0, ws: 0.76, rs: 0.6, roofF: 0.6, roofR: 0.29, slant: 0.14, tumble: 0.2, dome: true, quad: true, rings: true, lip: true , round: 0.12 }
+    '2002':  { L: 4.23, W: 1.59, H: 1.41, wb: 2.50, fo: 0.78, r: 0.33, nose: 0.74, cowl: 0.86, belt: 0.86, deck: 0.84, ws: 0.42, rs: 0.40, roofF: 0.62, roofR: 0.33, slant: 0.02, tumble: 0.16, chrome: true , round: 0.1 , plan: 0.2, side: 0.07 },
+    e30:     { L: 4.32, W: 1.65, H: 1.38, wb: 2.57, fo: 0.80, r: 0.34, nose: 0.76, cowl: 0.88, belt: 0.90, deck: 0.90, ws: 0.52, rs: 0.40, roofF: 0.6, roofR: 0.31, slant: 0.0, tumble: 0.14, chrome: true , plan: 0.08, side: 0.03 },
+    e30m3:   { L: 4.35, W: 1.68, H: 1.37, wb: 2.56, fo: 0.82, r: 0.35, nose: 0.74, cowl: 0.87, belt: 0.90, deck: 0.92, ws: 0.54, rs: 0.36, roofF: 0.6, roofR: 0.32, slant: 0.0, tumble: 0.14, wing: true, lip: true, wide: 0.05 , plan: 0.1, side: 0.03, flare: 0.09 },
+    e36:     { L: 4.43, W: 1.71, H: 1.34, wb: 2.70, fo: 0.83, r: 0.35, nose: 0.66, cowl: 0.86, belt: 0.92, deck: 0.92, ws: 0.70, rs: 0.52, roofF: 0.6, roofR: 0.3, slant: 0.1, tumble: 0.17, lip: true , round: 0.1 , plan: 0.18, side: 0.06 },
+    e46:     { L: 4.49, W: 1.76, H: 1.37, wb: 2.73, fo: 0.85, r: 0.36, nose: 0.68, cowl: 0.88, belt: 0.94, deck: 0.95, ws: 0.72, rs: 0.55, roofF: 0.6, roofR: 0.3, slant: 0.12, tumble: 0.18, rings: true , round: 0.13 , plan: 0.24, side: 0.09 },
+    e92m3:   { L: 4.62, W: 1.80, H: 1.42, wb: 2.76, fo: 0.90, r: 0.38, nose: 0.70, cowl: 0.92, belt: 1.0, deck: 1.0, ws: 0.76, rs: 0.6, roofF: 0.6, roofR: 0.29, slant: 0.14, tumble: 0.2, dome: true, quad: true, rings: true, lip: true , round: 0.12 , plan: 0.2, side: 0.08, flare: 0.05 }
   };
   var MODELS = Object.keys(SPEC);
   var COLORS = {
@@ -51,12 +51,13 @@
     if (MAT.glass) return MAT;
     var phys = function (o) { var m = new THREE.MeshPhysicalMaterial(o); if (o.color != null) m.color.convertSRGBToLinear(); return m; };
     MAT.glass = phys({ color: 0x1a222c, roughness: 0.05, metalness: 0.3, clearcoat: 1, envMapIntensity: 1.4, side: THREE.DoubleSide });
+    MAT.lens = phys({ color: 0x9aa6b4, roughness: 0.08, metalness: 0.6, clearcoat: 1, envMapIntensity: 1.5 });
     MAT.chrome = phys({ color: 0xe6e9ee, roughness: 0.12, metalness: 1, envMapIntensity: 1.3 });
     MAT.black = phys({ color: 0x141518, roughness: 0.55 });
     MAT.tire = phys({ color: 0x18191b, roughness: 0.85 });
-    MAT.lamp = new THREE.MeshBasicMaterial({ color: col(0xfff6dc) });
-    MAT.ring = new THREE.MeshBasicMaterial({ color: col(0xdff2ff) });
-    MAT.tail = phys({ color: 0xc8101e, roughness: 0.2, clearcoat: 1, emissive: 0x3a0005 });
+    MAT.lamp = new THREE.MeshBasicMaterial({ color: col(0xfffbe8) });
+    MAT.ring = new THREE.MeshBasicMaterial({ color: col(0xeaf8ff) });
+    MAT.tail = phys({ color: 0xd8101e, roughness: 0.2, clearcoat: 1, emissive: 0x7a0008 });
     MAT.amber = phys({ color: 0xf29a1e, roughness: 0.2, clearcoat: 1 });
     MAT.plate = phys({ color: 0xf4f4f0, roughness: 0.5 });
     return MAT;
@@ -159,28 +160,83 @@
     return t;
   }
 
+  // Umriss dicht abtasten (sonst haben lange Kanten keine Zwischenpunkte zum Verformen)
+  function dense(shape, n) { return new THREE.Shape(shape.getSpacedPoints(n)); }
+  // Karosserie formen: Ecken von oben gerundet (plan), Seiten gewölbt (side), Kotflügel über den
+  // Rädern ausgestellt (flare). Nur z wird verändert, die Seiten-Texturen bleiben an ihrem Platz.
+  function sculpt(geo, s, W, y0, y1, x0, x1, wheels) {
+    var p = geo.attributes.position, half = W / 2, endL = Math.min(0.75, (x1 - x0) * 0.2);
+    for (var i = 0; i < p.count; i++) {
+      var x = p.getX(i), y = p.getY(i), z = p.getZ(i), az = Math.min(1.2, Math.abs(z) / half), f = 1;
+      var e = Math.max(0, (x - (x1 - endL)) / endL, (x0 + endL - x) / endL);
+      f *= 1 - (s.plan || 0) * e * e * az * az;
+      var yy = Math.max(-1, Math.min(1, ((y - y0) / (y1 - y0)) * 2 - 1));
+      f *= 1 - (s.side || 0) * yy * yy * az;
+      if (s.flare && wheels) wheels.forEach(function (wx) {
+        var w = Math.max(0, 1 - Math.abs(x - wx) / (s.r * 1.9)), lowY = Math.max(0, 1 - Math.max(0, y - s.r * 1.6) / 0.25);
+        f *= 1 + s.flare * w * w * (3 - 2 * w) * lowY * az;
+      });
+      p.setZ(i, z * f);
+    }
+    smoothNormals(geo, 0.57);
+  }
+
+  // weiche Schattierung: Normalen benachbarter Flächen mitteln, solange der Knick unter ~55° liegt
+  // (ExtrudeGeometry ist nicht indiziert, computeVertexNormals ergäbe Facetten)
+  function smoothNormals(geo, cosT) {
+    var p = geo.attributes.position.array, nT = p.length / 9, fn = new Float32Array(nT * 3), map = {}, a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+    function key(i) { return Math.round(p[i] * 2000) + ',' + Math.round(p[i + 1] * 2000) + ',' + Math.round(p[i + 2] * 2000); }
+    for (var t = 0; t < nT; t++) {
+      a.fromArray(p, t * 9); b.fromArray(p, t * 9 + 3); c.fromArray(p, t * 9 + 6);
+      b.sub(a); c.sub(a); b.cross(c); var l = b.length() || 1; fn[t * 3] = b.x / l; fn[t * 3 + 1] = b.y / l; fn[t * 3 + 2] = b.z / l;
+      for (var v = 0; v < 3; v++) { var k = key(t * 9 + v * 3); (map[k] || (map[k] = [])).push(t); }
+    }
+    var out = new Float32Array(p.length);
+    for (t = 0; t < nT; t++) for (v = 0; v < 3; v++) {
+      var list = map[key(t * 9 + v * 3)], sx = 0, sy = 0, sz = 0;
+      for (var j = 0; j < list.length; j++) { var g = list[j], d = fn[t * 3] * fn[g * 3] + fn[t * 3 + 1] * fn[g * 3 + 1] + fn[t * 3 + 2] * fn[g * 3 + 2]; if (d > cosT) { sx += fn[g * 3]; sy += fn[g * 3 + 1]; sz += fn[g * 3 + 2]; } }
+      var ln = Math.hypot(sx, sy, sz) || 1, o = t * 9 + v * 3; out[o] = sx / ln; out[o + 1] = sy / ln; out[o + 2] = sz / ln;
+    }
+    geo.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+  }
+
   function add(g, geo, mat, x, y, z, rx, ry, rz) { var m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); g.add(m); return m; }
   function rbox(w, h, d) { return new THREE.BoxGeometry(w, h, d); }
 
-  var CACHE = {};
+  // je Modell einmal gebaut (Geometrie geteilt), je Farbe nur die Lack-Materialien getauscht
+  var CACHE = {}, PAINTS = {};
   function build(model, color) {
-    var s = SPEC[model] || SPEC.e30, M = mats(), key = model + ':' + color;
-    if (CACHE[key]) return CACHE[key].clone();
-    var paint = new THREE.MeshPhysicalMaterial({ color: col(color), metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.1 });
+    if (!SPEC[model]) model = 'e30';
+    if (!CACHE[model]) CACHE[model] = buildModel(model);
+    var car = CACHE[model].clone(), pk = model + ':' + color;
+    function recolor(m) {
+      if (!m || !m.userData.isPaint) return m;
+      var k = pk + ':' + m.uuid;
+      if (!PAINTS[k]) { PAINTS[k] = m.clone(); PAINTS[k].color.copy(col(color)); }
+      return PAINTS[k];
+    }
+    car.traverse(function (o) { if (o.isMesh) o.material = Array.isArray(o.material) ? o.material.map(recolor) : recolor(o.material); });
+    return car;
+  }
+  function buildModel(model) {
+    var s = SPEC[model], M = mats();
+    var paint = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0.35, roughness: 0.32, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.1 });
+    paint.userData.isPaint = true;
     var car = new THREE.Group(), body = new THREE.Group(); car.add(body);
     var W = s.W + (s.wide || 0), bev = s.round || 0.07;
     var lo = lowerShape(s);
     // Unterteil: Seiten mit Fugen-Textur, Rest Lack
-    var lg = new THREE.ExtrudeGeometry(lo.shape, { depth: W - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 20 });
+    var lg = new THREE.ExtrudeGeometry(dense(lo.shape, 260), { depth: W - 2 * bev, steps: 10, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 4 });
     lg.translate(0, 0, -(W - 2 * bev) / 2);
+    sculpt(lg, s, W, 0.1, Math.max(s.cowl, s.belt), -bev, s.L + bev, [lo.xr, lo.xf]);
     var sideLo = paint.clone(); sideLo.map = lowerSideTex(s, lo);
     add(body, lg, [sideLo, paint]);
     // Fahrgastzelle: oben eingezogen (Tumblehome)
     var cp = cabinPts(s, lo), csh = new THREE.Shape();
     cp.forEach(function (p, i) { if (i) csh.lineTo(p[0], p[1]); else csh.moveTo(p[0], p[1]); });
-    var cw = W * 0.86, cg = new THREE.ExtrudeGeometry(csh, { depth: cw - 0.08, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 2 });
+    var cw = W * 0.86, cg = new THREE.ExtrudeGeometry(csh, { depth: cw - 0.08, steps: 4, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 3 });
     cg.translate(0, 0, -(cw - 0.08) / 2);
-    (function () { var p = cg.attributes.position, yb = cp[0][1]; for (var i = 0; i < p.count; i++) { var k = Math.max(0, (p.getY(i) - yb) / (s.H - yb)); p.setZ(i, p.getZ(i) * (1 - s.tumble * k)); } cg.computeVertexNormals(); })();
+    (function () { var p = cg.attributes.position, yb = cp[0][1]; for (var i = 0; i < p.count; i++) { var k = Math.max(0, (p.getY(i) - yb) / (s.H - yb)); p.setZ(i, p.getZ(i) * (1 - s.tumble * k)); } smoothNormals(cg, 0.57); })();
     var sideCab = paint.clone(); sideCab.map = cabinSideTex(s, cp);
     add(body, cg, [sideCab, paint]);
     // Windschutz- und Heckscheibe als Glasflächen auf den Schrägen
@@ -190,46 +246,54 @@
       var u = new THREE.Vector3(dx / len, dy / len, 0), v = new THREE.Vector3(0, 0, 1), n = new THREE.Vector3().crossVectors(u, v);
       var m = new THREE.Mesh(new THREE.PlaneGeometry(len * 0.9, wid), M.glass);
       m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(u, v, n));
-      m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0).addScaledVector(n, 0.05);
+      m.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0).addScaledVector(n, 0.065);
       body.add(m); return m;
     }
     var mw = cw * (1 - s.tumble * 0.5) - 0.14;
     pane(cp[0], cp[1], mw); pane(cp[2], cp[3], mw);
 
     // ── Front (x = L) ──
-    var L = s.L, fx = L + bev + 0.012 - s.slant * 0.5, yl = s.nose - 0.17;
-    var front = new THREE.Group(); front.position.set(fx, 0, 0); front.rotation.y = Math.PI / 2; body.add(front);   // lokal: x quer, y hoch, +z nach vorn
-    var kw = model === 'e46' || model === 'e92m3' ? 0.2 : model === '2002' ? 0.13 : 0.14, kh = model === 'e46' || model === 'e92m3' ? 0.2 : 0.24;
-    if (model === '2002' || model === 'e30' || model === 'e30m3') add(front, rbox(W - 0.3, 0.2, 0.02), M.black, 0, yl, 0.0);          // schwarzer Grill quer
+    // Front: Teile sitzen auf der (bei E36/E46/E92 geneigten) Frontfläche; überzeichnet wie beim Spielzeug
+    var L = s.L, yl = s.nose - 0.19, f0 = 0.3;
+    function frontX(y) { return L + bev + 0.012 - s.slant * Math.max(0, Math.min(1, (y - f0) / (s.nose - f0))); }
+    var front = new THREE.Group(); front.position.set(frontX(yl), 0, 0); front.rotation.y = Math.PI / 2; body.add(front);   // lokal: x quer, y hoch, +z nach vorn
+    function fadd(geo, mat, lx, y, dz) { return add(front, geo, mat, lx, y, frontX(y) - front.position.x + (dz || 0)); }
+    var big = model === 'e46' || model === 'e92m3', kw = big ? 0.22 : 0.15, kh = big ? 0.26 : model === 'e36' ? 0.24 : 0.3;
+    if (model === '2002' || model === 'e30' || model === 'e30m3') fadd(rbox(W * (1 - (s.plan || 0) * 0.6) - 0.2, 0.26, 0.02), M.black, 0, yl, 0.0);   // schwarzer Grill quer
     [-1, 1].forEach(function (sd) {
       // Doppelniere: Chromrahmen, schwarzes Gitter
-      add(front, rbox(kw + 0.04, kh + 0.04, 0.03), M.chrome, sd * (kw / 2 + 0.03), yl + 0.02, 0.01);
-      add(front, rbox(kw, kh, 0.04), M.black, sd * (kw / 2 + 0.03), yl + 0.02, 0.012);
-      var ex = W / 2 - 0.28;
-      if (model === '2002') add(front, new THREE.CircleGeometry(0.1, 24), M.lamp, sd * ex, yl, 0.02);
-      else if (model === 'e30' || model === 'e30m3') [0, 1].forEach(function (k) { add(front, new THREE.CircleGeometry(0.075, 24), M.lamp, sd * (ex - 0.06 + k * 0.17 - 0.08), yl, 0.02); });
+      // Doppelniere: Chromrahmen, schwarzes Gitter mit senkrechten Stäben
+      var kx = sd * (kw / 2 + 0.035);
+      fadd(rbox(kw + 0.06, kh + 0.06, 0.03), M.chrome, kx, yl + 0.03, 0.012);
+      fadd(rbox(kw, kh, 0.04), M.black, kx, yl + 0.03, 0.016);
+      for (var b = 1; b < 4; b++) fadd(rbox(0.012, kh - 0.02, 0.045), M.chrome, kx - kw / 2 + b * kw / 4, yl + 0.03, 0.017);
+      var ex = W / 2 - 0.3;
+      if (model === '2002') { fadd(new THREE.CircleGeometry(0.15, 28), M.chrome, sd * ex, yl, 0.02); fadd(new THREE.CircleGeometry(0.125, 28), M.lamp, sd * ex, yl, 0.025); }
+      else if (model === 'e30' || model === 'e30m3') [0, 1].forEach(function (k) {
+        var lx = sd * (ex + 0.07 - (1 - k) * 0.22); fadd(new THREE.CircleGeometry(0.1, 28), M.chrome, lx, yl, 0.02); fadd(new THREE.CircleGeometry(0.082, 28), M.lamp, lx, yl, 0.025);
+      });
       else {
-        // Scheinwerfer unter Glas, bei E46/E92 mit Leuchtringen
-        add(front, rbox(0.42, 0.15, 0.03), M.glass, sd * (ex - 0.06), yl + 0.01, 0.01);
+        // Scheinwerfer unter Glas, bei E46/E92 mit hellen Leuchtringen
+        fadd(rbox(0.5, 0.22, 0.03), M.lens, sd * (ex - 0.02), yl + 0.02, 0.012);
         [0, 1].forEach(function (k) {
-          var cx = sd * (ex - 0.06 + (k ? 0.1 : -0.1) * sd);
-          add(front, new THREE.CircleGeometry(0.055, 20), M.lamp, cx, yl + 0.01, 0.03);
-          if (s.rings) add(front, new THREE.TorusGeometry(0.068, 0.009, 8, 32), M.ring, cx, yl + 0.01, 0.035);
+          var cx = sd * (ex - 0.02) + (k ? 0.115 : -0.115);
+          fadd(new THREE.CircleGeometry(0.07, 24), M.lamp, cx, yl + 0.02, 0.03);
+          if (s.rings) fadd(new THREE.TorusGeometry(0.088, 0.016, 8, 32), M.ring, cx, yl + 0.02, 0.035);
         });
       }
-      add(front, rbox(0.12, 0.05, 0.02), M.amber, sd * (W / 2 - 0.18), 0.36, 0.02);                // Blinker unten
+      fadd(rbox(0.16, 0.06, 0.02), M.amber, sd * (W / 2 - 0.26), 0.36, 0.03);                // Blinker unten
     });
-    add(front, rbox(0.42, 0.11, 0.02), M.plate, 0, 0.3, 0.06);                                   // Kennzeichenfeld (leer)
-    if (s.chrome) add(front, rbox(W + 0.04, 0.08, 0.1), M.chrome, 0, 0.42, 0.05);               // Chromstoßstange
-    else add(front, rbox(W + 0.02, 0.16, 0.08), M.black, 0, 0.24, 0.03);
-    if (s.lip) add(front, rbox(W - 0.1, 0.05, 0.18), M.black, 0, 0.19, 0.02);                    // Frontlippe
+    fadd(rbox(0.46, 0.12, 0.02), M.plate, 0, 0.3, 0.07);                                       // Kennzeichenfeld (leer)
+    if (s.chrome) { fadd(rbox(W + 0.06, 0.11, 0.12), M.chrome, 0, 0.42, 0.06); fadd(rbox(W + 0.07, 0.03, 0.125), M.black, 0, 0.42, 0.062); }   // Chromstoßstange mit Gummileiste
+    else fadd(rbox(W - 0.04, 0.18, 0.08), M.black, 0, 0.24, 0.03);
+    if (s.lip) fadd(rbox(W - 0.14, 0.06, 0.2), M.black, 0, 0.18, 0.02);                        // Frontlippe
     // ── Heck (x = 0) ──
     var rear = new THREE.Group(); rear.position.set(-bev - 0.012, 0, 0); rear.rotation.y = -Math.PI / 2; body.add(rear);
     var yt = s.deck - 0.2;
     [-1, 1].forEach(function (sd) {
-      if (model === '2002') add(rear, new THREE.CircleGeometry(0.075, 20), M.tail, sd * (W / 2 - 0.22), yt, 0.02);
-      else if (model === 'e30' || model === 'e30m3') { add(rear, rbox(0.46, 0.16, 0.02), M.tail, sd * (W / 2 - 0.3), yt, 0.01); add(rear, rbox(0.14, 0.16, 0.025), M.amber, sd * (W / 2 - 0.62), yt, 0.012); }
-      else add(rear, rbox(0.4, 0.13, 0.02), M.tail, sd * (W / 2 - 0.28), yt + 0.02, 0.01);
+      if (model === '2002') add(rear, new THREE.CircleGeometry(0.11, 24), M.tail, sd * (W / 2 - 0.26), yt, 0.02);
+      else if (model === 'e30' || model === 'e30m3') { add(rear, rbox(0.5, 0.2, 0.02), M.tail, sd * (W / 2 - 0.32), yt, 0.01); add(rear, rbox(0.15, 0.2, 0.025), M.amber, sd * (W / 2 - 0.66), yt, 0.012); }
+      else { add(rear, rbox(0.46, 0.17, 0.02), M.tail, sd * (W / 2 - 0.32), yt + 0.02, 0.01); add(rear, rbox(0.2, 0.05, 0.025), M.lamp, sd * (W / 2 - 0.32), yt - 0.02, 0.012); }
     });
     add(rear, rbox(0.42, 0.11, 0.02), M.plate, 0, yt - 0.06, 0.01);
     if (s.chrome) add(rear, rbox(W + 0.04, 0.08, 0.1), M.chrome, 0, 0.42, 0.05);
@@ -249,13 +313,12 @@
       [-1, 1].forEach(function (sd) {
         var wz = sd * (W / 2 - tw / 2 + 0.04);
         add(body, new THREE.CylinderGeometry(s.r, s.r, tw, 28), M.tire, wx, s.r, wz, Math.PI / 2);
-        add(body, new THREE.CircleGeometry(s.r * 0.7, 28), rm, wx, s.r, wz + sd * (tw / 2 + 0.003), 0, sd > 0 ? 0 : Math.PI, 0);
+        add(body, new THREE.CircleGeometry(s.r * 0.74, 28), rm, wx, s.r, wz + sd * (tw / 2 + 0.003), 0, sd > 0 ? 0 : Math.PI, 0);
       });
     });
     // Mitte des Autos in den Ursprung
     body.position.set(-L / 2, -s.H / 2, 0);
-    CACHE[key] = car;
-    return car.clone();
+    return car;
   }
 
   function random() {

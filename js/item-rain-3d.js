@@ -365,9 +365,10 @@
     function spawn() {
       var k = rand(0.8, 1.2), it = makeItem(), g = it.g;
       // jedes Teil etwa `size` groß (Ballons etwas größer)
-      var sc = size * k * (rise ? 1.5 : kind === 'car' ? 1.7 : 1) / it.len;
+      var sc = size * k * (rise ? 1.5 : kind === 'car' ? 2.2 : 1) / it.len;
       g.scale.set(sc, sc, sc);
       if (rise) g.rotation.set(rand(-0.15, 0.15), rand(0, 6.28), rand(-0.2, 0.2));
+      else if (kind === 'car') g.rotation.set(rand(-0.35, 0.35), rand(0, 6.28), rand(-0.3, 0.3));   // Autos eher waagrecht: Seite und Front bleiben lesbar
       else g.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
       scene.add(g);
       if (rise) {
@@ -379,7 +380,7 @@
         return;
       }
       ducks.push({ g: g, sc: sc, x: rand(margin, W - margin), y: rand(-200, -80), vx: rand(-30, 30), vy: rand(60, 160),
-                   wx: reduce ? 0 : rand(-2.2, 2.2), wy: reduce ? 0 : rand(-2.6, 2.6), wz: reduce ? 0 : rand(-2.2, 2.2),
+                   wx: reduce ? 0 : rand(-2.2, 2.2) * (kind === 'car' ? 0.15 : 1), wy: reduce ? 0 : rand(-2.6, 2.6) * (kind === 'car' ? 0.6 : 1), wz: reduce ? 0 : rand(-2.2, 2.2) * (kind === 'car' ? 0.2 : 1),
                    bounced: false, back: 0, h: size * k * 0.5, z: rand(-300, 300) });
       spawned++;
     }
