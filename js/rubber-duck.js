@@ -973,13 +973,20 @@
     return HUGS[key];
   }
   // Schlauch-Querschnitt entlang einer Kurve: Ellipse mit Halbachsen r (Breite) und r·(1 − flat) (Dicke),
-  // taper verjüngt zum Ende, twist dreht das Band um die Linie. Mit hug liegt die Linie auf dem Körper
-  // (Abstand lift) und die flache Seite zeigt immer zur Haut.
-  function sweepGeo(curve, segs, rad, P, closed, hug) {
+  // taper verjüngt zum Ende, twist dreht das Band um die Linie. Mit hug sitzen die Knickpunkte auf dem
+  // Körper (Abstand lift), die flache Seite zeigt zur Haut; zwei Punkte = Gerade, ab drei Punkten wird
+  // die Kurve nur nach außen geschoben, wo sie in den Körper tauchen würde (follow).
+  function sweepGeo(curve, segs, rad, P, closed, hug, follow) {
     var fr = curve.computeFrenetFrames(segs, closed), C = [], Nb = [], i, j;
     for (i = 0; i <= segs; i++) {
       var c = curve.getPointAt(i / segs);
-      if (hug) { var s = hug(c); c = s.p.clone().addScaledVector(s.n, P.lift || 0); Nb.push(s.n); }
+      if (hug) {
+        // nur nach außen schieben, wo die Linie in den Körper taucht – nie an die Haut heranziehen;
+        // bei zwei Punkten gar nicht (Gerade bleibt Gerade)
+        var s = hug(c), out = c.clone().sub(s.p).dot(s.n), lf = P.lift || 0;
+        if (follow && out < lf) c = s.p.clone().addScaledVector(s.n, lf);
+        Nb.push(s.n);
+      }
       C.push(c);
     }
     var pos = [], nor = [], uv = [], idx = [], tw = (P.twist || 0) * DEG, ct = Math.cos(tw), st = Math.sin(tw);
@@ -1047,11 +1054,11 @@
     } else if (info.t === 'hose') {
       var hp = info.p || {}, closed = !!hp.closed, hug = info.hug != null ? hugger(info.hug) : null;
       var cps = P.pts.map(function (q) { return new THREE.Vector3(q[0], q[1], q[2]); });
-      if (hug) cps = cps.map(function (q) { return hug(q).p; });
+      if (hug) cps = cps.map(function (q) { var s = hug(q); return s.p.clone().addScaledVector(s.n, P.lift || 0); });
       var path = hp.spline && cps.length > 1 ? new THREE.CatmullRomCurve3(cps, closed) : new PathCurve(roundedPath(cps, P.round));
       var len = path.getLength() || 1;
       if (P.turns > 0) g = coilGeo(path, P.turns, P.coil, 0, 0, P.r * 2);
-      else g = sweepGeo(path, Math.max(48, Math.ceil(len / 0.01)), hp.rad || 14, P, closed && !!hp.spline, hug);
+      else g = sweepGeo(path, Math.max(48, Math.ceil(len / 0.01)), hp.rad || 14, P, closed && !!hp.spline, hug, cps.length > 2);
     }
     var sc = info.sc || [1, 1, 1], off = info.off || [0, 0, 0];
     if (sc[0] !== 1 || sc[1] !== 1 || sc[2] !== 1) g.scale(sc[0], sc[1], sc[2]);
