@@ -931,7 +931,8 @@
     // Saug-Ente (Freischaltung „duck-vacuum“): kommt, wenn alles gelandet ist und Fress-/Fahrer-Ente fertig sind
     var vacuum = null, VE = null, othersBusy = false;
     if (wantVacuum) {
-      var vv = typeof opts.vacuum === 'string' ? opts.vacuum : '', vo3 = RD.viewerOutfit || function () { return null; };
+      // ohne eigenes vacuum=: wie Fahrer-/Fress-Ente (Name des Auslösers aus driver= bzw. eater=)
+      var vv = typeof opts.vacuum === 'string' ? opts.vacuum : typeof opts.driver === 'string' ? opts.driver : typeof opts.eater === 'string' ? opts.eater : '', vo3 = RD.viewerOutfit || function () { return null; };
       var vout = (vv && RD.OUTFITS.indexOf(vv) >= 0 ? vv : null) || (vv && vo3(vv)) || opts.mine || (opts.owner && vo3(opts.owner)) || 'none';
       VE = { scene: scene, W: W, FLOOR: FLOOR, items: ducks, size: size, reduce: reduce, outfit: vout,
              startAt: spawnEnd / 1000 + 2.2, ready: function () { return !othersBusy; } };
