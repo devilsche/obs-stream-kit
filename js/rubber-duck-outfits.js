@@ -1111,6 +1111,119 @@
     x.bezierCurveTo(c + 25, c - 105, c + 110, c - 95, c + 110, c - 30); x.bezierCurveTo(c + 110, c + 30, c + 20, c + 70, c, c + 100); x.fill();
   };
 
+  // ════════ Gothic / Industrial (Industrial goth, Gothic reaper, Victorian goth) ════════
+  var GC = { nori: 0x17231a, rice: 0xf7f4ea, salmon: 0xff7f50, tuna: 0xc8283c, cucumber: 0x6fbf4a };
+  // Maki: Nori-Wand, Reis-Ring, Füllung (Achse = y)
+  function maki(r, fill) {
+    var g = new THREE.Group();
+    add(g, cyl(r, r, r * 1.1, 28), fabric(GC.nori, { roughness: 0.6 }));
+    add(g, cyl(r * 0.9, r * 0.9, r * 1.12, 28), fabric(GC.rice, { roughness: 0.95 }));
+    add(g, cyl(r * 0.38, r * 0.38, r * 1.14, 20), M(fill || GC.salmon, { roughness: 0.35 }));
+    return g;
+  }
+  function chainLinks(parent, pts, mat, size) {   // Kettenglieder entlang einer Linie, abwechselnd gedreht
+    var curve = new THREE.CatmullRomCurve3(pts), L = curve.getLength(), n = Math.max(4, Math.round(L / (size * 1.6)));
+    for (var i = 0; i <= n; i++) {
+      var p = curve.getPointAt(i / n), t = curve.getTangentAt(i / n), l = add(parent, torus(size, size * 0.28, 16), mat);
+      l.position.copy(p); l.quaternion.setFromUnitVectors(new V3(0, 0, 1), new V3().crossVectors(t, new V3(0, 1, 0)).normalize().lengthSq() > 0 ? new V3().crossVectors(t, new V3(0, 1, 0)).normalize() : new V3(1, 0, 0));
+      l.rotateOnAxis(new V3(0, 0, 1), 0); l.scale.set(1.5, 1, 1); if (i % 2) l.rotateOnWorldAxis(t, PI / 2);
+    }
+  }
+  function steel() { return metal(0x8d9096, { roughness: 0.35 }); }
+  function rust() { return metal(0x7a4a2a, { roughness: 0.75, metalness: 0.55 }); }
+
+  // ── A Industrial: Gasmaske, Schweißerbrille, Cyber-Dreads ──
+  ACC.gasmask = function (c) {
+    var rub = M(0x1a1a1d, { roughness: 0.55, clearcoat: 0.3 }), st = steel();
+    var cup = add(c.g, sph(1, 32), rub); cup.scale.set(0.44, 0.3, 0.36); cup.position.set(1.3, 0.89, 0); cup.rotation.z = -0.1; cup.name = 'Mask';
+    var nose = add(c.g, cyl(0.1, 0.12, 0.1, 24), st); nose.rotation.z = PI / 2; nose.position.set(1.72, 0.86, 0); nose.name = 'Valve';
+    [-1, 1].forEach(function (s) {
+      var f = new THREE.Group(); f.position.set(1.4, 0.8, s * 0.3); f.rotation.set(s * -0.9, 0, 0.5); c.g.add(f);
+      add(f, cyl(0.1, 0.1, 0.14, 24), rust());
+      add(f, cyl(0.105, 0.105, 0.03, 24), st, 0, 0.07);
+      for (var k = 0; k < 4; k++) add(f, cyl(0.012, 0.012, 0.2, 6), st, -0.06 + k * 0.04, 0.085, 0).rotation.x = PI / 2;
+    });
+    var h = hatBase(c, -0.05, 0), r = h.userData.r, band = add(h, torus(r + 0.02, 0.03, 64), rub); band.rotation.x = PI / 2; h.rotation.z = -0.35;
+  };
+  ACC.goggles = function (c) {
+    var h = hatBase(c, 0.3, 0), r = h.userData.r; h.rotation.z = 0.22;
+    var strap = add(h, torus(r + 0.015, 0.035, 64), M(0x2a2420, { roughness: 0.7 })); strap.rotation.x = PI / 2; strap.scale.z = 1.4; strap.name = 'Strap';
+    [-1, 1].forEach(function (s) {
+      var dir = new V3(0.72, 0.62, s * 0.3).normalize(), p = c.headPoint(dir, 1.0), g = new THREE.Group();
+      g.position.copy(p); g.lookAt(p.clone().add(dir)); c.g.add(g);
+      add(g, cyl(0.13, 0.15, 0.12, 28), rust(), 0, 0, 0.05).rotation.x = PI / 2;
+      var lens = add(g, new THREE.CircleGeometry(0.11, 28), M(0x39ff14, { roughness: 0.05, clearcoat: 1, emissive: 0x1d8a0a, emissiveIntensity: 0.6 })); lens.position.z = 0.115;
+      for (var k = 0; k < 6; k++) { var a = k / 6 * PI * 2; add(g, sph(0.015, 8), steel(), Math.cos(a) * 0.14, Math.sin(a) * 0.14, 0.11); }
+    });
+  };
+  ACC.cyberdreads = function (c, a) {
+    var neon = M(a.color || 0x39ff14, { roughness: 0.35, emissive: 0x0f4a06, emissiveIntensity: 0.5 }), blk = M(0x111114, { roughness: 0.6 });
+    var n = 16;
+    for (var i = 0; i < n; i++) {
+      var s = (i / (n - 1)) * 2 - 1, root0 = c.headPoint(new V3(-0.35 - 0.2 * (1 - Math.abs(s)), 0.85, s * 0.75).normalize(), 0.98);
+      var sway = (i % 3 - 1) * 0.08, pts = [root0, root0.clone().add(new V3(-0.25, 0.05, s * 0.12)), root0.clone().add(new V3(-0.45 + sway, -0.45, s * 0.25)), root0.clone().add(new V3(-0.5 + sway, -0.95, s * 0.32))];
+      tube(pts, 0.04, i % 3 === 1 ? blk : neon, c.g);
+      add(c.g, cyl(0.05, 0.05, 0.06, 12), steel(), pts[2].x, pts[2].y, pts[2].z);
+    }
+    var bun = add(c.g, sph(0.2, 20), blk); bun.position.copy(c.headPoint(new V3(-0.4, 0.9, 0).normalize(), 1.0));
+  };
+
+  // ── B Gothic Reaper: rostige Sense mit aufgespießten Maki, Kette quer über die Brust ──
+  ACC.sushiscythe = function (c) {
+    var h = held(c, 1).add(new V3(0, 0, 0.08));
+    add(c.g, cyl(0.032, 0.032, 2.3, 10), M(0x16120f, { roughness: 0.6 }), h.x, h.y + 0.35, h.z);
+    var bl = add(c.g, torus(0.42, 0.04, 40, PI * 0.55), rust()); bl.position.set(h.x - 0.38, h.y + 1.42, h.z); bl.rotation.z = 0.2; bl.scale.set(1, 1, 0.25);
+    var edge = add(c.g, torus(0.455, 0.012, 40, PI * 0.55), metal(0xdfe3e8, { roughness: 0.1 })); edge.position.copy(bl.position); edge.rotation.z = 0.2; edge.scale.set(1, 1, 0.3);
+    [1.02, 0.66].forEach(function (y, k) { var mk = maki(0.17, k ? GC.cucumber : GC.tuna); mk.position.set(h.x, h.y + y, h.z); mk.rotation.set(PI / 2, 0, 0.5); c.g.add(mk); });
+    add(c.g, cyl(0.05, 0.03, 0.12, 10), steel(), h.x, h.y + 1.52, h.z);
+  };
+  ACC.crosschain = function (c) {
+    var pts = [U.surface(new V3(0.6, 0.62, 0.62)).p, U.surface(new V3(1, 0.25, 0.1)).p, U.surface(new V3(0.9, -0.2, -0.55)).p, U.surface(new V3(0.2, -0.3, -1)).p]
+      .map(function (p, i, A) { return p.clone().multiplyScalar(1.03); });
+    chainLinks(c.g, pts, steel(), 0.035);
+  };
+
+  // ── C Victorian Goth: Zylinder mit Schleier, Choker mit Kamee, Korsett-Schnürung ──
+  ACC.tophat = function (c) {
+    var h = hatBase(c, 0.34, 0), r = h.userData.r; h.rotation.z = 0.1; h.position.z = -0.08;
+    var blk = fabric(0x0e0e11, { roughness: 0.55 }), vel = fabric(0x4a1460, { roughness: 0.9 });
+    add(h, cyl(r + 0.22, r + 0.22, 0.025, 64), blk, 0, 0.012);
+    add(h, cyl(r * 0.78, r * 0.86, 0.62, 48), blk, 0, 0.33);
+    add(h, cyl(r * 0.87, r * 0.875, 0.12, 48), vel, 0, 0.08);
+    // schwarze Feder seitlich am Band, nach hinten geschwungen
+    var fpts = [new V3(r * 0.3, 0.12, r * 0.86), new V3(-r * 0.2, 0.45, r * 1.0), new V3(-r * 0.9, 0.7, r * 0.8), new V3(-r * 1.4, 0.62, r * 0.5)];
+    var curve = new THREE.CatmullRomCurve3(fpts), fm = M(0x0c0c10, { roughness: 0.6, side: THREE.DoubleSide });
+    for (var i = 0; i <= 14; i++) {
+      var t = i / 14, p = curve.getPointAt(t), w = Math.sin(t * PI) * 0.16 + 0.02, b = add(h, sph(1, 12), fm);
+      b.position.copy(p); b.scale.set(0.06, w, 0.012); b.lookAt(p.clone().add(new V3(0, 0, 1))); b.rotation.z += 0.9 - t;
+    }
+    tube(fpts, 0.008, fm, h);
+    // Rosen am Band
+    [[r * 0.6, 0.1, r * 0.62], [r * 0.4, 0.09, r * 0.78]].forEach(function (q, i) {
+      add(h, sph(0.06, 12), M(i ? 0x2a0a10 : 0x7a0a1e, { roughness: 0.5 }), q[0], q[1], q[2]);
+    });
+  };
+  ACC.choker = function (c) {
+    var vel = fabric(0x0c0c0f, { roughness: 0.95 }), t = add(c.g, torus(0.45, 0.04, 48), vel); t.position.set(0.44, 0.72, 0); t.rotation.set(PI / 2, -0.28, 0); t.scale.set(1, 1.04, 1);
+    var at = U.surfaceAt(0.62, 0, 0.42), g = new THREE.Group(); g.position.copy(at.p).addScaledVector(at.n, 0.04); g.lookAt(g.position.clone().add(at.n)); c.g.add(g);
+    var fr = add(g, torus(0.075, 0.014, 24), metal(0xc9ccd2, { roughness: 0.15 })); fr.scale.y = 1.25;
+    var cam = add(g, new THREE.CircleGeometry(0.072, 24), M(0x2a0a10, { roughness: 0.3 })); cam.scale.y = 1.25;
+    var face = add(g, sph(0.035, 12), M(0xf1ebe2), 0, 0.005, 0.01); face.scale.set(0.8, 1.2, 0.3);
+  };
+  ACC.corset = function (c) {
+    var lace = M(0x111114, { roughness: 0.5 }), bone = fabric(0x1a0a22, { roughness: 0.4, clearcoat: 0.6 });
+    var ys = [0.18, 0.08, -0.02, -0.12, -0.22];
+    for (var i = 0; i < ys.length - 1; i++) {
+      [[-1, 1], [1, -1]].forEach(function (d) {
+        var a = U.surface(new V3(1, ys[i], d[0] * 0.13)).p, b = U.surface(new V3(1, ys[i + 1], d[1] * 0.13)).p;
+        tube([a.clone().multiplyScalar(1.025), a.clone().lerp(b, 0.5).multiplyScalar(1.035), b.clone().multiplyScalar(1.025)], 0.01, lace, c.g);
+      });
+    }
+    ys.forEach(function (y) { [-1, 1].forEach(function (s) { var e = U.surface(new V3(1, y, s * 0.13)); add(c.g, torus(0.018, 0.007, 12), metal(0xc9ccd2), 0, 0, 0).position.copy(e.p.clone().addScaledVector(e.n, 0.02)); }); });
+    [-1, 1].forEach(function (s) { tube([0.24, 0.1, -0.05, -0.26].map(function (y) { return U.surface(new V3(1, y, s * 0.3)).p.multiplyScalar(1.02); }), 0.018, bone, c.g); });
+  };
+
+
   // Anzeigenamen der Bausteine (Duck-Editor)
   Object.assign(RD.ACC_LABELS || {}, {
     afro: 'Afro', angelwings: 'Angel wings', antennae: 'Antennae', astro: 'Space helmet', backpack: 'Backpack',
@@ -1133,7 +1246,9 @@
     racestripes: 'Racing stripes', wheel: 'Steering wheel', bow: 'Bow and heart arrow', curls: 'Curls', tutu: 'Tutu',
     bun: 'Hair bun', exechood: 'Executioner hood', axe: 'Axe', biceps: 'Biceps', dumbbell: 'Dumbbell', donut: 'Donut',
     bra: 'Lace bra', lacepanties: 'Lace panties', garter: 'Garter belt', boa: 'Feather boa', lashes: 'Eyelashes',
-    openvest: 'Open vest', sword: 'Sword', kiteshield: 'Kite shield', judgewig: 'Judge wig', gavel: 'Gavel', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass'
+    openvest: 'Open vest', sword: 'Sword', kiteshield: 'Kite shield', judgewig: 'Judge wig', gavel: 'Gavel', forelock: 'Forelock', gunbelt: 'Gun belt', grass: 'Blade of grass',
+    gasmask: 'Gas mask', goggles: 'Welding goggles', cyberdreads: 'Cyber dreads', sushiscythe: 'Sushi scythe',
+    crosschain: 'Chest chain', tophat: 'Top hat', choker: 'Velvet choker', corset: 'Corset lacing'
   });
 
   // ════════ Outfits ════════
@@ -1205,6 +1320,9 @@
     muscle: { label: 'Muscle duck', cat: 'fun', skin: 0xe9a13b, muscles: true, pattern: { type: 'abs', c2: 0x8a4a10, zone: 'skin' }, acc: [['headband', { color: 0xc8151b, dy: 0.36 }], ['brows'], ['biceps'], ['dumbbell']] },
     fat: { label: 'Fat duck', cat: 'fun', girth: 1.5, acc: [['donut']] },
     lingerie: { label: 'Lace lingerie', cat: 'fun', bill: 0xd8152a, acc: [['bra'], ['lacepanties'], ['garter'], ['boa'], ['lashes']] },
+    industrial: { label: 'Industrial goth', cat: 'fun', skin: 0x232327, suit: 0x16161a, collar: 0.6, bill: 0x2a2a2e, acc: [['cyberdreads'], ['goggles'], ['gasmask'], ['studcollar'], ['chain', { color: 0x9a9da3 }]] },
+    gothreaper: { label: 'Gothic reaper', cat: 'horror', skin: 0x0c0c0e, suit: 0x0c0c0e, collar: 2, face: 0x050505, faceX: -0.5, bill: 0x111114, eyes: 'glow', eyeColor: 0xff2a2a, acc: [['hood'], ['sushiscythe'], ['crosschain']] },
+    victorian: { label: 'Victorian goth', cat: 'fun', skin: 0xa79fb3, suit: 0x0e0e11, collar: 0.62, collarDip: 0.45, collarV: 1, bill: 0x3a1f4a, acc: [['tophat'], ['choker'], ['corset'], ['lashes']] },
 
     // ── Berühmtheiten ──
     elvis: { label: 'Elvis', cat: 'celebs', suit: 0xf7f5ef, collar: 0.5, belt: 0xe2b62a, beltY: -0.22, pattern: { type: 'dots', c2: 0xe2b62a, scale: 10, zone: 'suit', y: [-0.18, 0.5] }, acc: [['pompadour'], ['glasses', { lens: 0x7a5a20, opacity: 0.8, frame: 'gold' }], ['highcollar', { color: 0xf7f5ef }]] },

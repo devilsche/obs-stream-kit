@@ -1163,7 +1163,7 @@
   }
   // Requisiten in der Flügelspitze bzw. vor dem Körper gehalten (build-Option noProps lässt sie weg)
   var HELD = { claws: 1, hammer: 1, trident: 1, scythe: 1, broom: 1, palette: 1, scepter: 1, wand: 1, katana: 1, shield: 1,
-    beer: 1, halfmic: 1, club: 1, tray: 1, whip: 1, wheel: 1, bow: 1, dumbbell: 1, donut: 1, axe: 1, sword: 1, kiteshield: 1, gavel: 1 };
+    beer: 1, halfmic: 1, club: 1, tray: 1, whip: 1, wheel: 1, bow: 1, dumbbell: 1, donut: 1, axe: 1, sword: 1, kiteshield: 1, gavel: 1, sushiscythe: 1 };
   var ACC_LABELS = {};   // Anzeigenamen der Bausteine (Editor), von rubber-duck-outfits.js gefüllt
   var KEYS = Object.keys(OUTFITS);
   // Outfits aus dem Duck-Editor (Server, /api/fx/ducks/custom.js): ersetzen ein Outfit aus dem

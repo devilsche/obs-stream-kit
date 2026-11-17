@@ -37,6 +37,8 @@ DE = {
     "unicorn": ["Einhorn"], "angel": ["Engel"], "wizard": ["Zauberer"], "racer": ["Rennfahrer"],
     "cupid": ["Amor"], "muscle": ["Mucki", "Muckiente", "Muskelente"], "fat": ["Fett", "Fette Ente", "Dick"],
     "lingerie": ["Dessous", "Spitze", "Spitzendessous"], "butler": ["Diener"], "streamer": ["Streamer"],
+    "industrial": ["Industrial", "Cybergoth", "Gasmaske"], "gothreaper": ["Gothic Sensenmann", "Goth Reaper", "Gothic Tod"],
+    "victorian": ["Viktorianisch", "Gothic Lady", "Zylinder"],
 }
 
 
