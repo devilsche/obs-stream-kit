@@ -317,7 +317,7 @@
       });
     });
     if (!cols.length) cols = [0xffcd2a];
-    var st = 'wait', x = 0, dir = 1, eaten = 0, target = E.target, t = 0, ph = 0, phaseT = 0;
+    var st = 'wait', x = 0, dir = 1, eaten = 0, target = E.target, t = 0, ph = 0, phaseT = 0, tgt = null, tgtSide = 0;
     var bite = null, gulp = 0, burped = false, burp = 0, parts = [], puffs = [], done = false, eatenItems = 0;
     function fat() { return Math.min(1, eaten / target); }
     function scaleNow(extra) {
@@ -414,13 +414,19 @@
         else if (near) startBite(near, false);
         else {
           // Ziel: geringster Weg bis der Schnabel drüber ist (Stücke vor dem Schnabel zählen weniger als hinter ihr)
-          var best = null, bd = 1e9;
-          resting().forEach(function (it) { var dd = Math.min(Math.abs(it.x - tp.x), Math.abs(it.x - (x - dir * reach())) + reach() * 0.8); if (dd < bd) { bd = dd; best = it; } });
+          // Ziel festhalten, bis es gefressen oder weg ist – Wahl nur nach Abstand, nicht nach Blickrichtung
+          // (sonst wechselt das Ziel beim Umdrehen, und sie zuckt Bild für Bild hin und her)
+          if (!tgt || tgt.gone || tgt.bitten || !(tgt.rest > 0)) {
+            tgt = null; var bd = 1e9;
+            resting().forEach(function (it) { var dd = Math.abs(it.x - x); if (dd < bd) { bd = dd; tgt = it; } });
+            if (tgt) tgtSide = Math.abs(x - tgt.x) < 1 ? -dir : Math.sign(x - tgt.x);
+          }
+          var best = tgt;
           if (best) {
-            // Anlauf von der Seite, auf der sie gerade steht – Abstand = Schnabellänge (liegt es zu nah, tritt sie zurück)
-            var side = x === best.x ? -dir : Math.sign(x - best.x), want = best.x + side * reach(), dx = want - x;
-            if (Math.abs(dx) < 10) { face(best.x - x); startBite(best, false); }
-            else { face(dx); x += Math.sign(dx) * Math.min(Math.abs(dx), speed() * dt); waddle(1); }
+            // Anlauf von der Seite, auf der sie beim Wählen stand – Abstand = Schnabellänge (liegt es zu nah, tritt sie zurück)
+            var want = best.x + tgtSide * reach(), dx = want - x;
+            if (Math.abs(dx) < 10) { face(best.x - x); tgt = null; startBite(best, false); }
+            else { if (Math.abs(dx) > 3) face(dx); x += Math.sign(dx) * Math.min(Math.abs(dx), speed() * dt); waddle(1); }
           } else {
             // nichts da: langsam zur Mitte schlendern und schauen
             var cx0 = W / 2 + Math.sin(t * 0.3) * 300, dx2 = cx0 - x;
