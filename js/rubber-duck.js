@@ -829,6 +829,8 @@
   // neu bauen (Editor „Shape“), dazu Quader mit runden Ecken, Biegen als Bogen, Zylinder als Feder,
   // Schlauch entlang von Knickpunkten. userData.prim = {t, p (Maße), a (Bau-Argumente), sc, off}:
   // sc/off = nachträgliche Streckung/Verschiebung der gebauten Geometrie (z. B. ell()).
+  // Schlauch (t: 'hose'): p.pts Knickpunkte, p.spline = weiche Kurve statt Knicke, p.closed = Ring,
+  // p.flat/p.twist = flaches Band; hug = Körperform-Key → liegt auf dem Körper an (Träger, Bänder).
   var PRIM_TYPES = {
     BoxGeometry: ['box', ['width', 'height', 'depth', 'widthSegments', 'heightSegments', 'depthSegments']],
     CylinderGeometry: ['cyl', ['radiusTop', 'radiusBottom', 'height', 'radialSegments', 'heightSegments', 'openEnded', 'thetaStart', 'thetaLength']],
@@ -885,9 +887,12 @@
       sz('R', 'Ring radius', p.R); sz('tube', 'Thickness', p.tube);
       L.push({ k: 'arc', label: 'Closed (°)', min: 10, max: 360, step: 1, def: p.arc });
     } else if (info.t === 'hose') {
-      L.push({ k: 'r', label: 'Thickness', min: 0.004, max: 0.25, step: 0.001, def: p.r });
-      L.push({ k: 'taper', label: 'End thickness (×)', min: 0.05, max: 3, step: 0.01, def: p.taper });
-      L.push({ k: 'round', label: 'Round kinks', min: 0, max: 1, step: 0.01, def: p.round });
+      L.push({ k: 'r', label: 'Thickness (half width)', min: 0.004, max: 0.25, step: 0.001, def: p.r });
+      L.push({ k: 'flat', label: 'Flatness (0 = round, 1 = band)', min: 0, max: 0.98, step: 0.01, def: p.flat || 0 });
+      if (info.hug != null) L.push({ k: 'lift', label: 'Distance from body', min: 0, max: 0.2, step: 0.001, def: p.lift != null ? p.lift : 0.02 });
+      else L.push({ k: 'twist', label: 'Turn the band (°)', min: -180, max: 180, step: 1, def: p.twist || 0 });
+      L.push({ k: 'taper', label: 'End thickness (×)', min: 0.05, max: 3, step: 0.01, def: p.taper != null ? p.taper : 1 });
+      if (!p.spline) L.push({ k: 'round', label: 'Round kinks', min: 0, max: 1, step: 0.01, def: p.round != null ? p.round : 0.5 });
       L.push({ k: 'turns', label: 'Coil turns (0 = smooth)', min: 0, max: 80, step: 0.5, def: 0 });
       L.push({ k: 'coil', label: 'Coil width', min: 0.01, max: 0.4, step: 0.005, def: 0.06 });
     }
@@ -956,6 +961,64 @@
     }
     return new THREE.TubeGeometry(new PathCurve(pts), n * 2, wire / 2, 10, false);
   }
+  // Körperoberfläche für anliegende Schläuche (Träger): key = Körperform des Outfits (CUR_KEY beim Bau),
+  // liefert für einen Punkt den radial projizierten Oberflächenpunkt samt Normale
+  var HUGS = {};
+  function hugger(key) {
+    key = String(key || '');
+    if (!HUGS[key]) {
+      var parts = key ? shapeFor({ girth: parseFloat(key) || 1, muscles: /m$/.test(key) }).parts : PARTS;
+      HUGS[key] = function (q) { var pc = CUR; CUR = parts; try { return surface(q.clone().sub(CENTER)); } finally { CUR = pc; } };
+    }
+    return HUGS[key];
+  }
+  // Schlauch-Querschnitt entlang einer Kurve: Ellipse mit Halbachsen r (Breite) und r·(1 − flat) (Dicke),
+  // taper verjüngt zum Ende, twist dreht das Band um die Linie. Mit hug liegt die Linie auf dem Körper
+  // (Abstand lift) und die flache Seite zeigt immer zur Haut.
+  function sweepGeo(curve, segs, rad, P, closed, hug) {
+    var fr = curve.computeFrenetFrames(segs, closed), C = [], Nb = [], i, j;
+    for (i = 0; i <= segs; i++) {
+      var c = curve.getPointAt(i / segs);
+      if (hug) { var s = hug(c); c = s.p.clone().addScaledVector(s.n, P.lift || 0); Nb.push(s.n); }
+      C.push(c);
+    }
+    var pos = [], nor = [], uv = [], idx = [], tw = (P.twist || 0) * DEG, ct = Math.cos(tw), st = Math.sin(tw);
+    var T = new THREE.Vector3(), N = new THREE.Vector3(), B = new THREE.Vector3(), d = new THREE.Vector3(), flat = Math.min(0.98, Math.max(0, P.flat || 0));
+    for (i = 0; i <= segs; i++) {
+      if (hug) {
+        T.copy(C[Math.min(i + 1, segs)]).sub(C[Math.max(i - 1, 0)]);
+        if (T.lengthSq() < 1e-12) T.copy(fr.tangents[i]);
+        T.normalize();
+        N.copy(Nb[i]).addScaledVector(T, -Nb[i].dot(T));
+        if (N.lengthSq() < 1e-12) N.copy(fr.normals[i]);
+        N.normalize(); B.crossVectors(T, N);
+      } else {
+        N.copy(fr.normals[i]).multiplyScalar(ct).addScaledVector(fr.binormals[i], st);
+        B.copy(fr.binormals[i]).multiplyScalar(ct).addScaledVector(fr.normals[i], -st);
+      }
+      var f = 1 + ((P.taper != null ? P.taper : 1) - 1) * i / segs, rB = P.r * f, rN = rB * (1 - flat);
+      for (j = 0; j <= rad; j++) {
+        var v = j / rad * Math.PI * 2, cs = -Math.cos(v), sn = Math.sin(v);
+        pos.push(C[i].x + N.x * cs * rN + B.x * sn * rB, C[i].y + N.y * cs * rN + B.y * sn * rB, C[i].z + N.z * cs * rN + B.z * sn * rB);
+        d.copy(N).multiplyScalar(cs * rB).addScaledVector(B, sn * rN);
+        if (d.lengthSq() < 1e-16) d.copy(N);
+        d.normalize(); nor.push(d.x, d.y, d.z);
+        uv.push(i / segs, j / rad);
+      }
+    }
+    for (i = 1; i <= segs; i++) for (j = 1; j <= rad; j++) {
+      var a = (rad + 1) * (i - 1) + (j - 1), b = (rad + 1) * i + (j - 1), e = (rad + 1) * i + j, h = (rad + 1) * (i - 1) + j;
+      idx.push(a, b, h, b, e, h);
+    }
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    g.setIndex(idx);
+    return g;
+  }
+  // Editor: Punkt eines anliegenden Schlauchs auf den Körper setzen
+  function hugAt(info, q) { return info && info.hug != null ? hugger(info.hug)(q) : null; }
   function makePrim(info, gp) {
     var P = primParams(info, gp), g, A = info.a || [];
     if (info.t === 'box') {
@@ -982,21 +1045,13 @@
     } else if (info.t === 'torus') {
       g = new THREE.TorusGeometry(P.R, P.tube, A[2], A[3], P.arc * DEG);
     } else if (info.t === 'hose') {
-      var path = new PathCurve(roundedPath(P.pts.map(function (q) { return new THREE.Vector3(q[0], q[1], q[2]); }), P.round));
-      var len = path.acc[path.acc.length - 1] || 1;
+      var hp = info.p || {}, closed = !!hp.closed, hug = info.hug != null ? hugger(info.hug) : null;
+      var cps = P.pts.map(function (q) { return new THREE.Vector3(q[0], q[1], q[2]); });
+      if (hug) cps = cps.map(function (q) { return hug(q).p; });
+      var path = hp.spline && cps.length > 1 ? new THREE.CatmullRomCurve3(cps, closed) : new PathCurve(roundedPath(cps, P.round));
+      var len = path.getLength() || 1;
       if (P.turns > 0) g = coilGeo(path, P.turns, P.coil, 0, 0, P.r * 2);
-      else {
-        var ts2 = Math.max(48, Math.ceil(len / 0.01)), rad = 14;
-        g = new THREE.TubeGeometry(path, ts2, P.r, rad, false);
-        if (P.taper !== 1) {
-          var pa = g.attributes.position.array, cp = new THREE.Vector3();
-          for (var i2 = 0; i2 <= ts2; i2++) {
-            path.getPointAt(i2 / ts2, cp); var f = 1 + (P.taper - 1) * i2 / ts2;
-            for (var j2 = 0; j2 <= rad; j2++) { var n2 = (i2 * (rad + 1) + j2) * 3; pa[n2] = cp.x + (pa[n2] - cp.x) * f; pa[n2 + 1] = cp.y + (pa[n2 + 1] - cp.y) * f; pa[n2 + 2] = cp.z + (pa[n2 + 2] - cp.z) * f; }
-          }
-          g.computeVertexNormals();
-        }
-      }
+      else g = sweepGeo(path, Math.max(48, Math.ceil(len / 0.01)), hp.rad || 14, P, closed && !!hp.spline, hug);
     }
     var sc = info.sc || [1, 1, 1], off = info.off || [0, 0, 0];
     if (sc[0] !== 1 || sc[1] !== 1 || sc[2] !== 1) g.scale(sc[0], sc[1], sc[2]);
@@ -1222,7 +1277,8 @@
     applyCustom: applyCustom, dropCustom: dropCustom, origin: origin, def: getDef, original: original, applyXf: applyXf,
     applyPart: applyPart, readPiece: readPiece, pieceKey: pieceKey, applyParts: applyParts, setPartXf: setPartXf, partXf: partXf,
     FORMS: FORMS, formOf: formOf, latRest: latRest, geoBox: geoBox,
-    primOf: primOf, primSpec: primSpec, primParams: primParams, makePrim: makePrim,
+    primOf: primOf, primSpec: primSpec, primParams: primParams, makePrim: makePrim, hugAt: hugAt,
+    hugKey: function () { return CUR_KEY; },
     util: { vinyl: vinyl, ell: ell, canvasTex: canvasTex, textTex: textTex, surface: surface, surfaceAt: surfaceAt, sdTrunk: sdTrunk, PARTS: PARTS }
   };
 })(typeof window !== 'undefined' ? window : this);

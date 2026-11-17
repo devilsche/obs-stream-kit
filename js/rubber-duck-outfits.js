@@ -31,9 +31,13 @@
   function torus(R, r, seg, arc) { return new THREE.TorusGeometry(R, r, 12, seg || 48, arc || PI * 2); }
   function box(w, h, d) { return new THREE.BoxGeometry(w, h, d); }
   function lathe(pts, seg) { return new THREE.LatheGeometry(pts.map(function (p) { return new THREE.Vector2(p[0], p[1]); }), seg || 48); }
+  function r4(v) { return Math.round(v * 1e4) / 1e4; }
+  // weicher Schlauch durch Punkte; als Grundform „hose“ markiert → im Duck-Editor über Knickpunkte formbar
   function tube(pts, r, mat, parent, closed) {
-    var curve = new THREE.CatmullRomCurve3(pts.map(function (p) { return p instanceof V3 ? p : new V3(p[0], p[1], p[2]); }), !!closed);
+    var vs = pts.map(function (p) { return p instanceof V3 ? p : new V3(p[0], p[1], p[2]); });
+    var curve = new THREE.CatmullRomCurve3(vs, !!closed);
     var m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(16, pts.length * 12), r, 10, !!closed), mat);
+    m.userData.prim = { t: 'hose', p: { r: r, taper: 1, spline: true, closed: !!closed, rad: 10, pts: vs.map(function (v) { return [r4(v.x), r4(v.y), r4(v.z)]; }) } };
     parent.add(m); return m;
   }
   // Mesh entlang einer Richtung ausrichten (lokale +y-Achse → dir)
@@ -661,22 +665,13 @@
     s.closePath();
     var g = new THREE.ShapeGeometry(s); g.rotateY(PI / 2); return g;
   }
-  // Band entlang der Körperoberfläche durch die Richtungen dirs (wie U.surface), Breite w
+  // Band entlang der Körperoberfläche durch die Richtungen dirs (wie U.surface), Breite w, Abstand off.
+  // Flachgedrückter Schlauch, der am Körper anliegt (hug) → im Duck-Editor Knickpunkte ziehen, Breite,
+  // Flachheit und Abstand per Regler; die Punkte bleiben dabei auf dem Körper.
   function strap(c, dirs, w, mat, off) {
-    var dense = [];
-    dirs.forEach(function (d, i) { if (!i) return; for (var k = 0; k < 8; k++) dense.push(dirs[i - 1].clone().lerp(d, k / 8)); });
-    dense.push(dirs[dirs.length - 1]);
-    var P = dense.map(function (d) { var a = U.surface(d); return { p: a.p.clone().addScaledVector(a.n, off || 0.02), n: a.n }; });
-    var pos = [], idx = [];
-    P.forEach(function (q, i) {
-      var t = P[Math.min(i + 1, P.length - 1)].p.clone().sub(P[Math.max(i - 1, 0)].p).normalize();
-      var sd = new V3().crossVectors(t, q.n).normalize().multiplyScalar(w / 2);
-      pos.push(q.p.x - sd.x, q.p.y - sd.y, q.p.z - sd.z, q.p.x + sd.x, q.p.y + sd.y, q.p.z + sd.z);
-      if (i) { var k = i * 2; idx.push(k - 2, k, k - 1, k - 1, k, k + 1); }
-    });
-    var g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-    var m = new THREE.Mesh(g, dbl(mat)); c.g.add(m); return m;
+    var info = { t: 'hose', hug: RD.hugKey(), p: { r: w / 2, flat: 0.9, lift: off || 0.02, taper: 1, spline: true, rad: 12,
+      pts: dirs.map(function (d) { var q = U.surface(d).p; return [r4(q.x), r4(q.y), r4(q.z)]; }) } };
+    var m = new THREE.Mesh(RD.makePrim(info, {}), dbl(mat)); m.userData.prim = info; c.g.add(m); return m;
   }
   function heartShape(sc) {
     var h = new THREE.Shape();

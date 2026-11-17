@@ -213,7 +213,7 @@
             </span>
           </div>
           <p class="muted small" id="latHelp">Drag the yellow points in the view to reshape, like a box of clay. With the whole part selected the points span all its pieces, so pairs like ears stay matched. With mirroring on, points on the middle line stay on it.</p>
-          <p class="muted small" id="hoseHelp" hidden>The hose runs through these points. Drag them to lay it, add points for more kinks.</p>
+          <p class="muted small" id="hoseHelp" hidden>The hose runs through these points. Drag them to lay it, add points for more kinks. Straps stay on the body while you drag. With mirroring on, the matching piece on the other side (e.g. the second strap) follows every change.</p>
           <div id="latEdit" hidden>
             <div class="row">
               <label for="latPick">Handle</label>
@@ -826,6 +826,7 @@
         $('primTitle').textContent = 'Measurements (' + PRIM_NAME[info.t] + ')';
         sliders(box, st.mode + '|' + st.sel + '|' + i + '|' + info.t, RD.primSpec(info), RD.primParams(info, geoNow(i)), 'pm-', function (k, v) {
           var sx = subXf(i, true); (sx.geo = sx.geo || {})[k] = v;
+          if (info.t === 'hose' && $('latMirror').checked) { var tw = hoseTwin(i); if (tw != null) { var tx = subXf(tw, true); (tx.geo = tx.geo || {})[k] = v; } }
           if (!primRaf) primRaf = requestAnimationFrame(function () { primRaf = 0; applySel(); placeHandles(); });
         }, function () { cleanXf(st.sel); commit(); });
       }
@@ -834,7 +835,8 @@
         change(function () { var o = st.def.acc[ai][1] = st.def.acc[ai][1] || {}; if ($('shapeMirror').checked) o.mirror = true; else delete o.mirror; });
       });
       $('primReset').addEventListener('click', function () {
-        var i = primIdx(), sx = i == null ? null : subXf(i, false);
+        var i = primIdx(), sx = i == null ? null : subXf(i, false), info = primInfo();
+        if (sx && info && info.t === 'hose' && $('latMirror').checked) { var tw = hoseTwin(i), tx = tw == null ? null : subXf(tw, false); if (tx) delete tx.geo; }
         if (sx) { delete sx.geo; cleanXf(st.sel); applySel(); commit(); syncSel(); placeHandles(); }
       });
 
@@ -942,7 +944,7 @@
         var info = primInfo();
         if (info && info.t === 'hose') {
           var i = primIdx(), pts = RD.primParams(info, geoNow(i)).pts;
-          return { kind: 'hose', n: pts.length, space: pieces()[i], pts: pts, idx: i };
+          return { kind: 'hose', n: pts.length, space: pieces()[i], pts: pts, idx: i, info: info, twin: hoseTwin(i) };
         }
         return latTarget();
       }
@@ -1005,10 +1007,28 @@
           for (var k2 = 0; k2 < 3; k2++) l[j * 3 + k2] = round(k2 === ax ? -d[k2] : d[k2], 3);
         }
       }
-      // Schlauch: ganze Punktliste in die aktuelle Ebene schreiben
+      // Schlauch-Gegenstück: Stück derselben Gruppe, dessen Original-Punkte das Spiegelbild (z → −z) sind
+      // (linker/rechter Träger); mit „Mirror left/right“ folgt es jeder Änderung
+      function hoseTwin(i) {
+        var A = RD.primOf(pieces()[i]); if (!A || A.t !== 'hose' || !A.p || !A.p.pts) return null;
+        var pa = A.p.pts;
+        for (var j = 0; j < pieces().length; j++) {
+          if (j === i) continue;
+          var B = RD.primOf(pieces()[j]);
+          if (!B || B.t !== 'hose' || !B.p || !B.p.pts || B.p.pts.length !== pa.length) continue;
+          var ok = pa.some(function (q) { return Math.abs(q[2]) > 1e-3; }) && pa.every(function (q, k) { var r = B.p.pts[k]; return Math.abs(q[0] - r[0]) < 2e-3 && Math.abs(q[1] - r[1]) < 2e-3 && Math.abs(q[2] + r[2]) < 2e-3; });
+          if (ok) return j;
+        }
+        return null;
+      }
+      function twinOn(T) { return T && T.twin != null && $('latMirror').checked; }
+      function mirPts(pts) { return pts.map(function (q) { return [q[0], q[1], -q[2]]; }); }
+      // Schlauch: ganze Punktliste in die aktuelle Ebene schreiben (anliegende Schläuche: Punkte auf den Körper)
       function setPts(T, pts) {
-        var sx = subXf(T.idx, true); sx.geo = sx.geo || {};
-        sx.geo.pts = pts.map(function (q) { return q.map(function (v) { return round(v, 3); }); });
+        if (T.info && T.info.hug != null) pts = pts.map(function (q) { var s = RD.hugAt(T.info, new THREE.Vector3(q[0], q[1], q[2])); return s ? [s.p.x, s.p.y, s.p.z] : q; });
+        var r = pts.map(function (q) { return q.map(function (v) { return round(v, 3); }); });
+        var sx = subXf(T.idx, true); sx.geo = sx.geo || {}; sx.geo.pts = r;
+        if (twinOn(T)) { var tx = subXf(T.twin, true); tx.geo = tx.geo || {}; tx.geo.pts = mirPts(r); }
       }
       function readHandle() {
         var T = hTarget(); if (!T || st.h == null) return;
@@ -1024,7 +1044,7 @@
         $('latOn').disabled = !T;
         $('latOn').setAttribute('aria-pressed', String(st.lat && !!T));
         $('latOn').textContent = (st.lat ? 'Hide ' : 'Show ') + (hose ? 'hose points' : 'handles');
-        $('latMirrorWrap').hidden = hose; $('latHelp').hidden = hose; $('hoseHelp').hidden = !hose;
+        $('latMirrorWrap').hidden = hose && T.twin == null; $('latHelp').hidden = hose; $('hoseHelp').hidden = !hose;
         $('hoseAdd').hidden = $('hoseDel').hidden = !hose;
         $('latEdit').hidden = !(st.lat && T);
         if (!st.lat || !T) return;
@@ -1075,7 +1095,10 @@
       });
       $('latReset').addEventListener('click', function () {
         var T = hTarget(); if (!T) return;
-        if (T.kind === 'hose') { var sx = subXf(T.idx, false); if (sx && sx.geo) delete sx.geo.pts; st.h = null; attachTc(); }
+        if (T.kind === 'hose') {
+          [T.idx].concat(twinOn(T) ? [T.twin] : []).forEach(function (k) { var sx = subXf(k, false); if (sx && sx.geo) delete sx.geo.pts; });
+          st.h = null; attachTc();
+        }
         else { var xf = curXf(false); if (xf) delete xf.l; }
         afterHandles();
       });
