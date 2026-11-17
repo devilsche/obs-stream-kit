@@ -5,7 +5,9 @@
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
  *
- *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion })
+ *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, owner, eat })
+ * Sushi mit eater: eine Gummiente sammelt die gelandeten Sushi ein, frisst sich voll und platzt
+ * (eater = true oder Outfit-Name; owner = Kanalname → dessen !outfit; eat = Stücke bis zum Platzen).
  */
 (function (root) {
   'use strict';
@@ -292,6 +294,206 @@
     };
   }
 
+  // ── Fress-Ente beim Sushi-Regen: watschelt am unteren Rand zu liegenden Sushi, schnappt sie
+  // (auch im Flug), wird mit jedem Stück runder und langsamer, bläht sich auf und platzt –
+  // Gummifetzen, die gefressenen Sushi und der Schnabel fliegen heraus.
+  // E = { scene, W, H, FLOOR, items (Liste des Regens, live), makeSushi, size, reduce, outfit, target, duration }
+  function makeEater(E) {
+    var RD = root.RubberDuck, S = E.size * 1.05, Z = 420, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce;
+    var g = new THREE.Group(), d = RD.build({ outfit: E.outfit });
+    d.position.y = 0.55; g.add(d); g.visible = false; E.scene.add(g);
+    var lower = null, bills = [], mats = [], cols = [];
+    d.traverse(function (m) {
+      if (m.name === 'Lower bill') lower = m;
+      if (m.name === 'Upper bill' || m.name === 'Lower bill') bills.push(m);
+      if (!m.isMesh) return;
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(function (mt) {
+        if (mt && mt.emissive && mats.indexOf(mt) < 0) { mats.push(mt); mt.userData.em0 = mt.emissive.clone(); }
+        if (mt && mt.color && cols.length < 5 && !mt.transparent) {
+          var hx = mt.color.clone().convertLinearToSRGB().getHex(), l = (hx >> 16 & 255) + (hx >> 8 & 255) + (hx & 255);
+          if (l > 90 && l < 720 && cols.indexOf(hx) < 0) cols.push(hx);
+        }
+      });
+    });
+    if (!cols.length) cols = [0xffcd2a];
+    var st = 'wait', x = 0, dir = 1, eaten = 0, target = E.target, t = 0, ph = 0, phaseT = 0;
+    var bite = null, gulp = 0, burped = false, burp = 0, parts = [], puffs = [], done = false, eatenItems = 0;
+    function fat() { return Math.min(1, eaten / target); }
+    function scaleNow(extra) {
+      var f = fat(), e = extra || 0, sq = burp > 0 ? Math.sin(burp / 0.45 * Math.PI) : 0, gp = gulp > 0 ? Math.sin(gulp / 0.25 * Math.PI) : 0;
+      g.scale.set(S * (1 + 0.45 * f + e) * (1 + 0.06 * gp), S * (1 + 0.12 * f + e * 0.6) * (1 - 0.12 * sq + 0.05 * gp), S * (1 + 0.85 * f + e) * (1 + 0.08 * gp));
+    }
+    function face(dx) { dir = dx < 0 ? -1 : 1; g.rotation.y = dir > 0 ? -0.35 : Math.PI + 0.35; }
+    function reach() { return 1.32 * S * (1 + 0.45 * fat()) * 0.94; }
+    function tip() { return new THREE.Vector3(x + dir * reach(), -(FLOOR - S * 1.35), Z + 10); }
+    function resting() { return E.items.filter(function (it) { return it.rest > 0 && !it.gone && !it.bitten; }); }
+    function speed() { return (reduce ? 170 : 290) * (1 - 0.6 * fat()); }
+    function waddle(amount) {
+      ph += (E.dt || 0.016) * 11 * (0.6 + 0.4 * (1 - fat()));
+      d.rotation.x = Math.sin(ph) * 0.14 * amount * (reduce ? 0.4 : 1);
+      d.position.y = 0.55 + Math.abs(Math.sin(ph)) * 0.1 * amount * (1 - 0.6 * fat());
+    }
+    function startBite(it, air) {
+      it.bitten = true; bite = { it: it, t: 0, T: air ? 0.22 : 0.32, p0: new THREE.Vector3(it.x, -it.y, it.z), s0: it.g.scale.x };
+      st = 'eat';
+    }
+    function sample(a) { return a[Math.floor(Math.random() * a.length)]; }
+    // Teilchen nach dem Platzen: fliegen, ditschen am Boden, schrumpfen am Ende und zum Rand hin weich weg
+    function fling(o, x0, y0, z0, vx, vy, life, h) {
+      parts.push({ o: o, x: x0, y: y0, z: z0, vx: vx, vy: vy, wx: rand(-6, 6), wy: rand(-6, 6), wz: rand(-6, 6), age: 0, life: life, h: h, s0: o.scale.clone(), hops: 0 });
+      E.scene.add(o);
+    }
+    function burst() {
+      var cx = x, cy = FLOOR - S * 1.0 * (1 + 0.12 * fat());
+      g.visible = false;
+      // Puff-Wolke
+      for (var i = 0; i < (reduce ? 5 : 8); i++) {
+        var pm = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false });
+        var pu = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 10), pm);
+        pu.position.set(cx + rand(-60, 60), -(cy + rand(-50, 40)), Z + 40); pu.scale.setScalar(10);
+        E.scene.add(pu); puffs.push({ o: pu, age: 0, life: rand(0.5, 0.8), r: rand(70, 120) * (reduce ? 0.8 : 1) });
+      }
+      if (reduce) { done = true; return; }
+      // Gummifetzen in den Farben der Ente
+      var shard = new THREE.SphereGeometry(1, 10, 6);
+      for (var k = 0; k < 26; k++) {
+        var sm = new THREE.MeshStandardMaterial({ color: sample(cols), roughness: 0.45, metalness: 0 });
+        sm.color.convertSRGBToLinear();
+        var sh = new THREE.Mesh(shard, sm), r = rand(9, 22);
+        sh.scale.set(r, r * 0.3, r * rand(0.5, 0.9));
+        var a = rand(-Math.PI * 0.95, -Math.PI * 0.05), v = rand(380, 820);
+        fling(sh, cx + rand(-25, 25), cy + rand(-30, 30), Z + rand(-40, 60), Math.cos(a) * v, Math.sin(a) * v, rand(2.4, 3.4), r * 0.3);
+      }
+      // die gefressenen Sushi kommen wieder heraus
+      for (var j = 0; j < Math.min(eatenItems, 20); j++) {
+        var it = E.makeSushi(), sc = E.size * rand(0.75, 1.0) / it.len, a2 = rand(-Math.PI * 0.9, -Math.PI * 0.1), v2 = rand(300, 700);
+        it.g.scale.setScalar(sc); it.g.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
+        fling(it.g, cx + rand(-20, 20), cy + rand(-20, 20), Z + rand(-60, 20), Math.cos(a2) * v2, Math.sin(a2) * v2, rand(2.6, 3.6), E.size * 0.35);
+      }
+      // der Schnabel fliegt hoch und ditscht zum Schluss auf
+      d.updateMatrixWorld(true);
+      bills.forEach(function (b, i) {
+        E.scene.attach(b);
+        var p = b.position.clone();
+        b.position.set(0, 0, 0);
+        var bw = new THREE.Group(); bw.add(b); bw.position.copy(p);
+        fling(bw, p.x, -p.y, p.z + 30, rand(-120, 120) + (i ? 60 : -60), rand(-1000, -850), 4.2, S * 0.12);
+      });
+    }
+    function setGlow(k) {
+      mats.forEach(function (mt) { mt.emissive.copy(mt.userData.em0).lerp(new THREE.Color(0xff1a00), k); mt.emissiveIntensity = 1; });
+    }
+    function step(dt, tt) {
+      E.dt = dt; t = tt;
+      if (done && !parts.length && !puffs.length) return false;
+      if (st === 'wait') {
+        var r0 = resting();
+        if (r0.length || t > 4) {
+          var fx = r0.length ? r0[0].x : W / 2;
+          x = fx < W / 2 ? -S * 2 : W + S * 2; face(fx - x);
+          g.visible = true; st = 'walk';
+        }
+      }
+      if (st === 'walk') {
+        var late = t > E.duration * 0.8;
+        if (eaten >= target || (late && eaten > 0)) { st = 'swell'; phaseT = 0; }
+        else if (late && !eaten) { st = 'leave'; }
+      }
+      if (st === 'walk') {
+        // im Flug schnappen: fallendes Sushi genau vor dem Schnabel
+        var tp = tip(), air = null;
+        E.items.forEach(function (it) {
+          if (air || it.gone || it.bitten || it.rest > 0 || it.bounced || it.rise) return;
+          if (Math.abs(it.x - tp.x) < 34 && Math.abs(it.y - (-tp.y)) < 30) air = it;
+        });
+        // liegt schon eins vor dem Schnabel: sofort zuschnappen
+        var near = null;
+        if (!air) resting().forEach(function (it) { if (!near && Math.abs(it.x - tp.x) < 30) near = it; });
+        if (air) startBite(air, true);
+        else if (near) startBite(near, false);
+        else {
+          // Ziel: geringster Weg bis der Schnabel drüber ist (Stücke vor dem Schnabel zählen weniger als hinter ihr)
+          var best = null, bd = 1e9;
+          resting().forEach(function (it) { var dd = Math.min(Math.abs(it.x - tp.x), Math.abs(it.x - (x - dir * reach())) + reach() * 0.8); if (dd < bd) { bd = dd; best = it; } });
+          if (best) {
+            // Anlauf von der Seite, auf der sie gerade steht – Abstand = Schnabellänge (liegt es zu nah, tritt sie zurück)
+            var side = x === best.x ? -dir : Math.sign(x - best.x), want = best.x + side * reach(), dx = want - x;
+            if (Math.abs(dx) < 10) { face(best.x - x); startBite(best, false); }
+            else { face(dx); x += Math.sign(dx) * Math.min(Math.abs(dx), speed() * dt); waddle(1); }
+          } else {
+            // nichts da: langsam zur Mitte schlendern und schauen
+            var cx0 = W / 2 + Math.sin(t * 0.3) * 300, dx2 = cx0 - x;
+            if (Math.abs(dx2) > 20) { face(dx2); x += Math.sign(dx2) * speed() * 0.4 * dt; waddle(0.6); } else waddle(0);
+          }
+        }
+        d.rotation.z += (0 - d.rotation.z) * Math.min(1, dt * 10);
+      }
+      if (st === 'eat' && bite) {
+        bite.t += dt; var u = Math.min(1, bite.t / bite.T), it = bite.it;
+        // Kopf nicken, Schnabel auf und zu, das Stück wandert in den Schnabel und wird kleiner
+        d.rotation.z = -0.45 * Math.sin(u * Math.PI) * (bite.T > 0.3 ? 1 : 0.5);
+        if (lower) lower.rotation.z = -0.5 * Math.sin(Math.min(1, u * 1.3) * Math.PI);
+        var tp2 = tip(), p = bite.p0.clone().lerp(tp2, smooth(0, 0.7, u));
+        it.x = p.x; it.y = -p.y; it.z = p.z;
+        it.g.position.copy(p); it.g.scale.setScalar(bite.s0 * (1 - smooth(0.5, 1, u)));
+        if (u >= 1) {
+          it.gone = true; E.scene.remove(it.g); eaten++; eatenItems++; gulp = 0.25; bite = null; st = 'walk';
+          if (lower) lower.rotation.z = 0;
+          if (!burped && fat() >= 0.75) { burped = true; burp = 0.45; }
+        }
+      }
+      if (st === 'leave') {
+        var out = x < W / 2 ? -S * 3 : W + S * 3; face(out - x); x += Math.sign(out - x) * speed() * dt; waddle(1);
+        if (Math.abs(out - x) < 5) { g.visible = false; done = true; st = 'gone'; }
+      }
+      var extra = 0;
+      if (st === 'swell') {
+        phaseT += dt; var w = Math.min(1, phaseT / 1.4);
+        extra = 0.3 * smooth(0, 1, w);
+        setGlow(0.55 * w);
+        d.rotation.z *= 0.9; d.position.y = 0.55;
+        if (!reduce) { d.rotation.x = Math.sin(phaseT * 55) * 0.05 * w; g.position.x = x + Math.sin(phaseT * 70) * 4 * w; }
+        if (lower) lower.rotation.z = 0;
+        if (w >= 1) { st = 'burst'; burst(); }
+      }
+      if (gulp > 0) gulp = Math.max(0, gulp - dt);
+      if (burp > 0) burp = Math.max(0, burp - dt);
+      if (g.visible) {
+        scaleNow(extra);
+        if (st !== 'swell') g.position.x = x;
+        g.position.y = -FLOOR; g.position.z = Z;
+        if (RD.flutter) RD.flutter(d, t, 0.3, 0);
+      }
+      // Teilchen
+      parts = parts.filter(function (p) {
+        p.age += dt;
+        p.vy = Math.min(p.vy + 1500 * dt, 900);
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (p.y > FLOOR - p.h) {
+          p.y = FLOOR - p.h; p.hops++;
+          p.vy = p.hops < 3 ? -Math.abs(p.vy) * 0.35 : 0; p.vx *= 0.55; p.wx *= 0.5; p.wy *= 0.5; p.wz *= 0.5;
+        }
+        p.o.rotation.x += p.wx * dt; p.o.rotation.y += p.wy * dt; p.o.rotation.z += p.wz * dt;
+        // Rand-Fade: zum Bildrand und am Lebensende schrumpfen statt hart verschwinden
+        var edge = Math.min(1, Math.max(0, Math.min(p.x, W - p.x) / 90), Math.max(0, (p.y + 40) / 90));
+        var k = Math.min(edge, 1 - smooth(p.life - 0.5, p.life, p.age));
+        p.o.scale.copy(p.s0).multiplyScalar(Math.max(0.0001, k));
+        p.o.position.set(p.x, -p.y, p.z);
+        if (p.age >= p.life || (k <= 0.001 && p.age > 0.2)) { E.scene.remove(p.o); return false; }
+        return true;
+      });
+      puffs = puffs.filter(function (q) {
+        q.age += dt; var u = Math.min(1, q.age / q.life);
+        q.o.scale.setScalar(10 + q.r * smooth(0, 1, u)); q.o.material.opacity = 0.85 * (1 - u);
+        if (u >= 1) { E.scene.remove(q.o); return false; }
+        return true;
+      });
+      if (st === 'burst' && !parts.length && !puffs.length) done = true;
+      return !(done && !parts.length && !puffs.length);
+    }
+    return { step: step, hungry: function () { return st === 'wait' || st === 'walk' || st === 'eat'; } };
+  }
+
   function start(opts) {
     var W = 1920, H = 1080, FLOOR = H - 26;
     var canvas = opts.canvas, reduce = !!opts.reduceMotion;
@@ -315,7 +517,8 @@
     scene.add(rim);
 
     var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ? opts.kind : 'duck';
-    if ((kind === 'duck' && root.RubberDuck) || kind === 'car') {
+    var wantEater = kind === 'sushi' && !!opts.eater && !!root.RubberDuck;
+    if ((kind === 'duck' && root.RubberDuck) || kind === 'car' || wantEater) {
       // Umgebung zum Spiegeln für das Vinyl der Gummiente bzw. den Autolack
       var ec = document.createElement('canvas'); ec.width = 512; ec.height = 256;
       var ex = ec.getContext('2d'), eg = ex.createLinearGradient(0, 0, 0, 256);
@@ -362,6 +565,15 @@
     var size = opts.size || 96, count = opts.count || 120, duration = opts.duration || 22000;
     var spawnEnd = duration * 0.62, margin = 120;
     var ducks = [], spawned = 0, t0 = null, last = null;
+    // Fress-Ente (nur Sushi): Outfit aus opts.eater (Outfit-Name), sonst das !outfit des Kanals, sonst ohne
+    var eater = null, EE = null;
+    if (wantEater) {
+      var eo = typeof opts.eater === 'string' && RD.OUTFITS.indexOf(opts.eater) >= 0 ? opts.eater
+        : (opts.owner && RD.viewerOutfit && RD.viewerOutfit(opts.owner)) || 'none';
+      EE = { scene: scene, W: W, H: H, FLOOR: FLOOR, items: ducks, size: size, reduce: reduce, outfit: eo,
+             target: Math.max(3, opts.eat || 25), duration: duration / 1000, makeSushi: function () { return tpl.make(); } };
+      eater = makeEater(EE);
+    }
 
     function spawn() {
       var k = rand(0.8, 1.2), it = makeItem(), g = it.g;
@@ -393,7 +605,16 @@
       last = ts;
       var want = Math.min(count, Math.floor(count * (t / spawnEnd) * (1 + 0.25 * Math.sin(t / 900))));
       while (spawned < want) spawn();
+      var hungry = !!eater && eater.hungry();
       ducks = ducks.filter(function (d) {
+        if (d.gone) return false;
+        if (d.bitten) return true;   // die Ente zieht es gerade in den Schnabel
+        if (d.rest != null) {
+          // liegt am Boden und wartet aufs Gefressenwerden; ist die Ente satt oder die Zeit um, kippt es weg
+          d.rest -= dt;
+          if (d.rest <= 0 || !hungry) { d.rest = null; d.bounced = true; d.vy = 40; d.vx = 0; }
+          else { d.g.position.set(d.x, -d.y, d.z); return true; }
+        }
         if (d.rise) {
           d.ph += dt * d.sw;
           d.y += d.vy * dt;
@@ -433,7 +654,14 @@
           }
         }
         if (!d.bounced && d.y > FLOOR - d.h) {
-          d.bounced = true; d.y = FLOOR - d.h;
+          if (hungry && d.hop) {
+            // Fress-Ente unterwegs: nach dem Aufditschen liegen bleiben
+            d.y = FLOOR - d.h; d.vy = 0; d.vx = 0; d.wx = d.wy = d.wz = 0; d.rest = rand(5, 8);
+            d.g.position.set(d.x, -d.y, d.z);
+            return true;
+          }
+          if (hungry) d.hop = true; else d.bounced = true;
+          d.y = FLOOR - d.h;
           d.vy = -d.vy * rand(0.25, 0.4); d.vx *= 0.6; d.wx *= 0.5; d.wy *= 0.5; d.wz *= 0.5;
         }
         // nach dem Aufditschen kippt es nach hinten: etwas kleiner, hinter die
@@ -448,8 +676,10 @@
         d.g.position.set(d.x, -d.y, d.z - 600 * d.back);
         return true;
       });
+      var eating = false;
+      if (eater) { EE.items = ducks; eating = eater.step(dt, t / 1000); }
       renderer.render(scene, cam);
-      if (t < duration || ducks.length) requestAnimationFrame(frame);
+      if (t < duration || ducks.length || eating) requestAnimationFrame(frame);
       else renderer.clear();
     }
     requestAnimationFrame(frame);

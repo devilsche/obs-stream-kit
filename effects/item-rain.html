@@ -8,6 +8,7 @@
     /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random), ?by= Chat-Name (sein !outfit regnet zu einem Drittel mit),
        ?model= (Autos: mix|2002|e30|e30m3|e36|e46|e92m3),
        ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
+       Sushi: ?eater=0 ohne Fress-Ente, ?eater=<Outfit> mit diesem Outfit (sonst das !outfit des Kanals), ?eat=Stücke bis zum Platzen (Standard 25).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
@@ -39,7 +40,11 @@
         count: Math.max(5, parseInt(params.get('count'), 10) || (params.get('kind') === 'balloon' ? 60 : 120)) * (reduceMotion ? 0.4 : 1),
         // etwas größer als die hängenden Weihnachtskugeln (~64 px)
         size: 72,
-        reduceMotion: reduceMotion
+        reduceMotion: reduceMotion,
+        // Fress-Ente beim Sushi-Regen: sammelt ein, frisst sich voll, platzt
+        eater: params.get('eater') === '0' ? false : (params.get('eater') && params.get('eater') !== '1' ? params.get('eater') : true),
+        owner: window.__TWITCH_CHANNEL__ || '',
+        eat: parseInt(params.get('eat'), 10) || 25
       });
     })();
   </script>
