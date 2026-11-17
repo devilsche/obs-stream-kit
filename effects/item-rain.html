@@ -30,9 +30,11 @@
     (function () {
       'use strict';
       var params = new URLSearchParams(location.search);
+      function hasFeat(k) { return (window.__FEATURES__ || []).indexOf(k) >= 0; }
       var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       window.ItemRain3D.start({
-        kind: ['duck', 'balloon', 'car'].indexOf(params.get('kind')) >= 0 ? params.get('kind') : 'sushi',
+        // Enten nur mit Freischaltung „ducks“ (sonst Sushi statt Enten)
+        kind: ['duck', 'balloon', 'car'].indexOf(params.get('kind')) >= 0 && (params.get('kind') !== 'duck' || hasFeat('ducks')) ? params.get('kind') : 'sushi',
         model: params.get('model') || 'mix',
         // Enten-Outfit: none, thw, police, fire, batman, superman oder mix (zufällig je Ente)
         outfit: params.get('outfit') || 'none',
@@ -45,7 +47,7 @@
         size: 72,
         reduceMotion: reduceMotion,
         // Fress-Ente beim Sushi-Regen: sammelt ein, frisst sich voll, platzt
-        eater: (window.__FEATURES__ || []).indexOf('sushi-eater') < 0 || params.get('eater') === '0' ? false
+        eater: !hasFeat('ducks') || !hasFeat('sushi-eater') || params.get('eater') === '0' ? false
           : (params.get('eater') && params.get('eater') !== '1' ? params.get('eater') : true),
         owner: window.__TWITCH_CHANNEL__ || '',
         eat: parseInt(params.get('eat'), 10) || 25

@@ -8,6 +8,12 @@ from fx import commands, duck_outfits, duck_viewers as dv
 from fx import endpoints
 from fx.endpoints import bp_fx
 
+@pytest.fixture(autouse=True)
+def _ducks_on(monkeypatch):
+    """Enten sind freigeschaltet (Feature „ducks“); die Sperre testet test_ducks_gate."""
+    monkeypatch.setattr(endpoints, "_ducks_ok", lambda: True)
+
+
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 

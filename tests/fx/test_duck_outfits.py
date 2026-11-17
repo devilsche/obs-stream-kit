@@ -1,10 +1,18 @@
+import pytest
 """Duck-Editor: gespeicherte Outfits (data/duck-outfits.json) und das Script für die Effekte."""
 import json
 
 from flask import Flask, g
 
 from fx import duck_outfits as do
+from fx import endpoints
 from fx.endpoints import bp_fx
+
+@pytest.fixture(autouse=True)
+def _ducks_on(monkeypatch):
+    """Enten sind freigeschaltet (Feature „ducks“); die Sperre testet test_ducks_gate."""
+    monkeypatch.setattr(endpoints, "_ducks_ok", lambda: True)
+
 
 
 def test_save_load_roundtrip(tmp_path):

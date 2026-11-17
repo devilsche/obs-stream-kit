@@ -385,7 +385,7 @@ Zuschauer suchen sich einmal ein Gummienten-Outfit aus; es gilt danach überall,
 
 ### Freischaltungen je Tenant
 
-Manche Extras bekommt ein Tenant nur, wenn der Admin sie freischaltet: In `/admin/users` hat jeder Tenant die Spalte „Features“ mit Häkchen und „Save“ (`POST /admin/tenants/<id>/features`, nur Admins). Gespeichert als JSON-Liste in `settings['features']` (`core/features.py`, dort auch die Liste aller Extras); die Browser-Sources unter `/s/<token>/…` bekommen sie als `window.__FEATURES__`. Der Tenant eines Admins hat immer alle Extras (Spalte zeigt „All (admin)“). Bisher: `sushi-eater` – Fress-Ente beim Sushi-Regen.
+Manche Extras bekommt ein Tenant nur, wenn der Admin sie freischaltet: In `/admin/users` hat jeder Tenant die Spalte „Features“ mit Häkchen und „Save“ (`POST /admin/tenants/<id>/features`, nur Admins). Gespeichert als JSON-Liste in `settings['features']` (`core/features.py`, dort auch die Liste aller Extras); die Browser-Sources unter `/s/<token>/…` bekommen sie als `window.__FEATURES__`. Der Tenant eines Admins hat immer alle Extras (Spalte zeigt „All (admin)“). Bisher: `ducks` – aller Entenkram: ohne Freischaltung liefern `knife-duck`, `duck-greet`, `duck-parade`, `duck-assembly` und `duck-court` eine leere, durchsichtige Seite, `!outfit`, Begrüßung, Parade und `duckgreet` antworten mit 403, `custom.js` ist leer und der Party-Regen zeigt bei `kind=duck` Sushi; `sushi-eater` – Fress-Ente beim Sushi-Regen (braucht zusätzlich `ducks`; Streamer.bot trägt beim Sushi-Regen `eater=<Chat-Name>` ein).
 
 ### Wetter (`weather.html`)
 

@@ -5,7 +5,8 @@ import json
 
 # Schlüssel → Bezeichnung im Admin (englisch, wie das übrige Frontend)
 FEATURES = {
-    "sushi-eater": "Eater duck in the sushi rain",
+    "ducks": "Rubber ducks (all duck effects, !outfit)",
+    "sushi-eater": "Eater duck in the sushi rain (needs ducks)",
 }
 KEY = "features"
 

@@ -235,10 +235,29 @@ def _with_conn(fn):
             conn.close()
 
 
+def _ducks_ok() -> bool:
+    """Enten nur mit Freischaltung „ducks“ (Admin-Tenant hat sie immer, core/features.py)."""
+    from core import features
+    raw = _get_conn()
+    try:
+        return "ducks" in features.effective(raw, g.tenant_id)
+    except Exception:
+        log.exception("fx ducks: feature lookup failed")
+        return False
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            raw.close()
+
+
+DUCK_EFFECTS = {"duckgreet"}
+
+
 @bp_fx.route("/s/<token>/api/fx/<effect>", methods=["GET", "POST"])
 def push(token, effect):
     if g.tenant_id is None or effect not in commands.EFFECTS:
         abort(404)
+    if effect in DUCK_EFFECTS and not _ducks_ok():
+        abort(403)
     args = request.args.to_dict()
     if request.method == "POST":
         args.update(request.get_json(silent=True) or {})
@@ -474,6 +493,8 @@ def weather_info_route(token):
 def poll(token, effect):
     if g.tenant_id is None or effect not in commands.EFFECTS:
         abort(404)
+    if effect in DUCK_EFFECTS and not _ducks_ok():
+        abort(403)
     since = request.args.get("since", type=int)
     out = commands.poll(g.tenant_id, effect, since)
     out["now"] = time.time()          # Uhrabgleich für zeitabhängige Effekte (Schneefall)
@@ -513,6 +534,8 @@ def duck_outfits_js(token):
     """Outfits und umgebaute Teile aus dem Duck-Editor (global) als Script für Regen, Messer-Ente und Tools."""
     if g.tenant_id is None:
         abort(404)
+    if not _ducks_ok():
+        return _no_store(Response("/* ducks: not enabled for this channel */\n", mimetype="application/javascript"))
     root = current_app.config.get("_PROJECT_ROOT") or "."
     js = duck_outfits.script(duck_outfits.load(root), duck_outfits.load_parts(root))
     try:
@@ -531,6 +554,8 @@ def duck_viewer_outfit(token):
     die einfache Fetch-URL nutzt. Antwort {say, outfit} für die Chat-Nachricht."""
     if g.tenant_id is None:
         abort(404)
+    if not _ducks_ok():
+        abort(403)
     root = current_app.config.get("_PROJECT_ROOT") or "."
     user = (request.args.get("user") or "").strip()
     if not user:
@@ -558,6 +583,8 @@ def duck_parade_ping(token):
     landen solange oberhalb des Laufbands statt mittendrin."""
     if g.tenant_id is None:
         abort(404)
+    if not _ducks_ok():
+        abort(403)
     sec = request.args.get("sec", type=int) or 0
     if not 1 <= sec <= 120:
         return _no_store(jsonify({"ok": False})), 400
@@ -577,6 +604,8 @@ def duck_greet(token):
     (effects/duck-greet.html pollt /api/fx/duckgreet/poll)."""
     if g.tenant_id is None:
         abort(404)
+    if not _ducks_ok():
+        abort(403)
     root = current_app.config.get("_PROJECT_ROOT") or "."
     user = (request.args.get("user") or "").strip().lstrip("@")
     outfit = duck_viewers.outfit_of(root, g.tenant_id, user) if user else None
