@@ -562,7 +562,7 @@
       if (st === 'jump') {
         jump.t += dt; var u = Math.min(1, jump.t / 0.55), s1 = seat();
         // Bogen vom Boden bis zum Fenster, dann hinein bis der Hals an der Fensterlinie ist
-        var feetEnd = s1.sill + 1.1 * S, hgt = 1.6 * S + 40;
+        var feetEnd = s1.sill + 0.55 * S, hgt = 1.6 * S + 40;
         var fy = jump.y0 + (feetEnd - jump.y0) * u - Math.sin(u * Math.PI) * hgt;
         x = jump.x0 + (s1.x - jump.x0) * u;
         d.rotation.x = 0; d.position.y = 0.55;
@@ -597,7 +597,7 @@
         // Hals knapp über der Fensterlinie, Rest im Auto verborgen
         clip.constant = s2.sill + bob;
         var jig = st === 'rev' && !reduce ? Math.sin(T * 60) * 1.6 : 0;
-        g.position.set(s2.x + jig, -(s2.sill + bob + 1.1 * S), s2.z);
+        g.position.set(s2.x + jig, -(s2.sill + bob + 0.55 * S), s2.z);   // Kopf und Schultern über der Fensterlinie
         d.rotation.x = 0; d.rotation.z = st === 'drive' ? -car.dir * 0.15 : 0;   // lehnt sich im Fahrtwind zurück
         d.position.y = 0.55 + (st === 'rev' && !reduce ? Math.abs(Math.sin(T * 30)) * 0.08 : 0);
         if (RD.flutter) RD.flutter(d, t, st === 'drive' ? 1.2 + vx / 600 : 0.3, 0);
