@@ -5,7 +5,8 @@
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
  *
- *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, driver, owner, eat })
+ *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, driver, vacuum, owner, eat })
+ * vacuum: Saug-Ente räumt nach dem Regen alles Liegengebliebene weg (wie eater). kind=mix: Sushi, Enten, Autos gemischt.
  * Autos mit driver: eine Gummiente springt in ein gelandetes Auto und fährt damit weg (driver wie eater).
  * Sushi mit eater: eine Gummiente sammelt die gelandeten Sushi ein, frisst sich voll und platzt
  * (eater = true oder Outfit-Name; owner = Kanalname → dessen !outfit; eat = Stücke bis zum Platzen).
@@ -658,6 +659,138 @@
     return { step: step, wantsCar: function () { return st === 'wait'; } };
   }
 
+  // ── Saug-Ente: Gummiente auf einem runden Saugroboter, aus dem Schnabel ein geriffelter Saugschlauch.
+  // Fährt nach dem Regen unten durchs Bild und saugt alles Liegengebliebene ein (Spirale in die Düse,
+  // Bauch bläht sich), verschluckt sich ab und zu an einem Auto (stockt, hustet es aus, saugt erneut),
+  // rülpst am Ende und rollt raus.
+  // E = { scene, W, FLOOR, items (live), size, reduce, outfit, startAt (s), ready() }
+  function makeVacuum(E) {
+    var RD = root.RubberDuck, S = E.size * 1.0, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, Z = 460;
+    function M(hex, o) { return RD.util.vinyl(hex, o); }
+    var g = new THREE.Group(); g.visible = false; E.scene.add(g); g.scale.setScalar(S);
+    // Roboter: flache Scheibe mit Stoßleiste, Deckel, Leuchtring, zwei Seitenbürsten
+    var bot = new THREE.Group(); g.add(bot);
+    var shell = M(0x2b2d33, { roughness: 0.35 }), dark = M(0x15161a, { roughness: 0.6 }), glowM = new THREE.MeshBasicMaterial({ color: 0x39d0ff });
+    var base = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.2, 0.3, 48), shell); base.position.y = 0.2; bot.add(base);
+    var lid = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.12, 0.06, 48), M(0x3a3d45, { roughness: 0.25, clearcoat: 1 })); lid.position.y = 0.38; bot.add(lid);
+    var bump = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.07, 10, 64), dark); bump.rotation.x = Math.PI / 2; bump.position.y = 0.16; bot.add(bump);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.025, 8, 64), glowM); ring.rotation.x = Math.PI / 2; ring.position.y = 0.42; bot.add(ring);
+    var brushes = [];
+    [-1, 1].forEach(function (s) {
+      var b = new THREE.Group(); b.position.set(0.95, 0.06, s * 0.75); bot.add(b);
+      for (var k = 0; k < 3; k++) {
+        var br = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), M(0x9a9da3, { roughness: 0.8 }));
+        br.rotation.z = Math.PI / 2; br.position.x = 0.21; var arm = new THREE.Group(); arm.rotation.y = k / 3 * Math.PI * 2; arm.add(br); b.add(arm);
+      }
+      brushes.push(b);
+    });
+    // Ente oben drauf
+    var d = RD.build({ outfit: E.outfit }); d.position.set(-0.1, 0.42 + 0.55 * 0.85, 0); d.scale.setScalar(0.85); g.add(d);
+    // Schlauch vom Schnabel in einem Bogen nach vorn unten zur Düse (Ringe als Riffel)
+    var tip = new THREE.Vector3(1.32, 0.42 + 0.92 * 0.85 + 0.47, 0);
+    var nozzleAt = new THREE.Vector3(2.05, 0.14, 0);
+    var hose = new THREE.CatmullRomCurve3([tip, new THREE.Vector3(1.75, 1.35, 0), new THREE.Vector3(2.15, 0.75, 0), nozzleAt.clone().add(new THREE.Vector3(0, 0.12, 0))]);
+    var hm = M(0x4a4d55, { roughness: 0.4 });
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(hose, 48, 0.085, 12, false), hm));
+    for (var r = 0; r <= 14; r++) {
+      var p = hose.getPointAt(r / 14), tg = hose.getTangentAt(r / 14), rg = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 6, 20), M(0x2a2c31, { roughness: 0.5 }));
+      rg.position.copy(p); rg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg); g.add(rg);
+    }
+    var noz = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.26, 0.24, 24, 1, true), M(0x8d9096, { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }));
+    noz.position.copy(nozzleAt); g.add(noz);
+    var st = 'wait', x = 0, dir = 1, T = 0, sucked = 0, belly = 0, choked = false, choke = null, burp = 0, puffs = [], done = false, ph = 0;
+    var puffGeo = new THREE.SphereGeometry(1, 12, 8);
+    function face(s) { dir = s; g.rotation.y = s > 0 ? -0.3 : Math.PI + 0.3; }
+    function nozzle() { return { x: x + dir * 2.05 * S * Math.cos(0.3), y: FLOOR - 0.14 * S }; }
+    function onFloor(it) { return !it.gone && !it.sucked && !it.bitten && !it.taken && !it.rise && (it.rest > 0 || it.sit > 0 || (!it.bounced && it.y > FLOOR - 160)); }
+    function puff(px, py, col) {
+      var m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: col || 0xd8d2c4, transparent: true, opacity: 0.6, depthWrite: false }));
+      m.position.set(px, -py, Z + 30); m.scale.setScalar(4); E.scene.add(m);
+      puffs.push({ o: m, x: px, y: py, vx: rand(-40, 40), vy: -rand(20, 60), r: rand(10, 18), age: 0, life: rand(0.4, 0.7) });
+    }
+    function step(dt, t) {
+      if (done && !puffs.length) return false;
+      if (st === 'wait') {
+        if (t >= E.startAt && E.ready()) {
+          // von der Seite, auf der weniger liegt, damit sie gleich zu tun hat
+          var l = 0, rr = 0; E.items.forEach(function (it) { if (onFloor(it)) { if (it.x < W / 2) l++; else rr++; } });
+          var from = l >= rr ? -1 : 1; face(-from); x = from < 0 ? -3 * S : W + 3 * S;
+          g.visible = true; st = 'drive';
+        } else return true;
+      }
+      ph += dt;
+      brushes.forEach(function (b, i) { b.rotation.y += (i ? -1 : 1) * dt * 14; });
+      ring.material.color.setHSL(0.53, 1, 0.45 + 0.15 * Math.sin(ph * 6));
+      var nz = nozzle();
+      if (st === 'drive') {
+        var near = 0;
+        E.items.forEach(function (it) {
+          if (!onFloor(it)) return;
+          var dx = it.x - nz.x;
+          if (dx * dir > -60 && dx * dir < 300 && Math.abs(it.y - nz.y) < 280) {
+            near++;
+            if (Math.abs(dx) < 220 || dx * dir < 80) {
+              it.sucked = { t: 0, x0: it.x, y0: it.y, s0: it.g.scale.x, a0: Math.atan2(it.y - nz.y, it.x - nz.x), r0: Math.hypot(it.x - nz.x, it.y - nz.y) };
+              it.choke = !choked && !reduce && !!it.car && Math.random() < 0.5;
+            }
+          }
+        });
+        x += dir * (near ? 300 : 520) * dt;
+        if (!reduce) d.rotation.x = Math.sin(ph * 9) * 0.04;
+        if (!reduce && Math.random() < dt * 8) puff(x + dir * 1.0 * S, FLOOR - 4);
+        if ((dir > 0 && x > W + 3 * S) || (dir < 0 && x < -3 * S)) { g.visible = false; st = 'gone'; done = true; }
+        // am Ende der Fahrt (Bildmitte überschritten, nichts mehr liegt) einmal rülpsen
+        if (!burp && sucked > 3 && !E.items.some(onFloor) && (dir > 0 ? x > W * 0.55 : x < W * 0.45)) burp = 0.5;
+      }
+      if (st === 'choke') {
+        T += dt;
+        var it2 = choke;
+        if (T < 0.7) {
+          if (!reduce) { g.position.x = x + Math.sin(T * 70) * 4; d.rotation.z = Math.sin(T * 40) * 0.08; }
+          it2.g.position.set(nz.x, -(nz.y - 10), Z + 40);
+        } else {
+          // aushusten: Auto fliegt in hohem Bogen nach vorn, landet und bleibt liegen
+          it2.sucked = null; it2.rest = null; it2.bounced = false; it2.hop = true; it2.settled = false; it2.q1 = null;
+          it2.x = nz.x + dir * 30; it2.y = nz.y - 30; it2.vx = dir * rand(260, 380); it2.vy = -rand(520, 680);
+          it2.wx = rand(-3, 3); it2.wz = rand(-3, 3); it2.wy = 0; it2.g.scale.setScalar(it2.cough0);
+          for (var k = 0; k < 6; k++) puff(nz.x + rand(-20, 20), nz.y - rand(0, 30), 0xbdb6a8);
+          d.rotation.z = 0; st = 'drive';
+        }
+      }
+      // eingesaugte Teile: Spirale in die Düse, dabei kleiner
+      E.items.forEach(function (it) {
+        var sk = it.sucked; if (!sk || st === 'choke' && it === choke) return;
+        sk.t += dt; var u = Math.min(1, sk.t / 0.55), rad = sk.r0 * (1 - u), ang = sk.a0 + u * 6 * (dir > 0 ? 1 : -1);
+        var nzz = nozzle();
+        it.x = nzz.x + Math.cos(ang) * rad; it.y = nzz.y + Math.sin(ang) * rad * 0.6;
+        it.g.position.set(it.x, -it.y, Z + 20);
+        it.g.rotation.x += dt * 9; it.g.rotation.z += dt * 7;
+        var k2 = it.choke ? Math.max(0.35, 1 - u) : 1 - u * 0.95;
+        it.g.scale.setScalar(sk.s0 * k2);
+        if (u >= 1) {
+          if (it.choke) { choked = true; it.choke = false; it.cough0 = sk.s0; choke = it; st = 'choke'; T = 0; }
+          else { it.gone = true; E.scene.remove(it.g); sucked++; belly = Math.min(1, belly + 0.05); }
+        }
+      });
+      if (burp > 0) burp = Math.max(0, burp - dt);
+      var sq = burp > 0 ? Math.sin(burp / 0.5 * Math.PI) : 0;
+      d.scale.set(0.85 * (1 + 0.3 * belly), 0.85 * (1 + 0.08 * belly) * (1 - 0.12 * sq), 0.85 * (1 + 0.45 * belly));
+      if (st !== 'choke') g.position.x = x;
+      g.position.y = -FLOOR; g.position.z = Z;
+      if (RD.flutter) RD.flutter(d, t, 0.6, 0);
+      puffs = puffs.filter(function (p) {
+        p.age += dt; var u = Math.min(1, p.age / p.life);
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        var edge = Math.min(1, Math.max(0, Math.min(p.x, W - p.x) / 90));
+        p.o.scale.setScalar(p.r * (0.4 + u)); p.o.position.set(p.x, -p.y, Z + 30); p.o.material.opacity = 0.6 * (1 - u) * edge;
+        if (u >= 1) { E.scene.remove(p.o); p.o.material.dispose(); return false; }
+        return true;
+      });
+      return !(done && !puffs.length);
+    }
+    return { step: step, pending: function () { return !done; } };
+  }
+
   function start(opts) {
     var W = 1920, H = 1080, FLOOR = H - 26;
     var canvas = opts.canvas, reduce = !!opts.reduceMotion;
@@ -680,10 +813,13 @@
     rim.position.set(1, -0.3, 0.6);
     scene.add(rim);
 
-    var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ? opts.kind : 'duck';
+    // mix = gemischter Kram (Sushi, Enten, Autos), z. B. für !saugen
+    var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ||
+      (opts.kind === 'mix' && root.ToyCars && root.RubberDuck) ? opts.kind : 'duck';
     var wantEater = kind === 'sushi' && !!opts.eater && !!root.RubberDuck;
     var wantDriver = kind === 'car' && !!opts.driver && !!root.RubberDuck;
-    if ((kind === 'duck' && root.RubberDuck) || kind === 'car' || wantEater) {
+    var wantVacuum = kind !== 'balloon' && !!opts.vacuum && !!root.RubberDuck;
+    if ((kind === 'duck' && root.RubberDuck) || kind === 'car' || kind === 'mix' || wantEater || wantVacuum) {
       // Umgebung zum Spiegeln für das Vinyl der Gummiente bzw. den Autolack
       var ec = document.createElement('canvas'); ec.width = 512; ec.height = 256;
       var ex = ec.getContext('2d'), eg = ex.createLinearGradient(0, 0, 0, 256);
@@ -695,11 +831,13 @@
     var rise = kind === 'balloon';
     // Autos: Modell je Auto zufällig (model=mix) oder fest, Farbe aus den typischen Lacken des Modells
     var TC = root.ToyCars, carModel = TC && TC.SPEC[opts.model] ? opts.model : 'mix';
-    var tpl = kind === 'car' ? { make: function () {
+    var carTpl = TC ? { make: function () {
       var m = carModel === 'mix' ? TC.MODELS[Math.floor(Math.random() * TC.MODELS.length)] : carModel, p = TC.pickPaint(m);
       var sp = TC.SPEC[m];
       return { g: TC.build(m, p.c, p.l), len: sp.L, car: { L: sp.L, W: sp.W, hh: sp.H / 2, belt: sp.belt - sp.H / 2 } };
-    } } : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
+    } } : null;
+    var tpl = kind === 'car' ? carTpl : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
+    var sushiTpl = kind === 'mix' ? buildSushiTemplate() : null;
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
     // Enten: neue Gummiente (js/rubber-duck.js) mit Outfit; je Outfit einmal gebaut,
     // danach geklont (teilt Geometrie und Material). outfit 'mix' = zufällig je Ente
@@ -720,6 +858,12 @@
       fixedOutfit = pool[Math.floor(Math.random() * pool.length)];
     }
     function makeItem() {
+      if (kind === 'mix') {
+        var r = Math.random();
+        if (r < 0.4) return sushiTpl.make();
+        if (r < 0.75) return carTpl.make();
+        return { g: duckOf(RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)], false), len: 2.7 };
+      }
       if (kind === 'sushi' || kind === 'car' || rise) return tpl.make();
       if (RD) {
         var o = opts.outfit === 'mix' ? RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)] : (fixedOutfit || 'none');
@@ -750,13 +894,23 @@
       driver = makeDriver(DE);
     }
 
+    // Saug-Ente (Freischaltung „duck-vacuum“): kommt, wenn alles gelandet ist und Fress-/Fahrer-Ente fertig sind
+    var vacuum = null, VE = null, othersBusy = false;
+    if (wantVacuum) {
+      var vv = typeof opts.vacuum === 'string' ? opts.vacuum : '', vo3 = RD.viewerOutfit || function () { return null; };
+      var vout = (vv && RD.OUTFITS.indexOf(vv) >= 0 ? vv : null) || (vv && vo3(vv)) || opts.mine || (opts.owner && vo3(opts.owner)) || 'none';
+      VE = { scene: scene, W: W, FLOOR: FLOOR, items: ducks, size: size, reduce: reduce, outfit: vout,
+             startAt: spawnEnd / 1000 + 2.2, ready: function () { return !othersBusy; } };
+      vacuum = makeVacuum(VE);
+    }
+
     function spawn() {
       var k = rand(0.8, 1.2), it = makeItem(), g = it.g;
       // jedes Teil etwa `size` groß (Ballons etwas größer)
-      var sc = size * k * (rise ? 1.5 : kind === 'car' ? 2.2 : 1) / it.len;
+      var sc = size * k * (rise ? 1.5 : it.car ? 2.2 : 1) / it.len;
       g.scale.set(sc, sc, sc);
       if (rise) g.rotation.set(rand(-0.15, 0.15), rand(0, 6.28), rand(-0.2, 0.2));
-      else if (kind === 'car') g.rotation.set(rand(-0.35, 0.35), rand(0, 6.28), rand(-0.3, 0.3));   // Autos eher waagrecht: Seite und Front bleiben lesbar
+      else if (it.car) g.rotation.set(rand(-0.35, 0.35), rand(0, 6.28), rand(-0.3, 0.3));   // Autos eher waagrecht: Seite und Front bleiben lesbar
       else g.rotation.set(rand(0, 6.28), rand(0, 6.28), rand(0, 6.28));
       scene.add(g);
       if (rise) {
@@ -781,11 +935,13 @@
       last = ts;
       var want = Math.min(count, Math.floor(count * (t / spawnEnd) * (1 + 0.25 * Math.sin(t / 900))));
       while (spawned < want) spawn();
-      var hungry = (!!eater && eater.hungry()) || (!!driver && driver.wantsCar());
+      // keep: alles Gelandete bleibt liegen, bis die Saug-Ente durch ist
+      var keep = !!vacuum && vacuum.pending();
+      var hungry = (!!eater && eater.hungry()) || (!!driver && driver.wantsCar()) || keep;
       ducks = ducks.filter(function (d) {
         if (d.gone) return false;
         if (d.bitten) return true;   // die Ente zieht es gerade in den Schnabel
-        if (d.taken) return true;    // die Fahrer-Ente hat das Auto übernommen
+        if (d.taken || d.sucked) return true;    // Fahrer-Ente hat das Auto übernommen bzw. Saug-Ente zieht es ein
         if (d.rest != null) {
           // liegt am Boden und wartet aufs Gefressenwerden; ist die Ente satt oder die Zeit um, kippt es weg
           d.rest -= dt;
@@ -795,6 +951,7 @@
             d.g.quaternion.copy(d.q0).slerp(d.q1, smooth(0, 1, d.st));
             if (d.st >= 1) d.settled = true;
           }
+          if (keep) d.rest = Math.max(d.rest, 1);
           if (d.rest <= 0 || !hungry) { d.rest = null; d.bounced = true; d.vy = 40; d.vx = 0; }
           else { d.g.position.set(d.x, -d.y, d.z); return true; }
         }
@@ -816,6 +973,7 @@
         if (d.sit > 0) {
           // sitzt aufrecht am unteren Rand: Kippen klingt aus, nur der Umhang weht noch leicht
           d.sit -= dt;
+          if (keep) d.sit = Math.max(d.sit, 0.5);
           var damp = Math.exp(-dt * 10);
           d.g.rotation.x *= damp; d.g.rotation.z *= damp; d.g.rotation.y += d.wy * 0.15 * dt;
           if (RD && RD.flutter) RD.flutter(d.g, t / 1000, 0.35, d.ph);
@@ -867,6 +1025,8 @@
       var eating = false;
       if (eater) { EE.items = ducks; eating = eater.step(dt, t / 1000); }
       if (driver) { DE.items = ducks; eating = driver.step(dt, t / 1000) || eating; }
+      // Saug-Ente startet, sobald die Fress-Ente geplatzt ist und die Fahrer-Ente kein Auto mehr sucht
+      if (vacuum) { othersBusy = (!!eater && eater.hungry()) || (!!driver && driver.wantsCar()); VE.items = ducks; eating = vacuum.step(dt, t / 1000) || eating; }
       renderer.render(scene, cam);
       if (t < duration || ducks.length || eating) requestAnimationFrame(frame);
       else renderer.clear();

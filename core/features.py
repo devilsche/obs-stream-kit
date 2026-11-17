@@ -8,6 +8,7 @@ FEATURES = {
     "ducks": "Rubber ducks (all duck effects, !outfit)",
     "sushi-eater": "Eater duck in the sushi rain (needs ducks)",
     "bmw-driver": "Driver duck in the BMW rain (needs ducks)",
+    "duck-vacuum": "Vacuum duck cleans up after every rain (needs ducks)",
 }
 KEY = "features"
 

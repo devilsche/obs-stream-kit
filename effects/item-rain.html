@@ -13,6 +13,8 @@
        sonst das !outfit des Auslösers (?by=), sonst des Kanalinhabers;
        ?eat=Stücke bis zum Platzen (Standard 25).
        Autos: Fahrer-Ente nur mit Freischaltung „bmw-driver“ (+ „ducks“); ?driver=0 aus, ?driver=<Outfit> oder <Chat-Name>.
+       Saug-Ente nach jedem Regen (außer Ballons) mit Freischaltung „duck-vacuum“ (+ „ducks“); ?vacuum=0 aus, ?vacuum=<Outfit> oder <Chat-Name>.
+       ?kind=mix: Sushi, Enten und Autos gemischt (für !saugen, braucht „ducks“).
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
@@ -35,7 +37,7 @@
       var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       window.ItemRain3D.start({
         // Enten nur mit Freischaltung „ducks“ (sonst Sushi statt Enten)
-        kind: ['duck', 'balloon', 'car'].indexOf(params.get('kind')) >= 0 && (params.get('kind') !== 'duck' || hasFeat('ducks')) ? params.get('kind') : 'sushi',
+        kind: ['duck', 'balloon', 'car', 'mix'].indexOf(params.get('kind')) >= 0 && (['duck', 'mix'].indexOf(params.get('kind')) < 0 || hasFeat('ducks')) ? params.get('kind') : 'sushi',
         model: params.get('model') || 'mix',
         // Enten-Outfit: none, thw, police, fire, batman, superman oder mix (zufällig je Ente)
         outfit: params.get('outfit') || 'none',
@@ -53,6 +55,9 @@
         // Fahrer-Ente beim BMW-Regen: springt in ein Auto und fährt weg (driver= wie eater=)
         driver: !hasFeat('ducks') || !hasFeat('bmw-driver') || params.get('driver') === '0' ? false
           : (params.get('driver') && params.get('driver') !== '1' ? params.get('driver') : true),
+        // Saug-Ente: räumt nach dem Regen alles Liegengebliebene weg (vacuum= wie eater=)
+        vacuum: !hasFeat('ducks') || !hasFeat('duck-vacuum') || params.get('vacuum') === '0' ? false
+          : (params.get('vacuum') && params.get('vacuum') !== '1' ? params.get('vacuum') : true),
         owner: window.__TWITCH_CHANNEL__ || '',
         eat: parseInt(params.get('eat'), 10) || 25
       });
