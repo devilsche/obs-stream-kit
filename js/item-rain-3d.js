@@ -571,6 +571,7 @@
         car = pick();
         if (car) {
           car.taken = true; car.kk = 1; st = 'walk'; ownMaterials(car.g);
+          car.qBase = car.g.quaternion.clone();   // Lage auf den Rädern (Front zum Bildrand)
           x = car.dir > 0 ? W + S * 3 : -S * 3;     // kommt vom näheren Bildrand, von vorn aufs Auto zu
           g.visible = true; face(car.x - x);
           car.g.traverse(function (m) { if (m.isMesh && m.geometry && m.geometry.type === 'CircleGeometry') rims.push(m); });
@@ -619,7 +620,9 @@
           vx = Math.min(1400, vx + (reduce ? 700 : 950) * dt);
           car.x += car.dir * vx * dt;
           var lift = reduce ? 0 : Math.max(0, Math.sin(Math.min(1, T * 2.2) * Math.PI)) * 0.12;
-          car.g.rotation.z = car.dir * lift;
+          // Front anheben: um die eigene Querachse (lokal z) relativ zur Lage – nie über Euler-Winkel,
+          // sonst kippt ein nach links schauendes Auto (Gierwinkel ≈ π) aufs Dach
+          car.g.quaternion.copy(car.qBase).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), lift));
           car.g.position.set(car.x, -(car.y + bob), car.z);
           rims.forEach(function (m) { m.rotation.z -= car.dir * vx * dt / (car.sc * car.kk * 0.35); });
           if (!reduce && Math.random() < dt * 22) puff(car.x - car.dir * car.L * 0.45 * car.sc * car.kk, car.y + car.hh * car.kk * 0.8, car.z + 10, rand(14, 26), 0xb9a98a, -car.dir * rand(20, 80), -rand(30, 70));
