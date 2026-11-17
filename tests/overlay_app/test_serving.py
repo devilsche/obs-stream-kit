@@ -22,3 +22,14 @@ def test_overlay_asset_served(app):
     c = app.test_client()
     r = c.get("/s/tok/assets/DM-Sans.woff2")
     assert r.status_code == 200
+
+
+def test_overlay_html_injects_features(app):
+    c = app.test_client()
+    with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()):
+        r = c.get("/s/tok/effects/item-rain.html")
+    assert 'window.__FEATURES__ = [];' in r.get_data(as_text=True)
+    with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
+         mock.patch("core.features.enabled", return_value=["sushi-eater"]):
+        r = c.get("/s/tok/effects/item-rain.html")
+    assert 'window.__FEATURES__ = ["sushi-eater"];' in r.get_data(as_text=True)

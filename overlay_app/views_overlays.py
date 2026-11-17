@@ -33,11 +33,15 @@ def _serve_tenant_source(token, subdir, filepath):
     creds = _tenant_creds(g.tenant_id)
     theme = "entry"
     stinger_font = ""
+    feats = []
     conn = _get_conn()
     try:
         from pubg.db_pg import get_setting
+        from core import features
         theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
         stinger_font = get_setting(conn, g.tenant_id, "stinger_font", "") or ""
+        # vom Admin freigeschaltete Extras (z. B. Fress-Ente beim Sushi-Regen)
+        feats = features.enabled(conn, g.tenant_id)
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
@@ -48,6 +52,7 @@ def _serve_tenant_source(token, subdir, filepath):
         "__TWITCH_CLIENT_ID__": creds.twitch_client_id or "",
         "__THEME__": theme,
         "__STINGER_FONT__": stinger_font,
+        "__FEATURES__": feats,
     }
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 

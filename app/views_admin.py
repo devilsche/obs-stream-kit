@@ -67,16 +67,36 @@ def admin_users():
             cur.execute("""
                 SELECT u.id, u.twitch_user_id, u.display_name, u.avatar_url,
                        u.is_admin, u.is_approved, u.created_at,
-                       t.slug AS tenant_slug
+                       t.slug AS tenant_slug, t.id AS tenant_id
                 FROM users u
                 LEFT JOIN tenants t ON t.owner_user_id = u.id
                 ORDER BY u.created_at DESC
             """)
             users = [dict(r) for r in cur.fetchall()]
+        from core import features
+        on = features.all_enabled(conn)
+        for u in users:
+            u["features"] = on.get(u["tenant_id"], [])
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
-    return render_template("admin_users.html", user=g.user, users=users)
+    from core import features
+    return render_template("admin_users.html", user=g.user, users=users,
+                           feature_catalog=features.FEATURES)
+
+
+@bp_admin.route("/admin/tenants/<int:tenant_id>/features", methods=["POST"])
+@require_admin
+def admin_tenant_features(tenant_id: int):
+    """Extras eines Tenants freischalten: Formularfeld `feature` (mehrfach), Rest aus."""
+    from core import features
+    conn = _get_conn()
+    try:
+        features.set_enabled(conn, tenant_id, request.form.getlist("feature"))
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    return redirect("/admin/users")
 
 
 @bp_admin.route("/admin/users/<int:user_id>/approve", methods=["POST"])

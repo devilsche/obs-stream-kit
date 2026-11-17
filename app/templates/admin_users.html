@@ -16,6 +16,7 @@
             <th scope="col">Twitch ID</th>
             <th scope="col">Registered</th>
             <th scope="col">Status</th>
+            <th scope="col">Features</th>
             <th scope="col">Action</th>
           </tr>
         </thead>
@@ -47,6 +48,25 @@
                 Pending
               </span>
               {% endif %}
+            </td>
+            <td>
+              {% if u.tenant_id %}
+              <form method="POST" action="/admin/tenants/{{ u.tenant_id }}/features" class="dn-features">
+                <fieldset>
+                  <legend class="sw-sr-only">Features for {{ u.display_name }}</legend>
+                  {% for key, label in feature_catalog.items() %}
+                  <div class="dn-features__opt">
+                    <input type="checkbox" name="feature" value="{{ key }}" id="feat-{{ u.tenant_id }}-{{ key }}"{% if key in u.features %} checked{% endif %}>
+                    <label for="feat-{{ u.tenant_id }}-{{ key }}">{{ label }}</label>
+                  </div>
+                  {% endfor %}
+                </fieldset>
+                <button type="submit" class="dn-btn" aria-label="Save features for {{ u.display_name }}">
+                  <span class="material-symbols-outlined icon-sm" aria-hidden="true">save</span>
+                  Save
+                </button>
+              </form>
+              {% else %}—{% endif %}
             </td>
             <td>
               {% if not u.is_admin %}
