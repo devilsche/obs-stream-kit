@@ -500,7 +500,7 @@
   // (Wackeln, Abgaswolken) und das Auto rast mit drehenden Felgen und leicht hochgezogener Front davon.
   // E = { scene, renderer, W, FLOOR, items (live), size, reduce, outfit, duration }
   function makeDriver(E) {
-    var RD = root.RubberDuck, S = E.size * 0.5, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, GROW = 1.35, CZ = 420;
+    var RD = root.RubberDuck, S = E.size * 0.75, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, GROW = 2.0, CZ = 420;
     var g = new THREE.Group(), d = RD.build({ outfit: E.outfit });
     d.position.y = 0.55; g.add(d); g.visible = false; E.scene.add(g); g.scale.setScalar(S);
     // Clipping: unterhalb der Fensterlinie unsichtbar, solange sie im Auto sitzt
@@ -511,6 +511,31 @@
       (Array.isArray(m.material) ? m.material : [m.material]).forEach(function (mt) { if (mt) { mt.clippingPlanes = [clip]; mt.needsUpdate = true; } });
     });
     var st = 'wait', car = null, x = 0, dir = 1, cdir = 1, ph = 0, T = 0, vx = 0, puffs = [], rims = [], done = false, jump = null;
+    // Abblenden der übrigen Autos: die teilen sich ihre Materialien (Lack je Farbe, Glas, Reifen …),
+    // das Fahrer-Auto bekommt eigene Kopien – so trifft die Deckkraft nur die anderen.
+    var dim = 1, dimMats = [], dimSeen = new Set(), dimTick = 0;
+    function collectDim() {
+      E.items.forEach(function (it) {
+        if (it === car || !it.g) return;
+        it.g.traverse(function (m) {
+          if (!m.isMesh) return;
+          (Array.isArray(m.material) ? m.material : [m.material]).forEach(function (mt) {
+            if (!mt || dimSeen.has(mt)) return;
+            dimSeen.add(mt); dimMats.push({ m: mt, t: mt.transparent, o: mt.opacity, dw: mt.depthWrite });
+          });
+        });
+      });
+    }
+    function applyDim() {
+      dimMats.forEach(function (r) {
+        var k = r.o * dim, tr = r.t || dim < 0.999;
+        if (r.m.transparent !== tr) { r.m.transparent = tr; r.m.needsUpdate = true; }
+        r.m.opacity = k; r.m.depthWrite = dim > 0.95 ? r.dw : false;
+      });
+    }
+    function ownMaterials(g2) {
+      g2.traverse(function (m) { if (m.isMesh) m.material = Array.isArray(m.material) ? m.material.map(function (x) { return x.clone(); }) : m.material.clone(); });
+    }
     var puffGeo = new THREE.SphereGeometry(1, 14, 10);
     function puff(px, py, pz, r, col, vxp, vyp) {
       var m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7, depthWrite: false }));
@@ -534,11 +559,18 @@
     }
     function step(dt, t) {
       E.dt = dt;
-      if (done && !puffs.length) return false;
+      // übrige Autos abblenden, solange die Ente unterwegs ist, danach wieder einblenden
+      var wantDim = car && (st === 'walk' || st === 'jump' || st === 'rev' || st === 'drive') ? 0.15 : 1;
+      if (car && (dim !== wantDim || wantDim < 1)) {
+        if (dimTick-- <= 0) { collectDim(); dimTick = 10; }   // neu gefallene Autos mit neuen Lacken
+        dim += (wantDim - dim) * Math.min(1, dt * 4); if (Math.abs(dim - wantDim) < 0.01) dim = wantDim;
+        applyDim();
+      }
+      if (done && !puffs.length && dim >= 1) return false;
       if (st === 'wait') {
         car = pick();
         if (car) {
-          car.taken = true; car.kk = 1; st = 'walk';
+          car.taken = true; car.kk = 1; st = 'walk'; ownMaterials(car.g);
           x = car.dir > 0 ? W + S * 3 : -S * 3;     // kommt vom näheren Bildrand, von vorn aufs Auto zu
           g.visible = true; face(car.x - x);
           car.g.traverse(function (m) { if (m.isMesh && m.geometry && m.geometry.type === 'CircleGeometry') rims.push(m); });
@@ -584,7 +616,7 @@
           if (!reduce && Math.random() < dt * 14) puff(car.x - car.dir * car.L * 0.5 * car.sc * car.kk, car.y + car.hh * car.kk * 0.6, car.z + 10, rand(12, 22), 0x8a8a90, -car.dir * rand(40, 90), -rand(10, 40));
           if (T > (reduce ? 0.4 : 1.0)) { st = 'drive'; T = 0; vx = 0; }
         } else {
-          vx = Math.min(1500, vx + (reduce ? 900 : 1600) * dt);
+          vx = Math.min(1400, vx + (reduce ? 700 : 950) * dt);
           car.x += car.dir * vx * dt;
           var lift = reduce ? 0 : Math.max(0, Math.sin(Math.min(1, T * 2.2) * Math.PI)) * 0.12;
           car.g.rotation.z = car.dir * lift;
@@ -612,7 +644,7 @@
         if (u >= 1) { E.scene.remove(p.o); p.o.material.dispose(); return false; }
         return true;
       });
-      return !(done && !puffs.length);
+      return !(done && !puffs.length && dim >= 1);
     }
     return { step: step, wantsCar: function () { return st === 'wait'; } };
   }
