@@ -500,7 +500,7 @@
   // (Wackeln, Abgaswolken) und das Auto rast mit drehenden Felgen und leicht hochgezogener Front davon.
   // E = { scene, renderer, W, FLOOR, items (live), size, reduce, outfit, duration }
   function makeDriver(E) {
-    var RD = root.RubberDuck, S = E.size * 0.42, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, Z = 0;
+    var RD = root.RubberDuck, S = E.size * 0.5, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, GROW = 1.35, CZ = 420;
     var g = new THREE.Group(), d = RD.build({ outfit: E.outfit });
     d.position.y = 0.55; g.add(d); g.visible = false; E.scene.add(g); g.scale.setScalar(S);
     // Clipping: unterhalb der Fensterlinie unsichtbar, solange sie im Auto sitzt
@@ -521,7 +521,7 @@
     function waddle(a) { ph += (E.dt || 0.016) * 11; d.rotation.x = Math.sin(ph) * 0.14 * a * (reduce ? 0.4 : 1); d.position.y = 0.55 + Math.abs(Math.sin(ph)) * 0.1 * a; }
     // Sitzplatz und Fensterlinie in Bildschirm-Koordinaten (y nach unten) aus der Lage des Autos
     function seat() {
-      var sc = car.sc;
+      var sc = car.sc * car.kk;
       return { x: car.x - car.dir * car.L * 0.06 * sc, sill: car.y - car.car.belt * sc, z: car.z + car.W * 0.5 * sc + 4 };
     }
     function pick() {
@@ -538,18 +538,26 @@
       if (st === 'wait') {
         car = pick();
         if (car) {
-          car.taken = true; st = 'walk';
+          car.taken = true; car.kk = 1; st = 'walk';
           x = car.dir > 0 ? W + S * 3 : -S * 3;     // kommt vom näheren Bildrand, von vorn aufs Auto zu
           g.visible = true; face(car.x - x);
           car.g.traverse(function (m) { if (m.isMesh && m.geometry && m.geometry.type === 'CircleGeometry') rims.push(m); });
         } else if (t > E.duration * 0.6) { st = 'gone'; done = true; }
+      }
+      if (car && !car.gone) {
+        // gewähltes Auto: wächst etwas (Bühne für die Ente) und kommt ganz nach vorn, Räder bleiben am Boden
+        if (car.kk < GROW) car.kk = Math.min(GROW, car.kk + dt / 0.5 * (GROW - 1));
+        car.z += (CZ - car.z) * Math.min(1, dt * 6);
+        car.g.scale.setScalar(car.sc * car.kk);
+        car.y = FLOOR - car.hh * car.kk;
+        if (st === 'walk' || st === 'jump') car.g.position.set(car.x, -car.y, car.z);
       }
       if (st === 'walk') {
         var s0 = seat(), want = s0.x - car.dir * S * 0.2, dx = want - x;
         face(dx);
         if (Math.abs(dx) < 6) { st = 'jump'; jump = { t: 0, x0: x, y0: FLOOR }; face(car.dir); }
         else { x += Math.sign(dx) * Math.min(Math.abs(dx), (reduce ? 240 : 380) * dt); waddle(1); }
-        g.position.set(x, -FLOOR, car.z + car.W * 0.5 * car.sc + 30);
+        g.position.set(x, -FLOOR, car.z + car.W * 0.5 * car.sc * car.kk + 30);
       }
       if (st === 'jump') {
         jump.t += dt; var u = Math.min(1, jump.t / 0.55), s1 = seat();
@@ -573,7 +581,7 @@
         if (st === 'rev') {
           var shake = reduce ? 0 : Math.sin(T * 60) * 1.6 * Math.min(1, T * 2);
           car.g.position.set(car.x + shake, -(car.y + bob), car.z);
-          if (!reduce && Math.random() < dt * 14) puff(car.x - car.dir * car.L * 0.5 * car.sc, car.y + car.hh * 0.6, car.z + 10, rand(10, 18), 0x8a8a90, -car.dir * rand(40, 90), -rand(10, 40));
+          if (!reduce && Math.random() < dt * 14) puff(car.x - car.dir * car.L * 0.5 * car.sc * car.kk, car.y + car.hh * car.kk * 0.6, car.z + 10, rand(12, 22), 0x8a8a90, -car.dir * rand(40, 90), -rand(10, 40));
           if (T > (reduce ? 0.4 : 1.0)) { st = 'drive'; T = 0; vx = 0; }
         } else {
           vx = Math.min(1500, vx + (reduce ? 900 : 1600) * dt);
@@ -581,9 +589,9 @@
           var lift = reduce ? 0 : Math.max(0, Math.sin(Math.min(1, T * 2.2) * Math.PI)) * 0.12;
           car.g.rotation.z = car.dir * lift;
           car.g.position.set(car.x, -(car.y + bob), car.z);
-          rims.forEach(function (m) { m.rotation.z -= car.dir * vx * dt / (car.sc * 0.35); });
-          if (!reduce && Math.random() < dt * 22) puff(car.x - car.dir * car.L * 0.45 * car.sc, car.y + car.hh * 0.8, car.z + 10, rand(12, 22), 0xb9a98a, -car.dir * rand(20, 80), -rand(30, 70));
-          if (car.x < -car.L * car.sc || car.x > W + car.L * car.sc) { car.gone = true; E.scene.remove(car.g); g.visible = false; st = 'gone'; done = true; }
+          rims.forEach(function (m) { m.rotation.z -= car.dir * vx * dt / (car.sc * car.kk * 0.35); });
+          if (!reduce && Math.random() < dt * 22) puff(car.x - car.dir * car.L * 0.45 * car.sc * car.kk, car.y + car.hh * car.kk * 0.8, car.z + 10, rand(14, 26), 0xb9a98a, -car.dir * rand(20, 80), -rand(30, 70));
+          if (car.x < -car.L * car.sc * car.kk || car.x > W + car.L * car.sc * car.kk) { car.gone = true; E.scene.remove(car.g); g.visible = false; st = 'gone'; done = true; }
         }
         // Ente sitzt im Auto, schaut nach vorn, wippt im Takt
         // Hals knapp über der Fensterlinie, Rest im Auto verborgen
