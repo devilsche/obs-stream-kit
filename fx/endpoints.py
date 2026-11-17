@@ -515,7 +515,13 @@ def duck_outfits_js(token):
         abort(404)
     root = current_app.config.get("_PROJECT_ROOT") or "."
     js = duck_outfits.script(duck_outfits.load(root), duck_outfits.load_parts(root))
-    js += duck_viewers.script(duck_viewers.mapping(root, g.tenant_id))
+    try:
+        owner = _with_conn(lambda conn: _channel(conn, g.tenant_id))
+    except Exception:
+        log.exception("fx ducks: channel lookup failed")
+        owner = ""
+    # Kanalinhaber: seine !outfit-Wahl gilt auch, wenn er sie nur in einem anderen Kanal getroffen hat
+    js += duck_viewers.script(duck_viewers.mapping(root, g.tenant_id, owner=owner))
     return _no_store(Response(js, mimetype="application/javascript"))
 
 

@@ -142,3 +142,35 @@ def test_parade_ping_reaches_greeting(tmp_path):
     assert c.get("/s/t/api/fx/ducks/parade?sec=999").status_code == 400
     poll = c.get("/s/t/api/fx/duckgreet/poll?since=0").get_json()
     assert [(x["cmd"], x["params"]) for x in poll["commands"]] == [("parade", {"sec": 60})]
+
+
+def test_owner_choice_from_other_channel(tmp_path):
+    """Kanalinhaber hat sein !outfit nur in einem fremden Kanal gewählt → gilt auch im eigenen."""
+    root = str(tmp_path)
+    assert dv.set_outfit(root, 1, "OriginalHat3", "reaper")
+    assert dv.set_outfit(root, 1, "bob", "knight")
+    m = dv.mapping(root, 2, owner="originalhat3")
+    assert m == {"originalhat3": "reaper"}             # fremde Zuschauer bleiben draußen
+    # eigene Wahl im eigenen Kanal hat Vorrang
+    assert dv.set_outfit(root, 2, "originalhat3", "pirate")
+    assert dv.mapping(root, 2, owner="@OriginalHat3")["originalhat3"] == "pirate"
+    # ohne owner wie bisher
+    assert dv.mapping(root, 3) == {}
+
+
+def test_owner_choice_newest_wins(tmp_path):
+    root = str(tmp_path)
+    dv.set_outfit(root, 1, "hat", "reaper")
+    dv.set_outfit(root, 3, "hat", "witch")
+    v1 = dv.load(root, 1); v1["hat"]["t"] = 100; dv._write(root, 1, v1)
+    v3 = dv.load(root, 3); v3["hat"]["t"] = 200; dv._write(root, 3, v3)
+    assert dv.mapping(root, 2, owner="hat") == {"hat": "witch"}
+
+
+def test_custom_js_owner_from_other_channel(tmp_path, monkeypatch):
+    """custom.js eines Tenants enthält das !outfit seines Kanalinhabers aus einem fremden Kanal."""
+    root = str(tmp_path)
+    dv.set_outfit(root, 1, "originalhat3", "reaper")
+    monkeypatch.setattr(endpoints, "_with_conn", lambda fn: "OriginalHat3")
+    js = _client(root, tenant_id=2).get("/s/t/api/fx/ducks/custom.js").get_data(as_text=True)
+    assert 'RubberDuck.setViewers({"originalhat3":"reaper"})' in js

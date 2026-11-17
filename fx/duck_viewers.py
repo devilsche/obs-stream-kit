@@ -187,9 +187,30 @@ def set_outfit(root: str, tenant_id, name: str, key) -> bool:
     return True
 
 
-def mapping(root: str, tenant_id) -> dict:
-    """{login: outfit} für die Effekte."""
-    return {k: v["o"] for k, v in load(root, tenant_id).items() if isinstance(v, dict) and isinstance(v.get("o"), str)}
+def _anywhere(root: str, login: str):
+    """Neueste !outfit-Wahl eines Logins über alle Kanäle (Tenants) hinweg."""
+    import glob
+    best = None
+    for f in glob.glob(os.path.join(root, "data", "duck-viewers-*.json")):
+        m = re.search(r"duck-viewers-(\d+)\.json$", f)
+        if not m:
+            continue
+        v = load(root, int(m.group(1))).get(login)
+        if isinstance(v, dict) and isinstance(v.get("o"), str) and (best is None or (v.get("t") or 0) > (best.get("t") or 0)):
+            best = v
+    return best["o"] if best else None
+
+
+def mapping(root: str, tenant_id, owner: str = "") -> dict:
+    """{login: outfit} für die Effekte. owner = Kanalinhaber: hat er im eigenen Kanal nichts gewählt,
+    gilt seine neueste Wahl aus einem anderen Kanal (z. B. als Zuschauer bei einem anderen Streamer)."""
+    m = {k: v["o"] for k, v in load(root, tenant_id).items() if isinstance(v, dict) and isinstance(v.get("o"), str)}
+    own = login_of(owner)
+    if own and own not in m:
+        o = _anywhere(root, own)
+        if o:
+            m[own] = o
+    return m
 
 
 # ── Chat ──
