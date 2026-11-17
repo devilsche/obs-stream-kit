@@ -40,8 +40,8 @@ def _serve_tenant_source(token, subdir, filepath):
         from core import features
         theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
         stinger_font = get_setting(conn, g.tenant_id, "stinger_font", "") or ""
-        # vom Admin freigeschaltete Extras (z. B. Fress-Ente beim Sushi-Regen)
-        feats = features.enabled(conn, g.tenant_id)
+        # vom Admin freigeschaltete Extras (z. B. Fress-Ente beim Sushi-Regen); Admin-Tenant hat alle
+        feats = features.effective(conn, g.tenant_id)
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()

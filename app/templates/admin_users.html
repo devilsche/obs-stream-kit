@@ -50,7 +50,9 @@
               {% endif %}
             </td>
             <td>
-              {% if u.tenant_id %}
+              {% if u.tenant_id and u.is_admin %}
+              <span class="dn-badge">All (admin)</span>
+              {% elif u.tenant_id %}
               <form method="POST" action="/admin/tenants/{{ u.tenant_id }}/features" class="dn-features">
                 <fieldset>
                   <legend class="sw-sr-only">Features for {{ u.display_name }}</legend>

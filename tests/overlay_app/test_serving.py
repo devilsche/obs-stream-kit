@@ -30,6 +30,6 @@ def test_overlay_html_injects_features(app):
         r = c.get("/s/tok/effects/item-rain.html")
     assert 'window.__FEATURES__ = [];' in r.get_data(as_text=True)
     with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
-         mock.patch("core.features.enabled", return_value=["sushi-eater"]):
+         mock.patch("core.features.effective", return_value=["sushi-eater"]):
         r = c.get("/s/tok/effects/item-rain.html")
     assert 'window.__FEATURES__ = ["sushi-eater"];' in r.get_data(as_text=True)

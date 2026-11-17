@@ -38,3 +38,22 @@ def all_enabled(conn) -> dict:
     with conn.cursor() as cur:
         cur.execute("SELECT tenant_id, value FROM settings WHERE key = %s", (KEY,))
         return {r["tenant_id"]: parse(r["value"]) for r in cur.fetchall()}
+
+
+def is_admin_tenant(conn, tenant_id: int) -> bool:
+    """Gehört der Tenant einem Admin? Der bekommt alles, ohne Häkchen."""
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT u.is_admin FROM tenants t JOIN users u ON u.id = t.owner_user_id "
+                        "WHERE t.id = %s", (tenant_id,))
+            r = cur.fetchone()
+        return bool(r and r.get("is_admin"))
+    except Exception:
+        return False   # im Zweifel nichts extra freischalten, Source läuft trotzdem
+
+
+def effective(conn, tenant_id: int) -> list:
+    """Was die Sources bekommen: Admin-Tenant alles, sonst die Freischaltungen."""
+    if is_admin_tenant(conn, tenant_id):
+        return sorted(FEATURES)
+    return enabled(conn, tenant_id)

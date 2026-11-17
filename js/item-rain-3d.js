@@ -565,11 +565,12 @@
     var size = opts.size || 96, count = opts.count || 120, duration = opts.duration || 22000;
     var spawnEnd = duration * 0.62, margin = 120;
     var ducks = [], spawned = 0, t0 = null, last = null;
-    // Fress-Ente (nur Sushi): Outfit aus opts.eater (Outfit-Name), sonst das !outfit des Kanals, sonst ohne
+    // Fress-Ente (nur Sushi, nur mit Freischaltung „sushi-eater“)
     var eater = null, EE = null;
     if (wantEater) {
-      var eo = typeof opts.eater === 'string' && RD.OUTFITS.indexOf(opts.eater) >= 0 ? opts.eater
-        : (opts.owner && RD.viewerOutfit && RD.viewerOutfit(opts.owner)) || 'none';
+      // Outfit: eater = Outfit-Name oder Chat-Name (dessen !outfit), sonst der Auslöser (by=), sonst der Kanalinhaber
+      var ev = typeof opts.eater === 'string' ? opts.eater : '', vo = RD.viewerOutfit || function () { return null; };
+      var eo = (ev && RD.OUTFITS.indexOf(ev) >= 0 ? ev : null) || (ev && vo(ev)) || opts.mine || (opts.owner && vo(opts.owner)) || 'none';
       EE = { scene: scene, W: W, H: H, FLOOR: FLOOR, items: ducks, size: size, reduce: reduce, outfit: eo,
              target: Math.max(3, opts.eat || 25), duration: duration / 1000, makeSushi: function () { return tpl.make(); } };
       eater = makeEater(EE);
