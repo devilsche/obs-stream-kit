@@ -668,40 +668,71 @@
     var RD = root.RubberDuck, S = E.size * 1.0, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, Z = 460;
     function M(hex, o) { return RD.util.vinyl(hex, o); }
     var g = new THREE.Group(); g.visible = false; E.scene.add(g); g.scale.setScalar(S);
-    // Roboter: flache Scheibe mit Stoßleiste, Deckel, Leuchtring, zwei Seitenbürsten
+    // leicht zur Kamera gekippt, damit man die Oberseite sieht (sonst wirkt der Roboter von der Kante wie eine Scheibe)
+    var TILT = 0.34;
+    var shell = M(0xe8eaef, { roughness: 0.28, clearcoat: 1 }), dark = M(0x1b1c21, { roughness: 0.55 }), chrome = M(0xc9ccd2, { metalness: 0.85, roughness: 0.18 });
+    var glowM = new THREE.MeshBasicMaterial({ color: 0x39d0ff });
     var bot = new THREE.Group(); g.add(bot);
-    var shell = M(0x2b2d33, { roughness: 0.35 }), dark = M(0x15161a, { roughness: 0.6 }), glowM = new THREE.MeshBasicMaterial({ color: 0x39d0ff });
-    var base = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.2, 0.3, 48), shell); base.position.y = 0.2; bot.add(base);
-    var lid = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.12, 0.06, 48), M(0x3a3d45, { roughness: 0.25, clearcoat: 1 })); lid.position.y = 0.38; bot.add(lid);
-    var bump = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.07, 10, 64), dark); bump.rotation.x = Math.PI / 2; bump.position.y = 0.16; bot.add(bump);
-    var ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.025, 8, 64), glowM); ring.rotation.x = Math.PI / 2; ring.position.y = 0.42; bot.add(ring);
+    // Gehäuse mit gerundeter Kante (Drehkörper), dunkle Glasplatte oben, Leuchtring
+    var prof = [[0.001, 0.05], [1.12, 0.05], [1.23, 0.1], [1.27, 0.22], [1.24, 0.36], [1.12, 0.44], [0.001, 0.45]];
+    bot.add(new THREE.Mesh(new THREE.LatheGeometry(prof.map(function (q) { return new THREE.Vector2(q[0], q[1]); }), 64), shell));
+    var top = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 1.02, 0.02, 64), M(0x22252c, { roughness: 0.08, clearcoat: 1, metalness: 0.3 })); top.position.y = 0.455; bot.add(top);
+    var ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.022, 8, 80), glowM); ring.rotation.x = Math.PI / 2; ring.position.y = 0.465; bot.add(ring);
+    // Stoßleiste vorn (halber Ring), LED-Augen, Räder seitlich
+    var bump = new THREE.Mesh(new THREE.TorusGeometry(1.25, 0.075, 10, 48, Math.PI * 0.7), dark); bump.rotation.set(Math.PI / 2, 0, -Math.PI * 0.35); bump.position.y = 0.2; bot.add(bump);
+    [-1, 1].forEach(function (s) {
+      var eye = new THREE.Mesh(new THREE.SphereGeometry(0.055, 16, 10), glowM); eye.position.set(1.24, 0.3, s * 0.22); bot.add(eye);
+      var wh = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.12, 24), dark); wh.rotation.x = Math.PI / 2; wh.position.set(-0.05, 0.14, s * 1.17); bot.add(wh);
+      var hub = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.13, 16), chrome); hub.rotation.x = Math.PI / 2; hub.position.copy(wh.position); bot.add(hub);
+    });
+    // Seitenbürsten mit Borstenbüscheln
     var brushes = [];
     [-1, 1].forEach(function (s) {
-      var b = new THREE.Group(); b.position.set(0.95, 0.06, s * 0.75); bot.add(b);
+      var b = new THREE.Group(); b.position.set(0.95, 0.05, s * 0.82); bot.add(b);
+      b.add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.05, 16), dark));
       for (var k = 0; k < 3; k++) {
-        var br = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 6), M(0x9a9da3, { roughness: 0.8 }));
-        br.rotation.z = Math.PI / 2; br.position.x = 0.21; var arm = new THREE.Group(); arm.rotation.y = k / 3 * Math.PI * 2; arm.add(br); b.add(arm);
+        var arm = new THREE.Group(); arm.rotation.y = k / 3 * Math.PI * 2; b.add(arm);
+        var tuft = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.4, 8), M(0xf2b705, { roughness: 0.9 })); tuft.rotation.z = -Math.PI / 2; tuft.position.x = 0.24; arm.add(tuft);
       }
       brushes.push(b);
     });
+    // durchsichtiger Staubbehälter hinter der Ente – darin wirbelt, was sie eingesaugt hat
+    var bin = new THREE.Group(); bin.position.set(-0.82, 0.45, 0); bot.add(bin);
+    var glass = new THREE.MeshPhysicalMaterial({ color: 0xbfe6ff, transparent: true, opacity: 0.28, roughness: 0.05, clearcoat: 1, depthWrite: false, side: THREE.DoubleSide });
+    var can = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.78, 32, 1, true), glass); can.position.y = 0.39; can.renderOrder = 5; bin.add(can);
+    var cap = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.37, 0.07, 32), dark); cap.position.y = 0.8; bin.add(cap);
+    var cap2 = new THREE.Mesh(new THREE.CylinderGeometry(0.37, 0.37, 0.05, 32), dark); cap2.position.y = 0.02; bin.add(cap2);
+    var swirl = new THREE.Group(); swirl.position.y = 0.39; bin.add(swirl);
+    var minis = [];
     // Ente oben drauf
-    var d = RD.build({ outfit: E.outfit }); d.position.set(-0.1, 0.42 + 0.55 * 0.85, 0); d.scale.setScalar(0.85); g.add(d);
-    // Schlauch vom Schnabel in einem Bogen nach vorn unten zur Düse (Ringe als Riffel)
-    var tip = new THREE.Vector3(1.32, 0.42 + 0.92 * 0.85 + 0.47, 0);
-    var nozzleAt = new THREE.Vector3(2.05, 0.14, 0);
-    var hose = new THREE.CatmullRomCurve3([tip, new THREE.Vector3(1.75, 1.35, 0), new THREE.Vector3(2.15, 0.75, 0), nozzleAt.clone().add(new THREE.Vector3(0, 0.12, 0))]);
-    var hm = M(0x4a4d55, { roughness: 0.4 });
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(hose, 48, 0.085, 12, false), hm));
-    for (var r = 0; r <= 14; r++) {
-      var p = hose.getPointAt(r / 14), tg = hose.getTangentAt(r / 14), rg = new THREE.Mesh(new THREE.TorusGeometry(0.095, 0.018, 6, 20), M(0x2a2c31, { roughness: 0.5 }));
-      rg.position.copy(p); rg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg); g.add(rg);
+    var d = RD.build({ outfit: E.outfit }); d.position.set(0.12, 0.46 + 0.55 * 0.85, 0); d.scale.setScalar(0.85); g.add(d);
+    // Schlauch vom Schnabel im Bogen nach vorn zur Bodendüse; Riffel, Chromringe an den Enden
+    var tip = new THREE.Vector3(0.12 + 1.5 * 0.85, 0.46 + (0.9 + 0.55) * 0.85, 0);
+    var headAt = new THREE.Vector3(2.3, 0.1, 0);
+    var hose = new THREE.CatmullRomCurve3([tip, new THREE.Vector3(1.85, 1.85, 0.06), new THREE.Vector3(2.4, 1.05, 0.08), headAt.clone().add(new THREE.Vector3(-0.02, 0.24, 0))]);
+    g.add(new THREE.Mesh(new THREE.TubeGeometry(hose, 64, 0.11, 14, false), M(0x3d4048, { roughness: 0.45 })));
+    for (var r = 0; r <= 18; r++) {
+      var p = hose.getPointAt(r / 18), tg = hose.getTangentAt(r / 18);
+      var rg = new THREE.Mesh(new THREE.TorusGeometry(0.118, 0.02, 6, 24), r === 0 || r === 18 ? chrome : M(0x24262c, { roughness: 0.5 }));
+      rg.position.copy(p); rg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg); if (r === 0 || r === 18) rg.scale.setScalar(1.25); g.add(rg);
     }
-    var noz = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.26, 0.24, 24, 1, true), M(0x8d9096, { metalness: 0.7, roughness: 0.3, side: THREE.DoubleSide }));
-    noz.position.copy(nozzleAt); g.add(noz);
+    // Bodendüse: breiter Kopf quer zur Fahrtrichtung, Borstenleiste vorn, Gelenk zum Schlauch
+    var head = new THREE.Group(); head.position.copy(headAt); g.add(head);
+    var hb = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.16, 1.15), shell); head.add(hb);
+    var hcap = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.15, 16), shell); hcap.rotation.x = Math.PI / 2; hcap.position.set(0, 0.08, 0); head.add(hcap);
+    var strip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1.1), M(0xf2b705, { roughness: 0.9 })); strip.position.set(0.2, -0.07, 0); head.add(strip);
+    var joint = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.14, 20), chrome); joint.position.set(-0.02, 0.15, 0); head.add(joint);
     var st = 'wait', x = 0, dir = 1, T = 0, sucked = 0, belly = 0, choked = false, choke = null, burp = 0, puffs = [], done = false, ph = 0;
     var puffGeo = new THREE.SphereGeometry(1, 12, 8);
-    function face(s) { dir = s; g.rotation.y = s > 0 ? -0.3 : Math.PI + 0.3; }
-    function nozzle() { return { x: x + dir * 2.05 * S * Math.cos(0.3), y: FLOOR - 0.14 * S }; }
+    function face(s) { dir = s; g.rotation.set(TILT, s > 0 ? -0.35 : Math.PI + 0.35, 0); }
+    function nozzle() { return { x: x + dir * 2.3 * S * Math.cos(0.35), y: FLOOR - 0.12 * S }; }
+    // eingesaugtes Teil als Miniatur in den Behälter
+    function stash(it, s0) {
+      var m = it.g.clone(), f = 0.2 / ((it.car ? 2.2 : 1) * S);
+      m.scale.setScalar(s0 * f); m.position.set(rand(-0.18, 0.18), rand(-0.3, 0.3), rand(-0.18, 0.18));
+      m.userData.sp = rand(2, 5); swirl.add(m); minis.push(m);
+      if (minis.length > 24) swirl.remove(minis.shift());
+    }
     function onFloor(it) { return !it.gone && !it.sucked && !it.bitten && !it.taken && !it.rise && (it.rest > 0 || it.sit > 0 || (!it.bounced && it.y > FLOOR - 160)); }
     function puff(px, py, col) {
       var m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: col || 0xd8d2c4, transparent: true, opacity: 0.6, depthWrite: false }));
@@ -769,14 +800,17 @@
         it.g.scale.setScalar(sk.s0 * k2);
         if (u >= 1) {
           if (it.choke) { choked = true; it.choke = false; it.cough0 = sk.s0; choke = it; st = 'choke'; T = 0; }
-          else { it.gone = true; E.scene.remove(it.g); sucked++; belly = Math.min(1, belly + 0.05); }
+          else { it.gone = true; E.scene.remove(it.g); sucked++; belly = Math.min(1, belly + 0.05); stash(it, sk.s0); }
         }
       });
       if (burp > 0) burp = Math.max(0, burp - dt);
       var sq = burp > 0 ? Math.sin(burp / 0.5 * Math.PI) : 0;
       d.scale.set(0.85 * (1 + 0.3 * belly), 0.85 * (1 + 0.08 * belly) * (1 - 0.12 * sq), 0.85 * (1 + 0.45 * belly));
+      // Behälter-Inhalt wirbelt
+      swirl.rotation.y += dt * 4;
+      minis.forEach(function (m, i) { m.rotation.x += dt * m.userData.sp; m.rotation.z += dt * m.userData.sp * 0.7; m.position.y = Math.sin(ph * 3 + i) * 0.25; });
       if (st !== 'choke') g.position.x = x;
-      g.position.y = -FLOOR; g.position.z = Z;
+      g.position.y = -(FLOOR - 0.36 * S); g.position.z = Z;   // gekippt: Unterkante wieder auf den Boden
       if (RD.flutter) RD.flutter(d, t, 0.6, 0);
       puffs = puffs.filter(function (p) {
         p.age += dt; var u = Math.min(1, p.age / p.life);
