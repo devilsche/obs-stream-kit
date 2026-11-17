@@ -194,7 +194,9 @@
           <p class="muted small" id="shapeMirrorHelp" hidden>Adds a mirror copy on the other side of the duck that follows every change. Move the shape (or the hose points) off the middle to see both.</p>
           <div class="row">
             <button type="button" id="primReset" class="ghost">Reset measurements</button>
+            <button type="button" id="twinCopy" hidden aria-describedby="twinCopyHelp">Copy to other side</button>
           </div>
+          <p class="muted small" id="twinCopyHelp" hidden>Makes the matching piece on the other side (e.g. the second strap) an exact mirror of this one: points, sliders, position, turn and size.</p>
         </div>
         <div id="formBox" hidden>
           <h3>Shape</h3>
@@ -213,7 +215,7 @@
             </span>
           </div>
           <p class="muted small" id="latHelp">Drag the yellow points in the view to reshape, like a box of clay. With the whole part selected the points span all its pieces, so pairs like ears stay matched. With mirroring on, points on the middle line stay on it.</p>
-          <p class="muted small" id="hoseHelp" hidden>The hose runs through these points. Drag them to lay it, add points for more kinks. Straps stay on the body while you drag. With mirroring on, the matching piece on the other side (e.g. the second strap) follows every change.</p>
+          <p class="muted small" id="hoseHelp" hidden>The hose runs through these points. Drag them to lay it, add points for more kinks. Straps stay on the body while you drag. With mirroring on, the matching piece on the other side (e.g. the second strap) becomes an exact mirror with every change: points, sliders, position and turn.</p>
           <div id="latEdit" hidden>
             <div class="row">
               <label for="latPick">Handle</label>
@@ -693,7 +695,7 @@
         xf.p = v.p.map(function (n) { return round(n, 3); });
         xf.r = v.r.map(function (n) { return round(n, 1); });
         xf.s = v.s.map(function (n) { return round(n, 3); });
-        cleanXf(st.sel);
+        twinPiece(); cleanXf(st.sel);
       }
       tc.addEventListener('dragging-changed', function (e) {
         orbit.enabled = !e.value;
@@ -720,20 +722,20 @@
           var v = inp.dataset.v, i = +inp.dataset.i, xf = curXf(true);
           var arr = xf[v] || (v === 's' ? [1, 1, 1] : [0, 0, 0]);
           arr[i] = v === 's' ? Math.max(0.05, num(inp.value, 1)) : num(inp.value, 0);
-          xf[v] = arr; cleanXf(st.sel); applySel(); commit(); syncSel();
+          xf[v] = arr; twinPiece(); cleanXf(st.sel); applySel(); commit(); syncSel();
         });
       });
       $('uni').addEventListener('input', function () {
         var xf = curXf(true), u = num($('uni').value, 1), s = xf.s || [1, 1, 1], avg = (s[0] + s[1] + s[2]) / 3 || 1;
         xf.s = s.map(function (v) { return round(v / avg * u, 3); });
         $('uniOut').textContent = u.toFixed(2) + '×';
-        applySel();
+        twinPiece(); applySel();
       });
       $('uni').addEventListener('change', function () { cleanXf(st.sel); commit(); syncSel(); });
       ['bendX', 'bendZ'].forEach(function (id, k) {
         $(id).addEventListener('input', function () {
           var xf = curXf(true), b = xf.b || [0, 0]; b[k] = round(num($(id).value, 0), 3); xf.b = b;
-          $(id + 'Out').textContent = b[k].toFixed(3); applySel();
+          $(id + 'Out').textContent = b[k].toFixed(3); twinPiece(); applySel();
         });
         $(id).addEventListener('change', function () { cleanXf(st.sel); applySel(); commit(); syncSel(); });
       });
@@ -743,7 +745,7 @@
       $('phide').addEventListener('change', function () { curXf(true).hide = $('phide').checked; cleanXf(st.sel); applySel(); commit(); renderParts(); syncSel(); });
       $('pReset').addEventListener('click', function () {
         change(function () {
-          if (st.piece != null) { var b = partXfObj(false); if (b && b.sub) delete b.sub[pk(st.piece)]; cleanXf(st.sel); return; }
+          if (st.piece != null) { var b = partXfObj(false); if (b && b.sub) delete b.sub[pk(st.piece)]; twinPiece(); cleanXf(st.sel); return; }
           if (st.mode === 'ws') { st.gx = {}; return; }
           var i = accIndex(st.sel);
           if (i >= 0) { if (st.def.acc[i][1]) delete st.def.acc[i][1].xf; } else if (st.def.xf) { delete st.def.xf[st.sel]; if (!Object.keys(st.def.xf).length) delete st.def.xf; }
@@ -822,11 +824,13 @@
         var ai = st.mode === 'outfit' ? accIndex(st.sel) : -1, shp = ai >= 0 && st.def.acc && st.def.acc[ai] && st.def.acc[ai][0] === 'shape';
         $('shapeMirrorRow').hidden = $('shapeMirrorHelp').hidden = !shp;
         if (shp) $('shapeMirror').checked = !!(st.def.acc[ai][1] || {}).mirror;
+        var hasTwin = !!info && info.t === 'hose' && hoseTwin(i) != null;
+        $('twinCopy').hidden = $('twinCopyHelp').hidden = !hasTwin;
         if (!info) { box.textContent = ''; box.dataset.tag = ''; return; }
         $('primTitle').textContent = 'Measurements (' + PRIM_NAME[info.t] + ')';
         sliders(box, st.mode + '|' + st.sel + '|' + i + '|' + info.t, RD.primSpec(info), RD.primParams(info, geoNow(i)), 'pm-', function (k, v) {
           var sx = subXf(i, true); (sx.geo = sx.geo || {})[k] = v;
-          if (info.t === 'hose' && $('latMirror').checked) { var tw = hoseTwin(i); if (tw != null) { var tx = subXf(tw, true); (tx.geo = tx.geo || {})[k] = v; } }
+          syncTwin(i);
           if (!primRaf) primRaf = requestAnimationFrame(function () { primRaf = 0; applySel(); placeHandles(); });
         }, function () { cleanXf(st.sel); commit(); });
       }
@@ -834,10 +838,13 @@
         var ai = accIndex(st.sel); if (ai < 0) return;
         change(function () { var o = st.def.acc[ai][1] = st.def.acc[ai][1] || {}; if ($('shapeMirror').checked) o.mirror = true; else delete o.mirror; });
       });
+      $('twinCopy').addEventListener('click', function () {
+        var i = primIdx(); if (i == null) return;
+        syncTwin(i, true); cleanXf(st.sel); applySel(); commit(); syncSel(); placeHandles();
+      });
       $('primReset').addEventListener('click', function () {
         var i = primIdx(), sx = i == null ? null : subXf(i, false), info = primInfo();
-        if (sx && info && info.t === 'hose' && $('latMirror').checked) { var tw = hoseTwin(i), tx = tw == null ? null : subXf(tw, false); if (tx) delete tx.geo; }
-        if (sx) { delete sx.geo; cleanXf(st.sel); applySel(); commit(); syncSel(); placeHandles(); }
+        if (sx) { delete sx.geo; syncTwin(i); cleanXf(st.sel); applySel(); commit(); syncSel(); placeHandles(); }
       });
 
       // ── Griffpunkte: 3×3×3 um das ganze Teil (Raum der inneren Gruppe) bzw. ein Unterteil;
@@ -1022,13 +1029,26 @@
         return null;
       }
       function twinOn(T) { return T && T.twin != null && $('latMirror').checked; }
+      // Gegenstück komplett gespiegelt übernehmen: Punkte (z → −z), alle Regler, Lage, Drehung, Größe, Biegung
+      function syncTwin(i, force) {
+        if (i == null || (!force && !$('latMirror').checked)) return;
+        var info = RD.primOf(pieces()[i]); if (!info || info.t !== 'hose') return;
+        var tw = hoseTwin(i); if (tw == null) return;
+        var sx = subXf(i, false) || {}, tx = subXf(tw, true);
+        if (sx.geo) { tx.geo = JSON.parse(JSON.stringify(sx.geo)); if (tx.geo.pts) tx.geo.pts = mirPts(tx.geo.pts); } else delete tx.geo;
+        if (sx.p) tx.p = [sx.p[0], sx.p[1], -sx.p[2]]; else delete tx.p;
+        if (sx.r) tx.r = [-sx.r[0], -sx.r[1], sx.r[2]]; else delete tx.r;
+        if (sx.s) tx.s = sx.s.slice(); else delete tx.s;
+        if (sx.b) tx.b = sx.b.slice(); else delete tx.b;
+      }
+      function twinPiece() { if (st.piece != null) syncTwin(st.piece); }
       function mirPts(pts) { return pts.map(function (q) { return [q[0], q[1], -q[2]]; }); }
       // Schlauch: ganze Punktliste in die aktuelle Ebene schreiben (anliegende Schläuche: Punkte auf den Körper)
       function setPts(T, pts) {
         if (T.info && T.info.hug != null) pts = pts.map(function (q) { var s = RD.hugAt(T.info, new THREE.Vector3(q[0], q[1], q[2])); return s ? [s.p.x, s.p.y, s.p.z] : q; });
         var r = pts.map(function (q) { return q.map(function (v) { return round(v, 3); }); });
         var sx = subXf(T.idx, true); sx.geo = sx.geo || {}; sx.geo.pts = r;
-        if (twinOn(T)) { var tx = subXf(T.twin, true); tx.geo = tx.geo || {}; tx.geo.pts = mirPts(r); }
+        syncTwin(T.idx);
       }
       function readHandle() {
         var T = hTarget(); if (!T || st.h == null) return;
@@ -1096,7 +1116,7 @@
       $('latReset').addEventListener('click', function () {
         var T = hTarget(); if (!T) return;
         if (T.kind === 'hose') {
-          [T.idx].concat(twinOn(T) ? [T.twin] : []).forEach(function (k) { var sx = subXf(k, false); if (sx && sx.geo) delete sx.geo.pts; });
+          var sx = subXf(T.idx, false); if (sx && sx.geo) delete sx.geo.pts; syncTwin(T.idx);
           st.h = null; attachTc();
         }
         else { var xf = curXf(false); if (xf) delete xf.l; }
