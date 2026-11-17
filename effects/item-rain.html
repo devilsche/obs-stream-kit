@@ -12,6 +12,7 @@
        „sushi-eater“, /admin/users); ?eater=0 aus, ?eater=<Outfit> oder <Chat-Name> (dessen !outfit),
        sonst das !outfit des Auslösers (?by=), sonst des Kanalinhabers;
        ?eat=Stücke bis zum Platzen (Standard 25).
+       Autos: Fahrer-Ente nur mit Freischaltung „bmw-driver“ (+ „ducks“); ?driver=0 aus, ?driver=<Outfit> oder <Chat-Name>.
        Startet beim Laden – in OBS „Shutdown source when not visible“ an. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
@@ -49,6 +50,9 @@
         // Fress-Ente beim Sushi-Regen: sammelt ein, frisst sich voll, platzt
         eater: !hasFeat('ducks') || !hasFeat('sushi-eater') || params.get('eater') === '0' ? false
           : (params.get('eater') && params.get('eater') !== '1' ? params.get('eater') : true),
+        // Fahrer-Ente beim BMW-Regen: springt in ein Auto und fährt weg (driver= wie eater=)
+        driver: !hasFeat('ducks') || !hasFeat('bmw-driver') || params.get('driver') === '0' ? false
+          : (params.get('driver') && params.get('driver') !== '1' ? params.get('driver') : true),
         owner: window.__TWITCH_CHANNEL__ || '',
         eat: parseInt(params.get('eat'), 10) || 25
       });

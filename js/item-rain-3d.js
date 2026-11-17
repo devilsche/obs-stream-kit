@@ -5,7 +5,8 @@
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
  *
- *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, owner, eat })
+ *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, driver, owner, eat })
+ * Autos mit driver: eine Gummiente springt in ein gelandetes Auto und fährt damit weg (driver wie eater).
  * Sushi mit eater: eine Gummiente sammelt die gelandeten Sushi ein, frisst sich voll und platzt
  * (eater = true oder Outfit-Name; owner = Kanalname → dessen !outfit; eat = Stücke bis zum Platzen).
  */
@@ -494,6 +495,120 @@
     return { step: step, hungry: function () { return st === 'wait' || st === 'walk' || st === 'eat'; } };
   }
 
+  // ── Fahrer-Ente beim BMW-Regen: watschelt zu einem gelandeten Auto, springt durchs Fenster hinein,
+  // lehnt sich mit Kopf und Schultern heraus (Rest per Clipping im Auto verborgen), Motor heult auf
+  // (Wackeln, Abgaswolken) und das Auto rast mit drehenden Felgen und leicht hochgezogener Front davon.
+  // E = { scene, renderer, W, FLOOR, items (live), size, reduce, outfit, duration }
+  function makeDriver(E) {
+    var RD = root.RubberDuck, S = E.size * 0.42, W = E.W, FLOOR = E.FLOOR, reduce = E.reduce, Z = 0;
+    var g = new THREE.Group(), d = RD.build({ outfit: E.outfit });
+    d.position.y = 0.55; g.add(d); g.visible = false; E.scene.add(g); g.scale.setScalar(S);
+    // Clipping: unterhalb der Fensterlinie unsichtbar, solange sie im Auto sitzt
+    E.renderer.localClippingEnabled = true;
+    var clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), 1e6);
+    d.traverse(function (m) {
+      if (!m.isMesh) return;
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(function (mt) { if (mt) { mt.clippingPlanes = [clip]; mt.needsUpdate = true; } });
+    });
+    var st = 'wait', car = null, x = 0, dir = 1, cdir = 1, ph = 0, T = 0, vx = 0, puffs = [], rims = [], done = false, jump = null;
+    var puffGeo = new THREE.SphereGeometry(1, 14, 10);
+    function puff(px, py, pz, r, col, vxp, vyp) {
+      var m = new THREE.Mesh(puffGeo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.7, depthWrite: false }));
+      m.position.set(px, -py, pz); m.scale.setScalar(r * 0.3); E.scene.add(m);
+      puffs.push({ o: m, x: px, y: py, vx: vxp || 0, vy: vyp || -20, r: r, age: 0, life: rand(0.5, 0.9) });
+    }
+    function face(dx) { dir = dx < 0 ? -1 : 1; g.rotation.y = dir > 0 ? -0.35 : Math.PI + 0.35; }
+    function waddle(a) { ph += (E.dt || 0.016) * 11; d.rotation.x = Math.sin(ph) * 0.14 * a * (reduce ? 0.4 : 1); d.position.y = 0.55 + Math.abs(Math.sin(ph)) * 0.1 * a; }
+    // Sitzplatz und Fensterlinie in Bildschirm-Koordinaten (y nach unten) aus der Lage des Autos
+    function seat() {
+      var sc = car.sc;
+      return { x: car.x - car.dir * car.L * 0.06 * sc, sill: car.y - car.car.belt * sc, z: car.z + car.W * 0.5 * sc + 4 };
+    }
+    function pick() {
+      var best = null;
+      E.items.forEach(function (it) {
+        if (best || it.gone || it.taken || !(it.rest > 1.2) || !it.settled || it.x < 220 || it.x > W - 220) return;
+        best = it;
+      });
+      return best;
+    }
+    function step(dt, t) {
+      E.dt = dt;
+      if (done && !puffs.length) return false;
+      if (st === 'wait') {
+        car = pick();
+        if (car) {
+          car.taken = true; st = 'walk';
+          x = car.dir > 0 ? W + S * 3 : -S * 3;     // kommt vom näheren Bildrand, von vorn aufs Auto zu
+          g.visible = true; face(car.x - x);
+          car.g.traverse(function (m) { if (m.isMesh && m.geometry && m.geometry.type === 'CircleGeometry') rims.push(m); });
+        } else if (t > E.duration * 0.6) { st = 'gone'; done = true; }
+      }
+      if (st === 'walk') {
+        var s0 = seat(), want = s0.x - car.dir * S * 0.2, dx = want - x;
+        face(dx);
+        if (Math.abs(dx) < 6) { st = 'jump'; jump = { t: 0, x0: x, y0: FLOOR }; face(car.dir); }
+        else { x += Math.sign(dx) * Math.min(Math.abs(dx), (reduce ? 240 : 380) * dt); waddle(1); }
+        g.position.set(x, -FLOOR, car.z + car.W * 0.5 * car.sc + 30);
+      }
+      if (st === 'jump') {
+        jump.t += dt; var u = Math.min(1, jump.t / 0.55), s1 = seat();
+        // Bogen vom Boden bis zum Fenster, dann hinein bis der Hals an der Fensterlinie ist
+        var feetEnd = s1.sill + 1.1 * S, hgt = 1.6 * S + 40;
+        var fy = jump.y0 + (feetEnd - jump.y0) * u - Math.sin(u * Math.PI) * hgt;
+        x = jump.x0 + (s1.x - jump.x0) * u;
+        d.rotation.x = 0; d.position.y = 0.55;
+        d.scale.set(1 - 0.15 * Math.sin(u * Math.PI), 1 + 0.12 * Math.sin(u * Math.PI), 1);
+        // ab 70 % des Sprungs: alles unter der Fensterlinie unsichtbar (Welt-y = −Bildschirm-y → sichtbar wenn y ≥ −sill)
+        if (u > 0.7) clip.constant = s1.sill;
+        g.position.set(x, -fy, s1.z);
+        if (u >= 1) { st = 'rev'; T = 0; car.bob = 0.25; }
+      }
+      if (st === 'rev' || st === 'drive') {
+        var s2 = seat();
+        // Auto federt beim Einsteigen, wackelt beim Aufheulen
+        if (car.bob > 0) car.bob = Math.max(0, car.bob - dt);
+        var bob = car.bob > 0 ? Math.sin((0.25 - car.bob) / 0.25 * Math.PI) * 5 : 0;
+        T += dt;
+        if (st === 'rev') {
+          var shake = reduce ? 0 : Math.sin(T * 60) * 1.6 * Math.min(1, T * 2);
+          car.g.position.set(car.x + shake, -(car.y + bob), car.z);
+          if (!reduce && Math.random() < dt * 14) puff(car.x - car.dir * car.L * 0.5 * car.sc, car.y + car.hh * 0.6, car.z + 10, rand(10, 18), 0x8a8a90, -car.dir * rand(40, 90), -rand(10, 40));
+          if (T > (reduce ? 0.4 : 1.0)) { st = 'drive'; T = 0; vx = 0; }
+        } else {
+          vx = Math.min(1500, vx + (reduce ? 900 : 1600) * dt);
+          car.x += car.dir * vx * dt;
+          var lift = reduce ? 0 : Math.max(0, Math.sin(Math.min(1, T * 2.2) * Math.PI)) * 0.12;
+          car.g.rotation.z = car.dir * lift;
+          car.g.position.set(car.x, -(car.y + bob), car.z);
+          rims.forEach(function (m) { m.rotation.z -= car.dir * vx * dt / (car.sc * 0.35); });
+          if (!reduce && Math.random() < dt * 22) puff(car.x - car.dir * car.L * 0.45 * car.sc, car.y + car.hh * 0.8, car.z + 10, rand(12, 22), 0xb9a98a, -car.dir * rand(20, 80), -rand(30, 70));
+          if (car.x < -car.L * car.sc || car.x > W + car.L * car.sc) { car.gone = true; E.scene.remove(car.g); g.visible = false; st = 'gone'; done = true; }
+        }
+        // Ente sitzt im Auto, schaut nach vorn, wippt im Takt
+        // Hals knapp über der Fensterlinie, Rest im Auto verborgen
+        clip.constant = s2.sill + bob;
+        var jig = st === 'rev' && !reduce ? Math.sin(T * 60) * 1.6 : 0;
+        g.position.set(s2.x + jig, -(s2.sill + bob + 1.1 * S), s2.z);
+        d.rotation.x = 0; d.rotation.z = st === 'drive' ? -car.dir * 0.15 : 0;   // lehnt sich im Fahrtwind zurück
+        d.position.y = 0.55 + (st === 'rev' && !reduce ? Math.abs(Math.sin(T * 30)) * 0.08 : 0);
+        if (RD.flutter) RD.flutter(d, t, st === 'drive' ? 1.2 + vx / 600 : 0.3, 0);
+      }
+      puffs = puffs.filter(function (p) {
+        p.age += dt; var u = Math.min(1, p.age / p.life);
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        // Rand-Fade: am Bildrand und am Lebensende weich weg
+        var edge = Math.min(1, Math.max(0, Math.min(p.x, W - p.x) / 90));
+        p.o.scale.setScalar(p.r * (0.3 + 0.9 * u)); p.o.position.set(p.x, -p.y, p.o.position.z);
+        p.o.material.opacity = 0.7 * (1 - u) * edge;
+        if (u >= 1) { E.scene.remove(p.o); p.o.material.dispose(); return false; }
+        return true;
+      });
+      return !(done && !puffs.length);
+    }
+    return { step: step, wantsCar: function () { return st === 'wait'; } };
+  }
+
   function start(opts) {
     var W = 1920, H = 1080, FLOOR = H - 26;
     var canvas = opts.canvas, reduce = !!opts.reduceMotion;
@@ -518,6 +633,7 @@
 
     var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ? opts.kind : 'duck';
     var wantEater = kind === 'sushi' && !!opts.eater && !!root.RubberDuck;
+    var wantDriver = kind === 'car' && !!opts.driver && !!root.RubberDuck;
     if ((kind === 'duck' && root.RubberDuck) || kind === 'car' || wantEater) {
       // Umgebung zum Spiegeln für das Vinyl der Gummiente bzw. den Autolack
       var ec = document.createElement('canvas'); ec.width = 512; ec.height = 256;
@@ -532,7 +648,8 @@
     var TC = root.ToyCars, carModel = TC && TC.SPEC[opts.model] ? opts.model : 'mix';
     var tpl = kind === 'car' ? { make: function () {
       var m = carModel === 'mix' ? TC.MODELS[Math.floor(Math.random() * TC.MODELS.length)] : carModel, p = TC.pickPaint(m);
-      return { g: TC.build(m, p.c, p.l), len: TC.SPEC[m].L };
+      var sp = TC.SPEC[m];
+      return { g: TC.build(m, p.c, p.l), len: sp.L, car: { L: sp.L, W: sp.W, hh: sp.H / 2, belt: sp.belt - sp.H / 2 } };
     } } : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
     // Enten: neue Gummiente (js/rubber-duck.js) mit Outfit; je Outfit einmal gebaut,
@@ -575,6 +692,14 @@
              target: Math.max(3, opts.eat || 25), duration: duration / 1000, makeSushi: function () { return tpl.make(); } };
       eater = makeEater(EE);
     }
+    // Fahrer-Ente (nur BMW-Regen, nur mit Freischaltung „bmw-driver“): Outfit wie bei der Fress-Ente
+    var driver = null, DE = null;
+    if (wantDriver) {
+      var dv = typeof opts.driver === 'string' ? opts.driver : '', vo2 = RD.viewerOutfit || function () { return null; };
+      var dout = (dv && RD.OUTFITS.indexOf(dv) >= 0 ? dv : null) || (dv && vo2(dv)) || opts.mine || (opts.owner && vo2(opts.owner)) || 'none';
+      DE = { scene: scene, renderer: renderer, W: W, FLOOR: FLOOR, items: ducks, size: size, reduce: reduce, outfit: dout, duration: duration / 1000 };
+      driver = makeDriver(DE);
+    }
 
     function spawn() {
       var k = rand(0.8, 1.2), it = makeItem(), g = it.g;
@@ -593,7 +718,8 @@
         spawned++;
         return;
       }
-      ducks.push({ g: g, sc: sc, x: rand(margin, W - margin), y: rand(-200, -80), vx: rand(-30, 30), vy: rand(60, 160),
+      var cs = it.car ? { L: it.car.L, W: it.car.W, hh: it.car.hh * sc, belt: it.car.belt } : null;
+      ducks.push({ g: g, sc: sc, car: cs, L: cs && cs.L, W: cs && cs.W, hh: cs && cs.hh, x: rand(margin, W - margin), y: rand(-200, -80), vx: rand(-30, 30), vy: rand(60, 160),
                    wx: reduce ? 0 : rand(-2.2, 2.2) * (kind === 'car' ? 0.15 : 1), wy: reduce ? 0 : rand(-2.6, 2.6) * (kind === 'car' ? 0.6 : 1), wz: reduce ? 0 : rand(-2.2, 2.2) * (kind === 'car' ? 0.2 : 1),
                    bounced: false, back: 0, h: size * k * 0.5, z: rand(-300, 300) });
       spawned++;
@@ -606,13 +732,20 @@
       last = ts;
       var want = Math.min(count, Math.floor(count * (t / spawnEnd) * (1 + 0.25 * Math.sin(t / 900))));
       while (spawned < want) spawn();
-      var hungry = !!eater && eater.hungry();
+      var hungry = (!!eater && eater.hungry()) || (!!driver && driver.wantsCar());
       ducks = ducks.filter(function (d) {
         if (d.gone) return false;
         if (d.bitten) return true;   // die Ente zieht es gerade in den Schnabel
+        if (d.taken) return true;    // die Fahrer-Ente hat das Auto übernommen
         if (d.rest != null) {
           // liegt am Boden und wartet aufs Gefressenwerden; ist die Ente satt oder die Zeit um, kippt es weg
           d.rest -= dt;
+          if (d.q1 && !d.settled) {
+            // Auto setzt sich auf die Räder, Front zum nächsten Bildrand
+            d.st = Math.min(1, (d.st || 0) + dt / 0.45);
+            d.g.quaternion.copy(d.q0).slerp(d.q1, smooth(0, 1, d.st));
+            if (d.st >= 1) d.settled = true;
+          }
           if (d.rest <= 0 || !hungry) { d.rest = null; d.bounced = true; d.vy = 40; d.vx = 0; }
           else { d.g.position.set(d.x, -d.y, d.z); return true; }
         }
@@ -658,6 +791,11 @@
           if (hungry && d.hop) {
             // Fress-Ente unterwegs: nach dem Aufditschen liegen bleiben
             d.y = FLOOR - d.h; d.vy = 0; d.vx = 0; d.wx = d.wy = d.wz = 0; d.rest = rand(5, 8);
+            if (d.car) {
+              d.y = FLOOR - d.hh; d.rest = rand(4, 7); d.dir = d.x < W / 2 ? -1 : 1;
+              d.q0 = d.g.quaternion.clone(); d.q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, d.dir > 0 ? -0.25 : Math.PI + 0.25, 0));
+              d.z = Math.min(d.z, 150);   // vor den fallenden Autos, hinter der Ente
+            }
             d.g.position.set(d.x, -d.y, d.z);
             return true;
           }
@@ -679,6 +817,7 @@
       });
       var eating = false;
       if (eater) { EE.items = ducks; eating = eater.step(dt, t / 1000); }
+      if (driver) { DE.items = ducks; eating = driver.step(dt, t / 1000) || eating; }
       renderer.render(scene, cam);
       if (t < duration || ducks.length || eating) requestAnimationFrame(frame);
       else renderer.clear();

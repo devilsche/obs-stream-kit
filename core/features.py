@@ -7,6 +7,7 @@ import json
 FEATURES = {
     "ducks": "Rubber ducks (all duck effects, !outfit)",
     "sushi-eater": "Eater duck in the sushi rain (needs ducks)",
+    "bmw-driver": "Driver duck in the BMW rain (needs ducks)",
 }
 KEY = "features"
 
