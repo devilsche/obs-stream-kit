@@ -38,6 +38,8 @@
     .keepbtn { margin-top: auto; }
     .keepbtn[aria-pressed="true"] { background: #2e6b3a; border-color: var(--ok); box-shadow: none; }
     .have { font-size: 12px; color: var(--ok); }
+    .inside { font-size: 12px; color: var(--ok); }
+    .inside.no { color: var(--muted); }
     .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
     .btns button { flex: 1; }
     dialog { width: min(1200px, 96vw); height: min(820px, 92vh); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); }
@@ -62,6 +64,7 @@
   <div class="filters" role="group" aria-label="Filter">
     <span id="brands"></span>
     <button type="button" id="onlyKeep" aria-pressed="false">Only kept</button>
+    <button type="button" id="onlyInside" aria-pressed="false">Only with interior</button>
     <span class="count" id="count" aria-live="polite"></span>
   </div>
   <main>
@@ -94,7 +97,7 @@
     (function () {
       'use strict';
       var $ = function (id) { return document.getElementById(id); };
-      var list = [], picks = {}, brand = 'all', onlyKeep = false, tiles = [];
+      var list = [], picks = {}, scanned = {}, brand = 'all', onlyKeep = false, onlyInside = false, tiles = [];
       function say(m, err) { $('status').textContent = m; $('status').className = err ? 'err' : ''; }
       function api(method, url, body) {
         return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' })
@@ -111,6 +114,8 @@
           meta.append(el('h2', null, c.name), el('span', 'sub', c.brand + ' · by ' + c.author + ' · ' + c.faces.toLocaleString('en') + ' triangles'));
           meta.appendChild(el('span', 'lic' + (/NonCommercial/.test(c.license) ? ' nc' : ''), c.license));
           if (c.have) meta.appendChild(el('span', 'have', 'Already in the rain'));
+          var sc = scanned[c.uid];
+          meta.appendChild(el('span', 'inside' + (sc && sc.interior ? '' : ' no'), !sc ? 'Interior: not checked yet' : sc.error ? 'Could not check' : sc.interior ? 'Interior' : 'No interior (dark windows)'));
           var a = el('a', null, 'Sketchfab page'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', c.name + ' on Sketchfab'); meta.appendChild(a);
           var btns = el('div', 'btns'), pv = el('button', null, 'Preview'), b = el('button', 'keepbtn');
           pv.type = 'button'; pv.setAttribute('aria-label', 'Preview ' + c.name + ' in 3D'); b.type = 'button';
@@ -130,7 +135,7 @@
       function paint() {
         var n = 0, k = 0;
         tiles.forEach(function (t) {
-          var on = kept(t.c), show = (brand === 'all' || t.c.brand === brand) && (!onlyKeep || on);
+          var sc = scanned[t.c.uid], on = kept(t.c), show = (brand === 'all' || t.c.brand === brand) && (!onlyKeep || on) && (!onlyInside || (sc && sc.interior));
           t.li.hidden = !show; t.li.classList.toggle('keep', on);
           t.b.textContent = on ? 'Kept' : 'Keep'; t.b.setAttribute('aria-pressed', String(on));
           t.b.setAttribute('aria-label', (on ? 'Kept: ' : 'Keep ') + t.c.name);
@@ -234,11 +239,13 @@
       $('dlgClose').addEventListener('click', function () { dlg.close(); });
       dlg.addEventListener('close', function () { req++; clearModel(); cur = null; if (opener) opener.focus(); });
       $('onlyKeep').addEventListener('click', function () { onlyKeep = !onlyKeep; $('onlyKeep').setAttribute('aria-pressed', String(onlyKeep)); paint(); });
+      $('onlyInside').addEventListener('click', function () { onlyInside = !onlyInside; $('onlyInside').setAttribute('aria-pressed', String(onlyInside)); paint(); });
       Promise.all([
         fetch('/s/__WIDGET_TOKEN__/assets/cars/candidates.json').then(function (r) { return r.json(); }),
-        api('GET', '/app/api/cars/picks')
+        api('GET', '/app/api/cars/picks'),
+        api('GET', '/app/api/cars/scan').catch(function () { return { items: {} }; })
       ]).then(function (res) {
-        list = res[0]; picks = res[1].items || {};
+        list = res[0]; picks = res[1].items || {}; scanned = res[2].items || {};
         var brands = ['all'];
         list.forEach(function (c) { if (brands.indexOf(c.brand) < 0) brands.push(c.brand); });
         brands.forEach(function (b) {
