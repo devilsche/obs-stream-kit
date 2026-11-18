@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sweeper duck mockup</title>
+  <style>
+    /* Mockup für die neue Saug-Ente (Variante A): Gummiente fährt einen Kehrroboter
+       (assets/vacuum/sweeper.glb, Sketchfab, CC BY 4.0). Nur Vorschau, noch nicht im Regen. */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 5; }
+    header { padding: 12px 18px; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 20px; margin: 0; }
+    header p { margin: 4px 0 0; color: var(--muted); }
+    header a, .credit a { color: var(--text); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100vh - 70px); }
+    .stage { position: relative; min-height: 360px; }
+    #view { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    .hint { position: absolute; left: 12px; bottom: 10px; margin: 0; color: var(--muted); font-size: 12px; background: rgba(20, 26, 38, 0.8); padding: 4px 8px; border-radius: 6px; }
+    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; }
+    section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+    h2 { font-size: 15px; margin: 0 0 8px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .row > label { min-width: 90px; color: var(--muted); }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; min-height: 30px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    input, select { background: #0e131c; color: var(--text); border: 1px solid #4a5570; border-radius: 6px; padding: 4px 6px; font: inherit; min-height: 30px; }
+    input[type=range] { flex: 1; min-width: 110px; accent-color: var(--accent); }
+    input[type=checkbox] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+    select { flex: 1; min-width: 0; }
+    output { min-width: 44px; text-align: right; font-variant-numeric: tabular-nums; }
+    .credit { color: var(--muted); font-size: 12px; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; height: auto; }
+      .stage { height: 60vh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#panel">Skip to the controls</a>
+  <header>
+    <h1>Sweeper duck mockup</h1>
+    <p>Idea A for the new vacuum duck: the rubber duck drives a street-sweeper robot. Preview only, not in the rain yet.</p>
+  </header>
+  <div class="layout">
+    <div class="stage">
+      <canvas id="view" tabindex="0" role="img" aria-label="3D mockup of the rubber duck on the sweeper robot. Drag to turn, scroll to zoom, arrow keys turn it when focused."></canvas>
+      <p class="hint">Drag to turn · scroll to zoom · arrow keys</p>
+    </div>
+    <div class="panel" id="panel">
+      <section aria-labelledby="h-pose">
+        <h2 id="h-pose">Where the duck sits</h2>
+        <div class="row" role="group" aria-labelledby="h-pose" id="presets"></div>
+        <div id="sliders"></div>
+      </section>
+      <section aria-labelledby="h-look">
+        <h2 id="h-look">Look</h2>
+        <div class="row">
+          <label for="outfit">Outfit</label>
+          <select id="outfit"></select>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="yellow">
+          <label for="yellow">Paint the robot rubber-duck yellow</label>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="camera" checked>
+          <label for="camera">Keep the sensor on the roof</label>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="spin" checked>
+          <label for="spin">Turn slowly</label>
+        </div>
+      </section>
+      <section aria-labelledby="h-credit">
+        <h2 id="h-credit">Credit</h2>
+        <p class="credit" id="credit">Loading …</p>
+      </section>
+    </div>
+  </div>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck-outfits.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var THREE = window.THREE, RD = window.RubberDuck, $ = function (id) { return document.getElementById(id); };
+      var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      // Kehrroboter: y oben, Front zeigt nach +z (blaue „Augen“-Leuchten vorn), 2,1 m lang, 1,8 m hoch
+      // Ente: Schnabel zeigt nach +x, wird um -90° gedreht, damit sie nach vorn schaut
+      var POSES = {
+        roof: { label: 'On the roof', s: 0.42, y: 1.62, z: -0.55, yaw: 0, tilt: 0 },
+        front: { label: 'Front, above the eyes', s: 0.36, y: 1.32, z: 0.12, yaw: 0, tilt: 0.1 },
+        rear: { label: 'Rear seat', s: 0.4, y: 1.45, z: -1.2, yaw: 0, tilt: 0 },
+        big: { label: 'Big, riding on top', s: 0.62, y: 1.55, z: -0.5, yaw: 0, tilt: 0 }
+      };
+      var pose = JSON.parse(JSON.stringify(POSES.roof));
+      var SL = [['s', 'Size', 0.15, 1, 0.01], ['y', 'Height', 0.6, 2.4, 0.01], ['z', 'Forward', -1.7, 0.6, 0.01], ['yaw', 'Turn', -3.14, 3.14, 0.02], ['tilt', 'Lean forward', -0.5, 0.6, 0.01]];
+      var inputs = {};
+      SL.forEach(function (q) {
+        var row = document.createElement('div'), lab = document.createElement('label'), inp = document.createElement('input'), out = document.createElement('output');
+        row.className = 'row'; lab.htmlFor = 'sl-' + q[0]; lab.textContent = q[1];
+        inp.type = 'range'; inp.id = 'sl-' + q[0]; inp.min = q[2]; inp.max = q[3]; inp.step = q[4]; out.htmlFor = inp.id;
+        inp.addEventListener('input', function () { pose[q[0]] = +inp.value; sync(); place(); });
+        row.append(lab, inp, out); $('sliders').appendChild(row); inputs[q[0]] = [inp, out];
+      });
+      function sync() {
+        SL.forEach(function (q) {
+          inputs[q[0]][0].value = pose[q[0]];
+          inputs[q[0]][1].textContent = /yaw|tilt/.test(q[0]) ? Math.round(pose[q[0]] * 180 / Math.PI) + '°' : (+pose[q[0]]).toFixed(2);
+        });
+      }
+      Object.keys(POSES).forEach(function (k, i) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = POSES[k].label; b.setAttribute('aria-pressed', String(i === 0));
+        b.addEventListener('click', function () {
+          pose = JSON.parse(JSON.stringify(POSES[k]));
+          Array.prototype.forEach.call($('presets').children, function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+          sync(); place();
+        });
+        $('presets').appendChild(b);
+      });
+      sync();
+      RD.OUTFITS.forEach(function (k) { var o = document.createElement('option'); o.value = k; o.textContent = RD.info ? RD.info(k).label : k; $('outfit').appendChild(o); });
+      $('outfit').value = RD.OUTFITS.indexOf('industrial') >= 0 ? 'industrial' : 'none';
+
+      // ── Szene ──
+      var canvas = $('view'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding; renderer.setClearColor(0x1d2433);
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 1, 0.05, 100);
+      (function () {
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+      })();
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x404858, 0.6));
+      var key = new THREE.DirectionalLight(0xfff4e0, 0.9); key.position.set(-3, 5, 4); scene.add(key);
+      var floor = new THREE.Mesh(new THREE.CircleGeometry(3, 48), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
+      floor.rotation.x = -Math.PI / 2; scene.add(floor);
+      var rig = new THREE.Group(); scene.add(rig);
+      var robot = new THREE.Group(), duckHolder = new THREE.Group(); rig.add(robot, duckHolder);
+      var origMats = [], topCam = null;
+
+      new THREE.GLTFLoader().load('/s/__WIDGET_TOKEN__/assets/vacuum/sweeper.glb', function (gl) {
+        var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene;
+        m.traverse(function (o) {
+          if (o.name && /topCamera/i.test(o.name)) topCam = topCam || o;
+          if (o.isMesh) {
+            [].concat(o.material).forEach(function (mt) {
+              if (mt.name === 'sweeper') origMats.push({ mat: mt, color: mt.color.clone() });
+            });
+          }
+        });
+        robot.add(m); paint();
+      }, null, function () { $('credit').textContent = 'Could not load the sweeper model.'; });
+      fetch('/s/__WIDGET_TOKEN__/assets/vacuum/credits.json').then(function (r) { return r.json(); }).then(function (l) {
+        var c = l[0], p = $('credit'); p.textContent = '';
+        var a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '“' + c.title + '”';
+        var b = document.createElement('a'); b.href = c.licenseUrl; b.target = '_blank'; b.rel = 'noopener'; b.textContent = c.license;
+        p.append(a, document.createTextNode(' by ' + c.author + ', '), b, document.createTextNode('.'));
+      }).catch(function () {});
+
+      function paint() {
+        origMats.forEach(function (e) { e.mat.color.copy(e.color); if ($('yellow').checked) e.mat.color.setRGB(1, 0.78, 0.12); });
+        if (topCam) topCam.visible = $('camera').checked;
+      }
+      var duck = null;
+      function makeDuck() {
+        if (duck) duckHolder.remove(duck);
+        duck = new THREE.Group();
+        var d = RD.build({ outfit: $('outfit').value }); d.position.set(-0.12, -0.55, 0); duck.add(d);
+        duckHolder.add(duck); place();
+      }
+      function place() {
+        if (!duck) return;
+        duck.scale.setScalar(pose.s);
+        duck.position.set(0, pose.y + 0.55 * pose.s, pose.z);
+        duck.rotation.set(0, -Math.PI / 2 + pose.yaw, 0);
+        duck.rotateZ(-pose.tilt);
+      }
+      $('outfit').addEventListener('change', makeDuck);
+      $('yellow').addEventListener('change', paint);
+      $('camera').addEventListener('change', paint);
+      makeDuck();
+
+      // ── Ansicht ──
+      var orbit = { yaw: 0.7, pitch: 0.25, dist: 6.2 }, drag = null;
+      canvas.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        orbit.yaw -= (e.clientX - drag.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.4, orbit.pitch + (e.clientY - drag.y) * 0.006));
+        drag = { x: e.clientX, y: e.clientY };
+      });
+      canvas.addEventListener('pointerup', function () { drag = null; });
+      canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(2, Math.min(15, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+      canvas.addEventListener('keydown', function (e) {
+        var k = { ArrowLeft: [0.15, 0], ArrowRight: [-0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+        if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.4, orbit.pitch + k[1]));
+      });
+      function resize() { var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
+      window.addEventListener('resize', resize); resize();
+      var last = null;
+      function frame(ts) {
+        var dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+        if ($('spin').checked && !reduce && !drag) orbit.yaw += dt * 0.25;
+        if (duck && RD.flutter && !reduce) RD.flutter(duck, ts / 1000, 0.25, orbit.yaw);
+        var cp = Math.cos(orbit.pitch), ty = 1.0;
+        cam.position.set(Math.sin(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * cp * orbit.dist - 0.6);
+        cam.lookAt(0, ty, -0.6);
+        renderer.render(scene, cam);
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

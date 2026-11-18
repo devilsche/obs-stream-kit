@@ -65,6 +65,7 @@
   </main>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
@@ -125,7 +126,7 @@
         var g = new THREE.Group();
         if (!loader) return g;
         loader.load('/s/__WIDGET_TOKEN__/assets/cars/' + key + '.glb', function (gl) {
-          var m = gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3(); box.getSize(size);
+          var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3(); box.getSize(size);
           if (size.z > size.x) m.rotation.y = Math.PI / 2;
           box.setFromObject(m); box.getSize(size);
           var k = 4.4 / Math.max(size.x, size.z), c = new THREE.Vector3(); box.getCenter(c);
