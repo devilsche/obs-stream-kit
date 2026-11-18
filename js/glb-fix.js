@@ -8,6 +8,9 @@
  * - hat das Modell einen Innenraum (Materialnamen wie leather, seat, interior, dashboard, steering …),
  *   bleiben die Scheiben getönt durchsichtig, sonst dunkel undurchsichtig (sonst sähe man ins Leere)
  *
+ * - Kulisse weg: Partikel/Linien/Sprites und Teile, die weit über das Auto hinausragen (Wände, Boden,
+ *   Studio-Hintergrund); das Auto ist der Bereich, in dem 85 % der Dreiecke liegen
+ *
  *   GlbFix.prepare(root) → root (Materialien werden in place angepasst), root.userData.interior = true/false
  */
 (function (root) {
@@ -74,7 +77,37 @@
     }
     m.needsUpdate = true;
   }
+  function tris(g) { return g.index ? g.index.count / 3 : (g.attributes.position ? g.attributes.position.count / 3 : 0); }
+  // Studio-Kulisse entfernen (aus dem Baum, damit Box3.setFromObject sie nicht mehr mitzählt)
+  function isolate(obj) {
+    obj.updateMatrixWorld(true);
+    var drop = [], parts = [];
+    obj.traverse(function (o) {
+      if (o.isPoints || o.isLine || o.isSprite) { drop.push(o); return; }
+      if (o.isMesh && o.geometry) {
+        var b = new THREE.Box3().setFromObject(o);
+        if (!b.isEmpty()) parts.push({ o: o, b: b, t: tris(o.geometry) });
+      }
+    });
+    var total = parts.reduce(function (a, p) { return a + p.t; }, 0);
+    if (parts.length > 1 && total > 0) {
+      // Kern: dreiecksreichste Teile, bis 85 % aller Dreiecke erfasst sind
+      var sorted = parts.slice().sort(function (a, b) { return b.t - a.t; }), core = new THREE.Box3(), acc = 0;
+      for (var i = 0; i < sorted.length && acc < total * 0.85; i++) { core.union(sorted[i].b); acc += sorted[i].t; }
+      var cs = new THREE.Vector3(); core.getSize(cs);
+      var grow = new THREE.Box3(core.min.clone().addScaledVector(cs, -0.15), core.max.clone().addScaledVector(cs, 0.15));
+      parts.forEach(function (p) {
+        var s = new THREE.Vector3(); p.b.getSize(s);
+        var tooBig = s.x > cs.x * 1.6 || s.z > cs.z * 1.6 || s.y > cs.y * 2.2;
+        var outside = !grow.intersectsBox(p.b) || !grow.containsPoint(p.b.getCenter(new THREE.Vector3()));
+        if ((tooBig || outside) && p.t < total * 0.1) drop.push(p.o);
+      });
+    }
+    drop.forEach(function (o) { if (o.parent) o.parent.remove(o); });
+    obj.userData.removedParts = drop.length;
+  }
   function prepare(obj) {
+    isolate(obj);
     var inside = false;
     obj.traverse(function (o) {
       if (o.isMesh) [].concat(o.material).forEach(function (m) { if (m && INTERIOR.test(m.name || '')) inside = true; });
