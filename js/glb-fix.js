@@ -2,8 +2,7 @@
  * - alle Materialien beidseitig (manche Modelle haben gedrehte Flächen → fehlende Scheiben)
  * - Glas (Materialname enthält „glass“/„glas“ oder halbtransparent ohne Textur) wird dunkles, getöntes,
  *   undurchsichtiges Glas
- * - Atlas-Texturen mit Transparenz (z. B. Scheiben als durchsichtige Stellen): durchsichtige Pixel werden zu
- *   dunklem Glas, das Material undurchsichtig (sonst sieht man durchs Auto bzw. Sortierfehler)
+ * - Texturen mit Transparenz (Logos, Embleme, Aufkleber): werden ausgeschnitten (alphaTest), nicht eingefärbt
  *
  * - hat das Modell einen Innenraum (Materialnamen wie leather, seat, interior, dashboard, steering …),
  *   bleiben die Scheiben getönt durchsichtig, sonst dunkel undurchsichtig (sonst sähe man ins Leere)
@@ -28,30 +27,6 @@
   var GLASS = [0.05, 0.065, 0.08];
   var DONE = typeof WeakMap !== 'undefined' ? new WeakMap() : null;
 
-  // Pixel mit Alpha < 1 zu dunklem Glas mischen, Alpha voll
-  function opaqueTexture(tex) {
-    var img = tex && tex.image;
-    if (!img || !img.width) return tex;
-    var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-    var x = c.getContext('2d'); x.drawImage(img, 0, 0);
-    var d;
-    try { d = x.getImageData(0, 0, c.width, c.height); } catch (e) { return tex; }
-    var p = d.data, g0 = GLASS[0] * 255, g1 = GLASS[1] * 255, g2 = GLASS[2] * 255;
-    for (var i = 0; i < p.length; i += 4) {
-      var a = p[i + 3] / 255;
-      if (a < 0.98) {
-        // je durchsichtiger, desto mehr Glas; leicht spiegelnd heller als Schwarz
-        var k = Math.min(1, (1 - a) * 1.4);
-        p[i] = p[i] * (1 - k) + g0 * k; p[i + 1] = p[i + 1] * (1 - k) + g1 * k; p[i + 2] = p[i + 2] * (1 - k) + g2 * k;
-        p[i + 3] = 255;
-      }
-    }
-    x.putImageData(d, 0, 0);
-    var t = new THREE.CanvasTexture(c);
-    t.flipY = tex.flipY; t.encoding = tex.encoding; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT;
-    t.repeat.copy(tex.repeat); t.offset.copy(tex.offset); t.anisotropy = 4;
-    return t;
-  }
   var INTERIOR = /interior|leather|seat|dash|steer|carpet|cockpit|stitch|gauge|headliner|\bint_|_int\b|pedal|gear|console/i;
   function isGlassName(n) { return /glass|glas|window|scheibe|windshield/i.test(n || '') && !isLampName(n); }
   // Lampengläser (bernstein, Scheinwerfer, Rückleuchten) bleiben durchscheinend, sonst verschwinden die Lampen
@@ -81,8 +56,9 @@
       if ('clearcoat' in m) m.clearcoat = 1;
       m.envMapIntensity = 1.5;
     } else if (see && m.map) {
-      m.map = opaqueTexture(m.map);
-      m.transparent = false; m.opacity = 1; m.alphaTest = 0; m.depthWrite = true;
+      // Texturen mit Transparenz (Logos, Embleme, Aufkleber, Gitter): ausschneiden statt einfärben,
+      // dann gibt es keine Sortierfehler und keinen dunklen Kasten ums Logo
+      m.transparent = false; m.opacity = 1; m.alphaTest = 0.5; m.depthWrite = true;
     }
     m.needsUpdate = true;
   }
