@@ -4,6 +4,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.request
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,7 +20,17 @@ def add(ref, brand="Other"):
     c = json.load(open(p, encoding="utf-8"))
     if any(x["uid"] == uid for x in c):
         return "already listed: " + uid
-    d = json.load(urllib.request.urlopen("https://api.sketchfab.com/v3/models/" + uid, timeout=30))
+    d = None
+    for wait in (0, 30, 90):   # Sketchfab-Bremse (429): kurz warten, nochmal
+        time.sleep(wait)
+        try:
+            d = json.load(urllib.request.urlopen("https://api.sketchfab.com/v3/models/" + uid, timeout=30))
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429:
+                raise
+    if d is None:
+        return "Sketchfab rate limit, try again later: " + uid
     lic = (d.get("license") or {}).get("label", "")
     if not d.get("isDownloadable") or not lic:
         return "not downloadable / no free licence: " + d.get("name", uid)
