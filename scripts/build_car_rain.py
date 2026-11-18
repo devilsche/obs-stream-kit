@@ -8,7 +8,8 @@ Für jedes im Car-Picker behaltene Auto (Server: data/car-picks.json, data/car-s
   5. nach data/car-rain/<uid>.glb auf den Server, dazu data/car-rain/catalog.json
 Die Dateien kommen nicht ins Repo (öffentlich; manche Lizenzen erlauben keine Weitergabe der Datei).
 
-Aufruf:  python3 scripts/build_car_rain.py [--only <uid> …]
+Aufruf:  python3 scripts/build_car_rain.py [--only <uid> …] [--tris <max>]
+  --tris: eigene Obergrenze für diesen Lauf (z. B. 400000 für ein fein modelliertes Auto, dessen Felgen sonst eckig werden)
 """
 import io
 import json
@@ -233,7 +234,7 @@ def slug(name, used):
     return s
 
 
-def main(only=None):
+def main(only=None, max_tris=MAX_TRIS):
     os.makedirs(WORK, exist_ok=True)
     cands = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "cars", "candidates.json"), encoding="utf-8"))
     picks = remote_json("data/car-picks.json").get("picks", {})
@@ -259,13 +260,16 @@ def main(only=None):
         src, dst = os.path.join(WORK, uid + ".src.glb"), os.path.join(WORK, uid + ".glb")
         subprocess.run(SCP + ["root@31.70.95.217:%s/data/car-cache/%s.glb" % (REMOTE, uid), src], check=True)
         tris = sc.get("tris") or glb_scan.scan(src)["tris"]
-        ratio = min(1.0, MAX_TRIS / max(1, tris))
+        ratio = min(1.0, max_tris / max(1, tris))
         cmd = ["npx", "-y", "gltfpack", "-i", src, "-o", dst, "-km", "-kn", "-noq"]
         if ratio < 1:
             cmd += ["-si", "%.4f" % ratio]
         subprocess.run(cmd, check=True, capture_output=True)
         shrink_textures(dst)
         front, why = front_sign(dst, sc)
+        if uid in old and old[uid].get("front"):
+            # neu gebaut: Fahrtrichtung behalten (das „Turn around“ im Car editor bezieht sich darauf)
+            front, why = old[uid]["front"], old[uid].get("frontWhy", why)
         length = next((l for rx, l in LEN if re.search(rx, c["name"], re.I)), 4.5)
         info = glb_scan.scan(dst)
         entry = {"uid": uid, "key": old.get(uid, {}).get("key") or slug(c["name"], used), "name": c["name"], "brand": c["brand"],
@@ -287,4 +291,9 @@ if __name__ == "__main__":
     if "--all" in args:
         main(ALL)
     else:
-        main(set(args[args.index("--only") + 1:]) if "--only" in args else None)
+        mt = int(args[args.index("--tris") + 1]) if "--tris" in args else MAX_TRIS
+        only = None
+        if "--only" in args:
+            rest = args[args.index("--only") + 1:]
+            only = set(rest[:next((i for i, a in enumerate(rest) if a.startswith("--")), len(rest))])
+        main(only, mt)
