@@ -1,13 +1,14 @@
 [
  {
   "key": "2002",
-  "title": "1968 BMW 2002",
-  "author": "tonielpro520",
-  "profile": "https://sketchfab.com/tonielpro520",
-  "url": "https://sketchfab.com/3d-models/1968-bmw-2002-5d1917ff5d7d45399002ba2973514dcf",
+  "title": "1973 BMW 2002 Turbo",
+  "author": "DisneyCars",
+  "profile": "https://sketchfab.com/supercarmodels",
+  "url": "https://sketchfab.com/3d-models/1973-bmw-2002-turbo-72a33f305dea40f7b72da6fb1487376c",
   "license": "CC Attribution",
   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
-  "faces": 8654
+  "faces": 177021,
+  "note": "Simplified (gltfpack)."
  },
  {
   "key": "e30",
