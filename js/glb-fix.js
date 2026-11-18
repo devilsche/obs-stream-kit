@@ -106,6 +106,26 @@
     drop.forEach(function (o) { if (o.parent) o.parent.remove(o); });
     obj.userData.removedParts = drop.length;
   }
+  // Anteil der Punkte im Kabinenkern (mittleres Längsdrittel, innere Breite, mittlere Höhe):
+  // Sitze, Armaturenbrett, Lenkrad liegen dort, eine hohle Karosserie hat dort fast nichts
+  function cabinShare(obj) {
+    obj.updateMatrixWorld(true);
+    var box = new THREE.Box3().setFromObject(obj), size = new THREE.Vector3(); box.getSize(size);
+    if (box.isEmpty()) return 0;
+    var lx = size.x >= size.z, v = new THREE.Vector3(), n = 0, hit = 0;
+    obj.traverse(function (o) {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+      var p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 4000));
+      for (var i = 0; i < p.count; i += step) {
+        v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); n++;
+        var l = lx ? (v.x - box.min.x) / size.x : (v.z - box.min.z) / size.z;
+        var w = Math.abs(lx ? v.z - (box.min.z + box.max.z) / 2 : v.x - (box.min.x + box.max.x) / 2) / ((lx ? size.z : size.x) / 2);
+        var h = (v.y - box.min.y) / size.y;
+        if (l > 0.3 && l < 0.7 && w < 0.55 && h > 0.25 && h < 0.75) hit++;
+      }
+    });
+    return n ? hit / n : 0;
+  }
   function prepare(obj) {
     isolate(obj);
     var inside = false;
@@ -113,6 +133,7 @@
       if (o.isMesh) [].concat(o.material).forEach(function (m) { if (m && INTERIOR.test(m.name || '')) inside = true; });
       if (o.name && INTERIOR.test(o.name)) inside = true;
     });
+    if (!inside && cabinShare(obj) >= 0.04) inside = true;
     obj.traverse(function (o) {
       if (!o.isMesh) return;
       [].concat(o.material).forEach(function (m) { fixMaterial(m, inside); });
