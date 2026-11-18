@@ -196,10 +196,10 @@
           <label for="straight">Set turned front wheels straight</label>
         </div>
         <h3 class="sub3">Wheels</h3>
-        <p class="muted small-text">If the wheels turn together with other parts (e.g. the bonnet) or a truck has more axles: pick the wheel parts yourself – tyre, rim, brake. They are grouped into wheels by position; only they turn. Steering wheels (green) go in “Pick front wheel parts”, all others (orange) in “Pick wheel parts” – e.g. a truck with two rear axles. Without front wheels the foremost axle steers.</p>
+        <p class="muted small-text">If the wheels turn together with other parts (e.g. the bonnet) or a truck has more axles: pick the wheel parts yourself – tyre, rim, brake. They are grouped into wheels by position; only they turn. Two separate picks, a part may be in both: “Pick rolling parts” = what turns while driving (tyres, rims – not the brake calipers); “Pick steering parts” = what turns with the steering (front tyres and rims plus their brake calipers). A wheel steers as soon as one of its parts steers. Without steering parts the foremost axle steers. Colours: green = rolls and steers, orange = rolls only, blue = steers only.</p>
         <div class="row" role="group" aria-label="Wheel parts">
-          <button type="button" id="pickFront" aria-pressed="false">Pick front wheel parts</button>
-          <button type="button" id="pickWheel" aria-pressed="false">Pick wheel parts</button>
+          <button type="button" id="pickWheel" aria-pressed="false">Pick rolling parts</button>
+          <button type="button" id="pickFront" aria-pressed="false">Pick steering parts</button>
           <button type="button" id="wheelAuto" class="small">Automatic wheels</button>
         </div>
         <p class="small-text" id="wheelList"></p>
@@ -342,13 +342,14 @@
           car.traverse(function (o) { if (o.isMesh && zp.parts.indexOf(o.userData.pkey) >= 0) o.material = yellow; });
         }
         car.position.y = tpl.userData.dims.H / 2;   // Mitte im Auto → Räder auf den Boden
-        if (picking === 'wheel' || picking === 'front') {
+        if (picking === 'wheel' || picking === 'steer') {
           var orange = show.orange || (show.orange = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xff8a1f).convertSRGBToLinear(), roughness: 0.5 }));
           var green = show.green || (show.green = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x3ddc84).convertSRGBToLinear(), roughness: 0.5 }));
+          var blue = show.blue || (show.blue = new THREE.MeshStandardMaterial({ color: new THREE.Color(0x2f9bff).convertSRGBToLinear(), roughness: 0.5 }));
           car.traverse(function (o) {
             if (!o.isMesh) return;
-            if ((def.frontWheelParts || []).indexOf(o.userData.pkey) >= 0) o.material = green;
-            else if ((def.wheelParts || []).indexOf(o.userData.pkey) >= 0) o.material = orange;
+            var st = (def.steerParts || []).indexOf(o.userData.pkey) >= 0, ro = (def.wheelParts || []).indexOf(o.userData.pkey) >= 0;
+            if (st && ro) o.material = green; else if (ro) o.material = orange; else if (st) o.material = blue;
           });
         }
         // Lenkeinschlag der Vorderräder: gewählte Vorderräder, sonst die vorderste Achse (Front: +x)
@@ -365,6 +366,10 @@
         cur = list.filter(function (e) { return e.key === key; })[0];
         if (!cur) return;
         def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : []; def.zones = Array.isArray(def.zones) ? def.zones : [];
+        if (Array.isArray(def.frontWheelParts) && !def.steerParts) {   // alt: Vorderrad = lenkt und dreht
+          def.steerParts = def.frontWheelParts.slice(); def.wheelParts = (def.wheelParts || []).concat(def.frontWheelParts);
+        }
+        delete def.frontWheelParts;
         shown = 0; tpl = null; if ($('setDlg').open) $('setDlg').close(); fill();
         $('msg').hidden = false; $('msg').textContent = 'Loading the model …';
         TC.loadModel(cur).then(function (t) {
@@ -372,7 +377,7 @@
           tpl = t; $('msg').hidden = true;
           var mt = TC.meta(cur.key);
           if (mt && mt.norm) {
-            ['paintParts', 'rimParts', 'wheelParts', 'frontWheelParts'].forEach(function (k) { if (def[k]) def[k] = mt.norm(def[k]); });
+            ['paintParts', 'rimParts', 'wheelParts', 'steerParts'].forEach(function (k) { if (def[k]) def[k] = mt.norm(def[k]); });
             (def.zones || []).forEach(function (z) { z.parts = mt.norm(z.parts || []); });
             zones();
           }
@@ -555,8 +560,8 @@
       // ── Teile per Klick wählen ──
       function listParts() {
         if (!cur || !TC.meta(cur.key)) { $('partList').textContent = ''; return; }
-        var nf = (def.frontWheelParts || []).length;
-        $('wheelList').textContent = def.wheelParts || nf ? 'Own wheels: ' + (nf ? nf + ' front parts (steer), ' : '') + (def.wheelParts || []).length + ' other parts, ' + (TC.meta(cur.key).wheels || 0) + ' wheels built.' : 'Automatic wheels (' + (TC.meta(cur.key).wheels || 0) + ' found).';
+        var nf = (def.steerParts || []).length;
+        $('wheelList').textContent = def.wheelParts || nf ? 'Own wheels: ' + (def.wheelParts || []).length + ' rolling parts, ' + (nf ? nf + ' steering parts, ' : 'foremost axle steers, ') + (TC.meta(cur.key).wheels || 0) + ' wheels built.' : 'Automatic wheels (' + (TC.meta(cur.key).wheels || 0) + ' found).';
         $('partList').textContent = 'Paint: ' + partKeys('paint').length + ' parts' + (def.paintParts ? '' : ' (automatic)');
       }
       // Modell mit geänderten Einstellungen neu aufbereiten (Räder, Richtung …), Eingaben behalten
@@ -570,28 +575,28 @@
         var was = picking;
         picking = picking === w ? null : w;
         $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint'));
-        $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickFront').setAttribute('aria-pressed', String(picking === 'front')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
+        $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickFront').setAttribute('aria-pressed', String(picking === 'steer')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
         canvas.classList.toggle('picking', !!picking); zones();
-        var wheelMode = function (x) { return x === 'wheel' || x === 'front'; };
+        var wheelMode = function (x) { return x === 'wheel' || x === 'steer'; };
         if (wheelMode(picking) && !wheelMode(was)) {
           // eigene Räder: ohne Räder neu laden, damit die Teile ganz und anklickbar sind (Räder entstehen beim Verlassen)
           def.wheelParts = def.wheelParts || [];
-          reprepare({ wheelParts: [], frontWheelParts: undefined }); return;
+          reprepare({ wheelParts: [], steerParts: undefined, frontWheelParts: undefined }); return;
         }
         if (wheelMode(was) && !wheelMode(picking)) {   // Räder aufbauen
-          reprepare({ wheelParts: (def.wheelParts || []).slice(), frontWheelParts: def.frontWheelParts && def.frontWheelParts.length ? def.frontWheelParts.slice() : undefined }); return;
+          reprepare({ wheelParts: (def.wheelParts || []).slice(), steerParts: def.steerParts && def.steerParts.length ? def.steerParts.slice() : undefined, frontWheelParts: undefined }); return;
         }
         // gewählte Felgen sind die Räder (drehen/lenken allein): nach dem Wählen neu aufbauen
         show();
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
-      $('pickFront').addEventListener('click', function () { setPick('front'); });
+      $('pickFront').addEventListener('click', function () { setPick('steer'); });
       $('pickSplit').addEventListener('click', function () { setPick('split'); });
       $('joinSplit').addEventListener('click', function () {
         if (!def.splitParts || !def.splitParts.length) { say('No split parts.'); return; }
         delete def.splitParts; reprepare({ splitParts: undefined }); say('Split parts joined again.');
       });
-      $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; delete def.frontWheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); $('pickFront').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined, frontWheelParts: undefined }); });
+      $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; delete def.steerParts; delete def.frontWheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); $('pickFront').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined, steerParts: undefined, frontWheelParts: undefined }); });
       $('pickPaint').addEventListener('click', function () { setPick('paint'); });
       $('pickAuto').addEventListener('click', function () { delete def.paintParts; delete def.rimParts; delete def.paintMats; delete def.rimMats; listParts(); show(); });
       $('clearPaint').addEventListener('click', function () { def.paintParts = []; listParts(); show(); say('Paint parts cleared – click the ones you want.'); });
@@ -662,12 +667,12 @@
           });
           zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key + (tw.length > 1 ? ' (+' + (tw.length - 1) + ' on the other wheels)' : '')); return;
         }
-        if (picking === 'front' || picking === 'wheel') {
-          // ein Teil ist entweder Vorderrad oder anderes Rad
-          var mine = picking === 'front' ? 'frontWheelParts' : 'wheelParts', other = picking === 'front' ? 'wheelParts' : 'frontWheelParts';
+        if (picking === 'steer' || picking === 'wheel') {
+          // zwei unabhängige Listen: rollt (dreht beim Fahren) und lenkt; ein Teil darf in beiden sein
+          var mine = picking === 'steer' ? 'steerParts' : 'wheelParts';
           var L = (def[mine] || []).slice(), j1 = L.indexOf(key);
-          if (j1 >= 0) L.splice(j1, 1); else { L.push(key); if (def[other]) { var j2 = def[other].indexOf(key); if (j2 >= 0) def[other].splice(j2, 1); } }
-          def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'front' ? 'Front wheel: ' : 'Wheel: ')) + key); return;
+          if (j1 >= 0) L.splice(j1, 1); else L.push(key);
+          def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'steer' ? 'Steers: ' : 'Rolls: ')) + key); return;
         }
         var prop = 'paintParts';
         var list = partKeys(picking).slice(), i = list.indexOf(key);
@@ -706,7 +711,7 @@
         if (def.texOff) d.texOff = true;
         if (def.straight === false) d.straight = false;
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
-        if (def.frontWheelParts && def.frontWheelParts.length) d.frontWheelParts = def.frontWheelParts.slice(0, 400);
+        if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);
