@@ -191,6 +191,10 @@
           <label for="rimOwn">Own rim colour (for sets without their own rims)</label>
           <input type="color" id="rimColor" value="#c9ccd2" aria-label="Rim colour">
         </div>
+        <div class="row">
+          <input type="checkbox" id="rimTexOff">
+          <label for="rimTexOff">Rim colour replaces the rim texture</label>
+        </div>
         <p class="muted small-text" id="rimInfo"></p>
       </section>
       <section aria-labelledby="h-steer">
@@ -323,7 +327,7 @@
         if (rc == null && def.rimParts) { rc = 0x22e5ff; hint = (hint ? hint + ' ' : '') + 'Cyan = your rim parts. Tick “Own rim colour” to set it.'; }
         if (picking === 'paint' || picking === 'rim') { pc = 0xff3fb4; rc = 0x22e5ff; hint = ''; }   // Auswahl sichtbar machen
         $('pickHint').textContent = hint;
-        var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), zoneList: def.zones, zones: p.z, texOff: picking === 'paint' ? true : !!def.texOff });
+        var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), zoneList: def.zones, zones: p.z, rimTexOff: rimTexOn(), texOff: picking === 'paint' ? true : !!def.texOff });
         var zp = zonePicking();
         if (zp) {
           // gerade gewählter Bereich: gelb, damit man sieht, was dazugehört (auch bei Schwarz)
@@ -376,10 +380,11 @@
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
         $('texOff').checked = !!def.texOff; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
-        $('rimOwn').checked = def.rim != null; $('rimColor').value = hex(def.rim != null ? def.rim : 0xc9ccd2);
+        $('rimTexOff').checked = rimTexOn(); $('rimOwn').checked = def.rim != null; $('rimColor').value = hex(def.rim != null ? def.rim : 0xc9ccd2);
         paints(); zones();
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
+      function rimTexOn() { return def.rimTexOff != null ? !!def.rimTexOff : !!(def.rimParts && def.rimParts.length); }
       function ownColour(label, val, dflt, set) {
         var wrap = el('span', 'row'), cb = el('input'), c = el('input'), id = 'oc' + (ownColour.n = (ownColour.n || 0) + 1), lab = el('label', null, label);
         cb.type = 'checkbox'; cb.id = id; lab.htmlFor = id; cb.checked = val != null;
@@ -561,6 +566,7 @@
       });
       $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
       $('addOrig').addEventListener('click', function () { def.paints.push({ c: null, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
+      $('rimTexOff').addEventListener('change', function () { def.rimTexOff = $('rimTexOff').checked; show(); });
       $('rimOwn').addEventListener('change', function () { def.rim = $('rimOwn').checked ? int($('rimColor').value) : null; show(); });
       $('rimColor').addEventListener('input', function () { if ($('rimOwn').checked) { def.rim = int($('rimColor').value); show(); } });
       $('steer').addEventListener('input', function () { $('steerOut').textContent = Math.round(+$('steer').value * 180 / Math.PI) + '°'; show(); });
@@ -585,6 +591,7 @@
         if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);
         if (def.rimParts) d.rimParts = def.rimParts.slice(0, 400);
         if (def.texOff) d.texOff = true;
+        if (def.rimTexOff != null) d.rimTexOff = !!def.rimTexOff;
         if (def.straight === false) d.straight = false;
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);

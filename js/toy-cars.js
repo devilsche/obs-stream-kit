@@ -379,6 +379,8 @@
     o = o || {};
     var key = t.userData.key, v = vehicle(key), meta = META[key] || { all: [], paint: [], rim: [], zones: {} };
     var texOff = o.texOff != null ? o.texOff : !!v.texOff;
+    // Felgenfarbe ersetzt die Felgen-Textur (sonst Farbe × z. B. braune Chrom-Textur); Standard: an bei selbst gewählten Felgen
+    var rimTex = o.rimTexOff != null ? o.rimTexOff : v.rimTexOff != null ? !!v.rimTexOff : Array.isArray(v.rimParts) && v.rimParts.length > 0;
     var car = t.clone(true), swap = {};
     if (rim === undefined) rim = v.rim;
     if (o.paintParts || o.rimParts || o.zoneList) {
@@ -393,13 +395,13 @@
           if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f);
           return;
         }
-        if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', false);
+        if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', rimTex);
         else if (color != null && o.paintParts && o.paintParts.indexOf(k) >= 0) x.material = colourMat(x.material, color, 'p', texOff);
       });
       return car;
     }
     if (color != null) meta.paint.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
-    if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', false); });
+    if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', rimTex); });
     (Array.isArray(v.zones) ? v.zones : []).forEach(function (z) {
       var zc = zoneColour(z, o.zones);
       if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f); });
