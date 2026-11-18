@@ -38,6 +38,7 @@
       <button type="button" data-cam="front">Front</button>
       <button type="button" data-cam="rear">Rear</button>
       <button type="button" data-cam="top">Top</button>
+        <button type="button" data-cam="bottom">Bottom</button>
     </div>
     <a href="car-gallery">All cars</a>
   </header>
@@ -63,7 +64,7 @@
       var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.01, 200);
       CarStage.setup(renderer, scene);   // Studio-Raum, ACES-Belichtung (js/car-stage.js)
       var floor = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
-      floor.rotation.x = -Math.PI / 2; scene.add(floor);
+      floor.rotation.x = -Math.PI / 2; floor.name = 'floor'; scene.add(floor);
       var holder = new THREE.Group(); scene.add(holder);
       var loader = new THREE.GLTFLoader(), credits = [], current = null;
 
@@ -102,7 +103,7 @@
 
       // ── Ansicht: ziehen, Mausrad/Pinch, Pfeiltasten, Kamera-Knöpfe ──
       var orbit = { yaw: 0.8, pitch: 0.22, dist: 9, t: new THREE.Vector3(0, 0.6, 0) }, pts = {}, pinch = null, drag = null;
-      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
+      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45], bottom: [Math.PI, -1.45] };   // Front zeigt nach +x (wie im Regen)
       Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) {
         b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; orbit.t.set(0, 0.6, 0); var hc = holder.children[0]; orbit.dist = Math.max(9, hc && hc.userData.dims ? hc.userData.dims.L * 2.2 : 9); });
       });
@@ -137,7 +138,7 @@
         }
         var p = pts[e.pointerId];
         if (p.pan) panBy(e.clientX - p.x, e.clientY - p.y);
-        else { orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006)); }
+        else { orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-1.5, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006)); }
         pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: p.pan };
       });
       function up(e) { delete pts[e.pointerId]; if (!Object.keys(pts).length) drag = null; }
@@ -147,13 +148,14 @@
         var k = { ArrowLeft: [-0.15, 0], ArrowRight: [0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
         if (e.key === '+' || e.key === '=') { orbit.dist = Math.max(0.15, orbit.dist * 0.9); return; }
         if (e.key === '-') { orbit.dist = Math.min(25, orbit.dist * 1.1); return; }
-        if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
+        if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-1.5, Math.min(1.5, orbit.pitch + k[1]));
       });
       function resize() { var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
       window.addEventListener('resize', resize); resize();
       function frame() {
         var cp = Math.cos(orbit.pitch), T = orbit.t;
         cam.position.set(T.x + Math.cos(orbit.yaw) * cp * orbit.dist, T.y + Math.sin(orbit.pitch) * orbit.dist, T.z + Math.sin(orbit.yaw) * cp * orbit.dist);
+        var fl = scene.getObjectByName('floor'); if (fl) fl.visible = cam.position.y > 0.02;   // von unten: Boden aus
         cam.lookAt(T);
         renderer.render(scene, cam);
         requestAnimationFrame(frame);

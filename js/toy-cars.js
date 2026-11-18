@@ -5,7 +5,7 @@
  *   ToyCars.ready({ model, count }) → Promise   lädt den Katalog und count zufällige Modelle aus dem Mix
  *                                               (oder genau model, bzw. model=brand:<Marke> nur diese Marke)
  *   ToyCars.MODELS          geladene Modelle (Schlüssel), aus denen der Regen zieht
- *   ToyCars.has(key), ToyCars.dims(key) → { L, W, H, belt }, ToyCars.pickPaint(key) → { c }
+ *   ToyCars.has(key), ToyCars.dims(key) → { L, W, H, belt }, ToyCars.pickPaint(key) → { c, r?, z? } (Farbset)
  *   ToyCars.build(key, color) → THREE.Group (Mitte im Auto, Länge in x, Front +x, ~4,4 Einheiten je 4,5 m)
  *   ToyCars.applyCustom({ vehicles }) – Lackfarben, Felgenfarbe, Mix aus dem Auto-Editor (/api/fx/cars/custom.js)
  *   ToyCars.prepare(gltfScene, entry) → Vorlage (für Editor/Übersicht)
@@ -207,6 +207,11 @@
     }
     var paint = Array.isArray(v.paintParts) ? partMats(v.paintParts, 'paint') : Array.isArray(v.paintMats) ? byKeys(v.paintMats) : (ud.paintMats || []);
     var rim = Array.isArray(v.rimParts) ? partMats(v.rimParts, 'rim') : Array.isArray(v.rimMats) ? byKeys(v.rimMats) : (ud.rimMats || []);
+    // eigene Farbbereiche (Car editor „Colour zones“): je Bereich eigene Material-Kopien, gewinnen gegen Lack/Felge
+    var zones = {};
+    (Array.isArray(v.zones) ? v.zones : []).forEach(function (z) {
+      if (z && z.id && Array.isArray(z.parts) && z.parts.length) zones[z.id] = partMats(z.parts, 'z' + z.id);
+    });
     var autoPaint = {}, autoRim = {};
     (ud.paintMats || []).forEach(function (m) { autoPaint[m.uuid] = 1; }); (ud.rimMats || []).forEach(function (m) { autoRim[m.uuid] = 1; });
     var autoPaintParts = [], autoRimParts = [];
@@ -216,7 +221,7 @@
       if (ms.some(function (m) { return m && autoPaint[m.uuid]; })) autoPaintParts.push(o.userData.pkey);
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
-    META[e.key] = { all: all, paint: paint, rim: rim, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
+    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
@@ -288,14 +293,36 @@
     }).catch(function () { return MODELS.slice(); });
   }
 
-  // Lackfarbe: Liste aus dem Editor (gewichtet), c = null heißt Originalfarbe des Modells
+  // Farbset: Liste aus dem Editor (gewichtet). c = Lack (null = Originalfarbe des Modells),
+  // r = Felge (fehlt = Felgenfarbe des Autos, null = Original), z = Bereichsfarben {Bereich: Farbe} (fehlt = Grundfarbe)
+  function setOf(p) {
+    var o = { c: p.c == null ? null : p.c };
+    if (p.r !== undefined) o.r = p.r;
+    if (p.z && typeof p.z === 'object') o.z = p.z;
+    return o;
+  }
   function pickPaint(key) {
     var list = vehicle(key).paints;
     if (!Array.isArray(list) || !list.length) return { c: null };
     var sum = 0, r; list.forEach(function (p) { sum += p.w || 1; }); r = Math.random() * sum;
-    for (var i = 0; i < list.length; i++) { r -= list[i].w || 1; if (r <= 0) return { c: list[i].c == null ? null : list[i].c }; }
-    return { c: list[0].c == null ? null : list[0].c };
+    for (var i = 0; i < list.length; i++) { r -= list[i].w || 1; if (r <= 0) return setOf(list[i]); }
+    return setOf(list[0]);
   }
+  // Oberflächen der Farbbereiche: [Metall, Rauheit, Klarlack]
+  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], chrome: [1, 0.08, 0] };
+  function zoneMat(m, hex, f) {
+    var k = 'z:' + f + ':' + m.uuid + ':' + hex;
+    if (!PAINTS[k]) {
+      var c = PAINTS[k] = m.clone(), F = FINISH[f] || FINISH.satin;
+      c.color.setHex(hex).convertSRGBToLinear();
+      c.map = null; c.metalnessMap = null; c.roughnessMap = null; if (c.aoMap) c.aoMapIntensity = 0.35;
+      c.metalness = F[0]; c.roughness = F[1];
+      if ('clearcoat' in c) { c.clearcoat = F[2]; c.clearcoatRoughness = 0.08; }
+    }
+    return PAINTS[k];
+  }
+  // Farbe eines Bereichs: Set-Farbe, sonst Grundfarbe; null = Original lassen
+  function zoneColour(z, over) { return over && over[z.id] != null ? over[z.id] : (z.c == null ? null : z.c); }
   function colourMat(m, hex, tag, texOff) {
     var k = tag + ':' + m.uuid + ':' + hex + (texOff ? ':t' : '');
     if (!PAINTS[k]) {
@@ -314,18 +341,26 @@
   }
   // Kopie einer Vorlage mit Lack-/Felgenfarbe (rim: Zahl = Farbe, null = Original, undefined = aus dem Editor);
   // o = { paint: [Schlüssel], rims: [Schlüssel], texOff } überschreibt die Einstellungen (Vorschau im Editor)
-  // o.paintParts / o.rimParts: Teile-Schlüssel (Editor-Vorschau, Teile nicht zusammengefasst)
+  // o.paintParts / o.rimParts / o.zoneList: Teile-Schlüssel (Editor-Vorschau, Teile nicht zusammengefasst)
+  // o.zones: Bereichsfarben des Sets {Bereich: Farbe}
   function paintTemplate(t, color, rim, o) {
     o = o || {};
-    var key = t.userData.key, v = vehicle(key), meta = META[key] || { all: [], paint: [], rim: [] };
+    var key = t.userData.key, v = vehicle(key), meta = META[key] || { all: [], paint: [], rim: [], zones: {} };
     var texOff = o.texOff != null ? o.texOff : !!v.texOff;
     var car = t.clone(true), swap = {};
     if (rim === undefined) rim = v.rim;
-    if (o.paintParts || o.rimParts) {
-      // je Teil umfärben (Material-Kopien je Original-Material und Farbe)
+    if (o.paintParts || o.rimParts || o.zoneList) {
+      // je Teil umfärben (Material-Kopien je Original-Material und Farbe); Bereiche zuerst
+      var zl = o.zoneList || [];
       car.traverse(function (x) {
         if (!x.isMesh || Array.isArray(x.material)) return;
         var k = x.userData.pkey;
+        for (var i = 0; i < zl.length; i++) {
+          if ((zl[i].parts || []).indexOf(k) < 0) continue;
+          var zc = zoneColour(zl[i], o.zones);
+          if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f);
+          return;
+        }
         if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', false);
         else if (color != null && o.paintParts && o.paintParts.indexOf(k) >= 0) x.material = colourMat(x.material, color, 'p', texOff);
       });
@@ -333,6 +368,10 @@
     }
     if (color != null) meta.paint.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
     if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', false); });
+    (Array.isArray(v.zones) ? v.zones : []).forEach(function (z) {
+      var zc = zoneColour(z, o.zones);
+      if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f); });
+    });
     if (Object.keys(swap).length) car.traverse(function (x) {
       if (!x.isMesh) return;
       if (Array.isArray(x.material)) x.material = x.material.map(function (m) { return swap[m.uuid] || m; });
@@ -340,9 +379,11 @@
     });
     return car;
   }
-  function build(key, color) {
+  // set (optional): Farbset aus pickPaint – Felge und Bereichsfarben dazu
+  function build(key, color, set) {
     var t = TPL[key] || TPL[MODELS[0]];
-    return t ? paintTemplate(t, color) : new THREE.Group();
+    if (!set || typeof set !== 'object') set = {};
+    return t ? paintTemplate(t, color, set.r, { zones: set.z }) : new THREE.Group();
   }
   function dims(key) { var t = TPL[key] || TPL[MODELS[0]]; return t ? t.userData.dims : { L: 4.4, W: 1.8, H: 1.4, belt: 0.9 }; }
   function random() { var m = MODELS[Math.floor(Math.random() * MODELS.length)], p = pickPaint(m); return { model: m, color: p.c }; }

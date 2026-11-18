@@ -147,7 +147,7 @@
           if (!t.obj && !t.loading && busy < 2) {
             t.loading = true; busy++;
             TC.loadModel(t.e).then(function (tpl) {
-              var p = TC.pickPaint(t.e.key); t.obj = TC.paintTemplate(tpl, p.c);
+              var p = TC.pickPaint(t.e.key); t.obj = TC.paintTemplate(tpl, p.c, p.r, { zones: p.z });
             }).catch(function () {}).then(function () { busy--; });
           }
           if (!t.obj) return;

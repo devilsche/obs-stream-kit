@@ -77,7 +77,7 @@
     // Auto aufbauen; Räder einsammeln (vorn/hinten nach Lage im Auto)
     function setup(key) {
       var p = ToyCars.pickPaint(key);
-      car = ToyCars.build(key, p.c); dims = ToyCars.dims(key);
+      car = ToyCars.build(key, p.c, p); dims = ToyCars.dims(key);
       scene.add(car); car.updateMatrixWorld(true);
       car.traverse(function (o) {
         if (!/^Wheel /.test(o.name || '')) return;

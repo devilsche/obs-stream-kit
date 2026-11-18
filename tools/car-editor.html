@@ -53,6 +53,12 @@
     .issues[disabled] { opacity: 0.5; }
     .paint { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: 6px; }
     .paint.on { box-shadow: inset 0 0 0 2px var(--accent); }
+    .paint details { flex-basis: 100%; }
+    .paint summary { cursor: pointer; color: var(--muted); min-height: 24px; }
+    .zone { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
+    .zone.on { box-shadow: inset 0 0 0 2px var(--accent); }
+    .zone input[type=text] { flex: 1; min-width: 0; }
+    .zone select { flex: 0 1 auto; }
     #status { min-height: 20px; margin: 8px 0 0; }
     #status.ok { color: var(--ok); }
     #status.err { color: var(--danger); }
@@ -69,7 +75,7 @@
   <a class="skip" href="#panel">Skip to the editor controls</a>
   <header>
     <h1>Car editor</h1>
-    <p>Paints and rim colour per car; saved changes are live in the car rain at once. <a href="car-gallery">All cars</a> · <a href="car-picker">Car picker</a></p>
+    <p>Colour sets, zones and rims per car; saved changes are live in the car rain at once. <a href="car-gallery">All cars</a> · <a href="car-picker">Car picker</a></p>
   </header>
   <div class="layout">
     <div class="stage">
@@ -81,6 +87,7 @@
         <button type="button" class="small" data-cam="front">Front</button>
         <button type="button" class="small" data-cam="rear">Rear</button>
         <button type="button" class="small" data-cam="top">Top</button>
+        <button type="button" class="small" data-cam="bottom">Bottom</button>
       </div>
     </div>
     <div class="panel" id="panel">
@@ -122,14 +129,22 @@
       </section>
 
       <section aria-labelledby="h-paints">
-        <h2 id="h-paints">Paints</h2>
-        <p class="muted small-text">The rain picks one paint per car; a higher weight makes it more frequent. “Original” keeps the model's own colour. No paints = always original.</p>
+        <h2 id="h-paints">Colour sets</h2>
+        <p class="muted small-text">Each set is a paint plus matching rims and zone colours. The effects pick one set per car; a higher weight makes it more frequent. “Original” keeps the model's own colour. No sets = always original. Rims and zones without their own colour in a set use the defaults below.</p>
         <div id="paints"></div>
         <div class="row">
           <button type="button" id="addPaint">Add paint</button>
           <button type="button" id="addOrig" class="small">Add original colour</button>
         </div>
         <p class="muted small-text" id="paintInfo"></p>
+      </section>
+      <section aria-labelledby="h-zones">
+        <h2 id="h-zones">Colour zones</h2>
+        <p class="muted small-text">Own areas with a fixed colour, e.g. interior black or trim chrome. Add a zone, press “Pick parts”, then click the parts on the car. A part belongs to one zone only; zones win over paint and rims. A colour set can give a zone another colour.</p>
+        <div id="zones"></div>
+        <div class="row">
+          <button type="button" id="addZone">Add zone</button>
+        </div>
       </section>
       <section aria-labelledby="h-parts">
         <h2 id="h-parts">Which parts get the colours</h2>
@@ -165,10 +180,10 @@
       </section>
 
       <section aria-labelledby="h-rims">
-        <h2 id="h-rims">Rims</h2>
+        <h2 id="h-rims">Default rim colour</h2>
         <div class="row">
           <input type="checkbox" id="rimOwn">
-          <label for="rimOwn">Own rim colour</label>
+          <label for="rimOwn">Own rim colour (for sets without their own rims)</label>
           <input type="color" id="rimColor" value="#c9ccd2" aria-label="Rim colour">
         </div>
         <p class="muted small-text" id="rimInfo"></p>
@@ -228,11 +243,11 @@
       var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.01, 300);
       CarStage.setup(renderer, scene);
       var floor = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
-      floor.rotation.x = -Math.PI / 2; scene.add(floor);
+      floor.rotation.x = -Math.PI / 2; floor.name = 'floor'; scene.add(floor);
       var holder = new THREE.Group(); scene.add(holder);
       var orbit = { yaw: 0.8, pitch: 0.22, dist: 10, t: new THREE.Vector3(0, 0.6, 0) }, pts = {};
       // Front zeigt nach +x: Kamera auf +x schaut auf die Front
-      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
+      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45], bottom: [Math.PI, -1.45] };   // Front zeigt nach +x (wie im Regen)
       Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; orbit.t.set(0, 0.6, 0); var hc = holder.children[0]; orbit.dist = Math.max(9, hc && hc.userData.dims ? hc.userData.dims.L * 2.2 : 9); }); });
       // rechts/Mitte/Shift ziehen: Ansicht verschieben (Blickziel entlang der Bildebene)
       function panBy(dx, dy) {
@@ -265,7 +280,7 @@
         }
         var p = pts[e.pointerId];
         if (p.pan) panBy(e.clientX - p.x, e.clientY - p.y);
-        else { orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006)); }
+        else { orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-1.5, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006)); }
         pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: p.pan };
       });
       function up(e) { delete pts[e.pointerId]; }
@@ -273,13 +288,14 @@
       canvas.addEventListener('wheel', function (e) { e.preventDefault(); refocus(); orbit.dist = Math.max(0.15, Math.min(40, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
       canvas.addEventListener('keydown', function (e) {
         var k = { ArrowLeft: [-0.15, 0], ArrowRight: [0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
-        if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
+        if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-1.5, Math.min(1.5, orbit.pitch + k[1]));
       });
       function resize() { var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
       window.addEventListener('resize', resize);
       function frame() {
         var cp = Math.cos(orbit.pitch), T = orbit.t;
         cam.position.set(T.x + Math.cos(orbit.yaw) * cp * orbit.dist, T.y + Math.sin(orbit.pitch) * orbit.dist, T.z + Math.sin(orbit.yaw) * cp * orbit.dist);
+        var fl = scene.getObjectByName('floor'); if (fl) fl.visible = cam.position.y > 0.02;   // von unten: Boden aus
         cam.lookAt(T); renderer.render(scene, cam); requestAnimationFrame(frame);
       }
 
@@ -293,16 +309,22 @@
         while (holder.children.length) holder.remove(holder.children[0]);
         if (!tpl) return;
         var p = def.paints && def.paints.length ? def.paints[Math.min(shown, def.paints.length - 1)] : { c: null };
-        var pc = p.c == null ? null : p.c, rc = def.rim == null ? null : def.rim, hint = '';
+        var pc = p.c == null ? null : p.c, rc = p.r !== undefined ? p.r : (def.rim == null ? null : def.rim), hint = '';
         // nach dem Picken immer sichtbar machen, was gewählt ist: erste Lackfarbe der Liste, sonst pink/cyan
         if (pc == null && def.paintParts) {
           var first = (def.paints || []).filter(function (q) { return q.c != null; })[0];
           if (first) pc = first.c; else { pc = 0xff3fb4; hint = 'Pink = your paint parts. Add a paint to see the real colour.'; }
         }
         if (rc == null && def.rimParts) { rc = 0x22e5ff; hint = (hint ? hint + ' ' : '') + 'Cyan = your rim parts. Tick “Own rim colour” to set it.'; }
-        if (picking) { pc = 0xff3fb4; rc = 0x22e5ff; hint = ''; }   // Auswahl sichtbar machen
+        if (picking === 'paint' || picking === 'rim') { pc = 0xff3fb4; rc = 0x22e5ff; hint = ''; }   // Auswahl sichtbar machen
         $('pickHint').textContent = hint;
-        var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), texOff: picking ? true : !!def.texOff });
+        var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), zoneList: def.zones, zones: p.z, texOff: picking === 'paint' ? true : !!def.texOff });
+        var zp = zonePicking();
+        if (zp) {
+          // gerade gewählter Bereich: gelb, damit man sieht, was dazugehört (auch bei Schwarz)
+          var yellow = show.yellow || (show.yellow = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xffd21f).convertSRGBToLinear(), roughness: 0.5 }));
+          car.traverse(function (o) { if (o.isMesh && zp.parts.indexOf(o.userData.pkey) >= 0) o.material = yellow; });
+        }
         car.position.y = tpl.userData.dims.H / 2;   // Mitte im Auto → Räder auf den Boden
         if (picking === 'wheel') {
           var orange = show.orange || (show.orange = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xff8a1f).convertSRGBToLinear(), roughness: 0.5 }));
@@ -319,7 +341,7 @@
       function load(key, keepView) {
         cur = list.filter(function (e) { return e.key === key; })[0];
         if (!cur) return;
-        def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : [];
+        def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : []; def.zones = Array.isArray(def.zones) ? def.zones : [];
         shown = 0; tpl = null; fill();
         $('msg').hidden = false; $('msg').textContent = 'Loading the model …';
         TC.loadModel(cur).then(function (t) {
@@ -344,7 +366,16 @@
         $('texOff').checked = !!def.texOff; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
         $('rimOwn').checked = def.rim != null; $('rimColor').value = hex(def.rim != null ? def.rim : 0xc9ccd2);
-        paints();
+        paints(); zones();
+      }
+      // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
+      function ownColour(label, val, dflt, set) {
+        var wrap = el('span', 'row'), cb = el('input'), c = el('input'), id = 'oc' + (ownColour.n = (ownColour.n || 0) + 1), lab = el('label', null, label);
+        cb.type = 'checkbox'; cb.id = id; lab.htmlFor = id; cb.checked = val != null;
+        c.type = 'color'; c.value = hex(val != null ? val : dflt); c.disabled = val == null; c.setAttribute('aria-label', label + ' colour');
+        cb.addEventListener('change', function () { c.disabled = !cb.checked; set(cb.checked ? int(c.value) : undefined); show(); });
+        c.addEventListener('input', function () { if (cb.checked) { set(int(c.value)); show(); } });
+        wrap.append(cb, lab, c); return wrap;
       }
       function paints() {
         var box = $('paints'); box.textContent = '';
@@ -363,9 +394,63 @@
           sh.addEventListener('click', function () { shown = i; paints(); show(); });
           var rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove paint ' + n);
           rm.addEventListener('click', function () { def.paints.splice(i, 1); shown = 0; paints(); show(); });
-          row.append(wl, w, sh, rm); box.appendChild(row);
+          var rimC = ownColour('Rims', p.r == null ? null : p.r, def.rim != null ? def.rim : 0xc9ccd2, function (v) { if (v === undefined) delete p.r; else p.r = v; shown = i; });
+          row.append(rimC, wl, w, sh, rm);
+          if (def.zones.length) {
+            var det = el('details'), sum = el('summary', null, 'Zone colours in this set');
+            if (p.z && Object.keys(p.z).length) det.open = true;
+            det.appendChild(sum);
+            def.zones.forEach(function (z) {
+              var v = p.z && p.z[z.id] != null ? p.z[z.id] : null;
+              det.appendChild(ownColour(z.name || 'Zone', v, z.c != null ? z.c : 0x111111, function (val) {
+                p.z = p.z || {}; if (val === undefined) delete p.z[z.id]; else p.z[z.id] = val;
+                if (!Object.keys(p.z).length) delete p.z; shown = i;
+              }));
+            });
+            row.appendChild(det);
+          }
+          box.appendChild(row);
         });
       }
+      // ── Farbbereiche ──
+      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['chrome', 'Chrome']];
+      function zonePicking() { var m = /^zone:(.+)$/.exec(picking || ''); return m ? def.zones.filter(function (z) { return z.id === m[1]; })[0] || null : null; }
+      function zones() {
+        var box = $('zones'); box.textContent = '';
+        def.zones.forEach(function (z, i) {
+          var row = el('div', 'zone' + (picking === 'zone:' + z.id ? ' on' : '')), n = i + 1;
+          var r1 = el('div', 'row'), nm = el('input'), c = el('input'), f = el('select');
+          nm.type = 'text'; nm.value = z.name || ''; nm.maxLength = 30; nm.setAttribute('aria-label', 'Zone ' + n + ' name'); nm.autocomplete = 'off';
+          nm.addEventListener('input', function () { z.name = nm.value; });
+          nm.addEventListener('change', paints);
+          c.type = 'color'; c.value = hex(z.c != null ? z.c : 0x111111); c.setAttribute('aria-label', 'Zone ' + n + ' colour');
+          c.addEventListener('input', function () { z.c = int(c.value); show(); });
+          f.setAttribute('aria-label', 'Zone ' + n + ' surface');
+          FINISHES.forEach(function (q) { var o = el('option', null, q[1]); o.value = q[0]; f.appendChild(o); });
+          f.value = z.f || 'satin';
+          f.addEventListener('change', function () { z.f = f.value; show(); });
+          r1.append(nm, c, f);
+          var r2 = el('div', 'row'), pk = el('button', 'small', 'Pick parts'), cl = el('button', 'small', 'Clear'), rm = el('button', 'danger small', 'Remove');
+          [pk, cl, rm].forEach(function (b) { b.type = 'button'; });
+          pk.setAttribute('aria-pressed', String(picking === 'zone:' + z.id)); pk.setAttribute('aria-label', 'Pick parts for zone ' + (z.name || n));
+          cl.setAttribute('aria-label', 'Clear parts of zone ' + (z.name || n)); rm.setAttribute('aria-label', 'Remove zone ' + (z.name || n));
+          pk.addEventListener('click', function () { setPick('zone:' + z.id); });
+          cl.addEventListener('click', function () { z.parts = []; zones(); show(); });
+          rm.addEventListener('click', function () {
+            def.zones.splice(i, 1);
+            def.paints.forEach(function (p) { if (p.z) { delete p.z[z.id]; if (!Object.keys(p.z).length) delete p.z; } });
+            if (picking === 'zone:' + z.id) setPick(picking);
+            zones(); paints(); show();
+          });
+          r2.append(pk, cl, rm, el('span', 'muted small-text', (z.parts || []).length + ' parts'));
+          row.append(r1, r2); box.appendChild(row);
+        });
+      }
+      $('addZone').addEventListener('click', function () {
+        var id = 'z' + Date.now().toString(36).slice(-6);
+        def.zones.push({ id: id, name: def.zones.length ? 'Zone ' + (def.zones.length + 1) : 'Interior', c: 0x111111, f: 'matte', parts: [] });
+        zones(); paints(); setPick('zone:' + id);
+      });
       $('pick').addEventListener('change', function () { load($('pick').value); history.replaceState(null, '', '?car=' + encodeURIComponent($('pick').value)); say(''); });
       $('label').addEventListener('input', function () { def.label = $('label').value; });
       $('mix').addEventListener('change', function () { def.mix = $('mix').checked; });
@@ -389,7 +474,7 @@
         picking = picking === w ? null : w;
         $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint')); $('pickRim').setAttribute('aria-pressed', String(picking === 'rim'));
         $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel'));
-        canvas.classList.toggle('picking', !!picking);
+        canvas.classList.toggle('picking', !!picking); zones();
         if (picking === 'wheel' && !def.wheelParts) {
           // eigene Räder: ohne automatische Räder neu laden, damit die Teile ganz und anklickbar sind
           def.wheelParts = []; reprepare({ wheelParts: [] }); return;
@@ -427,6 +512,17 @@
         })[0];
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
+        var zp = zonePicking();
+        if (zp) {
+          var had = zp.parts.indexOf(key) >= 0;
+          if (had) zp.parts.splice(zp.parts.indexOf(key), 1);
+          else {
+            def.zones.forEach(function (z) { var j = z.parts.indexOf(key); if (j >= 0) z.parts.splice(j, 1); });
+            ['paintParts', 'rimParts'].forEach(function (k) { if (def[k]) { var j = def[k].indexOf(key); if (j >= 0) def[k].splice(j, 1); } });
+            zp.parts.push(key);
+          }
+          zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key); return;
+        }
         var prop = picking === 'paint' ? 'paintParts' : picking === 'rim' ? 'rimParts' : 'wheelParts';
         var list = picking === 'wheel' ? (def.wheelParts || []).slice() : partKeys(picking).slice(), i = list.indexOf(key);
         // eigene Lackteile: Textur ersetzen ist fast immer nötig (sonst Lackfarbe × dunkle Atlas-Textur) – einmal automatisch an
@@ -453,7 +549,14 @@
       }
       function current() { var c = {}; list.forEach(function (e) { var v = TC.vehicle(e.key); if (Object.keys(v).length) c[e.key] = v; }); return c; }
       $('save').addEventListener('click', function () {
-        var d = { mix: def.mix !== false, paints: def.paints.map(function (p) { return { c: p.c == null ? null : p.c, w: p.w || 1 }; }) };
+        var zids = def.zones.map(function (z) { return z.id; });
+        var d = { mix: def.mix !== false, paints: def.paints.map(function (p) {
+          var o = { c: p.c == null ? null : p.c, w: p.w || 1 };
+          if (p.r !== undefined) o.r = p.r;
+          if (p.z) { var z = {}; Object.keys(p.z).forEach(function (k) { if (zids.indexOf(k) >= 0 && p.z[k] != null) z[k] = p.z[k]; }); if (Object.keys(z).length) o.z = z; }
+          return o;
+        }) };
+        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : 0x111111, f: z.f || 'satin', parts: (z.parts || []).slice(0, 400) }; });
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.rim != null) d.rim = def.rim;
         if (def.flip) d.flip = true;
