@@ -11,7 +11,7 @@
     opt = opt || {};
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = opt.exposure || 1.35;
+    renderer.toneMappingExposure = opt.exposure || 1.15;
     renderer.physicallyCorrectLights = true;
     var pm = new THREE.PMREMGenerator(renderer);
     if (THREE.RoomEnvironment) scene.environment = pm.fromScene(new THREE.RoomEnvironment(), 0.04).texture;

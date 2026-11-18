@@ -250,7 +250,8 @@
   function colourMat(m, hex, tag, texOff) {
     var k = tag + ':' + m.uuid + ':' + hex + (texOff ? ':t' : '');
     if (!PAINTS[k]) {
-      var c = PAINTS[k] = m.clone(); c.color.setHex(hex);
+      // Farbwähler liefert sRGB, three.js rechnet linear: umrechnen, sonst wirkt die Farbe blass und überbelichtet
+      var c = PAINTS[k] = m.clone(); c.color.setHex(hex).convertSRGBToLinear();
       // Textur ersetzen: reine Lackfarbe; eingebackene Schattierung (AO) nur noch schwach
       if (texOff) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; }
       // Lack wie echter Autolack: wenig Metall (Metallwert 1 spiegelt nur die Umgebung und wirkt dunkel), Klarlack

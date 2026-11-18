@@ -18,7 +18,7 @@
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, premultipliedAlpha: true });
     renderer.setPixelRatio(1); renderer.setSize(W, H, false); renderer.setClearColor(0x000000, 0);
     var scene = new THREE.Scene();
-    if (root.CarStage) CarStage.setup(renderer, scene, { exposure: 1.25 });
+    if (root.CarStage) CarStage.setup(renderer, scene, { exposure: 1.1 });
     var cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 200);
     cam.position.set(0, 5.2, 18); cam.lookAt(0, 2.3, 0);
 
