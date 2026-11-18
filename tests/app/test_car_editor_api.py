@@ -37,3 +37,17 @@ def test_non_admin_is_refused(pg_conn_test_setup_non_admin, tmp_path):
     assert c.post("/app/api/cars/vehicles", json={"key": "x", "def": {}}).status_code == 403
     assert c.delete("/app/api/cars/rims/x").status_code == 403
     assert car_models.load(str(tmp_path), "vehicles") == {}
+
+
+def test_picks_save_and_list(pg_conn_test_setup, tmp_path):
+    conn, tid, _, sid = pg_conn_test_setup
+    c = _client(conn, sid, str(tmp_path))
+    uid = "0123456789abcdef0123456789abcdef"
+    assert c.post("/app/api/cars/picks", json={"key": uid, "def": {"keep": True}}).json["ok"]
+    assert c.get("/app/api/cars/picks").json["items"] == {uid: {"keep": True}}
+    assert c.get("/app/api/cars/boats").status_code == 404
+
+
+def test_non_admin_cannot_list_picks(pg_conn_test_setup_non_admin, tmp_path):
+    conn, tid, _, sid = pg_conn_test_setup_non_admin
+    assert _client(conn, sid, str(tmp_path)).get("/app/api/cars/picks").status_code == 403

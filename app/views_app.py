@@ -84,6 +84,11 @@ TOOLS = [
      "desc": "All cars of the BMW rain with their paints and all rims, with their URL parameter.",
      "path": "tools/car-gallery.html",
      "admin_only": True},
+    {"key": "car-picker",
+     "label": "Car picker",
+     "desc": "Free car models from Sketchfab by brand: tick the ones to keep for the car rain.",
+     "path": "tools/car-picker.html",
+     "admin_only": True},
     {"key": "car-viewer",
      "label": "Car viewer",
      "desc": "One car model large on screen: turn, zoom, front/side/rear/top view.",
@@ -744,6 +749,16 @@ def car_model_save(kind):
     if err:
         return jsonify({"ok": False, "error": err}), 400
     return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/cars/<kind>", methods=["GET"])
+@require_admin
+def car_model_list(kind):
+    """Gespeicherte Einträge einer Art (z. B. die Auswahl im Auto-Picker)."""
+    from fx import car_models
+    if kind not in car_models.KINDS:
+        abort(404)
+    return jsonify({"ok": True, "items": car_models.load(_duck_root(), kind)})
 
 
 @bp_app.route("/app/api/cars/<kind>/<key>", methods=["DELETE"])

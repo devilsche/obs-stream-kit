@@ -4,6 +4,7 @@ Global für alle Kanäle, wie die Enten-Outfits (fx/duck_outfits.py):
 - data/car-vehicles.json: Schlüssel = Fahrzeug (überschreibt ein eingebautes aus js/toy-cars.js
   oder legt ein neues an), Wert = Aufbau {label, body, rims, tires, parts, paints, …}
 - data/car-rims.json: Schlüssel = Felge, Wert = Felgen-Bauplan {style, n, dish, finish, …}
+- data/car-picks.json: Auswahl im Auto-Picker (tools/car-picker.html), Schlüssel = Sketchfab-uid, Wert = {keep: bool}
 
 Regen und Tools laden beides als Script (/s/<token>/api/fx/cars/custom.js), das
 ToyCars.applyCustom(...) aufruft — nach js/toy-cars.js, vor dem Effekt-Code.
@@ -17,7 +18,7 @@ import threading
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 MAX_DEF_BYTES = 32 * 1024
 MAX_DEPTH = 8
-KINDS = {"vehicles": 200, "rims": 200}
+KINDS = {"vehicles": 200, "rims": 200, "picks": 600}   # picks: Auswahl im Auto-Picker (Sketchfab-uid → {keep})
 
 _lock = threading.Lock()
 

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Car picker</title>
+  <style>
+    /* Auswahl der Auto-Modelle für den Regen: Kandidaten aus assets/cars/candidates.json (Sketchfab-Suche,
+       frei herunterladbar), Auswahl je Modell sofort gespeichert (data/car-picks.json, /app/api/cars/picks) */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --ok: #9be59b; --warn: #ffcf70; --danger: #ff8a80; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 3; }
+    header { padding: 18px 20px 4px; max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0; }
+    .lead { color: var(--muted); margin: 4px 0 0; }
+    .filters { position: sticky; top: 0; z-index: 2; background: var(--bg); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; max-width: 1400px; margin: 0 auto; border-bottom: 1px solid var(--line); }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; min-height: 34px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .count { color: var(--muted); margin-left: auto; }
+    #status { min-height: 20px; color: var(--muted); }
+    #status.err { color: var(--danger); }
+    main { max-width: 1400px; margin: 0 auto; padding: 14px 20px 40px; }
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .tile { background: var(--panel); border: 2px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+    .tile.keep { border-color: var(--ok); }
+    .tile[hidden] { display: none; }
+    .tile img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #0e131c; }
+    .meta { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 3px; flex: 1; }
+    .meta h2 { font-size: 15px; margin: 0; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .lic { font-size: 12px; align-self: flex-start; border: 1px solid var(--line); border-radius: 10px; padding: 0 7px; }
+    .lic.nc { color: var(--warn); border-color: var(--warn); }
+    .meta a { color: var(--text); font-size: 13px; padding: 3px 0; min-height: 24px; display: inline-block; }
+    .keepbtn { margin-top: auto; }
+    .keepbtn[aria-pressed="true"] { background: #2e6b3a; border-color: var(--ok); box-shadow: none; }
+    .have { font-size: 12px; color: var(--ok); }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#cars">Skip to the cars</a>
+  <header>
+    <h1>Car picker</h1>
+    <p class="lead">Free car models from Sketchfab. Press “Keep” on the ones you want in the car rain; your choice is saved at once. “View in 3D” opens the model on Sketchfab. Yellow licence = non-commercial.</p>
+  </header>
+  <div class="filters" role="group" aria-label="Filter">
+    <span id="brands"></span>
+    <button type="button" id="onlyKeep" aria-pressed="false">Only kept</button>
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+  <main>
+    <p id="status" role="status" aria-live="polite">Loading …</p>
+    <ul class="grid" id="cars"></ul>
+  </main>
+  <script>
+    (function () {
+      'use strict';
+      var $ = function (id) { return document.getElementById(id); };
+      var list = [], picks = {}, brand = 'all', onlyKeep = false, tiles = [];
+      function say(m, err) { $('status').textContent = m; $('status').className = err ? 'err' : ''; }
+      function api(method, url, body) {
+        return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
+      }
+      // gilt als behalten: ausdrücklich gewählt, oder schon im Regen (have) und nicht abgewählt
+      function kept(c) { var p = picks[c.uid]; return p ? !!p.keep : !!c.have; }
+      function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+      function build() {
+        var box = $('cars'); box.textContent = ''; tiles = [];
+        list.forEach(function (c) {
+          var li = el('li', 'tile'), img = el('img'), meta = el('div', 'meta');
+          img.src = c.thumb; img.alt = c.name; img.loading = 'lazy';
+          meta.append(el('h2', null, c.name), el('span', 'sub', c.brand + ' · by ' + c.author + ' · ' + c.faces.toLocaleString('en') + ' triangles'));
+          meta.appendChild(el('span', 'lic' + (/NonCommercial/.test(c.license) ? ' nc' : ''), c.license));
+          if (c.have) meta.appendChild(el('span', 'have', 'Already in the rain'));
+          var a = el('a', null, 'View in 3D'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'View ' + c.name + ' in 3D on Sketchfab'); meta.appendChild(a);
+          var b = el('button', 'keepbtn'); b.type = 'button';
+          b.addEventListener('click', function () {
+            var v = !kept(c);
+            api('POST', '/app/api/cars/picks', { key: c.uid, def: { keep: v } }).then(function () {
+              picks[c.uid] = { keep: v }; paint(); say(v ? 'Kept: ' + c.name : 'Dropped: ' + c.name);
+            }).catch(function (e) { say('Not saved: ' + e.message, true); });
+          });
+          meta.appendChild(b); li.append(img, meta); box.appendChild(li);
+          tiles.push({ c: c, li: li, b: b });
+        });
+        paint();
+      }
+      function paint() {
+        var n = 0, k = 0;
+        tiles.forEach(function (t) {
+          var on = kept(t.c), show = (brand === 'all' || t.c.brand === brand) && (!onlyKeep || on);
+          t.li.hidden = !show; t.li.classList.toggle('keep', on);
+          t.b.textContent = on ? 'Kept' : 'Keep'; t.b.setAttribute('aria-pressed', String(on));
+          t.b.setAttribute('aria-label', (on ? 'Kept: ' : 'Keep ') + t.c.name);
+          if (show) n++; if (on) k++;
+        });
+        $('count').textContent = n + ' shown · ' + k + ' kept';
+      }
+      $('onlyKeep').addEventListener('click', function () { onlyKeep = !onlyKeep; $('onlyKeep').setAttribute('aria-pressed', String(onlyKeep)); paint(); });
+      Promise.all([
+        fetch('/s/__WIDGET_TOKEN__/assets/cars/candidates.json').then(function (r) { return r.json(); }),
+        api('GET', '/app/api/cars/picks')
+      ]).then(function (res) {
+        list = res[0]; picks = res[1].items || {};
+        var brands = ['all'];
+        list.forEach(function (c) { if (brands.indexOf(c.brand) < 0) brands.push(c.brand); });
+        brands.forEach(function (b) {
+          var btn = el('button', null, b === 'all' ? 'All' : b); btn.type = 'button'; btn.setAttribute('aria-pressed', String(b === brand));
+          btn.addEventListener('click', function () { brand = b; Array.prototype.forEach.call($('brands').children, function (x) { x.setAttribute('aria-pressed', String(x === btn)); }); paint(); });
+          $('brands').append(btn, document.createTextNode(' '));
+        });
+        say(''); build();
+      }).catch(function (e) { say('Could not load: ' + e.message, true); });
+    })();
+  </script>
+</body>
+</html>
