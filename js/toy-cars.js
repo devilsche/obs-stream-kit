@@ -23,6 +23,9 @@
     return m ? m[1] : '../';
   })();
   var CATALOG = [], BYKEY = {}, TPL = {}, CUSTOM = {}, MODELS = [], PAINTS = {}, loading = {};
+  // Materiallisten je Modell außerhalb von userData: three.js kopiert userData beim Klonen per JSON –
+  // Materialien/Gruppen dort würden bei jedem fallenden Auto samt Texturen serialisiert (Ruckeln)
+  var META = {};
 
   function applyCustom(c) { CUSTOM = (c && c.vehicles) || {}; PAINTS = {}; }
   function vehicle(key) { return CUSTOM[key] || {}; }
@@ -64,7 +67,29 @@
 
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
   function prepare(scene, e) {
-    if (root.GlbFix) GlbFix.prepare(scene);
+    var v = vehicle(e.key);
+    if (root.GlbFix) GlbFix.prepare(scene, { wheels: v.straight !== false });
+    // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
+    var all = [], seen = {}, names = {};
+    scene.traverse(function (o) {
+      if (!o.isMesh) return;
+      [].concat(o.material).forEach(function (m) {
+        if (!m || seen[m.uuid]) return; seen[m.uuid] = 1;
+        var base = m.name || '#' + all.length; names[base] = (names[base] || 0) + 1;
+        m.userData.key = names[base] > 1 ? base + '~' + names[base] : base;
+        all.push(m);
+      });
+    });
+    function byKeys(keys) { return all.filter(function (m) { return keys.indexOf(m.userData.key) >= 0; }); }
+    var ud = scene.userData;
+    META[e.key] = {
+      all: all,
+      paint: Array.isArray(v.paintMats) ? byKeys(v.paintMats) : (ud.paintMats || []),
+      rim: Array.isArray(v.rimMats) ? byKeys(v.rimMats) : (ud.rimMats || []),
+      autoPaint: (ud.paintMats || []).map(function (m) { return m.userData.key; }),
+      autoRim: (ud.rimMats || []).map(function (m) { return m.userData.key; }),
+      wheels: (ud.wheels || []).length
+    };
     mergeStatic(scene);
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
@@ -90,9 +115,8 @@
     rot.position.sub(c.divideScalar(k));
     var car = new THREE.Group(); car.add(wrap); car.name = e.key;
     car.userData.dims = { L: size.x, W: size.z, H: size.y, belt: size.y * 0.62 };
-    car.userData.paintMats = scene.userData.paintMats || [];
-    car.userData.rimMats = scene.userData.rimMats || [];
     car.userData.key = e.key;
+    delete ud.wheels; delete ud.paintMats; delete ud.rimMats; delete ud.rimFromPaint;
     return car;
   }
   function loadModel(e) {
@@ -145,17 +169,23 @@
     for (var i = 0; i < list.length; i++) { r -= list[i].w || 1; if (r <= 0) return { c: list[i].c == null ? null : list[i].c }; }
     return { c: list[0].c == null ? null : list[0].c };
   }
-  function colourMat(m, hex, tag) {
-    var k = tag + ':' + m.uuid + ':' + hex;
-    if (!PAINTS[k]) { PAINTS[k] = m.clone(); PAINTS[k].color.setHex(hex); }
+  function colourMat(m, hex, tag, texOff) {
+    var k = tag + ':' + m.uuid + ':' + hex + (texOff ? ':t' : '');
+    if (!PAINTS[k]) { PAINTS[k] = m.clone(); PAINTS[k].color.setHex(hex); if (texOff) PAINTS[k].map = null; }
     return PAINTS[k];
   }
-  // Kopie einer Vorlage mit Lack-/Felgenfarbe (rim: Zahl = Farbe, null = Original, undefined = aus dem Editor)
-  function paintTemplate(t, color, rim) {
+  // Kopie einer Vorlage mit Lack-/Felgenfarbe (rim: Zahl = Farbe, null = Original, undefined = aus dem Editor);
+  // o = { paint: [Schlüssel], rims: [Schlüssel], texOff } überschreibt die Einstellungen (Vorschau im Editor)
+  function paintTemplate(t, color, rim, o) {
+    o = o || {};
+    var key = t.userData.key, v = vehicle(key), meta = META[key] || { all: [], paint: [], rim: [] };
+    function byKeys(keys) { return meta.all.filter(function (m) { return keys.indexOf(m.userData.key) >= 0; }); }
+    var pm = o.paint ? byKeys(o.paint) : meta.paint, rm = o.rims ? byKeys(o.rims) : meta.rim;
+    var texOff = o.texOff != null ? o.texOff : !!v.texOff;
     var car = t.clone(true), swap = {};
-    if (rim === undefined) rim = vehicle(t.userData.key).rim;
-    if (color != null) t.userData.paintMats.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p'); });
-    if (rim != null) t.userData.rimMats.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r'); });
+    if (rim === undefined) rim = v.rim;
+    if (color != null) pm.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
+    if (rim != null) rm.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', false); });
     if (Object.keys(swap).length) car.traverse(function (o) {
       if (!o.isMesh) return;
       if (Array.isArray(o.material)) o.material = o.material.map(function (m) { return swap[m.uuid] || m; });
@@ -172,6 +202,7 @@
 
   root.ToyCars = {
     ready: ready, build: build, dims: dims, pickPaint: pickPaint, random: random, applyCustom: applyCustom, prepare: prepare,
+    meta: function (k) { return META[k]; },
     forget: function (k) { delete TPL[k]; delete loading[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
     loadCatalog: loadCatalog, loadModel: loadModel, vehicle: vehicle, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }

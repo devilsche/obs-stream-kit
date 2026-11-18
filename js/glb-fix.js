@@ -116,7 +116,8 @@
     });
     return n ? hit / n : 0;
   }
-  function prepare(obj) {
+  function prepare(obj, opts) {
+    opts = opts || {};
     isolate(obj);
     var inside = false;
     obj.traverse(function (o) {
@@ -131,7 +132,7 @@
       if ([].concat(o.material).some(function (m) { return m && m.transparent; })) o.renderOrder = 2;
     });
     obj.userData.interior = inside;
-    try { obj.userData.wheels = wheels(obj); } catch (e) { obj.userData.wheels = []; }
+    try { obj.userData.wheels = opts.wheels === false ? [] : wheels(obj); } catch (e) { obj.userData.wheels = []; }
     try { colours(obj); } catch (e) { obj.userData.paintMats = []; obj.userData.rimMats = []; }
     return obj;
   }

@@ -20,6 +20,7 @@
     .layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; height: calc(100vh - 52px); }
     .stage { position: relative; min-height: 360px; }
     #view { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    #view.picking { cursor: crosshair; }
     .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); pointer-events: none; padding: 20px; text-align: center; }
     .msg[hidden] { display: none; }
     .views { position: absolute; left: 12px; top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
@@ -129,6 +130,25 @@
         </div>
         <p class="muted small-text" id="paintInfo"></p>
       </section>
+      <section aria-labelledby="h-parts">
+        <h2 id="h-parts">Which parts get the colours</h2>
+        <p class="muted small-text">Press a button, then click on the car: each click adds or removes that part. Paint parts show pink, rim parts cyan while picking.</p>
+        <div class="row" role="group" aria-label="Pick mode">
+          <button type="button" id="pickPaint" aria-pressed="false">Pick paint parts</button>
+          <button type="button" id="pickRim" aria-pressed="false">Pick rim parts</button>
+          <button type="button" id="pickAuto" class="small">Back to automatic</button>
+        </div>
+        <p class="small-text" id="partList"></p>
+        <div class="row">
+          <input type="checkbox" id="texOff">
+          <label for="texOff">Paint replaces the original paint texture (no mixing with the old colour)</label>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="straight">
+          <label for="straight">Set turned front wheels straight</label>
+        </div>
+      </section>
+
       <section aria-labelledby="h-rims">
         <h2 id="h-rims">Rims</h2>
         <div class="row">
@@ -230,11 +250,18 @@
       }
 
       // ── Fahrzeug ──
+      var picking = null;   // 'paint' | 'rim' | null
+      function partKeys(which) {
+        var m = TC.meta(cur.key) || {};
+        return which === 'paint' ? (def.paintMats || m.autoPaint || []) : (def.rimMats || m.autoRim || []);
+      }
       function show() {
         while (holder.children.length) holder.remove(holder.children[0]);
         if (!tpl) return;
         var p = def.paints && def.paints.length ? def.paints[Math.min(shown, def.paints.length - 1)] : { c: null };
-        var car = TC.paintTemplate(tpl, p.c == null ? null : p.c, def.rim == null ? null : def.rim);
+        var pc = p.c == null ? null : p.c, rc = def.rim == null ? null : def.rim;
+        if (picking) { pc = 0xff3fb4; rc = 0x22e5ff; }   // Auswahl sichtbar machen
+        var car = TC.paintTemplate(tpl, pc, rc, { paint: partKeys('paint'), rims: partKeys('rim'), texOff: picking ? true : !!def.texOff });
         car.position.y = tpl.userData.dims.H / 2;   // Mitte im Auto → Räder auf den Boden
         // Lenkeinschlag der Vorderräder (Räder an der Front: +x)
         var s = +$('steer').value;
@@ -255,6 +282,7 @@
           tpl = t; $('msg').hidden = true;
           $('paintInfo').textContent = t.userData.paintMats.length ? 'Paint material: ' + t.userData.paintMats.map(function (m) { return m.name; }).join(', ') : 'No paint material found – colours have no effect on this model.';
           $('rimInfo').textContent = t.userData.rimMats.length ? 'Rim material: ' + t.userData.rimMats.map(function (m) { return m.name; }).join(', ') : 'No rim material found.';
+          listParts();
           var nw = 0; t.traverse(function (o) { if (/^Wheel /.test(o.name)) nw++; });
           $('steerInfo').textContent = nw >= 4 ? 'Wheels are separate parts (' + nw + '), set straight on loading.' : 'Wheels are not separate on this model – steering has no effect.';
           show();
@@ -266,6 +294,7 @@
         $('label').value = def.label || ''; $('label').placeholder = cur.name;
         $('mix').checked = def.mix !== false; $('flip').checked = !!def.flip;
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
+        $('texOff').checked = !!def.texOff; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
         $('rimOwn').checked = def.rim != null; $('rimColor').value = hex(def.rim != null ? def.rim : 0xc9ccd2);
         paints();
@@ -294,6 +323,40 @@
       $('label').addEventListener('input', function () { def.label = $('label').value; });
       $('mix').addEventListener('change', function () { def.mix = $('mix').checked; });
       $('rework').addEventListener('change', function () { def.rework = $('rework').checked; });
+      // ── Teile per Klick wählen ──
+      function listParts() {
+        if (!cur || !TC.meta(cur.key)) { $('partList').textContent = ''; return; }
+        $('partList').textContent = 'Paint: ' + (partKeys('paint').join(', ') || 'none') + (def.paintMats ? '' : ' (automatic)') +
+          ' · Rims: ' + (partKeys('rim').join(', ') || 'none') + (def.rimMats ? '' : ' (automatic)');
+      }
+      function setPick(w) {
+        picking = picking === w ? null : w;
+        $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint')); $('pickRim').setAttribute('aria-pressed', String(picking === 'rim'));
+        canvas.classList.toggle('picking', !!picking); show();
+      }
+      $('pickPaint').addEventListener('click', function () { setPick('paint'); });
+      $('pickRim').addEventListener('click', function () { setPick('rim'); });
+      $('pickAuto').addEventListener('click', function () { delete def.paintMats; delete def.rimMats; listParts(); show(); });
+      $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
+      $('straight').addEventListener('change', function () {
+        def.straight = $('straight').checked;
+        var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { straight: def.straight }); TC.applyCustom({ vehicles: c });
+        TC.forget(cur.key); var keep = clone(def); load(cur.key); def = keep; fill();
+      });
+      var down = null, ray = new THREE.Raycaster();
+      canvas.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY }; });
+      canvas.addEventListener('pointerup', function (e) {
+        if (!picking || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5 || !holder.children[0]) return;
+        var r = canvas.getBoundingClientRect();
+        ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
+        var hit = ray.intersectObject(holder, true).filter(function (h) { return h.object.isMesh; })[0];
+        if (!hit) return;
+        var mat = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex] : hit.object.material;
+        var key = mat && mat.userData.key; if (!key) return;
+        var prop = picking === 'paint' ? 'paintMats' : 'rimMats', list = partKeys(picking).slice(), i = list.indexOf(key);
+        if (i >= 0) list.splice(i, 1); else list.push(key);
+        def[prop] = list; listParts(); show(); say((i >= 0 ? 'Removed: ' : 'Added: ') + key);
+      });
       $('note').addEventListener('input', function () { def.note = $('note').value; });
       // Umdrehen: Vorlage mit der neuen Richtung neu aufbauen (gilt erst nach dem Speichern auch im Regen)
       $('flip').addEventListener('change', function () {
@@ -317,6 +380,10 @@
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.rim != null) d.rim = def.rim;
         if (def.flip) d.flip = true;
+        if (def.paintMats) d.paintMats = def.paintMats.slice(0, 60);
+        if (def.rimMats) d.rimMats = def.rimMats.slice(0, 60);
+        if (def.texOff) d.texOff = true;
+        if (def.straight === false) d.straight = false;
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);
         }

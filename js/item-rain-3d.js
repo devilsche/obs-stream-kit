@@ -908,7 +908,7 @@
       return { g: Math.random() < 0.12 ? tpl.pink() : tpl.yellow(), len: 2.6 };
     }
     var size = opts.size || 96, count = opts.count || 120, duration = opts.duration || 22000;
-    if (kind === 'car') count = Math.min(count, 40);   // echte Modelle sind schwer: höchstens 40 Autos
+    if (kind === 'car') count = Math.min(count, 30);   // echte Modelle sind schwer: höchstens 30 Autos
     var spawnEnd = duration * 0.62, margin = 120;
     var ducks = [], spawned = 0, t0 = null, last = null;
     // Fress-Ente (nur Sushi, nur mit Freischaltung „sushi-eater“)

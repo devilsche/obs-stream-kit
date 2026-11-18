@@ -26,7 +26,16 @@ from fx import glb_scan  # noqa: E402
 SSH = ["ssh", "-i", os.path.expanduser("~/.ssh/obskit"), "root@31.70.95.217"]
 SCP = ["scp", "-q", "-i", os.path.expanduser("~/.ssh/obskit")]
 REMOTE = "/opt/obs-stream-kit"
-MAX_TRIS = 40000
+
+
+class _All(set):
+    """--all: jedes Modell neu bauen"""
+    def __contains__(self, x):
+        return True
+
+
+ALL = _All()
+MAX_TRIS = 120000   # darunter bleibt ein Modell unvereinfacht (runde Räder!); Teile werden beim Laden zusammengefasst
 MAX_TEX = 1024
 WORK = os.path.join(tempfile.gettempdir(), "car-rain-build")
 # typische Längen (m) für Nicht-Pkw, sonst 4,5 m
@@ -105,11 +114,19 @@ def front_sign(path, scan):
         pos, neg = max(abs(st[0]), abs(st[1])), max(abs(st[2]), abs(st[3]))
         if abs(pos - neg) > 4:
             return (1 if pos > neg else -1), "steered wheels"
-    # 2. Lampen nach Namen: Scheinwerfer vorn, Rückleuchten hinten
+    # 2. Lenkrad liegt vor den Sitzen (gilt auch bei Mittel-/Heckmotor)
+    pts = _named_points(g, binc, r"steer|lenkrad|steering", r"seat|sitz|bench")
+    if pts:
+        return pts, "steering wheel"
+    # 3. Außenspiegel sitzen an der A-Säule, also vor der Dachmitte
+    pts = _mirror_vs_roof(g, binc)
+    if pts:
+        return pts, "mirrors"
+    # 4. Lampen nach Namen: Scheinwerfer vorn, Rückleuchten hinten
     pts = _named_points(g, binc, r"head|front|_fl\b|_fr\b|grill|kidney|niere", r"tail|rear|brake|reverse|_rl\b|_rr\b|exhaust|auspuff")
     if pts:
         return pts, "light names"
-    # 3. kürzerer Überhang vorn (Frontmotor)
+    # sonst: im Browser über den kürzeren Überhang (Frontmotor)
     return 0, "unknown"
 
 
@@ -153,6 +170,57 @@ def _named_points(g, binc, front_re, rear_re):
     return 1 if mf > mr else -1
 
 
+def _all_points(g, binc, name_re=None):
+    """[(x, y, z, name)] in Weltkoordinaten; name = Knoten- und Materialname."""
+    import fx.glb_scan as gs
+    mats, out = g.get("materials", []), []
+    rx = re.compile(name_re, re.I) if name_re else None
+
+    def walk(i, M, label):
+        nd = g["nodes"][i]
+        W = gs._mat_mul(M, gs._local(nd))
+        lab = label + " " + (nd.get("name") or "")
+        if "mesh" in nd:
+            for p in g["meshes"][nd["mesh"]]["primitives"]:
+                pos = p.get("attributes", {}).get("POSITION")
+                if pos is None:
+                    continue
+                name = lab + " " + (mats[p["material"]].get("name", "") if "material" in p else "")
+                if rx and not rx.search(name):
+                    continue
+                for x, y, z in gs._positions(g, binc, pos, max(1, g["accessors"][pos]["count"] // 400)):
+                    out.append((W[0] * x + W[1] * y + W[2] * z + W[3], W[4] * x + W[5] * y + W[6] * z + W[7], W[8] * x + W[9] * y + W[10] * z + W[11]))
+        for c in nd.get("children", []):
+            walk(c, W, lab)
+    ident = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    for r in g["scenes"][g.get("scene", 0)]["nodes"]:
+        walk(r, ident, "")
+    return out
+
+
+def _mirror_vs_roof(g, binc):
+    """Außenspiegel (außen, nicht Innenspiegel) gegen die Mitte des Dachs."""
+    allp = _all_points(g, binc)
+    mir = [p for p in _all_points(g, binc, r"mirror|spiegel") ]
+    if len(allp) < 50 or len(mir) < 5:
+        return 0
+    xs, zs, ys = [p[0] for p in allp], [p[2] for p in allp], [p[1] for p in allp]
+    sx, sz, h0, h1 = max(xs) - min(xs), max(zs) - min(zs), min(ys), max(ys)
+    k = 0 if sx >= sz else 2
+    lat = 2 - k
+    mid_lat = (max(p[lat] for p in allp) + min(p[lat] for p in allp)) / 2
+    half = (max(p[lat] for p in allp) - min(p[lat] for p in allp)) / 2
+    outer = [p for p in mir if abs(p[lat] - mid_lat) > half * 0.6]   # Innenspiegel liegt in der Mitte
+    roof = [p for p in allp if p[1] > h0 + (h1 - h0) * 0.9]
+    if len(outer) < 5 or len(roof) < 5:
+        return 0
+    mm = sum(p[k] for p in outer) / len(outer)
+    mr = sum(p[k] for p in roof) / len(roof)
+    if abs(mm - mr) < 0.04 * max(sx, sz):
+        return 0
+    return 1 if mm > mr else -1
+
+
 def slug(name, used):
     s = re.sub(r"\|.*$", "", name).strip().lower()
     s = re.sub(r"www\.\w+\.com", "", s)
@@ -185,7 +253,7 @@ def main(only=None):
             if uid in old:
                 catalog.append(old[uid])
             continue
-        if uid in old and not (only and uid in only):
+        if uid in old and not (only is not None and uid in only):
             catalog.append(old[uid])
             continue
         src, dst = os.path.join(WORK, uid + ".src.glb"), os.path.join(WORK, uid + ".glb")
@@ -216,4 +284,7 @@ def main(only=None):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    main(set(args[args.index("--only") + 1:]) if "--only" in args else None)
+    if "--all" in args:
+        main(ALL)
+    else:
+        main(set(args[args.index("--only") + 1:]) if "--only" in args else None)

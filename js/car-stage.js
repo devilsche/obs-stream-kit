@@ -11,14 +11,17 @@
     opt = opt || {};
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = opt.exposure || 0.9;
+    renderer.toneMappingExposure = opt.exposure || 1.35;
     renderer.physicallyCorrectLights = true;
     var pm = new THREE.PMREMGenerator(renderer);
     if (THREE.RoomEnvironment) scene.environment = pm.fromScene(new THREE.RoomEnvironment(), 0.04).texture;
     pm.dispose();
-    // schwaches Führungslicht von oben vorn für Form und Schatten-Kanten
-    var key = new THREE.DirectionalLight(0xffffff, 1.2); key.position.set(-3, 6, 4); scene.add(key);
-    scene.add(new THREE.HemisphereLight(0xffffff, 0x303640, 0.35));
+    // Führungslicht von oben vorn, Gegenlicht von der anderen Seite (sonst liegt eine Seite im Schatten),
+    // kräftiges Grundlicht, damit Räder und dunkle Lacke nicht absaufen
+    var key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(4, 7, 5); scene.add(key);
+    var fill = new THREE.DirectionalLight(0xffffff, 1.0); fill.position.set(-5, 4, -5); scene.add(fill);
+    var low = new THREE.DirectionalLight(0xffffff, 0.5); low.position.set(0, -2, 6); scene.add(low);   // von unten vorn: Räder, Schweller
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x5a6070, 0.9));
     return scene;
   }
   root.CarStage = { setup: setup };
