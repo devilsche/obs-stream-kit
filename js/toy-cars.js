@@ -79,19 +79,29 @@
   }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
-  // Katalog + Auswahl laden; was bis timeout fertig ist, fährt mit
+  // Katalog + Auswahl laden: auflösen, sobald das erste Modell fertig ist (oder nach timeout); die übrigen
+  // laden weiter und kommen in MODELS dazu – der Regen zieht bei jedem neuen Auto aus der aktuellen Liste.
+  // Bevorzugt kleine Dateien (zwei Drittel der Auswahl aus der kleineren Hälfte des Katalogs).
   function ready(opts) {
     opts = opts || {};
-    var count = opts.count || 6, timeout = opts.timeout || 12000;
+    var count = opts.count || 4, timeout = opts.timeout || 10000;
     return loadCatalog().then(function () {
-      var pick = opts.model && BYKEY[opts.model] ? [BYKEY[opts.model]] : shuffle(CATALOG.filter(inMix)).slice(0, count);
+      var pick;
+      if (opts.model && BYKEY[opts.model]) pick = [BYKEY[opts.model]];
+      else {
+        var mix = CATALOG.filter(inMix).sort(function (a, b) { return (a.bytes || 0) - (b.bytes || 0); });
+        var small = shuffle(mix.slice(0, Math.ceil(mix.length / 2))), big = shuffle(mix.slice(Math.ceil(mix.length / 2)));
+        var nSmall = Math.min(small.length, Math.ceil(count * 2 / 3));
+        pick = small.slice(0, nSmall).concat(big.slice(0, count - nSmall));
+        // kleinste zuerst laden, damit der Regen schnell starten kann
+        pick.sort(function (a, b) { return (a.bytes || 0) - (b.bytes || 0); });
+      }
       return new Promise(function (resolve) {
-        var left = pick.length, done = false;
+        var done = false;
         function finish() { if (done) return; done = true; resolve(MODELS.slice()); }
-        if (!left) return finish();
+        if (!pick.length) return finish();
         pick.forEach(function (e) {
-          loadModel(e).then(function () { if (MODELS.indexOf(e.key) < 0) MODELS.push(e.key); }).catch(function () {})
-            .then(function () { if (--left === 0) finish(); });
+          loadModel(e).then(function () { if (MODELS.indexOf(e.key) < 0) MODELS.push(e.key); finish(); }).catch(function () {});
         });
         setTimeout(finish, timeout);
       });

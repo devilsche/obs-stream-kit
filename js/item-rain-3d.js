@@ -659,8 +659,8 @@
     return { step: step, wantsCar: function () { return st === 'wait'; } };
   }
 
-  // ── Saug-Ente: Gummiente auf einem runden Saugroboter, aus dem Schnabel ein geriffelter Saugschlauch.
-  // Fährt nach dem Regen unten durchs Bild und saugt alles Liegengebliebene ein (Spirale in die Düse,
+  // ── Saug-Ente: Gummiente auf einem runden Saugroboter.
+  // Fährt nach dem Regen unten durchs Bild und saugt alles Liegengebliebene vorn ein (Spirale unter die Stoßleiste,
   // Bauch bläht sich), verschluckt sich ab und zu an einem Auto (stockt, hustet es aus, saugt erneut),
   // rülpst am Ende und rollt raus.
   // E = { scene, W, FLOOR, items (live), size, reduce, outfit, startAt (s), ready() }
@@ -705,27 +705,24 @@
     var swirl = new THREE.Group(); swirl.position.y = 0.39; bin.add(swirl);
     var minis = [];
     // Ente oben drauf
-    var d = RD.build({ outfit: E.outfit }); d.position.set(0.12, 0.46 + 0.55 * 0.85, 0); d.scale.setScalar(0.85); g.add(d);
-    // Schlauch vom Schnabel im Bogen nach vorn zur Bodendüse; Riffel, Chromringe an den Enden
-    var tip = new THREE.Vector3(0.12 + 1.5 * 0.85, 0.46 + (0.9 + 0.55) * 0.85, 0);
-    var headAt = new THREE.Vector3(2.3, 0.1, 0);
-    var hose = new THREE.CatmullRomCurve3([tip, new THREE.Vector3(1.85, 1.85, 0.06), new THREE.Vector3(2.4, 1.05, 0.08), headAt.clone().add(new THREE.Vector3(-0.02, 0.24, 0))]);
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(hose, 64, 0.11, 14, false), M(0x3d4048, { roughness: 0.45 })));
-    for (var r = 0; r <= 18; r++) {
-      var p = hose.getPointAt(r / 18), tg = hose.getTangentAt(r / 18);
-      var rg = new THREE.Mesh(new THREE.TorusGeometry(0.118, 0.02, 6, 24), r === 0 || r === 18 ? chrome : M(0x24262c, { roughness: 0.5 }));
-      rg.position.copy(p); rg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tg); if (r === 0 || r === 18) rg.scale.setScalar(1.25); g.add(rg);
-    }
-    // Bodendüse: breiter Kopf quer zur Fahrtrichtung, Borstenleiste vorn, Gelenk zum Schlauch
-    var head = new THREE.Group(); head.position.copy(headAt); g.add(head);
-    var hb = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.16, 1.15), shell); head.add(hb);
-    var hcap = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.15, 16), shell); hcap.rotation.x = Math.PI / 2; hcap.position.set(0, 0.08, 0); head.add(hcap);
-    var strip = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.06, 1.1), M(0xf2b705, { roughness: 0.9 })); strip.position.set(0.2, -0.07, 0); head.add(strip);
-    var joint = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.14, 20), chrome); joint.position.set(-0.02, 0.15, 0); head.add(joint);
+    var DS = 0.85, d = RD.build({ outfit: E.outfit }); d.position.set(0.12, 0.46 + 0.55 * DS, 0); d.scale.setScalar(DS); g.add(d);
+    // Kehrroboter-Modell („Autonomous Robot Sweeper“ von Zeps3D, Sketchfab, CC BY 4.0, assets/vacuum/sweeper.glb)
+    // ersetzt den Rundroboter, sobald geladen; Ente sitzt auf dem Dach wie im Mockup (tools/vacuum-mockup.html)
+    if (THREE.GLTFLoader) new THREE.GLTFLoader().load('../assets/vacuum/sweeper.glb', function (gl) {
+      var m = root.GlbFix ? root.GlbFix.prepare(gl.scene) : gl.scene, k = 1.2;
+      var sw = new THREE.Group(), turn = new THREE.Group(); turn.add(m); turn.rotation.y = Math.PI / 2; sw.add(turn); sw.scale.setScalar(k);
+      sw.updateMatrixWorld(true);
+      var b = new THREE.Box3().setFromObject(sw), c = new THREE.Vector3(); b.getCenter(c);
+      turn.position.set(-c.x / k, -b.min.y / k, -c.z / k);
+      bot.visible = false; g.add(sw);
+      var roof = (b.max.y - b.min.y) * 0.88;
+      DS = 0.5; d.scale.setScalar(DS); d.position.set(0.1, roof + 0.55 * DS, 0);
+    });
+    // kein Schlauch: gesaugt wird vorn unter der Stoßleiste
     var st = 'wait', x = 0, dir = 1, T = 0, sucked = 0, belly = 0, choked = false, choke = null, burp = 0, puffs = [], done = false, ph = 0;
     var puffGeo = new THREE.SphereGeometry(1, 12, 8);
     function face(s) { dir = s; g.rotation.set(TILT, s > 0 ? -0.35 : Math.PI + 0.35, 0); }
-    function nozzle() { return { x: x + dir * 2.3 * S * Math.cos(0.35), y: FLOOR - 0.12 * S }; }
+    function nozzle() { return { x: x + dir * 1.3 * S * Math.cos(0.35), y: FLOOR - 0.12 * S }; }
     // eingesaugtes Teil als Miniatur in den Behälter
     function stash(it, s0) {
       var m = it.g.clone(), f = 0.2 / ((it.car ? 2.2 : 1) * S);
@@ -805,7 +802,7 @@
       });
       if (burp > 0) burp = Math.max(0, burp - dt);
       var sq = burp > 0 ? Math.sin(burp / 0.5 * Math.PI) : 0;
-      d.scale.set(0.85 * (1 + 0.3 * belly), 0.85 * (1 + 0.08 * belly) * (1 - 0.12 * sq), 0.85 * (1 + 0.45 * belly));
+      d.scale.set(DS * (1 + 0.3 * belly), DS * (1 + 0.08 * belly) * (1 - 0.12 * sq), DS * (1 + 0.45 * belly));
       // Behälter-Inhalt wirbelt
       swirl.rotation.y += dt * 4;
       minis.forEach(function (m, i) { m.rotation.x += dt * m.userData.sp; m.rotation.z += dt * m.userData.sp * 0.7; m.position.y = Math.sin(ph * 3 + i) * 0.25; });

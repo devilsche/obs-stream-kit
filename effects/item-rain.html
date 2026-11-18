@@ -40,7 +40,7 @@
       var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
       // Autos (car, mix): erst echte Modelle laden (js/toy-cars.js), dann starten; ohne Modelle keine Autos
       var wantsCars = ['car', 'mix'].indexOf(params.get('kind')) >= 0 && window.ToyCars && ToyCars.ready;
-      if (wantsCars) ToyCars.ready({ model: params.get('model'), count: params.get('kind') === 'mix' ? 3 : 6 }).then(go, go);
+      if (wantsCars) ToyCars.ready({ model: params.get('model'), count: params.get('kind') === 'mix' ? 3 : 4 }).then(go, go);
       else go();
       function go() {
       if (wantsCars && !ToyCars.MODELS.length && params.get('kind') === 'car') params.set('kind', 'sushi');
