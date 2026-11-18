@@ -155,7 +155,7 @@
 
       // ── 3D-Vorschau im Modal: Modell vom Server (lädt beim ersten Mal von Sketchfab), unsere Darstellung ──
       var THREE = window.THREE, dlg = $('dlg'), canvas = $('view'), renderer = null, scene, cam, holder, cur = null, opener = null, req = 0;
-      var orbit = { yaw: 0.8, pitch: 0.22, dist: 9 }, pts = {}, running = false;
+      var orbit = { yaw: 0.8, pitch: 0.22, dist: 9, t: new THREE.Vector3(0, 0.6, 0) }, pts = {}, running = false;
       var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
       function setup() {
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
@@ -166,7 +166,13 @@
         var floor = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
         floor.rotation.x = -Math.PI / 2; scene.add(floor);
         holder = new THREE.Group(); scene.add(holder);
-        canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+        // rechts/Mitte/Shift ziehen: Ansicht verschieben (Blickziel entlang der Bildebene)
+      function panBy(dx, dy) {
+        var k = orbit.dist * 0.0012, r = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), u = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+        orbit.t.addScaledVector(r, -dx * k).addScaledVector(u, dy * k);
+      }
+      canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.button === 2 || e.shiftKey }; canvas.setPointerCapture(e.pointerId); });
         canvas.addEventListener('pointermove', function (e) {
           if (!pts[e.pointerId]) return;
           var ids = Object.keys(pts);
@@ -178,8 +184,9 @@
             return;
           }
           var p = pts[e.pointerId];
-          orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
-          pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+          if (p.pan) panBy(e.clientX - p.x, e.clientY - p.y);
+          else { orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006)); }
+          pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: p.pan };
         });
         function up(e) { delete pts[e.pointerId]; }
         canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
@@ -191,16 +198,16 @@
           if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
         });
         Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) {
-          b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; });
+          b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; orbit.t.set(0, 0.6, 0); });
         });
       }
       function frame() {
         if (!dlg.open) { running = false; return; }
         var r = canvas.getBoundingClientRect();
         if (r.width && (canvas.width !== Math.round(r.width * renderer.getPixelRatio()))) { renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
-        var cp = Math.cos(orbit.pitch), ty = 0.6;
-        cam.position.set(Math.cos(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.sin(orbit.yaw) * cp * orbit.dist);
-        cam.lookAt(0, ty, 0);
+        var cp = Math.cos(orbit.pitch), T = orbit.t;
+        cam.position.set(T.x + Math.cos(orbit.yaw) * cp * orbit.dist, T.y + Math.sin(orbit.pitch) * orbit.dist, T.z + Math.sin(orbit.yaw) * cp * orbit.dist);
+        cam.lookAt(T);
         renderer.render(scene, cam);
         requestAnimationFrame(frame);
       }
@@ -219,7 +226,7 @@
         foot.append(document.createTextNode('By ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles · '), a);
         clearModel(); paint();
         $('dlgMsg').hidden = false; $('dlgMsg').textContent = 'Loading … the first time the server fetches the model from Sketchfab, this can take up to a minute.';
-        orbit.yaw = 0.8; orbit.pitch = 0.22; orbit.dist = 9;
+        orbit.yaw = 0.8; orbit.pitch = 0.22; orbit.dist = 9; orbit.t.set(0, 0.6, 0);
         dlg.showModal(); canvas.focus();
         if (!running) { running = true; requestAnimationFrame(frame); }
         new THREE.GLTFLoader().load('/app/api/cars/preview/' + c.uid + '.glb', function (gl) {

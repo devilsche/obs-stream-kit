@@ -230,11 +230,17 @@
       var floor = new THREE.Mesh(new THREE.CircleGeometry(9, 64), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
       floor.rotation.x = -Math.PI / 2; scene.add(floor);
       var holder = new THREE.Group(); scene.add(holder);
-      var orbit = { yaw: 0.8, pitch: 0.22, dist: 10 }, pts = {};
+      var orbit = { yaw: 0.8, pitch: 0.22, dist: 10, t: new THREE.Vector3(0, 0.6, 0) }, pts = {};
       // Front zeigt nach +x: Kamera auf +x schaut auf die Front
       var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
-      Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; }); });
-      canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; orbit.t.set(0, 0.6, 0); }); });
+      // rechts/Mitte/Shift ziehen: Ansicht verschieben (Blickziel entlang der Bildebene)
+      function panBy(dx, dy) {
+        var k = orbit.dist * 0.0012, r = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), u = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+        orbit.t.addScaledVector(r, -dx * k).addScaledVector(u, dy * k);
+      }
+      canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.button === 2 || e.shiftKey }; canvas.setPointerCapture(e.pointerId); });
       canvas.addEventListener('pointermove', function (e) {
         if (!pts[e.pointerId]) return;
         var ids = Object.keys(pts);
@@ -246,8 +252,9 @@
           return;
         }
         var p = pts[e.pointerId];
-        orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
-        pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+        if (p.pan) panBy(e.clientX - p.x, e.clientY - p.y);
+        else { orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006)); }
+        pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: p.pan };
       });
       function up(e) { delete pts[e.pointerId]; }
       canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
@@ -259,9 +266,9 @@
       function resize() { var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
       window.addEventListener('resize', resize);
       function frame() {
-        var cp = Math.cos(orbit.pitch), ty = 0.6;
-        cam.position.set(Math.cos(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.sin(orbit.yaw) * cp * orbit.dist);
-        cam.lookAt(0, ty, 0); renderer.render(scene, cam); requestAnimationFrame(frame);
+        var cp = Math.cos(orbit.pitch), T = orbit.t;
+        cam.position.set(T.x + Math.cos(orbit.yaw) * cp * orbit.dist, T.y + Math.sin(orbit.pitch) * orbit.dist, T.z + Math.sin(orbit.yaw) * cp * orbit.dist);
+        cam.lookAt(T); renderer.render(scene, cam); requestAnimationFrame(frame);
       }
 
       // ── Fahrzeug ──
@@ -306,7 +313,7 @@
         TC.loadModel(cur).then(function (t) {
           if (cur.key !== key) return;
           tpl = t; $('msg').hidden = true;
-          if (!keepView) orbit.dist = Math.max(9, t.userData.dims.L * 2.2);
+          if (!keepView) { orbit.dist = Math.max(9, t.userData.dims.L * 2.2); orbit.t.set(0, 0.6, 0); }
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
           $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – pick the paint parts below.';
           $('rimInfo').textContent = meta.rim.length ? 'Rim material: ' + meta.rim.map(function (m) { return m.userData.key; }).join(', ') : 'No rim material found – pick the rim parts below.';
@@ -396,6 +403,7 @@
       var down = null, ray = new THREE.Raycaster();
       canvas.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY }; });
       canvas.addEventListener('pointerup', function (e) {
+        if (e.button !== 0 || e.shiftKey) return;   // nur Linksklick wählt
         if (!picking || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5 || !holder.children[0]) return;
         var r = canvas.getBoundingClientRect();
         ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
