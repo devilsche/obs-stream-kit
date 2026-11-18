@@ -118,6 +118,9 @@
           if (c.have) meta.appendChild(el('span', 'have', 'Already in the rain'));
           var sc = scanned[c.uid];
           meta.appendChild(el('span', 'inside' + (sc && sc.interior ? '' : ' no'), !sc ? 'Interior: not checked yet' : sc.error ? 'Could not check' : sc.interior ? 'Interior' : 'No interior (dark windows)'));
+          if (sc && !sc.error && sc.wheels != null) meta.appendChild(el('span', 'inside' + (sc.wheels === 4 ? '' : ' no'),
+            sc.wheels === 4 ? 'Wheels: separate' + (sc.steered ? ', turned in the model (will be set straight, steerable)' : ', straight, steerable')
+              : sc.half ? 'Wheels: only on one side (half model)' : 'Wheels: not separable (no tyre material), cannot steer'));
           var a = el('a', null, 'Sketchfab page'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', c.name + ' on Sketchfab'); meta.appendChild(a);
           var btns = el('div', 'btns'), pv = el('button', null, 'Preview'), b = el('button', 'keepbtn');
           pv.type = 'button'; pv.setAttribute('aria-label', 'Preview ' + c.name + ' in 3D'); b.type = 'button';

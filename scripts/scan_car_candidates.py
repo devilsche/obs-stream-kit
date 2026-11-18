@@ -19,10 +19,13 @@ PAUSE = 20 * 60
 
 def main(root="."):
     cands = json.load(open(os.path.join(root, "assets", "cars", "candidates.json"), encoding="utf-8"))
+    # zuerst die im Picker behaltenen
+    picks = car_models.load(root, "picks")
+    cands.sort(key=lambda c: 0 if (picks.get(c["uid"]) or {}).get("keep") or (c.get("have") and c["uid"] not in picks) else 1)
     done = car_models.load(root, "scan")
     for i, c in enumerate(cands):
         uid = c["uid"]
-        if uid in done and "interior" in done[uid]:
+        if uid in done and "wheels" in done[uid]:
             continue
         fresh = not sketchfab.cached(root, uid)
         while True:

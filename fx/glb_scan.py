@@ -8,6 +8,8 @@ import json
 import re
 import struct
 
+TIRE = re.compile(r"tire|tyre|reifen|rubber|whitewall", re.I)
+NOT_TIRE = re.compile(r"trim|seal|strip|window|door|mat\b|pedal", re.I)
 INTERIOR = re.compile(r"interior|leather|seat|dash|steer|carpet|cockpit|stitch|gauge|headliner|\bint_|_int\b|pedal|gear|console", re.I)
 CT = {5120: "b", 5121: "B", 5122: "h", 5123: "H", 5125: "I", 5126: "f"}
 NC = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4, "MAT4": 16}
@@ -82,6 +84,7 @@ def scan(path):
             walk(c, W)
 
     ident = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    tire_mats = {i for i, m in enumerate(mats) if TIRE.search(m.get("name", "")) and not NOT_TIRE.search(m.get("name", ""))}
     for r in g["scenes"][g.get("scene", 0)]["nodes"]:
         walk(r, ident)
     for _, pos, p in prims:
@@ -89,11 +92,15 @@ def scan(path):
         total_v += cnt
         tris += (g["accessors"][p["indices"]]["count"] if "indices" in p else cnt) // 3
     step = max(1, total_v // MAX_POINTS)
-    pts = []
-    for W, pos, _ in prims:
+    pts, tire = [], []
+    for W, pos, p in prims:
+        is_tire = p.get("material") in tire_mats
         for x, y, z in _positions(g, binc, pos, step):
-            pts.append((W[0] * x + W[1] * y + W[2] * z + W[3], W[4] * x + W[5] * y + W[6] * z + W[7],
-                        W[8] * x + W[9] * y + W[10] * z + W[11]))
+            q = (W[0] * x + W[1] * y + W[2] * z + W[3], W[4] * x + W[5] * y + W[6] * z + W[7],
+                 W[8] * x + W[9] * y + W[10] * z + W[11])
+            pts.append(q)
+            if is_tire:
+                tire.append(q)
     if not pts:
         return {"interior": named, "tris": tris, "share": 0.0}
     mn = [min(p[k] for p in pts) for k in range(3)]
@@ -110,5 +117,35 @@ def scan(path):
         if 0.3 < l < 0.7 and w < 0.55 and 0.25 < h < 0.75:
             hit += 1
     share = hit / len(pts)
-    return {"interior": bool(named or share >= 0.04), "tris": tris, "share": round(share, 4),
-            "size": [round(size[0], 3), round(size[1], 3), round(size[2], 3)]}
+    res = {"interior": bool(named or share >= 0.04), "tris": tris, "share": round(share, 4),
+           "size": [round(size[0], 3), round(size[1], 3), round(size[2], 3)]}
+    res.update(_wheels(tire, mn, size, la, lat))
+    return res
+
+
+def _wheels(tire, mn, size, la, lat):
+    """Räder wie js/glb-fix.js: Reifenpunkte (untere Hälfte) in vier Gruppen, Lenkwinkel aus der Hauptachse."""
+    import math
+    tire = [p for p in tire if p[1] - mn[1] < size[1] * 0.5]
+    if len(tire) < 40:
+        return {"wheels": 0, "steer": []}
+    cl = mn[la] + size[la] / 2
+    cw = mn[lat] + size[lat] / 2
+    quads = {}
+    for p in tire:
+        quads.setdefault(("a" if p[la] > cl else "b") + ("r" if p[lat] > cw else "l"), []).append(p)
+    steer = []
+    for k in sorted(quads):
+        q = quads[k]
+        if len(q) < 10:
+            continue
+        ml = sum(p[la] for p in q) / len(q)
+        mw = sum(p[lat] for p in q) / len(q)
+        sll = sum((p[la] - ml) ** 2 for p in q)
+        sww = sum((p[lat] - mw) ** 2 for p in q)
+        slw = sum((p[la] - ml) * (p[lat] - mw) for p in q)
+        plane = 0.5 * math.atan2(2 * slw, sll - sww)        # Radebene gegen die Längsachse
+        a = math.degrees(plane)
+        steer.append(round(a, 1))
+    n = len(steer)
+    return {"wheels": n, "steer": steer, "steered": any(abs(a) > 4 for a in steer), "half": n in (1, 2, 3)}
