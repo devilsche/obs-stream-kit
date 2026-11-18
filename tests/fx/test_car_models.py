@@ -86,3 +86,11 @@ def test_catalog_and_model_files(tmp_path):
 
 def test_catalog_missing_is_empty(tmp_path):
     assert _client(str(tmp_path)).get("/s/t/api/fx/cars/catalog.json").json == []
+
+
+def test_many_picked_parts_fit(tmp_path):
+    # viele gewählte Teile mit langen Namen (Lack, Räder, Farbbereiche) müssen speicherbar sein
+    keys = ["polySurface%d_w:3DWheel Front LSG1_0/%d" % (i, j) for i in range(4) for j in range(115)]
+    d = {"paintParts": keys[:400], "wheelParts": keys[:400], "steerParts": keys[:200],
+         "zones": [{"id": "rim", "name": "Rims", "c": 1, "f": "satin", "parts": keys[:400]}]}
+    assert cm.save(str(tmp_path), "vehicles", "abt", d) is None
