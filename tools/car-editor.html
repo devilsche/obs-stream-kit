@@ -295,9 +295,9 @@
         var wheels = []; car.traverse(function (o) { if (/^Wheel /.test(o.name)) wheels.push(o); });
         wheels.forEach(function (o) { var w = new THREE.Vector3(); o.getWorldPosition(w); if (w.x > 0) o.rotation.y = s; });
         holder.add(car);
-        orbit.dist = Math.max(9, tpl.userData.dims.L * 2.2);
       }
-      function load(key) {
+      // keepView: gleiche Kamera behalten (Neuaufbau nach Picken, Umdrehen …), sonst passend zum Auto zoomen
+      function load(key, keepView) {
         cur = list.filter(function (e) { return e.key === key; })[0];
         if (!cur) return;
         def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : [];
@@ -306,6 +306,7 @@
         TC.loadModel(cur).then(function (t) {
           if (cur.key !== key) return;
           tpl = t; $('msg').hidden = true;
+          if (!keepView) orbit.dist = Math.max(9, t.userData.dims.L * 2.2);
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
           $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – pick the paint parts below.';
           $('rimInfo').textContent = meta.rim.length ? 'Rim material: ' + meta.rim.map(function (m) { return m.userData.key; }).join(', ') : 'No rim material found – pick the rim parts below.';
@@ -362,7 +363,7 @@
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), patch);
         Object.keys(patch).forEach(function (k) { if (patch[k] === undefined) delete c[cur.key][k]; });
         TC.applyCustom({ vehicles: c });
-        TC.forget(cur.key); var keep = clone(def); load(cur.key); def = keep; fill();
+        TC.forget(cur.key); var keep = clone(def); load(cur.key, true); def = keep; fill();
       }
       function setPick(w) {
         var was = picking;
@@ -390,7 +391,7 @@
       $('straight').addEventListener('change', function () {
         def.straight = $('straight').checked;
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { straight: def.straight }); TC.applyCustom({ vehicles: c });
-        TC.forget(cur.key); var keep = clone(def); load(cur.key); def = keep; fill();
+        TC.forget(cur.key); var keep = clone(def); load(cur.key, true); def = keep; fill();
       });
       var down = null, ray = new THREE.Raycaster();
       canvas.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY }; });
@@ -413,7 +414,7 @@
       $('flip').addEventListener('change', function () {
         def.flip = $('flip').checked;
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { flip: def.flip }); TC.applyCustom({ vehicles: c });
-        TC.forget(cur.key); var keep = clone(def); load(cur.key); def = keep; fill();
+        TC.forget(cur.key); var keep = clone(def); load(cur.key, true); def = keep; fill();
       });
       $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
       $('addOrig').addEventListener('click', function () { def.paints.push({ c: null, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
