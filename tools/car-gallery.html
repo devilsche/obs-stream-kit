@@ -65,6 +65,8 @@
   </main>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-RoomEnvironment.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
@@ -171,16 +173,7 @@
       renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.setScissorTest(true);
       var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-      (function () {
-        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
-        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
-        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
-        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
-        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
-        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
-      })();
-      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x404858, 0.6));
-      var key = new THREE.DirectionalLight(0xfff4e0, 0.9); key.position.set(-1, 1.6, 1.4); scene.add(key);
+      CarStage.setup(renderer, scene);   // Studio-Raum, ACES-Belichtung (js/car-stage.js)
       var holder = new THREE.Group(); scene.add(holder);
 
       function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); }
