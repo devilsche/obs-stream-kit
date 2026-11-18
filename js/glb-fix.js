@@ -163,6 +163,10 @@
   var PAINT = /paint|carpaint|lack|main_color|maincolor|body_?colou?r|bodywork|exterior_?colou?r|\bbody\b|^body/i, NOT_PAINT = /under|interior|\bint|chassis|frame|plastic|black|glass/i;
   function matName(m) { return (m && m.name) || ''; }
   function isTire(m) { return TIRE.test(matName(m)) && !NOT_TIRE.test(matName(m)); }
+  // ganze Räder an Teile- oder Materialnamen (wheel_lf, 3DWheel Front L, Tyre_RR …), nicht das Lenkrad
+  var WHEEL = /wheel|tyre|tire|\brim|rim_|_rim|whl/i, NOT_WHEEL = /steer|stitch|spare|lenk|interior|\bint_/i;
+  function wheelNode(o, stop) { for (var p = o; p && p !== stop; p = p.parent) if (p.name && WHEEL.test(p.name) && !NOT_WHEEL.test(p.name)) return true; return false; }
+  function isWheelMat(m) { return isTire(m) || (WHEEL.test(matName(m)) && !NOT_WHEEL.test(matName(m))); }
   function isRimMat(m) { return RIM.test(matName(m)) && !NOT_RIM.test(matName(m)); }
   // Dreiecke einer Geometrie als Liste von [a, b, c] Indizes
   function triIndex(g) {
@@ -183,8 +187,9 @@
       var mats = [].concat(o.material), g = o.geometry, pos = g.attributes.position, M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
       var groups = g.groups && g.groups.length ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }];
       var idx = triIndex(g);
+      var byNode = wheelNode(o, obj);
       groups.forEach(function (gr) {
-        if (!isTire(mats[gr.materialIndex || 0] || mats[0])) return;
+        if (!byNode && !isWheelMat(mats[gr.materialIndex || 0] || mats[0])) return;
         var end = Math.min(idx.length, gr.start + gr.count), step = Math.max(1, Math.floor((end - gr.start) / 6000));
         for (var i = gr.start; i < end; i += step) {
           v.fromBufferAttribute(pos, idx[i]).applyMatrix4(M);

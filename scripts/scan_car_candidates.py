@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fx import car_models, glb_scan, sketchfab  # noqa: E402
 
 
+VERSION = 2   # erhöhen, wenn sich die Vermessung ändert: dann wird neu gemessen (aus dem Cache, ohne Download)
 PACE = 120
 PAUSE = 20 * 60
 
@@ -25,12 +26,13 @@ def main(root="."):
     done = car_models.load(root, "scan")
     for i, c in enumerate(cands):
         uid = c["uid"]
-        if uid in done and "wheels" in done[uid]:
+        if (done.get(uid) or {}).get("v") == VERSION:
             continue
         fresh = not sketchfab.cached(root, uid)
         while True:
             try:
                 res = glb_scan.scan(sketchfab.fetch(root, uid))
+                res["v"] = VERSION
             except sketchfab.RateLimited:
                 print("rate limited, pausing %d min" % (PAUSE // 60), flush=True)
                 time.sleep(PAUSE)

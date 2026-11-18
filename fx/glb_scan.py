@@ -9,6 +9,9 @@ import re
 import struct
 
 TIRE = re.compile(r"tire|tyre|reifen|rubber|whitewall", re.I)
+# ganze Räder an Teile- oder Materialnamen (wheel_lf, 3DWheel Front L, Tyre_RR, FL_ghwheel …), nicht das Lenkrad
+WHEEL = re.compile(r"wheel|tyre|tire|\brim|rim_|_rim|whl", re.I)
+NOT_WHEEL = re.compile(r"steer|stitch|spare|lenk|interior|\bint_", re.I)
 NOT_TIRE = re.compile(r"trim|seal|strip|window|door|mat\b|pedal", re.I)
 INTERIOR = re.compile(r"interior|leather|seat|dash|steer|carpet|cockpit|stitch|gauge|headliner|\bint_|_int\b|pedal|gear|console", re.I)
 CT = {5120: "b", 5121: "B", 5122: "h", 5123: "H", 5125: "I", 5126: "f"}
@@ -71,30 +74,33 @@ def scan(path):
     tris = 0
     prims = []
 
-    def walk(i, M):
+    def walk(i, M, wheelish):
         nd = g["nodes"][i]
         W = _mat_mul(M, _local(nd))
+        nm = nd.get("name", "") or ""
+        wh = wheelish or bool(WHEEL.search(nm) and not NOT_WHEEL.search(nm))
         if "mesh" in nd:
             for p in g["meshes"][nd["mesh"]]["primitives"]:
                 pos = p.get("attributes", {}).get("POSITION")
                 if pos is None:
                     continue
-                prims.append((W, pos, p))
+                prims.append((W, pos, p, wh))
         for c in nd.get("children", []):
-            walk(c, W)
+            walk(c, W, wh)
 
     ident = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
-    tire_mats = {i for i, m in enumerate(mats) if TIRE.search(m.get("name", "")) and not NOT_TIRE.search(m.get("name", ""))}
+    tire_mats = {i for i, m in enumerate(mats) if (TIRE.search(m.get("name", "")) and not NOT_TIRE.search(m.get("name", "")))
+                 or (WHEEL.search(m.get("name", "")) and not NOT_WHEEL.search(m.get("name", "")))}
     for r in g["scenes"][g.get("scene", 0)]["nodes"]:
-        walk(r, ident)
-    for _, pos, p in prims:
+        walk(r, ident, False)
+    for _, pos, p, _w in prims:
         cnt = g["accessors"][pos]["count"]
         total_v += cnt
         tris += (g["accessors"][p["indices"]]["count"] if "indices" in p else cnt) // 3
     step = max(1, total_v // MAX_POINTS)
     pts, tire = [], []
-    for W, pos, p in prims:
-        is_tire = p.get("material") in tire_mats
+    for W, pos, p, wh in prims:
+        is_tire = wh or p.get("material") in tire_mats
         for x, y, z in _positions(g, binc, pos, step):
             q = (W[0] * x + W[1] * y + W[2] * z + W[3], W[4] * x + W[5] * y + W[6] * z + W[7],
                  W[8] * x + W[9] * y + W[10] * z + W[11])
