@@ -751,6 +751,18 @@ def car_model_save(kind):
     return jsonify({"ok": True})
 
 
+@bp_app.route("/app/api/cars/preview/<uid>.glb")
+@require_admin
+def car_preview_glb(uid):
+    """Car-Picker: Sketchfab-Modell für die 3D-Vorschau (beim ersten Mal vom Server geladen, dann aus dem Cache)."""
+    from fx import sketchfab
+    try:
+        path = sketchfab.fetch(_duck_root(), uid)
+    except sketchfab.FetchError as e:
+        return jsonify({"ok": False, "error": str(e)}), 502
+    return send_from_directory(os.path.dirname(path), os.path.basename(path), mimetype="model/gltf-binary", max_age=86400)
+
+
 @bp_app.route("/app/api/cars/<kind>", methods=["GET"])
 @require_admin
 def car_model_list(kind):

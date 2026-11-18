@@ -38,13 +38,26 @@
     .keepbtn { margin-top: auto; }
     .keepbtn[aria-pressed="true"] { background: #2e6b3a; border-color: var(--ok); box-shadow: none; }
     .have { font-size: 12px; color: var(--ok); }
+    .btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; }
+    .btns button { flex: 1; }
+    dialog { width: min(1200px, 96vw); height: min(820px, 92vh); padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--text); }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+    .dlg { display: flex; flex-direction: column; height: 100%; }
+    .dlg-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    .dlg-head h2 { font-size: 17px; margin: 0; flex: 1; min-width: 180px; }
+    .stage { position: relative; flex: 1; min-height: 0; }
+    #view { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    .msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; color: var(--muted); pointer-events: none; }
+    .msg[hidden] { display: none; }
+    .dlg-foot { padding: 6px 14px 10px; color: var(--muted); font-size: 12px; }
+    .dlg-foot a { color: var(--text); }
   </style>
 </head>
 <body>
   <a class="skip" href="#cars">Skip to the cars</a>
   <header>
     <h1>Car picker</h1>
-    <p class="lead">Free car models from Sketchfab. Press “Keep” on the ones you want in the car rain; your choice is saved at once. “View in 3D” opens the model on Sketchfab. Yellow licence = non-commercial.</p>
+    <p class="lead">Free car models from Sketchfab. “Preview” shows the model in 3D the way it will look here (the first time the server downloads it, which can take up to a minute). “Keep” saves your choice at once. Yellow licence = non-commercial.</p>
   </header>
   <div class="filters" role="group" aria-label="Filter">
     <span id="brands"></span>
@@ -55,6 +68,28 @@
     <p id="status" role="status" aria-live="polite">Loading …</p>
     <ul class="grid" id="cars"></ul>
   </main>
+  <dialog id="dlg" aria-labelledby="dlgTitle">
+    <div class="dlg">
+      <div class="dlg-head">
+        <h2 id="dlgTitle"></h2>
+        <button type="button" id="dlgKeep" class="keepbtn"></button>
+        <button type="button" data-cam="3q">3/4</button>
+        <button type="button" data-cam="side">Side</button>
+        <button type="button" data-cam="front">Front</button>
+        <button type="button" data-cam="rear">Rear</button>
+        <button type="button" data-cam="top">Top</button>
+        <button type="button" id="dlgClose">Close</button>
+      </div>
+      <div class="stage">
+        <canvas id="view" tabindex="0" role="img" aria-label="3D preview of the car. Drag to turn, scroll or pinch to zoom, arrow keys turn it."></canvas>
+        <p class="msg" id="dlgMsg" role="status" aria-live="polite"></p>
+      </div>
+      <p class="dlg-foot" id="dlgFoot"></p>
+    </div>
+  </dialog>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
   <script>
     (function () {
       'use strict';
@@ -76,18 +111,21 @@
           meta.append(el('h2', null, c.name), el('span', 'sub', c.brand + ' · by ' + c.author + ' · ' + c.faces.toLocaleString('en') + ' triangles'));
           meta.appendChild(el('span', 'lic' + (/NonCommercial/.test(c.license) ? ' nc' : ''), c.license));
           if (c.have) meta.appendChild(el('span', 'have', 'Already in the rain'));
-          var a = el('a', null, 'View in 3D'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', 'View ' + c.name + ' in 3D on Sketchfab'); meta.appendChild(a);
-          var b = el('button', 'keepbtn'); b.type = 'button';
-          b.addEventListener('click', function () {
-            var v = !kept(c);
-            api('POST', '/app/api/cars/picks', { key: c.uid, def: { keep: v } }).then(function () {
-              picks[c.uid] = { keep: v }; paint(); say(v ? 'Kept: ' + c.name : 'Dropped: ' + c.name);
-            }).catch(function (e) { say('Not saved: ' + e.message, true); });
-          });
-          meta.appendChild(b); li.append(img, meta); box.appendChild(li);
+          var a = el('a', null, 'Sketchfab page'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.setAttribute('aria-label', c.name + ' on Sketchfab'); meta.appendChild(a);
+          var btns = el('div', 'btns'), pv = el('button', null, 'Preview'), b = el('button', 'keepbtn');
+          pv.type = 'button'; pv.setAttribute('aria-label', 'Preview ' + c.name + ' in 3D'); b.type = 'button';
+          pv.addEventListener('click', function () { openPreview(c, pv); });
+          b.addEventListener('click', function () { toggle(c); });
+          btns.append(pv, b); meta.appendChild(btns); li.append(img, meta); box.appendChild(li);
           tiles.push({ c: c, li: li, b: b });
         });
         paint();
+      }
+      function toggle(c) {
+        var v = !kept(c);
+        return api('POST', '/app/api/cars/picks', { key: c.uid, def: { keep: v } }).then(function () {
+          picks[c.uid] = { keep: v }; paint(); say(v ? 'Kept: ' + c.name : 'Dropped: ' + c.name);
+        }).catch(function (e) { say('Not saved: ' + e.message, true); });
       }
       function paint() {
         var n = 0, k = 0;
@@ -99,7 +137,102 @@
           if (show) n++; if (on) k++;
         });
         $('count').textContent = n + ' shown · ' + k + ' kept';
+        if (cur) { var on = kept(cur); $('dlgKeep').textContent = on ? 'Kept' : 'Keep'; $('dlgKeep').setAttribute('aria-pressed', String(on)); }
       }
+
+      // ── 3D-Vorschau im Modal: Modell vom Server (lädt beim ersten Mal von Sketchfab), unsere Darstellung ──
+      var THREE = window.THREE, dlg = $('dlg'), canvas = $('view'), renderer = null, scene, cam, holder, cur = null, opener = null, req = 0;
+      var orbit = { yaw: 0.8, pitch: 0.22, dist: 9 }, pts = {}, running = false;
+      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI / 2, 1.45] };
+      function setup() {
+        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+        renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+        renderer.outputEncoding = THREE.sRGBEncoding; renderer.setClearColor(0x1d2433);
+        scene = new THREE.Scene(); cam = new THREE.PerspectiveCamera(30, 1, 0.05, 200);
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+        scene.add(new THREE.HemisphereLight(0xfff6e0, 0x404858, 0.6));
+        var key = new THREE.DirectionalLight(0xfff4e0, 0.9); key.position.set(-4, 6, 5); scene.add(key);
+        var floor = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
+        floor.rotation.x = -Math.PI / 2; scene.add(floor);
+        holder = new THREE.Group(); scene.add(holder);
+        canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+        canvas.addEventListener('pointermove', function (e) {
+          if (!pts[e.pointerId]) return;
+          var ids = Object.keys(pts);
+          if (ids.length === 2) {
+            var a = pts[ids[0]], b = pts[ids[1]], d0 = Math.hypot(a.x - b.x, a.y - b.y);
+            pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+            var d1 = Math.hypot(pts[ids[0]].x - pts[ids[1]].x, pts[ids[0]].y - pts[ids[1]].y);
+            if (d0 > 0) orbit.dist = Math.max(2.5, Math.min(25, orbit.dist * d0 / d1));
+            return;
+          }
+          var p = pts[e.pointerId];
+          orbit.yaw -= (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
+          pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+        });
+        function up(e) { delete pts[e.pointerId]; }
+        canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
+        canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(2.5, Math.min(25, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+        canvas.addEventListener('keydown', function (e) {
+          var k = { ArrowLeft: [0.15, 0], ArrowRight: [-0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+          if (e.key === '+' || e.key === '=') { orbit.dist = Math.max(2.5, orbit.dist * 0.9); return; }
+          if (e.key === '-') { orbit.dist = Math.min(25, orbit.dist * 1.1); return; }
+          if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
+        });
+        Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) {
+          b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; });
+        });
+      }
+      function frame() {
+        if (!dlg.open) { running = false; return; }
+        var r = canvas.getBoundingClientRect();
+        if (r.width && (canvas.width !== Math.round(r.width * renderer.getPixelRatio()))) { renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
+        var cp = Math.cos(orbit.pitch), ty = 0.6;
+        cam.position.set(Math.sin(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * cp * orbit.dist);
+        cam.lookAt(0, ty, 0);
+        renderer.render(scene, cam);
+        requestAnimationFrame(frame);
+      }
+      function clearModel() {
+        while (holder.children.length) {
+          var o = holder.children[0]; holder.remove(o);
+          o.traverse(function (m) { if (m.isMesh) { m.geometry.dispose(); [].concat(m.material).forEach(function (mt) { if (mt) { if (mt.map) mt.map.dispose(); mt.dispose(); } }); } });
+        }
+      }
+      function openPreview(c, btn) {
+        if (!renderer) setup();
+        cur = c; opener = btn; var my = ++req;
+        $('dlgTitle').textContent = c.name;
+        var foot = $('dlgFoot'); foot.textContent = '';
+        var a = el('a', null, 'Sketchfab page'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener';
+        foot.append(document.createTextNode('By ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles · '), a);
+        clearModel(); paint();
+        $('dlgMsg').hidden = false; $('dlgMsg').textContent = 'Loading … the first time the server fetches the model from Sketchfab, this can take up to a minute.';
+        orbit.yaw = 0.8; orbit.pitch = 0.22; orbit.dist = 9;
+        dlg.showModal(); canvas.focus();
+        if (!running) { running = true; requestAnimationFrame(frame); }
+        new THREE.GLTFLoader().load('/app/api/cars/preview/' + c.uid + '.glb', function (gl) {
+          if (my !== req) return;
+          var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3();
+          box.getSize(size);
+          if (size.z > size.x) m.rotation.y = Math.PI / 2;
+          box.setFromObject(m); box.getSize(size);
+          var k = 4.4 / Math.max(size.x, size.z), ctr = new THREE.Vector3(); box.getCenter(ctr);
+          var inner = new THREE.Group(); inner.add(m); m.position.set(-ctr.x, -box.min.y, -ctr.z); inner.scale.setScalar(k);
+          holder.add(inner); $('dlgMsg').hidden = true;
+        }, null, function () {
+          if (my !== req) return;
+          $('dlgMsg').textContent = 'Could not load this model (Sketchfab refused it or it is too large).';
+        });
+      }
+      $('dlgKeep').addEventListener('click', function () { if (cur) toggle(cur); });
+      $('dlgClose').addEventListener('click', function () { dlg.close(); });
+      dlg.addEventListener('close', function () { req++; clearModel(); cur = null; if (opener) opener.focus(); });
       $('onlyKeep').addEventListener('click', function () { onlyKeep = !onlyKeep; $('onlyKeep').setAttribute('aria-pressed', String(onlyKeep)); paint(); });
       Promise.all([
         fetch('/s/__WIDGET_TOKEN__/assets/cars/candidates.json').then(function (r) { return r.json(); }),

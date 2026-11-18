@@ -76,7 +76,12 @@
         current = c.key;
         while (holder.children.length) holder.remove(holder.children[0]);
         var p = $('credit'); p.textContent = 'Loading …';
-        loader.load('/s/__WIDGET_TOKEN__/assets/cars/' + c.key + '.glb', function (gl) {
+        // volle Qualität: Original von Sketchfab über den Server (Cache); sonst die leichte Fassung für den Regen
+        var m0 = /([0-9a-f]{32})/.exec(c.url || ''), full = m0 ? '/app/api/cars/preview/' + m0[1] + '.glb' : null;
+        p.textContent = full ? 'Loading the full-quality model … the first time the server fetches it from Sketchfab, this can take up to a minute.' : 'Loading …';
+        function light() { loader.load('/s/__WIDGET_TOKEN__/assets/cars/' + c.key + '.glb', got, null, function () { p.textContent = 'Could not load this model.'; }); }
+        if (full) loader.load(full, got, null, light); else light();
+        function got(gl) {
           if (current !== c.key) return;
           var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3();
           box.getSize(size);
@@ -88,8 +93,8 @@
           p.textContent = '';
           var a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '“' + c.title + '”';
           var l = document.createElement('a'); l.href = c.licenseUrl; l.target = '_blank'; l.rel = 'noopener'; l.textContent = c.license;
-          p.append(a, document.createTextNode(' by ' + c.author + ', '), l, document.createTextNode(c.note ? '. ' + c.note : '.'));
-        }, null, function () { p.textContent = 'Could not load this model.'; });
+          p.append(a, document.createTextNode(' by ' + c.author + ', '), l, document.createTextNode('. Full-quality original.'));
+        }
       }
       fetch('/s/__WIDGET_TOKEN__/assets/cars/credits.json').then(function (r) { return r.json(); }).then(function (list) {
         credits = list;

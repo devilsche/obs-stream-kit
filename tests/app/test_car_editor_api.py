@@ -51,3 +51,18 @@ def test_picks_save_and_list(pg_conn_test_setup, tmp_path):
 def test_non_admin_cannot_list_picks(pg_conn_test_setup_non_admin, tmp_path):
     conn, tid, _, sid = pg_conn_test_setup_non_admin
     assert _client(conn, sid, str(tmp_path)).get("/app/api/cars/picks").status_code == 403
+
+
+def test_preview_is_admin_only(pg_conn_test_setup_non_admin, tmp_path):
+    conn, tid, _, sid = pg_conn_test_setup_non_admin
+    r = _client(conn, sid, str(tmp_path)).get("/app/api/cars/preview/0123456789abcdef0123456789abcdef.glb")
+    assert r.status_code == 403
+
+
+def test_preview_serves_cached_file(pg_conn_test_setup, tmp_path):
+    conn, tid, _, sid = pg_conn_test_setup
+    uid = "0123456789abcdef0123456789abcdef"
+    (tmp_path / "data" / "car-cache").mkdir(parents=True)
+    (tmp_path / "data" / "car-cache" / (uid + ".glb")).write_bytes(b"glTF")
+    r = _client(conn, sid, str(tmp_path)).get("/app/api/cars/preview/" + uid + ".glb")
+    assert r.status_code == 200 and r.data == b"glTF" and r.mimetype == "model/gltf-binary"
