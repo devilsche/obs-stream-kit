@@ -246,18 +246,22 @@
   }
   // ── Karosserie ──
   // Seitenprofil unten: Boden mit Radläufen, Front, Haube, Gürtellinie, Kofferraum, Heck (x 0 = Heck)
+  // s.arch = { r: { y, a }, f: { y, a } }: Radläufe je Achse (Mitte, Radius) passend zu den Reifen, sonst aus s.r
   function lowerShape(s) {
-    var L = s.L, ro = L - s.wb - s.fo, xr = ro, xf = ro + s.wb, gc = 0.16, ar = s.r + 0.05;
+    var L = s.L, ro = L - s.wb - s.fo, xr = ro, xf = ro + s.wb, gc = 0.16;
+    var A = s.arch || { r: { y: s.r, a: s.r + 0.05 }, f: { y: s.r, a: s.r + 0.05 } };
+    var yr = Math.max(gc + 0.01, A.r.y), yf = Math.max(gc + 0.01, A.f.y);
+    var arr = Math.min(A.r.a, xr - 0.1, (xf - xr) / 2 - 0.05), arf = Math.min(A.f.a, L - xf - 0.12, (xf - xr) / 2 - 0.05);
     var sh = new THREE.Shape();
     sh.moveTo(0.06, gc + 0.04);
-    sh.lineTo(xr - ar, gc);
-    sh.lineTo(xr - ar, s.r);
-    sh.absarc(xr, s.r, ar, Math.PI, 0, true);
-    sh.lineTo(xr + ar, gc);                                           // Unterboden waagrecht zwischen den Radläufen
-    sh.lineTo(xf - ar, gc);
-    sh.lineTo(xf - ar, s.r);
-    sh.absarc(xf, s.r, ar, Math.PI, 0, true);
-    sh.lineTo(xf + ar, gc);
+    sh.lineTo(xr - arr, gc);
+    sh.lineTo(xr - arr, yr);
+    sh.absarc(xr, yr, arr, Math.PI, 0, true);
+    sh.lineTo(xr + arr, gc);                                          // Unterboden waagrecht zwischen den Radläufen
+    sh.lineTo(xf - arf, gc);
+    sh.lineTo(xf - arf, yf);
+    sh.absarc(xf, yf, arf, Math.PI, 0, true);
+    sh.lineTo(xf + arf, gc);
     sh.lineTo(L - 0.08, gc);
     sh.quadraticCurveTo(L, gc + 0.02, L, gc + 0.14);
     sh.lineTo(L - s.slant, s.nose);                                   // Front
@@ -270,7 +274,7 @@
     sh.quadraticCurveTo(0.02, s.deck, 0.02, s.deck - 0.12);
     sh.lineTo(0, gc + 0.12);                                          // Heck
     sh.closePath();
-    return { shape: sh, xr: xr, xf: xf, xc: xc, xd: xd };
+    return { shape: sh, xr: xr, xf: xf, xc: xc, xd: xd, arch: { r: { y: yr, a: arr }, f: { y: yf, a: arf } } };
   }
   // Fahrgastzelle: Windschutzscheibe, Dach, Heckscheibe (Seitenprofil)
   function cabinPts(s, lo) {
@@ -541,9 +545,13 @@
     paint.userData.isPaint = true;
     var car = new THREE.Group(), body = new THREE.Group(), shell = new THREE.Group(); car.add(body);
     shell.name = 'Shell'; body.add(shell);
-    var bev = s.round || 0.07, lo = lowerShape(s), L = s.L;
-    // Räder: Mitte auf Höhe des Reifenradius; die Karosserie hebt sich mit größeren Rädern und Tieferlegung
+    // Räder: Mitte auf Höhe des Reifenradius; die Karosserie hebt sich mit größeren Rädern und Tieferlegung,
+    // die Radläufe wachsen mit dem Reifen der jeweiligen Achse (Mitte = Radmitte, 5 cm Luft)
     var Rf = s.r * v.tires.f.d, Rrr = s.r * v.tires.r.d, lift = (Rf + Rrr) / 2 - s.r + v.ride;
+    // Radlauf darf nicht durch Haube bzw. Kofferraum stoßen: dann sitzt die Karosserie höher (Monstertruck)
+    lift = Math.max(lift, 2 * Rf + 0.05 - (s.nose - 0.08), 2 * Rrr + 0.05 - (s.deck - 0.1));
+    s.arch = { r: { y: Rrr - lift, a: Rrr + 0.05 }, f: { y: Rf - lift, a: Rf + 0.05 } };
+    var bev = s.round || 0.07, lo = lowerShape(s), L = s.L;
     shell.position.y = lift;
     // Unterteil: Seiten mit Fugen-Textur, Rest Lack
     var lg = new THREE.ExtrudeGeometry(dense(lo.shape, 260), { depth: W - 2 * bev, steps: 10, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 4 });
@@ -696,14 +704,15 @@
       }
     },
     skirts: function (p, mat, c) {
-      var ar = c.s.r + 0.05, x0 = c.lo.xr + ar, x1 = c.lo.xf - ar;
+      var x0 = c.lo.xr + c.lo.arch.r.a, x1 = c.lo.xf - c.lo.arch.f.a;
       [-1, 1].forEach(function (sd) { add(c.shell, rbox(x1 - x0, p.h, 0.04 + p.out), mat, (x0 + x1) / 2, 0.16 + p.h / 2 - 0.05, sd * (c.W / 2 + p.out / 2 - 0.01)); });
     },
     flares: function (p, mat, c) {
-      var axles = p.axle === 'front' ? [c.lo.xf] : p.axle === 'rear' ? [c.lo.xr] : [c.lo.xr, c.lo.xf];
-      axles.forEach(function (wx) {
+      var axles = p.axle === 'front' ? ['f'] : p.axle === 'rear' ? ['r'] : ['r', 'f'];
+      axles.forEach(function (k) {
+        var wx = k === 'f' ? c.lo.xf : c.lo.xr, ar = c.lo.arch[k];
         [-1, 1].forEach(function (sd) {
-          var fl = add(c.shell, new THREE.TorusGeometry(c.s.r + 0.05 + p.thick * 0.7, p.thick, 10, 28, Math.PI), mat, wx, c.s.r, sd * (c.W / 2 - 0.01));
+          var fl = add(c.shell, new THREE.TorusGeometry(ar.a + p.thick * 0.7, p.thick, 10, 28, Math.PI), mat, wx, ar.y, sd * (c.W / 2 - 0.01));
           fl.scale.set(1, 1, 1 + p.out * 0.85 / p.thick);
         });
       });
