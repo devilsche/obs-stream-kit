@@ -370,6 +370,8 @@
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
         var prop = picking === 'paint' ? 'paintParts' : 'rimParts', list = partKeys(picking).slice(), i = list.indexOf(key);
+        // eigene Lackteile: Textur ersetzen ist fast immer nötig (sonst Lackfarbe × dunkle Atlas-Textur) – einmal automatisch an
+        if (picking === 'paint' && !def.paintParts && def.texOff == null) { def.texOff = true; $('texOff').checked = true; }
         if (i >= 0) list.splice(i, 1); else list.push(key);
         def[prop] = list; listParts(); show(); say((i >= 0 ? 'Removed: ' : 'Added: ') + key);
       });

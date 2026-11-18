@@ -250,7 +250,9 @@
   function colourMat(m, hex, tag, texOff) {
     var k = tag + ':' + m.uuid + ':' + hex + (texOff ? ':t' : '');
     if (!PAINTS[k]) {
-      var c = PAINTS[k] = m.clone(); c.color.setHex(hex); if (texOff) c.map = null;
+      var c = PAINTS[k] = m.clone(); c.color.setHex(hex);
+      // Textur ersetzen: reine Lackfarbe; eingebackene Schattierung (AO) nur noch schwach
+      if (texOff) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; }
       // Lack wie echter Autolack: wenig Metall (Metallwert 1 spiegelt nur die Umgebung und wirkt dunkel), Klarlack
       if (tag === 'p') {
         c.metalness = Math.min(c.metalness != null ? c.metalness : 0, 0.35); c.metalnessMap = null;
