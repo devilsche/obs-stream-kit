@@ -118,14 +118,14 @@
           return;
         }
         var p = pts[e.pointerId];
-        orbit.yaw -= (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
+        orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
         pts[e.pointerId] = { x: e.clientX, y: e.clientY };
       });
       function up(e) { delete pts[e.pointerId]; if (!Object.keys(pts).length) drag = null; }
       canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
       canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(2.5, Math.min(25, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
       canvas.addEventListener('keydown', function (e) {
-        var k = { ArrowLeft: [0.15, 0], ArrowRight: [-0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+        var k = { ArrowLeft: [-0.15, 0], ArrowRight: [0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
         if (e.key === '+' || e.key === '=') { orbit.dist = Math.max(2.5, orbit.dist * 0.9); return; }
         if (e.key === '-') { orbit.dist = Math.min(25, orbit.dist * 1.1); return; }
         if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));

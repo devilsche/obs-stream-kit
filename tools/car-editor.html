@@ -246,14 +246,14 @@
           return;
         }
         var p = pts[e.pointerId];
-        orbit.yaw -= (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
+        orbit.yaw += (e.clientX - p.x) * 0.008; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + (e.clientY - p.y) * 0.006));
         pts[e.pointerId] = { x: e.clientX, y: e.clientY };
       });
       function up(e) { delete pts[e.pointerId]; }
       canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
       canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(3, Math.min(40, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
       canvas.addEventListener('keydown', function (e) {
-        var k = { ArrowLeft: [0.15, 0], ArrowRight: [-0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+        var k = { ArrowLeft: [-0.15, 0], ArrowRight: [0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
         if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
       });
       function resize() { var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
@@ -399,7 +399,12 @@
         if (!picking || !down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5 || !holder.children[0]) return;
         var r = canvas.getBoundingClientRect();
         ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
-        var hit = ray.intersectObject(holder, true).filter(function (h) { return h.object.isMesh; })[0];
+        // Glas und Durchsichtiges überspringen: der Klick geht durch die Scheibe auf das Teil dahinter
+        var hit = ray.intersectObject(holder, true).filter(function (h) {
+          if (!h.object.isMesh) return false;
+          var m = Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex] : h.object.material;
+          return m && !m.transparent && m.opacity >= 0.95 && !/glass|glas|window|scheibe|windshield/i.test(m.name || '') && m.visible !== false;
+        })[0];
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
         var prop = picking === 'paint' ? 'paintParts' : picking === 'rim' ? 'rimParts' : 'wheelParts';
