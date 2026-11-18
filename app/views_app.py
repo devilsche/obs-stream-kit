@@ -79,6 +79,16 @@ TOOLS = [
      "desc": "Rebuild any rubber duck outfit or make a new one: move, turn and resize hats and props, change colours. Saved outfits go live everywhere.",
      "path": "tools/duck-editor.html",
      "admin_only": True},
+    {"key": "car-gallery",
+     "label": "Toy cars",
+     "desc": "All cars of the BMW rain with their paints and all rims, with their URL parameter.",
+     "path": "tools/car-gallery.html",
+     "admin_only": True},
+    {"key": "car-editor",
+     "label": "Toy car editor",
+     "desc": "Build rims, pick rims and tyres per car, add and tune lips, wings, diffusers, skirts, flares and exhausts. Saved cars go live in the BMW rain.",
+     "path": "tools/car-editor.html",
+     "admin_only": True},
     {"key": "pumpkin-turn",
      "label": "Pumpkin turn preview",
      "desc": "Tune how the autumn pumpkins turn, roll and light up at night.",
@@ -700,6 +710,32 @@ def duck_part_delete(key):
     """Globalen Umbau eines Teils verwerfen: wieder wie im Code."""
     from fx import duck_outfits
     return jsonify({"ok": True, "deleted": duck_outfits.delete_part(_duck_root(), key)})
+
+
+@bp_app.route("/app/api/cars/<kind>", methods=["POST"])
+@require_admin
+def car_model_save(kind):
+    """Auto-Editor: Fahrzeug bzw. Felge speichern (global, gilt sofort im BMW-Regen). Nur JSON."""
+    from fx import car_models
+    if kind not in car_models.KINDS:
+        abort(404)
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "JSON body expected"}), 400
+    err = car_models.save(_duck_root(), kind, body.get("key"), body.get("def"))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/cars/<kind>/<key>", methods=["DELETE"])
+@require_admin
+def car_model_delete(kind, key):
+    """Gespeichertes Fahrzeug bzw. Felge löschen: eigenes ist weg, umgebautes wieder im Original."""
+    from fx import car_models
+    if kind not in car_models.KINDS:
+        abort(404)
+    return jsonify({"ok": True, "deleted": car_models.delete(_duck_root(), kind, key)})
 
 
 def _visible_tools():

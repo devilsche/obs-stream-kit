@@ -1,6 +1,6 @@
 /* Party-Regen in echtem 3D (three.js r128, js/vendor/three-r128.min.js) für
  * effects/item-rain.html: Gummientchen (kind=duck), Sushi (kind=sushi), Spielzeugautos (kind=car,
- * js/toy-cars.js, model=mix|2002|e30|e30m3|e36|e46|e92m3) – fallen – oder Luftballons (kind=balloon),
+ * js/toy-cars.js, model=mix|<Fahrzeug> aus dem Auto-Editor, eingebaut 2002|e30|e30m3|e36|e46|e92m3) – fallen – oder Luftballons (kind=balloon),
  * die von unten aufsteigen.
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
@@ -864,10 +864,10 @@
     }
     var rise = kind === 'balloon';
     // Autos: Modell je Auto zufällig (model=mix) oder fest, Farbe aus den typischen Lacken des Modells
-    var TC = root.ToyCars, carModel = TC && TC.SPEC[opts.model] ? opts.model : 'mix';
+    var TC = root.ToyCars, carModel = TC && TC.has(opts.model) ? opts.model : 'mix';
     var carTpl = TC ? { make: function () {
       var m = carModel === 'mix' ? TC.MODELS[Math.floor(Math.random() * TC.MODELS.length)] : carModel, p = TC.pickPaint(m);
-      var sp = TC.SPEC[m];
+      var sp = TC.dims(m);
       return { g: TC.build(m, p.c, p.l), len: sp.L, car: { L: sp.L, W: sp.W, hh: sp.H / 2, belt: sp.belt - sp.H / 2 } };
     } } : null;
     var tpl = kind === 'car' ? carTpl : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();

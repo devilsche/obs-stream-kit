@@ -18,7 +18,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, abort, request
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, commands, duck_outfits, duck_viewers, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -545,6 +545,16 @@ def duck_outfits_js(token):
         owner = ""
     # Kanalinhaber: seine !outfit-Wahl gilt auch, wenn er sie nur in einem anderen Kanal getroffen hat
     js += duck_viewers.script(duck_viewers.mapping(root, g.tenant_id, owner=owner))
+    return _no_store(Response(js, mimetype="application/javascript"))
+
+
+@bp_fx.route("/s/<token>/api/fx/cars/custom.js")
+def car_models_js(token):
+    """Felgen und Fahrzeuge aus dem Auto-Editor (global) als Script für den BMW-Regen und die Tools."""
+    if g.tenant_id is None:
+        abort(404)
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    js = car_models.script(car_models.load(root, "vehicles"), car_models.load(root, "rims"))
     return _no_store(Response(js, mimetype="application/javascript"))
 
 

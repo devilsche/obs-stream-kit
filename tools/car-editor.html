@@ -1,0 +1,634 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toy car editor</title>
+  <style>
+    /* Auto-Editor für den BMW-Regen (js/toy-cars.js): Fahrzeuge (Karosserie, Felgen + Reifen je Achse,
+       Tuning-Teile, Fahrwerk, Lackierungen) und Felgen bauen. Speichern = global, sofort live. */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --danger: #ff8a80; --ok: #9be59b; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 5; }
+    header { padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 20px; margin: 0; }
+    header p { margin: 0; color: var(--muted); }
+    header a { color: var(--text); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 420px; height: calc(100vh - 52px); }
+    .stage { position: relative; min-height: 360px; }
+    #view { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    .hint { position: absolute; left: 12px; bottom: 10px; margin: 0; color: var(--muted); font-size: 12px; background: rgba(20, 26, 38, 0.8); padding: 4px 8px; border-radius: 6px; }
+    .views { position: absolute; left: 12px; top: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; }
+    section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+    h2 { font-size: 15px; margin: 0 0 8px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .row > label { min-width: 96px; color: var(--muted); }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; min-height: 30px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.primary { background: var(--accent); color: #1b1300; border-color: var(--accent); font-weight: 700; }
+    button.primary:hover { background: #ffd24a; }
+    button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+    button.ghost { background: transparent; border-color: var(--line); }
+    button.small { padding: 2px 8px; min-height: 26px; font-size: 13px; }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    input, select { background: #0e131c; color: var(--text); border: 1px solid #4a5570; border-radius: 6px; padding: 4px 6px; font: inherit; min-height: 30px; box-sizing: border-box; }
+    input[type=number] { width: 70px; }
+    input[type=color] { width: 44px; padding: 2px; }
+    input[type=range] { flex: 1; min-width: 110px; accent-color: var(--accent); }
+    input[type=checkbox] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
+    select { max-width: 100%; }
+    .grow { flex: 1; min-width: 0; }
+    .muted { color: var(--muted); }
+    .small-text { font-size: 12px; margin: 4px 0; }
+    output { min-width: 52px; font-variant-numeric: tabular-nums; text-align: right; }
+    .origin { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+    fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 4px 10px 8px; }
+    fieldset.on { border-color: var(--accent); }
+    legend { color: var(--text); padding: 0 4px; font-weight: 600; }
+    .head { display: flex; gap: 6px; align-items: center; justify-content: flex-end; margin: 2px 0 4px; }
+    .paint { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: 6px; }
+    .paint.on { box-shadow: inset 0 0 0 2px var(--accent); }
+    #status { min-height: 20px; margin: 8px 0 0; }
+    #status.ok { color: var(--ok); }
+    #status.err { color: var(--danger); }
+    .sticky { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    [hidden] { display: none !important; }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; height: auto; }
+      .stage { height: 55vh; }
+      .panel { border-left: 0; border-top: 1px solid var(--line); overflow: visible; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#panel">Skip to the editor controls</a>
+  <header>
+    <h1>Toy car editor</h1>
+    <p>Saved cars and rims go live at once in the BMW rain and the overview. <a href="car-gallery">All cars and rims</a></p>
+  </header>
+  <div class="layout">
+    <div class="stage">
+      <canvas id="view" role="img" aria-label="3D preview of the car or rim being edited. Drag to orbit, scroll to zoom, arrow keys turn it when focused." tabindex="0"></canvas>
+      <div class="views" role="group" aria-label="Camera">
+        <button type="button" class="small" data-cam="3q">3/4</button>
+        <button type="button" class="small" data-cam="side">Side</button>
+        <button type="button" class="small" data-cam="front">Front</button>
+        <button type="button" class="small" data-cam="rear">Rear</button>
+        <button type="button" class="small" data-cam="top">Top</button>
+      </div>
+      <p class="hint">Drag to orbit · scroll to zoom · arrow keys turn · Ctrl+Z undo</p>
+    </div>
+    <div class="panel" id="panel">
+      <section aria-labelledby="h-mode">
+        <h2 id="h-mode">Mode</h2>
+        <div class="row" role="group" aria-labelledby="h-mode">
+          <button type="button" data-tab="car" aria-pressed="true">Cars</button>
+          <button type="button" data-tab="rim" aria-pressed="false">Rims</button>
+        </div>
+      </section>
+
+      <!-- ── Fahrzeug ── -->
+      <div id="carBox">
+        <section aria-labelledby="h-car">
+          <h2 id="h-car">Car</h2>
+          <div class="row">
+            <label for="carPick">Car</label>
+            <select id="carPick" class="grow"></select>
+          </div>
+          <div class="row">
+            <span class="origin" id="carOrigin"></span>
+            <button type="button" id="carDup">Copy as new car</button>
+          </div>
+          <div class="row" id="carKeyRow" hidden>
+            <label for="carKey">URL name</label>
+            <input id="carKey" class="grow" autocomplete="off" aria-describedby="carKeyHelp">
+            <span id="carKeyHelp" class="muted small-text">Used as <code>model=&lt;name&gt;</code>: lowercase letters, digits, dashes.</span>
+          </div>
+          <div class="row">
+            <label for="carLabel">Display name</label>
+            <input id="carLabel" class="grow" maxlength="40" autocomplete="off">
+          </div>
+          <div class="row">
+            <label for="carYears">Years</label>
+            <input id="carYears" class="grow" maxlength="20" autocomplete="off">
+          </div>
+          <div class="row">
+            <input type="checkbox" id="carMix">
+            <label for="carMix">In the random mix (<code>model=mix</code>)</label>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-body">
+          <h2 id="h-body">Body</h2>
+          <div class="row">
+            <label for="carBody">Body</label>
+            <select id="carBody" class="grow"></select>
+          </div>
+          <div class="row">
+            <label for="carBumpers">Bumpers</label>
+            <select id="carBumpers" class="grow">
+              <option value="chrome">Chrome</option>
+              <option value="black">Black</option>
+              <option value="paint">Body colour</option>
+            </select>
+          </div>
+          <div class="row">
+            <input type="checkbox" id="carRings">
+            <label for="carRings">Light rings around the headlights (glass headlights only)</label>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-stance">
+          <h2 id="h-stance">Stance</h2>
+          <div id="stance"></div>
+        </section>
+
+        <section aria-labelledby="h-wheels">
+          <h2 id="h-wheels">Wheels</h2>
+          <div class="row">
+            <label for="rimF">Front rim</label>
+            <select id="rimF" class="grow"></select>
+          </div>
+          <div class="row">
+            <label for="rimR">Rear rim</label>
+            <select id="rimR" class="grow"></select>
+          </div>
+          <fieldset>
+            <legend>Front tyres</legend>
+            <div id="tireF"></div>
+          </fieldset>
+          <div class="row">
+            <input type="checkbox" id="tireSame">
+            <label for="tireSame">Rear tyres like the front</label>
+          </div>
+          <fieldset id="tireRBox">
+            <legend>Rear tyres</legend>
+            <div id="tireR"></div>
+          </fieldset>
+        </section>
+
+        <section aria-labelledby="h-parts">
+          <h2 id="h-parts">Tuning parts</h2>
+          <div class="row">
+            <label for="partAdd">Add</label>
+            <select id="partAdd" class="grow"></select>
+            <button type="button" id="partAddBtn">Add part</button>
+          </div>
+          <p class="muted small-text" id="partsEmpty">No parts yet.</p>
+          <div id="parts"></div>
+        </section>
+
+        <section aria-labelledby="h-paints">
+          <h2 id="h-paints">Paints</h2>
+          <p class="muted small-text">The rain picks one paint per car; a higher weight makes it more frequent. Click “Show” to preview a paint.</p>
+          <div id="paints"></div>
+          <button type="button" id="paintAdd">Add paint</button>
+        </section>
+      </div>
+
+      <!-- ── Felge ── -->
+      <div id="rimBox" hidden>
+        <section aria-labelledby="h-rim">
+          <h2 id="h-rim">Rim</h2>
+          <div class="row">
+            <label for="rimPick">Rim</label>
+            <select id="rimPick" class="grow"></select>
+          </div>
+          <div class="row">
+            <span class="origin" id="rimOrigin"></span>
+            <button type="button" id="rimDup">Copy as new rim</button>
+          </div>
+          <div class="row" id="rimKeyRow" hidden>
+            <label for="rimKey">Name</label>
+            <input id="rimKey" class="grow" autocomplete="off" aria-describedby="rimKeyHelp">
+            <span id="rimKeyHelp" class="muted small-text">Lowercase letters, digits, dashes.</span>
+          </div>
+          <div class="row">
+            <label for="rimLabel">Display name</label>
+            <input id="rimLabel" class="grow" maxlength="40" autocomplete="off">
+          </div>
+          <div class="row">
+            <label for="rimShow">Preview</label>
+            <select id="rimShow" class="grow">
+              <option value="wheel">Wheel alone</option>
+              <option value="car">On the selected car</option>
+            </select>
+          </div>
+        </section>
+        <section aria-labelledby="h-shape">
+          <h2 id="h-shape">Shape</h2>
+          <div class="row">
+            <label for="rimStyle">Style</label>
+            <select id="rimStyle" class="grow"></select>
+          </div>
+          <div id="rimShape"></div>
+        </section>
+        <section aria-labelledby="h-finish">
+          <h2 id="h-finish">Finish</h2>
+          <div class="row">
+            <label for="rimFinish">Finish</label>
+            <select id="rimFinish" class="grow"></select>
+          </div>
+          <div class="row">
+            <input type="checkbox" id="rimOwnColor">
+            <label for="rimOwnColor">Own colour</label>
+            <input type="color" id="rimColor" aria-label="Rim colour">
+          </div>
+          <div class="row">
+            <label for="rimAccent">Lip and cap</label>
+            <select id="rimAccent" class="grow"></select>
+          </div>
+          <div class="row">
+            <label for="rimCap">Centre</label>
+            <select id="rimCap" class="grow">
+              <option value="small">Small cap</option>
+              <option value="big">Big cap</option>
+              <option value="nuts">Wheel nuts</option>
+              <option value="none">Plain hub</option>
+            </select>
+          </div>
+        </section>
+      </div>
+
+      <div class="sticky">
+        <div class="row">
+          <button type="button" class="primary" id="save">Save</button>
+          <button type="button" class="ghost" id="undo" disabled>Undo</button>
+          <button type="button" class="danger" id="reset" hidden>Back to original</button>
+          <button type="button" class="danger" id="del" hidden>Delete</button>
+        </div>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </div>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var THREE = window.THREE, TC = window.ToyCars;
+      var $ = function (id) { return document.getElementById(id); };
+      var KEY_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+      var LIVERIES = { '': 'Plain', stripes: 'Racing stripes', race: 'Stripes + race number', carbon: 'Carbon roof' };
+      function clone(o) { return JSON.parse(JSON.stringify(o)); }
+      function hex(c) { return '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); }
+      function int(h) { return parseInt(h.slice(1), 16); }
+      function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+      var uid = 0;
+      function isAngle(k) { return /angle|camber/.test(k); }
+      function fmt(k, v) { return isAngle(k) ? Math.round(v * 180 / Math.PI) + '°' : (Math.abs(v) >= 10 ? String(Math.round(v)) : v.toFixed(2)); }
+      // Regler mit Beschriftung und Wertanzeige
+      function slider(box, k, label, min, max, step, val, on) {
+        var row = el('div', 'row'), id = 'f' + (uid++), lab = el('label', null, label), inp = el('input'), out = el('output');
+        lab.htmlFor = id; inp.id = id; inp.type = 'range'; inp.min = min; inp.max = max; inp.step = step; inp.value = val;
+        out.htmlFor = id; out.textContent = fmt(k, +val);
+        inp.addEventListener('input', function () { out.textContent = fmt(k, +inp.value); on(+inp.value); });
+        inp.addEventListener('change', commit);
+        row.append(lab, inp, out); box.appendChild(row); return inp;
+      }
+      function choice(box, label, opts, names, val, on) {
+        var row = el('div', 'row'), id = 'f' + (uid++), lab = el('label', null, label), sel = el('select', 'grow');
+        lab.htmlFor = id; sel.id = id;
+        opts.forEach(function (o, i) { var op = el('option', null, names ? names[i] : String(o)); op.value = String(o); sel.appendChild(op); });
+        sel.value = String(val);
+        sel.addEventListener('change', function () { var i = Array.prototype.map.call(sel.options, function (o) { return o.value; }).indexOf(sel.value); on(opts[i]); commit(); });
+        row.append(lab, sel); box.appendChild(row); return sel;
+      }
+
+      // ── Zustand ──
+      var custom = { vehicles: {}, rims: {} };
+      Object.keys(TC.VEHICLES).forEach(function (k) { if (TC.isCustomVehicle(k)) custom.vehicles[k] = TC.VEHICLES[k]; });
+      Object.keys(TC.RIMS).forEach(function (k) { if (TC.isCustomRim(k)) custom.rims[k] = TC.RIMS[k]; });
+      var tab = 'car', car = { key: null, isNew: false, def: null, paint: 0 }, rim = { key: null, isNew: false, def: null };
+      var hist = [];
+      function snapshot() { return JSON.stringify({ tab: tab, car: car, rim: rim }); }
+      var lastSnap = null;
+      function commit() {
+        var s = snapshot();
+        if (lastSnap && s !== lastSnap) { hist.push(lastSnap); if (hist.length > 80) hist.shift(); }
+        lastSnap = s; $('undo').disabled = !hist.length;
+      }
+      function undo() {
+        if (!hist.length) return;
+        var st = JSON.parse(hist.pop()); car = st.car; rim = st.rim; lastSnap = snapshot();
+        $('undo').disabled = !hist.length; setTab(st.tab, true); fillCar(); fillRim(); rebuild(); say('Undone.', '');
+      }
+      function say(msg, cls) { var s = $('status'); s.textContent = msg; s.className = cls || ''; }
+
+      // ── Auswahl-Listen ──
+      function vehicleName(k) { var v = TC.VEHICLES[k]; return (v && v.label || k) + (v && v.years ? ' (' + v.years + ')' : ''); }
+      function rimName(k) { var r = TC.RIMS[k]; return (r && r.label) || k; }
+      function fillSelect(sel, keys, name, val) {
+        sel.textContent = '';
+        keys.forEach(function (k) { var o = el('option', null, name(k)); o.value = k; sel.appendChild(o); });
+        if (val != null) sel.value = val;
+      }
+      function lists() {
+        fillSelect($('carPick'), Object.keys(TC.VEHICLES), vehicleName, car.isNew ? null : car.key);
+        fillSelect($('rimPick'), Object.keys(TC.RIMS), rimName, rim.isNew ? null : rim.key);
+        fillSelect($('rimF'), Object.keys(TC.RIMS), rimName);
+        fillSelect($('rimR'), Object.keys(TC.RIMS), rimName);
+      }
+      fillSelect($('carBody'), Object.keys(TC.BODIES), function (k) { return TC.BODIES[k].label; });
+      fillSelect($('partAdd'), Object.keys(TC.PARTS), function (k) { return TC.PARTS[k].label; });
+      fillSelect($('rimStyle'), Object.keys(TC.RIM_STYLES), function (k) { return TC.RIM_STYLES[k]; });
+      fillSelect($('rimFinish'), Object.keys(TC.FINISHES), function (k) { return TC.FINISHES[k].label; });
+      fillSelect($('rimAccent'), ['same'].concat(Object.keys(TC.FINISHES)), function (k) { return k === 'same' ? 'Same as the rim' : TC.FINISHES[k].label; });
+
+      // ── Fahrzeug ──
+      function loadCar(k) {
+        car = { key: k, isNew: false, def: TC.normVehicle(clone(TC.VEHICLES[k])), paint: 0 };
+        fillCar(); rebuild(); commit();
+      }
+      function origin(isNew, builtin, isCustom) { return isNew ? 'New, not saved yet' : isCustom ? (builtin ? 'Built-in, changed' : 'Own') : 'Built-in'; }
+      function fillCar() {
+        var d = car.def;
+        $('carPick').value = car.isNew ? '' : car.key;
+        $('carOrigin').textContent = origin(car.isNew, TC.isBuiltinVehicle(car.key), TC.isCustomVehicle(car.key));
+        $('carKeyRow').hidden = !car.isNew; $('carKey').value = car.isNew ? car.key || '' : '';
+        $('carLabel').value = d.label; $('carYears').value = d.years; $('carMix').checked = d.mix !== false;
+        $('carBody').value = d.body; $('carBumpers').value = d.bumpers; $('carRings').checked = !!d.rings;
+        var st = $('stance'); st.textContent = '';
+        [['widen', 'Wide body', -0.1, 0.4, 0.01], ['ride', 'Ride height', -0.2, 0.3, 0.005], ['track', 'Track', -0.1, 0.3, 0.005], ['camber', 'Camber', -0.3, 0.3, 0.005]].forEach(function (p) {
+          slider(st, p[0], p[1], p[2], p[3], p[4], d[p[0]], function (v) { d[p[0]] = v; rebuild(); });
+        });
+        $('rimF').value = d.rims.f; $('rimR').value = d.rims.r;
+        $('tireSame').checked = JSON.stringify(d.tires.f) === JSON.stringify(d.tires.r);
+        tireSliders($('tireF'), 'f'); tireSliders($('tireR'), 'r');
+        $('tireRBox').hidden = $('tireSame').checked;
+        fillParts(); fillPaints(); buttons();
+      }
+      function tireSliders(box, ax) {
+        box.textContent = '';
+        var t = car.def.tires[ax];
+        [['w', 'Width', 0.12, 0.6, 0.005], ['side', 'Sidewall', 0.06, 0.6, 0.01], ['d', 'Diameter', 0.6, 1.6, 0.01]].forEach(function (p) {
+          slider(box, p[0], p[1], p[2], p[3], p[4], t[p[0]], function (v) {
+            t[p[0]] = v;
+            if (ax === 'f' && $('tireSame').checked) car.def.tires.r = clone(t);
+            rebuild();
+          });
+        });
+      }
+      function fillParts() {
+        var box = $('parts'); box.textContent = '';
+        $('partsEmpty').hidden = car.def.parts.length > 0;
+        car.def.parts.forEach(function (p, i) {
+          var spec = TC.PARTS[p.t], fs = el('fieldset'), lg = el('legend', null, spec.label + (countOf(p.t) > 1 ? ' ' + (car.def.parts.filter(function (q, j) { return q.t === p.t && j <= i; }).length) : ''));
+          fs.appendChild(lg);
+          var head = el('div', 'head'), rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove ' + lg.textContent);
+          rm.addEventListener('click', function () { car.def.parts.splice(i, 1); fillParts(); rebuild(); commit(); });
+          var dup = el('button', 'ghost small', 'Duplicate'); dup.type = 'button'; dup.setAttribute('aria-label', 'Duplicate ' + lg.textContent);
+          dup.addEventListener('click', function () { car.def.parts.splice(i + 1, 0, clone(p)); fillParts(); rebuild(); commit(); });
+          head.append(dup, rm); fs.appendChild(head);
+          spec.params.forEach(function (q) {
+            if (q.opts) choice(fs, q.label, q.opts, q.names, p[q.k], function (v) { p[q.k] = v; rebuild(); });
+            else slider(fs, q.k, q.label, q.min, q.max, q.step, p[q.k], function (v) { p[q.k] = v; rebuild(); });
+          });
+          var matRow = el('div', 'row'), id = 'f' + (uid++), lab = el('label', null, 'Material'), sel = el('select', 'grow'), colIn = el('input');
+          lab.htmlFor = id; sel.id = id;
+          Object.keys(TC.PART_MATS).forEach(function (m) { var o = el('option', null, TC.PART_MATS[m]); o.value = m; sel.appendChild(o); });
+          sel.value = p.mat; colIn.type = 'color'; colIn.value = hex(p.color != null ? p.color : 0xc8151b); colIn.hidden = p.mat !== 'color'; colIn.setAttribute('aria-label', spec.label + ' colour');
+          sel.addEventListener('change', function () { p.mat = sel.value; if (p.mat === 'color' && p.color == null) p.color = int(colIn.value); colIn.hidden = p.mat !== 'color'; rebuild(); commit(); });
+          colIn.addEventListener('input', function () { p.color = int(colIn.value); rebuild(); });
+          colIn.addEventListener('change', commit);
+          matRow.append(lab, sel, colIn); fs.appendChild(matRow);
+          box.appendChild(fs);
+        });
+      }
+      function countOf(t) { return car.def.parts.filter(function (q) { return q.t === t; }).length; }
+      function fillPaints() {
+        var box = $('paints'); box.textContent = '';
+        car.paint = Math.min(car.paint, car.def.paints.length - 1);
+        car.def.paints.forEach(function (p, i) {
+          var row = el('div', 'paint' + (i === car.paint ? ' on' : '')), c = el('input'), lv = el('select'), w = el('input'), wl = el('label', 'muted', 'Weight');
+          var n = i + 1, idW = 'f' + (uid++);
+          c.type = 'color'; c.value = hex(p.c); c.setAttribute('aria-label', 'Paint ' + n + ' colour');
+          c.addEventListener('input', function () { p.c = int(c.value); car.paint = i; rebuild(); });
+          c.addEventListener('change', function () { fillPaints(); commit(); });
+          Object.keys(LIVERIES).forEach(function (k) { var o = el('option', null, LIVERIES[k]); o.value = k; lv.appendChild(o); });
+          lv.value = p.l || ''; lv.setAttribute('aria-label', 'Paint ' + n + ' livery');
+          lv.addEventListener('change', function () { if (lv.value) p.l = lv.value; else delete p.l; car.paint = i; fillPaints(); rebuild(); commit(); });
+          w.type = 'number'; w.min = 1; w.max = 20; w.step = 1; w.value = p.w || 1; w.id = idW; wl.htmlFor = idW;
+          w.addEventListener('change', function () { p.w = Math.max(1, Math.min(20, parseInt(w.value, 10) || 1)); commit(); });
+          var show = el('button', 'ghost small', 'Show'); show.type = 'button'; show.setAttribute('aria-pressed', String(i === car.paint)); show.setAttribute('aria-label', 'Show paint ' + n);
+          show.addEventListener('click', function () { car.paint = i; fillPaints(); rebuild(); });
+          var rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.disabled = car.def.paints.length < 2; rm.setAttribute('aria-label', 'Remove paint ' + n);
+          rm.addEventListener('click', function () { car.def.paints.splice(i, 1); fillPaints(); rebuild(); commit(); });
+          row.append(c, lv, wl, w, show, rm); box.appendChild(row);
+        });
+      }
+      $('carPick').addEventListener('change', function () { loadCar($('carPick').value); say('', ''); });
+      $('carDup').addEventListener('click', function () {
+        var base = car.isNew ? 'car' : car.key, k = base + '-2', i = 2;
+        while (TC.VEHICLES[k]) { i++; k = base + '-' + i; }
+        car = { key: k, isNew: true, def: clone(car.def), paint: car.paint };
+        car.def.label = (car.def.label || base) + ' copy';
+        fillCar(); commit(); $('carKey').focus();
+      });
+      $('carKey').addEventListener('input', function () { car.key = $('carKey').value.trim(); });
+      $('carLabel').addEventListener('input', function () { car.def.label = $('carLabel').value; });
+      $('carLabel').addEventListener('change', commit);
+      $('carYears').addEventListener('input', function () { car.def.years = $('carYears').value; });
+      $('carYears').addEventListener('change', commit);
+      $('carMix').addEventListener('change', function () { car.def.mix = $('carMix').checked; commit(); });
+      $('carBody').addEventListener('change', function () { car.def.body = $('carBody').value; rebuild(); commit(); });
+      $('carBumpers').addEventListener('change', function () { car.def.bumpers = $('carBumpers').value; rebuild(); commit(); });
+      $('carRings').addEventListener('change', function () { car.def.rings = $('carRings').checked; rebuild(); commit(); });
+      $('rimF').addEventListener('change', function () { car.def.rims.f = $('rimF').value; rebuild(); commit(); });
+      $('rimR').addEventListener('change', function () { car.def.rims.r = $('rimR').value; rebuild(); commit(); });
+      $('tireSame').addEventListener('change', function () {
+        if ($('tireSame').checked) car.def.tires.r = clone(car.def.tires.f);
+        $('tireRBox').hidden = $('tireSame').checked; tireSliders($('tireR'), 'r'); rebuild(); commit();
+      });
+      $('partAddBtn').addEventListener('click', function () {
+        car.def.parts.push(TC.normPart({ t: $('partAdd').value }));
+        fillParts(); rebuild(); commit();
+        var fs = $('parts').lastElementChild; if (fs) { fs.scrollIntoView({ block: 'nearest' }); fs.querySelector('input, select').focus(); }
+      });
+      $('paintAdd').addEventListener('click', function () { car.def.paints.push({ c: 0xc9ccd2, w: 1 }); car.paint = car.def.paints.length - 1; fillPaints(); rebuild(); commit(); });
+
+      // ── Felge ──
+      function loadRim(k) {
+        rim = { key: k, isNew: false, def: TC.normRim(clone(TC.RIMS[k])) };
+        fillRim(); rebuild(); commit();
+      }
+      function fillRim() {
+        var d = rim.def;
+        $('rimPick').value = rim.isNew ? '' : rim.key;
+        $('rimOrigin').textContent = origin(rim.isNew, TC.isBuiltinRim(rim.key), TC.isCustomRim(rim.key));
+        $('rimKeyRow').hidden = !rim.isNew; $('rimKey').value = rim.isNew ? rim.key || '' : '';
+        $('rimLabel').value = d.label; $('rimStyle').value = d.style; $('rimFinish').value = d.finish;
+        $('rimOwnColor').checked = d.color != null; $('rimColor').hidden = d.color == null;
+        $('rimColor').value = hex(d.color != null ? d.color : (TC.FINISHES[d.finish] || {}).c || 0xcccccc);
+        $('rimAccent').value = d.accent; $('rimCap').value = d.cap;
+        var box = $('rimShape'); box.textContent = '';
+        [['n', d.style === 'disc' || d.style === 'steel' ? 'Holes' : 'Spokes', 3, 24, 1], ['sw', 'Spoke width', 0.08, 0.9, 0.01], ['dish', 'Dish depth', 0, 1, 0.01],
+          ['lip', 'Lip width', 0, 0.3, 0.005], ['twist', 'Twist', -1, 1, 0.01]].forEach(function (p) {
+          slider(box, p[0], p[1], p[2], p[3], p[4], d[p[0]], function (v) { d[p[0]] = v; rebuild(); });
+        });
+        buttons();
+      }
+      $('rimPick').addEventListener('change', function () { loadRim($('rimPick').value); say('', ''); });
+      $('rimDup').addEventListener('click', function () {
+        var base = rim.isNew ? 'rim' : rim.key, k = base + '-2', i = 2;
+        while (TC.RIMS[k]) { i++; k = base + '-' + i; }
+        rim = { key: k, isNew: true, def: clone(rim.def) };
+        rim.def.label = (rim.def.label || base) + ' copy';
+        fillRim(); commit(); $('rimKey').focus();
+      });
+      $('rimKey').addEventListener('input', function () { rim.key = $('rimKey').value.trim(); });
+      $('rimLabel').addEventListener('input', function () { rim.def.label = $('rimLabel').value; });
+      $('rimLabel').addEventListener('change', commit);
+      $('rimShow').addEventListener('change', function () { camView($('rimShow').value === 'wheel' ? 'wheel' : '3q'); rebuild(); });
+      $('rimStyle').addEventListener('change', function () { rim.def.style = $('rimStyle').value; fillRim(); rebuild(); commit(); });
+      $('rimFinish').addEventListener('change', function () { rim.def.finish = $('rimFinish').value; if (rim.def.color == null) $('rimColor').value = hex(TC.FINISHES[rim.def.finish].c); rebuild(); commit(); });
+      $('rimOwnColor').addEventListener('change', function () { rim.def.color = $('rimOwnColor').checked ? int($('rimColor').value) : null; $('rimColor').hidden = rim.def.color == null; rebuild(); commit(); });
+      $('rimColor').addEventListener('input', function () { rim.def.color = int($('rimColor').value); rebuild(); });
+      $('rimColor').addEventListener('change', commit);
+      $('rimAccent').addEventListener('change', function () { rim.def.accent = $('rimAccent').value; rebuild(); commit(); });
+      $('rimCap').addEventListener('change', function () { rim.def.cap = $('rimCap').value; rebuild(); commit(); });
+
+      // ── Modus ──
+      function setTab(t, quiet) {
+        tab = t;
+        Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.tab === t)); });
+        $('carBox').hidden = t !== 'car'; $('rimBox').hidden = t !== 'rim';
+        camView(t === 'rim' && $('rimShow').value === 'wheel' ? 'wheel' : '3q');
+        buttons(); if (!quiet) rebuild();
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('[data-tab]'), function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+
+      // ── Speichern ──
+      function buttons() {
+        var c = tab === 'car', key = c ? car.key : rim.key, isNew = c ? car.isNew : rim.isNew;
+        var builtin = c ? TC.isBuiltinVehicle(key) : TC.isBuiltinRim(key), isCustom = c ? TC.isCustomVehicle(key) : TC.isCustomRim(key);
+        $('reset').hidden = isNew || !builtin || !isCustom;
+        $('del').hidden = isNew || builtin || !isCustom;
+      }
+      function api(method, url, body) {
+        return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
+      }
+      function refresh() { TC.applyCustom(custom); lists(); }
+      $('save').addEventListener('click', function () {
+        var c = tab === 'car', st = c ? car : rim, kind = c ? 'vehicles' : 'rims';
+        if (!KEY_RE.test(st.key || '')) { say('Name: lowercase letters, digits and dashes (max 32).', 'err'); (c ? $('carKey') : $('rimKey')).focus(); return; }
+        if (st.isNew && (c ? TC.VEHICLES : TC.RIMS)[st.key]) { say('“' + st.key + '” already exists. Pick another name.', 'err'); return; }
+        var def = clone(st.def);
+        if (c) { if (!def.label) def.label = st.key; } else if (def.color == null) delete def.color;
+        say('Saving …', '');
+        api('POST', '/app/api/cars/' + kind, { key: st.key, def: def }).then(function () {
+          custom[kind][st.key] = def; st.isNew = false; refresh();
+          if (c) fillCar(); else fillRim();
+          say('Saved. It is live in the BMW rain now.', 'ok');
+        }).catch(function (e) { say('Not saved: ' + e.message, 'err'); });
+      });
+      function drop(msg) {
+        var c = tab === 'car', st = c ? car : rim, kind = c ? 'vehicles' : 'rims';
+        if (!window.confirm(msg)) return;
+        api('DELETE', '/app/api/cars/' + kind + '/' + encodeURIComponent(st.key)).then(function () {
+          delete custom[kind][st.key]; refresh();
+          var k = (c ? TC.VEHICLES : TC.RIMS)[st.key] ? st.key : Object.keys(c ? TC.VEHICLES : TC.RIMS)[0];
+          if (c) loadCar(k); else loadRim(k);
+          say('Done.', 'ok');
+        }).catch(function (e) { say('Failed: ' + e.message, 'err'); });
+      }
+      $('reset').addEventListener('click', function () { drop('Throw away your changes and go back to the built-in version?'); });
+      $('del').addEventListener('click', function () { drop('Delete it for good? Cars using a deleted rim fall back to the five-star rim.'); });
+      $('undo').addEventListener('click', undo);
+      document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !/^(INPUT|SELECT)$/.test((e.target || {}).tagName || '')) { e.preventDefault(); undo(); }
+      });
+
+      // ── 3D-Vorschau ──
+      var canvas = $('view'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.setClearColor(0x1d2433);
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(32, 1, 0.05, 200);
+      (function () {
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+      })();
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x404858, 0.6));
+      var key = new THREE.DirectionalLight(0xfff4e0, 0.9); key.position.set(-3, 5, 4); scene.add(key);
+      var floor = new THREE.Mesh(new THREE.CircleGeometry(4.5, 48), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
+      floor.rotation.x = -Math.PI / 2; scene.add(floor);
+      var holder = new THREE.Group(); scene.add(holder);
+      var orbit = { yaw: -0.7, pitch: 0.28, dist: 9, ty: 0.7 };
+      var CAMS = { '3q': [-0.7, 0.28], side: [0, 0.05], front: [Math.PI / 2, 0.1], rear: [-Math.PI / 2, 0.1], top: [0, 1.45], wheel: [0.25, 0.1] };
+      function camView(v) {
+        var c = CAMS[v] || CAMS['3q']; orbit.yaw = c[0]; orbit.pitch = c[1];
+        if (v === 'wheel') { orbit.dist = 3.2; orbit.ty = 0; floor.visible = false; } else { orbit.dist = 9; orbit.ty = 0.7; floor.visible = true; }
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { camView(b.dataset.cam); }); });
+      var drag = null;
+      canvas.addEventListener('pointerdown', function (e) { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+      canvas.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        orbit.yaw -= (e.clientX - drag.x) * 0.008; orbit.pitch = Math.max(-0.2, Math.min(1.5, orbit.pitch + (e.clientY - drag.y) * 0.006));
+        drag = { x: e.clientX, y: e.clientY };
+      });
+      canvas.addEventListener('pointerup', function () { drag = null; });
+      canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(1.5, Math.min(30, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+      canvas.addEventListener('keydown', function (e) {
+        var k = { ArrowLeft: [0.15, 0], ArrowRight: [-0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
+        if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.2, Math.min(1.5, orbit.pitch + k[1]));
+      });
+
+      function dispose(o) { o.traverse(function (m) { if (m.isMesh && m.geometry) m.geometry.dispose(); }); }
+      var pending = false;
+      function rebuild() {
+        if (pending) return; pending = true;
+        requestAnimationFrame(function () {
+          pending = false;
+          var old = holder.children[0]; if (old) { holder.remove(old); dispose(old); }
+          var obj;
+          if (tab === 'rim' && $('rimShow').value === 'wheel') obj = TC.wheel(rim.def, null, 0.62);
+          else {
+            var d = clone(car.def), p = d.paints[Math.min(car.paint, d.paints.length - 1)] || { c: 0xc9ccd2 };
+            if (tab === 'rim') d.rims = { f: rim.def, r: rim.def };
+            obj = TC.buildDef(d, p.c, p.l);
+            var box = new THREE.Box3().setFromObject(obj); obj.position.y = -box.min.y;   // Räder auf den Boden
+          }
+          holder.add(obj);
+        });
+      }
+      function resize() {
+        var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false);
+        cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', resize);
+      function frame() {
+        var cp = Math.cos(orbit.pitch);
+        cam.position.set(Math.sin(orbit.yaw) * cp * orbit.dist, orbit.ty + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * cp * orbit.dist);
+        cam.lookAt(0, orbit.ty, 0);
+        renderer.render(scene, cam);
+        requestAnimationFrame(frame);
+      }
+
+      // ── Start: ?vehicle= bzw. ?rim= ──
+      var qs = new URLSearchParams(location.search);
+      lists();
+      var startCar = qs.get('vehicle') && TC.VEHICLES[qs.get('vehicle')] ? qs.get('vehicle') : Object.keys(TC.VEHICLES)[0];
+      var startRim = qs.get('rim') && TC.RIMS[qs.get('rim')] ? qs.get('rim') : Object.keys(TC.RIMS)[0];
+      car = { key: startCar, isNew: false, def: TC.normVehicle(clone(TC.VEHICLES[startCar])), paint: 0 };
+      rim = { key: startRim, isNew: false, def: TC.normRim(clone(TC.RIMS[startRim])) };
+      fillCar(); fillRim();
+      setTab(qs.get('rim') ? 'rim' : 'car');
+      commit();
+      resize(); requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

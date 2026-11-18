@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Toy cars</title>
+  <style>
+    /* Übersicht aller Spielzeugautos (js/toy-cars.js + eigene aus dem Auto-Editor) je Lackierung und aller Felgen:
+       eine WebGL-Fläche hinter dem Raster, jede Kachel wird per Scissor in ihren Bereich gezeichnet */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 3; }
+    #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; }
+    header { padding: 18px 20px 4px; max-width: 1400px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0; }
+    h2.sec { font-size: 18px; margin: 22px 0 10px; }
+    .lead { color: var(--muted); margin: 4px 0 0; }
+    .lead a { color: var(--text); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; max-width: 1400px; margin: 0 auto; }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; min-height: 34px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    label { color: var(--muted); }
+    input[type=search] { background: var(--panel); color: var(--text); border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 10px; font: inherit; min-height: 34px; }
+    .count { color: var(--muted); margin-left: auto; }
+    main { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+    .grid.rims { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+    .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+    .tile[hidden] { display: none; }
+    .stage { aspect-ratio: 4 / 3; width: 100%; }
+    .rims .stage { aspect-ratio: 1 / 1; }
+    .meta { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
+    .meta h3 { font-size: 16px; margin: 0; }
+    .sub { color: var(--muted); font-size: 13px; }
+    .param { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
+    .meta a { color: var(--text); font-size: 13px; padding: 4px 0; min-height: 24px; display: inline-block; }
+    .tag { font-size: 11px; border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; color: var(--muted); align-self: flex-start; }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#cars">Skip to the cars</a>
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <header>
+    <h1>Toy cars</h1>
+    <p class="lead">Every car of the BMW rain in each of its paints, and every rim. Use a car as <code>?model=&lt;name&gt;</code> on <code>effects/item-rain.html?kind=car</code>; <code>mix</code> picks one per car from all cars in the mix. <a href="car-editor">Open the editor</a></p>
+  </header>
+  <div class="filters" role="group" aria-label="Filter cars">
+    <span id="views"></span>
+    <label for="q">Search</label>
+    <input type="search" id="q" autocomplete="off">
+    <span class="count" id="count" aria-live="polite"></span>
+  </div>
+  <main>
+    <h2 class="sec" id="h-cars">Cars</h2>
+    <ul class="grid" id="cars" aria-labelledby="h-cars"></ul>
+    <h2 class="sec" id="h-rims">Rims</h2>
+    <ul class="grid rims" id="rims" aria-labelledby="h-rims"></ul>
+  </main>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var THREE = window.THREE, TC = window.ToyCars;
+      var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var LIVERY = { stripes: 'racing stripes', race: 'race number', carbon: 'carbon roof' };
+      function hex(c) { return '#' + ('000000' + c.toString(16)).slice(-6); }
+
+      // ── Kacheln ──
+      var tiles = [], carList = document.getElementById('cars'), rimList = document.getElementById('rims');
+      function tile(list, o) {
+        var li = document.createElement('li'); li.className = 'tile';
+        var st = document.createElement('div'); st.className = 'stage'; st.setAttribute('role', 'img'); st.setAttribute('aria-label', o.alt);
+        var meta = document.createElement('div'); meta.className = 'meta';
+        var h = document.createElement('h3'); h.textContent = o.title;
+        var sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = o.sub;
+        meta.append(h, sub);
+        if (o.tag) { var tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = o.tag; meta.appendChild(tg); }
+        var p = document.createElement('code'); p.className = 'param'; p.textContent = o.param; meta.appendChild(p);
+        var a = document.createElement('a'); a.href = o.edit; a.textContent = 'Edit'; a.setAttribute('aria-label', 'Edit ' + o.title); meta.appendChild(a);
+        li.append(st, meta); list.appendChild(li);
+        var t = { li: li, stage: st, make: o.make, obj: null, kind: o.kind, text: (o.title + ' ' + o.param + ' ' + o.sub).toLowerCase(), yaw: o.kind === 'rim' ? 0.5 : -0.7 + (tiles.length % 5) * 0.12, hover: false };
+        li.addEventListener('pointerenter', function () { t.hover = true; });
+        li.addEventListener('pointerleave', function () { t.hover = false; });
+        li.addEventListener('focusin', function () { t.hover = true; });
+        li.addEventListener('focusout', function () { t.hover = false; });
+        tiles.push(t);
+      }
+      Object.keys(TC.VEHICLES).forEach(function (k) {
+        var v = TC.VEHICLES[k], name = v.label || k, years = v.years ? ' (' + v.years + ')' : '';
+        var tag = TC.isCustomVehicle(k) ? (TC.isBuiltinVehicle(k) ? 'Changed' : 'Own') : null;
+        if (v.mix === false) tag = (tag ? tag + ' · ' : '') + 'Not in mix';
+        (v.paints && v.paints.length ? v.paints : [{ c: 0xc9ccd2 }]).forEach(function (p, i) {
+          tile(carList, {
+            kind: 'car', title: name + years, sub: 'Paint ' + hex(p.c) + (p.l ? ' with ' + LIVERY[p.l] : '') + (p.w ? ' · weight ' + p.w : ''),
+            alt: name + ' toy car, paint ' + (i + 1), param: 'model=' + k, edit: 'car-editor?vehicle=' + encodeURIComponent(k), tag: tag,
+            make: function () { return TC.build(k, p.c, p.l); }
+          });
+        });
+      });
+      Object.keys(TC.RIMS).forEach(function (k) {
+        var r = TC.normRim(TC.RIMS[k]);
+        tile(rimList, {
+          kind: 'rim', title: r.label || k, sub: TC.RIM_STYLES[r.style] + ' · ' + r.n + ' · ' + (TC.FINISHES[r.finish] || {}).label,
+          alt: (r.label || k) + ' rim', param: 'rim: ' + k, edit: 'car-editor?rim=' + encodeURIComponent(k),
+          tag: TC.isCustomRim(k) ? (TC.isBuiltinRim(k) ? 'Changed' : 'Own') : null,
+          make: function () { return TC.wheel(TC.RIMS[k], null, 0.5); }
+        });
+      });
+
+      // ── Filter ──
+      var view = 'all', views = document.getElementById('views'), q = document.getElementById('q'), count = document.getElementById('count');
+      [['all', 'All'], ['car', 'Cars'], ['rim', 'Rims']].forEach(function (e) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = e[1]; b.setAttribute('aria-pressed', String(e[0] === view));
+        b.addEventListener('click', function () { view = e[0]; Array.prototype.forEach.call(views.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); apply(); });
+        views.appendChild(b); views.appendChild(document.createTextNode(' '));
+      });
+      q.addEventListener('input', apply);
+      function apply() {
+        var s = q.value.trim().toLowerCase(), n = 0;
+        tiles.forEach(function (t) { var show = (view === 'all' || t.kind === view) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
+        document.getElementById('h-cars').hidden = carList.hidden = view === 'rim';
+        document.getElementById('h-rims').hidden = rimList.hidden = view === 'car';
+        count.textContent = n + ' of ' + tiles.length;
+      }
+      apply();
+
+      // ── WebGL: eine Fläche, je Kachel ein eigener Ausschnitt ──
+      var canvas = document.getElementById('gl');
+      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      renderer.outputEncoding = THREE.sRGBEncoding;
+      renderer.setScissorTest(true);
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+      (function () {
+        var c = document.createElement('canvas'); c.width = 512; c.height = 256;
+        var x = c.getContext('2d'), gr = x.createLinearGradient(0, 0, 0, 256);
+        gr.addColorStop(0, '#ffffff'); gr.addColorStop(0.45, '#c9d2dc'); gr.addColorStop(0.55, '#6a7280'); gr.addColorStop(1, '#25282e');
+        x.fillStyle = gr; x.fillRect(0, 0, 512, 256);
+        var tex = new THREE.CanvasTexture(c); tex.mapping = THREE.EquirectangularReflectionMapping; tex.encoding = THREE.sRGBEncoding;
+        var pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(tex).texture; pm.dispose();
+      })();
+      scene.add(new THREE.HemisphereLight(0xfff6e0, 0x404858, 0.6));
+      var key = new THREE.DirectionalLight(0xfff4e0, 0.9); key.position.set(-1, 1.6, 1.4); scene.add(key);
+      var holder = new THREE.Group(); scene.add(holder);
+
+      function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); }
+      window.addEventListener('resize', resize); resize();
+
+      var last = null;
+      function frame(ts) {
+        var dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
+        var H = window.innerHeight, W = window.innerWidth, built = 0;
+        renderer.setScissor(0, 0, W, H); renderer.clear();
+        tiles.forEach(function (t) {
+          if (t.li.hidden) return;
+          var r = t.stage.getBoundingClientRect();
+          if (r.bottom < 0 || r.top > H || r.right < 0 || r.left > W) return;
+          // erst bauen, wenn sichtbar (höchstens zwei pro Bild)
+          if (!t.obj) { if (built >= 2) return; built++; t.obj = t.make(); }
+          if (!reduce) t.yaw += dt * (t.hover ? 1.2 : 0.3);
+          if (t.kind === 'rim') { t.obj.rotation.set(0, t.yaw * 0.6 + 0.3, 0); cam.position.set(0, 0, 3.4); cam.lookAt(0, 0, 0); }
+          else { t.obj.rotation.set(0, t.yaw, 0); cam.position.set(0, 2.2, 9.6); cam.lookAt(0, -0.1, 0); }
+          if (holder.children[0]) holder.remove(holder.children[0]);
+          holder.add(t.obj);
+          var y = H - r.bottom;
+          renderer.setViewport(r.left, y, r.width, r.height); renderer.setScissor(r.left, y, r.width, r.height);
+          cam.aspect = r.width / r.height; cam.updateProjectionMatrix();
+          renderer.render(scene, cam);
+        });
+        requestAnimationFrame(frame);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>

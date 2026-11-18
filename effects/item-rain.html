@@ -6,7 +6,7 @@
   <title>Item Rain</title>
   <style>
     /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random), ?by= Chat-Name (sein !outfit regnet zu einem Drittel mit),
-       ?model= (Autos: mix|2002|e30|e30m3|e36|e46|e92m3),
+       ?model= (Autos: mix oder ein Fahrzeug aus tools/car-gallery – eingebaut 2002|e30|e30m3|e36|e46|e92m3, eigene aus dem Auto-Editor),
        ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
        Sushi: Fress-Ente nur, wenn der Admin sie für den Tenant freigeschaltet hat (window.__FEATURES__ enthält
        „sushi-eater“, /admin/users); ?eater=0 aus, ?eater=<Outfit> oder <Chat-Name> (dessen !outfit),
@@ -28,6 +28,7 @@
   <script src="../js/rubber-duck-outfits.js"></script>
   <script src="../api/fx/ducks/custom.js"></script>
   <script src="../js/toy-cars.js"></script>
+  <script src="../api/fx/cars/custom.js"></script>
   <script src="../js/item-rain-3d.js"></script>
   <script>
     (function () {
