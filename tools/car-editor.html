@@ -57,6 +57,15 @@
     #status.ok { color: var(--ok); }
     #status.err { color: var(--danger); }
     .sticky { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    .view2d { width: 100%; height: auto; background: #0e131c; border: 1px solid var(--line); border-radius: 8px; touch-action: none; display: block; margin: 6px 0; }
+    .view2d .curve { fill: none; stroke: var(--accent); stroke-width: 0.012; }
+    .view2d .belt { fill: none; stroke: #7fc6ff; stroke-width: 0.01; stroke-dasharray: 0.04 0.03; }
+    .view2d .ground { stroke: #4a5570; stroke-width: 0.008; }
+    .view2d .wheel { fill: none; stroke: #c4bad6; stroke-width: 0.01; }
+    .view2d .outline { fill: rgba(242, 183, 5, 0.08); stroke: var(--accent); stroke-width: 0.012; }
+    .view2d .pt { fill: #141a26; stroke: var(--accent); stroke-width: 0.012; cursor: grab; }
+    .view2d .pt.belt-pt { stroke: #7fc6ff; }
+    .view2d .pt.on { fill: var(--accent); }
     [hidden] { display: none !important; }
     @media (max-width: 900px) {
       .layout { grid-template-columns: 1fr; height: auto; }
@@ -141,6 +150,29 @@
             <input type="checkbox" id="carRings">
             <label for="carRings">Light rings around the headlights (glass headlights only)</label>
           </div>
+        </section>
+
+        <section aria-labelledby="h-shape-car">
+          <h2 id="h-shape-car">Body shape</h2>
+          <p class="muted small-text">Drag the points: side view = outline from the side (yellow) and window line (blue), top view = width along the car. Or pick a point and type the values.</p>
+          <svg class="view2d" id="sideView" role="img" aria-label="Side view of the body outline with draggable points"></svg>
+          <svg class="view2d" id="topView" role="img" aria-label="Top view of the body width with draggable points"></svg>
+          <div class="row">
+            <label for="ptPick">Point</label>
+            <select id="ptPick" class="grow"></select>
+          </div>
+          <div class="row">
+            <label for="ptX">Along (m)</label>
+            <input type="number" id="ptX" step="0.01">
+            <label for="ptY" id="ptYLabel">Height (m)</label>
+            <input type="number" id="ptY" step="0.01">
+          </div>
+          <div class="row">
+            <button type="button" id="beltAdd" class="ghost small">Add window-line point</button>
+            <button type="button" id="beltDel" class="ghost small">Remove window-line point</button>
+          </div>
+          <div id="shapeSliders"></div>
+          <button type="button" id="shapeReset" class="danger small">Back to the original body shape</button>
         </section>
 
         <section aria-labelledby="h-stance">
@@ -355,14 +387,108 @@
         $('carLabel').value = d.label; $('carYears').value = d.years; $('carMix').checked = d.mix !== false;
         $('carBody').value = d.body; $('carBumpers').value = d.bumpers; $('carRings').checked = !!d.rings;
         var st = $('stance'); st.textContent = '';
-        [['widen', 'Wide body', -0.1, 0.4, 0.01], ['ride', 'Ride height', -0.2, 0.3, 0.005], ['track', 'Track', -0.1, 0.3, 0.005], ['camber', 'Camber', -0.3, 0.3, 0.005]].forEach(function (p) {
+        [['widen', 'Wide body', -0.1, 0.4, 0.01], ['ride', 'Ride height', -0.2, 0.3, 0.005], ['track', 'Track', -0.1, 0.3, 0.005], ['camber', 'Camber', -0.3, 0.3, 0.005], ['gap', 'Arch gap', 0, 0.3, 0.005]].forEach(function (p) {
           slider(st, p[0], p[1], p[2], p[3], p[4], d[p[0]], function (v) { d[p[0]] = v; rebuild(); });
         });
         $('rimF').value = d.rims.f; $('rimR').value = d.rims.r;
         $('tireSame').checked = JSON.stringify(d.tires.f) === JSON.stringify(d.tires.r);
         tireSliders($('tireF'), 'f'); tireSliders($('tireR'), 'r');
         $('tireRBox').hidden = $('tireSame').checked;
-        fillParts(); fillPaints(); buttons();
+        fillShape(); fillParts(); fillPaints(); buttons();
+      }
+      // ── Karosserieform (Seitenansicht, Draufsicht, Regler) ──
+      var PT_NAMES = {
+        top: ['Rear end', 'Boot lid', 'Rear window base', 'Roof rear', 'Roof middle', 'Roof front', 'Windscreen base', 'Bonnet', 'Bonnet front', 'Nose'],
+        bot: ['Rear bottom', 'Sill rear', 'Sill front', 'Front bottom'],
+        plan: ['Width: rear end', 'Width: rear corner', 'Width: middle rear', 'Width: middle front', 'Width: front corner', 'Width: nose']
+      };
+      var sel = { list: 'top', i: 4 }, SVGNS = 'http://www.w3.org/2000/svg';
+      function sh() { return car.def.shape; }
+      function normSh() { car.def.shape = TC.normShape(car.def.shape, TC.BODIES[car.def.body].shape); }
+      function svgEl(tag, attrs, parent) { var e = document.createElementNS(SVGNS, tag); Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); }); if (parent) parent.appendChild(e); return e; }
+      function pathOf(pts, flip) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(3) + ' ' + (flip ? -p[1] : p[1]).toFixed(3); }).join(' '); }
+      function ptLists() {
+        var o = [];
+        ['top', 'bot'].forEach(function (l) { sh()[l].forEach(function (p, i) { o.push({ list: l, i: i, name: PT_NAMES[l][i] }); }); });
+        sh().belt.forEach(function (p, i) { o.push({ list: 'belt', i: i, name: 'Window line ' + (i + 1) }); });
+        sh().plan.forEach(function (p, i) { o.push({ list: 'plan', i: i, name: PT_NAMES.plan[i] }); });
+        return o;
+      }
+      function drawShape() {
+        var S = sh(), L = S.L, sv = $('sideView'), tv = $('topView'), H = Math.max.apply(null, S.top.map(function (p) { return p[1]; }));
+        sv.textContent = ''; tv.textContent = '';
+        sv.setAttribute('viewBox', [-0.25, -(H + 0.2), L + 0.5, H + 0.3].join(' '));
+        svgEl('line', { x1: -0.25, y1: 0, x2: L + 0.25, y2: 0, class: 'ground' }, sv);
+        var xr = L - S.wb - S.fo, xf = xr + S.wb, tf = car.def.tires;
+        [[xr, tf.r.d], [xf, tf.f.d]].forEach(function (w) { svgEl('circle', { cx: w[0], cy: -S.r * w[1], r: S.r * w[1], class: 'wheel' }, sv); });
+        svgEl('path', { d: pathOf(TC.curve(S.top, 10, [2, 6]), true), class: 'curve' }, sv);
+        svgEl('path', { d: pathOf(TC.curve(S.bot, 10), true), class: 'curve' }, sv);
+        svgEl('path', { d: pathOf(TC.curve([S.top[2]].concat(S.belt, [S.top[6]]), 8), true), class: 'belt' }, sv);
+        var hw = S.W / 2, planC = TC.curve(S.plan, 10);
+        tv.setAttribute('viewBox', [-0.25, -(hw + 0.15), L + 0.5, 2 * hw + 0.3].join(' '));
+        var out = planC.map(function (p) { return [p[0], p[1] * hw]; }), back = planC.slice().reverse().map(function (p) { return [p[0], -p[1] * hw]; });
+        svgEl('path', { d: pathOf(out.concat(back), false) + ' Z', class: 'outline' }, tv);
+        function handle(svg, l, i, x, y) {
+          var on = sel.list === l && sel.i === i;
+          var c = svgEl('circle', { cx: x, cy: y, r: 0.05, class: 'pt' + (l === 'belt' ? ' belt-pt' : '') + (on ? ' on' : '') }, svg);
+          c.addEventListener('pointerdown', function (e) { e.preventDefault(); sel = { list: l, i: i }; drag2d = { svg: svg, l: l, i: i }; svg.setPointerCapture(e.pointerId); fillPt(); drawShape(); });
+        }
+        ['top', 'bot', 'belt'].forEach(function (l) { S[l].forEach(function (p, i) { handle(sv, l, i, p[0], -p[1]); }); });
+        S.plan.forEach(function (p, i) { handle(tv, 'plan', i, p[0], -p[1] * hw); });
+      }
+      var drag2d = null;
+      function svgPoint(svg, e) { var pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+      ['sideView', 'topView'].forEach(function (id) {
+        var svg = $(id);
+        svg.addEventListener('pointermove', function (e) {
+          if (!drag2d || drag2d.svg !== svg) return;
+          var q = svgPoint(svg, e), p = sh()[drag2d.l][drag2d.i];
+          p[0] = Math.round(q.x * 100) / 100;
+          p[1] = drag2d.l === 'plan' ? Math.round(-q.y / (sh().W / 2) * 100) / 100 : Math.round(-q.y * 100) / 100;
+          normSh(); fillPt(); drawShape(); rebuild();
+        });
+        svg.addEventListener('pointerup', function () { if (drag2d) { drag2d = null; commit(); } });
+      });
+      function fillPt() {
+        var pk = $('ptPick'), list = ptLists();
+        pk.textContent = '';
+        list.forEach(function (o, k) { var op = el('option', null, o.name); op.value = k; pk.appendChild(op); if (o.list === sel.list && o.i === sel.i) pk.value = k; });
+        var p = sh()[sel.list] && sh()[sel.list][sel.i];
+        if (!p) { sel = { list: 'top', i: 4 }; p = sh().top[4]; }
+        $('ptX').value = p[0].toFixed(2); $('ptY').value = p[1].toFixed(2);
+        $('ptYLabel').textContent = sel.list === 'plan' ? 'Half width (share)' : 'Height (m)';
+        $('beltDel').disabled = sh().belt.length < 2;
+      }
+      $('ptPick').addEventListener('change', function () { var o = ptLists()[+$('ptPick').value]; sel = { list: o.list, i: o.i }; fillPt(); drawShape(); });
+      ['ptX', 'ptY'].forEach(function (id, c) {
+        $(id).addEventListener('change', function () {
+          var v = parseFloat($(id).value); if (!isFinite(v)) return;
+          sh()[sel.list][sel.i][c] = v; normSh(); fillPt(); drawShape(); rebuild(); commit();
+        });
+      });
+      $('beltAdd').addEventListener('click', function () {
+        var S = sh(), x = (S.top[2][0] + S.top[6][0]) / 2, y = S.belt[0][1];
+        S.belt.push([x + (S.belt.length % 2 ? 0.4 : -0.4), y]); normSh(); sel = { list: 'belt', i: sh().belt.length - 1 }; fillShape(); rebuild(); commit();
+      });
+      $('beltDel').addEventListener('click', function () {
+        if (sh().belt.length < 2) return;
+        sh().belt.splice(sel.list === 'belt' ? sel.i : sh().belt.length - 1, 1); sel = { list: 'top', i: 4 }; fillShape(); rebuild(); commit();
+      });
+      $('shapeReset').addEventListener('click', function () { car.def.shape = clone(TC.BODIES[car.def.body].shape); fillShape(); rebuild(); commit(); });
+      function fillShape() {
+        normSh(); drawShape(); fillPt();
+        var box = $('shapeSliders'); box.textContent = '';
+        var S = sh();
+        slider(box, 'L', 'Length', 3, 6.5, 0.01, S.L, function (v) {
+          var k = v / sh().L, T = sh();
+          ['top', 'bot', 'plan', 'belt'].forEach(function (l) { T[l].forEach(function (p) { p[0] *= k; }); });
+          T.wb *= k; T.fo *= k; T.L = v; normSh(); drawShape(); rebuild();
+        });
+        [['W', 'Width', 1.2, 2.6, 0.01], ['wb', 'Wheelbase', 1.6, 4.5, 0.01], ['fo', 'Front overhang', 0.3, 1.6, 0.01], ['r', 'Wheel size', 0.2, 0.6, 0.005],
+          ['tuck', 'Tuck under', 0.6, 1, 0.01], ['sr', 'Shoulder round', 0, 0.3, 0.005], ['gB', 'Glass width at belt', 0.5, 1, 0.01],
+          ['gR', 'Roof width', 0.3, 1, 0.01], ['crown', 'Roof and bonnet crown', 0, 0.3, 0.005], ['endR', 'Rounded ends', 0.02, 0.3, 0.005]].forEach(function (q) {
+          slider(box, q[0], q[1], q[2], q[3], q[4], S[q[0]], function (v) { sh()[q[0]] = v; normSh(); drawShape(); rebuild(); });
+        });
       }
       function tireSliders(box, ax) {
         box.textContent = '';
@@ -437,7 +563,7 @@
       $('carYears').addEventListener('input', function () { car.def.years = $('carYears').value; });
       $('carYears').addEventListener('change', commit);
       $('carMix').addEventListener('change', function () { car.def.mix = $('carMix').checked; commit(); });
-      $('carBody').addEventListener('change', function () { car.def.body = $('carBody').value; rebuild(); commit(); });
+      $('carBody').addEventListener('change', function () { car.def.body = $('carBody').value; car.def.shape = clone(TC.BODIES[car.def.body].shape); fillShape(); rebuild(); commit(); });
       $('carBumpers').addEventListener('change', function () { car.def.bumpers = $('carBumpers').value; rebuild(); commit(); });
       $('carRings').addEventListener('change', function () { car.def.rings = $('carRings').checked; rebuild(); commit(); });
       $('rimF').addEventListener('change', function () { car.def.rims.f = $('rimF').value; rebuild(); commit(); });
