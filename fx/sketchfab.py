@@ -20,7 +20,15 @@ _guard = threading.Lock()
 
 
 class FetchError(Exception):
-    pass
+    def __init__(self, msg, status=502):
+        super().__init__(msg)
+        self.status = status
+
+
+class RateLimited(FetchError):
+    """Sketchfab sagt 429: zu viele Downloads, später nochmal."""
+    def __init__(self):
+        super().__init__("Sketchfab rate limit, try again later", 429)
 
 
 def token(root: str):
@@ -36,6 +44,10 @@ def token(root: str):
             if k.strip() == "Sketchfab API Token" and v.strip():
                 return v.strip()
     return None
+
+
+def cached(root: str, uid: str) -> bool:
+    return bool(isinstance(uid, str) and UID_RE.match(uid) and os.path.exists(cache_path(root, uid)))
 
 
 def cache_path(root: str, uid: str) -> str:
@@ -68,6 +80,8 @@ def fetch(root: str, uid: str) -> str:
             with _open(API.format(uid=uid), {"Authorization": "Token " + tok}, 30) as r:
                 info = json.load(r)
         except Exception as e:
+            if getattr(e, "code", None) == 429:
+                raise RateLimited() from e
             raise FetchError("Sketchfab refused the download (%s)" % getattr(e, "code", "network")) from e
         url = (info.get("glb") or {}).get("url")
         if not url:

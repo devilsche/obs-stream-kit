@@ -232,7 +232,10 @@
           holder.add(inner); $('dlgMsg').hidden = true;
         }, null, function () {
           if (my !== req) return;
-          $('dlgMsg').textContent = 'Could not load this model (Sketchfab refused it or it is too large).';
+          // Grund vom Server holen (z. B. Sketchfab-Bremse)
+          fetch('/app/api/cars/preview/' + c.uid + '.glb', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+            if (my === req) $('dlgMsg').textContent = 'Could not load this model: ' + (j.error || 'unknown error') + '.';
+          }).catch(function () { if (my === req) $('dlgMsg').textContent = 'Could not load this model.'; });
         });
       }
       $('dlgKeep').addEventListener('click', function () { if (cur) toggle(cur); });

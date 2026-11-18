@@ -759,7 +759,7 @@ def car_preview_glb(uid):
     try:
         path = sketchfab.fetch(_duck_root(), uid)
     except sketchfab.FetchError as e:
-        return jsonify({"ok": False, "error": str(e)}), 502
+        return jsonify({"ok": False, "error": str(e)}), e.status
     return send_from_directory(os.path.dirname(path), os.path.basename(path), mimetype="model/gltf-binary", max_age=86400)
 
 

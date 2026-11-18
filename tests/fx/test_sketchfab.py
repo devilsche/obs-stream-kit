@@ -46,3 +46,15 @@ def test_token_from_secrets(tmp_path, monkeypatch):
     monkeypatch.delenv("SKETCHFAB_API_TOKEN", raising=False)
     (tmp_path / ".secrets").write_text("Other: x\nSketchfab API Token: abc123\n")
     assert sketchfab.token(str(tmp_path)) == "abc123"
+
+
+def test_rate_limit_is_reported(tmp_path, monkeypatch):
+    import urllib.error
+    monkeypatch.setenv("SKETCHFAB_API_TOKEN", "tok")
+
+    def fake_open(url, headers=None, timeout=60):
+        raise urllib.error.HTTPError(url, 429, "Too Many Requests", {}, None)
+    monkeypatch.setattr(sketchfab, "_open", fake_open)
+    with pytest.raises(sketchfab.RateLimited) as e:
+        sketchfab.fetch(str(tmp_path), UID)
+    assert e.value.status == 429
