@@ -5,7 +5,10 @@
  * - Atlas-Texturen mit Transparenz (z. B. Scheiben als durchsichtige Stellen): durchsichtige Pixel werden zu
  *   dunklem Glas, das Material undurchsichtig (sonst sieht man durchs Auto bzw. Sortierfehler)
  *
- *   GlbFix.prepare(root) → root (Materialien werden in place angepasst)
+ * - hat das Modell einen Innenraum (Materialnamen wie leather, seat, interior, dashboard, steering …),
+ *   bleiben die Scheiben getönt durchsichtig, sonst dunkel undurchsichtig (sonst sähe man ins Leere)
+ *
+ *   GlbFix.prepare(root) → root (Materialien werden in place angepasst), root.userData.interior = true/false
  */
 (function (root) {
   'use strict';
@@ -37,10 +40,11 @@
     t.repeat.copy(tex.repeat); t.offset.copy(tex.offset); t.anisotropy = 4;
     return t;
   }
+  var INTERIOR = /interior|leather|seat|dash|steer|carpet|cockpit|stitch|gauge|headliner|\bint_|_int\b|pedal|gear|console/i;
   function isGlassName(n) { return /glass|glas|window|scheibe|windshield/i.test(n || '') && !isLampName(n); }
   // Lampengläser (bernstein, Scheinwerfer, Rückleuchten) bleiben durchscheinend, sonst verschwinden die Lampen
   function isLampName(n) { return /amber|bronze|lamp|light|head|tail|indicator|blinker|clear|lens/i.test(n || ''); }
-  function fixMaterial(m) {
+  function fixMaterial(m, inside) {
     if (!m || (DONE && DONE.has(m))) return;
     if (DONE) DONE.set(m, true);
     m.side = THREE.DoubleSide;
@@ -49,7 +53,16 @@
     if (m.opacity < 0.05 && !m.map) { m.visible = false; m.needsUpdate = true; return; }
     if (isLampName(m.name)) { if (see) m.depthWrite = false; m.needsUpdate = true; return; }
     if (isGlassName(m.name) || (see && !m.map)) {
-      // eigenes Glas-Material: dunkel getönt, glänzend, undurchsichtig
+      if (inside) {
+        // mit Innenraum: getönt durchsichtig, Innenleben bleibt sichtbar
+        m.transparent = true; m.opacity = Math.min(m.opacity < 1 ? m.opacity : 0.4, 0.45); m.depthWrite = false; m.alphaTest = 0;
+        if (!m.map) m.color.setRGB(0.12, 0.14, 0.17);
+        m.metalness = 0.2; m.roughness = 0.03; if ('clearcoat' in m) m.clearcoat = 1; m.envMapIntensity = 1.6;
+        if ('transmission' in m) m.transmission = 0;
+        m.needsUpdate = true;
+        return;
+      }
+      // ohne Innenraum: eigenes Glas-Material, dunkel getönt, glänzend, undurchsichtig
       m.transparent = false; m.opacity = 1; m.alphaTest = 0; m.depthWrite = true;
       if (!m.map) m.color.setRGB(GLASS[0], GLASS[1], GLASS[2]);
       m.metalness = 0.3; m.roughness = 0.04;
@@ -62,10 +75,18 @@
     m.needsUpdate = true;
   }
   function prepare(obj) {
+    var inside = false;
+    obj.traverse(function (o) {
+      if (o.isMesh) [].concat(o.material).forEach(function (m) { if (m && INTERIOR.test(m.name || '')) inside = true; });
+      if (o.name && INTERIOR.test(o.name)) inside = true;
+    });
     obj.traverse(function (o) {
       if (!o.isMesh) return;
-      [].concat(o.material).forEach(fixMaterial);
+      [].concat(o.material).forEach(function (m) { fixMaterial(m, inside); });
+      // durchsichtige Scheiben nach dem Rest zeichnen
+      if ([].concat(o.material).some(function (m) { return m && m.transparent; })) o.renderOrder = 2;
     });
+    obj.userData.interior = inside;
     return obj;
   }
   root.GlbFix = { prepare: prepare };
