@@ -160,6 +160,11 @@
         <div class="row">
           <button type="button" id="pickAuto" class="small">Back to automatic</button>
         </div>
+        <div class="row" role="group" aria-label="Split parts">
+          <button type="button" id="pickSplit" aria-pressed="false">Split a part</button>
+          <button type="button" id="joinSplit" class="small">Join split parts</button>
+        </div>
+        <p class="muted small-text">If one click marks too much (e.g. the whole rim with the hub): press “Split a part”, click it – it falls apart into its pieces, then pick as usual. Picks on the whole part carry over to all pieces.</p>
         <p class="small-text" id="partList"></p>
         <p class="muted small-text" id="pickHint" aria-live="polite"></p>
         <div class="row">
@@ -347,6 +352,12 @@
         TC.loadModel(cur).then(function (t) {
           if (cur.key !== key) return;
           tpl = t; $('msg').hidden = true;
+          var mt = TC.meta(cur.key);
+          if (mt && mt.norm) {
+            ['paintParts', 'rimParts', 'wheelParts'].forEach(function (k) { if (def[k]) def[k] = mt.norm(def[k]); });
+            (def.zones || []).forEach(function (z) { z.parts = mt.norm(z.parts || []); });
+            zones();
+          }
           if (!keepView) { orbit.dist = Math.max(9, t.userData.dims.L * 2.2); orbit.t.set(0, 0.6, 0); }
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
           $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – pick the paint parts below.';
@@ -473,7 +484,7 @@
         var was = picking;
         picking = picking === w ? null : w;
         $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint')); $('pickRim').setAttribute('aria-pressed', String(picking === 'rim'));
-        $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel'));
+        $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
         canvas.classList.toggle('picking', !!picking); zones();
         if (picking === 'wheel' && !def.wheelParts) {
           // eigene Räder: ohne automatische Räder neu laden, damit die Teile ganz und anklickbar sind
@@ -485,6 +496,11 @@
         show();
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
+      $('pickSplit').addEventListener('click', function () { setPick('split'); });
+      $('joinSplit').addEventListener('click', function () {
+        if (!def.splitParts || !def.splitParts.length) { say('No split parts.'); return; }
+        delete def.splitParts; reprepare({ splitParts: undefined }); say('Split parts joined again.');
+      });
       $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined }); });
       $('pickPaint').addEventListener('click', function () { setPick('paint'); });
       $('pickRim').addEventListener('click', function () { setPick('rim'); });
@@ -512,6 +528,12 @@
         })[0];
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
+        if (picking === 'split') {
+          var kd = (TC.meta(cur.key) || {}).kids || {}, isKid = Object.keys(kd).some(function (q) { return kd[q].indexOf(key) >= 0; });
+          if (isKid) { say('Already split: ' + key); return; }
+          def.splitParts = (def.splitParts || []).concat([key]);
+          reprepare({ splitParts: def.splitParts.slice() }); say('Split: ' + key + ' – now pick the pieces.'); return;
+        }
         var zp = zonePicking();
         if (zp) {
           var had = zp.parts.indexOf(key) >= 0;
@@ -565,6 +587,7 @@
         if (def.texOff) d.texOff = true;
         if (def.straight === false) d.straight = false;
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
+        if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);
         }

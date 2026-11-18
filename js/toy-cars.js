@@ -181,6 +181,38 @@
       n++; pk[base] = (pk[base] || 0) + 1;
       o.userData.pkey = pk[base] > 1 ? base + '~' + pk[base] : base;
     });
+    // „Split a part“ im Car editor: einzelne Teile fein zerlegen (an harten Kanten/UV-Nähten, ohne Verschweißen);
+    // Stücke heißen <Teil>.<n>; Auswahlen auf das ganze Teil gelten für alle Stücke, Stücke ohne Zerlegung fürs ganze Teil
+    var kids = {}, exists = {};
+    if (Array.isArray(v.splitParts) && v.splitParts.length) {
+      var todo = [];
+      scene.traverse(function (o) { if (o.isMesh && !Array.isArray(o.material) && v.splitParts.indexOf(o.userData.pkey) >= 0) todo.push(o); });
+      todo.forEach(function (o) {
+        var isl = islandsOf(o.geometry, true);
+        if (isl.length < 2 || isl.length > 400) return;
+        kids[o.userData.pkey] = [];
+        isl.forEach(function (tris, j) {
+          var m = new THREE.Mesh(subGeo(o.geometry, tris), o.material);
+          m.name = o.name + '.' + j; m.renderOrder = o.renderOrder;
+          m.position.copy(o.position); m.quaternion.copy(o.quaternion); m.scale.copy(o.scale);
+          m.userData = Object.assign({}, o.userData, { pkey: o.userData.pkey + '.' + j });
+          kids[o.userData.pkey].push(m.userData.pkey); o.parent.add(m);
+        });
+        o.parent.remove(o);
+      });
+    }
+    scene.traverse(function (o) { if (o.isMesh) exists[o.userData.pkey] = 1; });
+    function norm(list) {
+      if (!Array.isArray(list)) return list;
+      var out = [];
+      list.forEach(function (k) {
+        var add = kids[k] || (!exists[k] && /\.\d+$/.test(k) && exists[k.replace(/\.\d+$/, '')] ? [k.replace(/\.\d+$/, '')] : [k]);
+        add.forEach(function (x) { if (out.indexOf(x) < 0) out.push(x); });
+      });
+      return out;
+    }
+    v = Object.assign({}, v, { paintParts: norm(v.paintParts), rimParts: norm(v.rimParts), wheelParts: norm(v.wheelParts),
+      zones: Array.isArray(v.zones) ? v.zones.map(function (z) { return Object.assign({}, z, { parts: norm(z.parts) }); }) : v.zones });
     var wheelKeys = Array.isArray(v.wheelParts) ? v.wheelParts : null;
     if (!wheelKeys && own) {
       // Felgen + Reifen (Material heißt tire/tyre/reifen/rubber, nicht Dichtungen/Leisten)
@@ -221,7 +253,7 @@
       if (ms.some(function (m) { return m && autoPaint[m.uuid]; })) autoPaintParts.push(o.userData.pkey);
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
-    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
+    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
