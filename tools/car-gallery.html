@@ -57,10 +57,14 @@
   <main>
     <h2 class="sec" id="h-cars">Cars</h2>
     <ul class="grid" id="cars" aria-labelledby="h-cars"></ul>
+    <h2 class="sec" id="h-real">Real models (preview, not in the rain yet)</h2>
+    <p class="lead" id="realLead">Free 3D models from Sketchfab under CC BY 4.0, shown as they come. Pick the ones you like; they will then get our paints, rims and tuning parts.</p>
+    <ul class="grid" id="real" aria-labelledby="h-real"></ul>
     <h2 class="sec" id="h-rims">Rims</h2>
     <ul class="grid rims" id="rims" aria-labelledby="h-rims"></ul>
   </main>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
@@ -72,7 +76,7 @@
       function hex(c) { return '#' + ('000000' + c.toString(16)).slice(-6); }
 
       // ── Kacheln ──
-      var tiles = [], carList = document.getElementById('cars'), rimList = document.getElementById('rims');
+      var tiles = [], carList = document.getElementById('cars'), rimList = document.getElementById('rims'), realList = document.getElementById('real');
       function tile(list, o) {
         var li = document.createElement('li'); li.className = 'tile';
         var st = document.createElement('div'); st.className = 'stage'; st.setAttribute('role', 'img'); st.setAttribute('aria-label', o.alt);
@@ -81,8 +85,9 @@
         var sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = o.sub;
         meta.append(h, sub);
         if (o.tag) { var tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = o.tag; meta.appendChild(tg); }
-        var p = document.createElement('code'); p.className = 'param'; p.textContent = o.param; meta.appendChild(p);
-        var a = document.createElement('a'); a.href = o.edit; a.textContent = 'Edit'; a.setAttribute('aria-label', 'Edit ' + o.title); meta.appendChild(a);
+        if (o.param) { var p = document.createElement('code'); p.className = 'param'; p.textContent = o.param; meta.appendChild(p); }
+        if (o.edit) { var a = document.createElement('a'); a.href = o.edit; a.textContent = 'Edit'; a.setAttribute('aria-label', 'Edit ' + o.title); meta.appendChild(a); }
+        (o.links || []).forEach(function (l) { var x = document.createElement('a'); x.href = l[0]; x.textContent = l[1]; x.target = '_blank'; x.rel = 'noopener'; meta.appendChild(x); });
         li.append(st, meta); list.appendChild(li);
         var t = { li: li, stage: st, make: o.make, obj: null, kind: o.kind, text: (o.title + ' ' + o.param + ' ' + o.sub).toLowerCase(), yaw: o.kind === 'rim' ? 0.5 : -0.7 + (tiles.length % 5) * 0.12, hover: false };
         li.addEventListener('pointerenter', function () { t.hover = true; });
@@ -113,9 +118,36 @@
         });
       });
 
+      // echte Modelle (assets/cars/*.glb, Urheber in assets/cars/credits.json): beim ersten Sichtbarwerden geladen,
+      // auf ~4,4 Einheiten Länge gebracht, längste waagrechte Achse = x, auf den Boden gestellt
+      var loader = window.THREE.GLTFLoader ? new THREE.GLTFLoader() : null, realTiles = [];
+      function realModel(key) {
+        var g = new THREE.Group();
+        if (!loader) return g;
+        loader.load('/s/__WIDGET_TOKEN__/assets/cars/' + key + '.glb', function (gl) {
+          var m = gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3(); box.getSize(size);
+          if (size.z > size.x) m.rotation.y = Math.PI / 2;
+          box.setFromObject(m); box.getSize(size);
+          var k = 4.4 / Math.max(size.x, size.z), c = new THREE.Vector3(); box.getCenter(c);
+          var inner = new THREE.Group(); inner.add(m); m.position.sub(c); inner.scale.setScalar(k);
+          g.add(inner);
+        });
+        return g;
+      }
+      fetch('/s/__WIDGET_TOKEN__/assets/cars/credits.json').then(function (r) { return r.json(); }).then(function (list) {
+        list.forEach(function (c) {
+          tile(realList, {
+            kind: 'real', title: c.title, sub: 'by ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles · for ' + c.key,
+            alt: c.title + ' 3D model', links: [[c.url, 'Model on Sketchfab'], [c.licenseUrl, 'Licence']],
+            make: function () { return realModel(c.key); }
+          });
+        });
+        apply();
+      }).catch(function () { document.getElementById('realLead').textContent = 'Could not load the model list.'; });
+
       // ── Filter ──
       var view = 'all', views = document.getElementById('views'), q = document.getElementById('q'), count = document.getElementById('count');
-      [['all', 'All'], ['car', 'Cars'], ['rim', 'Rims']].forEach(function (e) {
+      [['all', 'All'], ['car', 'Cars'], ['real', 'Real models'], ['rim', 'Rims']].forEach(function (e) {
         var b = document.createElement('button'); b.type = 'button'; b.textContent = e[1]; b.setAttribute('aria-pressed', String(e[0] === view));
         b.addEventListener('click', function () { view = e[0]; Array.prototype.forEach.call(views.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); apply(); });
         views.appendChild(b); views.appendChild(document.createTextNode(' '));
@@ -124,8 +156,9 @@
       function apply() {
         var s = q.value.trim().toLowerCase(), n = 0;
         tiles.forEach(function (t) { var show = (view === 'all' || t.kind === view) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
-        document.getElementById('h-cars').hidden = carList.hidden = view === 'rim';
-        document.getElementById('h-rims').hidden = rimList.hidden = view === 'car';
+        document.getElementById('h-cars').hidden = carList.hidden = view !== 'all' && view !== 'car';
+        document.getElementById('h-real').hidden = document.getElementById('realLead').hidden = realList.hidden = view !== 'all' && view !== 'real';
+        document.getElementById('h-rims').hidden = rimList.hidden = view !== 'all' && view !== 'rim';
         count.textContent = n + ' of ' + tiles.length;
       }
       apply();
