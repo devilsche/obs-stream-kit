@@ -99,10 +99,20 @@
       wheels.forEach(function (w) { w.front = flagged ? !!w.flag : w.x > 0 && w.x > maxX - dims.L * 0.08; });
       shadow.scale.set(dims.L * 1.15, dims.W * 1.4, 1);
     }
+    // weiche Übergänge: Lenkung mit begrenzter Geschwindigkeit und weichem Auslauf, Raddrehung mit Trägheit
+    var cur = { steer: 0, rear: 0, front: 0 };
+    function ease(v, target, tau, dt, maxRate) {
+      var d = (target - v) * (1 - Math.exp(-dt / tau));
+      if (maxRate) d = Math.max(-maxRate * dt, Math.min(maxRate * dt, d));
+      return v + d;
+    }
     function spinWheels(rearRate, frontRate, steer, dt) {
+      cur.steer = ease(cur.steer, steer, 0.12, dt, 1.6);       // ~90°/s, ~0,4 s bis zum vollen Einschlag
+      cur.rear = ease(cur.rear, rearRate, rearRate > cur.rear ? 0.35 : 0.25, dt);   // anfahren/durchdrehen etwas träger als bremsen
+      cur.front = ease(cur.front, frontRate, frontRate > cur.front ? 0.35 : 0.25, dt);
       wheels.forEach(function (w) {
-        if (w.spin) w.spin.rotation[w.spin.userData.ax] -= (w.front ? frontRate : rearRate) * dt * w.sgn;
-        if (w.front) w.pivot.rotation.y = steer;
+        if (w.spin) w.spin.rotation[w.spin.userData.ax] -= (w.front ? cur.front : cur.rear) * dt * w.sgn;
+        if (w.front) w.pivot.rotation.y = cur.steer;
       });
     }
     function rearPoints() {
