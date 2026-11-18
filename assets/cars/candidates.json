@@ -1857,5 +1857,27 @@
   "url": "https://sketchfab.com/3d-models/none-375d5ba0713f42f3a29d5e95c707aeba",
   "thumb": "https://media.sketchfab.com/models/375d5ba0713f42f3a29d5e95c707aeba/thumbnails/a7eb2aaedf3a4b3eb1e602f0a14b4535/34a13105152e499495fc6717e8737984.jpeg",
   "likes": 100
+ },
+ {
+  "uid": "2f34cd0605e64581b29265877fa5d9da",
+  "brand": "Koenigsegg",
+  "name": "2025 Koenigsegg Gemera",
+  "author": "Ddiaz Design",
+  "license": "CC Attribution-NonCommercial-ShareAlike",
+  "faces": 368274,
+  "url": "https://sketchfab.com/3d-models/2025-koenigsegg-gemera-2f34cd0605e64581b29265877fa5d9da",
+  "thumb": "https://media.sketchfab.com/models/2f34cd0605e64581b29265877fa5d9da/thumbnails/ce8a9b77d9e540febf588c2fd7b0c76c/bffc7c3f4d6e4b75b99ddc6944fad561.jpeg",
+  "wish": true
+ },
+ {
+  "uid": "a2b8c329bb76426ab0081f77ba852c0f",
+  "brand": "Mitsubishi",
+  "name": "Mitsubishi Lancer Evo IX | www.vecarz.com",
+  "author": "vecarz",
+  "license": "CC Attribution-NonCommercial",
+  "faces": 259772,
+  "url": "https://sketchfab.com/3d-models/mitsubishi-lancer-evo-ix-wwwvecarzcom-a2b8c329bb76426ab0081f77ba852c0f",
+  "thumb": "https://media.sketchfab.com/models/a2b8c329bb76426ab0081f77ba852c0f/thumbnails/cc223331ee3b4dcdb9cfd46884b5b5d3/7ddcfad20eb44daba276d13bde5eed16.jpeg",
+  "wish": true
  }
 ]
