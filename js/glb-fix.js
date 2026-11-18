@@ -99,6 +99,9 @@
       parts.forEach(function (p) {
         var s = new THREE.Vector3(); p.b.getSize(s);
         var tooBig = s.x > cs.x * 1.6 || s.z > cs.z * 1.6 || s.y > cs.y * 2.2;
+        // flache Bodenplatte/Wand, die über das Auto hinausreicht (Ausstellungs-Untergrund)
+        var flat = Math.min(s.x, s.y, s.z) < Math.max(cs.x, cs.z) * 0.01 && (s.x > cs.x * 1.1 || s.z > cs.z * 1.1);
+        tooBig = tooBig || flat;
         var outside = !grow.intersectsBox(p.b) || !grow.containsPoint(p.b.getCenter(new THREE.Vector3()));
         if ((tooBig || outside) && p.t < total * 0.1) drop.push(p.o);
       });
