@@ -197,7 +197,7 @@
       var holder = new THREE.Group(); scene.add(holder);
       var orbit = { yaw: 0.8, pitch: 0.22, dist: 10 }, pts = {};
       // Front zeigt nach +x: Kamera auf +x schaut auf die Front
-      var CAMS = { '3q': [0.8, 0.22], side: [0, 0.05], front: [Math.PI / 2, 0.1], rear: [-Math.PI / 2, 0.1], top: [0, 1.45] };
+      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
       Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; }); });
       canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
       canvas.addEventListener('pointermove', function (e) {

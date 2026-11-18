@@ -94,7 +94,10 @@
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-RoomEnvironment.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
       'use strict';
@@ -153,7 +156,7 @@
       // ── 3D-Vorschau im Modal: Modell vom Server (lädt beim ersten Mal von Sketchfab), unsere Darstellung ──
       var THREE = window.THREE, dlg = $('dlg'), canvas = $('view'), renderer = null, scene, cam, holder, cur = null, opener = null, req = 0;
       var orbit = { yaw: 0.8, pitch: 0.22, dist: 9 }, pts = {}, running = false;
-      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI / 2, 1.45] };
+      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
       function setup() {
         renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
         renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -196,7 +199,7 @@
         var r = canvas.getBoundingClientRect();
         if (r.width && (canvas.width !== Math.round(r.width * renderer.getPixelRatio()))) { renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
         var cp = Math.cos(orbit.pitch), ty = 0.6;
-        cam.position.set(Math.sin(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * cp * orbit.dist);
+        cam.position.set(Math.cos(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.sin(orbit.yaw) * cp * orbit.dist);
         cam.lookAt(0, ty, 0);
         renderer.render(scene, cam);
         requestAnimationFrame(frame);
@@ -221,13 +224,10 @@
         if (!running) { running = true; requestAnimationFrame(frame); }
         new THREE.GLTFLoader().load('/app/api/cars/preview/' + c.uid + '.glb', function (gl) {
           if (my !== req) return;
-          var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3();
-          box.getSize(size);
-          if (size.z > size.x) m.rotation.y = Math.PI / 2;
-          box.setFromObject(m); box.getSize(size);
-          var k = 4.4 / Math.max(size.x, size.z), ctr = new THREE.Vector3(); box.getCenter(ctr);
-          var inner = new THREE.Group(); inner.add(m); m.position.set(-ctr.x, -box.min.y, -ctr.z); inner.scale.setScalar(k);
-          holder.add(inner); $('dlgMsg').hidden = true;
+          // wie im Regen aufbereiten; Fahrtrichtung aus dem Katalog, falls das Auto schon drin ist
+          var inCat = (ToyCars.catalog() || []).filter(function (e) { return e.uid === c.uid; })[0];
+          var car = ToyCars.prepare(gl.scene, inCat || { key: c.uid, front: 0, len: 4.5 }); car.position.y = car.userData.dims.H / 2;
+          holder.add(car); $('dlgMsg').hidden = true;
         }, null, function () {
           if (my !== req) return;
           // Grund vom Server holen (z. B. Sketchfab-Bremse)
@@ -237,6 +237,7 @@
         });
       }
       $('dlgKeep').addEventListener('click', function () { if (cur) toggle(cur); });
+      if (window.ToyCars) ToyCars.loadCatalog().catch(function () {});
       $('dlgClose').addEventListener('click', function () { dlg.close(); });
       dlg.addEventListener('close', function () { req++; clearModel(); cur = null; if (opener) opener.focus(); });
       $('onlyKeep').addEventListener('click', function () { onlyKeep = !onlyKeep; $('onlyKeep').setAttribute('aria-pressed', String(onlyKeep)); paint(); });

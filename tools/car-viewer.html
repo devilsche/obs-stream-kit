@@ -49,7 +49,10 @@
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-RoomEnvironment.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
       'use strict';
@@ -76,13 +79,9 @@
         if (full) loader.load(full, got, null, light); else light();
         function got(gl) {
           if (current !== c.uid) return;
-          var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3();
-          box.getSize(size);
-          if (size.z > size.x) m.rotation.y = Math.PI / 2;
-          box.setFromObject(m); box.getSize(size);
-          var k = 4.4 / Math.max(size.x, size.z), ctr = new THREE.Vector3(); box.getCenter(ctr);
-          var inner = new THREE.Group(); inner.add(m); m.position.set(-ctr.x, -box.min.y, -ctr.z); inner.scale.setScalar(k);
-          holder.add(inner);
+          // wie im Regen aufbereiten: Front nach +x (inkl. „Turn around“), Länge nach Katalog, Räder gerade
+          var car = ToyCars.prepare(gl.scene, c); car.position.y = car.userData.dims.H / 2;
+          holder.add(car); orbit.dist = Math.max(9, car.userData.dims.L * 2.1);
           p.textContent = '';
           var a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '“' + c.name + '”';
           var l = document.createElement('span'); l.textContent = c.license;
@@ -103,7 +102,7 @@
 
       // ── Ansicht: ziehen, Mausrad/Pinch, Pfeiltasten, Kamera-Knöpfe ──
       var orbit = { yaw: 0.8, pitch: 0.22, dist: 9 }, pts = {}, pinch = null, drag = null;
-      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI / 2, 1.45] };
+      var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
       Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) {
         b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; });
       });
@@ -135,7 +134,7 @@
       window.addEventListener('resize', resize); resize();
       function frame() {
         var cp = Math.cos(orbit.pitch), ty = 0.6;
-        cam.position.set(Math.sin(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.cos(orbit.yaw) * cp * orbit.dist);
+        cam.position.set(Math.cos(orbit.yaw) * cp * orbit.dist, ty + Math.sin(orbit.pitch) * orbit.dist, Math.sin(orbit.yaw) * cp * orbit.dist);
         cam.lookAt(0, ty, 0);
         renderer.render(scene, cam);
         requestAnimationFrame(frame);
