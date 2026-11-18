@@ -83,7 +83,7 @@
   <a class="skip" href="#panel">Skip to the editor controls</a>
   <header>
     <h1>Car editor</h1>
-    <p>Colour sets, zones and rims per car; saved changes are live in the car rain at once. <a href="car-gallery">All cars</a> · <a href="car-picker">Car picker</a></p>
+    <p>Colour sets and colour zones per car; saved changes are live in the car rain at once. <a href="car-gallery">All cars</a> · <a href="car-picker">Car picker</a></p>
   </header>
   <div class="layout">
     <div class="stage">
@@ -146,7 +146,7 @@
 
       <section aria-labelledby="h-paints">
         <h2 id="h-paints">Colour sets</h2>
-        <p class="muted small-text">Each set is a paint plus matching rims and zone colours. The effects pick one set per car; a higher weight makes it more frequent. “Original” keeps the model's own colour. No sets = always original. Rims and zones without their own colour in a set use the defaults below.</p>
+        <p class="muted small-text">Each set is a paint plus matching zone colours (rims, interior …). The effects pick one set per car; a higher weight makes it more frequent. “Original” keeps the model's own colour. No sets = always original. Zones without their own colour in a set use the zone colour below.</p>
         <div id="paints"></div>
         <div class="row">
           <button type="button" id="addPaint">Add colour set</button>
@@ -164,14 +164,10 @@
       </section>
       <section aria-labelledby="h-parts">
         <h2 id="h-parts">Which parts get the colours</h2>
-        <p class="muted small-text">Press a button, then click on the car: each click adds or removes exactly that part. Paint parts show pink, rim parts cyan while picking. “Clear” empties the list so only what you click counts.</p>
+        <p class="muted small-text">Press a button, then click on the car: each click adds or removes exactly that part. Paint parts show pink while picking. “Clear paint” empties the list so only what you click counts. Rims are a colour zone (“Rims”) like the others.</p>
         <div class="row" role="group" aria-label="Paint parts">
           <button type="button" id="pickPaint" aria-pressed="false">Pick paint parts</button>
           <button type="button" id="clearPaint" class="small">Clear paint</button>
-        </div>
-        <div class="row" role="group" aria-label="Rim parts">
-          <button type="button" id="pickRim" aria-pressed="false">Pick rim parts</button>
-          <button type="button" id="clearRim" class="small">Clear rims</button>
         </div>
         <div class="row">
           <button type="button" id="pickAuto" class="small">Back to automatic</button>
@@ -200,19 +196,6 @@
         <p class="small-text" id="wheelList"></p>
       </section>
 
-      <section aria-labelledby="h-rims">
-        <h2 id="h-rims">Default rim colour</h2>
-        <div class="row">
-          <input type="checkbox" id="rimOwn">
-          <label for="rimOwn">Own rim colour (for sets without their own rims)</label>
-          <input type="color" id="rimColor" value="#c9ccd2" aria-label="Rim colour">
-        </div>
-        <div class="row">
-          <input type="checkbox" id="rimTexOff">
-          <label for="rimTexOff">Rim colour replaces the rim texture</label>
-        </div>
-        <p class="muted small-text" id="rimInfo"></p>
-      </section>
       <section aria-labelledby="h-steer">
         <h2 id="h-steer">Steering (preview)</h2>
         <div class="row">
@@ -328,22 +311,21 @@
       var picking = null;   // 'paint' | 'rim' | null
       function partKeys(which) {
         var m = TC.meta(cur.key) || {};
-        return which === 'paint' ? (def.paintParts || m.autoPaintParts || []) : (def.rimParts || m.autoRimParts || []);
+        return def.paintParts || m.autoPaintParts || [];
       }
       function show() {
         while (holder.children.length) holder.remove(holder.children[0]);
         if (!tpl) return;
         var p = def.paints && def.paints.length ? def.paints[Math.min(shown, def.paints.length - 1)] : { c: null };
-        var pc = p.c == null ? null : p.c, rc = p.r !== undefined ? p.r : (def.rim == null ? null : def.rim), hint = '';
+        var pc = p.c == null ? null : p.c, hint = '';
         // nach dem Picken immer sichtbar machen, was gewählt ist: erste Lackfarbe der Liste, sonst pink/cyan
         if (pc == null && def.paintParts) {
           var first = (def.paints || []).filter(function (q) { return q.c != null; })[0];
           if (first) pc = first.c; else { pc = 0xff3fb4; hint = 'Pink = your paint parts. Add a paint to see the real colour.'; }
         }
-        if (rc == null && def.rimParts) { rc = 0x22e5ff; hint = (hint ? hint + ' ' : '') + 'Cyan = your rim parts. Tick “Own rim colour” to set it.'; }
-        if (picking === 'paint' || picking === 'rim') { pc = 0xff3fb4; rc = 0x22e5ff; hint = ''; }   // Auswahl sichtbar machen
+        if (picking === 'paint') { pc = 0xff3fb4; hint = ''; }   // Auswahl sichtbar machen
         $('pickHint').textContent = hint;
-        var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), zoneList: def.zones, zones: p.z, rimTexOff: rimTexOn(), texOff: picking === 'paint' ? true : !!def.texOff });
+        var car = TC.paintTemplate(tpl, pc, null, { paintParts: partKeys('paint'), rimParts: [], zoneList: def.zones, zones: p.z, texOff: picking === 'paint' ? true : !!def.texOff });
         var zp = zonePicking();
         if (zp) {
           // gerade gewählter Bereich: gelb, damit man sieht, was dazugehört (auch bei Schwarz)
@@ -379,9 +361,9 @@
             zones();
           }
           if (!keepView) { orbit.dist = Math.max(9, t.userData.dims.L * 2.2); orbit.t.set(0, 0.6, 0); }
+          migrateRims(t);
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
           $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – pick the paint parts below.';
-          $('rimInfo').textContent = meta.rim.length ? 'Rim material: ' + meta.rim.map(function (m) { return m.userData.key; }).join(', ') : 'No rim material found – pick the rim parts below.';
           listParts();
           var nw = 0; t.traverse(function (o) { if (/^Wheel /.test(o.name)) nw++; });
           $('steerInfo').textContent = nw >= 4 ? 'Wheels are separate parts (' + nw + '), set straight on loading.' : 'Wheels are not separate on this model – steering has no effect.';
@@ -396,11 +378,32 @@
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
         $('texOff').checked = !!def.texOff; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
-        $('rimTexOff').checked = rimTexOn(); $('rimOwn').checked = def.rim != null; $('rimColor').value = hex(def.rim != null ? def.rim : 0xc9ccd2);
         paints(); zones();
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
-      function rimTexOn() { return def.rimTexOff != null ? !!def.rimTexOff : !!(def.rimParts && def.rimParts.length); }
+      // Felgen = Farbbereich „Rims“ (id rim). Alte Einstellungen (rimParts, rim, Felge je Set) einmalig umrechnen;
+      // Räder, die bisher aus den gewählten Felgen gebaut wurden, als eigene Radteile übernehmen (bleiben gleich)
+      function migrateRims(t) {
+        var has = def.zones.some(function (z) { return z.id === 'rim'; });
+        var old = def.rimParts || def.rim != null || def.paints.some(function (p) { return p.r !== undefined; });
+        if (has && !old) return;
+        var m = TC.meta(cur.key) || {};
+        if (!has) {
+          var parts = (def.rimParts || m.autoRimParts || []).slice();
+          if (def.rimParts && def.rimParts.length && !def.wheelParts) {
+            var wk = []; t.traverse(function (o) { if (o.isMesh && o.userData.pkey && o.parent && o.parent.name === 'Spin') wk.push(o.userData.pkey); });
+            t.traverse(function (o) { if (/^Wheel /.test(o.name)) o.traverse(function (x) { if (x.isMesh && wk.indexOf(x.userData.pkey) < 0) wk.push(x.userData.pkey); }); });
+            if (wk.length) def.wheelParts = wk;
+          }
+          def.zones.unshift({ id: 'rim', name: 'Rims', c: def.rim != null ? def.rim : null, f: 'satin', parts: parts });
+        }
+        def.paints.forEach(function (p) {
+          if (p.r !== undefined) { if (p.r != null) { p.z = p.z || {}; p.z.rim = p.r; } delete p.r; }
+        });
+        delete def.rimParts; delete def.rim; delete def.rimTexOff; delete def.rimMats;
+        zones(); paints();
+        if (old) say('Rims are now the colour zone “Rims”. Save to keep it.');
+      }
       function ownColour(label, val, dflt, set) {
         var wrap = el('span', 'row'), cb = el('input'), c = el('input'), id = 'oc' + (ownColour.n = (ownColour.n || 0) + 1), lab = el('label', null, label);
         cb.type = 'checkbox'; cb.id = id; lab.htmlFor = id; cb.checked = val != null;
@@ -425,10 +428,11 @@
           var row = el('div', 'paint' + (i === shown ? ' on' : '')), n = i + 1;
           var pick = el('button', 'set-pick'); pick.type = 'button'; pick.setAttribute('aria-pressed', String(i === shown));
           var nz = p.z ? Object.keys(p.z).length : 0;
-          var desc = (p.c == null ? 'Original' : hex(p.c)) + ', rims ' + (p.r === undefined ? 'default' : p.r == null ? 'original' : hex(p.r)) + (nz ? ', ' + nz + ' zone colour' + (nz > 1 ? 's' : '') : '');
+          var desc = (p.c == null ? 'Original' : hex(p.c)) + (nz ? ', ' + nz + ' zone colour' + (nz > 1 ? 's' : '') : '');
           pick.setAttribute('aria-label', 'Show set ' + n + ': ' + desc + ', weight ' + (p.w || 1));
-          pick.append(swatch(p.c == null ? 'orig' : p.c), swatch(p.r === undefined ? 'dflt' : p.r == null ? 'orig' : p.r, 'rim'),
-            el('span', null, 'Set ' + n), el('span', 'muted', '· weight ' + (p.w || 1) + (nz ? ' · ' + nz + ' zone' + (nz > 1 ? 's' : '') : '')));
+          var zsw = def.zones.filter(function (z) { return p.z && p.z[z.id] != null; }).map(function (z) { return swatch(p.z[z.id], 'rim'); });
+          pick.append.apply(pick, [swatch(p.c == null ? 'orig' : p.c)].concat(zsw).concat([
+            el('span', null, 'Set ' + n), el('span', 'muted', '· weight ' + (p.w || 1) + (nz ? ' · ' + nz + ' zone' + (nz > 1 ? 's' : '') : ''))]));
           pick.addEventListener('click', function () { shown = i; paints(); show(); });
           var ed = el('button', 'small', 'Edit'); ed.type = 'button'; ed.setAttribute('aria-label', 'Edit set ' + n);
           ed.addEventListener('click', function () { editSet(i); });
@@ -452,20 +456,19 @@
         pc.addEventListener('input', function () { p.c = int(pc.value); changed(); });
         r1.append(pl, pc, oc, ol);
         // Felge
-        var r2 = ownColour('Own rims (else default rim colour)', p.r == null ? null : p.r, def.rim != null ? def.rim : 0xc9ccd2, function (v) { if (v === undefined) delete p.r; else p.r = v; changed(); });
         // Gewicht
         var r3 = el('div', 'row'), wl = el('label', null, 'Weight'), w = el('input');
         w.type = 'number'; w.min = 1; w.max = 20; w.value = p.w || 1; w.id = 'setW'; wl.htmlFor = 'setW';
         w.addEventListener('change', function () { p.w = Math.max(1, Math.min(20, parseInt(w.value, 10) || 1)); w.value = p.w; changed(); });
         r3.append(wl, w, el('span', 'muted small-text', 'higher = more often'));
-        b.append(r1, r2, r3);
+        b.append(r1, r3);
         // Bereichsfarben
         var zb = el('div', 'zones-in-set');
         zb.appendChild(el('h3', 'sub3', 'Zones in this set'));
         if (!def.zones.length) zb.appendChild(el('p', 'muted small-text', 'No zones yet – add them under “Colour zones”.'));
         def.zones.forEach(function (z) {
           var v = p.z && p.z[z.id] != null ? p.z[z.id] : null;
-          zb.appendChild(ownColour((z.name || 'Zone') + ' (else ' + hex(z.c != null ? z.c : 0x111111) + ')', v, z.c != null ? z.c : 0x111111, function (val) {
+          zb.appendChild(ownColour((z.name || 'Zone') + ' (else ' + (z.c != null ? hex(z.c) : 'original') + ')', v, z.c != null ? z.c : 0x111111, function (val) {
             p.z = p.z || {}; if (val === undefined) delete p.z[z.id]; else p.z[z.id] = val;
             if (!Object.keys(p.z).length) delete p.z; changed();
           }));
@@ -489,13 +492,15 @@
           nm.type = 'text'; nm.value = z.name || ''; nm.maxLength = 30; nm.setAttribute('aria-label', 'Zone ' + n + ' name'); nm.autocomplete = 'off';
           nm.addEventListener('input', function () { z.name = nm.value; });
           nm.addEventListener('change', function () { paints(); if ($('setDlg').open) editSet(shown); });
-          c.type = 'color'; c.value = hex(z.c != null ? z.c : 0x111111); c.setAttribute('aria-label', 'Zone ' + n + ' colour');
+          c.type = 'color'; c.value = hex(z.c != null ? z.c : 0xc9ccd2); c.setAttribute('aria-label', 'Zone ' + n + ' colour'); c.disabled = z.c == null;
           c.addEventListener('input', function () { z.c = int(c.value); show(); });
+          var oc = el('input'), ol = el('label', 'muted', 'Original'); oc.type = 'checkbox'; oc.id = 'zo' + z.id; ol.htmlFor = oc.id; oc.checked = z.c == null;
+          oc.addEventListener('change', function () { c.disabled = oc.checked; z.c = oc.checked ? null : int(c.value); show(); paints(); });
           f.setAttribute('aria-label', 'Zone ' + n + ' surface');
           FINISHES.forEach(function (q) { var o = el('option', null, q[1]); o.value = q[0]; f.appendChild(o); });
           f.value = z.f || 'satin';
           f.addEventListener('change', function () { z.f = f.value; show(); });
-          r1.append(nm, c, f);
+          r1.append(nm, c, oc, ol, f);
           var r2 = el('div', 'row'), pk = el('button', 'small', 'Pick parts'), cl = el('button', 'small', 'Clear'), rm = el('button', 'danger small', 'Remove');
           [pk, cl, rm].forEach(function (b) { b.type = 'button'; });
           pk.setAttribute('aria-pressed', String(picking === 'zone:' + z.id)); pk.setAttribute('aria-label', 'Pick parts for zone ' + (z.name || n));
@@ -525,8 +530,7 @@
       function listParts() {
         if (!cur || !TC.meta(cur.key)) { $('partList').textContent = ''; return; }
         $('wheelList').textContent = def.wheelParts ? 'Own wheels: ' + def.wheelParts.length + ' parts picked, ' + (TC.meta(cur.key).wheels || 0) + ' wheels built.' : 'Automatic wheels (' + (TC.meta(cur.key).wheels || 0) + ' found).';
-        $('partList').textContent = 'Paint: ' + partKeys('paint').length + ' parts' + (def.paintParts ? '' : ' (automatic)') +
-          ' · Rims: ' + partKeys('rim').length + ' parts' + (def.rimParts ? '' : ' (automatic)');
+        $('partList').textContent = 'Paint: ' + partKeys('paint').length + ' parts' + (def.paintParts ? '' : ' (automatic)');
       }
       // Modell mit geänderten Einstellungen neu aufbereiten (Räder, Richtung …), Eingaben behalten
       function reprepare(patch) {
@@ -538,7 +542,7 @@
       function setPick(w) {
         var was = picking;
         picking = picking === w ? null : w;
-        $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint')); $('pickRim').setAttribute('aria-pressed', String(picking === 'rim'));
+        $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint'));
         $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
         canvas.classList.toggle('picking', !!picking); zones();
         if (picking === 'wheel' && !def.wheelParts) {
@@ -547,7 +551,6 @@
         }
         if (was === 'wheel' && picking !== 'wheel') { reprepare({ wheelParts: (def.wheelParts || []).slice() }); return; }   // Räder aufbauen
         // gewählte Felgen sind die Räder (drehen/lenken allein): nach dem Wählen neu aufbauen
-        if (was === 'rim' && picking !== 'rim' && def.rimParts && !def.wheelParts) { reprepare({ rimParts: def.rimParts.slice() }); return; }
         show();
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
@@ -558,10 +561,8 @@
       });
       $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined }); });
       $('pickPaint').addEventListener('click', function () { setPick('paint'); });
-      $('pickRim').addEventListener('click', function () { setPick('rim'); });
       $('pickAuto').addEventListener('click', function () { delete def.paintParts; delete def.rimParts; delete def.paintMats; delete def.rimMats; listParts(); show(); });
       $('clearPaint').addEventListener('click', function () { def.paintParts = []; listParts(); show(); say('Paint parts cleared – click the ones you want.'); });
-      $('clearRim').addEventListener('click', function () { def.rimParts = []; listParts(); show(); say('Rim parts cleared – click the ones you want.'); });
       $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
       $('straight').addEventListener('change', function () {
         def.straight = $('straight').checked;
@@ -595,12 +596,12 @@
           if (had) zp.parts.splice(zp.parts.indexOf(key), 1);
           else {
             def.zones.forEach(function (z) { var j = z.parts.indexOf(key); if (j >= 0) z.parts.splice(j, 1); });
-            ['paintParts', 'rimParts'].forEach(function (k) { if (def[k]) { var j = def[k].indexOf(key); if (j >= 0) def[k].splice(j, 1); } });
+            ['paintParts'].forEach(function (k) { if (def[k]) { var j = def[k].indexOf(key); if (j >= 0) def[k].splice(j, 1); } });
             zp.parts.push(key);
           }
           zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key); return;
         }
-        var prop = picking === 'paint' ? 'paintParts' : picking === 'rim' ? 'rimParts' : 'wheelParts';
+        var prop = picking === 'paint' ? 'paintParts' : 'wheelParts';
         var list = picking === 'wheel' ? (def.wheelParts || []).slice() : partKeys(picking).slice(), i = list.indexOf(key);
         // eigene Lackteile: Textur ersetzen ist fast immer nötig (sonst Lackfarbe × dunkle Atlas-Textur) – einmal automatisch an
         if (picking === 'paint' && !def.paintParts && def.texOff == null) { def.texOff = true; $('texOff').checked = true; }
@@ -616,9 +617,6 @@
       });
       $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); editSet(shown); });
       $('addOrig').addEventListener('click', function () { def.paints.push({ c: null, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
-      $('rimTexOff').addEventListener('change', function () { def.rimTexOff = $('rimTexOff').checked; show(); });
-      $('rimOwn').addEventListener('change', function () { def.rim = $('rimOwn').checked ? int($('rimColor').value) : null; show(); });
-      $('rimColor').addEventListener('input', function () { if ($('rimOwn').checked) { def.rim = int($('rimColor').value); show(); } });
       $('steer').addEventListener('input', function () { $('steerOut').textContent = Math.round(+$('steer').value * 180 / Math.PI) + '°'; show(); });
 
       function api(method, url, body) {
@@ -630,18 +628,14 @@
         var zids = def.zones.map(function (z) { return z.id; });
         var d = { mix: def.mix !== false, paints: def.paints.map(function (p) {
           var o = { c: p.c == null ? null : p.c, w: p.w || 1 };
-          if (p.r !== undefined) o.r = p.r;
           if (p.z) { var z = {}; Object.keys(p.z).forEach(function (k) { if (zids.indexOf(k) >= 0 && p.z[k] != null) z[k] = p.z[k]; }); if (Object.keys(z).length) o.z = z; }
           return o;
         }) };
-        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : 0x111111, f: z.f || 'satin', parts: (z.parts || []).slice(0, 400) }; });
+        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', parts: (z.parts || []).slice(0, 400) }; });
         if (def.label) d.label = def.label.slice(0, 40);
-        if (def.rim != null) d.rim = def.rim;
         if (def.flip) d.flip = true;
         if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);
-        if (def.rimParts) d.rimParts = def.rimParts.slice(0, 400);
         if (def.texOff) d.texOff = true;
-        if (def.rimTexOff != null) d.rimTexOff = !!def.rimTexOff;
         if (def.straight === false) d.straight = false;
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
