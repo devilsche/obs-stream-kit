@@ -341,13 +341,51 @@
     return setOf(list[0]);
   }
   // Oberflächen der Farbbereiche: [Metall, Rauheit, Klarlack]
-  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], chrome: [1, 0.08, 0] };
-  function zoneMat(m, hex, f) {
-    var k = 'z:' + f + ':' + m.uuid + ':' + hex;
+  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], shiny: [0.35, 0.1, 1], chrome: [1, 0.06, 0] };
+  // mittlere (lineare) Helligkeit einer Textur, damit die Graustufen-Struktur im Mittel 1 ergibt
+  var LUM = {};
+  function texLum(tex) {
+    if (LUM[tex.uuid] != null) return LUM[tex.uuid];
+    var v = 0.5;
+    try {
+      var img = tex.image, cv = document.createElement('canvas'); cv.width = cv.height = 32;
+      var g = cv.getContext('2d'); g.drawImage(img, 0, 0, 32, 32);
+      var d = g.getImageData(0, 0, 32, 32).data, sum = 0, n = 0;
+      for (var i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 128) continue;
+        var l = 0.2126 * Math.pow(d[i] / 255, 2.2) + 0.7152 * Math.pow(d[i + 1] / 255, 2.2) + 0.0722 * Math.pow(d[i + 2] / 255, 2.2);
+        sum += l; n++;
+      }
+      if (n) v = Math.max(0.02, sum / n);
+    } catch (e) { /* kein Bild/Canvas (z. B. Node) */ }
+    return (LUM[tex.uuid] = v);
+  }
+  // Textur nur als Struktur: Graustufen, auf mittlere Helligkeit 1 normiert, mal Bereichsfarbe
+  function detailMap(c) {
+    var k = 1 / texLum(c.map);
+    c.onBeforeCompile = function (sh) {
+      sh.uniforms.uDetailK = { value: k };
+      sh.fragmentShader = 'uniform float uDetailK;\n' + sh.fragmentShader.replace('#include <map_fragment>', [
+        '#ifdef USE_MAP',
+        '  vec4 texelColor = mapTexelToLinear( texture2D( map, vUv ) );',
+        '  float dl = dot( texelColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) ) * uDetailK;',
+        '  diffuseColor.rgb *= mix( 1.0, clamp( dl, 0.0, 1.8 ), 0.85 );',
+        '  diffuseColor.a *= texelColor.a;',
+        '#endif'].join('\n'));
+    };
+    c.customProgramCacheKey = function () { return 'detail'; };
+  }
+  function zoneMat(m, hex, f, flat) {
+    var k = 'z:' + f + ':' + m.uuid + ':' + hex + (flat ? ':flat' : '');
     if (!PAINTS[k]) {
       var c = PAINTS[k] = m.clone(), F = FINISH[f] || FINISH.satin;
-      c.color.setHex(hex).convertSRGBToLinear();
-      c.map = null; c.metalnessMap = null; c.roughnessMap = null; if (c.aoMap) c.aoMapIntensity = 0.35;
+      c.color.setHex(hex);
+      // Metall zeigt nur die gespiegelte Umgebung, eingefärbt mit seiner Farbe: dunkle Farbe = schwarzes Chrom.
+      // Darum Helligkeit anheben, Farbton behalten (Gold-Chrom geht weiter)
+      if (f === 'chrome') { var hsl = {}; c.color.getHSL(hsl); c.color.setHSL(hsl.h, hsl.s * 0.6, Math.max(hsl.l, 0.8)); c.envMapIntensity = 1.4; }
+      c.color.convertSRGBToLinear();
+      if (flat || !c.map) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; } else detailMap(c);
+      c.metalnessMap = null; c.roughnessMap = null;
       c.metalness = F[0]; c.roughness = F[1];
       if ('clearcoat' in c) { c.clearcoat = F[2]; c.clearcoatRoughness = 0.08; }
     }
@@ -392,7 +430,7 @@
         for (var i = 0; i < zl.length; i++) {
           if ((zl[i].parts || []).indexOf(k) < 0) continue;
           var zc = zoneColour(zl[i], o.zones);
-          if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f);
+          if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f, zl[i].flat);
           return;
         }
         if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', rimTex);
@@ -404,7 +442,7 @@
     if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', rimTex); });
     (Array.isArray(v.zones) ? v.zones : []).forEach(function (z) {
       var zc = zoneColour(z, o.zones);
-      if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f); });
+      if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f, z.flat); });
     });
     if (Object.keys(swap).length) car.traverse(function (x) {
       if (!x.isMesh) return;

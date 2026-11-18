@@ -482,7 +482,7 @@
       $('setClose').addEventListener('click', closeSet);
       $('setDlg').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeSet(); } });
       // ── Farbbereiche ──
-      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['chrome', 'Chrome']];
+      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['shiny', 'Shiny'], ['chrome', 'Chrome (colour = tint)']];
       function zonePicking() { var m = /^zone:(.+)$/.exec(picking || ''); return m ? def.zones.filter(function (z) { return z.id === m[1]; })[0] || null : null; }
       function zones() {
         var box = $('zones'); box.textContent = '';
@@ -500,7 +500,9 @@
           FINISHES.forEach(function (q) { var o = el('option', null, q[1]); o.value = q[0]; f.appendChild(o); });
           f.value = z.f || 'satin';
           f.addEventListener('change', function () { z.f = f.value; show(); });
-          r1.append(nm, c, oc, ol, f);
+          var fc = el('input'), fl = el('label', 'muted', 'Flat colour'); fc.type = 'checkbox'; fc.id = 'zf' + z.id; fl.htmlFor = fc.id; fc.checked = !!z.flat;
+          fc.addEventListener('change', function () { z.flat = fc.checked; show(); });
+          r1.append(nm, c, oc, ol, f, fc, fl);
           var r2 = el('div', 'row'), pk = el('button', 'small', 'Pick parts'), cl = el('button', 'small', 'Clear'), rm = el('button', 'danger small', 'Remove');
           [pk, cl, rm].forEach(function (b) { b.type = 'button'; });
           pk.setAttribute('aria-pressed', String(picking === 'zone:' + z.id)); pk.setAttribute('aria-label', 'Pick parts for zone ' + (z.name || n));
@@ -631,7 +633,7 @@
           if (p.z) { var z = {}; Object.keys(p.z).forEach(function (k) { if (zids.indexOf(k) >= 0 && p.z[k] != null) z[k] = p.z[k]; }); if (Object.keys(z).length) o.z = z; }
           return o;
         }) };
-        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', parts: (z.parts || []).slice(0, 400) }; });
+        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', flat: !!z.flat, parts: (z.parts || []).slice(0, 400) }; });
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.flip) d.flip = true;
         if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);
