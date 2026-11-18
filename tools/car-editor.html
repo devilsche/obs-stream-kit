@@ -280,8 +280,9 @@
         TC.loadModel(cur).then(function (t) {
           if (cur.key !== key) return;
           tpl = t; $('msg').hidden = true;
-          $('paintInfo').textContent = t.userData.paintMats.length ? 'Paint material: ' + t.userData.paintMats.map(function (m) { return m.name; }).join(', ') : 'No paint material found – colours have no effect on this model.';
-          $('rimInfo').textContent = t.userData.rimMats.length ? 'Rim material: ' + t.userData.rimMats.map(function (m) { return m.name; }).join(', ') : 'No rim material found.';
+          var meta = TC.meta(cur.key) || { paint: [], rim: [] };
+          $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – pick the paint parts below.';
+          $('rimInfo').textContent = meta.rim.length ? 'Rim material: ' + meta.rim.map(function (m) { return m.userData.key; }).join(', ') : 'No rim material found – pick the rim parts below.';
           listParts();
           var nw = 0; t.traverse(function (o) { if (/^Wheel /.test(o.name)) nw++; });
           $('steerInfo').textContent = nw >= 4 ? 'Wheels are separate parts (' + nw + '), set straight on loading.' : 'Wheels are not separate on this model – steering has no effect.';
