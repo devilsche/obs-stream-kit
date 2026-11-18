@@ -99,6 +99,27 @@
     });
     return out;
   }
+  // sehr viele Stücke (z. B. 1386 Profilklötze auf 6 Reifen): Stücke, deren Hüllquader sich berühren, zusammenfassen
+  function clusterIslands(geo, isl) {
+    var pos = geo.attributes.position, idx = geo.index ? geo.index.array : null;
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    var sz = new THREE.Vector3(); geo.boundingBox.getSize(sz); var eps = sz.length() * 0.002;
+    var bx = isl.map(function (tris) {
+      var b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+      tris.forEach(function (t) { for (var q = 0; q < 3; q++) { var v = idx ? idx[t * 3 + q] : t * 3 + q, x = pos.getX(v), y = pos.getY(v), z = pos.getZ(v);
+        if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (z < b[2]) b[2] = z; if (x > b[3]) b[3] = x; if (y > b[4]) b[4] = y; if (z > b[5]) b[5] = z; } });
+      return b;
+    });
+    var n = isl.length, par = []; for (var i = 0; i < n; i++) par[i] = i;
+    function f(a) { while (par[a] !== a) a = par[a] = par[par[a]]; return a; }
+    for (i = 0; i < n; i++) for (var j = i + 1; j < n; j++) {
+      var A = bx[i], B = bx[j];
+      if (A[0] - eps <= B[3] && B[0] - eps <= A[3] && A[1] - eps <= B[4] && B[1] - eps <= A[4] && A[2] - eps <= B[5] && B[2] - eps <= A[5]) par[f(j)] = f(i);
+    }
+    var g = {}, order = [];
+    for (i = 0; i < n; i++) { var r = f(i); if (!g[r]) { g[r] = []; order.push(r); } g[r] = g[r].concat(isl[i]); }
+    return order.map(function (r) { return g[r]; });
+  }
   function splitIslands(scene) {
     var list = [];
     scene.traverse(function (o) { if (o.isMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && o.geometry && o.geometry.attributes.position) list.push(o); });
@@ -109,6 +130,7 @@
       if (isl.length < 2 || Math.max.apply(null, isl.map(function (x) { return x.length; })) > nt * 0.9) {
         if (o.material && o.material.map && o.geometry.attributes.uv) { var uvIsl = islandsOf(o.geometry, true); if (uvIsl.length > 1 && uvIsl.length <= 400) isl = uvIsl; }
       }
+      if (isl.length > 400) isl = clusterIslands(o.geometry, isl);
       if (isl.length < 2 || isl.length > 400) return;
       var base = o.name || '';
       isl.forEach(function (tris, k) {
@@ -247,12 +269,16 @@
         o.parent.remove(o);
       });
     }
-    scene.traverse(function (o) { if (o.isMesh) exists[o.userData.pkey] = 1; });
+    var byBase = {};
+    scene.traverse(function (o) {
+      if (!o.isMesh) return; exists[o.userData.pkey] = 1;
+      var m = /^(.*)\/\d+$/.exec(o.userData.pkey || ''); if (m) (byBase[m[1]] || (byBase[m[1]] = [])).push(o.userData.pkey);
+    });
     function norm(list) {
       if (!Array.isArray(list)) return list;
       var out = [];
       list.forEach(function (k) {
-        var add = kids[k] || (!exists[k] && /\.\d+$/.test(k) && exists[k.replace(/\.\d+$/, '')] ? [k.replace(/\.\d+$/, '')] : [k]);
+        var add = kids[k] || (!exists[k] && byBase[k]) || (!exists[k] && /\.\d+$/.test(k) && exists[k.replace(/\.\d+$/, '')] ? [k.replace(/\.\d+$/, '')] : [k]);
         add.forEach(function (x) { if (out.indexOf(x) < 0) out.push(x); });
       });
       return out;
