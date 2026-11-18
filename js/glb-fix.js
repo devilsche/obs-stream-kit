@@ -226,6 +226,7 @@
     });
     meshes.forEach(function (o) {
       var g = o.geometry, pos = g.attributes.position, mats = [].concat(o.material), idx = triIndex(g);
+      var srcRim = nameRim(o, obj);   // Felge nach Teilenamen (z. B. „M_Rim_Main“ mit Material „material“) – merken
       var M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), keep = [], moved = false;
       var groups = g.groups && g.groups.length ? g.groups : [{ start: 0, count: idx.length, materialIndex: 0 }];
       var newGroups = [], A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), m = new THREE.Vector3();
@@ -242,7 +243,7 @@
           }
           if (!hit) { keep.push(idx[i], idx[i + 1], idx[i + 2]); continue; }
           moved = true;
-          var key = mat.uuid, part = hit.parts[key] || (hit.parts[key] = { mat: mat, pos: [], attrs: {} });
+          var key = mat.uuid + (srcRim ? ':rim' : ''), part = hit.parts[key] || (hit.parts[key] = { mat: mat, pos: [], attrs: {}, rim: srcRim });
           [A, B, C].forEach(function (P) { part.pos.push(P.x - hit.w.center.x, P.y - hit.w.center.y, P.z - hit.w.center.z); });
           // alle übrigen Daten mitnehmen (Normalen gedreht, UVs, Farben, Tangenten) – sonst greifen Texturen ins Leere
           var NM = new THREE.Matrix3().getNormalMatrix(M);
@@ -275,7 +276,7 @@
           if (a.v.length / a.size === p.pos.length / 3) geo.setAttribute(an, new THREE.BufferAttribute(new a.type(a.v), a.size, a.norm));
         });
         if (!geo.attributes.normal) geo.computeVertexNormals();
-        var mesh = new THREE.Mesh(geo, p.mat); mesh.userData.wheelPart = true; h.pivot.add(mesh);
+        var mesh = new THREE.Mesh(geo, p.mat); mesh.userData.wheelPart = true; if (p.rim) mesh.userData.rimByName = true; h.pivot.add(mesh);
       });
       // gerade stellen
       h.pivot.rotation.y = 0;
@@ -287,6 +288,10 @@
   }
 
   // ── Farben ──
+  function nameRim(o, stop) {
+    for (var p = o; p && p !== stop; p = p.parent) if (p.name && RIM.test(p.name) && !NOT_RIM.test(p.name)) return true;
+    return false;
+  }
   function rimMesh(o) {
     for (var p = o; p; p = p.parent) if (p.name && RIM.test(p.name) && !NOT_RIM.test(p.name)) return true;
     return !!o.userData.wheelPart;
@@ -337,7 +342,7 @@
     var seen = {};
     obj.traverse(function (o) {
       if (!o.isMesh) return;
-      var byName = rimMesh(o) && !o.userData.wheelPart;
+      var byName = (rimMesh(o) && !o.userData.wheelPart) || !!o.userData.rimByName;
       [].concat(o.material).forEach(function (m) {
         if (!m || seen[m.uuid] || isTire(m)) return;
         // Teile, die nach Namen Felgen sind (z. B. Knoten „rim001“), aber Lack-ähnliche Materialien haben
