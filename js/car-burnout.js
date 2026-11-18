@@ -83,8 +83,11 @@
         if (!/^Wheel /.test(o.name || '')) return;
         var w = new THREE.Vector3(); o.getWorldPosition(w);
         var spin = o.children.filter(function (c) { return c.name === 'Spin'; })[0];
-        wheels.push({ pivot: o, spin: spin, front: w.x > 0, side: w.z > 0 ? 1 : -1 });
+        wheels.push({ pivot: o, spin: spin, x: w.x, side: w.z > 0 ? 1 : -1 });
       });
+      // vorn = vorderste Achse (Truck/Bus: mehrere Hinterachsen)
+      var maxX = Math.max.apply(null, wheels.map(function (w) { return w.x; }).concat([-1e9]));
+      wheels.forEach(function (w) { w.front = w.x > 0 && w.x > maxX - dims.L * 0.08; });
       shadow.scale.set(dims.L * 1.15, dims.W * 1.4, 1);
     }
     function spinWheels(rearRate, frontRate, steer, dt) {
@@ -95,7 +98,7 @@
     }
     function rearPoints() {
       var out = [];
-      if (wheels.length) wheels.forEach(function (w) { if (!w.front) { var p = new THREE.Vector3(); w.pivot.getWorldPosition(p); p.y = 0; out.push({ k: 'w' + w.side, p: p }); } });
+      if (wheels.length) wheels.forEach(function (w) { if (!w.front) { var p = new THREE.Vector3(); w.pivot.getWorldPosition(p); p.y = 0; out.push({ k: w.pivot.name, p: p }); } });
       else [-1, 1].forEach(function (sd) { var p = new THREE.Vector3(-dims.L * 0.32, 0, sd * dims.W * 0.38); car.localToWorld(p); p.y = 0; out.push({ k: 'w' + sd, p: p }); });
       return out;
     }

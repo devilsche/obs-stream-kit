@@ -69,13 +69,13 @@
   // Teile in zusammenhängende Stücke zerlegen (Tür und Gerüst sind oft ein Mesh): Ecken verbunden über
   // gemeinsame Dreiecke oder gleiche Position. So ist im Editor jedes Stück einzeln wählbar; der Regen
   // fasst danach wieder zusammen (mergeStatic). Mehr als 400 Stücke: Mesh bleibt ganz.
-  function islandsOf(geo) {
+  function islandsOf(geo, noWeld) {
     var pos = geo.attributes.position, n = pos.count, idx = geo.index ? geo.index.array : null, nt = (idx ? idx.length : n) / 3;
     var par = new Int32Array(n); for (var i = 0; i < n; i++) par[i] = i;
     function f(a) { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; }
     function u(a, b) { a = f(a); b = f(b); if (a !== b) par[b] = a; }
     var seen = {};
-    for (i = 0; i < n; i++) {
+    for (i = 0; i < n && !noWeld; i++) {
       var k = Math.round(pos.getX(i) * 1e4) + ',' + Math.round(pos.getY(i) * 1e4) + ',' + Math.round(pos.getZ(i) * 1e4);
       if (seen[k] !== undefined) u(seen[k], i); else seen[k] = i;
     }
@@ -103,7 +103,12 @@
     var list = [];
     scene.traverse(function (o) { if (o.isMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && o.geometry && o.geometry.attributes.position) list.push(o); });
     list.forEach(function (o) {
-      var isl = islandsOf(o.geometry);
+      var isl = islandsOf(o.geometry), nt = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+      // ein einziges Netz mit Textur (Low-Poly-Atlas: Scheinwerfer, Kennzeichen nur aufgemalt): nach Textur-Inseln trennen
+      // (an UV-Nähten sind die Ecken doppelt, ohne Verschweißen zerfällt das Netz in die Bereiche des Texturbilds)
+      if (isl.length < 2 || Math.max.apply(null, isl.map(function (x) { return x.length; })) > nt * 0.9) {
+        if (o.material && o.material.map && o.geometry.attributes.uv) { var uvIsl = islandsOf(o.geometry, true); if (uvIsl.length > 1 && uvIsl.length <= 400) isl = uvIsl; }
+      }
       if (isl.length < 2 || isl.length > 400) return;
       var base = o.name || '';
       isl.forEach(function (tris, k) {
@@ -118,9 +123,41 @@
   }
 
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
+  // Räder aus selbst gewählten Teilen (Car editor „Pick wheel parts“): Teile nach Lage zu Rädern gruppieren
+  // (Seite, dann entlang der Länge), je Rad Drehpunkt in der Mitte, Drehgruppe „Spin“ um die Querachse
+  function buildWheels(scene, keys) {
+    scene.updateMatrixWorld(true);
+    var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(), ctr = new THREE.Vector3(); box.getSize(size); box.getCenter(ctr);
+    var lx = size.x >= size.z, len = lx ? size.x : size.z, parts = [];
+    scene.traverse(function (o) {
+      if (!o.isMesh || keys.indexOf(o.userData.pkey) < 0) return;
+      var b = new THREE.Box3().setFromObject(o), c = new THREE.Vector3(); b.getCenter(c); parts.push({ o: o, c: c, b: b });
+    });
+    var groups = [];
+    ['l', 'r'].forEach(function (side) {
+      var ps = parts.filter(function (p) { var w = lx ? p.c.z - ctr.z : p.c.x - ctr.x; return side === 'r' ? w > 0 : w <= 0; });
+      ps.sort(function (a, b) { return lx ? a.c.x - b.c.x : a.c.z - b.c.z; });
+      var cur = null;
+      ps.forEach(function (p) {
+        var l = lx ? p.c.x : p.c.z;
+        if (!cur || l - cur.last > len * 0.08) { cur = { side: side, list: [], last: l }; groups.push(cur); }
+        cur.list.push(p); cur.last = l;
+      });
+    });
+    groups.forEach(function (g, i) {
+      var b = new THREE.Box3(); g.list.forEach(function (p) { b.union(p.b); });
+      var c = new THREE.Vector3(); b.getCenter(c);
+      var pivot = new THREE.Group(); pivot.name = 'Wheel ' + g.side + i; pivot.position.copy(c); scene.add(pivot);
+      var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x'; pivot.add(spin);
+      scene.updateMatrixWorld(true);
+      g.list.forEach(function (p) { spin.attach(p.o); p.o.userData.wheelPart = true; });
+    });
+    return groups.length;
+  }
+
   function prepare(scene, e) {
-    var v = vehicle(e.key);
-    if (root.GlbFix) GlbFix.prepare(scene, { wheels: v.straight !== false });
+    var v = vehicle(e.key), own = Array.isArray(v.wheelParts);
+    if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own && v.straight !== false });
     splitIslands(scene);
     // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
     var all = [], seen = {}, names = {};
@@ -143,6 +180,7 @@
       n++; pk[base] = (pk[base] || 0) + 1;
       o.userData.pkey = pk[base] > 1 ? base + '~' + pk[base] : base;
     });
+    var ownWheels = own && v.wheelParts.length ? buildWheels(scene, v.wheelParts) : 0;
     var ud = scene.userData;
     // gewählte Teile (paintParts/rimParts) bekommen eigene Material-Kopien: nur sie werden umgefärbt,
     // auch wenn ihr Material sonst z. B. mit den Scheinwerfern geteilt ist
@@ -167,16 +205,16 @@
       if (ms.some(function (m) { return m && autoPaint[m.uuid]; })) autoPaintParts.push(o.userData.pkey);
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
-    META[e.key] = { all: all, paint: paint, rim: rim, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: (ud.wheels || []).length };
+    META[e.key] = { all: all, paint: paint, rim: rim, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
     var lx = size.x >= size.z, front = e.front || 0;
     if (!front) {
       // kürzerer Überhang vorn: Radmitten gegen die Fahrzeugenden
-      var ws = scene.userData.wheels || [];
+      var ws = []; scene.traverse(function (o) { if (/^Wheel /.test(o.name || '')) ws.push(o); });
       if (ws.length >= 4) {
-        var vals = ws.map(function (w) { var p = new THREE.Vector3(); w.pivot.getWorldPosition(p); return lx ? p.x : p.z; });
+        var vals = ws.map(function (w) { var p = new THREE.Vector3(); w.getWorldPosition(p); return lx ? p.x : p.z; });
         var lo = lx ? box.min.x : box.min.z, hi = lx ? box.max.x : box.max.z;
         front = (hi - Math.max.apply(null, vals)) < (Math.min.apply(null, vals) - lo) ? 1 : -1;
       } else front = 1;

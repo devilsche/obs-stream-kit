@@ -180,23 +180,27 @@
       });
     });
     }
-    function quads() {
-      var q = {};
-      tireP.forEach(function (p) {
-        var l = lx ? p.x - ctr.x : p.z - ctr.z, w = lx ? p.z - ctr.z : p.x - ctr.x, k = (l > 0 ? 'a' : 'b') + (w > 0 ? 'r' : 'l');
-        (q[k] = q[k] || []).push(p);
+    function clusters() {
+      var len = lx ? size.x : size.z, gap = Math.max(0.02 * len, 1e-6), out = {};
+      ['l', 'r'].forEach(function (side) {
+        var pts = tireP.filter(function (p) { var w = lx ? p.z - ctr.z : p.x - ctr.x; return side === 'r' ? w > 0 : w <= 0; });
+        pts.sort(function (a, b) { return (lx ? a.x - b.x : a.z - b.z); });
+        var cur = [], n = 0;
+        function flush() { if (cur.length >= 10) out[side + (n++)] = cur; cur = []; }
+        pts.forEach(function (p, i) {
+          if (i && (lx ? p.x - pts[i - 1].x : p.z - pts[i - 1].z) > gap) flush();
+          cur.push(p);
+        });
+        flush();
       });
-      return Object.keys(q).filter(function (k) { return q[k].length >= 10; }).length;
+      return out;
     }
+    function quads() { return Object.keys(clusters()).length; }
     collect(true);
     if (tireP.length < 40 || quads() < 4) collect(false);
     if (tireP.length < 40) return [];
-    // vier Gruppen: vorn/hinten × links/rechts (um die Mitte des Autos)
-    var Q = {};
-    tireP.forEach(function (p) {
-      var l = lx ? p.x - ctr.x : p.z - ctr.z, w = lx ? p.z - ctr.z : p.x - ctr.x, k = (l > 0 ? 'a' : 'b') + (w > 0 ? 'r' : 'l');
-      (Q[k] = Q[k] || []).push(p);
-    });
+    // Räder je Seite entlang der Länge an Lücken trennen: jede Achse einzeln (auch 6 oder 10 Räder bei Truck/Bus)
+    var Q = clusters();
     var out = [];
     Object.keys(Q).forEach(function (k) {
       var pts = Q[k]; if (pts.length < 10) return;
@@ -208,7 +212,7 @@
       var ax = new THREE.Vector3(-Math.sin(ang), 0, Math.cos(ang));   // senkrecht dazu = Achse
       var R = s.y / 2, hw = 0;
       pts.forEach(function (p) { hw = Math.max(hw, Math.abs((p.x - c.x) * ax.x + (p.z - c.z) * ax.z)); });
-      out.push({ key: k, center: new THREE.Vector3(mx, c.y, mz), axis: ax, radius: R, half: hw, front: k[0] });
+      out.push({ key: k, center: new THREE.Vector3(mx, c.y, mz), axis: ax, radius: R, half: hw });
     });
     if (out.length < 4) return [];
     // vorn = Seite mit dem größeren Radeinschlag bzw. die kürzere Überhang-Seite; Lenkwinkel je Rad
@@ -239,7 +243,7 @@
           for (var q = 0; q < groupsOut.length && !hit; q++) {
             var w = groupsOut[q].w, d = m.clone().sub(w.center), along = d.dot(w.axis);
             var radial = d.clone().addScaledVector(w.axis, -along).length();
-            if (Math.abs(along) <= w.half * 1.15 + 0.004 && radial <= w.radius * 1.01) hit = groupsOut[q];
+            if (Math.abs(along) <= w.half * 1.02 + 0.004 && radial <= w.radius * 0.98) hit = groupsOut[q];   // eng: Haube/Kotflügel bleiben dran
           }
           if (!hit) { keep.push(idx[i], idx[i + 1], idx[i + 2]); continue; }
           moved = true;
@@ -285,7 +289,7 @@
       // Drehgruppe: dreht das Rad um seine Achse (Querachse des Autos), pivot.rotation.y lenkt
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';
       spin.add(inner); h.pivot.add(spin);
-      res.push({ pivot: h.pivot, front: h.w.front, side: h.w.key[1], radius: h.w.radius, steer: h.w.steer });
+      res.push({ pivot: h.pivot, side: h.w.key[0], radius: h.w.radius, steer: h.w.steer });
     });
     return res;
   }
