@@ -346,7 +346,7 @@
     return setOf(list[0]);
   }
   // Oberflächen der Farbbereiche: [Metall, Rauheit, Klarlack]
-  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], shiny: [0.35, 0.1, 1], chrome: [1, 0.06, 0] };
+  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], shiny: [0.35, 0.1, 1], chrome: [1, 0.06, 0], glass: [0, 0.04, 1] };
   // mittlere (lineare) Helligkeit einer Textur, damit die Graustufen-Struktur im Mittel 1 ergibt
   var LUM = {};
   function texLum(tex) {
@@ -392,6 +392,8 @@
       if (flat || !c.map) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; } else detailMap(c);
       c.metalnessMap = null; c.roughnessMap = null;
       c.metalness = F[0]; c.roughness = F[1];
+      // Glas: bleibt durchsichtig, die Farbe tönt nur (getönte Scheiben, farbige Lampengläser)
+      if (f === 'glass') { c.transparent = true; c.opacity = Math.min(m.transparent ? m.opacity : 1, 0.55); c.depthWrite = false; c.alphaTest = 0; }
       if ('clearcoat' in c) { c.clearcoat = F[2]; c.clearcoatRoughness = 0.08; }
     }
     return PAINTS[k];

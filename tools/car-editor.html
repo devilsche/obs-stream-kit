@@ -162,6 +162,10 @@
           <button type="button" id="addZone">Add zone</button>
         </div>
         <div class="row">
+          <input type="checkbox" id="clickGlass" checked>
+          <label for="clickGlass">Click through glass (off: windows, lamp lenses and other see-through parts can be picked)</label>
+        </div>
+        <div class="row">
           <input type="checkbox" id="allWheels" checked>
           <label for="allWheels">Same part on all wheels (a click on a wheel part picks the matching part on every wheel)</label>
         </div>
@@ -494,7 +498,7 @@
       $('setClose').addEventListener('click', closeSet);
       $('setDlg').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeSet(); } });
       // ── Farbbereiche ──
-      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['shiny', 'Shiny'], ['chrome', 'Chrome (colour = tint)']];
+      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['shiny', 'Shiny'], ['chrome', 'Chrome (colour = tint)'], ['glass', 'Glass (see-through, colour = tint)']];
       function zonePicking() { var m = /^zone:(.+)$/.exec(picking || ''); return m ? def.zones.filter(function (z) { return z.id === m[1]; })[0] || null : null; }
       function zones() {
         var box = $('zones'); box.textContent = '';
@@ -627,7 +631,9 @@
         var hit = ray.intersectObject(holder, true).filter(function (h) {
           if (!h.object.isMesh) return false;
           var m = Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex] : h.object.material;
-          return m && !m.transparent && m.opacity >= 0.95 && !/glass|glas|window|scheibe|windshield/i.test(m.name || '') && m.visible !== false;
+          if (!m || m.visible === false) return false;
+          if (!$('clickGlass').checked) return true;   // durchsichtige Teile wählbar
+          return !m.transparent && m.opacity >= 0.95 && !/glass|glas|window|scheibe|windshield/i.test(m.name || '');
         })[0];
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
