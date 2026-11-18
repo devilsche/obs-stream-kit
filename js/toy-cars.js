@@ -3,7 +3,7 @@
  * Dateien /api/fx/cars/model/<uid>.glb). Braucht three r128, GLTFLoader und js/glb-fix.js davor.
  *
  *   ToyCars.ready({ model, count }) → Promise   lädt den Katalog und count zufällige Modelle aus dem Mix
- *                                               (oder genau model); löst spätestens nach timeout ms auf
+ *                                               (oder genau model, bzw. model=brand:<Marke> nur diese Marke)
  *   ToyCars.MODELS          geladene Modelle (Schlüssel), aus denen der Regen zieht
  *   ToyCars.has(key), ToyCars.dims(key) → { L, W, H, belt }, ToyCars.pickPaint(key) → { c }
  *   ToyCars.build(key, color) → THREE.Group (Mitte im Auto, Länge in x, Front +x, ~4,4 Einheiten je 4,5 m)
@@ -78,6 +78,7 @@
         front = (hi - Math.max.apply(null, vals)) < (Math.min.apply(null, vals) - lo) ? 1 : -1;
       } else front = 1;
     }
+    if (vehicle(e.key).flip) front = -front;   // im Car editor als falsch herum markiert
     var rot = new THREE.Group(); rot.add(scene);
     rot.rotation.y = lx ? (front > 0 ? 0 : Math.PI) : (front > 0 ? Math.PI / 2 : -Math.PI / 2);
     rot.updateMatrixWorld(true);
@@ -113,9 +114,11 @@
     var count = opts.count || 4, timeout = opts.timeout || 10000;
     return loadCatalog().then(function () {
       var pick;
+      var brand = /^brand:(.+)$/i.exec(opts.model || '');
       if (opts.model && BYKEY[opts.model]) pick = [BYKEY[opts.model]];
       else {
-        var mix = CATALOG.filter(inMix).sort(function (a, b) { return (a.bytes || 0) - (b.bytes || 0); });
+        // model=brand:<Marke>: nur Autos dieser Marke (auch die, die nicht im Mix sind)
+        var mix = (brand ? CATALOG.filter(function (e) { return (e.brand || '').toLowerCase() === brand[1].toLowerCase(); }) : CATALOG.filter(inMix)).sort(function (a, b) { return (a.bytes || 0) - (b.bytes || 0); });
         var small = shuffle(mix.slice(0, Math.ceil(mix.length / 2))), big = shuffle(mix.slice(Math.ceil(mix.length / 2)));
         var nSmall = Math.min(small.length, Math.ceil(count * 2 / 3));
         pick = small.slice(0, nSmall).concat(big.slice(0, count - nSmall));
@@ -169,6 +172,7 @@
 
   root.ToyCars = {
     ready: ready, build: build, dims: dims, pickPaint: pickPaint, random: random, applyCustom: applyCustom, prepare: prepare,
+    forget: function (k) { delete TPL[k]; delete loading[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
     loadCatalog: loadCatalog, loadModel: loadModel, vehicle: vehicle, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
   };

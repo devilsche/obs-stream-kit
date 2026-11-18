@@ -93,6 +93,11 @@
           <input type="checkbox" id="mix">
           <label for="mix">In the random mix (<code>model=mix</code>)</label>
         </div>
+        <div class="row">
+          <input type="checkbox" id="flip" aria-describedby="flipHelp">
+          <label for="flip">Turn around (front and rear are mixed up)</label>
+        </div>
+        <p class="muted small-text" id="flipHelp">The front should face the “Front” camera. If you see the rear there, tick this – the car then drives off forwards.</p>
       </section>
       <section aria-labelledby="h-paints">
         <h2 id="h-paints">Paints</h2>
@@ -227,7 +232,7 @@
         $('pick').value = cur.key;
         $('info').textContent = cur.brand + ' · by ' + cur.author + ' · ' + cur.license + (cur.interior ? ' · interior' : ' · no interior');
         $('label').value = def.label || ''; $('label').placeholder = cur.name;
-        $('mix').checked = def.mix !== false;
+        $('mix').checked = def.mix !== false; $('flip').checked = !!def.flip;
         $('rimOwn').checked = def.rim != null; $('rimColor').value = hex(def.rim != null ? def.rim : 0xc9ccd2);
         paints();
       }
@@ -254,6 +259,12 @@
       $('pick').addEventListener('change', function () { load($('pick').value); history.replaceState(null, '', '?car=' + encodeURIComponent($('pick').value)); say(''); });
       $('label').addEventListener('input', function () { def.label = $('label').value; });
       $('mix').addEventListener('change', function () { def.mix = $('mix').checked; });
+      // Umdrehen: Vorlage mit der neuen Richtung neu aufbauen (gilt erst nach dem Speichern auch im Regen)
+      $('flip').addEventListener('change', function () {
+        def.flip = $('flip').checked;
+        var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { flip: def.flip }); TC.applyCustom({ vehicles: c });
+        TC.forget(cur.key); var keep = clone(def); load(cur.key); def = keep; fill();
+      });
       $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
       $('addOrig').addEventListener('click', function () { def.paints.push({ c: null, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
       $('rimOwn').addEventListener('change', function () { def.rim = $('rimOwn').checked ? int($('rimColor').value) : null; show(); });
@@ -269,6 +280,7 @@
         var d = { mix: def.mix !== false, paints: def.paints.map(function (p) { return { c: p.c == null ? null : p.c, w: p.w || 1 }; }) };
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.rim != null) d.rim = def.rim;
+        if (def.flip) d.flip = true;
         say('Saving …');
         api('POST', '/app/api/cars/vehicles', { key: cur.key, def: d }).then(function () {
           var c = current(); c[cur.key] = d; TC.applyCustom({ vehicles: c }); say('Saved. Live in the car rain now.', 'ok');

@@ -645,6 +645,8 @@ def urls():
     # Schalter mit "feature" nur zeigen, wenn der Tenant die Freischaltung hat (core/features.py)
     for e in effects:
         e["switches"] = [sw for sw in e["switches"] if not sw.get("feature") or sw["feature"] in feats]
+        if e["file"] == "item-rain.html":
+            e["switches"] = [_car_model_switch(project_root, sw) if sw["key"] == "model" else sw for sw in e["switches"]]
     transitions = TRANSITIONS
     return render_template("urls.html",
                            user=g.user, token=token,
@@ -653,6 +655,20 @@ def urls():
                            overlays=OVERLAYS, overlay_base=base_url,
                            alerts=ALERTS, decor=DECOR,
                            stingers=stingers, effects=effects, transitions=transitions)
+
+
+def _car_model_switch(root, sw):
+    """Auswahl „Car model“ aus dem Auto-Katalog (data/car-rain/catalog.json): Mix, je Marke, je Auto."""
+    import json as _json
+    try:
+        with open(os.path.join(root, "data", "car-rain", "catalog.json"), encoding="utf-8") as f:
+            cat = _json.load(f)
+    except (OSError, ValueError):
+        cat = []
+    brands = sorted({c.get("brand", "") for c in cat if c.get("brand")})
+    opts = [["mix", "Random mix"]] + [["brand:" + b, "All " + b] for b in brands]
+    opts += [[c["key"], "%s – %s" % (c.get("brand", ""), c.get("name", c["key"]))] for c in sorted(cat, key=lambda c: (c.get("brand", ""), c.get("name", "")))]
+    return dict(sw, options=opts)
 
 
 @bp_app.route("/app/dock/weather")
