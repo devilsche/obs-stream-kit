@@ -125,29 +125,34 @@
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
   // Räder aus selbst gewählten Teilen (Car editor „Pick wheel parts“): Teile nach Lage zu Rädern gruppieren
   // (Seite, dann entlang der Länge), je Rad Drehpunkt in der Mitte, Drehgruppe „Spin“ um die Querachse
-  function buildWheels(scene, keys) {
+  // frontKeys: als Vorderräder gewählte Teile (lenken); sonst lenkt die vorderste Achse
+  function buildWheels(scene, keys, frontKeys) {
+    frontKeys = frontKeys || [];
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(), ctr = new THREE.Vector3(); box.getSize(size); box.getCenter(ctr);
     var lx = size.x >= size.z, len = lx ? size.x : size.z, parts = [];
     scene.traverse(function (o) {
-      if (!o.isMesh || keys.indexOf(o.userData.pkey) < 0) return;
-      var b = new THREE.Box3().setFromObject(o), c = new THREE.Vector3(); b.getCenter(c); parts.push({ o: o, c: c, b: b });
+      if (!o.isMesh) return;
+      var f = frontKeys.indexOf(o.userData.pkey) >= 0;
+      if (!f && keys.indexOf(o.userData.pkey) < 0) return;
+      var b = new THREE.Box3().setFromObject(o), c = new THREE.Vector3(); b.getCenter(c); parts.push({ o: o, c: c, b: b, f: f });
     });
-    var groups = [];
-    ['l', 'r'].forEach(function (side) {
-      var ps = parts.filter(function (p) { var w = lx ? p.c.z - ctr.z : p.c.x - ctr.x; return side === 'r' ? w > 0 : w <= 0; });
+    var groups = [], flagged = frontKeys.length > 0;
+    [true, false].forEach(function (front) { ['l', 'r'].forEach(function (side) {
+      var ps = parts.filter(function (p) { var w = lx ? p.c.z - ctr.z : p.c.x - ctr.x; return p.f === front && (side === 'r' ? w > 0 : w <= 0); });
       ps.sort(function (a, b) { return lx ? a.c.x - b.c.x : a.c.z - b.c.z; });
       var cur = null;
       ps.forEach(function (p) {
         var l = lx ? p.c.x : p.c.z;
-        if (!cur || l - cur.last > len * 0.08) { cur = { side: side, list: [], last: l }; groups.push(cur); }
+        if (!cur || l - cur.last > len * 0.08) { cur = { side: side, list: [], last: l, front: front }; groups.push(cur); }
         cur.list.push(p); cur.last = l;
       });
-    });
+    }); });
     groups.forEach(function (g, i) {
       var b = new THREE.Box3(); g.list.forEach(function (p) { b.union(p.b); });
       var c = new THREE.Vector3(); b.getCenter(c);
       var pivot = new THREE.Group(); pivot.name = 'Wheel ' + g.side + i; pivot.position.copy(c); scene.add(pivot);
+      if (flagged) pivot.userData.front = g.front;   // ausdrücklich gewählt: nur diese lenken
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x'; pivot.add(spin);
       scene.updateMatrixWorld(true);
       g.list.forEach(function (p) { spin.attach(p.o); p.o.userData.wheelPart = true; });
@@ -158,7 +163,7 @@
   function prepare(scene, e) {
     var v = vehicle(e.key);
     // eigene Räder: ausdrücklich gewählte Radteile, sonst die gewählten Felgen (plus Reifen) – dann dreht nur das
-    var own = Array.isArray(v.wheelParts) || (Array.isArray(v.rimParts) && v.rimParts.length > 0);
+    var own = Array.isArray(v.wheelParts) || Array.isArray(v.frontWheelParts) || (Array.isArray(v.rimParts) && v.rimParts.length > 0);
     if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own, straight: v.straight !== false });
     splitIslands(scene);
     // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
@@ -211,9 +216,9 @@
       });
       return out;
     }
-    v = Object.assign({}, v, { paintParts: norm(v.paintParts), rimParts: norm(v.rimParts), wheelParts: norm(v.wheelParts),
+    v = Object.assign({}, v, { paintParts: norm(v.paintParts), rimParts: norm(v.rimParts), wheelParts: norm(v.wheelParts), frontWheelParts: norm(v.frontWheelParts),
       zones: Array.isArray(v.zones) ? v.zones.map(function (z) { return Object.assign({}, z, { parts: norm(z.parts) }); }) : v.zones });
-    var wheelKeys = Array.isArray(v.wheelParts) ? v.wheelParts : null;
+    var wheelKeys = Array.isArray(v.wheelParts) || Array.isArray(v.frontWheelParts) ? (v.wheelParts || []) : null;
     if (!wheelKeys && own) {
       // Felgen + Reifen (Material heißt tire/tyre/reifen/rubber, nicht Dichtungen/Leisten)
       wheelKeys = v.rimParts.slice();
@@ -223,7 +228,7 @@
         if (/tire|tyre|reifen|rubber|whitewall/i.test(nm) && !/trim|seal|strip|window|door/i.test(nm)) wheelKeys.push(o.userData.pkey);
       });
     }
-    var ownWheels = own && wheelKeys && wheelKeys.length ? buildWheels(scene, wheelKeys) : 0;
+    var ownWheels = own && wheelKeys && (wheelKeys.length || (v.frontWheelParts || []).length) ? buildWheels(scene, wheelKeys, v.frontWheelParts || []) : 0;
     var ud = scene.userData;
     // gewählte Teile (paintParts/rimParts) bekommen eigene Material-Kopien: nur sie werden umgefärbt,
     // auch wenn ihr Material sonst z. B. mit den Scheinwerfern geteilt ist

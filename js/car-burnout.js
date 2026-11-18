@@ -90,11 +90,13 @@
           var axw = new THREE.Vector3(spin.userData.ax === 'z' ? 0 : 1, 0, spin.userData.ax === 'z' ? 1 : 0).applyQuaternion(q);
           sgn = axw.z >= 0 ? 1 : -1;
         }
-        wheels.push({ pivot: o, spin: spin, x: w.x, side: w.z > 0 ? 1 : -1, sgn: sgn });
+        wheels.push({ pivot: o, spin: spin, x: w.x, side: w.z > 0 ? 1 : -1, sgn: sgn, flag: o.userData.front });
       });
       // vorn = vorderste Achse (Truck/Bus: mehrere Hinterachsen)
       var maxX = Math.max.apply(null, wheels.map(function (w) { return w.x; }).concat([-1e9]));
-      wheels.forEach(function (w) { w.front = w.x > 0 && w.x > maxX - dims.L * 0.08; });
+      // im Car editor gewählte Vorderräder haben Vorrang
+      var flagged = wheels.some(function (w) { return w.flag != null; });
+      wheels.forEach(function (w) { w.front = flagged ? !!w.flag : w.x > 0 && w.x > maxX - dims.L * 0.08; });
       shadow.scale.set(dims.L * 1.15, dims.W * 1.4, 1);
     }
     function spinWheels(rearRate, frontRate, steer, dt) {
