@@ -556,11 +556,15 @@
       var sc = car.sc * car.kk;
       return { x: car.x - car.dir * car.L * 0.06 * sc, sill: car.y - car.car.belt * sc, z: car.z + car.W * 0.5 * sc + 4 };
     }
+    // erst wenn alle Autos unten sind: das Auto, das am nächsten zur Bildmitte steht
     function pick() {
+      if (!E.allDown) return null;
       var best = null;
       E.items.forEach(function (it) {
-        if (best || it.gone || it.taken || !(it.rest > 1.2) || !it.settled || it.x < 220 || it.x > W - 220) return;
-        best = it;
+        if (it.gone || it.taken || !(it.rest > 0) || !it.settled || it.x < 220 || it.x > W - 220) return;
+        var covered = E.items.some(function (o) { return o !== it && o.car && o.rest != null && !o.taken && o.y < it.y - it.hh * 0.5 && Math.abs(o.x - it.x) < (o.L * o.sc + it.L * it.sc) * 0.45; });
+        if (covered) return;
+        if (!best || Math.abs(it.x - W / 2) < Math.abs(best.x - W / 2)) best = it;
       });
       return best;
     }
@@ -582,7 +586,7 @@
           x = car.dir > 0 ? W + S * 3 : -S * 3;     // kommt vom näheren Bildrand, von vorn aufs Auto zu
           g.visible = true; face(car.x - x);
           car.g.traverse(function (m) { if (m.isMesh && m.geometry && m.geometry.type === 'CircleGeometry') rims.push(m); });
-        } else if (t > E.duration * 0.6) { st = 'gone'; done = true; }
+        } else if (E.allDown && (E.downFor || 0) > 3) { st = 'gone'; done = true; }   // kein passendes Auto
       }
       if (car && !car.gone) {
         // gewähltes Auto: wächst etwas (Bühne für die Ente) und kommt ganz nach vorn, Räder bleiben am Boden
@@ -656,7 +660,7 @@
       });
       return !(done && !puffs.length && dim >= 1);
     }
-    return { step: step, wantsCar: function () { return st === 'wait'; } };
+    return { step: step, wantsCar: function () { return st === 'wait'; }, busy: function () { return !done; } };
   }
 
   // ── Saug-Ente: Gummiente auf einem runden Saugroboter.
@@ -904,6 +908,7 @@
       return { g: Math.random() < 0.12 ? tpl.pink() : tpl.yellow(), len: 2.6 };
     }
     var size = opts.size || 96, count = opts.count || 120, duration = opts.duration || 22000;
+    if (kind === 'car') count = Math.min(count, 40);   // echte Modelle sind schwer: höchstens 40 Autos
     var spawnEnd = duration * 0.62, margin = 120;
     var ducks = [], spawned = 0, t0 = null, last = null;
     // Fress-Ente (nur Sushi, nur mit Freischaltung „sushi-eater“)
@@ -960,6 +965,15 @@
       spawned++;
     }
     function remove(d) { scene.remove(d.g); }
+    // Oberkante der liegenden Autos unter d (waagrecht überlappend), sonst der Boden
+    function groundFor(d) {
+      var gy = FLOOR, half = (d.L || 4.4) * d.sc * 0.45;
+      ducks.forEach(function (r) {
+        if (r === d || !r.car || r.rest == null || r.taken || r.gone || r.sucked) return;
+        if (Math.abs(r.x - d.x) < half + (r.L || 4.4) * r.sc * 0.45) gy = Math.min(gy, r.y - r.hh * 0.9);
+      });
+      return gy;
+    }
 
     function frame(ts) {
       if (t0 === null) { t0 = ts; last = ts; }
@@ -967,8 +981,8 @@
       last = ts;
       var want = Math.min(count, Math.floor(count * (t / spawnEnd) * (1 + 0.25 * Math.sin(t / 900))));
       while (spawned < want) spawn();
-      // keep: alles Gelandete bleibt liegen, bis die Saug-Ente durch ist
-      var keep = !!vacuum && vacuum.pending();
+      // keep: alles Gelandete bleibt liegen, bis die Fahrer-Ente ein Auto hat bzw. die Saug-Ente durch ist
+      var keep = (!!vacuum && vacuum.pending()) || (!!driver && driver.wantsCar());
       var hungry = (!!eater && eater.hungry()) || (!!driver && driver.wantsCar()) || keep;
       ducks = ducks.filter(function (d) {
         if (d.gone) return false;
@@ -1026,12 +1040,14 @@
             return true;
           }
         }
-        if (!d.bounced && d.y > FLOOR - d.h) {
+        // Autos stapeln sich: Boden ist die Oberkante eines schon liegenden Autos darunter (keine Durchdringung)
+        var gy = d.car && hungry ? groundFor(d) : FLOOR;
+        if (!d.bounced && d.y > gy - (d.car && hungry ? d.hh : d.h)) {
           if (hungry && d.hop) {
             // Fress-Ente unterwegs: nach dem Aufditschen liegen bleiben
             d.y = FLOOR - d.h; d.vy = 0; d.vx = 0; d.wx = d.wy = d.wz = 0; d.rest = rand(5, 8);
             if (d.car) {
-              d.y = FLOOR - d.hh; d.rest = rand(4, 7); d.dir = d.x < W / 2 ? -1 : 1;
+              d.y = gy - d.hh; d.rest = rand(4, 7); d.dir = d.x < W / 2 ? -1 : 1;
               d.q0 = d.g.quaternion.clone(); d.q1 = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, d.dir > 0 ? -0.25 : Math.PI + 0.25, 0));
               d.z = Math.min(d.z, 150);   // vor den fallenden Autos, hinter der Ente
             }
@@ -1056,9 +1072,14 @@
       });
       var eating = false;
       if (eater) { EE.items = ducks; eating = eater.step(dt, t / 1000); }
-      if (driver) { DE.items = ducks; eating = driver.step(dt, t / 1000) || eating; }
+      if (driver) {
+        // alle Autos unten: fertig gestreut und keins mehr in der Luft
+        DE.allDown = spawned >= count && ducks.every(function (d) { return !d.car || d.rest != null || d.taken || d.bounced; });
+        DE.downFor = DE.allDown ? (DE.downFor || 0) + dt : 0;
+        DE.items = ducks; eating = driver.step(dt, t / 1000) || eating;
+      }
       // Saug-Ente startet, sobald die Fress-Ente geplatzt ist und die Fahrer-Ente kein Auto mehr sucht
-      if (vacuum) { othersBusy = (!!eater && eater.hungry()) || (!!driver && driver.wantsCar()); VE.items = ducks; eating = vacuum.step(dt, t / 1000) || eating; }
+      if (vacuum) { othersBusy = (!!eater && eater.hungry()) || (!!driver && driver.busy()); VE.items = ducks; eating = vacuum.step(dt, t / 1000) || eating; }
       renderer.render(scene, cam);
       if (t < duration || ducks.length || eating) requestAnimationFrame(frame);
       else renderer.clear();

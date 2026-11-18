@@ -37,9 +37,35 @@
     });
   }
 
+  // Starre Teile mit gleichem Material zu einem Mesh zusammenfassen (weniger Zeichenaufrufe – bei 40 Autos
+  // mit je dutzenden Teilen sonst tausende pro Bild); Räder (Gruppen „Wheel …“) bleiben eigene Teile
+  function mergeStatic(scene) {
+    var BGU = THREE.BufferGeometryUtils;
+    if (!BGU || !BGU.mergeBufferGeometries) return;
+    scene.updateMatrixWorld(true);
+    var inv = new THREE.Matrix4().copy(scene.matrixWorld).invert(), groups = {};
+    function inWheel(o) { for (var p = o; p && p !== scene; p = p.parent) if (/^Wheel /.test(p.name || '')) return true; return false; }
+    scene.traverse(function (o) {
+      if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || inWheel(o)) return;
+      var g = o.geometry; if (!g || !g.attributes.position || Object.keys(g.morphAttributes || {}).length) return;
+      var sig = o.material.uuid + '|' + Object.keys(g.attributes).sort().join(',') + '|' + (g.index ? 'i' : 'n') + '|' + o.renderOrder;
+      (groups[sig] = groups[sig] || { mat: o.material, order: o.renderOrder, list: [] }).list.push(o);
+    });
+    Object.keys(groups).forEach(function (k) {
+      var gr = groups[k]; if (gr.list.length < 2) return;
+      var geos = gr.list.map(function (o) { var gg = o.geometry.clone(); gg.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)); return gg; });
+      var merged = null;
+      try { merged = BGU.mergeBufferGeometries(geos, false); } catch (err) { merged = null; }
+      if (!merged) return;
+      var mesh = new THREE.Mesh(merged, gr.mat); mesh.renderOrder = gr.order; scene.add(mesh);
+      gr.list.forEach(function (o) { if (o.parent) o.parent.remove(o); });
+    });
+  }
+
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
   function prepare(scene, e) {
     if (root.GlbFix) GlbFix.prepare(scene);
+    mergeStatic(scene);
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
     var lx = size.x >= size.z, front = e.front || 0;

@@ -80,12 +80,14 @@
       var sorted = parts.slice().sort(function (a, b) { return b.t - a.t; }), core = new THREE.Box3(), acc = 0;
       for (var i = 0; i < sorted.length && acc < total * 0.85; i++) { core.union(sorted[i].b); acc += sorted[i].t; }
       var cs = new THREE.Vector3(); core.getSize(cs);
-      var grow = new THREE.Box3(core.min.clone().addScaledVector(cs, -0.15), core.max.clone().addScaledVector(cs, 0.15));
+      var grow = new THREE.Box3(core.min.clone().addScaledVector(cs, -0.6), core.max.clone().addScaledVector(cs, 0.6));
       parts.forEach(function (p) {
         var s = new THREE.Vector3(); p.b.getSize(s);
-        var tooBig = s.x > cs.x * 1.6 || s.z > cs.z * 1.6 || s.y > cs.y * 2.2;
+        // großzügig: bei Modellen mit sehr detaillierten Rädern ist der „Kern“ nur der Radbereich – die Karosserie
+        // ist dann bis ~1,8× länger und darf nicht als Kulisse gelten
+        var tooBig = s.x > cs.x * 3 || s.z > cs.z * 3 || s.y > cs.y * 3;
         // flache Bodenplatte/Wand, die über das Auto hinausreicht (Ausstellungs-Untergrund)
-        var flat = Math.min(s.x, s.y, s.z) < Math.max(cs.x, cs.z) * 0.01 && (s.x > cs.x * 1.1 || s.z > cs.z * 1.1);
+        var flat = Math.min(s.x, s.y, s.z) < Math.max(cs.x, cs.z) * 0.01 && (s.x > cs.x * 2 || s.z > cs.z * 2);
         tooBig = tooBig || flat;
         var outside = !grow.intersectsBox(p.b) || !grow.containsPoint(p.b.getCenter(new THREE.Vector3()));
         if ((tooBig || outside) && p.t < total * 0.1) drop.push(p.o);
