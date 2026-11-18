@@ -36,6 +36,7 @@
     .param { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
     .tag { font-size: 12px; color: var(--ok); }
     .tag.off { color: var(--muted); }
+    .tag.rework { color: #ffcf70; }
     .links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
     .meta a { color: var(--text); font-size: 13px; padding: 3px 0; min-height: 24px; display: inline-block; }
     .swatches { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -85,6 +86,7 @@
           var v = TC.vehicle(e.key), li = el('li', 'tile'), st = el('div', 'stage'), meta = el('div', 'meta');
           st.setAttribute('role', 'img'); st.setAttribute('aria-label', (v.label || e.name) + ', 3D model');
           meta.append(el('h2', null, v.label || e.name), el('span', 'sub', e.brand + ' · by ' + e.author + ' · ' + e.license));
+          if (v.rework) meta.appendChild(el('span', 'tag rework', 'Needs rework' + (v.issues && v.issues.length ? ': ' + v.issues.join(', ') : '') + (v.note ? ' – ' + v.note : '')));
           meta.appendChild(el('span', 'tag' + (v.mix === false ? ' off' : ''), (v.mix === false ? 'Not in the mix' : 'In the mix') + (e.interior ? ' · interior' : '') + (e.wheels >= 4 ? ' · steerable wheels' : '')));
           if (Array.isArray(v.paints) && v.paints.length) {
             var sw = el('div', 'swatches'); sw.setAttribute('aria-label', 'Paints');
@@ -101,15 +103,16 @@
           a3.href = e.url; a3.target = '_blank'; a3.rel = 'noopener';
           links.append(a1, a2, a3); meta.appendChild(links);
           li.append(st, meta); $('cars').appendChild(li);
-          var t = { e: e, li: li, stage: st, obj: null, loading: false, yaw: -0.7 + (tiles.length % 5) * 0.12, hover: false, text: (e.name + ' ' + e.key + ' ' + e.brand + ' ' + (v.label || '')).toLowerCase() };
+          var t = { rework: !!v.rework, e: e, li: li, stage: st, obj: null, loading: false, yaw: -0.7 + (tiles.length % 5) * 0.12, hover: false, text: (e.name + ' ' + e.key + ' ' + e.brand + ' ' + (v.label || '')).toLowerCase() };
           li.addEventListener('pointerenter', function () { t.hover = true; }); li.addEventListener('pointerleave', function () { t.hover = false; });
           li.addEventListener('focusin', function () { t.hover = true; }); li.addEventListener('focusout', function () { t.hover = false; });
           tiles.push(t);
         });
         // Farbtupfer als Klassen in einem <style>, keine Inline-Styles
         if (css) { var stl = document.createElement('style'); stl.textContent = css; document.head.appendChild(stl); }
+        brands.push('rework');
         brands.forEach(function (b) {
-          var btn = el('button', null, b === 'all' ? 'All' : b); btn.type = 'button'; btn.setAttribute('aria-pressed', String(b === brand));
+          var btn = el('button', null, b === 'all' ? 'All' : b === 'rework' ? 'Needs rework' : b); btn.type = 'button'; btn.setAttribute('aria-pressed', String(b === brand));
           btn.addEventListener('click', function () { brand = b; Array.prototype.forEach.call($('brands').children, function (x) { x.setAttribute('aria-pressed', String(x === btn)); }); apply(); });
           $('brands').append(btn, document.createTextNode(' '));
         });
@@ -118,7 +121,7 @@
       $('q').addEventListener('input', apply);
       function apply() {
         var s = $('q').value.trim().toLowerCase(), n = 0;
-        tiles.forEach(function (t) { var show = (brand === 'all' || t.e.brand === brand) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
+        tiles.forEach(function (t) { var show = (brand === 'all' || t.e.brand === brand || (brand === 'rework' && t.rework)) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
         $('count').textContent = n + ' of ' + tiles.length + ' cars';
       }
 
