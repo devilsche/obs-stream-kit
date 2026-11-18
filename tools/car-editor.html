@@ -145,6 +145,7 @@
           <button type="button" id="pickAuto" class="small">Back to automatic</button>
         </div>
         <p class="small-text" id="partList"></p>
+        <p class="muted small-text" id="pickHint" aria-live="polite"></p>
         <div class="row">
           <input type="checkbox" id="texOff">
           <label for="texOff">Paint replaces the original paint texture (no mixing with the old colour)</label>
@@ -265,8 +266,15 @@
         while (holder.children.length) holder.remove(holder.children[0]);
         if (!tpl) return;
         var p = def.paints && def.paints.length ? def.paints[Math.min(shown, def.paints.length - 1)] : { c: null };
-        var pc = p.c == null ? null : p.c, rc = def.rim == null ? null : def.rim;
-        if (picking) { pc = 0xff3fb4; rc = 0x22e5ff; }   // Auswahl sichtbar machen
+        var pc = p.c == null ? null : p.c, rc = def.rim == null ? null : def.rim, hint = '';
+        // nach dem Picken immer sichtbar machen, was gewählt ist: erste Lackfarbe der Liste, sonst pink/cyan
+        if (pc == null && def.paintParts) {
+          var first = (def.paints || []).filter(function (q) { return q.c != null; })[0];
+          if (first) pc = first.c; else { pc = 0xff3fb4; hint = 'Pink = your paint parts. Add a paint to see the real colour.'; }
+        }
+        if (rc == null && def.rimParts) { rc = 0x22e5ff; hint = (hint ? hint + ' ' : '') + 'Cyan = your rim parts. Tick “Own rim colour” to set it.'; }
+        if (picking) { pc = 0xff3fb4; rc = 0x22e5ff; hint = ''; }   // Auswahl sichtbar machen
+        $('pickHint').textContent = hint;
         var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), texOff: picking ? true : !!def.texOff });
         car.position.y = tpl.userData.dims.H / 2;   // Mitte im Auto → Räder auf den Boden
         // Lenkeinschlag der Vorderräder (Räder an der Front: +x)
