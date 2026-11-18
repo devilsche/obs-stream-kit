@@ -848,9 +848,9 @@
     rim.position.set(1, -0.3, 0.6);
     scene.add(rim);
 
-    // mix = gemischter Kram (Sushi, Enten, Autos), z. B. für !saugen
+    // mix = gemischter Kram (Sushi, Enten; Autos nur, wenn js/toy-cars.js geladen ist), z. B. für !saugen
     var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ||
-      (opts.kind === 'mix' && root.ToyCars && root.RubberDuck) ? opts.kind : 'duck';
+      (opts.kind === 'mix' && root.RubberDuck) ? opts.kind : 'duck';
     var wantEater = kind === 'sushi' && !!opts.eater && !!root.RubberDuck;
     var wantDriver = kind === 'car' && !!opts.driver && !!root.RubberDuck;
     var wantVacuum = kind !== 'balloon' && !!opts.vacuum && !!root.RubberDuck;
@@ -895,8 +895,10 @@
     function makeItem() {
       if (kind === 'mix') {
         var r = Math.random();
-        if (r < 0.4) return sushiTpl.make();
-        if (r < 0.75) return carTpl.make();
+        if (carTpl && root.ToyCars.MODELS && root.ToyCars.MODELS.length) {
+          if (r < 0.4) return sushiTpl.make();
+          if (r < 0.75) return carTpl.make();
+        } else if (r < 0.6) return sushiTpl.make();
         return { g: duckOf(RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)], false), len: 2.7 };
       }
       if (kind === 'sushi' || kind === 'car' || rise) return tpl.make();

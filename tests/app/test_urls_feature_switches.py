@@ -23,14 +23,12 @@ def test_others_see_only_basic_switches(pg_conn_test_setup_non_admin):
     assert "Eating duck (sushi)" not in body and "Vacuum duck" not in body and "Duck outfit" not in body
 
 
-def test_car_model_dropdown_from_catalog(pg_conn_test_setup, tmp_path):
-    conn, tid, _, sid = pg_conn_test_setup
+def test_car_model_options_from_catalog(tmp_path):
+    """Auswahl „Car model“ (für den kommenden Burnout-Effekt): Mix, je Marke, je Auto."""
+    from app.views_app import _car_model_switch
     d = tmp_path / "data" / "car-rain"
     d.mkdir(parents=True)
     (d / "catalog.json").write_text('[{"uid": "a", "key": "p911", "brand": "Porsche", "name": "911 Turbo"}]')
-    (tmp_path / "effects").mkdir()
-    (tmp_path / "effects" / "item-rain.html").write_text("<html></html>")
-    c = _client(conn, sid)
-    c.application.config["_PROJECT_ROOT"] = str(tmp_path)
-    body = c.get("/app/urls").get_data(as_text=True)
-    assert "All Porsche" in body and "brand:Porsche" in body and "911 Turbo" in body
+    sw = _car_model_switch(str(tmp_path), {"key": "model", "options": []})
+    assert ["mix", "Random mix"] in sw["options"] and ["brand:Porsche", "All Porsche"] in sw["options"]
+    assert ["p911", "Porsche – 911 Turbo"] in sw["options"]

@@ -27,11 +27,10 @@
   <script src="../js/rubber-duck.js"></script>
   <script src="../js/rubber-duck-outfits.js"></script>
   <script src="../api/fx/ducks/custom.js"></script>
+  <!-- Autos sind aus dem Regen raus (echte Modelle zu schwer für viele auf einmal) – kommen in einen eigenen Burnout-Effekt.
+       Für die Saug-Ente wird der Kehrroboter weiter mit dem GLTFLoader geladen. -->
   <script src="../js/vendor/three-r128-GLTFLoader.js"></script>
-  <script src="../js/vendor/three-r128-BufferGeometryUtils.js"></script>
   <script src="../js/glb-fix.js"></script>
-  <script src="../js/toy-cars.js"></script>
-  <script src="../api/fx/cars/custom.js"></script>
   <script src="../js/item-rain-3d.js"></script>
   <script>
     (function () {
@@ -47,7 +46,7 @@
       if (wantsCars && !ToyCars.MODELS.length && params.get('kind') === 'car') params.set('kind', 'sushi');
       window.ItemRain3D.start({
         // Enten nur mit Freischaltung „ducks“ (sonst Sushi statt Enten)
-        kind: ['duck', 'balloon', 'car', 'mix'].indexOf(params.get('kind')) >= 0 && (['duck', 'mix'].indexOf(params.get('kind')) < 0 || hasFeat('ducks')) ? params.get('kind') : 'sushi',
+        kind: ['duck', 'balloon', 'mix'].indexOf(params.get('kind')) >= 0 && (['duck', 'mix'].indexOf(params.get('kind')) < 0 || hasFeat('ducks')) ? params.get('kind') : 'sushi',
         model: params.get('model') || 'mix',
         // Enten-Outfit: none, thw, police, fire, batman, superman oder mix (zufällig je Ente)
         outfit: params.get('outfit') || 'none',

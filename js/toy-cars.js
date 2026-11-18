@@ -66,10 +66,62 @@
     });
   }
 
+  // Teile in zusammenhängende Stücke zerlegen (Tür und Gerüst sind oft ein Mesh): Ecken verbunden über
+  // gemeinsame Dreiecke oder gleiche Position. So ist im Editor jedes Stück einzeln wählbar; der Regen
+  // fasst danach wieder zusammen (mergeStatic). Mehr als 400 Stücke: Mesh bleibt ganz.
+  function islandsOf(geo) {
+    var pos = geo.attributes.position, n = pos.count, idx = geo.index ? geo.index.array : null, nt = (idx ? idx.length : n) / 3;
+    var par = new Int32Array(n); for (var i = 0; i < n; i++) par[i] = i;
+    function f(a) { while (par[a] !== a) { par[a] = par[par[a]]; a = par[a]; } return a; }
+    function u(a, b) { a = f(a); b = f(b); if (a !== b) par[b] = a; }
+    var seen = {};
+    for (i = 0; i < n; i++) {
+      var k = Math.round(pos.getX(i) * 1e4) + ',' + Math.round(pos.getY(i) * 1e4) + ',' + Math.round(pos.getZ(i) * 1e4);
+      if (seen[k] !== undefined) u(seen[k], i); else seen[k] = i;
+    }
+    for (var t = 0; t < nt; t++) { var a = idx ? idx[t * 3] : t * 3; u(a, idx ? idx[t * 3 + 1] : t * 3 + 1); u(a, idx ? idx[t * 3 + 2] : t * 3 + 2); }
+    var groups = {}, order = [];
+    for (t = 0; t < nt; t++) { var r = f(idx ? idx[t * 3] : t * 3); if (!groups[r]) { groups[r] = []; order.push(r); } groups[r].push(t); }
+    return order.map(function (r) { return groups[r]; });
+  }
+  function subGeo(geo, tris) {
+    var idx = geo.index ? geo.index.array : null, out = new THREE.BufferGeometry();
+    Object.keys(geo.attributes).forEach(function (an) {
+      var at = geo.attributes[an], sz = at.itemSize, Arr = at.isInterleavedBufferAttribute ? Float32Array : at.array.constructor;
+      var arr = new Arr(tris.length * 3 * sz), o = 0;
+      tris.forEach(function (t) {
+        for (var q = 0; q < 3; q++) {
+          var vi = idx ? idx[t * 3 + q] : t * 3 + q;
+          for (var c = 0; c < sz; c++) arr[o++] = at.isInterleavedBufferAttribute ? [at.getX, at.getY, at.getZ, at.getW][c].call(at, vi) : at.array[vi * sz + c];
+        }
+      });
+      out.setAttribute(an, new THREE.BufferAttribute(arr, sz, at.normalized));
+    });
+    return out;
+  }
+  function splitIslands(scene) {
+    var list = [];
+    scene.traverse(function (o) { if (o.isMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && o.geometry && o.geometry.attributes.position) list.push(o); });
+    list.forEach(function (o) {
+      var isl = islandsOf(o.geometry);
+      if (isl.length < 2 || isl.length > 400) return;
+      var base = o.name || '';
+      isl.forEach(function (tris, k) {
+        var m = new THREE.Mesh(subGeo(o.geometry, tris), o.material);
+        m.name = (base || 'part') + '/' + k; m.renderOrder = o.renderOrder;
+        m.position.copy(o.position); m.quaternion.copy(o.quaternion); m.scale.copy(o.scale);
+        m.userData = Object.assign({}, o.userData);
+        o.parent.add(m);
+      });
+      o.parent.remove(o);
+    });
+  }
+
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
   function prepare(scene, e) {
     var v = vehicle(e.key);
     if (root.GlbFix) GlbFix.prepare(scene, { wheels: v.straight !== false });
+    splitIslands(scene);
     // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
     var all = [], seen = {}, names = {};
     scene.traverse(function (o) {
@@ -197,7 +249,15 @@
   }
   function colourMat(m, hex, tag, texOff) {
     var k = tag + ':' + m.uuid + ':' + hex + (texOff ? ':t' : '');
-    if (!PAINTS[k]) { PAINTS[k] = m.clone(); PAINTS[k].color.setHex(hex); if (texOff) PAINTS[k].map = null; }
+    if (!PAINTS[k]) {
+      var c = PAINTS[k] = m.clone(); c.color.setHex(hex); if (texOff) c.map = null;
+      // Lack wie echter Autolack: wenig Metall (Metallwert 1 spiegelt nur die Umgebung und wirkt dunkel), Klarlack
+      if (tag === 'p') {
+        c.metalness = Math.min(c.metalness != null ? c.metalness : 0, 0.35); c.metalnessMap = null;
+        c.roughness = Math.min(Math.max(c.roughness != null ? c.roughness : 0.4, 0.25), 0.45);
+        if ('clearcoat' in c) { c.clearcoat = 1; c.clearcoatRoughness = 0.06; }
+      }
+    }
     return PAINTS[k];
   }
   // Kopie einer Vorlage mit Lack-/Felgenfarbe (rim: Zahl = Farbe, null = Original, undefined = aus dem Editor);
