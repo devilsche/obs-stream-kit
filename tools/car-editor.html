@@ -375,6 +375,8 @@
           def.wheelParts = []; reprepare({ wheelParts: [] }); return;
         }
         if (was === 'wheel' && picking !== 'wheel') { reprepare({ wheelParts: (def.wheelParts || []).slice() }); return; }   // Räder aufbauen
+        // gewählte Felgen sind die Räder (drehen/lenken allein): nach dem Wählen neu aufbauen
+        if (was === 'rim' && picking !== 'rim' && def.rimParts && !def.wheelParts) { reprepare({ rimParts: def.rimParts.slice() }); return; }
         show();
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });

@@ -83,7 +83,14 @@
         if (!/^Wheel /.test(o.name || '')) return;
         var w = new THREE.Vector3(); o.getWorldPosition(w);
         var spin = o.children.filter(function (c) { return c.name === 'Spin'; })[0];
-        wheels.push({ pivot: o, spin: spin, x: w.x, side: w.z > 0 ? 1 : -1 });
+        // Drehrichtung: Achse der Drehgruppe in Weltrichtung; vorwärts rollen = Drehung um −z der Welt
+        var sgn = 1;
+        if (spin) {
+          var q = new THREE.Quaternion(); spin.getWorldQuaternion(q);
+          var axw = new THREE.Vector3(spin.userData.ax === 'z' ? 0 : 1, 0, spin.userData.ax === 'z' ? 1 : 0).applyQuaternion(q);
+          sgn = axw.z >= 0 ? 1 : -1;
+        }
+        wheels.push({ pivot: o, spin: spin, x: w.x, side: w.z > 0 ? 1 : -1, sgn: sgn });
       });
       // vorn = vorderste Achse (Truck/Bus: mehrere Hinterachsen)
       var maxX = Math.max.apply(null, wheels.map(function (w) { return w.x; }).concat([-1e9]));
@@ -92,7 +99,7 @@
     }
     function spinWheels(rearRate, frontRate, steer, dt) {
       wheels.forEach(function (w) {
-        if (w.spin) w.spin.rotation[w.spin.userData.ax] -= (w.front ? frontRate : rearRate) * dt;
+        if (w.spin) w.spin.rotation[w.spin.userData.ax] -= (w.front ? frontRate : rearRate) * dt * w.sgn;
         if (w.front) w.pivot.rotation.y = steer;
       });
     }

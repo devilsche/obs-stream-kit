@@ -156,7 +156,9 @@
   }
 
   function prepare(scene, e) {
-    var v = vehicle(e.key), own = Array.isArray(v.wheelParts);
+    var v = vehicle(e.key);
+    // eigene Räder: ausdrücklich gewählte Radteile, sonst die gewählten Felgen (plus Reifen) – dann dreht nur das
+    var own = Array.isArray(v.wheelParts) || (Array.isArray(v.rimParts) && v.rimParts.length > 0);
     if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own && v.straight !== false });
     splitIslands(scene);
     // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
@@ -175,12 +177,21 @@
     var pk = {}, n = 0;
     scene.traverse(function (o) {
       if (!o.isMesh) return;
-      var wheel = null; for (var p = o.parent; p && p !== scene; p = p.parent) if (/^Wheel /.test(p.name || '')) { wheel = p.name; break; }
-      var m0 = [].concat(o.material)[0], base = wheel ? wheel + ':' + (m0 && m0.userData.key) : (o.name || '#' + n);
+      var base = o.name || '#' + n;   // unabhängig davon, ob das Teil an einem Rad hängt (Auswahl bleibt stabil)
       n++; pk[base] = (pk[base] || 0) + 1;
       o.userData.pkey = pk[base] > 1 ? base + '~' + pk[base] : base;
     });
-    var ownWheels = own && v.wheelParts.length ? buildWheels(scene, v.wheelParts) : 0;
+    var wheelKeys = Array.isArray(v.wheelParts) ? v.wheelParts : null;
+    if (!wheelKeys && own) {
+      // Felgen + Reifen (Material heißt tire/tyre/reifen/rubber, nicht Dichtungen/Leisten)
+      wheelKeys = v.rimParts.slice();
+      scene.traverse(function (o) {
+        if (!o.isMesh) return;
+        var nm = [].concat(o.material).map(function (m) { return (m && m.name) || ''; }).join(' ');
+        if (/tire|tyre|reifen|rubber|whitewall/i.test(nm) && !/trim|seal|strip|window|door/i.test(nm)) wheelKeys.push(o.userData.pkey);
+      });
+    }
+    var ownWheels = own && wheelKeys && wheelKeys.length ? buildWheels(scene, wheelKeys) : 0;
     var ud = scene.userData;
     // gewählte Teile (paintParts/rimParts) bekommen eigene Material-Kopien: nur sie werden umgefärbt,
     // auch wenn ihr Material sonst z. B. mit den Scheinwerfern geteilt ist

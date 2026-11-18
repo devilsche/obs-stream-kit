@@ -226,12 +226,40 @@
     // Dreiecke im Radzylinder herauslösen
     var groupsOut = out.map(function (w) {
       var pivot = new THREE.Group(); pivot.name = 'Wheel ' + w.key; pivot.position.copy(w.center); obj.add(pivot);
-      return { w: w, pivot: pivot, parts: {} };
+      return { w: w, pivot: pivot, parts: {}, whole: [] };
     });
+    // Gibt es eigene Rad-/Reifen-Netze, wird nur aus denen geschnitten (Karosserie bleibt ganz);
+    // ganze Teile (mehr als 3 Netze) werden nicht zerschnitten, sondern komplett ans nächste Rad gehängt
+    function isNamed(o) { return nameRim(o, obj) || wheelNode(o, obj) || [].concat(o.material).some(function (mm) { return isWheelMat(mm); }); }
+    var anyNamed = meshes.some(isNamed), wholeMode = meshes.length > 3;
     meshes.forEach(function (o) {
+      if (!wholeMode && anyNamed && !isNamed(o)) return;
       var g = o.geometry, pos = g.attributes.position, mats = [].concat(o.material), idx = triIndex(g);
       var srcRim = nameRim(o, obj);   // Felge nach Teilenamen (z. B. „M_Rim_Main“ mit Material „material“) – merken
       var M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), keep = [], moved = false;
+      // nur Teile, die überwiegend im Rad liegen (oder Reifen/Felge heißen), werden zerschnitten – Karosserie,
+      // Radkasten, Fahrwerk bleiben dran. Ausnahme: Modelle aus 1–3 Netzen (dort steckt das Rad in der Karosserie)
+      var named = srcRim || wheelNode(o, obj) || mats.some(function (mm) { return isWheelMat(mm); });
+      if (!named && meshes.length > 3) {
+        var tot = 0, ins = 0, P = new THREE.Vector3(), Q = new THREE.Vector3(), S = new THREE.Vector3(), stepT = Math.max(3, Math.floor(idx.length / 3 / 1500) * 3);
+        for (var ti = 0; ti + 2 < idx.length; ti += stepT) {
+          P.fromBufferAttribute(pos, idx[ti]).applyMatrix4(M); Q.fromBufferAttribute(pos, idx[ti + 1]).applyMatrix4(M); S.fromBufferAttribute(pos, idx[ti + 2]).applyMatrix4(M);
+          P.add(Q).add(S).multiplyScalar(1 / 3); tot++;
+          for (var qq = 0; qq < groupsOut.length; qq++) {
+            var ww = groupsOut[qq].w, dd = P.clone().sub(ww.center), al = dd.dot(ww.axis);
+            if (Math.abs(al) <= ww.half * 1.02 + 0.004 && dd.addScaledVector(ww.axis, -al).length() <= ww.radius * 0.98) { ins++; break; }
+          }
+        }
+        if (!tot || ins / tot < 0.6) return;
+      }
+      if (wholeMode) {
+        // ganzes Teil ans nächste Rad (Mitte des Teils im Radbereich)
+        var bb = new THREE.Box3().setFromObject(o), cc = new THREE.Vector3(); bb.getCenter(cc); cc.applyMatrix4(inv);
+        var best = null, bd = Infinity;
+        groupsOut.forEach(function (h) { var d = cc.distanceTo(h.w.center); if (d < bd) { bd = d; best = h; } });
+        if (best && bd < best.w.radius * 1.6) { best.whole.push(o); if (srcRim) o.userData.rimByName = true; }
+        return;
+      }
       var groups = g.groups && g.groups.length ? g.groups : [{ start: 0, count: idx.length, materialIndex: 0 }];
       var newGroups = [], A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), m = new THREE.Vector3();
       groups.forEach(function (gr) {
@@ -285,6 +313,8 @@
       // gerade stellen
       h.pivot.rotation.y = 0;
       var inner = new THREE.Group(); while (h.pivot.children.length) inner.add(h.pivot.children[0]);
+      h.pivot.add(inner); obj.updateMatrixWorld(true);
+      h.whole.forEach(function (o) { inner.attach(o); o.userData.wheelPart = true; });   // Weltlage bleibt
       inner.rotation.y = h.w.fix;
       // Drehgruppe: dreht das Rad um seine Achse (Querachse des Autos), pivot.rotation.y lenkt
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';
