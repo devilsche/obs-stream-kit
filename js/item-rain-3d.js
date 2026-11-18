@@ -1,6 +1,6 @@
 /* Party-Regen in echtem 3D (three.js r128, js/vendor/three-r128.min.js) für
  * effects/item-rain.html: Gummientchen (kind=duck), Sushi (kind=sushi), Spielzeugautos (kind=car,
- * js/toy-cars.js, model=mix|<Fahrzeug> aus dem Auto-Editor, eingebaut 2002|e30|e30m3|e36|e46|e92m3) – fallen – oder Luftballons (kind=balloon),
+ * js/toy-cars.js: echte 3D-Modelle aus dem Car-Picker, model=mix|<Schlüssel>) – fallen – oder Luftballons (kind=balloon),
  * die von unten aufsteigen.
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.

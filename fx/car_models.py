@@ -1,8 +1,8 @@
 """Fahrzeuge und Felgen aus dem Auto-Editor (tools/car-editor.html) für den BMW-Regen.
 
 Global für alle Kanäle, wie die Enten-Outfits (fx/duck_outfits.py):
-- data/car-vehicles.json: Schlüssel = Fahrzeug (überschreibt ein eingebautes aus js/toy-cars.js
-  oder legt ein neues an), Wert = Aufbau {label, body, rims, tires, parts, paints, …}
+- data/car-vehicles.json: Schlüssel = Modell-Schlüssel aus dem Katalog (data/car-rain/catalog.json),
+  Wert = Einstellungen aus dem Car editor {label, mix, paints: [{c, w}], rim}
 - data/car-rims.json: Schlüssel = Felge, Wert = Felgen-Bauplan {style, n, dish, finish, …}
 - data/car-picks.json: Auswahl im Auto-Picker (tools/car-picker.html), Schlüssel = Sketchfab-uid, Wert = {keep: bool}
 

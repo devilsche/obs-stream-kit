@@ -192,11 +192,11 @@ EFFECT_META = {
     "snow.html": {"hidden": True},
     "item-rain.html": {"switches": [
         {"key": "kind", "label": "What rains", "type": "select", "default": "sushi",
-         "options": [["sushi", "Sushi"], ["car", "BMW toy cars"], ["balloon", "Balloons (rising)"],
+         "options": [["sushi", "Sushi"], ["car", "Cars (real 3D models)"], ["balloon", "Balloons (rising)"],
                      ["duck", "Rubber ducks"], ["mix", "Mix: sushi, ducks and cars"]],
          "tooltip": "Rubber ducks and the mix need the ducks feature, otherwise sushi rains"},
         {"key": "model", "label": "Car model", "type": "text", "default": "mix", "placeholder": "mix",
-         "tooltip": "For cars: mix = random per car, or a model name from the car overview (e.g. e30, e92m3)"},
+         "tooltip": "For cars: mix = 6 random cars from the mix per rain, or a model name from the Car overview"},
         {"key": "count", "label": "Amount", "type": "select", "default": "120",
          "options": [["40", "40"], ["60", "60"], ["120", "120"], ["200", "200"]],
          "tooltip": "How many items fall (balloons default to 60)"},
