@@ -45,3 +45,15 @@ def test_bust_static_urls_does_not_escape_the_root(tmp_path):
     from app.views_app import _bust_static_urls
     html = '<script src="/tools-static/../../etc/passwd"></script>'
     assert _bust_static_urls(html, str(tmp_path)) == html
+
+
+def test_bust_token_js_urls(tmp_path):
+    from app.views_app import _bust_static_urls
+    (tmp_path / "js" / "vendor").mkdir(parents=True)
+    (tmp_path / "js" / "toy-cars.js").write_text("x")
+    (tmp_path / "js" / "vendor" / "three.js").write_text("x")
+    html = ('<script src="/s/tok123/js/toy-cars.js"></script><script src="/s/tok123/js/vendor/three.js"></script>'
+            '<script src="/s/tok123/js/missing.js"></script><script src="/s/tok123/api/fx/cars/custom.js"></script>')
+    out = _bust_static_urls(html, str(tmp_path))
+    assert '/s/tok123/js/toy-cars.js?v=' in out and '/s/tok123/js/vendor/three.js?v=' in out
+    assert 'src="/s/tok123/js/missing.js"' in out and 'src="/s/tok123/api/fx/cars/custom.js"' in out

@@ -817,6 +817,7 @@ def tools_index():
 #: URL bei jedem Deploy, und "ich sehe den Fix nicht" hoert auf, eine
 #: mogliche Erklaerung zu sein.
 _STATIC_REF = re.compile(r'(src|href)="(/(?:tools|widgets)-static/[^"?]+)"')
+_TOKEN_JS_REF = re.compile(r'(src)="(/s/[^/"]+/js/([^"?]+))"')
 
 
 def _bust_static_urls(html: str, root: str) -> str:
@@ -829,7 +830,17 @@ def _bust_static_urls(html: str, root: str) -> str:
         if not full.startswith(root) or not os.path.exists(full):
             return m.group(0)
         return f'{attr}="{url}?v={int(os.path.getmtime(full))}"'
-    return _STATIC_REF.sub(repl, html)
+    html = _STATIC_REF.sub(repl, html)
+
+    # Skripte der Sources, die Tools über /s/<token>/js/… laden (z. B. js/toy-cars.js): ebenfalls ?v=<mtime>,
+    # sonst ruft ein neues Tool eine alte, gecachte Fassung auf
+    def repl_js(m):
+        attr, url, rel = m.group(1), m.group(2), m.group(3)
+        full = os.path.normpath(os.path.join(root, "js", rel))
+        if not full.startswith(root) or not os.path.exists(full):
+            return m.group(0)
+        return f'{attr}="{url}?v={int(os.path.getmtime(full))}"'
+    return _TOKEN_JS_REF.sub(repl_js, html)
 
 
 @bp_app.route("/app/tools/<key>")
