@@ -242,8 +242,21 @@
           }
           if (!hit) { keep.push(idx[i], idx[i + 1], idx[i + 2]); continue; }
           moved = true;
-          var key = mat.uuid, part = hit.parts[key] || (hit.parts[key] = { mat: mat, pos: [] });
+          var key = mat.uuid, part = hit.parts[key] || (hit.parts[key] = { mat: mat, pos: [], attrs: {} });
           [A, B, C].forEach(function (P) { part.pos.push(P.x - hit.w.center.x, P.y - hit.w.center.y, P.z - hit.w.center.z); });
+          // alle übrigen Daten mitnehmen (Normalen gedreht, UVs, Farben, Tangenten) – sonst greifen Texturen ins Leere
+          var NM = new THREE.Matrix3().getNormalMatrix(M);
+          Object.keys(g.attributes).forEach(function (an) {
+            if (an === 'position') return;
+            var at = g.attributes[an], arr = part.attrs[an] || (part.attrs[an] = { size: an === 'tangent' ? 4 : at.itemSize, norm: an === 'normal' || an === 'tangent' ? false : at.normalized,
+              type: an === 'normal' || an === 'tangent' || at.isInterleavedBufferAttribute ? Float32Array : at.array.constructor, v: [] });
+            for (var q = 0; q < 3; q++) {
+              var vi = idx[i + q];
+              if (an === 'normal') { var nv = new THREE.Vector3().fromBufferAttribute(at, vi).applyMatrix3(NM).normalize(); arr.v.push(nv.x, nv.y, nv.z); }
+              else if (an === 'tangent') { var tv = new THREE.Vector3(at.getX(vi), at.getY(vi), at.getZ(vi)).applyMatrix3(NM).normalize(); arr.v.push(tv.x, tv.y, tv.z, at.itemSize > 3 ? at.getW(vi) : 1); }
+              else for (var cc = 0; cc < at.itemSize; cc++) arr.v.push(at.isInterleavedBufferAttribute ? [at.getX, at.getY, at.getZ, at.getW][cc].call(at, vi) : at.array[vi * at.itemSize + cc]);
+            }
+          });
         }
         if (keep.length > startKeep) newGroups.push({ start: startKeep, count: keep.length - startKeep, materialIndex: gr.materialIndex || 0 });
       });
@@ -256,7 +269,12 @@
     groupsOut.forEach(function (h) {
       Object.keys(h.parts).forEach(function (k) {
         var p = h.parts[k], geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(p.pos, 3)); geo.computeVertexNormals();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(p.pos, 3));
+        Object.keys(p.attrs).forEach(function (an) {
+          var a = p.attrs[an];
+          if (a.v.length / a.size === p.pos.length / 3) geo.setAttribute(an, new THREE.BufferAttribute(new a.type(a.v), a.size, a.norm));
+        });
+        if (!geo.attributes.normal) geo.computeVertexNormals();
         var mesh = new THREE.Mesh(geo, p.mat); mesh.userData.wheelPart = true; h.pivot.add(mesh);
       });
       // gerade stellen
