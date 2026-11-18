@@ -515,10 +515,18 @@
           f.setAttribute('aria-label', 'Zone ' + n + ' surface');
           FINISHES.forEach(function (q) { var o = el('option', null, q[1]); o.value = q[0]; f.appendChild(o); });
           f.value = z.f || 'satin';
-          f.addEventListener('change', function () { z.f = f.value; show(); });
+          f.addEventListener('change', function () { z.f = f.value; zones(); show(); });
           var fc = el('input'), fl = el('label', 'muted', 'Flat colour'); fc.type = 'checkbox'; fc.id = 'zf' + z.id; fl.htmlFor = fc.id; fc.checked = !!z.flat;
           fc.addEventListener('change', function () { z.flat = fc.checked; show(); });
           r1.append(nm, c, oc, ol, f, fc, fl);
+          if ((z.f || 'satin') === 'glass') {
+            // Deckkraft des Glases: 5 % (fast unsichtbar) bis 100 % (blickdicht)
+            var rg = el('div', 'row'), ra = el('input'), rl = el('label', 'muted', 'Opacity'), ro = el('output');
+            ra.type = 'range'; ra.min = 5; ra.max = 100; ra.step = 1; ra.id = 'zop' + z.id; rl.htmlFor = ra.id; ro.htmlFor = ra.id;
+            ra.value = Math.round((z.o != null ? z.o : 0.55) * 100); ro.textContent = ra.value + ' %';
+            ra.addEventListener('input', function () { z.o = +ra.value / 100; ro.textContent = ra.value + ' %'; show(); });
+            rg.append(rl, ra, ro); row.appendChild(rg);
+          }
           var r2 = el('div', 'row'), pk = el('button', 'small', 'Pick parts'), cl = el('button', 'small', 'Clear'), rm = el('button', 'danger small', 'Remove');
           [pk, cl, rm].forEach(function (b) { b.type = 'button'; });
           pk.setAttribute('aria-pressed', String(picking === 'zone:' + z.id)); pk.setAttribute('aria-label', 'Pick parts for zone ' + (z.name || n));
@@ -532,7 +540,7 @@
             zones(); paints(); show(); if ($('setDlg').open) editSet(shown);
           });
           r2.append(pk, cl, rm, el('span', 'muted small-text', (z.parts || []).length + ' parts'));
-          row.append(r1, r2); box.appendChild(row);
+          row.insertBefore(r1, row.firstChild); row.appendChild(r2); box.appendChild(row);
         });
       }
       $('addZone').addEventListener('click', function () {
@@ -691,7 +699,7 @@
           if (p.z) { var z = {}; Object.keys(p.z).forEach(function (k) { if (zids.indexOf(k) >= 0 && p.z[k] != null) z[k] = p.z[k]; }); if (Object.keys(z).length) o.z = z; }
           return o;
         }) };
-        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', flat: !!z.flat, parts: (z.parts || []).slice(0, 400) }; });
+        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', flat: !!z.flat, o: z.f === 'glass' && z.o != null ? z.o : undefined, parts: (z.parts || []).slice(0, 400) }; });
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.flip) d.flip = true;
         if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);

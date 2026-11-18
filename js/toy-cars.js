@@ -380,8 +380,9 @@
     };
     c.customProgramCacheKey = function () { return 'detail'; };
   }
-  function zoneMat(m, hex, f, flat) {
-    var k = 'z:' + f + ':' + m.uuid + ':' + hex + (flat ? ':flat' : '');
+  // op: Deckkraft bei Glas (0.05–1), sonst ohne Bedeutung
+  function zoneMat(m, hex, f, flat, op) {
+    var k = 'z:' + f + ':' + m.uuid + ':' + hex + (flat ? ':flat' : '') + (f === 'glass' ? ':' + (op != null ? op : '') : '');
     if (!PAINTS[k]) {
       var c = PAINTS[k] = m.clone(), F = FINISH[f] || FINISH.satin;
       c.color.setHex(hex);
@@ -393,7 +394,7 @@
       c.metalnessMap = null; c.roughnessMap = null;
       c.metalness = F[0]; c.roughness = F[1];
       // Glas: bleibt durchsichtig, die Farbe tönt nur (getönte Scheiben, farbige Lampengläser)
-      if (f === 'glass') { c.transparent = true; c.opacity = Math.min(m.transparent ? m.opacity : 1, 0.55); c.depthWrite = false; c.alphaTest = 0; }
+      if (f === 'glass') { c.transparent = true; c.opacity = op != null ? Math.max(0.05, Math.min(1, op)) : Math.min(m.transparent ? m.opacity : 1, 0.55); c.depthWrite = false; c.alphaTest = 0; }
       if ('clearcoat' in c) { c.clearcoat = F[2]; c.clearcoatRoughness = 0.08; }
     }
     return PAINTS[k];
@@ -437,7 +438,7 @@
         for (var i = 0; i < zl.length; i++) {
           if ((zl[i].parts || []).indexOf(k) < 0) continue;
           var zc = zoneColour(zl[i], o.zones);
-          if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f, zl[i].flat);
+          if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f, zl[i].flat, zl[i].o);
           return;
         }
         if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', rimTex);
@@ -449,7 +450,7 @@
     if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', rimTex); });
     (Array.isArray(v.zones) ? v.zones : []).forEach(function (z) {
       var zc = zoneColour(z, o.zones);
-      if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f, z.flat); });
+      if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f, z.flat, z.o); });
     });
     if (Object.keys(swap).length) car.traverse(function (x) {
       if (!x.isMesh) return;
