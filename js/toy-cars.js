@@ -122,6 +122,40 @@
     });
   }
 
+  // weich schattieren: Normalen gleich liegender Ecken mitteln, außer an Kanten über maxDeg (flach schattierte Räder wirken sonst eckig)
+  function smoothNormals(g, maxDeg) {
+    var pos = g.attributes.position, nrm = g.attributes.normal;
+    if (!pos) return;
+    if (!nrm) { g.computeVertexNormals(); return; }
+    if (!g.boundingBox) g.computeBoundingBox();
+    var sz = new THREE.Vector3(); g.boundingBox.getSize(sz);
+    var eps = Math.max(1e-7, sz.length() * 1e-5), n = pos.count, map = {}, cos = Math.cos(maxDeg * Math.PI / 180), i, j;
+    for (i = 0; i < n; i++) {
+      var k = Math.round(pos.getX(i) / eps) + ',' + Math.round(pos.getY(i) / eps) + ',' + Math.round(pos.getZ(i) / eps);
+      (map[k] || (map[k] = [])).push(i);
+    }
+    var src = new Float32Array(n * 3), out = new Float32Array(n * 3);
+    for (i = 0; i < n; i++) { src[i * 3] = nrm.getX(i); src[i * 3 + 1] = nrm.getY(i); src[i * 3 + 2] = nrm.getZ(i); }
+    // je Lage: Ecken mit ähnlicher Richtung (Kette unter maxDeg) zu Gruppen verbinden, jede Gruppe bekommt
+    // genau eine gemittelte Normale – so gibt es an glatten Stellen keinen Sprung, echte Kanten bleiben
+    Object.keys(map).forEach(function (k) {
+      var gr = map[k], m = gr.length, par = [];
+      for (var q = 0; q < m; q++) par[q] = q;
+      function f(q) { while (par[q] !== q) q = par[q] = par[par[q]]; return q; }
+      for (var a = 0; a < m; a++) for (var b = a + 1; b < m; b++) {
+        var A = gr[a] * 3, B = gr[b] * 3;
+        if (src[A] * src[B] + src[A + 1] * src[B + 1] + src[A + 2] * src[B + 2] >= cos) par[f(b)] = f(a);
+      }
+      var acc = {};
+      gr.forEach(function (vi, q) { var r = f(q), c = acc[r] || (acc[r] = [0, 0, 0]); c[0] += src[vi * 3]; c[1] += src[vi * 3 + 1]; c[2] += src[vi * 3 + 2]; });
+      gr.forEach(function (vi, q) {
+        var c = acc[f(q)], l = Math.sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]) || 1;
+        out[vi * 3] = c[0] / l; out[vi * 3 + 1] = c[1] / l; out[vi * 3 + 2] = c[2] / l;
+      });
+    });
+    g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
+  }
+
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
   // Räder aus selbst gewählten Teilen (Car editor „Pick wheel parts“): Teile nach Lage zu Rädern gruppieren
   // (Seite, dann entlang der Länge), je Rad Drehpunkt in der Mitte, Drehgruppe „Spin“ um die Querachse
@@ -237,6 +271,12 @@
     }
     var ownWheels = own && wheelKeys && (wheelKeys.length || (v.steerParts || []).length) ? buildWheels(scene, wheelKeys, v.steerParts || []) : 0;
     var ud = scene.userData;
+    // „Smooth wheel shading“ im Car editor: alle Teile an den Rädern weich schattieren
+    if (v.smoothWheels) {
+      var sm = [];
+      scene.traverse(function (o) { if (o.isMesh && o.userData.wheelPart && sm.indexOf(o.geometry) < 0) sm.push(o.geometry); });
+      sm.forEach(function (g) { smoothNormals(g, 50); });
+    }
     // gewählte Teile (paintParts/rimParts) bekommen eigene Material-Kopien: nur sie werden umgefärbt,
     // auch wenn ihr Material sonst z. B. mit den Scheinwerfern geteilt ist
     function partMats(parts, tag) {

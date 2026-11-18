@@ -203,6 +203,10 @@
           <button type="button" id="wheelAuto" class="small">Automatic wheels</button>
         </div>
         <p class="small-text" id="wheelList"></p>
+        <div class="row">
+          <input type="checkbox" id="smoothWheels">
+          <label for="smoothWheels">Smooth wheel shading (rounder look for wheels that show every facet)</label>
+        </div>
       </section>
 
       <section aria-labelledby="h-steer">
@@ -397,7 +401,7 @@
         $('label').value = def.label || ''; $('label').placeholder = cur.name;
         $('mix').checked = def.mix !== false; $('flip').checked = !!def.flip;
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
-        $('texOff').checked = !!def.texOff; $('straight').checked = def.straight !== false;
+        $('texOff').checked = !!def.texOff; $('smoothWheels').checked = !!def.smoothWheels; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
         paints(); zones();
       }
@@ -601,6 +605,7 @@
       $('pickAuto').addEventListener('click', function () { delete def.paintParts; delete def.rimParts; delete def.paintMats; delete def.rimMats; listParts(); show(); });
       $('clearPaint').addEventListener('click', function () { def.paintParts = []; listParts(); show(); say('Paint parts cleared – click the ones you want.'); });
       $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
+      $('smoothWheels').addEventListener('change', function () { def.smoothWheels = $('smoothWheels').checked; reprepare({ smoothWheels: def.smoothWheels || undefined }); });
       $('straight').addEventListener('change', function () {
         def.straight = $('straight').checked;
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { straight: def.straight }); TC.applyCustom({ vehicles: c });
@@ -709,6 +714,7 @@
         if (def.flip) d.flip = true;
         if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);
         if (def.texOff) d.texOff = true;
+        if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
