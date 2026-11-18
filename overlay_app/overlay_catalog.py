@@ -190,6 +190,10 @@ _WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["dr
 
 EFFECT_META = {
     "snow.html": {"hidden": True},
+    "car-burnout.html": {"switches": [
+        {"key": "model", "label": "Car", "type": "select", "default": "mix", "options": [["mix", "Random mix"]],
+         "tooltip": "Random car from the mix, all cars of one brand, or exactly one car (list from the Car overview)"},
+    ]},
     "item-rain.html": {"switches": [
         {"key": "kind", "label": "What rains", "type": "select", "default": "sushi",
          "options": [["sushi", "Sushi"], ["balloon", "Balloons (rising)"],

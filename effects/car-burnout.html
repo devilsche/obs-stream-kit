@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Car Burnout</title>
+  <style>
+    /* Burnout (js/car-burnout.js): ein echtes 3D-Auto fährt rein, Donut mit Reifenqualm und Gummispuren,
+       aufheulen, Burnout, raus. ?model=mix (zufällig aus dem Mix) | brand:<Marke> | <Schlüssel aus der Car overview>.
+       Lack und Felgen aus dem Car editor. Startet beim Laden – in OBS „Shutdown source when not visible“ an,
+       etwa 15 s einblenden. */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="../js/vendor/three-r128-BufferGeometryUtils.js"></script>
+  <script src="../js/vendor/three-r128-RoomEnvironment.js"></script>
+  <script src="../js/glb-fix.js"></script>
+  <script src="../js/car-stage.js"></script>
+  <script src="../js/toy-cars.js"></script>
+  <script src="../api/fx/cars/custom.js"></script>
+  <script src="../js/car-burnout.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(location.search);
+      CarBurnout.start({
+        canvas: document.getElementById('gl'),
+        model: params.get('model') || 'mix',
+        reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)
+      });
+    })();
+  </script>
+</body>
+</html>

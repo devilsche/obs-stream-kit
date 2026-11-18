@@ -645,7 +645,7 @@ def urls():
     # Schalter mit "feature" nur zeigen, wenn der Tenant die Freischaltung hat (core/features.py)
     for e in effects:
         e["switches"] = [sw for sw in e["switches"] if not sw.get("feature") or sw["feature"] in feats]
-        if e["file"] == "item-rain.html":
+        if e["file"] in ("item-rain.html", "car-burnout.html"):
             e["switches"] = [_car_model_switch(project_root, sw) if sw["key"] == "model" else sw for sw in e["switches"]]
     transitions = TRANSITIONS
     return render_template("urls.html",

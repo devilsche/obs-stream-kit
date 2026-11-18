@@ -281,7 +281,10 @@
       // gerade stellen
       h.pivot.rotation.y = 0;
       var inner = new THREE.Group(); while (h.pivot.children.length) inner.add(h.pivot.children[0]);
-      inner.rotation.y = h.w.fix; h.pivot.add(inner);
+      inner.rotation.y = h.w.fix;
+      // Drehgruppe: dreht das Rad um seine Achse (Querachse des Autos), pivot.rotation.y lenkt
+      var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';
+      spin.add(inner); h.pivot.add(spin);
       res.push({ pivot: h.pivot, front: h.w.front, side: h.w.key[1], radius: h.w.radius, steer: h.w.steer });
     });
     return res;
