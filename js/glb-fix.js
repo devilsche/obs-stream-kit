@@ -182,14 +182,17 @@
     obj.traverse(function (o) { if (o.isMesh && o.geometry && o.geometry.attributes.position) meshes.push(o); });
     var box = new THREE.Box3().setFromObject(obj), size = new THREE.Vector3(), ctr = new THREE.Vector3(); box.getSize(size); box.getCenter(ctr);
     var lx = size.x >= size.z;   // Längsachse x oder z
-    // Reifenpunkte (in obj-Koordinaten)
+    // Reifenpunkte (in obj-Koordinaten); erst nur Reifen-Materialien (genauer Winkel), sonst ganze Räder nach Namen
+    function collect(strict) {
+    tireP = [];
     meshes.forEach(function (o) {
       var mats = [].concat(o.material), g = o.geometry, pos = g.attributes.position, M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
       var groups = g.groups && g.groups.length ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }];
       var idx = triIndex(g);
-      var byNode = wheelNode(o, obj);
+      var byNode = !strict && wheelNode(o, obj);
       groups.forEach(function (gr) {
-        if (!byNode && !isWheelMat(mats[gr.materialIndex || 0] || mats[0])) return;
+        var mm = mats[gr.materialIndex || 0] || mats[0];
+        if (!byNode && !(strict ? isTire(mm) : isWheelMat(mm))) return;
         var end = Math.min(idx.length, gr.start + gr.count), step = Math.max(1, Math.floor((end - gr.start) / 6000));
         for (var i = gr.start; i < end; i += step) {
           v.fromBufferAttribute(pos, idx[i]).applyMatrix4(M);
@@ -197,6 +200,17 @@
         }
       });
     });
+    }
+    function quads() {
+      var q = {};
+      tireP.forEach(function (p) {
+        var l = lx ? p.x - ctr.x : p.z - ctr.z, w = lx ? p.z - ctr.z : p.x - ctr.x, k = (l > 0 ? 'a' : 'b') + (w > 0 ? 'r' : 'l');
+        (q[k] = q[k] || []).push(p);
+      });
+      return Object.keys(q).filter(function (k) { return q[k].length >= 10; }).length;
+    }
+    collect(true);
+    if (tireP.length < 40 || quads() < 4) collect(false);
     if (tireP.length < 40) return [];
     // vier Gruppen: vorn/hinten × links/rechts (um die Mitte des Autos)
     var Q = {};

@@ -89,8 +89,8 @@ def scan(path):
             walk(c, W, wh)
 
     ident = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
-    tire_mats = {i for i, m in enumerate(mats) if (TIRE.search(m.get("name", "")) and not NOT_TIRE.search(m.get("name", "")))
-                 or (WHEEL.search(m.get("name", "")) and not NOT_WHEEL.search(m.get("name", "")))}
+    tire_mats = {i for i, m in enumerate(mats) if TIRE.search(m.get("name", "")) and not NOT_TIRE.search(m.get("name", ""))}
+    wheel_mats = {i for i, m in enumerate(mats) if WHEEL.search(m.get("name", "")) and not NOT_WHEEL.search(m.get("name", ""))}
     for r in g["scenes"][g.get("scene", 0)]["nodes"]:
         walk(r, ident, False)
     for _, pos, p, _w in prims:
@@ -98,15 +98,18 @@ def scan(path):
         total_v += cnt
         tris += (g["accessors"][p["indices"]]["count"] if "indices" in p else cnt) // 3
     step = max(1, total_v // MAX_POINTS)
-    pts, tire = [], []
+    pts, tire, wheel = [], [], []
     for W, pos, p, wh in prims:
-        is_tire = wh or p.get("material") in tire_mats
+        is_tire = p.get("material") in tire_mats
+        is_wheel = wh or p.get("material") in wheel_mats
         for x, y, z in _positions(g, binc, pos, step):
             q = (W[0] * x + W[1] * y + W[2] * z + W[3], W[4] * x + W[5] * y + W[6] * z + W[7],
                  W[8] * x + W[9] * y + W[10] * z + W[11])
             pts.append(q)
             if is_tire:
                 tire.append(q)
+            elif is_wheel:
+                wheel.append(q)
     if not pts:
         return {"interior": named, "tris": tris, "share": 0.0}
     mn = [min(p[k] for p in pts) for k in range(3)]
@@ -125,7 +128,11 @@ def scan(path):
     share = hit / len(pts)
     res = {"interior": bool(named or share >= 0.04), "tris": tris, "share": round(share, 4),
            "size": [round(size[0], 3), round(size[1], 3), round(size[2], 3)]}
-    res.update(_wheels(tire, mn, size, la, lat))
+    # Winkel am Reifen messen (Bremssättel/Speichen verfälschen ihn); nur ohne Reifen-Material die ganzen Räder
+    w = _wheels(tire, mn, size, la, lat)
+    if w["wheels"] < 4:
+        w = _wheels(tire + wheel, mn, size, la, lat)
+    res.update(w)
     return res
 
 

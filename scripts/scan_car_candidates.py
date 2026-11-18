@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fx import car_models, glb_scan, sketchfab  # noqa: E402
 
 
-VERSION = 2   # erhöhen, wenn sich die Vermessung ändert: dann wird neu gemessen (aus dem Cache, ohne Download)
+VERSION = 3   # erhöhen, wenn sich die Vermessung ändert: dann wird neu gemessen (aus dem Cache, ohne Download)
 PACE = 120
 PAUSE = 20 * 60
 
