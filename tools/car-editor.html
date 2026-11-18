@@ -233,14 +233,26 @@
       var orbit = { yaw: 0.8, pitch: 0.22, dist: 10, t: new THREE.Vector3(0, 0.6, 0) }, pts = {};
       // Front zeigt nach +x: Kamera auf +x schaut auf die Front
       var CAMS = { '3q': [0.8, 0.22], side: [Math.PI / 2, 0.05], front: [0, 0.1], rear: [Math.PI, 0.1], top: [Math.PI, 1.45] };   // Front zeigt nach +x (wie im Regen)
-      Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; orbit.t.set(0, 0.6, 0); }); });
+      Array.prototype.forEach.call(document.querySelectorAll('[data-cam]'), function (b) { b.addEventListener('click', function () { var c = CAMS[b.dataset.cam]; orbit.yaw = c[0]; orbit.pitch = c[1]; orbit.t.set(0, 0.6, 0); var hc = holder.children[0]; orbit.dist = Math.max(9, hc && hc.userData.dims ? hc.userData.dims.L * 2.2 : 9); }); });
       // rechts/Mitte/Shift ziehen: Ansicht verschieben (Blickziel entlang der Bildebene)
       function panBy(dx, dy) {
         var k = orbit.dist * 0.0012, r = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), u = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
         orbit.t.addScaledVector(r, -dx * k).addScaledVector(u, dy * k);
       }
       canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
-      canvas.addEventListener('pointerdown', function (e) { pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.button === 2 || e.shiftKey }; canvas.setPointerCapture(e.pointerId); });
+      // Drehpunkt = Oberfläche in der Bildmitte (Kamera bleibt stehen, nur Ziel/Abstand rücken auf den Treffer)
+      var fRay = new THREE.Raycaster(), fMid = new THREE.Vector2(0, 0);
+      function refocus() {
+        if (!holder.children.length) return;
+        cam.updateMatrixWorld(); fRay.setFromCamera(fMid, cam);
+        var h = fRay.intersectObject(holder, true).filter(function (x) {
+          var m = Array.isArray(x.object.material) ? x.object.material[0] : x.object.material;
+          return x.object.visible && !(m && m.transparent && m.opacity < 0.6);
+        })[0];
+        if (!h || h.distance < 0.05) return;
+        orbit.t.copy(cam.position).addScaledVector(fRay.ray.direction, h.distance); orbit.dist = h.distance;
+      }
+      canvas.addEventListener('pointerdown', function (e) { if (!(e.button === 1 || e.button === 2 || e.shiftKey) && !Object.keys(pts).length) refocus(); pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.button === 2 || e.shiftKey }; canvas.setPointerCapture(e.pointerId); });
       canvas.addEventListener('pointermove', function (e) {
         if (!pts[e.pointerId]) return;
         var ids = Object.keys(pts);
@@ -248,7 +260,7 @@
           var a = pts[ids[0]], b = pts[ids[1]], d0 = Math.hypot(a.x - b.x, a.y - b.y);
           pts[e.pointerId] = { x: e.clientX, y: e.clientY };
           var d1 = Math.hypot(pts[ids[0]].x - pts[ids[1]].x, pts[ids[0]].y - pts[ids[1]].y);
-          if (d0 > 0) orbit.dist = Math.max(0.4, Math.min(40, orbit.dist * d0 / d1));
+          if (d0 > 0) orbit.dist = Math.max(0.15, Math.min(40, orbit.dist * d0 / d1));
           return;
         }
         var p = pts[e.pointerId];
@@ -258,7 +270,7 @@
       });
       function up(e) { delete pts[e.pointerId]; }
       canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
-      canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(0.4, Math.min(40, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+      canvas.addEventListener('wheel', function (e) { e.preventDefault(); refocus(); orbit.dist = Math.max(0.15, Math.min(40, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
       canvas.addEventListener('keydown', function (e) {
         var k = { ArrowLeft: [-0.15, 0], ArrowRight: [0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
         if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
