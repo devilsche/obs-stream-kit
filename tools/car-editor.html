@@ -132,10 +132,16 @@
       </section>
       <section aria-labelledby="h-parts">
         <h2 id="h-parts">Which parts get the colours</h2>
-        <p class="muted small-text">Press a button, then click on the car: each click adds or removes that part. Paint parts show pink, rim parts cyan while picking.</p>
-        <div class="row" role="group" aria-label="Pick mode">
+        <p class="muted small-text">Press a button, then click on the car: each click adds or removes exactly that part. Paint parts show pink, rim parts cyan while picking. “Clear” empties the list so only what you click counts.</p>
+        <div class="row" role="group" aria-label="Paint parts">
           <button type="button" id="pickPaint" aria-pressed="false">Pick paint parts</button>
+          <button type="button" id="clearPaint" class="small">Clear paint</button>
+        </div>
+        <div class="row" role="group" aria-label="Rim parts">
           <button type="button" id="pickRim" aria-pressed="false">Pick rim parts</button>
+          <button type="button" id="clearRim" class="small">Clear rims</button>
+        </div>
+        <div class="row">
           <button type="button" id="pickAuto" class="small">Back to automatic</button>
         </div>
         <p class="small-text" id="partList"></p>
@@ -253,7 +259,7 @@
       var picking = null;   // 'paint' | 'rim' | null
       function partKeys(which) {
         var m = TC.meta(cur.key) || {};
-        return which === 'paint' ? (def.paintMats || m.autoPaint || []) : (def.rimMats || m.autoRim || []);
+        return which === 'paint' ? (def.paintParts || m.autoPaintParts || []) : (def.rimParts || m.autoRimParts || []);
       }
       function show() {
         while (holder.children.length) holder.remove(holder.children[0]);
@@ -261,7 +267,7 @@
         var p = def.paints && def.paints.length ? def.paints[Math.min(shown, def.paints.length - 1)] : { c: null };
         var pc = p.c == null ? null : p.c, rc = def.rim == null ? null : def.rim;
         if (picking) { pc = 0xff3fb4; rc = 0x22e5ff; }   // Auswahl sichtbar machen
-        var car = TC.paintTemplate(tpl, pc, rc, { paint: partKeys('paint'), rims: partKeys('rim'), texOff: picking ? true : !!def.texOff });
+        var car = TC.paintTemplate(tpl, pc, rc, { paintParts: partKeys('paint'), rimParts: partKeys('rim'), texOff: picking ? true : !!def.texOff });
         car.position.y = tpl.userData.dims.H / 2;   // Mitte im Auto → Räder auf den Boden
         // Lenkeinschlag der Vorderräder (Räder an der Front: +x)
         var s = +$('steer').value;
@@ -327,8 +333,8 @@
       // ── Teile per Klick wählen ──
       function listParts() {
         if (!cur || !TC.meta(cur.key)) { $('partList').textContent = ''; return; }
-        $('partList').textContent = 'Paint: ' + (partKeys('paint').join(', ') || 'none') + (def.paintMats ? '' : ' (automatic)') +
-          ' · Rims: ' + (partKeys('rim').join(', ') || 'none') + (def.rimMats ? '' : ' (automatic)');
+        $('partList').textContent = 'Paint: ' + partKeys('paint').length + ' parts' + (def.paintParts ? '' : ' (automatic)') +
+          ' · Rims: ' + partKeys('rim').length + ' parts' + (def.rimParts ? '' : ' (automatic)');
       }
       function setPick(w) {
         picking = picking === w ? null : w;
@@ -337,7 +343,9 @@
       }
       $('pickPaint').addEventListener('click', function () { setPick('paint'); });
       $('pickRim').addEventListener('click', function () { setPick('rim'); });
-      $('pickAuto').addEventListener('click', function () { delete def.paintMats; delete def.rimMats; listParts(); show(); });
+      $('pickAuto').addEventListener('click', function () { delete def.paintParts; delete def.rimParts; delete def.paintMats; delete def.rimMats; listParts(); show(); });
+      $('clearPaint').addEventListener('click', function () { def.paintParts = []; listParts(); show(); say('Paint parts cleared – click the ones you want.'); });
+      $('clearRim').addEventListener('click', function () { def.rimParts = []; listParts(); show(); say('Rim parts cleared – click the ones you want.'); });
       $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
       $('straight').addEventListener('change', function () {
         def.straight = $('straight').checked;
@@ -352,9 +360,8 @@
         ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
         var hit = ray.intersectObject(holder, true).filter(function (h) { return h.object.isMesh; })[0];
         if (!hit) return;
-        var mat = Array.isArray(hit.object.material) ? hit.object.material[hit.face.materialIndex] : hit.object.material;
-        var key = mat && mat.userData.key; if (!key) return;
-        var prop = picking === 'paint' ? 'paintMats' : 'rimMats', list = partKeys(picking).slice(), i = list.indexOf(key);
+        var key = hit.object.userData.pkey; if (!key) return;
+        var prop = picking === 'paint' ? 'paintParts' : 'rimParts', list = partKeys(picking).slice(), i = list.indexOf(key);
         if (i >= 0) list.splice(i, 1); else list.push(key);
         def[prop] = list; listParts(); show(); say((i >= 0 ? 'Removed: ' : 'Added: ') + key);
       });
@@ -381,8 +388,8 @@
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.rim != null) d.rim = def.rim;
         if (def.flip) d.flip = true;
-        if (def.paintMats) d.paintMats = def.paintMats.slice(0, 60);
-        if (def.rimMats) d.rimMats = def.rimMats.slice(0, 60);
+        if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);
+        if (def.rimParts) d.rimParts = def.rimParts.slice(0, 400);
         if (def.texOff) d.texOff = true;
         if (def.straight === false) d.straight = false;
         if (def.rework || (def.issues && def.issues.length) || def.note) {
@@ -400,6 +407,7 @@
         }).catch(function (e) { say('Failed: ' + e.message, 'err'); });
       });
 
+      TC.editMode(true);   // Teile einzeln lassen, damit sie anklickbar sind
       TC.loadCatalog().then(function (l) {
         list = l.slice().sort(function (a, b) { return (a.brand + a.name).localeCompare(b.brand + b.name); });
         list.forEach(function (e) { var o = el('option', null, e.brand + ' – ' + (TC.vehicle(e.key).label || e.name)); o.value = e.key; $('pick').appendChild(o); });

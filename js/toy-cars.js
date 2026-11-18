@@ -26,6 +26,7 @@
   // Materiallisten je Modell außerhalb von userData: three.js kopiert userData beim Klonen per JSON –
   // Materialien/Gruppen dort würden bei jedem fallenden Auto samt Texturen serialisiert (Ruckeln)
   var META = {};
+  var EDIT = false;   // Car editor: Teile nicht zusammenfassen (einzeln anklickbar)
 
   function applyCustom(c) { CUSTOM = (c && c.vehicles) || {}; PAINTS = {}; }
   function vehicle(key) { return CUSTOM[key] || {}; }
@@ -81,16 +82,41 @@
       });
     });
     function byKeys(keys) { return all.filter(function (m) { return keys.indexOf(m.userData.key) >= 0; }); }
+    // feste Schlüssel je Teil (Mesh): Name bzw. Reihenfolge, Radteile mit Rad und Material – Auswahl im Editor
+    var pk = {}, n = 0;
+    scene.traverse(function (o) {
+      if (!o.isMesh) return;
+      var wheel = null; for (var p = o.parent; p && p !== scene; p = p.parent) if (/^Wheel /.test(p.name || '')) { wheel = p.name; break; }
+      var m0 = [].concat(o.material)[0], base = wheel ? wheel + ':' + (m0 && m0.userData.key) : (o.name || '#' + n);
+      n++; pk[base] = (pk[base] || 0) + 1;
+      o.userData.pkey = pk[base] > 1 ? base + '~' + pk[base] : base;
+    });
     var ud = scene.userData;
-    META[e.key] = {
-      all: all,
-      paint: Array.isArray(v.paintMats) ? byKeys(v.paintMats) : (ud.paintMats || []),
-      rim: Array.isArray(v.rimMats) ? byKeys(v.rimMats) : (ud.rimMats || []),
-      autoPaint: (ud.paintMats || []).map(function (m) { return m.userData.key; }),
-      autoRim: (ud.rimMats || []).map(function (m) { return m.userData.key; }),
-      wheels: (ud.wheels || []).length
-    };
-    mergeStatic(scene);
+    // gewählte Teile (paintParts/rimParts) bekommen eigene Material-Kopien: nur sie werden umgefärbt,
+    // auch wenn ihr Material sonst z. B. mit den Scheinwerfern geteilt ist
+    function partMats(parts, tag) {
+      var out = [], copies = {};
+      scene.traverse(function (o) {
+        if (!o.isMesh || parts.indexOf(o.userData.pkey) < 0 || Array.isArray(o.material)) return;
+        var m = o.material, c = copies[m.uuid];
+        if (!c) { c = copies[m.uuid] = m.clone(); c.userData = { key: m.userData.key + '@' + tag }; out.push(c); }
+        o.material = c;
+      });
+      return out;
+    }
+    var paint = Array.isArray(v.paintParts) ? partMats(v.paintParts, 'paint') : Array.isArray(v.paintMats) ? byKeys(v.paintMats) : (ud.paintMats || []);
+    var rim = Array.isArray(v.rimParts) ? partMats(v.rimParts, 'rim') : Array.isArray(v.rimMats) ? byKeys(v.rimMats) : (ud.rimMats || []);
+    var autoPaint = {}, autoRim = {};
+    (ud.paintMats || []).forEach(function (m) { autoPaint[m.uuid] = 1; }); (ud.rimMats || []).forEach(function (m) { autoRim[m.uuid] = 1; });
+    var autoPaintParts = [], autoRimParts = [];
+    scene.traverse(function (o) {
+      if (!o.isMesh) return;
+      var ms = [].concat(o.material);
+      if (ms.some(function (m) { return m && autoPaint[m.uuid]; })) autoPaintParts.push(o.userData.pkey);
+      if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
+    });
+    META[e.key] = { all: all, paint: paint, rim: rim, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: (ud.wheels || []).length };
+    if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
     var lx = size.x >= size.z, front = e.front || 0;
@@ -176,20 +202,29 @@
   }
   // Kopie einer Vorlage mit Lack-/Felgenfarbe (rim: Zahl = Farbe, null = Original, undefined = aus dem Editor);
   // o = { paint: [Schlüssel], rims: [Schlüssel], texOff } überschreibt die Einstellungen (Vorschau im Editor)
+  // o.paintParts / o.rimParts: Teile-Schlüssel (Editor-Vorschau, Teile nicht zusammengefasst)
   function paintTemplate(t, color, rim, o) {
     o = o || {};
     var key = t.userData.key, v = vehicle(key), meta = META[key] || { all: [], paint: [], rim: [] };
-    function byKeys(keys) { return meta.all.filter(function (m) { return keys.indexOf(m.userData.key) >= 0; }); }
-    var pm = o.paint ? byKeys(o.paint) : meta.paint, rm = o.rims ? byKeys(o.rims) : meta.rim;
     var texOff = o.texOff != null ? o.texOff : !!v.texOff;
     var car = t.clone(true), swap = {};
     if (rim === undefined) rim = v.rim;
-    if (color != null) pm.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
-    if (rim != null) rm.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', false); });
-    if (Object.keys(swap).length) car.traverse(function (o) {
-      if (!o.isMesh) return;
-      if (Array.isArray(o.material)) o.material = o.material.map(function (m) { return swap[m.uuid] || m; });
-      else if (swap[o.material.uuid]) o.material = swap[o.material.uuid];
+    if (o.paintParts || o.rimParts) {
+      // je Teil umfärben (Material-Kopien je Original-Material und Farbe)
+      car.traverse(function (x) {
+        if (!x.isMesh || Array.isArray(x.material)) return;
+        var k = x.userData.pkey;
+        if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', false);
+        else if (color != null && o.paintParts && o.paintParts.indexOf(k) >= 0) x.material = colourMat(x.material, color, 'p', texOff);
+      });
+      return car;
+    }
+    if (color != null) meta.paint.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
+    if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', false); });
+    if (Object.keys(swap).length) car.traverse(function (x) {
+      if (!x.isMesh) return;
+      if (Array.isArray(x.material)) x.material = x.material.map(function (m) { return swap[m.uuid] || m; });
+      else if (swap[x.material.uuid]) x.material = swap[x.material.uuid];
     });
     return car;
   }
@@ -202,7 +237,7 @@
 
   root.ToyCars = {
     ready: ready, build: build, dims: dims, pickPaint: pickPaint, random: random, applyCustom: applyCustom, prepare: prepare,
-    meta: function (k) { return META[k]; },
+    meta: function (k) { return META[k]; }, editMode: function (on) { EDIT = !!on; },
     forget: function (k) { delete TPL[k]; delete loading[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
     loadCatalog: loadCatalog, loadModel: loadModel, vehicle: vehicle, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
