@@ -78,7 +78,7 @@
   "license": "CC Attribution",
   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
   "faces": 968409,
-  "note": "Simplified for the rain (gltfpack, about 14,000 triangles); this version is under the same licence."
+  "note": "Simplified (gltfpack, about 106,000 triangles); this version is under the same licence."
  },
  {
   "key": "g80m3",
@@ -89,7 +89,7 @@
   "license": "CC Attribution-NonCommercial-ShareAlike",
   "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
   "faces": 658592,
-  "note": "Simplified for the rain (gltfpack, about 15,000 triangles); this version is under the same licence."
+  "note": "Simplified (gltfpack, about 87,000 triangles); this version is under the same licence."
  },
  {
   "key": "e28m5",
@@ -100,7 +100,7 @@
   "license": "CC Attribution-NonCommercial-ShareAlike",
   "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
   "faces": 185411,
-  "note": "Simplified for the rain (gltfpack); this version is under the same licence."
+  "note": "Simplified (gltfpack, about 50,000 triangles); this version is under the same licence."
  },
  {
   "key": "e30m3b",

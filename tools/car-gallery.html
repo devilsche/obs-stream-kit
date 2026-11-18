@@ -88,7 +88,7 @@
         if (o.tag) { var tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = o.tag; meta.appendChild(tg); }
         if (o.param) { var p = document.createElement('code'); p.className = 'param'; p.textContent = o.param; meta.appendChild(p); }
         if (o.edit) { var a = document.createElement('a'); a.href = o.edit; a.textContent = 'Edit'; a.setAttribute('aria-label', 'Edit ' + o.title); meta.appendChild(a); }
-        (o.links || []).forEach(function (l) { var x = document.createElement('a'); x.href = l[0]; x.textContent = l[1]; x.target = '_blank'; x.rel = 'noopener'; meta.appendChild(x); });
+        (o.links || []).forEach(function (l) { var x = document.createElement('a'); x.href = l[0]; x.textContent = l[1]; if (/^https?:/.test(l[0])) { x.target = '_blank'; x.rel = 'noopener'; } meta.appendChild(x); });
         li.append(st, meta); list.appendChild(li);
         var t = { li: li, stage: st, make: o.make, obj: null, kind: o.kind, text: (o.title + ' ' + o.param + ' ' + o.sub).toLowerCase(), yaw: o.kind === 'rim' ? 0.5 : -0.7 + (tiles.length % 5) * 0.12, hover: false };
         li.addEventListener('pointerenter', function () { t.hover = true; });
@@ -139,7 +139,7 @@
         list.forEach(function (c) {
           tile(realList, {
             kind: 'real', title: c.title, sub: 'by ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles in the original' + (c.note ? ' · ' + c.note : ''),
-            alt: c.title + ' 3D model', links: [[c.url, 'Model on Sketchfab'], [c.licenseUrl, 'Licence']],
+            alt: c.title + ' 3D model', links: [['car-viewer?model=' + encodeURIComponent(c.key), 'View large'], [c.url, 'Model on Sketchfab'], [c.licenseUrl, 'Licence']],
             make: function () { return realModel(c.key); }
           });
         });

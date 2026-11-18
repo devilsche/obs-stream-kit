@@ -84,6 +84,11 @@ TOOLS = [
      "desc": "All cars of the BMW rain with their paints and all rims, with their URL parameter.",
      "path": "tools/car-gallery.html",
      "admin_only": True},
+    {"key": "car-viewer",
+     "label": "Car viewer",
+     "desc": "One car model large on screen: turn, zoom, front/side/rear/top view.",
+     "path": "tools/car-viewer.html",
+     "admin_only": True},
     {"key": "car-editor",
      "label": "Toy car editor",
      "desc": "Build rims, pick rims and tyres per car, add and tune lips, wings, diffusers, skirts, flares and exhausts. Saved cars go live in the BMW rain.",
@@ -608,6 +613,11 @@ def urls():
             row = cur.fetchone()
             token = row["token"] if row else None
         creds = core_creds.get(conn, g.tenant_id)
+        try:
+            from core import features
+            feats = set(features.effective(conn, g.tenant_id))
+        except Exception:
+            feats = set()
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
@@ -627,6 +637,9 @@ def urls():
                                 switches_map=STINGER_META)
     effects  = list_dir_sources(project_root, "effects",  desc="Visual effect overlay.",
                                 switches_map=EFFECT_META)
+    # Schalter mit "feature" nur zeigen, wenn der Tenant die Freischaltung hat (core/features.py)
+    for e in effects:
+        e["switches"] = [sw for sw in e["switches"] if not sw.get("feature") or sw["feature"] in feats]
     transitions = TRANSITIONS
     return render_template("urls.html",
                            user=g.user, token=token,
