@@ -68,3 +68,21 @@ def test_custom_js_endpoint(tmp_path):
 
 def test_custom_js_needs_a_token(tmp_path):
     assert _client(str(tmp_path), tenant_id=None).get("/s/t/api/fx/cars/custom.js").status_code == 404
+
+
+def test_catalog_and_model_files(tmp_path):
+    d = tmp_path / "data" / "car-rain"
+    d.mkdir(parents=True)
+    uid = "0123456789abcdef0123456789abcdef"
+    (d / "catalog.json").write_text('[{"uid": "%s", "key": "e30"}]' % uid)
+    (d / (uid + ".glb")).write_bytes(b"glTF")
+    c = _client(str(tmp_path))
+    assert c.get("/s/t/api/fx/cars/catalog.json").json == [{"uid": uid, "key": "e30"}]
+    r = c.get("/s/t/api/fx/cars/model/" + uid + ".glb")
+    assert r.status_code == 200 and r.data == b"glTF" and r.mimetype == "model/gltf-binary"
+    assert c.get("/s/t/api/fx/cars/model/../../x.glb").status_code == 404
+    assert c.get("/s/t/api/fx/cars/model/ffffffffffffffffffffffffffffffff.glb").status_code == 404
+
+
+def test_catalog_missing_is_empty(tmp_path):
+    assert _client(str(tmp_path)).get("/s/t/api/fx/cars/catalog.json").json == []

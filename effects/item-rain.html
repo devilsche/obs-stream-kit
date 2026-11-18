@@ -6,7 +6,7 @@
   <title>Item Rain</title>
   <style>
     /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random), ?by= Chat-Name (sein !outfit regnet zu einem Drittel mit),
-       ?model= (Autos: mix oder ein Fahrzeug aus tools/car-gallery – eingebaut 2002|e30|e30m3|e36|e46|e92m3, eigene aus dem Auto-Editor),
+       ?model= (Autos: mix = je Regen 6 zufällige echte Modelle aus dem Mix, oder ein Modell-Schlüssel aus tools/car-gallery),
        ?duration=Millisekunden (Standard 22000), ?count=Anzahl (Standard 120).
        Sushi: Fress-Ente nur, wenn der Admin sie für den Tenant freigeschaltet hat (window.__FEATURES__ enthält
        „sushi-eater“, /admin/users); ?eater=0 aus, ?eater=<Outfit> oder <Chat-Name> (dessen !outfit),
@@ -27,6 +27,8 @@
   <script src="../js/rubber-duck.js"></script>
   <script src="../js/rubber-duck-outfits.js"></script>
   <script src="../api/fx/ducks/custom.js"></script>
+  <script src="../js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="../js/glb-fix.js"></script>
   <script src="../js/toy-cars.js"></script>
   <script src="../api/fx/cars/custom.js"></script>
   <script src="../js/item-rain-3d.js"></script>
@@ -36,6 +38,12 @@
       var params = new URLSearchParams(location.search);
       function hasFeat(k) { return (window.__FEATURES__ || []).indexOf(k) >= 0; }
       var reduceMotion = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      // Autos (car, mix): erst echte Modelle laden (js/toy-cars.js), dann starten; ohne Modelle keine Autos
+      var wantsCars = ['car', 'mix'].indexOf(params.get('kind')) >= 0 && window.ToyCars && ToyCars.ready;
+      if (wantsCars) ToyCars.ready({ model: params.get('model'), count: params.get('kind') === 'mix' ? 3 : 6 }).then(go, go);
+      else go();
+      function go() {
+      if (wantsCars && !ToyCars.MODELS.length && params.get('kind') === 'car') params.set('kind', 'sushi');
       window.ItemRain3D.start({
         // Enten nur mit Freischaltung „ducks“ (sonst Sushi statt Enten)
         kind: ['duck', 'balloon', 'car', 'mix'].indexOf(params.get('kind')) >= 0 && (['duck', 'mix'].indexOf(params.get('kind')) < 0 || hasFeat('ducks')) ? params.get('kind') : 'sushi',
@@ -62,6 +70,7 @@
         owner: window.__TWITCH_CHANNEL__ || '',
         eat: parseInt(params.get('eat'), 10) || 25
       });
+      }
     })();
   </script>
 </body>

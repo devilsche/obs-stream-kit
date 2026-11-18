@@ -9,11 +9,14 @@ Laub; winter/spring/summer: fx/season_db.py) schreiben den Befehl zusätzlich
 in die DB; der erste Poll ohne `since` liefert sie als `state` mit.
 """
 import functools
+import json
 import logging
+import os
+import re
 import sqlite3
 import time
 
-from flask import Blueprint, Response, current_app, g, jsonify, abort, request
+from flask import Blueprint, Response, current_app, g, jsonify, abort, request, send_from_directory
 
 from core.db_compat import SqliteCompatConn
 import datetime
@@ -546,6 +549,35 @@ def duck_outfits_js(token):
     # Kanalinhaber: seine !outfit-Wahl gilt auch, wenn er sie nur in einem anderen Kanal getroffen hat
     js += duck_viewers.script(duck_viewers.mapping(root, g.tenant_id, owner=owner))
     return _no_store(Response(js, mimetype="application/javascript"))
+
+
+@bp_fx.route("/s/<token>/api/fx/cars/catalog.json")
+def car_catalog(token):
+    """Aufbereitete Auto-Modelle für den Regen (data/car-rain/catalog.json, scripts/build_car_rain.py)."""
+    if g.tenant_id is None:
+        abort(404)
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    try:
+        with open(os.path.join(root, "data", "car-rain", "catalog.json"), encoding="utf-8") as f:
+            cat = json.load(f)
+    except (OSError, ValueError):
+        cat = []
+    return _no_store(jsonify(cat))
+
+
+_UID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+@bp_fx.route("/s/<token>/api/fx/cars/model/<uid>.glb")
+def car_model_file(token, uid):
+    """Ein aufbereitetes Modell; lange cachebar (Datei ändert sich nur mit neuer Aufbereitung)."""
+    if g.tenant_id is None or not _UID_RE.match(uid):
+        abort(404)
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    d = os.path.join(root, "data", "car-rain")
+    if not os.path.exists(os.path.join(d, uid + ".glb")):
+        abort(404)
+    return send_from_directory(os.path.abspath(d), uid + ".glb", mimetype="model/gltf-binary", max_age=7 * 86400)
 
 
 @bp_fx.route("/s/<token>/api/fx/cars/custom.js")

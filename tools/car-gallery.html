@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Toy cars</title>
+  <title>Car overview</title>
   <style>
-    /* Übersicht aller Spielzeugautos (js/toy-cars.js + eigene aus dem Auto-Editor) je Lackierung und aller Felgen:
-       eine WebGL-Fläche hinter dem Raster, jede Kachel wird per Scissor in ihren Bereich gezeichnet */
-    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; }
+    /* Übersicht der Autos im Regen (Katalog /api/fx/cars/catalog.json, aufbereitet von scripts/build_car_rain.py):
+       eine WebGL-Fläche hinter dem Raster, jede Kachel per Scissor; Modelle laden erst, wenn sichtbar */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --ok: #9be59b; }
     html { background: var(--bg); }
     body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
     .skip { position: absolute; left: -9999px; }
@@ -15,7 +15,6 @@
     #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; }
     header { padding: 18px 20px 4px; max-width: 1400px; margin: 0 auto; }
     h1 { font-size: 22px; margin: 0; }
-    h2.sec { font-size: 18px; margin: 22px 0 10px; }
     .lead { color: var(--muted); margin: 4px 0 0; }
     .lead a { color: var(--text); }
     .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; max-width: 1400px; margin: 0 auto; }
@@ -27,172 +26,131 @@
     input[type=search] { background: var(--panel); color: var(--text); border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 10px; font: inherit; min-height: 34px; }
     .count { color: var(--muted); margin-left: auto; }
     main { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
-    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
-    .grid.rims { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
     .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .tile[hidden] { display: none; }
     .stage { aspect-ratio: 4 / 3; width: 100%; }
-    .rims .stage { aspect-ratio: 1 / 1; }
     .meta { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
-    .meta h3 { font-size: 16px; margin: 0; }
+    .meta h2 { font-size: 15px; margin: 0; }
     .sub { color: var(--muted); font-size: 13px; }
     .param { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
-    .meta a { color: var(--text); font-size: 13px; padding: 4px 0; min-height: 24px; display: inline-block; }
-    .tag { font-size: 11px; border: 1px solid var(--line); border-radius: 10px; padding: 0 6px; color: var(--muted); align-self: flex-start; }
+    .tag { font-size: 12px; color: var(--ok); }
+    .tag.off { color: var(--muted); }
+    .links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+    .meta a { color: var(--text); font-size: 13px; padding: 3px 0; min-height: 24px; display: inline-block; }
+    .swatches { display: flex; gap: 4px; flex-wrap: wrap; }
+    .sw { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); }
+    .swo { background: conic-gradient(#c33, #3c3, #33c, #c33); }
   </style>
 </head>
 <body>
   <a class="skip" href="#cars">Skip to the cars</a>
   <canvas id="gl" aria-hidden="true"></canvas>
   <header>
-    <h1>Toy cars</h1>
-    <p class="lead">Every car of the BMW rain in each of its paints, and every rim. Use a car as <code>?model=&lt;name&gt;</code> on <code>effects/item-rain.html?kind=car</code>; <code>mix</code> picks one per car from all cars in the mix. <a href="car-editor">Open the editor</a></p>
+    <h1>Car overview</h1>
+    <p class="lead">Every car of the car rain (<code>effects/item-rain.html?kind=car</code>), real 3D models chosen in the <a href="car-picker">Car picker</a>. Each rain loads 6 random cars from the mix; <code>&amp;model=&lt;name&gt;</code> picks one. Paints and rim colour in the <a href="car-editor">Car editor</a>.</p>
   </header>
   <div class="filters" role="group" aria-label="Filter cars">
-    <span id="views"></span>
+    <span id="brands"></span>
     <label for="q">Search</label>
     <input type="search" id="q" autocomplete="off">
     <span class="count" id="count" aria-live="polite"></span>
   </div>
   <main>
-    <h2 class="sec" id="h-cars">Cars</h2>
-    <ul class="grid" id="cars" aria-labelledby="h-cars"></ul>
-    <h2 class="sec" id="h-real">Real models (preview, not in the rain yet)</h2>
-    <p class="lead" id="realLead">Free 3D models from Sketchfab under CC BY 4.0, shown as they come. Pick the ones you like; they will then get our paints, rims and tuning parts.</p>
-    <ul class="grid" id="real" aria-labelledby="h-real"></ul>
-    <h2 class="sec" id="h-rims">Rims</h2>
-    <ul class="grid rims" id="rims" aria-labelledby="h-rims"></ul>
+    <p id="status" role="status" aria-live="polite">Loading …</p>
+    <ul class="grid" id="cars"></ul>
   </main>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-RoomEnvironment.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
       'use strict';
-      var THREE = window.THREE, TC = window.ToyCars;
+      var THREE = window.THREE, TC = window.ToyCars, $ = function (id) { return document.getElementById(id); };
       var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
-      var LIVERY = { stripes: 'racing stripes', race: 'race number', carbon: 'carbon roof' };
-      function hex(c) { return '#' + ('000000' + c.toString(16)).slice(-6); }
+      function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+      function hex(c) { return '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); }
+      var tiles = [], brand = 'all', css = '', ncss = 0;
 
-      // ── Kacheln ──
-      var tiles = [], carList = document.getElementById('cars'), rimList = document.getElementById('rims'), realList = document.getElementById('real');
-      function tile(list, o) {
-        var li = document.createElement('li'); li.className = 'tile';
-        var st = document.createElement('div'); st.className = 'stage'; st.setAttribute('role', 'img'); st.setAttribute('aria-label', o.alt);
-        var meta = document.createElement('div'); meta.className = 'meta';
-        var h = document.createElement('h3'); h.textContent = o.title;
-        var sub = document.createElement('span'); sub.className = 'sub'; sub.textContent = o.sub;
-        meta.append(h, sub);
-        if (o.tag) { var tg = document.createElement('span'); tg.className = 'tag'; tg.textContent = o.tag; meta.appendChild(tg); }
-        if (o.param) { var p = document.createElement('code'); p.className = 'param'; p.textContent = o.param; meta.appendChild(p); }
-        if (o.edit) { var a = document.createElement('a'); a.href = o.edit; a.textContent = 'Edit'; a.setAttribute('aria-label', 'Edit ' + o.title); meta.appendChild(a); }
-        (o.links || []).forEach(function (l) { var x = document.createElement('a'); x.href = l[0]; x.textContent = l[1]; if (/^https?:/.test(l[0])) { x.target = '_blank'; x.rel = 'noopener'; } meta.appendChild(x); });
-        li.append(st, meta); list.appendChild(li);
-        var t = { li: li, stage: st, make: o.make, obj: null, kind: o.kind, text: (o.title + ' ' + o.param + ' ' + o.sub).toLowerCase(), yaw: o.kind === 'rim' ? 0.5 : -0.7 + (tiles.length % 5) * 0.12, hover: false };
-        li.addEventListener('pointerenter', function () { t.hover = true; });
-        li.addEventListener('pointerleave', function () { t.hover = false; });
-        li.addEventListener('focusin', function () { t.hover = true; });
-        li.addEventListener('focusout', function () { t.hover = false; });
-        tiles.push(t);
-      }
-      Object.keys(TC.VEHICLES).forEach(function (k) {
-        var v = TC.VEHICLES[k], name = v.label || k, years = v.years ? ' (' + v.years + ')' : '';
-        var tag = TC.isCustomVehicle(k) ? (TC.isBuiltinVehicle(k) ? 'Changed' : 'Own') : null;
-        if (v.mix === false) tag = (tag ? tag + ' · ' : '') + 'Not in mix';
-        (v.paints && v.paints.length ? v.paints : [{ c: 0xc9ccd2 }]).forEach(function (p, i) {
-          tile(carList, {
-            kind: 'car', title: name + years, sub: 'Paint ' + hex(p.c) + (p.l ? ' with ' + LIVERY[p.l] : '') + (p.w ? ' · weight ' + p.w : ''),
-            alt: name + ' toy car, paint ' + (i + 1), param: 'model=' + k, edit: 'car-editor?vehicle=' + encodeURIComponent(k), tag: tag,
-            make: function () { return TC.build(k, p.c, p.l); }
-          });
+      TC.loadCatalog().then(function (list) {
+        $('status').textContent = list.length ? '' : 'No cars yet – pick some in the Car picker.';
+        var brands = ['all'];
+        list.forEach(function (e) {
+          if (brands.indexOf(e.brand) < 0) brands.push(e.brand);
+          var v = TC.vehicle(e.key), li = el('li', 'tile'), st = el('div', 'stage'), meta = el('div', 'meta');
+          st.setAttribute('role', 'img'); st.setAttribute('aria-label', (v.label || e.name) + ', 3D model');
+          meta.append(el('h2', null, v.label || e.name), el('span', 'sub', e.brand + ' · by ' + e.author + ' · ' + e.license));
+          meta.appendChild(el('span', 'tag' + (v.mix === false ? ' off' : ''), (v.mix === false ? 'Not in the mix' : 'In the mix') + (e.interior ? ' · interior' : '') + (e.wheels >= 4 ? ' · steerable wheels' : '')));
+          if (Array.isArray(v.paints) && v.paints.length) {
+            var sw = el('div', 'swatches'); sw.setAttribute('aria-label', 'Paints');
+            v.paints.forEach(function (p) {
+              var d = el('span', 'sw'); d.title = p.c == null ? 'Original colour' : hex(p.c);
+              if (p.c == null) d.classList.add('swo'); else { d.classList.add('swc' + ncss); css += '.swc' + ncss + '{background:' + hex(p.c) + '}'; ncss++; }
+              sw.appendChild(d);
+            });
+            meta.appendChild(sw);
+          }
+          meta.appendChild(el('code', 'param', 'model=' + e.key));
+          var links = el('div', 'links'), a1 = el('a', null, 'Edit'), a2 = el('a', null, 'View large'), a3 = el('a', null, 'Sketchfab');
+          a1.href = 'car-editor?car=' + encodeURIComponent(e.key); a2.href = 'car-viewer?model=' + encodeURIComponent(e.uid);
+          a3.href = e.url; a3.target = '_blank'; a3.rel = 'noopener';
+          links.append(a1, a2, a3); meta.appendChild(links);
+          li.append(st, meta); $('cars').appendChild(li);
+          var t = { e: e, li: li, stage: st, obj: null, loading: false, yaw: -0.7 + (tiles.length % 5) * 0.12, hover: false, text: (e.name + ' ' + e.key + ' ' + e.brand + ' ' + (v.label || '')).toLowerCase() };
+          li.addEventListener('pointerenter', function () { t.hover = true; }); li.addEventListener('pointerleave', function () { t.hover = false; });
+          li.addEventListener('focusin', function () { t.hover = true; }); li.addEventListener('focusout', function () { t.hover = false; });
+          tiles.push(t);
         });
-      });
-      Object.keys(TC.RIMS).forEach(function (k) {
-        var r = TC.normRim(TC.RIMS[k]);
-        tile(rimList, {
-          kind: 'rim', title: r.label || k, sub: TC.RIM_STYLES[r.style] + ' · ' + r.n + ' · ' + (TC.FINISHES[r.finish] || {}).label,
-          alt: (r.label || k) + ' rim', param: 'rim: ' + k, edit: 'car-editor?rim=' + encodeURIComponent(k),
-          tag: TC.isCustomRim(k) ? (TC.isBuiltinRim(k) ? 'Changed' : 'Own') : null,
-          make: function () { return TC.wheel(TC.RIMS[k], null, 0.5); }
-        });
-      });
-
-      // echte Modelle (assets/cars/*.glb, Urheber in assets/cars/credits.json): beim ersten Sichtbarwerden geladen,
-      // auf ~4,4 Einheiten Länge gebracht, längste waagrechte Achse = x, auf den Boden gestellt
-      var loader = window.THREE.GLTFLoader ? new THREE.GLTFLoader() : null, realTiles = [];
-      function realModel(key) {
-        var g = new THREE.Group();
-        if (!loader) return g;
-        loader.load('/s/__WIDGET_TOKEN__/assets/cars/' + key + '.glb', function (gl) {
-          var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3(); box.getSize(size);
-          if (size.z > size.x) m.rotation.y = Math.PI / 2;
-          box.setFromObject(m); box.getSize(size);
-          var k = 4.4 / Math.max(size.x, size.z), c = new THREE.Vector3(); box.getCenter(c);
-          var inner = new THREE.Group(); inner.add(m); m.position.sub(c); inner.scale.setScalar(k);
-          g.add(inner);
-        });
-        return g;
-      }
-      fetch('/s/__WIDGET_TOKEN__/assets/cars/credits.json').then(function (r) { return r.json(); }).then(function (list) {
-        list.forEach(function (c) {
-          tile(realList, {
-            kind: 'real', title: c.title, sub: 'by ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles in the original' + (c.note ? ' · ' + c.note : ''),
-            alt: c.title + ' 3D model', links: [['car-viewer?model=' + encodeURIComponent(c.key), 'View large'], [c.url, 'Model on Sketchfab'], [c.licenseUrl, 'Licence']],
-            make: function () { return realModel(c.key); }
-          });
+        // Farbtupfer als Klassen in einem <style>, keine Inline-Styles
+        if (css) { var stl = document.createElement('style'); stl.textContent = css; document.head.appendChild(stl); }
+        brands.forEach(function (b) {
+          var btn = el('button', null, b === 'all' ? 'All' : b); btn.type = 'button'; btn.setAttribute('aria-pressed', String(b === brand));
+          btn.addEventListener('click', function () { brand = b; Array.prototype.forEach.call($('brands').children, function (x) { x.setAttribute('aria-pressed', String(x === btn)); }); apply(); });
+          $('brands').append(btn, document.createTextNode(' '));
         });
         apply();
-      }).catch(function () { document.getElementById('realLead').textContent = 'Could not load the model list.'; });
-
-      // ── Filter ──
-      var view = 'all', views = document.getElementById('views'), q = document.getElementById('q'), count = document.getElementById('count');
-      [['all', 'All'], ['car', 'Cars'], ['real', 'Real models'], ['rim', 'Rims']].forEach(function (e) {
-        var b = document.createElement('button'); b.type = 'button'; b.textContent = e[1]; b.setAttribute('aria-pressed', String(e[0] === view));
-        b.addEventListener('click', function () { view = e[0]; Array.prototype.forEach.call(views.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); apply(); });
-        views.appendChild(b); views.appendChild(document.createTextNode(' '));
-      });
-      q.addEventListener('input', apply);
+      }).catch(function () { $('status').textContent = 'Could not load the car list.'; });
+      $('q').addEventListener('input', apply);
       function apply() {
-        var s = q.value.trim().toLowerCase(), n = 0;
-        tiles.forEach(function (t) { var show = (view === 'all' || t.kind === view) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
-        document.getElementById('h-cars').hidden = carList.hidden = view !== 'all' && view !== 'car';
-        document.getElementById('h-real').hidden = document.getElementById('realLead').hidden = realList.hidden = view !== 'all' && view !== 'real';
-        document.getElementById('h-rims').hidden = rimList.hidden = view !== 'all' && view !== 'rim';
-        count.textContent = n + ' of ' + tiles.length;
+        var s = $('q').value.trim().toLowerCase(), n = 0;
+        tiles.forEach(function (t) { var show = (brand === 'all' || t.e.brand === brand) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
+        $('count').textContent = n + ' of ' + tiles.length + ' cars';
       }
-      apply();
 
-      // ── WebGL: eine Fläche, je Kachel ein eigener Ausschnitt ──
-      var canvas = document.getElementById('gl');
-      var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+      // ── WebGL: eine Fläche, je Kachel ein Ausschnitt ──
+      var canvas = $('gl'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-      renderer.outputEncoding = THREE.sRGBEncoding;
       renderer.setScissorTest(true);
-      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
-      CarStage.setup(renderer, scene);   // Studio-Raum, ACES-Belichtung (js/car-stage.js)
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+      CarStage.setup(renderer, scene);
       var holder = new THREE.Group(); scene.add(holder);
-
       function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); }
       window.addEventListener('resize', resize); resize();
-
-      var last = null;
+      var last = null, busy = 0;
       function frame(ts) {
         var dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
-        var H = window.innerHeight, W = window.innerWidth, built = 0;
+        var H = window.innerHeight, W = window.innerWidth;
         renderer.setScissor(0, 0, W, H); renderer.clear();
         tiles.forEach(function (t) {
           if (t.li.hidden) return;
           var r = t.stage.getBoundingClientRect();
           if (r.bottom < 0 || r.top > H || r.right < 0 || r.left > W) return;
-          // erst bauen, wenn sichtbar (höchstens zwei pro Bild)
-          if (!t.obj) { if (built >= 2) return; built++; t.obj = t.make(); }
+          // höchstens zwei Modelle gleichzeitig laden
+          if (!t.obj && !t.loading && busy < 2) {
+            t.loading = true; busy++;
+            TC.loadModel(t.e).then(function (tpl) {
+              var p = TC.pickPaint(t.e.key); t.obj = TC.paintTemplate(tpl, p.c);
+            }).catch(function () {}).then(function () { busy--; });
+          }
+          if (!t.obj) return;
           if (!reduce) t.yaw += dt * (t.hover ? 1.2 : 0.3);
-          if (t.kind === 'rim') { t.obj.rotation.set(0, t.yaw * 0.6 + 0.3, 0); cam.position.set(0, 0, 3.4); cam.lookAt(0, 0, 0); }
-          else { t.obj.rotation.set(0, t.yaw, 0); cam.position.set(0, 2.2, 9.6); cam.lookAt(0, -0.1, 0); }
+          t.obj.rotation.set(0, t.yaw, 0);
+          var d = t.obj.userData.dims || { L: 4.4 }, dist = Math.max(8.5, d.L * 2.1);
+          cam.position.set(0, dist * 0.23, dist); cam.lookAt(0, -0.1, 0);
           if (holder.children[0]) holder.remove(holder.children[0]);
           holder.add(t.obj);
           var y = H - r.bottom;

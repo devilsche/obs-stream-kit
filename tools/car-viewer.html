@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Car viewer</title>
   <style>
-    /* Großansicht eines Auto-Modells (assets/cars/*.glb, aufbereitet von js/glb-fix.js): frei drehen und zoomen */
+    /* Großansicht eines Auto-Modells aus dem Katalog (/api/fx/cars/catalog.json) in voller Qualität (Original von Sketchfab über
+       /app/api/cars/preview/<uid>.glb, sonst die Regen-Fassung), aufbereitet von js/glb-fix.js: frei drehen und zoomen */
     :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; }
     html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
     .skip { position: absolute; left: -9999px; }
@@ -65,16 +66,16 @@
 
       // Modell auf ~4,4 m Länge, längste Achse = x, Boden y = 0
       function show(c) {
-        current = c.key;
+        current = c.uid;
         while (holder.children.length) holder.remove(holder.children[0]);
         var p = $('credit'); p.textContent = 'Loading …';
         // volle Qualität: Original von Sketchfab über den Server (Cache); sonst die leichte Fassung für den Regen
         var m0 = /([0-9a-f]{32})/.exec(c.url || ''), full = m0 ? '/app/api/cars/preview/' + m0[1] + '.glb' : null;
         p.textContent = full ? 'Loading the full-quality model … the first time the server fetches it from Sketchfab, this can take up to a minute.' : 'Loading …';
-        function light() { loader.load('/s/__WIDGET_TOKEN__/assets/cars/' + c.key + '.glb', got, null, function () { p.textContent = 'Could not load this model.'; }); }
+        function light() { loader.load('/s/__WIDGET_TOKEN__/api/fx/cars/model/' + c.uid + '.glb', got, null, function () { p.textContent = 'Could not load this model.'; }); }
         if (full) loader.load(full, got, null, light); else light();
         function got(gl) {
-          if (current !== c.key) return;
+          if (current !== c.uid) return;
           var m = window.GlbFix ? GlbFix.prepare(gl.scene) : gl.scene, box = new THREE.Box3().setFromObject(m), size = new THREE.Vector3();
           box.getSize(size);
           if (size.z > size.x) m.rotation.y = Math.PI / 2;
@@ -83,20 +84,21 @@
           var inner = new THREE.Group(); inner.add(m); m.position.set(-ctr.x, -box.min.y, -ctr.z); inner.scale.setScalar(k);
           holder.add(inner);
           p.textContent = '';
-          var a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '“' + c.title + '”';
-          var l = document.createElement('a'); l.href = c.licenseUrl; l.target = '_blank'; l.rel = 'noopener'; l.textContent = c.license;
+          var a = document.createElement('a'); a.href = c.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '“' + c.name + '”';
+          var l = document.createElement('span'); l.textContent = c.license;
           p.append(a, document.createTextNode(' by ' + c.author + ', '), l, document.createTextNode('. Full-quality original.'));
         }
       }
-      fetch('/s/__WIDGET_TOKEN__/assets/cars/credits.json').then(function (r) { return r.json(); }).then(function (list) {
+      fetch('/s/__WIDGET_TOKEN__/api/fx/cars/catalog.json').then(function (r) { return r.json(); }).then(function (list) {
         credits = list;
-        list.forEach(function (c) { var o = document.createElement('option'); o.value = c.key; o.textContent = c.title; $('pick').appendChild(o); });
-        var want = new URLSearchParams(location.search).get('model'), c = list.filter(function (x) { return x.key === want; })[0] || list[0];
-        $('pick').value = c.key; show(c);
+        list.forEach(function (c) { var o = document.createElement('option'); o.value = c.uid; o.textContent = c.brand + ' – ' + c.name; $('pick').appendChild(o); });
+        var want = new URLSearchParams(location.search).get('model'), c = list.filter(function (x) { return x.uid === want || x.key === want; })[0] || list[0];
+        if (!c) return;
+        $('pick').value = c.uid; show(c);
       });
       $('pick').addEventListener('change', function () {
-        var c = credits.filter(function (x) { return x.key === $('pick').value; })[0];
-        if (c) { show(c); history.replaceState(null, '', '?model=' + encodeURIComponent(c.key)); }
+        var c = credits.filter(function (x) { return x.uid === $('pick').value; })[0];
+        if (c) { show(c); history.replaceState(null, '', '?model=' + encodeURIComponent(c.uid)); }
       });
 
       // ── Ansicht: ziehen, Mausrad/Pinch, Pfeiltasten, Kamera-Knöpfe ──
