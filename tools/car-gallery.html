@@ -138,7 +138,7 @@
       fetch('/s/__WIDGET_TOKEN__/assets/cars/credits.json').then(function (r) { return r.json(); }).then(function (list) {
         list.forEach(function (c) {
           tile(realList, {
-            kind: 'real', title: c.title, sub: 'by ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles · for ' + c.key,
+            kind: 'real', title: c.title, sub: 'by ' + c.author + ' · ' + c.license + ' · ' + c.faces.toLocaleString('en') + ' triangles in the original' + (c.note ? ' · ' + c.note : ''),
             alt: c.title + ' 3D model', links: [[c.url, 'Model on Sketchfab'], [c.licenseUrl, 'Licence']],
             make: function () { return realModel(c.key); }
           });

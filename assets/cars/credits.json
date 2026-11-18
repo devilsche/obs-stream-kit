@@ -58,5 +58,48 @@
   "license": "CC Attribution",
   "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
   "faces": 19154
+ },
+ {
+  "key": "e39m5",
+  "title": "2003 BMW M5 (E39)",
+  "author": "DisneyCars",
+  "profile": "https://sketchfab.com/supercarmodels",
+  "url": "https://sketchfab.com/3d-models/2003-bmw-m5-e39-ee681faa74b349148ad12f6dab644fe8",
+  "license": "CC Attribution",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "faces": 6047
+ },
+ {
+  "key": "e92m3b",
+  "title": "2010 BMW M3 (E92)",
+  "author": "ilvskf",
+  "profile": "https://sketchfab.com/ilvskf",
+  "url": "https://sketchfab.com/3d-models/2010-bmw-m3-e92-1b61f48d5ebc4d9d94ac5f76ef1aede4",
+  "license": "CC Attribution",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "faces": 968409,
+  "note": "Simplified for the rain (gltfpack, about 14,000 triangles); this version is under the same licence."
+ },
+ {
+  "key": "g80m3",
+  "title": "BMW M3 Competition",
+  "author": "VTX",
+  "profile": "https://sketchfab.com/VTX_car",
+  "url": "https://sketchfab.com/3d-models/bmw-m3-competition-feb4ac88e53c44b59f17289ada1e8e63",
+  "license": "CC Attribution-NonCommercial-ShareAlike",
+  "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "faces": 658592,
+  "note": "Simplified for the rain (gltfpack, about 15,000 triangles); this version is under the same licence."
+ },
+ {
+  "key": "e28m5",
+  "title": "1988 BMW M5 E28",
+  "author": "OUTPISTON",
+  "profile": "https://sketchfab.com/outpiston",
+  "url": "https://sketchfab.com/3d-models/1988-bmw-m5-e28-475e8664b683493ca019157791163161",
+  "license": "CC Attribution-NonCommercial-ShareAlike",
+  "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "faces": 185411,
+  "note": "Simplified for the rain (gltfpack); this version is under the same licence."
  }
 ]
