@@ -53,8 +53,16 @@
     .issues[disabled] { opacity: 0.5; }
     .paint { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; padding: 4px; border-radius: 6px; }
     .paint.on { box-shadow: inset 0 0 0 2px var(--accent); }
-    .paint details { flex-basis: 100%; }
-    .paint summary { cursor: pointer; color: var(--muted); min-height: 24px; }
+    .set-pick { flex: 1; display: flex; gap: 8px; align-items: center; background: transparent; border-color: var(--line); text-align: left; }
+    .set-pick:hover { background: #222b3d; }
+    .sw { display: inline-block; width: 22px; height: 22px; border-radius: 50%; border: 2px solid #4a5570; flex: none; }
+    .sw.rim { border-radius: 4px; }
+    .sw.orig { background: repeating-linear-gradient(45deg, #888 0 4px, #555 4px 8px); }
+    .sw.dflt { background: transparent; border-style: dashed; }
+    #setDlg { position: fixed; left: 16px; bottom: 16px; top: auto; right: auto; margin: 0; width: min(380px, calc(100vw - 32px)); max-height: 72vh; overflow-y: auto;
+      background: var(--panel); color: var(--text); border: 1px solid var(--accent); border-radius: 10px; padding: 12px 14px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); z-index: 10; }
+    #setDlg h2 { margin-bottom: 4px; }
+    #setDlg .zones-in-set { border-top: 1px solid var(--line); margin-top: 8px; padding-top: 6px; }
     .zone { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
     .zone.on { box-shadow: inset 0 0 0 2px var(--accent); }
     .zone input[type=text] { flex: 1; min-width: 0; }
@@ -81,6 +89,14 @@
     <div class="stage">
       <canvas id="view" tabindex="0" role="img" aria-label="3D preview of the selected car. Drag to turn, scroll to zoom, arrow keys turn it."></canvas>
       <p class="msg" id="msg" role="status" aria-live="polite">Loading …</p>
+      <dialog id="setDlg" aria-labelledby="setTitle">
+        <h2 id="setTitle">Colour set</h2>
+        <p class="muted small-text">Changes show on the car at once. Save with “Save” in the panel.</p>
+        <div id="setBody"></div>
+        <div class="row">
+          <button type="button" id="setClose" class="primary">Done</button>
+        </div>
+      </dialog>
       <div class="views" role="group" aria-label="Camera">
         <button type="button" class="small" data-cam="3q">3/4</button>
         <button type="button" class="small" data-cam="side">Side</button>
@@ -133,7 +149,7 @@
         <p class="muted small-text">Each set is a paint plus matching rims and zone colours. The effects pick one set per car; a higher weight makes it more frequent. “Original” keeps the model's own colour. No sets = always original. Rims and zones without their own colour in a set use the defaults below.</p>
         <div id="paints"></div>
         <div class="row">
-          <button type="button" id="addPaint">Add paint</button>
+          <button type="button" id="addPaint">Add colour set</button>
           <button type="button" id="addOrig" class="small">Add original colour</button>
         </div>
         <p class="muted small-text" id="paintInfo"></p>
@@ -351,7 +367,7 @@
         cur = list.filter(function (e) { return e.key === key; })[0];
         if (!cur) return;
         def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : []; def.zones = Array.isArray(def.zones) ? def.zones : [];
-        shown = 0; tpl = null; fill();
+        shown = 0; tpl = null; if ($('setDlg').open) $('setDlg').close(); fill();
         $('msg').hidden = false; $('msg').textContent = 'Loading the model …';
         TC.loadModel(cur).then(function (t) {
           if (cur.key !== key) return;
@@ -393,41 +409,75 @@
         c.addEventListener('input', function () { if (cb.checked) { set(int(c.value)); show(); } });
         wrap.append(cb, lab, c); return wrap;
       }
+      // Farbfelder ohne Inline-Styles: Klassen mit erzeugtem <style>
+      var swCss = document.head.appendChild(document.createElement('style')), swN = 0, swRules = {};
+      function swatch(col, extra) {
+        var d = el('span', 'sw' + (extra ? ' ' + extra : ''));
+        if (col === 'orig') d.classList.add('orig');
+        else if (col === 'dflt') d.classList.add('dflt');
+        else { var h = hex(col); if (!swRules[h]) { swRules[h] = 'swc' + (swN++); swCss.textContent += '.' + swRules[h] + '{background:' + h + '}'; } d.classList.add(swRules[h]); }
+        d.setAttribute('aria-hidden', 'true'); return d;
+      }
+      // kompakte Liste; bearbeitet wird im Dialog (editSet)
       function paints() {
         var box = $('paints'); box.textContent = '';
         def.paints.forEach(function (p, i) {
           var row = el('div', 'paint' + (i === shown ? ' on' : '')), n = i + 1;
-          if (p.c == null) row.appendChild(el('span', null, 'Original colour'));
-          else {
-            var c = el('input'); c.type = 'color'; c.value = hex(p.c); c.setAttribute('aria-label', 'Paint ' + n + ' colour');
-            c.addEventListener('input', function () { p.c = int(c.value); shown = i; show(); });
-            c.addEventListener('change', paints); row.appendChild(c);
-          }
-          var wl = el('label', 'muted', 'Weight'), w = el('input'), id = 'w' + i;
-          w.type = 'number'; w.min = 1; w.max = 20; w.value = p.w || 1; w.id = id; wl.htmlFor = id;
-          w.addEventListener('change', function () { p.w = Math.max(1, Math.min(20, parseInt(w.value, 10) || 1)); });
-          var sh = el('button', 'small', 'Show'); sh.type = 'button'; sh.setAttribute('aria-pressed', String(i === shown)); sh.setAttribute('aria-label', 'Show paint ' + n);
-          sh.addEventListener('click', function () { shown = i; paints(); show(); });
-          var rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove paint ' + n);
-          rm.addEventListener('click', function () { def.paints.splice(i, 1); shown = 0; paints(); show(); });
-          var rimC = ownColour('Rims', p.r == null ? null : p.r, def.rim != null ? def.rim : 0xc9ccd2, function (v) { if (v === undefined) delete p.r; else p.r = v; shown = i; });
-          row.append(rimC, wl, w, sh, rm);
-          if (def.zones.length) {
-            var det = el('details'), sum = el('summary', null, 'Zone colours in this set');
-            if (p.z && Object.keys(p.z).length) det.open = true;
-            det.appendChild(sum);
-            def.zones.forEach(function (z) {
-              var v = p.z && p.z[z.id] != null ? p.z[z.id] : null;
-              det.appendChild(ownColour(z.name || 'Zone', v, z.c != null ? z.c : 0x111111, function (val) {
-                p.z = p.z || {}; if (val === undefined) delete p.z[z.id]; else p.z[z.id] = val;
-                if (!Object.keys(p.z).length) delete p.z; shown = i;
-              }));
-            });
-            row.appendChild(det);
-          }
-          box.appendChild(row);
+          var pick = el('button', 'set-pick'); pick.type = 'button'; pick.setAttribute('aria-pressed', String(i === shown));
+          var nz = p.z ? Object.keys(p.z).length : 0;
+          var desc = (p.c == null ? 'Original' : hex(p.c)) + ', rims ' + (p.r === undefined ? 'default' : p.r == null ? 'original' : hex(p.r)) + (nz ? ', ' + nz + ' zone colour' + (nz > 1 ? 's' : '') : '');
+          pick.setAttribute('aria-label', 'Show set ' + n + ': ' + desc + ', weight ' + (p.w || 1));
+          pick.append(swatch(p.c == null ? 'orig' : p.c), swatch(p.r === undefined ? 'dflt' : p.r == null ? 'orig' : p.r, 'rim'),
+            el('span', null, 'Set ' + n), el('span', 'muted', '· weight ' + (p.w || 1) + (nz ? ' · ' + nz + ' zone' + (nz > 1 ? 's' : '') : '')));
+          pick.addEventListener('click', function () { shown = i; paints(); show(); });
+          var ed = el('button', 'small', 'Edit'); ed.type = 'button'; ed.setAttribute('aria-label', 'Edit set ' + n);
+          ed.addEventListener('click', function () { editSet(i); });
+          var rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove set ' + n);
+          rm.addEventListener('click', function () { def.paints.splice(i, 1); shown = 0; if ($('setDlg').open) $('setDlg').close(); paints(); show(); });
+          row.append(pick, ed, rm); box.appendChild(row);
         });
       }
+      var setOpener = null;
+      function editSet(i) {
+        var p = def.paints[i]; if (!p) return;
+        shown = i; paints(); show();
+        $('setTitle').textContent = 'Colour set ' + (i + 1);
+        var b = $('setBody'); b.textContent = '';
+        function changed() { shown = i; paints(); show(); }
+        // Lack
+        var r1 = el('div', 'row'), oc = el('input'), ol = el('label', null, 'Original paint'), pc = el('input'), pl = el('label', null, 'Paint');
+        oc.type = 'checkbox'; oc.id = 'setOrig'; ol.htmlFor = 'setOrig'; oc.checked = p.c == null;
+        pc.type = 'color'; pc.id = 'setPaint'; pl.htmlFor = 'setPaint'; pc.value = hex(p.c != null ? p.c : 0xc8151b); pc.disabled = p.c == null;
+        oc.addEventListener('change', function () { pc.disabled = oc.checked; p.c = oc.checked ? null : int(pc.value); changed(); });
+        pc.addEventListener('input', function () { p.c = int(pc.value); changed(); });
+        r1.append(pl, pc, oc, ol);
+        // Felge
+        var r2 = ownColour('Own rims (else default rim colour)', p.r == null ? null : p.r, def.rim != null ? def.rim : 0xc9ccd2, function (v) { if (v === undefined) delete p.r; else p.r = v; changed(); });
+        // Gewicht
+        var r3 = el('div', 'row'), wl = el('label', null, 'Weight'), w = el('input');
+        w.type = 'number'; w.min = 1; w.max = 20; w.value = p.w || 1; w.id = 'setW'; wl.htmlFor = 'setW';
+        w.addEventListener('change', function () { p.w = Math.max(1, Math.min(20, parseInt(w.value, 10) || 1)); w.value = p.w; changed(); });
+        r3.append(wl, w, el('span', 'muted small-text', 'higher = more often'));
+        b.append(r1, r2, r3);
+        // Bereichsfarben
+        var zb = el('div', 'zones-in-set');
+        zb.appendChild(el('h3', 'sub3', 'Zones in this set'));
+        if (!def.zones.length) zb.appendChild(el('p', 'muted small-text', 'No zones yet – add them under “Colour zones”.'));
+        def.zones.forEach(function (z) {
+          var v = p.z && p.z[z.id] != null ? p.z[z.id] : null;
+          zb.appendChild(ownColour((z.name || 'Zone') + ' (else ' + hex(z.c != null ? z.c : 0x111111) + ')', v, z.c != null ? z.c : 0x111111, function (val) {
+            p.z = p.z || {}; if (val === undefined) delete p.z[z.id]; else p.z[z.id] = val;
+            if (!Object.keys(p.z).length) delete p.z; changed();
+          }));
+        });
+        b.appendChild(zb);
+        setOpener = document.activeElement;
+        var d = $('setDlg'); if (!d.open) d.show();
+        pc.disabled ? oc.focus() : pc.focus();
+      }
+      function closeSet() { var d = $('setDlg'); if (!d.open) return; d.close(); if (setOpener && document.contains(setOpener)) setOpener.focus(); }
+      $('setClose').addEventListener('click', closeSet);
+      $('setDlg').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeSet(); } });
       // ── Farbbereiche ──
       var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['chrome', 'Chrome']];
       function zonePicking() { var m = /^zone:(.+)$/.exec(picking || ''); return m ? def.zones.filter(function (z) { return z.id === m[1]; })[0] || null : null; }
@@ -438,7 +488,7 @@
           var r1 = el('div', 'row'), nm = el('input'), c = el('input'), f = el('select');
           nm.type = 'text'; nm.value = z.name || ''; nm.maxLength = 30; nm.setAttribute('aria-label', 'Zone ' + n + ' name'); nm.autocomplete = 'off';
           nm.addEventListener('input', function () { z.name = nm.value; });
-          nm.addEventListener('change', paints);
+          nm.addEventListener('change', function () { paints(); if ($('setDlg').open) editSet(shown); });
           c.type = 'color'; c.value = hex(z.c != null ? z.c : 0x111111); c.setAttribute('aria-label', 'Zone ' + n + ' colour');
           c.addEventListener('input', function () { z.c = int(c.value); show(); });
           f.setAttribute('aria-label', 'Zone ' + n + ' surface');
@@ -456,7 +506,7 @@
             def.zones.splice(i, 1);
             def.paints.forEach(function (p) { if (p.z) { delete p.z[z.id]; if (!Object.keys(p.z).length) delete p.z; } });
             if (picking === 'zone:' + z.id) setPick(picking);
-            zones(); paints(); show();
+            zones(); paints(); show(); if ($('setDlg').open) editSet(shown);
           });
           r2.append(pk, cl, rm, el('span', 'muted small-text', (z.parts || []).length + ' parts'));
           row.append(r1, r2); box.appendChild(row);
@@ -465,7 +515,7 @@
       $('addZone').addEventListener('click', function () {
         var id = 'z' + Date.now().toString(36).slice(-6);
         def.zones.push({ id: id, name: def.zones.length ? 'Zone ' + (def.zones.length + 1) : 'Interior', c: 0x111111, f: 'matte', parts: [] });
-        zones(); paints(); setPick('zone:' + id);
+        zones(); paints(); if ($('setDlg').open) editSet(shown); setPick('zone:' + id);
       });
       $('pick').addEventListener('change', function () { load($('pick').value); history.replaceState(null, '', '?car=' + encodeURIComponent($('pick').value)); say(''); });
       $('label').addEventListener('input', function () { def.label = $('label').value; });
@@ -564,7 +614,7 @@
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { flip: def.flip }); TC.applyCustom({ vehicles: c });
         TC.forget(cur.key); var keep = clone(def); load(cur.key, true); def = keep; fill();
       });
-      $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
+      $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); editSet(shown); });
       $('addOrig').addEventListener('click', function () { def.paints.push({ c: null, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
       $('rimTexOff').addEventListener('change', function () { def.rimTexOff = $('rimTexOff').checked; show(); });
       $('rimOwn').addEventListener('change', function () { def.rim = $('rimOwn').checked ? int($('rimColor').value) : null; show(); });
