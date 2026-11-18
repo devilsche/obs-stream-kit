@@ -82,7 +82,7 @@
       car.traverse(function (o) {
         if (!/^Wheel /.test(o.name || '')) return;
         var w = new THREE.Vector3(); o.getWorldPosition(w);
-        var spin = o.children.filter(function (c) { return c.name === 'Spin'; })[0];
+        var spin = o.getObjectByName('Spin');   // direkt oder unter „Keep“ (nicht gerade gestellte Räder)
         // Drehrichtung: Achse der Drehgruppe in Weltrichtung; vorwärts rollen = Drehung um −z der Welt
         var sgn = 1;
         if (spin) {

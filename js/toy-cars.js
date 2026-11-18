@@ -159,7 +159,7 @@
     var v = vehicle(e.key);
     // eigene Räder: ausdrücklich gewählte Radteile, sonst die gewählten Felgen (plus Reifen) – dann dreht nur das
     var own = Array.isArray(v.wheelParts) || (Array.isArray(v.rimParts) && v.rimParts.length > 0);
-    if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own && v.straight !== false });
+    if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own, straight: v.straight !== false });
     splitIslands(scene);
     // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
     var all = [], seen = {}, names = {};

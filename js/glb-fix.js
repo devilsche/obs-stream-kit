@@ -132,7 +132,7 @@
       if ([].concat(o.material).some(function (m) { return m && m.transparent; })) o.renderOrder = 2;
     });
     obj.userData.interior = inside;
-    try { obj.userData.wheels = opts.wheels === false ? [] : wheels(obj); } catch (e) { obj.userData.wheels = []; }
+    try { obj.userData.wheels = opts.wheels === false ? [] : wheels(obj, opts.straight !== false); } catch (e) { obj.userData.wheels = []; }
     try { colours(obj); } catch (e) { obj.userData.paintMats = []; obj.userData.rimMats = []; }
     return obj;
   }
@@ -154,7 +154,8 @@
     for (var i = 0; i < n; i++) a[i] = i;
     return a;
   }
-  function wheels(obj) {
+  // straight: im Modell eingeschlagene Räder (mehr als ~2°) gerade stellen; sonst bleiben sie wie modelliert
+  function wheels(obj, straight) {
     obj.updateMatrixWorld(true);
     var inv = new THREE.Matrix4().copy(obj.matrixWorld).invert ? new THREE.Matrix4().copy(obj.matrixWorld).invert() : new THREE.Matrix4().getInverse(obj.matrixWorld);
     var meshes = [], tireP = [], v = new THREE.Vector3();
@@ -315,10 +316,14 @@
       var inner = new THREE.Group(); while (h.pivot.children.length) inner.add(h.pivot.children[0]);
       h.pivot.add(inner); obj.updateMatrixWorld(true);
       h.whole.forEach(function (o) { inner.attach(o); o.userData.wheelPart = true; });   // Weltlage bleibt
+      // Rad auf die Querachse drehen, damit es sauber um die Spin-Achse dreht; nicht gerade stellen = die Drehung
+      // außen wieder zurück (Rad bleibt sichtbar wie modelliert, dreht trotzdem um seine eigene Achse)
       inner.rotation.y = h.w.fix;
-      // Drehgruppe: dreht das Rad um seine Achse (Querachse des Autos), pivot.rotation.y lenkt
+      var turned = Math.abs(h.w.steer) > 0.035;
+      var keep = new THREE.Group(); keep.name = 'Keep'; keep.rotation.y = straight && turned ? 0 : -h.w.fix;
+      // Drehgruppe: dreht das Rad um seine Achse, pivot.rotation.y lenkt
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';
-      spin.add(inner); h.pivot.add(spin);
+      spin.add(inner); keep.add(spin); h.pivot.add(keep);
       res.push({ pivot: h.pivot, side: h.w.key[0], radius: h.w.radius, steer: h.w.steer });
     });
     return res;
