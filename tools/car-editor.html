@@ -161,6 +161,10 @@
         <div class="row">
           <button type="button" id="addZone">Add zone</button>
         </div>
+        <div class="row">
+          <input type="checkbox" id="allWheels" checked>
+          <label for="allWheels">Same part on all wheels (a click on a wheel part picks the matching part on every wheel)</label>
+        </div>
       </section>
       <section aria-labelledby="h-parts">
         <h2 id="h-parts">Which parts get the colours</h2>
@@ -571,6 +575,33 @@
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), { straight: def.straight }); TC.applyCustom({ vehicles: c });
         TC.forget(cur.key); var keep = clone(def); load(cur.key, true); def = keep; fill();
       });
+      // baugleiches Teil an allen anderen Rädern (gleiche Dreieckszahl und Größe), für „Same part on all wheels“
+      function twins(key) {
+        if (!$('allWheels').checked || !tpl) return [key];
+        function wheelOf(o) { for (var p = o; p; p = p.parent) if (/^Wheel /.test(p.name || '')) return p; return null; }
+        function sig(o) {
+          var g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+          return { n: g.index ? g.index.count : g.attributes.position.count, r: g.boundingSphere.radius };
+        }
+        var me = null; tpl.traverse(function (o) { if (o.isMesh && o.userData.pkey === key) me = o; });
+        var w = me && wheelOf(me); if (!w) return [key];
+        // je anderem Rad genau ein Teil: gleiche Dreieckszahl und Größe, und an derselben Stelle im Rad
+        // (Gegenseite gespiegelt) – sonst nähme ein Klick auf eine Radmutter alle Radmuttern mit
+        function off(o, wh) { var c = new THREE.Vector3(), p = new THREE.Vector3(); o.updateMatrixWorld(true); c.copy(o.geometry.boundingSphere.center).applyMatrix4(o.matrixWorld); wh.getWorldPosition(p); return c.sub(p); }
+        var s0 = sig(me), o0 = off(me, w), out = [key], best = {};
+        tpl.traverse(function (o) {
+          if (!o.isMesh || o === me) return;
+          var ow = wheelOf(o); if (!ow || ow === w) return;
+          var s1 = sig(o);
+          if (s1.n !== s0.n || Math.abs(s1.r - s0.r) > s0.r * 0.03 + 1e-6) return;
+          var o1 = off(o, ow), wp = new THREE.Vector3(), mp = new THREE.Vector3(); ow.getWorldPosition(wp); w.getWorldPosition(mp);
+          if ((wp.z > 0) !== (mp.z > 0)) o1.z = -o1.z;   // andere Seite: quer spiegeln
+          var d = o1.distanceTo(o0);
+          if (!best[ow.uuid] || d < best[ow.uuid].d) best[ow.uuid] = { d: d, k: o.userData.pkey };
+        });
+        Object.keys(best).forEach(function (u) { if (best[u].d < s0.r * 1.5 + 0.02 && out.indexOf(best[u].k) < 0) out.push(best[u].k); });
+        return out;
+      }
       var down = null, ray = new THREE.Raycaster();
       canvas.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY }; });
       canvas.addEventListener('pointerup', function (e) {
@@ -594,14 +625,14 @@
         }
         var zp = zonePicking();
         if (zp) {
-          var had = zp.parts.indexOf(key) >= 0;
-          if (had) zp.parts.splice(zp.parts.indexOf(key), 1);
-          else {
-            def.zones.forEach(function (z) { var j = z.parts.indexOf(key); if (j >= 0) z.parts.splice(j, 1); });
-            ['paintParts'].forEach(function (k) { if (def[k]) { var j = def[k].indexOf(key); if (j >= 0) def[k].splice(j, 1); } });
-            zp.parts.push(key);
-          }
-          zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key); return;
+          var had = zp.parts.indexOf(key) >= 0, tw = twins(key);
+          tw.forEach(function (k2) {
+            if (had) { var j0 = zp.parts.indexOf(k2); if (j0 >= 0) zp.parts.splice(j0, 1); return; }
+            def.zones.forEach(function (z) { var j = z.parts.indexOf(k2); if (j >= 0) z.parts.splice(j, 1); });
+            ['paintParts'].forEach(function (k) { if (def[k]) { var j = def[k].indexOf(k2); if (j >= 0) def[k].splice(j, 1); } });
+            if (zp.parts.indexOf(k2) < 0) zp.parts.push(k2);
+          });
+          zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key + (tw.length > 1 ? ' (+' + (tw.length - 1) + ' on the other wheels)' : '')); return;
         }
         var prop = picking === 'paint' ? 'paintParts' : 'wheelParts';
         var list = picking === 'wheel' ? (def.wheelParts || []).slice() : partKeys(picking).slice(), i = list.indexOf(key);
