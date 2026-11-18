@@ -101,5 +101,16 @@
   "licenseUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
   "faces": 185411,
   "note": "Simplified for the rain (gltfpack); this version is under the same licence."
+ },
+ {
+  "key": "e30m3b",
+  "title": "[FREE] BMW M3 E30",
+  "author": "Martin Trafas",
+  "profile": "https://sketchfab.com/TinoD2",
+  "url": "https://sketchfab.com/3d-models/free-bmw-m3-e30-ac3c7013434e403e8faff87948caf422",
+  "license": "CC Attribution",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "faces": 117261,
+  "note": "Simplified for the rain (gltfpack, about 17,000 triangles)."
  }
 ]

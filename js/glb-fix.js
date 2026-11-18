@@ -39,12 +39,14 @@
   }
   function isGlassName(n) { return /glass|glas|window|scheibe|windshield/i.test(n || '') && !isLampName(n); }
   // Lampengläser (bernstein, Scheinwerfer, Rückleuchten) bleiben durchscheinend, sonst verschwinden die Lampen
-  function isLampName(n) { return /amber|bronze|lamp|light|head|tail|indicator|blinker|clear/i.test(n || ''); }
+  function isLampName(n) { return /amber|bronze|lamp|light|head|tail|indicator|blinker|clear|lens/i.test(n || ''); }
   function fixMaterial(m) {
     if (!m || (DONE && DONE.has(m))) return;
     if (DONE) DONE.set(m, true);
     m.side = THREE.DoubleSide;
     var see = m.transparent || m.opacity < 1 || (m.alphaTest > 0);
+    // unsichtbare Hilfsflächen (Deckkraft fast 0, ohne Textur) ausblenden statt zu Glas zu machen
+    if (m.opacity < 0.05 && !m.map) { m.visible = false; m.needsUpdate = true; return; }
     if (isLampName(m.name)) { if (see) m.depthWrite = false; m.needsUpdate = true; return; }
     if (isGlassName(m.name) || (see && !m.map)) {
       // eigenes Glas-Material: dunkel getönt, glänzend, undurchsichtig
