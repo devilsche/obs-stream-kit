@@ -60,7 +60,7 @@
       var canvas = $('view'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
       renderer.outputEncoding = THREE.sRGBEncoding; renderer.setClearColor(0x1d2433);
-      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.05, 200);
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.01, 200);
       CarStage.setup(renderer, scene);   // Studio-Raum, ACES-Belichtung (js/car-stage.js)
       var floor = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshStandardMaterial({ color: 0x2a3346, roughness: 0.9 }));
       floor.rotation.x = -Math.PI / 2; scene.add(floor);
@@ -120,7 +120,7 @@
           var a = pts[ids[0]], b = pts[ids[1]], d0 = Math.hypot(a.x - b.x, a.y - b.y);
           pts[e.pointerId] = { x: e.clientX, y: e.clientY };
           var d1 = Math.hypot(pts[ids[0]].x - pts[ids[1]].x, pts[ids[0]].y - pts[ids[1]].y);
-          if (d0 > 0) orbit.dist = Math.max(2.5, Math.min(25, orbit.dist * d0 / d1));
+          if (d0 > 0) orbit.dist = Math.max(0.4, Math.min(25, orbit.dist * d0 / d1));
           return;
         }
         var p = pts[e.pointerId];
@@ -130,10 +130,10 @@
       });
       function up(e) { delete pts[e.pointerId]; if (!Object.keys(pts).length) drag = null; }
       canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
-      canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(2.5, Math.min(25, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
+      canvas.addEventListener('wheel', function (e) { e.preventDefault(); orbit.dist = Math.max(0.4, Math.min(25, orbit.dist * (e.deltaY > 0 ? 1.1 : 0.9))); }, { passive: false });
       canvas.addEventListener('keydown', function (e) {
         var k = { ArrowLeft: [-0.15, 0], ArrowRight: [0.15, 0], ArrowUp: [0, 0.08], ArrowDown: [0, -0.08] }[e.key];
-        if (e.key === '+' || e.key === '=') { orbit.dist = Math.max(2.5, orbit.dist * 0.9); return; }
+        if (e.key === '+' || e.key === '=') { orbit.dist = Math.max(0.4, orbit.dist * 0.9); return; }
         if (e.key === '-') { orbit.dist = Math.min(25, orbit.dist * 1.1); return; }
         if (!k) return; e.preventDefault(); orbit.yaw += k[0]; orbit.pitch = Math.max(-0.1, Math.min(1.5, orbit.pitch + k[1]));
       });
