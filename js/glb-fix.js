@@ -61,6 +61,17 @@
       var dv = Math.max(Math.abs(nrm[i * 4] - 128), Math.abs(nrm[i * 4 + 1] - 128));
       keep[i] = cd > 12 || dv > 10 ? 1 : 0;
     }
+    // nur Grundfarbe ausschneiden, die mit dem Bildrand verbunden ist (die Atlas-Fläche zwischen den Motiven):
+    // dunkle Motivteile innerhalb eines Wappens (schwarzes Pferd im gelben Schild) bleiben stehen
+    var cutAway = new Uint8Array(n), stack = [];
+    function seed(j) { if (!keep[j] && !cutAway[j]) { cutAway[j] = 1; stack.push(j); } }
+    for (i = 0; i < w; i++) { seed(i); seed((h - 1) * w + i); }
+    for (i = 0; i < h; i++) { seed(i * w); seed(i * w + w - 1); }
+    while (stack.length) {
+      var j = stack.pop(), x0 = j % w;
+      if (x0 > 0) seed(j - 1); if (x0 < w - 1) seed(j + 1); if (j >= w) seed(j - w); if (j < n - w) seed(j + w);
+    }
+    for (i = 0; i < n; i++) if (!cutAway[i]) keep[i] = 1;
     var out = new Uint8Array(n);
     for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
       var k = 0;
