@@ -20,11 +20,15 @@
       v: { power: 2, speed: 2, handling: 2, susp: 4, brakes: 3, weight: 10 }, drive: 'rwd' },
     { id: 'truck', re: /truck|\bural\b|caterpillar|kamaz|\bman\b|scania|\bzil\b|\bmaz\b/i,
       v: { power: 4, speed: 3, handling: 3, susp: 7, brakes: 3, weight: 9 }, drive: 'awd' },
+    { id: 'suv', re: /\bg\s?-?63\b|\bg-?klasse\b|\bg-?class\b/i,
+      v: { power: 7, speed: 6, handling: 3, susp: 7, brakes: 5, weight: 8 }, drive: 'awd' },
+    { id: 'hyper', re: /\b91[78]k?\b|\bw14\b|\bformula\b|\bf1\b/i,
+      v: { power: 10, speed: 10, handling: 9, susp: 5, brakes: 9, weight: 2 }, drive: 'awd' },
     { id: 'super', re: /supercar|lamborghini|ferrari|koenigsegg|bugatti|mclaren|gt3|aventador|huracan|pagani/i,
       v: { power: 10, speed: 10, handling: 8, susp: 5, brakes: 8, weight: 3 }, drive: 'awd' },
-    { id: 'sport', re: /sport|\bm[2-8]\b|\brs\d*\b|\bamg\b|porsche|mustang|shelby|corvette|\bevo\b|\bgt-?r\b|\bsupra\b/i,
+    { id: 'sport', re: /\bsport\b|\bm[2-8]\b|\brs\d*\b|\bamg\b|porsche|mustang|shelby|corvette|\bevo\b|\bgt-?r\b|\bsupra\b/i,
       v: { power: 8, speed: 8, handling: 7, susp: 5, brakes: 7, weight: 4 }, drive: 'rwd' },
-    { id: 'small', re: /\bgolf\b|\bpolo\b|\bmini\b|\bfiat\b|\b2cv\b|\bsmart\b|\bup!?\b/i,
+    { id: 'small', re: /\bgolf\b|\bpolo\b|\bmini\b|\bfiat\b|\b2cv\b|\bsmart\b|\b(vw|volkswagen) up!?(?!\w)/i,
       v: { power: 4, speed: 4, handling: 6, susp: 5, brakes: 5, weight: 3 }, drive: 'fwd' },
     { id: 'sedan', re: /sedan|estate|limousine|kombi/i,
       v: { power: 5, speed: 5, handling: 5, susp: 5, brakes: 5, weight: 5 }, drive: 'rwd' }
@@ -41,7 +45,7 @@
     var c = klass(entry), len = entry && +entry.len;
     var r = { on: true };
     KEYS.forEach(function (k) { r[k] = c.v[k]; });
-    r.drive = c.drive;
+    r.drive = /ferrari/i.test((entry && (entry.brand || '') + ' ' + (entry.name || '')) || '') ? 'rwd' : c.drive; // Ferrari-Supercars fahren Heckantrieb
     r.len = len >= 2 && len <= 20 ? len : 4.5;
     return r;
   }

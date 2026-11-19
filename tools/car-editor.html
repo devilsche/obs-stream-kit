@@ -746,7 +746,14 @@
         });
         return r;
       }
-      function raceChanged() { def.race = raceRead(); }
+      // nur Abweichungen von der Schätzung speichern (plus on=false); sonst race entfernen – die Schätzung bleibt so lebendig
+      function raceChanged() {
+        var r = raceRead(), g = CarRaceStats.guess(cur), o = {};
+        $('raceLen').value = r.len;
+        CarRaceStats.KEYS.concat(['drive', 'len']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
+        if (!r.on) o.on = false;
+        if (Object.keys(o).length) def.race = o; else delete def.race;
+      }
       Array.prototype.forEach.call(document.querySelectorAll('.race-in'), function (el) { el.addEventListener('input', raceChanged); });
       ['raceOn', 'raceDrive', 'raceLen'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
       $('raceReset').addEventListener('click', function () { delete def.race; raceFill(); say('Race stats reset to the estimate. Save to keep it.', 'ok'); });

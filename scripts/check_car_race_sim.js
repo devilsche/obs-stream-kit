@@ -284,6 +284,21 @@ FIX.forEach(function (e) {
 if (!(G.trolza.speed <= 3 && G.trolza.weight >= 9)) fail('Trolza: speed ≤ 3 und weight ≥ 9 erwartet');
 if (!(G.lambo.speed >= 9)) fail('Lamborghini: speed ≥ 9 erwartet');
 if (G.hoon.power !== 10) fail('Hoonicorn: power = 10 erwartet');
+var CAND = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'assets', 'cars', 'candidates.json'), 'utf8'));
+if (CAND.length < 100) fail('assets/cars/candidates.json zu klein: ' + CAND.length);
+CAND.forEach(function (e) {
+  var g = Stats.guess({ key: e.key || e.uid, name: e.name, brand: e.brand, len: e.len });
+  Stats.KEYS.forEach(function (k) { if (!(g[k] >= 1 && g[k] <= 10)) fail('Katalog "' + e.name + '": ' + k + ' = ' + g[k]); });
+  if (['fwd', 'rwd', 'awd'].indexOf(g.drive) < 0) fail('Katalog "' + e.name + '": drive ' + g.drive);
+  if (!(g.len >= 2 && g.len <= 20)) fail('Katalog "' + e.name + '": len ' + g.len);
+});
+function gn(name, brand) { return Stats.guess({ key: 'x', name: name, brand: brand || '' }); }
+var p918 = gn('Porsche 918 Spyder 2015', 'Porsche'), w14 = gn('Amg W14 S1', 'Mercedes-Benz'), g63 = gn('Mersedes-Benz G63 AMG', 'Mercedes-Benz');
+if (!(p918.speed >= 9 && p918.weight <= 3)) fail('Porsche 918: Hypercar erwartet');
+if (!(w14.speed >= 9 && w14.weight <= 3)) fail('AMG W14: Hypercar erwartet');
+if (!(g63.weight >= 7 && g63.handling <= 4 && g63.speed >= 5 && g63.speed <= 7)) fail('G63: schwerer SUV erwartet');
+if (gn('Ferrari F40', 'Ferrari').drive !== 'rwd') fail('Ferrari: rwd erwartet');
+if (gn('Toyota Hilux Pickup', 'Toyota').weight !== 5 || gn('Kia Sportage', 'Kia').speed !== 5) fail('Pickup/Sportage dürfen nicht Kleinwagen/Sport sein');
 if (G.golf.len !== 4.5) fail('Golf ohne len: Rückfall 4,5 erwartet');
 
 function report() {
