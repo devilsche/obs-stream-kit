@@ -83,14 +83,15 @@ def _advance(t, now):
 
 
 def pick_car(cars, vehicles, rng, taken):
-    """Auto für einen Fahrer: Katalog-Einträge mit mix != False und race.on != False,
+    """Auto für einen Fahrer: Katalog-Einträge mit mix != False, race.on != False und ohne rework,
     bevorzugt solche, die noch niemand in der Lobby fährt; Farbset nach Gewicht w.
     Ohne passendes Auto car_key None (das Overlay zeichnet einen Platzhalter)."""
     cands = []
     for c in cars or []:
         key = c.get("key")
         v = (vehicles or {}).get(key) or {}
-        if not key or v.get("mix") is False or (v.get("race") or {}).get("on") is False:
+        if not key or v.get("mix") is False or (v.get("race") or {}).get("on") is False \
+                or v.get("rework"):
             continue
         cands.append(c)
     if not cands:

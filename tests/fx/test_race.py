@@ -161,6 +161,15 @@ def test_pick_car_respects_mix_and_race_off():
         "car_key": None, "uid": None, "paint": 0}
 
 
+def test_pick_car_skips_rework():
+    cat = [{"key": k, "uid": k, "name": k} for k in ("a", "b")]
+    rng = random.Random(3)
+    for _ in range(20):
+        assert race.pick_car(cat, {"a": {"rework": True}}, rng, set())["car_key"] == "b"
+    assert race.pick_car(cat, {"a": {"rework": True}, "b": {"rework": True}}, rng, set()) == {
+        "car_key": None, "uid": None, "paint": 0}
+
+
 def test_pick_car_prefers_free_and_weights_paint():
     cat = [{"key": k, "uid": k, "name": k} for k in ("a", "b")]
     veh = {"a": {"paints": [{"c": "#1", "w": 0}, {"c": "#2", "w": 3}]}}
