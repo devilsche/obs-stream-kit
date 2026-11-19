@@ -25,7 +25,13 @@
   var TILT = 58 * Math.PI / 180, FOV = 30;
   var MAX_STEER = 0.42;   // größter Lenkeinschlag der Vorderräder (rad), wie in der Simulation
   var POLL_MS = 1000, HOLD = 5, FADE = 0.6, PODIUM_HOLD = 15;
-  var LABEL_W = 512, LABEL_H = 112;
+  var LABEL_W = 512, LABEL_H = 112, LABEL_CH = 160;   // Schild: Namensfeld 112 px hoch, darunter Platz für die Modellzeile
+  // Katalogname fürs Anzeigen säubern (Quellen-Anhängsel wie „| www.vecarz.com“, „[FREE]“, „FREE“ weg)
+  function cleanName(n) {
+    return String(n || '').replace(/\|\s*www\.\S+/gi, '').replace(/\[\s*free\s*\]/gi, '').replace(/\bfree\b/gi, '')
+      .replace(/\s{2,}/g, ' ').replace(/^[\s|\-\u2013\u00b7]+|[\s|\-\u2013\u00b7]+$/g, '');
+  }
+  function shortName(n, max) { n = cleanName(n); return n.length > max ? n.slice(0, max - 1) + '\u2026' : n; }
   var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
 
@@ -322,10 +328,9 @@
       };
       r.holder.rotation.order = 'YXZ';
       // Vorschau: Modellname mit anzeigen (zur Fehlersuche „welches Auto war das?“), echte Rennen nur der Chatname
-      var model = entry ? String(entry.name || key) : key ? String(key) : 'placeholder box';
-      if (model.length > 22) model = model.slice(0, 21) + '\u2026';
-      r.modelName = model;
-      r.shown = preview ? r.display + ' \u00b7 ' + model : r.display;
+      // Automodell: in Rangliste, Fahrerkarte, Lobby-Karte und als zweite Zeile unter dem Namensschild
+      r.modelName = entry ? shortName(entry.name || key, 20) : key ? shortName(key, 20) : '';
+      r.shown = r.display;
       if (preview && root.console) console.info('Car Race preview: grid ' + src.grid + ' ' + r.display + ' = ' + (key || '(no car)') + (entry ? ' (' + entry.name + ', front ' + (entry.front || 'auto') + ')' : ''));
       var shadow = new THREE.Mesh(own2(r, new THREE.PlaneGeometry(1, 1)), own2(r, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })));
       shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.07; r.shadow = shadow; r.holder.add(shadow);
@@ -427,7 +432,7 @@
 
     // ---- Namensschilder (Sprites mit fester Bildschirmgröße) ----
     function makeLabel(r) {
-      var c = document.createElement('canvas'); c.width = LABEL_W; c.height = LABEL_H;
+      var c = document.createElement('canvas'); c.width = LABEL_W; c.height = LABEL_CH;
       var tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding;
       var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, sizeAttenuation: false, opacity: 0 });
       var sp = new THREE.Sprite(mat); sp.center.set(0.5, 0); sp.renderOrder = 10;
@@ -439,14 +444,15 @@
       g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath();
     }
     // mode: '' normal · 'up' gerade überholt (Akzentrand, Pfeil nach oben, leuchtet) · 'dnf' ausgegraut
-    function drawLabel(r, place, force, mode) {
-      mode = mode || '';
-      var text = place + '\u0000' + r.shown + '\u0000' + mode;
+    // withModel: zweite, kleinere Zeile mit dem Automodell unter dem Namensfeld
+    function drawLabel(r, place, force, mode, withModel) {
+      mode = mode || ''; withModel = !!withModel && !!r.modelName && mode !== 'dnf';
+      var text = place + '\u0000' + r.shown + '\u0000' + mode + (withModel ? '\u0000m' : '');
       if (!force && text === r.labelText) return;
-      r.labelText = text; r.labelPlace = place; r.labelMode = mode;
+      r.labelText = text; r.labelPlace = place; r.labelMode = mode; r.label.withModel = withModel;
       var L = r.label, g = L.g;
-      g.clearRect(0, 0, LABEL_W, LABEL_H);
-      var fs = preview ? 38 : 50, pad = 22, gap = 14, bw = 7;   // Vorschau: längerer Text (Modellname)
+      g.clearRect(0, 0, LABEL_W, LABEL_CH);
+      var fs = 50, pad = 22, gap = 14, bw = 7;
       g.font = font(800, fs);
       var aw = mode === 'up' ? fs * 0.62 : 0;   // Platz für den Pfeil
       var pw = g.measureText(place).width + aw, name = r.shown;
@@ -467,6 +473,15 @@
       }
       g.font = font(800, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.accent; g.fillText(place, tx, LABEL_H / 2 + 2);
       g.font = font(700, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.text; g.fillText(name, x0 + pad + pw + gap, LABEL_H / 2 + 2);
+      if (withModel) {
+        g.font = font(600, 30);
+        var md = r.modelName; while (md.length > 1 && g.measureText(md).width > LABEL_W - 60) md = md.slice(0, -2) + '\u2026';
+        var mw = g.measureText(md).width + 28, my = LABEL_H + 2, mh = LABEL_CH - LABEL_H - 6;
+        roundRect(g, (LABEL_W - mw) / 2, my, mw, mh, 14); g.fillStyle = withAlpha(TK.surface, 0.8); g.fill();
+        g.fillStyle = TK.dim; g.textAlign = 'center'; g.fillText(md, LABEL_W / 2, my + mh / 2 + 1); g.textAlign = 'left';
+      }
+      // ohne Modellzeile sitzt die Unterkante des Namensfelds auf dem Ankerpunkt
+      L.sprite.center.set(0.5, withModel ? 0 : (LABEL_CH - LABEL_H) / LABEL_CH);
       L.boxW = boxW + 2 * bw;
       L.tex.needsUpdate = true;
     }
@@ -478,7 +493,12 @@
       var placed = [];
       list.forEach(function (it) {
         var r = it.r, L = r.label, up = r.flash > 0;
-        drawLabel(r, it.place, false, it.dnf ? 'dnf' : up ? 'up' : '');
+        // Modellzeile nur, wenn Platz ist: nah genug dran und kein Gedränge (mit Hysterese gegen Flackern)
+        var zoomPx = race && race.cam ? Math.exp(race.cam.lp) : PX_MAX;
+        if (podium) r.showModel = true;
+        else if (r.labelK < 0.8 || zoomPx < 8) r.showModel = false;
+        else if (r.labelK > 0.95 && zoomPx > 9.5) r.showModel = true;
+        drawLabel(r, it.place, false, it.dnf ? 'dnf' : up ? 'up' : '', r.showModel);
         tmpV.set(r.holder.position.x, r.holder.position.y + r.height + 0.9, r.holder.position.z).project(cam);
         var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H, wpx = hpx * L.boxW / LABEL_H;
         var crowd = placed.some(function (o) { return Math.abs(o.px - px) < (o.w + wpx) / 2 && Math.abs(o.py - py) < hpx * 1.1; });
@@ -488,8 +508,8 @@
         var k = lerp(0.62, 1, r.labelK) * pulse, edge = Math.min(px, W - px, py, H - py);
         var ef = podium ? 1 : clamp((edge - hpx * 0.5) / (hpx * 2), 0, 1);   // Podest: Kamera hält die Schilder im Bild
         L.vis = ease(L.vis, it.show ? 1 : 0, 0.25, dt);
-        var sy = hpx * k / H * 2 * tanV;
-        L.sprite.scale.set(sy * LABEL_W / LABEL_H, sy, 1);
+        var sy = hpx * k / H * 2 * tanV * (LABEL_CH / LABEL_H);   // hpx = Höhe des Namensfelds
+        L.sprite.scale.set(sy * LABEL_W / LABEL_CH, sy, 1);
         L.sprite.position.set(r.holder.position.x, r.holder.position.y + r.height + 0.9, r.holder.position.z);
         L.sprite.material.opacity = lerp(0.45, 1, r.labelK) * (it.dnf ? 0.6 : 1) * ef * L.vis * (tmpV.z < 1 ? 1 : 0);
         L.sprite.renderOrder = up ? 200 : 100 - it.order;   // vordere Plätze (und der Überholende) liegen oben
@@ -683,7 +703,7 @@
       hud.font = font(600, fs * 0.9); hud.fillStyle = TK.dim; hud.fillText('Type !race to join \u00b7 ' + list.length + '/10', x0 + fs, y0 + fs * 2.9);
       var y = y0 + fs * 4.4;
       list.forEach(function (r) {
-        var e = catalogEntry(r.car_key), car = e ? e.name || r.car_key : '';
+        var e = catalogEntry(r.car_key), car = e ? shortName(e.name || r.car_key, 20) : '';
         hud.beginPath(); hud.arc(x0 + fs * 1.3, y, fs * 0.32, 0, Math.PI * 2); hud.fillStyle = hexColor(r.color, '#9146ff'); hud.fill();
         hud.font = font(700, fs); hud.fillStyle = TK.text;
         var nm = fitText(hud, String(r.display || r.user_id), w * 0.42); hud.fillText(nm, x0 + fs * 2.1, y);
@@ -1106,7 +1126,7 @@
       }
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
-      var pw = rh * (preview ? 12 : 7.4), ph = rows.length * rh + rh * 0.4;
+      var pw = rh * 11.5, ph = rows.length * rh + rh * 0.4;   // Platz · Name · Automodell
       var rx = STAGE ? W - m - pw : m;   // Vollbild: Rangliste rechts oben (links oben ist das Bild-im-Bild)
       pill(hud, rx, m, pw, ph);
       hud.textBaseline = 'middle';
@@ -1129,7 +1149,13 @@
         }
         hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
         hud.fillStyle = row.fin ? TK.accent : TK.text;
-        hud.fillText(fitText(hud, row.r.shown, pw - rh * 2.25), rx + rh * 1.95, y);
+        var nm = fitText(hud, row.r.shown, (pw - rh * 2.25) * 0.55);
+        hud.fillText(nm, rx + rh * 1.95, y);
+        if (row.r.modelName) {   // Automodell kleiner und gedämpft dahinter
+          var nx = rx + rh * 1.95 + hud.measureText(nm).width + rh * 0.3;
+          hud.font = font(500, fs * 0.82); hud.fillStyle = TK.dim;
+          hud.fillText(fitText(hud, row.r.modelName, rx + pw - rh * 0.3 - nx), nx, y + fs * 0.05);
+        }
         hud.globalAlpha = 1;
       });
       // Runde rechts oben
@@ -1717,7 +1743,7 @@
     if (document.fonts && document.fonts.load) {
       document.fonts.load('700 40px "DM Sans"').then(function () {
         readTokens();
-        if (race) race.order.forEach(function (r) { drawLabel(r, r.labelPlace || '', true, r.labelMode); });
+        if (race) race.order.forEach(function (r) { drawLabel(r, r.labelPlace || '', true, r.labelMode, r.label.withModel); });
       }).catch(function () {});
     }
     var catReady = (ToyCars.loadCatalog ? ToyCars.loadCatalog() : Promise.resolve([])).catch(function () { return []; });
