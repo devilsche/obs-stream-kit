@@ -32,3 +32,17 @@ je Tenant getrennt, nur betroffene Tests, README). Coins/Garage nie doppelt guts
 ## Task G4 – Streamer.bot (Controller, braucht SB geschlossen)
 - `!race [auto]` mit sub/tier, `!coins`, `!garage`, `!buy <auto>`, `!reroll`, `!paint <set>`; Kanalpunkt-Aktion
   (Trigger: Belohnung „Choose your car for the next race“, vom Nutzer in SB/Twitch angelegt) mit Erstattung bei `refund`.
+
+## Task G5 – Nitro und Anrempeln (Nutzerwunsch)
+Vertrag:
+- Server `cmd=nitro&id&user`: nur Phase race, Fahrer im Rennen, nicht DNF/im Ziel, einmal pro Rennen, kostet 50 Coins.
+  `cmd=bump&id&user&q=<name>`: Ziel unscharf unter den anderen Fahrern im Rennen, einmal pro Rennen, kostet 100 Coins.
+  Ereignis-Zeit t = (now − starts_at) + 1.5 s (alle Overlays bekommen es vor Eintritt). Antwort `{ok, say}`, Abzug atomar,
+  keine Wirkung/kein Abzug außerhalb des Rennens. Testfahrer können nichts davon.
+- State: `race_events: [{t, type: 'nitro'|'bump', id, target?}]` (sortiert nach t).
+- Sim: `create({…, events})` bzw. `sim.setEvents(list)` vor dem Weiterrechnen; Nitro = +25 % Zielgeschwindigkeit/
+  Beschleunigung für 2,5 s; Bump = seitlicher Stoß wie Kontakt (Massenverhältnis zählt, Ziel kann sich drehen), Auslöser
+  braucht max. 25 m Abstand – sonst „fährt“ der Angreifer kurz hin? Nein: Bump wirkt als kurzer Ruck auf das Ziel (Ziel
+  rutscht seitlich, Tempoverlust, Dreher-Chance 30 % · Massenfaktor). Deterministisch, `sim.events` meldet 'nitro'/'bump'.
+- Overlay: Nitro = Flammen am Auspuff + Speed-Streifen; Bump = Funken/Ruck + kurze Einblendung „BUMP! A → B“; reicht
+  Ereignisse an die Sim weiter (auch nach Neuladen).
