@@ -390,6 +390,9 @@
       // Vorschau: Modellname mit anzeigen (zur Fehlersuche „welches Auto war das?“), echte Rennen nur der Chatname
       // Automodell: in Rangliste, Fahrerkarte, Lobby-Karte und als zweite Zeile unter dem Namensschild
       r.modelName = entry ? shortName(entry.name || key, 20) : key ? shortName(key, 20) : '';
+      var RD = root.RubberDuck;
+      r.outfit = RD && RD.viewerOutfit ? RD.viewerOutfit(r.display) || RD.viewerOutfit(r.id) : null;
+      if (!r.outfit && preview && RD && RD.OUTFITS && RD.OUTFITS.length) r.outfit = RD.OUTFITS[Math.floor(Math.random() * RD.OUTFITS.length)];
       r.shown = r.display;
       if (preview && root.console) console.info('Car Race preview: grid ' + src.grid + ' ' + r.display + ' = ' + (key || '(no car)') + (entry ? ' (' + entry.name + ', front ' + (entry.front || 'auto') + ')' : ''));
       var shadow = new THREE.Mesh(own2(r, new THREE.PlaneGeometry(1, 1)), own2(r, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })));
@@ -420,6 +423,31 @@
       r.holder.add(b);
       r.shadow.scale.set(r.len * 1.15, r.w * 1.4, 1);
     }
+    // Gummiente als Fahrer (ToyCars.addDriver, js/rubber-duck.js): einmal je Fahrer, nur in echten Modellen
+    // (Ersatz-Kisten ohne Ente); Outfit nach !outfit des Zuschauers, Testfahrer in der Vorschau zufällig.
+    // Verkohlt beim Wrack automatisch mit (charMaterials läuft über das ganze Modell)
+    var duckCache = {};   // Outfit → fertige Ente (Vorlage für Kopien)
+    function addDuck(r, model) {
+      if (!ToyCars.addDriver || !root.RubberDuck || r.duck) return;
+      // eine Ente je Outfit bauen (teuer: Flächen werden abgetastet), weitere Fahrer bekommen eine Kopie
+      var RD = root.RubberDuck, build0 = RD.build, key = r.outfit || '';
+      RD.build = function (o) {
+        if (!duckCache[key]) duckCache[key] = build0.call(RD, o);
+        return RD.clone ? RD.clone(duckCache[key]) : duckCache[key].clone();
+      };
+      try { r.duck = ToyCars.addDriver(model, r.key, { outfit: r.outfit || undefined }); } catch (e) { r.duck = null; }
+      finally { RD.build = build0; }
+      if (r.duck) { r.duckBase = { y: r.duck.position.y, x: r.duck.rotation.x, z: r.duck.rotation.z }; r.da = 0; r.dw = 0; }
+    }
+    // Ente wackelt nach Stößen (gedämpfte Feder), bei reduzierter Bewegung ruhig
+    function duckKick(r, v) { if (r && r.duck && !reduce) r.dw += (Math.random() < 0.5 ? -1 : 1) * v; }
+    function duckStep(r, dt, bounce) {
+      if (!r.duck) return;
+      r.dw += (-70 * r.da - 7 * r.dw) * dt; r.da += r.dw * dt;
+      r.da = clamp(r.da, -0.5, 0.5);
+      r.duck.rotation.x = r.duckBase.x + r.da; r.duck.rotation.z = r.duckBase.z + r.da * 0.4;
+      r.duck.position.y = r.duckBase.y + (bounce || 0);
+    }
     function setModel(r) {
       if (r.isModel) return;
       var model = ToyCars.build(r.key, r.set ? r.set.c : null, r.set || {});
@@ -429,6 +457,7 @@
       model.scale.setScalar(k); model.position.y = d.H / 2 * k + 0.03;   // Asphalt liegt 3 cm über dem Boden (sonst sinken die Reifen ein)
       if (r.body) r.holder.remove(r.body);   // Kisten-Geometrie wird mit dem Fahrer entsorgt
       r.holder.add(model); r.body = model; r.isModel = true;
+      addDuck(r, model);
       r.height = d.H * k; r.w = d.W * k;
       r.shadow.scale.set(r.len * 1.15, r.w * 1.4, 1);
       // Räder einsammeln (wie js/car-burnout.js): vorn = vorderste Achse oder im Car editor markiert
@@ -1767,6 +1796,9 @@
           else if (e.type === 'nitro') snd.nitro();
         }
         var p = r.holder.position, back = rearOf(r, true);
+        if (e.type === 'crash' || e.type === 'spin') duckKick(r, 4);
+        else if (e.type === 'push') { duckKick(r, 3); duckKick(o, 1.5); }
+        else if (e.type === 'bump') { duckKick(o, 5); duckKick(r, 2); }
         if (e.type === 'overtake') { r.flash = FLASH; }
         else if (e.type === 'spin') burst('smoke', back.x, back.z, 5);
         else if (e.type === 'crash') { burst('smoke', p.x, p.z, 7); if (e.rail) burst('spark', p.x, p.z, 10, { y: 0.6 }); r.jolt = 1; }
@@ -1835,6 +1867,8 @@
       var pts = [], labels = [], camFix = null;
       if (race.stage === 'podium') {
         var pd = race.podium;
+        // Siegerente hüpft auf dem Podest (bei reduzierter Bewegung nicht)
+        if (pd.cars) pd.cars.forEach(function (c, k) { duckStep(c.r, dt, k === 0 && !reduce ? Math.abs(Math.sin(pd.t * 5)) * 0.25 : 0); });
         pd.t += dt;
         var shot = pd.shot = podiumShotAt(pd, pd.t);
         // Schilder: in der Totale alle, in Nahaufnahmen nur das Auto im Bild (sonst angeschnitten)
@@ -1896,6 +1930,7 @@
             r.jolt = Math.max(0, r.jolt - dt * 3.5);
           }
           if (r.flash > 0) r.flash = Math.max(0, r.flash - dt);
+          duckStep(r, dt);
           // neben der Bahn: Staub/Kies aus dem Heck; Dreher: Reifenqualm (nur ohne reduzierte Bewegung)
           if (!reduce && c.v > 3 && ((c.off && Math.random() < dt * 10) || (c.state === 'spin' && Math.random() < dt * 12))) {
             var bk = rearOf(r, true);
