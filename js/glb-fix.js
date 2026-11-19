@@ -30,6 +30,8 @@
  *     ganzen Rad-Netzen verrauscht (±4–42°, links/rechts gegensinnig) → galten als eingeschlagen und wurden
  *     verdreht „gerade gestellt“, vorn UND hinten (Gegenrad-Regel)
  *   - bmw-m3-competition: Skin-Netze → scripts/build_car_rain.py bake_skins (nicht hier)
+ *   - 2020-ferrari-roma, SF90, GT3 Touring: COLOR_0-Alpha ≈ 0 → Carbon/Chrom/Scheiben schrieben Alpha 0 (dropMaskAlpha)
+ *   - ~38 Autos mit KHR_materials_transmission (Lampengläser, Scheiben ohne Innenraum): r128 → fast unsichtbar
  */
 (function (root) {
   'use strict';
@@ -41,10 +43,32 @@
   function isGlassName(n) { return /glass|glas|window|scheibe|windshield/i.test(n || '') && !isLampName(n); }
   // Lampengläser (bernstein, Scheinwerfer, Rückleuchten) bleiben durchscheinend, sonst verschwinden die Lampen
   function isLampName(n) { return /amber|bronze|lamp|light|head|tail|indicator|blinker|clear|lens/i.test(n || ''); }
+  function tinted(m) { var c = m.color; return !!c && Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) > 0.25; }
+  // Vertex-Farben mit Alpha (COLOR_0 als VEC4): three r128 multipliert das Alpha in die Deckkraft. Spiele-Exporte
+  // (Ferrari Roma, SF90, GT3 Touring …) speichern dort eine Maske ≈ 0 → Teile schreiben Alpha 0, in OBS sieht man
+  // durch Carbon, Chrom und Scheiben hindurch. Ist das Alpha im Mittel < 0,5, gilt es nicht als Deckkraft: nur RGB behalten
+  function dropMaskAlpha(o) {
+    var g = o.geometry, at = g && g.attributes && g.attributes.color;
+    if (!at || at.itemSize !== 4 || !at.count) return;
+    var max = !at.normalized || at.isInterleavedBufferAttribute ? 1 : ({ Uint8Array: 255, Uint16Array: 65535, Int8Array: 127, Int16Array: 32767 }[at.array.constructor.name] || 1);
+    var sum = 0, n = 0, step = Math.max(1, Math.floor(at.count / 2000)), i;
+    for (i = 0; i < at.count; i += step) { sum += at.getW(i) / max; n++; }
+    if (sum / n >= 0.5) return;
+    var Arr = at.isInterleavedBufferAttribute ? Float32Array : at.array.constructor, out = new Arr(at.count * 3);
+    for (i = 0; i < at.count; i++) { out[i * 3] = at.getX(i); out[i * 3 + 1] = at.getY(i); out[i * 3 + 2] = at.getZ(i); }
+    g.setAttribute('color', new THREE.BufferAttribute(out, 3, at.normalized));
+  }
   function fixMaterial(m, inside) {
     if (!m || (DONE && DONE.has(m))) return;
     if (DONE) DONE.set(m, true);
     m.side = THREE.DoubleSide;
+    // KHR_materials_transmission: three r128 rechnet Transmission nur als Deckkraft-Abzug (Alpha ≈ 1 − transmission
+    // + Glanz) – Scheiben/Lampengläser mit transmission ≈ 1 wurden unsichtbar, in OBS (durchsichtige Browser-Quelle)
+    // sogar Löcher. Darum: Transmission aus, stattdessen normale Teildeckkraft (transmission 1 → Deckkraft 0,4)
+    if (m.transmission > 0) {
+      var tr = m.transmission; m.transmission = 0;
+      m.transparent = true; m.opacity = Math.min(m.opacity, Math.max(0.3, 1 - 0.6 * tr));
+    }
     var see = m.transparent || m.opacity < 1 || (m.alphaTest > 0);
     // unsichtbare Hilfsflächen (Deckkraft fast 0, ohne Textur) ausblenden statt zu Glas zu machen
     if (m.opacity < 0.05 && !m.map) { m.visible = false; m.needsUpdate = true; return; }
@@ -52,8 +76,9 @@
     if (isGlassName(m.name) || (see && !m.map)) {
       if (inside) {
         // mit Innenraum: getönt durchsichtig, Innenleben bleibt sichtbar
-        m.transparent = true; m.opacity = Math.min(m.opacity < 1 ? m.opacity : 0.4, 0.45); m.depthWrite = false; m.alphaTest = 0;
-        if (!m.map) m.color.setRGB(0.12, 0.14, 0.17);
+        // mindestens 0,3 Deckkraft: Glas mit Alpha 0,25 (Ferrari Roma) wirkte sonst wie gar keine Scheibe
+        m.transparent = true; m.opacity = Math.max(0.3, Math.min(m.opacity < 1 ? m.opacity : 0.4, 0.45)); m.depthWrite = false; m.alphaTest = 0;
+        if (!m.map && !tinted(m)) m.color.setRGB(0.12, 0.14, 0.17);   // farbiges Glas (RED_GLASS) behält seine Farbe
         m.metalness = 0.2; m.roughness = 0.03; if ('clearcoat' in m) m.clearcoat = 1; m.envMapIntensity = 1.6;
         if ('transmission' in m) m.transmission = 0;
         m.needsUpdate = true;
@@ -61,7 +86,7 @@
       }
       // ohne Innenraum: eigenes Glas-Material, dunkel getönt, glänzend, undurchsichtig
       m.transparent = false; m.opacity = 1; m.alphaTest = 0; m.depthWrite = true;
-      if (!m.map) m.color.setRGB(GLASS[0], GLASS[1], GLASS[2]);
+      if (!m.map && !tinted(m)) m.color.setRGB(GLASS[0], GLASS[1], GLASS[2]);
       m.metalness = 0.3; m.roughness = 0.04;
       if ('clearcoat' in m) m.clearcoat = 1;
       m.envMapIntensity = 1.5;
@@ -169,6 +194,7 @@
     if (!inside && cabinShare(obj) >= 0.04) inside = true;
     obj.traverse(function (o) {
       if (!o.isMesh) return;
+      dropMaskAlpha(o);
       [].concat(o.material).forEach(function (m) { fixMaterial(m, inside); });
       // durchsichtige Scheiben nach dem Rest zeichnen
       if ([].concat(o.material).some(function (m) { return m && m.transparent; })) o.renderOrder = 2;

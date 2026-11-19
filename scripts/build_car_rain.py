@@ -88,9 +88,13 @@ def shrink_textures(path, max_px=MAX_TEX):
             try:
                 pic = Image.open(io.BytesIO(data))
                 if max(pic.size) > max_px:
+                    # Palettenbilder mit Transparenz (tRNS) erst nach RGBA – sonst wurden sie als JPEG ohne Alpha gespeichert
+                    alpha = "A" in pic.getbands() or (pic.mode == "P" and "transparency" in pic.info)
+                    if pic.mode == "P":
+                        pic = pic.convert("RGBA" if alpha else "RGB")
                     pic.thumbnail((max_px, max_px))
                     buf = io.BytesIO()
-                    if pic.mode in ("RGBA", "LA", "P") and "A" in pic.getbands():
+                    if alpha:
                         pic.save(buf, "PNG", optimize=True)
                         im["mimeType"] = "image/png"
                     else:
