@@ -78,6 +78,7 @@ Vorschläge (vom Nutzer nicht widersprochen, im Bau anpassbar):
   3D-Szene (feste Bildschirmgröße), nicht als DOM-Element (keine Inline-Styles). Bei Gedränge kleiner/blasser,
   vorderste bleiben voll.
 - **Rangliste** live am Rand (kompakt, alle Plätze bei ≤ 10).
+- **Windschatten und Überholen sichtbar** (Nutzerwunsch): feine helle Luftschlieren zwischen Vorder- und Hintermann, solange der Windschatten wirkt; beim Überholen leuchtet das Namensschild kurz mit Pfeil auf, die Rangliste tauscht die Plätze animiert.
 - Rahmen im Theme-Look (`--theme-*`), Rand-Fade, `prefers-reduced-motion` respektieren (Kamerafahrten ruhiger).
 
 ## Maßstab (Variante b+c, vom Nutzer gewählt)
