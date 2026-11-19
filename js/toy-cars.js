@@ -283,6 +283,25 @@
       var o = t[0], M = new THREE.Matrix4().copy(t[1].pivot.matrixWorld).invert().multiply(o.matrixWorld);
       t[1].inner.add(o); M.decompose(o.position, o.quaternion, o.scale); o.userData.wheelPart = true;
     });
+    // Reifen mit Namen, deren Mitte neben dem Drehpunkt liegt (Mittelwert der Reifenpunkte statt Mitte; Shelby GT500:
+    // Rad eierte 3,5 cm): Reifenmitte in der Radebene messen
+    W.forEach(function (w) {
+      if (w.ring) return;
+      var up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3().crossVectors(w.ax, up).normalize(), eu = [Infinity, -Infinity], es = [Infinity, -Infinity], n = 0;
+      w.inner.updateMatrixWorld(true);
+      w.inner.traverse(function (o) {
+        if (!o.isMesh || !/tire|tyre|reifen/i.test(((o.material && o.material.name) || '') + ' ' + (o.name || ''))) return;
+        var p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 3000));
+        for (var i = 0; i < p.count; i += step) {
+          v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).sub(w.c); var pu = v.dot(up), ps = v.dot(side); n++;
+          eu = [Math.min(eu[0], pu), Math.max(eu[1], pu)]; es = [Math.min(es[0], ps), Math.max(es[1], ps)];
+        }
+      });
+      var hu = eu[1] - eu[0], hs = es[1] - es[0];
+      // nur wenn der Reifen rund und etwa so groß wie das Rad ist (keine halben Reifen o. Ä.)
+      if (n > 20 && Math.abs(hu - hs) < hu * 0.08 && hu > w.R * 1.6 && hu < w.R * 2.6)
+        w.ring = { off: new THREE.Vector3().addScaledVector(up, (eu[0] + eu[1]) / 2).addScaledVector(side, (es[0] + es[1]) / 2), size: hu };
+    });
     // Drehpunkt auf die Reifenmitte legen (Weltlage aller Teile bleibt): pivot um off verschieben, inner zurück
     W.forEach(function (w) {
       if (!w.ring || w.ring.off.length() < w.R * 0.02) return;

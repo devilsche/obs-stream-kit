@@ -265,6 +265,7 @@
   // ── Räder ──
   // Innenraum-Gummi (z. B. „INT_Rubber“ beim Lancer Evo IX: Fußmatten, Dichtungen im Motorraum) ist kein Reifen –
   // sonst landen die Vorderräder in der Kabine, stehen ~45° schräg und hängen zu hoch im Radkasten
+  var CALIPER = /calip|brembo|sattel/i;
   var TIRE = /tire|tyre|reifen|rubber|whitewall/i, NOT_TIRE = /trim|seal|strip|window|door|mat\b|pedal|interior|\bint_|_int\b/i;
   var RIM = /\brim|rim\b|rims|felge|hubcap|wheel|alloy|spoke/i, NOT_RIM = /steer|stitch|tire|tyre|lenk|trim|interior|\bint/i;
   var PAINT = /paint|carpaint|lack|main_color|maincolor|body_?colou?r|bodywork|exterior_?colou?r|\bbody\b|^body/i, NOT_PAINT = /under|interior|\bint|chassis|frame|plastic|black|glass/i;
@@ -464,6 +465,11 @@
       // Drehgruppe: dreht das Rad um seine Achse, pivot.rotation.y lenkt
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';
       spin.add(inner); keep.add(spin); h.pivot.add(keep);
+      // Bremssättel lenken mit, drehen aber nicht mit dem Rad (sonst kreisen sie beim Fahren/Lenken – „Restpartikel“
+      // am M3 E30): aus der Drehgruppe in „Keep“ umhängen, Weltlage bleibt
+      obj.updateMatrixWorld(true);
+      var cal = []; inner.traverse(function (o) { if (o.isMesh && CALIPER.test(((o.material && o.material.name) || '') + ' ' + (o.name || ''))) cal.push(o); });
+      cal.forEach(function (o) { keep.attach(o); o.userData.wheelPart = true; o.userData.caliper = true; });
       res.push({ pivot: h.pivot, side: h.w.key[0], radius: h.w.radius, steer: h.w.steer, half: h.w.half });
     });
     return res;
