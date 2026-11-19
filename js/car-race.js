@@ -73,7 +73,7 @@
         // freier Bereich: rechts neben oder unter dem Bild-im-Bild (+24 px Rand) – der größere
         var m = 24, px0 = (PIP[0] + PIP[2] + m) / UIK, py0 = (PIP[1] + PIP[3] + m) / UIK;
         var right = { x: px0, y: 0, w: W - px0, h: H }, below = { x: 0, y: py0, w: W, h: H - py0 };
-        VW = right.w * right.h >= below.w * below.h ? right : below;
+        VW = right;   // links unter dem Bild-im-Bild steht die Rangliste: frei ist nur der Bereich rechts davon
         // Bildmitte der Kamera in die Mitte des freien Bereichs schieben (außermittige Projektion)
         cam.setViewOffset(W, H, W / 2 - (VW.x + VW.w / 2), H / 2 - (VW.y + VW.h / 2), W, H);
       } else VW = { x: 0, y: 0, w: W, h: H };
@@ -682,7 +682,7 @@
       frameA = ease(frameA, visible ? 1 : 0, 0.3, dt);
       var k = dpr;
       hud.setTransform(k, 0, 0, k, 0, 0);
-      hud.clearRect(x - 30, y - 30, w + 60, h + 60);   // HUD nie über dem Spiel
+      hud.clearRect(x - 10, y - 10, w + 20, h + 20);   // HUD nie über dem Spiel
       if (frameA > 0.01) {
         hud.save(); hud.globalAlpha = frameA;
         hud.shadowColor = 'rgba(0,0,0,0.55)'; hud.shadowBlur = 22;
@@ -1163,6 +1163,47 @@
       g.fillStyle = withAlpha(TK.surface, 0.82); g.fill();
       g.lineWidth = Math.max(1, h * 0.05); g.strokeStyle = TK.border; g.stroke();
     }
+    // Vollbild: kompakte Rangliste direkt unter dem Bild-im-Bild (gleiche Breite), halbtransparent wie die Lobby-Karte;
+    // je Zeile Platz, Chatfarben-Balken, Name (20 px bei 1080p) und rechtsbündig das Automodell (15 px, entfällt
+    // ohne Platz) – alles per measureText auf die Spalte gekürzt. Bis 10 Zeilen; reicht der Platz nicht, werden sie flacher.
+    function drawStageRanking(rows, now) {
+      var k = dpr * UIK, sw = W, sh = H;
+      hud.save(); hud.setTransform(k, 0, 0, k, 0, 0);
+      W = FULLW; H = FULLH;
+      try {
+        var x0 = PIP[0] / UIK, y0 = (PIP[1] + PIP[3] + 16) / UIK, w = PIP[2] / UIK, pad = 6, n = Math.max(1, rows.length);
+        var rowH = Math.min(17, (H - y0 - 8 - pad * 2) / n), fName = Math.min(10, rowH * 0.6), fCar = Math.min(7.5, rowH * 0.45);
+        var h = rows.length * rowH + pad * 2, bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
+        hud.save();
+        hud.shadowColor = 'rgba(0,0,0,0.4)'; hud.shadowBlur = 10; hud.shadowOffsetY = 2;
+        roundRect(hud, x0, y0, w, h, 7); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
+        hud.restore();
+        roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 7); hud.lineWidth = 1; hud.strokeStyle = withAlpha(TK.accent, 0.85); hud.stroke();
+        hud.save(); roundRect(hud, x0, y0, w, h, 7); hud.clip();
+        hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 2; hud.shadowOffsetY = 1; hud.textBaseline = 'middle';
+        var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
+        rows.forEach(function (row, i) {
+          var r = row.r;
+          r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
+          var y = y0 + pad + r.rankY * rowH + rowH / 2;
+          if (r.flash > 0) { hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fillRect(x0 + 2, y - rowH / 2 + 1, w - 4, rowH - 2); }
+          hud.globalAlpha = row.dnf ? 0.6 : 1;
+          var px = x0 + pad, placeW = fName * 2.2;
+          hud.textAlign = 'right'; hud.font = font(800, fName); hud.fillStyle = row.dnf ? dim : TK.accent;
+          hud.fillText(fitText(hud, row.place, placeW), px + placeW, y);
+          if (!row.dnf) { hud.fillStyle = r.color; hud.fillRect(px + placeW + 4, y - rowH * 0.32, 3, rowH * 0.64); }
+          var nx = px + placeW + 12, right = x0 + w - pad, avail = right - nx;
+          hud.font = font(500, fCar);
+          var car = r.modelName || '', carW = car ? Math.min(hud.measureText(car).width, avail * 0.45) : 0;
+          if (carW < 30) carW = 0;   // zu eng: Automodell weglassen
+          hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 700, fName); hud.fillStyle = row.fin ? TK.accent : white;
+          hud.fillText(fitText(hud, r.shown, avail - (carW ? carW + 8 : 0)), nx, y);
+          if (carW) { hud.textAlign = 'right'; hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, carW), right, y + 0.5); }
+          hud.globalAlpha = 1;
+        });
+        hud.restore();
+      } finally { W = sw; H = sh; hud.restore(); }
+    }
     // HUD zeichnen: ganzes Canvas leeren, dann im freien Bereich (Vollbild) bzw. im ganzen Fenster
     function drawHudView(fn) {
       hud.setTransform(1, 0, 0, 1, 0, 0); hud.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
@@ -1180,38 +1221,42 @@
       }
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
-      var pw = rh * 11.5, ph = rows.length * rh + rh * 0.4;   // Platz · Name · Automodell
-      var rx = STAGE ? W - m - pw : m;   // Vollbild: Rangliste rechts oben (links oben ist das Bild-im-Bild)
-      pill(hud, rx, m, pw, ph);
-      hud.textBaseline = 'middle';
-      // Zeilen gleiten beim Platztausch (bei reduzierter Bewegung sofort)
-      var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
-      rows.forEach(function (row, i) {
-        var r = row.r;
-        r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
-        var y = m + rh * 0.2 + r.rankY * rh + rh / 2;
-        if (r.flash > 0) {   // gerade überholt: Zeile kurz in Akzentfarbe hinterlegt
-          roundRect(hud, rx + rh * 0.15, y - rh * 0.46, pw - rh * 0.3, rh * 0.92, rh * 0.2);
-          hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fill();
-        }
-        hud.globalAlpha = row.dnf ? 0.6 : 1;
-        hud.font = font(800, fs); hud.textAlign = 'right';
-        hud.fillStyle = row.dnf ? TK.dim : TK.accent;
-        hud.fillText(row.place, rx + rh * (row.dnf ? 1.7 : 1.15), y);
-        if (!row.dnf) {
-          hud.beginPath(); hud.arc(rx + rh * 1.55, y, rh * 0.17, 0, Math.PI * 2); hud.fillStyle = row.r.color; hud.fill();
-        }
-        hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
-        hud.fillStyle = row.fin ? TK.accent : TK.text;
-        var nm = fitText(hud, row.r.shown, (pw - rh * 2.25) * 0.55);
-        hud.fillText(nm, rx + rh * 1.95, y);
-        if (row.r.modelName) {   // Automodell kleiner und gedämpft dahinter
-          var nx = rx + rh * 1.95 + hud.measureText(nm).width + rh * 0.3;
-          hud.font = font(500, fs * 0.82); hud.fillStyle = TK.dim;
-          hud.fillText(fitText(hud, row.r.modelName, rx + pw - rh * 0.3 - nx), nx, y + fs * 0.05);
-        }
-        hud.globalAlpha = 1;
-      });
+      // Vollbild: Rangliste in der Spalte unter dem Bild-im-Bild (eigene Funktion, außerhalb des freien Bereichs)
+      if (STAGE) drawStageRanking(rows, now);
+      else {
+        var pw = rh * 11.5, ph = rows.length * rh + rh * 0.4;   // Platz · Name · Automodell
+        var rx = m;
+        pill(hud, rx, m, pw, ph);
+        hud.textBaseline = 'middle';
+        // Zeilen gleiten beim Platztausch (bei reduzierter Bewegung sofort)
+        var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
+        rows.forEach(function (row, i) {
+          var r = row.r;
+          r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
+          var y = m + rh * 0.2 + r.rankY * rh + rh / 2;
+          if (r.flash > 0) {   // gerade überholt: Zeile kurz in Akzentfarbe hinterlegt
+            roundRect(hud, rx + rh * 0.15, y - rh * 0.46, pw - rh * 0.3, rh * 0.92, rh * 0.2);
+            hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fill();
+          }
+          hud.globalAlpha = row.dnf ? 0.6 : 1;
+          hud.font = font(800, fs); hud.textAlign = 'right';
+          hud.fillStyle = row.dnf ? TK.dim : TK.accent;
+          hud.fillText(row.place, rx + rh * (row.dnf ? 1.7 : 1.15), y);
+          if (!row.dnf) {
+            hud.beginPath(); hud.arc(rx + rh * 1.55, y, rh * 0.17, 0, Math.PI * 2); hud.fillStyle = row.r.color; hud.fill();
+          }
+          hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
+          hud.fillStyle = row.fin ? TK.accent : TK.text;
+          var nm = fitText(hud, row.r.shown, (pw - rh * 2.25) * 0.55);
+          hud.fillText(nm, rx + rh * 1.95, y);
+          if (row.r.modelName) {   // Automodell kleiner und gedämpft dahinter
+            var nx = rx + rh * 1.95 + hud.measureText(nm).width + rh * 0.3;
+            hud.font = font(500, fs * 0.82); hud.fillStyle = TK.dim;
+            hud.fillText(fitText(hud, row.r.modelName, rx + pw - rh * 0.3 - nx), nx, y + fs * 0.05);
+          }
+          hud.globalAlpha = 1;
+        });
+      }
       // Runde rechts oben
       var lapText = null;
       if (race.stage === 'grid') lapText = race.laps + ' LAPS';
