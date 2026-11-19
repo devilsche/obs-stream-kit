@@ -302,6 +302,7 @@
       // Vorschau: Modellname mit anzeigen (zur Fehlersuche „welches Auto war das?“), echte Rennen nur der Chatname
       var model = entry ? String(entry.name || key) : key ? String(key) : 'placeholder box';
       if (model.length > 22) model = model.slice(0, 21) + '\u2026';
+      r.modelName = model;
       r.shown = preview ? r.display + ' \u00b7 ' + model : r.display;
       if (preview && root.console) console.info('Car Race preview: grid ' + src.grid + ' ' + r.display + ' = ' + (key || '(no car)') + (entry ? ' (' + entry.name + ', front ' + (entry.front || 'auto') + ')' : ''));
       var shadow = new THREE.Mesh(own2(r, new THREE.PlaneGeometry(1, 1)), own2(r, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })));
@@ -487,7 +488,7 @@
       race = {
         id: st.race_id, seed: st.seed | 0, T: T, laps: st.laps || 3,
         finishWindow: preview && finishOpt != null ? finishOpt : (st.finish_window || 15),   // ?finish nur in der Vorschau: echte Rennen nehmen den Server-Wert, damit jede Instanz dasselbe Ergebnis rechnet
-        startsAt: st.starts_at, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
+        startsAt: st.starts_at, introAt: null, intro: null, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
         sim: null, simKey: '', prev: null, alpha: 1, ended: false, fadeAt: null, endedAt: null, shownAt: srvNow(),
         cam: null, lastLeader: null, evIdx: 0, oil: []
       };
@@ -530,7 +531,7 @@
     function startSim() {
       race.sim = CarRaceSim.create({ seed: race.seed, track: race.T, laps: race.laps, finishWindow: race.finishWindow, cars: simCars() });
       race.simKey = race.rosterKey + '@' + race.startsAt;
-      race.stage = 'race'; race.ended = false; race.evIdx = 0; clearOil();
+      race.stage = 'race'; race.ended = false; race.evIdx = 0; clearOil(); endIntro();
       var t = srvNow() - race.startsAt;
       if (t > 0.5) { race.sim.fastForward(Math.min(t, 120)); race.cam = null; }   // Neuladen: dieselbe Rennsituation
       snap();
@@ -554,13 +555,16 @@
         waitLogged = true;   // leere Seite erklärbar machen (Dashboard-Link ohne ?preview=1)
         if (root.console && console.info) console.info('Car Race: waiting for !race \u2013 add ?preview=1 to test');
       }
-      if (ph === 'countdown' || ph === 'race') {
+      if (ph === 'countdown' || ph === 'intro' || ph === 'race') {
         if (!st.race_id || finished[st.race_id]) return;
         if (race && race.id === st.race_id && race.dropAt != null) { race.dropAt = null; }   // wieder genug Fahrer
         if (!race || race.id !== st.race_id) newRace(st);
         if (!race.sim) {
-          race.startsAt = st.starts_at;
           syncRacers(st.racers);
+          // countdown: starts_at = Beginn der Vorstellung, Rennstart danach (wie fx/race.py);
+          // intro/race: der Server nennt beide Zeiten
+          if (ph === 'countdown') { race.introAt = st.starts_at; race.startsAt = st.starts_at + introSeconds(race.order.length); }
+          else { race.introAt = st.intro_at != null ? st.intro_at : st.starts_at - introSeconds(race.order.length); race.startsAt = st.starts_at; }
           if (ph === 'race') startSim();
         } else if (race.stage === 'race' && (st.starts_at !== race.startsAt || rosterOf(st.racers) !== race.rosterKey)) {
           // Start vorgezogen (10. Fahrer) oder Feld kurz vor dem Start geändert: neu aufsetzen
@@ -715,25 +719,83 @@
         var k = podiumShotAt(pd, t), D = (W / k.px) / (2 * tanH), hor = D * Math.cos(k.tilt) + 3;
         segs.push({ x: k.x, z: k.z, cx: k.x + hor * Math.sin(k.orb), cz: k.z + hor * Math.cos(k.orb), half: k.wide > 0.5 ? half : W / k.px / 2 + 2 });
       }
-      function blocks(x, z, rad) {
-        if (Math.hypot(x - pc.x, z - pc.z) < half + 3 + rad) return true;
-        return segs.some(function (sg) {   // Abstand zur Strecke Blickpunkt → Kamera
-          var dx = sg.cx - sg.x, dz = sg.cz - sg.z, L2 = dx * dx + dz * dz || 1;
-          var u = clamp(((x - sg.x) * dx + (z - sg.z) * dz) / L2, 0, 1);
-          return Math.hypot(x - (sg.x + dx * u), z - (sg.z + dz * u)) < sg.half + rad;
-        });
-      }
-      trackDecor.objs.forEach(function (d) { if (blocks(d.o.position.x, d.o.position.z, d.r)) d.o.visible = false; });
+      hideDecor(function (x, z, rad) { return Math.hypot(x - pc.x, z - pc.z) < half + 3 + rad || nearSegs(segs, x, z, rad); });
+    }
+    // Abstand eines Punkts zu den Strecken Blickpunkt → Kamera (Korridore)
+    function nearSegs(segs, x, z, rad) {
+      return segs.some(function (sg) {
+        var dx = sg.cx - sg.x, dz = sg.cz - sg.z, L2 = dx * dx + dz * dz || 1;
+        var u = clamp(((x - sg.x) * dx + (z - sg.z) * dz) / L2, 0, 1);
+        return Math.hypot(x - (sg.x + dx * u), z - (sg.z + dz * u)) < sg.half + rad;
+      });
+    }
+    // Deko ausblenden, die blocks(x, z, Radius) trifft; Rückgabe zum Wiederherstellen (restoreDecor)
+    function hideDecor(blocks) {
+      var undo = { objs: [], trees: [] };
+      trackDecor.objs.forEach(function (d) { if (d.o.visible && blocks(d.o.position.x, d.o.position.z, d.r)) { d.o.visible = false; undo.objs.push(d.o); } });
       var tr = trackDecor.trees;
       if (tr) {
-        var zero = new THREE.Matrix4().makeScale(0, 0, 0), hit = false;
+        var zero = new THREE.Matrix4().makeScale(0, 0, 0);
         tr.spots.forEach(function (sp, i) {
-          if (!blocks(sp[0], sp[1], 2.5)) return;
-          tr.trunks.setMatrixAt(i, zero); tr.crowns.setMatrixAt(i, zero); hit = true;
+          if (sp.hidden || !blocks(sp[0], sp[1], 2.5)) return;
+          var a = new THREE.Matrix4(), b = new THREE.Matrix4(); tr.trunks.getMatrixAt(i, a); tr.crowns.getMatrixAt(i, b);
+          undo.trees.push([i, a, b]); sp.hidden = true;
+          tr.trunks.setMatrixAt(i, zero); tr.crowns.setMatrixAt(i, zero);
         });
-        if (hit) { tr.trunks.instanceMatrix.needsUpdate = true; tr.crowns.instanceMatrix.needsUpdate = true; }
+        if (undo.trees.length) { tr.trunks.instanceMatrix.needsUpdate = true; tr.crowns.instanceMatrix.needsUpdate = true; }
+      }
+      return undo;
+    }
+    function restoreDecor(undo) {
+      if (!undo) return;
+      undo.objs.forEach(function (o) { o.visible = true; });
+      var tr = trackDecor.trees;
+      if (tr && undo.trees.length) {
+        undo.trees.forEach(function (u) { tr.trunks.setMatrixAt(u[0], u[1]); tr.crowns.setMatrixAt(u[0], u[2]); tr.spots[u[0]].hidden = false; });
+        tr.trunks.instanceMatrix.needsUpdate = true; tr.crowns.instanceMatrix.needsUpdate = true;
       }
     }
+
+    // ---- Fahrervorstellung (Phase intro) ----
+    // Dauer wie fx/race.py: 2 s + 1,6 s je Fahrer. Kamera fliegt tief von hinten (letzter Startplatz) nach vorn
+    // (Pole), hält je Auto 1,6 s schräg vorn von der Außenseite; die letzten 2 s Totale der Startaufstellung mit
+    // Startampel 3-2-1. Feste Schlüsselbilder (für alle Instanzen gleich); reduzierte Bewegung: stehende
+    // Startaufstellung mit Fahrerliste.
+    var INTRO_BASE = 2.0, INTRO_PER = 1.6, INTRO_TILT = 20 * Math.PI / 180;
+    function introSeconds(n) { return INTRO_BASE + INTRO_PER * n; }
+    function gridSlot(i) {
+      var c = race.gridSim.cars[i], p = race.T.at(c.s);
+      return { x: p.x + p.nx * c.d, z: p.z + p.nz * c.d, p: p, d: c.d };
+    }
+    function buildIntro() {
+      var n = race.order.length, keys = [], prevOrb = null;
+      function unwrap(o) { if (prevOrb != null) { while (o - prevOrb > Math.PI) o -= 2 * Math.PI; while (o - prevOrb < -Math.PI) o += 2 * Math.PI; } prevOrb = o; return o; }
+      for (var k = 0; k < n; k++) {
+        var i = n - 1 - k, r = race.order[i], sl = gridSlot(i), p = sl.p, side = sl.d >= 0 ? 1 : -1;
+        var fx = Math.cos(p.yaw), fz = -Math.sin(p.yaw);
+        var orb = unwrap(Math.atan2(fx * 0.75 + p.nx * side * 0.65, fz * 0.75 + p.nz * side * 0.65));
+        var cosT = Math.cos(INTRO_TILT), px = Math.min(0.42 * W / Math.max(r.len, 3.5), (H * 0.3) / ((r.height + 0.3) * cosT));
+        // Auto im oberen Teil des Bildes, unten Platz für die Fahrerkarte
+        var y = r.height * 0.5 - (H * 0.14) / (px * cosT);
+        var base = { x: sl.x, z: sl.z, y: y, px: px, tilt: INTRO_TILT, wide: 0, focus: i };
+        keys.push(Object.assign({ t: INTRO_PER * k + 0.55, orb: orb + 0.06 }, base), Object.assign({ t: INTRO_PER * (k + 1), orb: orb - 0.06 }, base));
+      }
+      var fit = camFit(race.order.map(function (r, i) { var sl = gridSlot(i); return { x: sl.x, z: sl.z }; })) || { x: 0, z: 0, px: PX_MAX };
+      var high = { x: fit.x, z: fit.z, y: 0, px: fit.px, tilt: TILT, orb: unwrap(0), wide: 1, focus: -1 };
+      keys.push(Object.assign({ t: INTRO_PER * n + 0.9 }, high), Object.assign({ t: introSeconds(n) }, high));
+      // Deko entlang der Fahrt ausblenden (beim Rennstart wieder da)
+      var tanH = Math.tan(FOV * Math.PI / 360) * (W / H), segs = [], intro = { keys: keys, at: race.introAt, n: n };
+      for (var t = 0.55; t <= introSeconds(n); t += 0.2) {
+        var s = shotAt(keys, t), D = (W / s.px) / (2 * tanH), hor = D * Math.cos(s.tilt) + 3;
+        segs.push({ x: s.x, z: s.z, cx: s.x + hor * Math.sin(s.orb), cz: s.z + hor * Math.cos(s.orb), half: s.wide > 0.5 ? 6 : W / s.px / 2 + 2 });
+      }
+      intro.undo = reduce ? null : hideDecor(function (x, z, rad) { return nearSegs(segs, x, z, rad); });
+      return intro;
+    }
+    // Schlüsselbild-Interpolation (wie die Siegerehrung)
+    function shotAt(K, t) { return podiumShotAt({ keys: K }, t); }
+    function endIntro() { if (race.intro) { restoreDecor(race.intro.undo); race.intro.undo = null; } }
+
     // freier Platz fürs Podest kurz vor der Ziellinie (Seite egal), sonst weiter draußen
     function podiumSpot(width) {
       var T = race.T, HALF = T.width / 2, p = T.at(-14), best = null;
@@ -902,6 +964,11 @@
       hud.clearRect(0, 0, W, H);
       if (!race) return;
       if (race.stage === 'podium') { drawPodiumHud(); return; }
+      var introT = race.stage === 'grid' && race.introAt != null ? now - race.introAt : -1;
+      if (introT >= 0 && race.order.length >= 3) {
+        if (reduce) { drawGridList(); drawLights(race.startsAt - now); return; }
+        if (race.introShot && race.introShot.wide < 0.5) { drawIntroCard(introT); return; }
+      }
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
       var pw = rh * (preview ? 12 : 7.4), ph = rows.length * rh + rh * 0.4;
@@ -943,8 +1010,10 @@
       hud.textAlign = 'center'; hud.fillStyle = TK.text; hud.fillText(lapText, W - m - lw / 2, m + rh * 0.6);
       // Countdown
       var left = race.startsAt != null ? race.startsAt - now : null;
-      if (race.stage === 'grid' && left != null) {
-        if (left > 5) {
+      if (race.stage === 'grid' && left != null && introT >= 0) {
+        drawLights(left);
+      } else if (race.stage === 'grid' && left != null) {
+        if (left > 0) {
           var sec = Math.ceil(left), t = 'STARTS IN ' + Math.floor(sec / 60) + ':' + ('0' + sec % 60).slice(-2);
           hud.font = font(800, fs * 1.1);
           var tw = hud.measureText(t).width + rh * 1.2;
@@ -952,10 +1021,66 @@
           hud.fillStyle = TK.text; hud.fillText(t, W / 2, m + rh * 0.65);
           hud.font = font(600, fs * 0.9); hud.fillStyle = TK.dim;
           hud.fillText('!race to join · ' + race.order.length + '/10', W / 2, m + rh * 1.85);
-        } else bigText(String(Math.max(1, Math.ceil(left))), left % 1);
+        }
       } else if (race.stage === 'race' && left != null && -left < 1.2) {
         bigText('GO!', 1 + left / 1.2);
       }
+    }
+    // Startampel in den letzten 2 s vor dem Start: drei rote Lichter gehen nacheinander an, dazu 3-2-1
+    function drawLights(left) {
+      if (!(left > 0 && left <= 2)) return;
+      var lit = Math.min(3, Math.floor((2 - left) / (2 / 3)) + 1), rad = clamp(H * 0.04, 9, 22), gap = rad * 2.8;
+      var cx = W / 2, cy = Math.round(Math.min(W * 0.045, H * 0.07)) + rad * 1.6;
+      pill(hud, cx - gap * 1.5 - rad * 0.4, cy - rad * 1.4, gap * 3 + rad * 0.8, rad * 2.8);
+      for (var i = 0; i < 3; i++) {
+        hud.beginPath(); hud.arc(cx + (i - 1) * gap, cy, rad, 0, Math.PI * 2);
+        hud.fillStyle = i < lit ? '#e0262b' : 'rgba(60,60,66,0.9)'; hud.fill();
+      }
+      bigText(String(4 - lit), (left % (2 / 3)) * 1.5);
+    }
+    // Fahrerkarte im Stil einer Bauchbinde: Startplatz, Name (Akzent in Chatfarbe), Automodell
+    function drawIntroCard(introT) {
+      var n = race.order.length, k = Math.floor(introT / INTRO_PER);
+      if (k < 0 || k >= n) return;
+      var r = race.order[n - 1 - k], st = introT - k * INTRO_PER;
+      var a = clamp((st - 0.4) / 0.2, 0, 1) * clamp((INTRO_PER - st) / 0.15, 0, 1);
+      if (a <= 0) return;
+      var m = Math.round(Math.min(W * 0.045, H * 0.07)), f1 = clamp(H * 0.12, 30, 72), f2 = clamp(H * 0.075, 18, 44), f3 = clamp(H * 0.05, 16, 28);
+      var ch = f1 * 0.4 + f2 * 1.25 + f3 * 1.35 + f3 * 0.6, y0 = H - m - ch, x0 = m, pad = f3 * 0.8;
+      hud.save(); hud.globalAlpha = a;
+      hud.font = font(900, f1); var pw = hud.measureText('P' + r.grid).width;
+      var maxText = W - 2 * m - pw - pad * 3 - 8;
+      hud.font = font(800, f2); var nm = fitText(hud, r.display, maxText), nw = hud.measureText(nm).width;
+      hud.font = font(600, f3); var md = fitText(hud, r.modelName || '', maxText), mw = hud.measureText(md).width;
+      var cw = Math.min(W - 2 * m, 8 + pad * 3 + pw + Math.max(nw, mw));
+      var slide = reduce ? 0 : (1 - clamp((st - 0.4) / 0.3, 0, 1)) * -24;
+      hud.translate(slide, 0);
+      roundRect(hud, x0, y0, cw, ch, f3 * 0.5); hud.fillStyle = withAlpha(TK.surface, 0.9); hud.fill();
+      hud.lineWidth = 2; hud.strokeStyle = TK.border; hud.stroke();
+      hud.fillStyle = r.color; hud.fillRect(x0 + 2, y0 + f3 * 0.4, 6, ch - f3 * 0.8);   // Chatfarbe als Akzentbalken
+      hud.textBaseline = 'middle'; hud.textAlign = 'left';
+      hud.font = font(900, f1); hud.fillStyle = TK.accent; hud.fillText('P' + r.grid, x0 + 8 + pad, y0 + ch / 2);
+      var tx = x0 + 8 + pad * 2 + pw;
+      hud.font = font(800, f2); hud.fillStyle = TK.text; hud.fillText(nm, tx, y0 + ch * 0.38);
+      hud.font = font(600, f3); hud.fillStyle = TK.dim; hud.fillText(md, tx, y0 + ch * 0.72);
+      hud.restore();
+    }
+    // Reduzierte Bewegung: Liste der Startaufstellung statt Vorbeiflug
+    function drawGridList() {
+      var n = race.order.length, fs = clamp(H * 0.05, 16, 26), rh = fs * 1.35, m = Math.round(Math.min(W * 0.045, H * 0.07));
+      var w = Math.min(W - 2 * m, fs * 22), h = rh * (n + 1.4), x0 = (W - w) / 2, y0 = Math.max(m, (H - h) / 2);
+      pill(hud, x0, y0, w, h);
+      hud.textBaseline = 'middle'; hud.textAlign = 'center'; hud.font = font(800, fs); hud.fillStyle = TK.accent;
+      hud.fillText('STARTING GRID', W / 2, y0 + rh * 0.7);
+      race.order.forEach(function (r, i) {
+        var y = y0 + rh * (i + 1.7);
+        hud.textAlign = 'right'; hud.font = font(800, fs); hud.fillStyle = TK.accent; hud.fillText('P' + r.grid, x0 + fs * 2.4, y);
+        hud.beginPath(); hud.arc(x0 + fs * 3, y, fs * 0.25, 0, Math.PI * 2); hud.fillStyle = r.color; hud.fill();
+        hud.textAlign = 'left'; hud.font = font(700, fs); hud.fillStyle = TK.text;
+        var nm = fitText(hud, r.display, w * 0.42); hud.fillText(nm, x0 + fs * 3.6, y);
+        hud.font = font(600, fs * 0.9); hud.fillStyle = TK.dim;
+        hud.fillText(fitText(hud, r.modelName || '', w - fs * 4.2 - w * 0.45), x0 + fs * 3.6 + w * 0.45, y);
+      });
     }
     // große Zahl in der Mitte, pulst je Sekunde (bei reduzierter Bewegung ruhig)
     function bigText(t, frac) {
@@ -1202,6 +1327,25 @@
         // reduzierte Bewegung: sofort (Schnitt statt Fahrt)
         camFix = Object.assign({}, shot, { direct: reduce || pd.t > 1.2 });
       } else if (race.stage === 'grid') {
+        // Fahrervorstellung: ab introAt bis zum Rennstart (Phase intro)
+        var introT = race.introAt != null ? now - race.introAt : -1;
+        var inIntro = introT >= 0 && race.gridSim && race.order.length >= 3 && race.dropAt == null;
+        var ishot = null;
+        if (inIntro) {
+          if (!race.intro || race.intro.at !== race.introAt || race.intro.n !== race.order.length) {
+            endIntro();
+            race.intro = buildIntro();
+            var c0 = race.cam || { x: 0, z: 0, lp: Math.log(PX_MAX), ty: 0, tilt: TILT, orb: 0 };
+            race.intro.cam0 = { x: c0.x, z: c0.z, px: Math.exp(c0.lp), y: c0.ty || 0, tilt: c0.tilt == null ? TILT : c0.tilt, orb: c0.orb || 0 };
+          }
+          if (!reduce) {
+            ishot = race.introShot = shotAt(race.intro.keys, introT);
+            // die ersten 0,55 s aus der bisherigen Kamera hinein überblenden, danach direkt den Schlüsselbildern folgen
+            var b0 = smooth01(introT / 0.55), q0 = race.intro.cam0;
+            camFix = { x: lerp(q0.x, ishot.x, b0), z: lerp(q0.z, ishot.z, b0), y: lerp(q0.y, ishot.y, b0),
+              px: Math.exp(lerp(Math.log(q0.px), Math.log(ishot.px), b0)), tilt: lerp(q0.tilt, ishot.tilt, b0), orb: lerp(q0.orb, ishot.orb, b0), direct: true };
+          }
+        } else race.introShot = null;
         if (race.gridSim) race.order.forEach(function (r, i) {
           var c = race.gridSim.cars[i];
           if (!r.disp) r.disp = { s: c.s, d: c.d };
@@ -1211,7 +1355,8 @@
           var lean = Math.abs(dsv) > 0.3 ? clamp(Math.atan2(ddv * 0.4, Math.abs(dsv) + 2), -0.25, 0.25) : 0;
           placeCar(r, T, r.disp.s, r.disp.d, T.at(r.disp.s).yaw + lean, 0, 0, lean * 2, dt);
           pts.push({ x: r.holder.position.x, z: r.holder.position.z });
-          labels.push({ r: r, place: String(r.grid), show: true, order: i });
+          // während des Vorbeiflugs keine Schilder (die Fahrerkarte zeigt den Fahrer), in der Totale wieder
+          labels.push({ r: r, place: String(r.grid), show: !ishot || ishot.wide > 0.5, order: i });
         });
       } else {
         advanceSim(now - race.startsAt);
@@ -1296,22 +1441,24 @@
         car_key: pick ? pick.key : null, uid: pick ? pick.uid : null,
         paint: Array.isArray(paints) && paints.length ? Math.floor(Math.random() * paints.length) : 0 });
       var now = Date.now() / 1000;
-      if (pv.racers.length >= 10) { pv.phase = 'race'; pv.starts_at = now; }
+      if (pv.racers.length >= 10) pvIntro(now);
       else if (pv.racers.length >= 3 && pv.phase === 'lobby') { pv.phase = 'countdown'; pv.starts_at = now + 60; }
       previewInfo();
       apply(pvView());
     }
     function startNow() {
       if (!pv || pv.phase !== 'countdown') return;
-      pv.phase = 'race'; pv.starts_at = Date.now() / 1000;
+      pvIntro(Date.now() / 1000);
       previewInfo();
       apply(pvView());
     }
+    // wie fx/race.py: Startaufstellung schließen, Fahrer vorstellen, dann Rennen
+    function pvIntro(at) { pv.phase = 'intro'; pv.intro_at = at; pv.starts_at = at + introSeconds(pv.racers.length); }
     function pvView() { return Object.assign({ now: Date.now() / 1000 }, pv, { racers: pv.racers.slice() }); }
     function previewInfo() {
       if (!opts.onPreviewInfo || !pv) return;
       var open = pv.phase === 'lobby' || pv.phase === 'countdown';
-      opts.onPreviewInfo('Preview · ' + pv.racers.length + '/10 racers · ' + (open ? 'countdown' : 'racing'),
+      opts.onPreviewInfo('Preview · ' + pv.racers.length + '/10 racers · ' + (open ? 'countdown' : pv.phase === 'intro' ? 'intro' : 'racing'),
         open && pv.racers.length < 10, pv.phase === 'countdown');
     }
     var pvLast = 0;
@@ -1320,7 +1467,8 @@
       var now = Date.now() / 1000;
       if (now - pvLast < 0.25) return;
       pvLast = now;
-      if (pv.phase === 'countdown' && now >= pv.starts_at) { pv.phase = 'race'; previewInfo(); }
+      if (pv.phase === 'countdown' && now >= pv.starts_at) { pvIntro(pv.starts_at); previewInfo(); }
+      if (pv.phase === 'intro' && now >= pv.starts_at) { pv.phase = 'race'; previewInfo(); }
       apply(pvView());
     }
 

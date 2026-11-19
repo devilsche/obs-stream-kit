@@ -1,7 +1,8 @@
 """Car Race: Lobby, Rennuhr und Ergebnis-Annahme je Tenant (nur im Speicher).
 
 Zuschauer melden sich per !race (Streamer.bot → Endpoint) an. Ab dem 3. Fahrer
-läuft ein Countdown, beim 10. startet das Rennen sofort. Das Overlay holt den
+läuft ein Countdown; danach (oder sofort beim 10.) schließt die Startaufstellung, das
+Overlay stellt die Fahrer vor (Phase intro, 2 s + 1,6 s je Fahrer), dann startet das Rennen. Das Overlay holt den
 Zustand per Poll, fährt das Rennen und meldet die Platzierung zurück. Gespeichert
 wird erst das Ergebnis (fx/race_db.py); die Lobby selbst überlebt keinen Neustart.
 
@@ -21,6 +22,12 @@ COOLDOWN = 120
 RESULT_WINDOW = 120
 LAPS = 3
 FINISH_WINDOW = 15
+INTRO_BASE = 2.0   # Vorstellung der Fahrer vor dem Start: 2 s + 1,6 s je Fahrer (Overlay fliegt übers Feld)
+INTRO_PER = 1.6
+
+
+def intro_seconds(n):
+    return INTRO_BASE + INTRO_PER * n
 
 _LOCK = threading.Lock()
 _T = {}  # tenant_id -> Zustand
@@ -43,6 +50,14 @@ def _new_race(now):
 
 def _get(tenant_id):
     return _T.setdefault(tenant_id, {"phase": "idle", "racers": [], "last_counted": None})
+
+
+def _intro(t, at):
+    """Startaufstellung schließen: Vorstellung läuft ab `at`, danach startet das Rennen."""
+    t["phase"] = "intro"
+    t["intro_at"] = at
+    t["starts_at"] = at + intro_seconds(len(t["racers"]))
+    t["ends_at"] = t["starts_at"]
 
 
 def _go(t, now, starts_at=None):
@@ -70,7 +85,9 @@ def _advance(t, now):
         if ph == "lobby" and now >= t["ends_at"]:
             _idle(t)
         elif ph == "countdown" and now >= t["ends_at"]:
-            _go(t, now, starts_at=t["ends_at"])
+            _intro(t, t["ends_at"])
+        elif ph == "intro" and now >= t["ends_at"]:
+            _go(t, now, starts_at=t["starts_at"])
         elif ph == "race" and now >= t["ends_at"]:
             # kein Ergebnis gekommen: Rennen zählt nicht
             _cooldown(t, t["ends_at"])
@@ -133,6 +150,8 @@ def join(tenant_id, user_id, login, display, color, now, cars, test=False):
         t = _get(tenant_id)
         _advance(t, now)
         ph = t["phase"]
+        if ph == "intro":
+            return _refuse(t, now, "grid closed, race starting")
         if ph == "race":
             return _refuse(t, now, "race running")
         if ph in ("podium", "cooldown"):
@@ -152,7 +171,7 @@ def join(tenant_id, user_id, login, display, color, now, cars, test=False):
                             "display": display, "color": color, "test": bool(test), **car})
         n = len(t["racers"])
         if n >= MAX:
-            _go(t, now)
+            _intro(t, now)
         elif n >= MIN and t["phase"] == "lobby":
             t["phase"] = "countdown"
             t["starts_at"] = now + COUNTDOWN
@@ -172,10 +191,10 @@ def _refuse(t, now, say):
 def _view(t, now):
     out = {"phase": t["phase"], "now": now, "racers": []}
     if t["phase"] == "idle":
-        out.update({"race_id": None, "seed": None, "track": None, "starts_at": None, "ends_at": None})
+        out.update({"race_id": None, "seed": None, "track": None, "starts_at": None, "intro_at": None, "ends_at": None})
         return out
     out.update({"race_id": t["race_id"], "seed": t["seed"], "track": t["track"], "laps": LAPS,
-                "finish_window": FINISH_WINDOW, "starts_at": t["starts_at"],
+                "finish_window": FINISH_WINDOW, "starts_at": t["starts_at"], "intro_at": t.get("intro_at"),
                 "ends_at": t["podium_until"] if t["phase"] == "podium" else t["ends_at"]})
     out["racers"] = [{k: r[k] for k in ("grid", "user_id", "display", "color", "car_key", "uid", "paint")}
                      for r in t["racers"]]
@@ -202,7 +221,7 @@ def admin(tenant_id, action, now, user_id=None):
         elif action == "start":
             if t["phase"] not in ("lobby", "countdown") or len(t["racers"]) < MIN:
                 return {"ok": False, "say": "need %d racers" % MIN, "state": _view(t, now)}
-            _go(t, now)
+            _intro(t, now)
         elif action == "remove":
             if t["phase"] not in ("lobby", "countdown"):
                 return {"ok": False, "say": "nothing to remove from", "state": _view(t, now)}

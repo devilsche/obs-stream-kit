@@ -35,10 +35,14 @@ def st(now=T, tid=TID):
 
 
 def start_race(cars, n=3, now=T):
+    """Fahrer anmelden, starten; Rennen läuft nach der Vorstellung ab now + intro_seconds(n)."""
     for i in range(n):
         j(cars, "abcdefghij"[i], now)
     race.admin(TID, "start", now)
     return st(now)["race_id"]
+
+
+I3 = race.intro_seconds(3)   # Vorstellung bei 3 Fahrern
 
 
 # --- Lobby und Uhr ---
@@ -50,14 +54,22 @@ def test_lobby_opens_on_first_and_countdown_on_third(cars):
     j(cars, "c")
     s = st()
     assert s["phase"] == "countdown" and s["ends_at"] == T + 60 and s["starts_at"] == T + 60
-    assert st(T + 60)["phase"] == "race"
+    s = st(T + 60)
+    assert s["phase"] == "intro" and s["intro_at"] == T + 60 and s["starts_at"] == T + 60 + I3
+    assert st(T + 60 + I3 - 0.1)["phase"] == "intro"
+    s = st(T + 60 + I3)
+    assert s["phase"] == "race" and s["starts_at"] == T + 60 + I3 and s["ends_at"] == T + 60 + I3 + race.RACE_MAX
 
 
 def test_tenth_starts_immediately_and_eleventh_is_refused(cars):
     for u in "abcdefghij":
         j(cars, u)
-    assert st()["phase"] == "race"
+    s = st()
+    assert s["phase"] == "intro" and s["intro_at"] == T and s["starts_at"] == T + race.intro_seconds(10)
     out = j(cars, "k")
+    assert out["ok"] is False and out["say"] == "grid closed, race starting"
+    assert st(T + race.intro_seconds(10))["phase"] == "race"
+    out = j(cars, "k", T + race.intro_seconds(10))
     assert out["ok"] is False and out["say"] == "race running"
     assert len(st()["racers"]) == 10
 
@@ -75,9 +87,18 @@ def test_grid_order_is_join_order(cars):
     assert [(r["grid"], r["user_id"]) for r in st()["racers"]] == [(1, "c"), (2, "a"), (3, "b")]
 
 
+def test_join_during_intro_is_refused(cars):
+    start_race(cars)
+    out = j(cars, "z", T + 1)
+    assert out["ok"] is False and out["say"] == "grid closed, race starting"
+    assert len(st(T + 1)["racers"]) == 3
+    assert race.admin(TID, "remove", T + 1, user_id="a")["ok"] is False   # Aufstellung ist zu
+    assert race.accept_result(TID, st(T + 1)["race_id"], [1, 2, 3], T + 1) is None   # Rennen läuft noch nicht
+
+
 def test_join_during_race_and_cooldown_is_refused_without_change(cars):
     rid = start_race(cars)
-    out = j(cars, "z", T + 5)
+    out = j(cars, "z", T + I3 + 5)
     assert out["ok"] is False and out["say"] == "race running"
     race.accept_result(TID, rid, [1, 2, 3], T + 30)
     out = j(cars, "z", T + 60)
@@ -90,9 +111,10 @@ def test_join_during_race_and_cooldown_is_refused_without_change(cars):
 
 def test_race_without_result_ends_after_race_max(cars):
     start_race(cars)
-    assert st(T + race.RACE_MAX - 1)["phase"] == "race"
-    assert st(T + race.RACE_MAX)["phase"] == "cooldown"
-    assert st(T + race.RACE_MAX + race.COOLDOWN)["phase"] == "idle"
+    S = T + I3   # echter Rennstart
+    assert st(S + race.RACE_MAX - 1)["phase"] == "race"
+    assert st(S + race.RACE_MAX)["phase"] == "cooldown"
+    assert st(S + race.RACE_MAX + race.COOLDOWN)["phase"] == "idle"
 
 
 def test_lobby_expires_after_5_min_below_three(cars):
@@ -114,7 +136,8 @@ def test_cancel_start_remove_void(cars):
     assert race.admin(TID, "remove", T, user_id="zz")["ok"] is False
     j(cars, "c")
     assert race.admin(TID, "start", T + 1)["ok"] is True
-    assert st(T + 1)["phase"] == "race"
+    assert st(T + 1)["phase"] == "intro"
+    assert st(T + 1 + I3)["phase"] == "race"
     assert race.admin(TID, "remove", T + 1, user_id="a")["ok"] is False  # nicht im Rennen
     assert race.admin(TID, "void", T + 1)["ok"] is False  # noch nichts gezählt
     rid = st(T + 1)["race_id"]
@@ -139,7 +162,8 @@ def test_result_counts_once_and_only_in_window(cars):
 
 def test_late_result_after_window_is_not_counted(cars):
     rid = start_race(cars)
-    assert race.accept_result(TID, rid, [1, 2, 3], T + race.RESULT_WINDOW + 1) is None
+    # Frist zählt ab dem echten Rennstart (nach der Vorstellung)
+    assert race.accept_result(TID, rid, [1, 2, 3], T + I3 + race.RESULT_WINDOW + 1) is None
     assert race.accept_result(TID, "other", [1, 2, 3], T + 10) is None
 
 
@@ -147,7 +171,7 @@ def test_invalid_places_are_rejected(cars):
     rid = start_race(cars)
     for bad in ([1, 2], [1, 1, 2], [1, 3, None], [0, 1, 2], [1, 2, 3, 4], ["a", 1, 2], [[1], 1, 2], [True, 2, 3]):
         with pytest.raises(ValueError):
-            race.accept_result(TID, rid, bad, T + 10)
+            race.accept_result(TID, rid, bad, T + I3 + 10)
     assert race.accept_result(TID, rid, [None, None, None], T + 10) is not None
 
 
@@ -255,6 +279,8 @@ def test_result_endpoint_counts_once_and_gives_points(conn, tmp_path, clock):
     for u in "abc":
         _join(c, u)
     c.get("/s/tok/api/fx/car-race?cmd=start")
+    assert c.get("/s/tok/api/fx/car-race/state").get_json()["phase"] == "intro"
+    clock["now"] = T + I3
     s = c.get("/s/tok/api/fx/car-race/state").get_json()
     assert s["phase"] == "race"
     clock["now"] = T + 40
@@ -277,6 +303,7 @@ def test_result_endpoint_bad_body_is_400_and_db_failure_not_counted(conn, tmp_pa
         _join(c, u)
     c.get("/s/tok/api/fx/car-race?cmd=start")
     rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
+    clock["now"] = T + I3 + 1
     assert c.post("/s/tok/api/fx/car-race/result", json={"race_id": rid, "places": [1, 1, 2]}).status_code == 400
     assert c.post("/s/tok/api/fx/car-race/result", json={}).status_code == 400
 
@@ -301,6 +328,7 @@ def test_race_with_test_racer_is_never_recorded(conn, tmp_path, clock):
     c.get("/s/tok/api/fx/car-race?cmd=join&test=1")
     c.get("/s/tok/api/fx/car-race?cmd=start")
     rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
+    clock["now"] = T + I3 + 1
     r = c.post("/s/tok/api/fx/car-race/result", json={"race_id": rid, "places": [1, 2, 3]}).get_json()
     assert r["counted"] is False
     assert conn.execute("SELECT COUNT(*) FROM fx_race_result").fetchone()[0] == 0
@@ -313,6 +341,7 @@ def test_failed_write_can_be_retried_and_void_ignores_unstored(conn, tmp_path, c
         _join(c, u)
     c.get("/s/tok/api/fx/car-race?cmd=start")
     rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
+    clock["now"] = T + I3 + 1
     real = race_db.record
     monkeypatch.setattr(race_db, "record", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db")))
     body = {"race_id": rid, "places": [1, 2, 3]}
