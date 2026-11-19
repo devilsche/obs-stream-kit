@@ -2,7 +2,7 @@
 /* Prüfskript für js/car-race-sim.js (Car Race: Strecke + deterministische Fahrsimulation).
  * Kein Test-Framework: gibt „OK“ aus oder eine Fehlerliste, Exit-Code ≠ 0 bei Fehler.
  *
- *   node scripts/check_car_race_sim.js            alle Prüfungen (inkl. Bilanz über 1000 Rennen + Golf-Probe über 1000)
+ *   node scripts/check_car_race_sim.js            alle Prüfungen (inkl. Rundenpace, Bilanz über 1000 Rennen + Golf-Probe über 1000)
  *   node scripts/check_car_race_sim.js --races 200 Bilanz mit weniger Rennen (schneller beim Abstimmen)
  *   node scripts/check_car_race_sim.js --tracks    nur die Strecken prüfen und ihre Eigenschaften drucken
  *   node scripts/check_car_race_sim.js --seed 3    Bilanz mit anderer Stichprobe (Feld + Rennen-Seeds; Standard 2026)
@@ -198,7 +198,9 @@ function run(opts, label, checkSteps) {
   sim.events.forEach(function (e) { if (e.type === 'crash' && e.rail) railIds[e.id] = 1; });
   sim.cars.forEach(function (c) { if (c.off && !railIds[c.id]) info.offAtEnd++; });
   info.rails = Object.keys(railIds).length;
-  if (info.returned !== info.offs - info.rails - info.offAtEnd) fail(label + ': ' + info.returned + ' von ' + info.offs + ' Abflügen kehren zurück (' + info.rails + ' Leitplanke, ' + info.offAtEnd + ' bei Rennende draußen)');
+  // Ausnahme: Rennen mit einem erlaubten seltenen Fall (festgefahren) – wer sich durch den Auslauf quetscht, ist neben
+  // der Fahrbahn ohne 'off'-Ereignis; das zählt schon als seltener Fall
+  if (info.returned !== info.offs - info.rails - info.offAtEnd && !(bad && /^(Bilanz-Rennen|Probe) /.test(label))) fail(label + ': ' + info.returned + ' von ' + info.offs + ' Abflügen kehren zurück (' + info.rails + ' Leitplanke, ' + info.offAtEnd + ' bei Rennende draußen)');
   sim.checkInfo = info;
   return sim;
 }
@@ -327,6 +329,29 @@ var def = Sim.stats({}), ref = Sim.stats(AVG);
   var t = Sim.track(Sim.TRACKS[1]);
   if (!(Sim.lapTime(w, t) < Sim.lapTime(ref, t) && Sim.lapTime(ref, t) < Sim.lapTime(b, t))) fail('lapTime: nicht W14 < Bezug < Bus');
 })();
+// Rundenpace (Nutzer-Kompromiss Task 9: „ein Bus fährt eben nicht so schnell wie ein Lambo“, aber mit kleiner
+// Außenseiter-Chance), Mittel über alle Strecken: Bus 8–13 % langsamer als Countach und Diablo, Ural/CT680 im Bereich
+// des Busses, Golf GTI Mk1 3–6 % langsamer als das Mittel der Supersportwagen, W14 ≥ 8 % schneller
+function paceOf(key) {
+  var st = Sim.stats(carRaw(key));
+  return Sim.TRACKS.reduce(function (a, sd) { return a + Sim.lapTime(st, Sim.track(sd)); }, 0) / Sim.TRACKS.length;
+}
+var PACE = {}, superAvg = SUPER.reduce(function (a, k) { return a + paceOf(k); }, 0) / SUPER.length;
+['2022-lamborghini-countach-lp', '1995-lamborghini-diablo-sv', 'ural-4320-soviet-army-truck', 'caterpillar-ct680'].forEach(function (k) {
+  PACE[k] = paceOf(BUS_KEY) / paceOf(k);
+});
+PACE.golf = paceOf(GOLF_KEY) / superAvg; PACE.w14 = paceOf(W14_KEY) / superAvg;
+['2022-lamborghini-countach-lp', '1995-lamborghini-diablo-sv'].forEach(function (k) {
+  if (!(PACE[k] >= 1.08 && PACE[k] <= 1.13)) fail('Bus/' + k + ' = ' + PACE[k].toFixed(3) + ' (Soll 8–13 % langsamer)');
+});
+['ural-4320-soviet-army-truck', 'caterpillar-ct680'].forEach(function (k) {
+  if (!(PACE[k] > 0.9 && PACE[k] < 1.1)) fail(k + ': Rundenpace nicht im Bereich des Busses (Bus/' + k + ' = ' + PACE[k].toFixed(3) + ')');
+});
+if (!(PACE.golf >= 1.03 && PACE.golf <= 1.06)) fail('Golf GTI Mk1 ' + (100 * (PACE.golf - 1)).toFixed(1) + ' % langsamer als die Supersportwagen (Soll 3–6 %)');
+if (!(PACE.w14 <= 0.92)) fail('W14 nur ' + (100 * (1 - PACE.w14)).toFixed(1) + ' % schneller als die Supersportwagen (Soll ≥ 8 %)');
+var paceInfo = 'Rundenpace: Bus/Countach ' + PACE['2022-lamborghini-countach-lp'].toFixed(3) + ', Bus/Diablo ' + PACE['1995-lamborghini-diablo-sv'].toFixed(3) +
+  ', Bus/Ural ' + PACE['ural-4320-soviet-army-truck'].toFixed(3) + ', Bus/CT680 ' + PACE['caterpillar-ct680'].toFixed(3) +
+  ', Golf Mk1/Supersportwagen ' + PACE.golf.toFixed(3) + ', W14/Supersportwagen ' + PACE.w14.toFixed(3);
 
 var r1 = Sim.rng(42), r2 = Sim.rng(42);
 for (var q = 0; q < 5; q++) if (r1() !== r2()) fail('rng(42) ist nicht deterministisch');
@@ -482,7 +507,7 @@ for (var race = 0; race < RACES; race++) {
 var secs = (Date.now() - started) / 1000;
 wtimes.sort(function (a, b) { return a - b; });
 var busPct = 100 * busWins / RACES, strongPct = 100 * strongWins / RACES;
-if (busPct < 0.5) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 0,5 %)');
+if (busPct < 0.2) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 0,2 %)');
 if (strongPct > 60 || strongPct < 25) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 25–60 %)');
 if (incidents.crash / RACES > 1.2) fail((incidents.crash / RACES).toFixed(2) + ' Crashs je Rennen inkl. Leitplanke (Soll ≤ 1,2)');
 function mean(A) { return A.length ? A.reduce(function (x, y) { return x + y; }, 0) / A.length : 0; }
@@ -523,7 +548,7 @@ for (race = 0; race < GPROBE; race++) {
   gs.result().forEach(function (e) { if (e.id === GOLF_KEY && e.place === 1) golfWins++; });
 }
 var golfPct = 100 * golfWins / GPROBE;
-if (golfPct < 0.3) fail('Golf GTI Mk1 gegen 9 Supersportwagen gewinnt ' + golfPct.toFixed(2) + ' % (Soll ≥ 0,3 %)');
+if (golfPct < 0.2) fail('Golf GTI Mk1 gegen 9 Supersportwagen gewinnt ' + golfPct.toFixed(2) + ' % (Soll ≥ 0,2 %)');
 
 /* Race-stats-Schätzung (js/car-race-stats.js): Tabelle, Klassen und gültige Bereiche */
 function validRace(g, label) {
@@ -584,6 +609,7 @@ function report() {
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
   (trackInfo || []).forEach(function (l) { console.log(l); });
   if (busInfo) console.log(busInfo);
+  if (typeof paceInfo === 'string') console.log(paceInfo);
   if (typeof RACES !== 'undefined' && wtimes.length) {
     console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) +
       ' %, stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +

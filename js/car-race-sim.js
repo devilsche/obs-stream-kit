@@ -106,13 +106,13 @@
   var DRAG_EXP = 4;           // Beschleunigung fällt mit (v / vtop)^4 ab
   // Bezugsauto (etwa Feld-Mittel des Katalogs): echte Werte, um die gestaucht wird
   var REF = { vmax: 300, acc: 3.5, pw: 0.4, grip: 1.1, brake: 1.3, kg: 1500 };
-  // Realismus-Faktor: 0 = alle gleich, 1 = volle echte Verhältnisse. Wirkung je Größe =
-  // exp(REAL · Gewicht · S · tanh(ln(echt / Bezug) / S)): kleine Unterschiede wirken fast wie (echt / Bezug)^(REAL · Gewicht),
-  // Extreme werden gestaucht. Nach unten deutlich stärker (S = SAT_LO) als nach oben (SAT_HI): langsame Autos
-  // liegen dicht beieinander (Bus, Oldtimer behalten eine kleine Außenseiter-Chance), schnelle setzen sich ab
-  // (ein F1 gewinnt oft, aber nicht immer)
+  // Realismus-Faktor: 0 = alle gleich, 1 = volle echte Verhältnisse. Wirkung je Größe mit x = ln(echt / Bezug):
+  // unter dem Bezug exp(REAL · Gewicht · LO · x) – gleichmäßig auf LO gestaucht, so bleibt die Reihenfolge, aber ein
+  // Bus ist nur ~10 % langsamer als ein Lamborghini, ein Golf Mk1 ~4 % hinter den Supersportwagen (Nutzer-Kompromiss
+  // Task 9: kleine Außenseiter-Chance); über dem Bezug exp(REAL · Gewicht · SAT_HI · tanh(x / SAT_HI)) – Extreme
+  // gesättigt, damit ein F1 oft, aber nicht immer gewinnt
   var REAL = 0.5;
-  var SAT_LO = 0.14, SAT_HI = 0.7;
+  var LO = 0.27, SAT_HI = 0.7;
   // Gewichte je Größe: Kurvenhaftung und Bremsen stark (kurvige Strecken), vmax wenig (kurze Geraden)
   var W_VMAX = 0.4, W_ACC = 0.7, W_GRIP = 1.1, W_BRAKE = 0.8;
   var W_MASS = 1.3;           // Kontakt-Masse ungestaucht: (kg / Bezug)^(REAL · W_MASS)
@@ -380,8 +380,8 @@
     // Beschleunigung: geometrisches Mittel aus 0–100-Zeit und Leistungsgewicht (PS je kg)
     var accR = Math.sqrt(REF.acc / acc) * Math.sqrt(hp / kg / REF.pw);
     function f(ratio, w) {
-      var x = Math.log(ratio), S = x < 0 ? SAT_LO : SAT_HI;
-      return Math.exp(R * w * S * Math.tanh(x / S));
+      var x = Math.log(ratio);
+      return Math.exp(R * w * (x < 0 ? LO * x : SAT_HI * Math.tanh(x / SAT_HI)));
     }
     return {
       acc: ACC_BASE * f(accR, W_ACC),
