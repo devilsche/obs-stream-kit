@@ -521,14 +521,15 @@
         }
       }
       var tex = new THREE.CanvasTexture(cv);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4;
+      // Mipmaps (64 px, Zweierpotenz) + Anisotropie gegen Moiré aus der Entfernung
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8; tex.generateMipmaps = true; tex.minFilter = THREE.LinearMipmapLinearFilter;
       CARBON_TEX = tex;
     } catch (e) { CARBON_TEX = null; }
     return CARBON_TEX;
   }
-  // Carbon-Teile bekommen Kasten-UVs in Auto-Größe (eine Kachel = 8 cm → Bündel 1 cm), unabhängig von den
+  // Carbon-Teile bekommen Kasten-UVs in Auto-Größe (eine Kachel = 2,4 cm → Bündel 3 mm wie echtes Köper-Carbon), unabhängig von den
   // Modell-UVs (Atlas-UVs ergäben riesige oder winzige Muster); Geometrie dafür einmal je Teil kopiert
-  var CARBON_GEO = {};
+  var CARBON_GEO = {}, CARBON_TILE = 0.024;   // Meter je Kachel (8 Bündel)
   function carbonUV(car) {
     var inv = null, v = new THREE.Vector3(), n = new THREE.Vector3();
     car.traverse(function (x) {
@@ -539,7 +540,7 @@
       if (!g) {
         g = x.geometry.clone();
         var p = g.attributes.position, nr = g.attributes.normal, uv = new Float32Array(p.count * 2), NM = new THREE.Matrix3().getNormalMatrix(M);
-        var s = 1 / (0.08 * UNIT);   // Teile liegen in Auto-Einheiten (UNIT je Meter)
+        var s = 1 / (CARBON_TILE * UNIT);   // Teile liegen in Auto-Einheiten (UNIT je Meter)
         for (var i = 0; i < p.count; i++) {
           v.fromBufferAttribute(p, i).applyMatrix4(M);
           if (nr) n.fromBufferAttribute(nr, i).applyMatrix3(NM); else n.set(0, 1, 0);
