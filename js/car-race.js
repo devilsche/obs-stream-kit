@@ -645,7 +645,32 @@
     }
     function is3D(now) {
       if (!STAGE) return true;
-      return !!race && (race.stage !== 'grid' || (race.introAt != null && now >= race.introAt));
+      // erst 0,8 s nach Beginn der Vorstellung: dann hat der OBS-Move-Filter (~0,6 s) das Spiel schon verkleinert
+      return !!race && (race.stage !== 'grid' || (race.introAt != null && now >= race.introAt + 0.8));
+    }
+    // Loch für das Bild-im-Bild: dort bleibt die Bühne durchsichtig (das verkleinerte Spiel liegt darunter),
+    // dazu ein Rahmen in Akzentfarbe mit weichem Schatten nach außen; blendet mit der 3D-Bühne ein und aus
+    var frameA = 0;
+    function pipHole(dt) {
+      if (!STAGE) return;
+      var x = PIP[0], y = PIP[1], w = PIP[2], h = PIP[3], PH = Math.round(H * UIK);
+      if (renderer.setScissor) {
+        renderer.setScissorTest(true); renderer.setScissor(x, PH - y - h, w, h);
+        renderer.setClearColor(0x000000, 0); renderer.clear(true, true, false);
+        renderer.setScissorTest(false);
+      }
+      frameA = ease(frameA, visible ? 1 : 0, 0.3, dt);
+      var k = dpr;
+      hud.setTransform(k, 0, 0, k, 0, 0);
+      hud.clearRect(x - 30, y - 30, w + 60, h + 60);   // HUD nie über dem Spiel
+      if (frameA > 0.01) {
+        hud.save(); hud.globalAlpha = frameA;
+        hud.shadowColor = 'rgba(0,0,0,0.55)'; hud.shadowBlur = 22;
+        roundRect(hud, x - 3, y - 3, w + 6, h + 6, 8);
+        hud.lineWidth = 6; hud.strokeStyle = TK.accent; hud.stroke();
+        hud.restore();
+        hud.clearRect(x, y, w, h);   // Schatten nicht ins Loch
+      }
     }
     function drawLobbyCard(now) {
       var st = lobbyCard; if (!st) return;
@@ -1559,6 +1584,7 @@
       renderer.render(scene, cam);
       var rows = rankingRows();
       drawHudView(function () { drawHud(now, rows); });
+      pipHole(dt);
     }
 
     // ---- Maus/Tastatur: kurz heranzoomen (nur im Browser; OBS hat keine Maus) ----
