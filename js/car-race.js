@@ -626,9 +626,7 @@
         c.x = spot.x + x + bw / 2; c.z = spot.z; c.top = 0.25 + h;
         x += bw;
         // Auto aufs Podest: leicht zur Kamera gedreht, Räder gerade
-        var r = c.r;
-        r.holder.position.set(c.x, c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
-        r.steer = 0; r.wheels.forEach(function (w) { if (w.front) w.pivot.rotation.y = 0; });
+        seatOnBlock(c);
       });
       // Übrige Autos, Schlieren und Schilder ausblenden
       var onPodium = {}; cars.forEach(function (c) { onPodium[c.r.id] = 1; });
@@ -753,13 +751,42 @@
     }
     // Sieger: steht noch die Kiste, Modell laden. Volles Modell nachladen ist bewusst nicht eingebaut –
     // ToyCars.build() nutzt eine Vorlage je Modell-Schlüssel, ein Austausch bräuchte eine zweite Vorlage.
+    // Auto aufs Podest setzen: Räder gerade und in Grundstellung, kein Ruck/Wanken/Nicken; dann so anheben oder
+    // absenken, dass der tiefste echte Punkt des Modells (Ecken, nicht die Bounding-Box: gedrehte Teile würden sie
+    // aufblähen) genau auf der Blockoberkante liegt
+    function seatOnBlock(c) {
+      var r = c.r;
+      r.jolt = 0; r.steer = 0; r.wheelAngle = 0;
+      r.wheels.forEach(function (w) {
+        if (w.spin) w.spin.rotation[w.spin.userData.ax || 'x'] = w.base;
+        if (w.front) w.pivot.rotation.y = 0;
+      });
+      r.holder.position.set(c.x, c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
+      r.holder.updateMatrixWorld(true);   // sonst misst lowestPoint mit der alten Lage aus dem Rennen
+      var low = lowestPoint(r.body);
+      if (isFinite(low)) r.holder.position.y += c.top - low;
+      r.holder.updateMatrixWorld(true);
+    }
+    function lowestPoint(obj) {
+      var v = new THREE.Vector3(), low = Infinity;
+      obj.traverse(function (o) {
+        if (!o.isMesh || !o.visible || !o.geometry || !o.geometry.attributes || !o.geometry.attributes.position) return;
+        var pa = o.geometry.attributes.position, e = o.matrixWorld.elements, n = pa.count;
+        for (var i = 0; i < n; i++) {
+          var x = pa.getX(i), y = pa.getY(i), z = pa.getZ(i);
+          var wy = e[1] * x + e[5] * y + e[9] * z + e[13];
+          if (wy < low) low = wy;
+        }
+      });
+      return low;
+    }
     function upgradeWinnerModel(c) {
       var r = c.r;
       if (r.isModel || !r.entry) return;
       loadCarModel(r.entry).then(function () {
         if (r.gone || !race || race.stage !== 'podium') return;
         setModel(r);
-        r.holder.position.set(c.x, c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
+        seatOnBlock(c);
       }).catch(function () {});
     }
     function drawPodiumHud() {
@@ -1311,7 +1338,7 @@
       requestAnimationFrame(frame);
     });
 
-    return { addTestRacer: addTestRacer, startNow: startNow };
+    return { addTestRacer: addTestRacer, startNow: startNow, _state: function () { return race; } };   // _state: nur für Tests
   }
 
   root.CarRace = { start: start };
