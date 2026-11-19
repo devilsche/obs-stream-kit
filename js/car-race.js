@@ -2034,6 +2034,9 @@
 
     // ---- Vorschau: lokale Lobby ohne Server ----
     var pv = null, pvN = 0, pvResetAt = null;
+    // Vorschau-Strecke: fest gewählt (Index in TRACKS) oder null = jede Vorschau-Runde die nächste (Start zufällig)
+    var pvTrack = isFinite(parseInt(opts.track, 10)) ? ((parseInt(opts.track, 10) % CarRaceSim.TRACKS.length) + CarRaceSim.TRACKS.length) % CarRaceSim.TRACKS.length : null;
+    var pvCycle = Math.floor(Math.random() * CarRaceSim.TRACKS.length);
     function pvCars() {
       return (ToyCars.catalog ? ToyCars.catalog() : []).filter(function (e) {
         var v = ToyCars.vehicle(e.key) || {};
@@ -2043,9 +2046,10 @@
     }
     function previewReset() {
       pvResetAt = null;
-      var trackOpt = parseInt(opts.track, 10);
+      var trackIdx = pvTrack != null ? pvTrack : (pvCycle = (pvCycle + 1) % CarRaceSim.TRACKS.length);
       pv = { race_events: [], phase: 'lobby', race_id: 'preview-' + Date.now().toString(36), seed: Math.floor(Math.random() * 2147483647),
-        track: isFinite(trackOpt) ? trackOpt : Math.floor(Math.random() * 1000), laps: 3, finish_window: 15, starts_at: null, racers: [] };
+        track: trackIdx, laps: 3, finish_window: 15, starts_at: null, racers: [] };
+      if (opts.onPreviewTrack) opts.onPreviewTrack(trackIdx, pvTrack == null);
       pvN = 0;
       for (var i = 0; i < 3; i++) addTestRacer();
     }
@@ -2118,7 +2122,14 @@
       requestAnimationFrame(frame);
     });
 
-    return { addTestRacer: addTestRacer, startNow: startNow, nitro: function () { previewAction('nitro'); }, bump: function () { previewAction('bump'); }, _state: function () { return race; }, _cam: function () { return cam; }, _introCardAt: introCardAt };   // _state/_cam: nur für Tests
+    // Vorschau: Strecke wählen (Index oder null = wechselnd) bzw. die nächste – startet eine neue Vorschau-Runde
+    function previewTrack(idx) {
+      if (!preview) return;
+      pvTrack = idx == null || idx === '' ? null : ((+idx % CarRaceSim.TRACKS.length) + CarRaceSim.TRACKS.length) % CarRaceSim.TRACKS.length;
+      teardown(); show(false); previewReset();
+    }
+    function previewNextTrack() { previewTrack(null); }
+    return { addTestRacer: addTestRacer, startNow: startNow, setTrack: previewTrack, nextTrack: previewNextTrack, nitro: function () { previewAction('nitro'); }, bump: function () { previewAction('bump'); }, _state: function () { return race; }, _cam: function () { return cam; }, _introCardAt: introCardAt };   // _state/_cam: nur für Tests
   }
 
   root.CarRace = { start: start };

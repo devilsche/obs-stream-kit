@@ -298,7 +298,7 @@ if (args.indexOf('--tracks') >= 0) {
 ['rng', 'track', 'stats', 'create'].forEach(function (f) {
   if (typeof Sim[f] !== 'function') fail('CarRaceSim.' + f + ' fehlt');
 });
-if (!Array.isArray(Sim.TRACKS) || Sim.TRACKS.length !== 3) fail('CarRaceSim.TRACKS braucht genau 3 Strecken');
+if (!Array.isArray(Sim.TRACKS) || Sim.TRACKS.length !== 5) fail('CarRaceSim.TRACKS braucht genau 5 Strecken');
 (function () {   // neue Ausgaben vorhanden?
   var t = Sim.track(Sim.TRACKS ? Sim.TRACKS[0] : 1);
   if (typeof t.runoffAt !== 'function' || !t.runoff || !Array.isArray(t.corners)) fail('track() liefert kein runoffAt/runoff/corners');
@@ -365,7 +365,7 @@ Sim.TRACKS.forEach(function (seed) {
   r.probs.forEach(function (p) { fail('Strecke ' + seed + ': ' + p); });
   chars[r.character] = 1;
 });
-['fast', 'twisty', 'hairpin'].forEach(function (ch) { if (!chars[ch]) fail('keine Strecke mit Charakter ' + ch); });
+['fast', 'twisty', 'hairpin', 'sweeping', 'kart'].forEach(function (ch) { if (!chars[ch]) fail('keine Strecke mit Charakter ' + ch); });
 
 // ---- 3. Determinismus + fastForward ----
 function pickKeys(rnd, arr, n) {

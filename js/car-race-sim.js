@@ -2,12 +2,12 @@
  * Läuft im Browser (window.CarRaceSim) und in Node (module.exports). Prüfskript: scripts/check_car_race_sim.js
  *
  *   CarRaceSim.rng(seed) → () => Zahl in [0, 1)          mulberry32, einzige Zufallsquelle der Simulation
- *   CarRaceSim.TRACKS = [1, 2, 3]                         drei kuratierte Strecken, Reihenfolge fest:
- *       1 Speedway (fast), 2 Twister (twisty), 3 Hairpin (hairpin); der Server schickt eine Zufallszahl,
+ *   CarRaceSim.TRACKS = [1, 2, 3, 4, 5]                   fünf kuratierte Strecken, Reihenfolge fest (neue hinten):
+ *       1 Speedway (fast), 2 Twister (twisty), 3 Hairpin (hairpin), 4 Coast (sweeping), 5 Kart (kart); der Server schickt eine Zufallszahl,
  *       der Client nimmt TRACKS[track % TRACKS.length]. CarRaceSim.LAYOUTS = die Polygone dazu.
  *   CarRaceSim.track(seed) → { pts, len, width, at(s), radiusAt(s), runoffAt(s), runoff, corners,
  *                              longestStraight, turnDir, name, character }
- *       seed wählt das Layout LAYOUTS[(seed − 1) mod 3]; aus dem Seed kommen nur die Wellen.
+ *       seed wählt das Layout LAYOUTS[(seed − 1) mod 5]; aus dem Seed kommen nur die Wellen.
  *       Polygon mit Eckradien: Geraden + Kreisbögen, Links- UND Rechtskurven, Radien ≥ 13 m, Runde ~295–315 m.
  *       pts = Mittellinie im 1-m-Raster [[x, z]…]; at(s) → { x, z, yaw, curv, nx, nz, bump, runL, runR }
  *       (s in Metern ab Start/Ziel, beliebig auch negativ/über len hinaus; yaw so, dass three.js
@@ -193,6 +193,12 @@
     ] },
     { name: 'Hairpin', character: 'hairpin', pts: [        // lange Gerade in eine 180°-Haarnadel, danach Schikane
       [0, 0, 18], [102, 0, 13], [102, 27, 13], [70, 27, 15], [54, 48, 15], [28, 38, 15], [10, 62, 15], [-20, 36, 16]
+    ] },
+    { name: 'Coast', character: 'sweeping', pts: [         // weite, schnelle Bögen, eine Schikane oben, Gegenbogen
+      [0, 0, 22], [96, 0, 34], [132, 28, 30], [132, 64, 14], [106, 68, 14], [95, 80, 14], [54, 80, 22], [34, 65, 18], [0, 63, 22], [-12, 34, 22]
+    ] },
+    { name: 'Kart', character: 'kart', pts: [              // kurze Gerade, dann eng links/rechts im Wechsel
+      [0, 0, 15], [84, 0, 15], [100, 26, 13], [78, 46, 13], [96, 70, 13], [62, 82, 17], [40, 62, 14], [10, 76, 17], [-12, 46, 20]
     ] }
   ];
   var CORNER_K = 1 / 60;      // Kurve = zusammenhängender Abschnitt mit |curv| > 1/60
@@ -332,7 +338,7 @@
   }
 
   var trackCache = {};
-  // seed wählt das Layout: LAYOUTS[(seed − 1) mod 3] (TRACKS = [1, 2, 3]); die Wellen kommen aus dem Seed
+  // seed wählt das Layout: LAYOUTS[(seed − 1) mod 5] (TRACKS = [1, 2, 3, 4, 5]); die Wellen kommen aus dem Seed
   function track(seed) {
     seed = seed | 0;
     if (trackCache[seed]) return trackCache[seed];
@@ -1122,8 +1128,8 @@
 
   return {
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
-    // drei kuratierte Strecken, Reihenfolge fest
-    TRACKS: [1, 2, 3],
+    // fünf kuratierte Strecken, Reihenfolge fest (neue werden hinten angehängt)
+    TRACKS: [1, 2, 3, 4, 5],
     HEAVY_PUSH: HEAVY_PUSH, REAL: REAL, REF: REF, lapTime: lapTime, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
   };
 });
