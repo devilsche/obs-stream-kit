@@ -69,6 +69,9 @@
     // Rechnung in logischen Pixeln (Höhe 540, UIK = Bildhöhe / 540), damit alle Größen wie im 960×540-Fenster
     // wirken; Kameras zielen auf die Mitte des freien Bereichs VW (ohne Bild-im-Bild), das HUD liegt darin.
     var STAGE = opts.layout === 'stage', UIK = 1, PIP = opts.pip || [24, 24, 640, 360], VW = { x: 0, y: 0, w: 640, h: 360 }, FULLW = 640, FULLH = 360;
+    // view = x,y,w,h (nur Vollbild-Layout): das Rennen nur in diesem Rechteck (Rest durchsichtig, OBS zeigt dahinter
+    // das Spiel unscharf), Goldrahmen drumherum; ohne view füllt das Rennen den Bildschirm (Loch fürs Bild-im-Bild)
+    var VIEW = STAGE && opts.view && opts.view.length === 4 ? opts.view : null;
 
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, premultipliedAlpha: true });
     renderer.setClearColor(0x000000, 0);
@@ -86,7 +89,10 @@
       renderer.setPixelRatio(dpr * resScale); renderer.setSize(PW, PH, false);
       hudCanvas.width = Math.round(PW * dpr); hudCanvas.height = Math.round(PH * dpr);
       cam.aspect = W / H;
-      if (STAGE) {
+      if (VIEW) {
+        VW = { x: VIEW[0] / UIK, y: VIEW[1] / UIK, w: VIEW[2] / UIK, h: VIEW[3] / UIK };
+        cam.clearViewOffset(); cam.aspect = VW.w / VW.h;   // gerendert wird nur ins Rechteck (Viewport)
+      } else if (STAGE) {
         // freier Bereich: rechts neben oder unter dem Bild-im-Bild (+24 px Rand) – der größere
         var m = 24, px0 = (PIP[0] + PIP[2] + m) / UIK, py0 = (PIP[1] + PIP[3] + m) / UIK;
         var right = { x: px0, y: 0, w: W - px0, h: H }, below = { x: 0, y: py0, w: W, h: H - py0 };
@@ -721,8 +727,30 @@
     // Loch für das Bild-im-Bild: dort bleibt die Bühne durchsichtig (das verkleinerte Spiel liegt darunter),
     // dazu ein Rahmen in Akzentfarbe mit weichem Schatten nach außen; blendet mit der 3D-Bühne ein und aus
     var frameA = 0;
+    // Projektionen (Schilder, Partikel-Randblende) im Rechteck view rechnen: W/H = Rechteck, Koordinaten darin
+    function inViewport(fn) { return VIEW ? inView(fn) : fn(); }
+    // Szene zeichnen: mit view nur ins Rechteck (Viewport + Scissor), der Rest bleibt durchsichtig
+    function renderScene() {
+      if (!VIEW || !renderer.setViewport) { renderer.render(scene, cam); return; }
+      var PH = Math.round(H * UIK), x = VIEW[0], y = PH - VIEW[1] - VIEW[3], w = VIEW[2], h = VIEW[3];
+      renderer.setScissorTest(false); renderer.setViewport(0, 0, Math.round(W * UIK), PH); renderer.clear();
+      renderer.setViewport(x, y, w, h); renderer.setScissor(x, y, w, h); renderer.setScissorTest(true);
+      renderer.render(scene, cam);
+      renderer.setScissorTest(false); renderer.setViewport(0, 0, Math.round(W * UIK), PH);
+    }
     function pipHole(dt) {
       if (!STAGE) return;
+      if (VIEW) {   // Rahmen ums Renn-Rechteck statt Loch fürs Bild-im-Bild
+        frameA = ease(frameA, visible ? 1 : 0, 0.3, dt);
+        if (frameA <= 0.01) return;
+        hud.setTransform(dpr, 0, 0, dpr, 0, 0);
+        hud.save(); hud.globalAlpha = frameA;
+        hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 10;
+        roundRect(hud, VIEW[0] - 1.5, VIEW[1] - 1.5, VIEW[2] + 3, VIEW[3] + 3, 3);
+        hud.lineWidth = 3; hud.strokeStyle = FRAME_GOLD; hud.stroke();
+        hud.restore();
+        return;
+      }
       var x = PIP[0], y = PIP[1], w = PIP[2], h = PIP[3], PH = Math.round(H * UIK);
       if (renderer.setScissor) {
         renderer.setScissorTest(true); renderer.setScissor(x, PH - y - h, w, h);
@@ -1163,7 +1191,7 @@
         if (!c.pts) return;
         var t1 = '+' + (c.pts.gained | 0) + ' \u2192 ' + (c.pts.month_total | 0) + ' pts', t2 = c.pts.month_rank ? '#' + c.pts.month_rank + ' this month' : '';
         tmpV.set(c.x, 0.25, c.z + 2.0).project(cam);
-        var px = (tmpV.x * 0.5 + 0.5) * FULLW - VW.x, py = (1 - (tmpV.y * 0.5 + 0.5)) * FULLH - VW.y + 6;
+        var px = VIEW ? (tmpV.x * 0.5 + 0.5) * W : (tmpV.x * 0.5 + 0.5) * FULLW - VW.x, py = (VIEW ? (1 - (tmpV.y * 0.5 + 0.5)) * H : (1 - (tmpV.y * 0.5 + 0.5)) * FULLH - VW.y) + 6;
         hud.font = font(800, fsP); var w1 = hud.measureText(t1).width;
         hud.font = font(600, fsP); var w2 = t2 ? hud.measureText(t2).width : 0;
         var w = Math.max(w1, w2) + fsP * 1.1, h = fsP * (t2 ? 2.6 : 1.5);
@@ -1225,7 +1253,8 @@
         c.tilt = ease(c.tilt == null ? TILT : c.tilt, fit.tilt != null ? fit.tilt : TILT, tauZ, dt);
         c.orb = ease(c.orb || 0, fit.orb || 0, tauP, dt);
       }
-      var px = Math.exp(c.lp), visW = W / px, tanH = Math.tan(FOV * Math.PI / 360) * (W / H);
+      var vw = VIEW ? VW.w : W, vh = VIEW ? VW.h : H;
+      var px = Math.exp(c.lp), visW = vw / px, tanH = Math.tan(FOV * Math.PI / 360) * (vw / vh);
       var D = visW / (2 * tanH), hor = D * Math.cos(c.tilt);
       cam.position.set(c.x + hor * Math.sin(c.orb), c.ty + D * Math.sin(c.tilt), c.z + hor * Math.cos(c.orb));
       cam.lookAt(c.x, c.ty, c.z);
@@ -1850,7 +1879,7 @@
           labels.push({ r: r, place: dnf ? 'DNF' : String(c.place != null ? c.place : c.pos), show: true, order: o, dnf: dnf });
         });
       }
-      stepPuffs(dt);
+      inViewport(function () { stepPuffs(dt); });
       // Unfall-Highlight: Kamera zum Geschehen (Auto ~35 % der Bildbreite), dann zurück; reduzierte Bewegung: nur Schild
       if (race.stage === 'race' && race.hl && !reduce) {
         var hw = highlightWeight(race.sim);
@@ -1870,8 +1899,8 @@
       if (ut) camFix = ut;   // Handzoom hat Vorrang vor Automatik und Unfall-Highlight
       updateCamera(pts, dt, camFix);
       cam.updateMatrixWorld();
-      updateLabels(labels, dt);
-      renderer.render(scene, cam);
+      inViewport(function () { updateLabels(labels, dt); });
+      renderScene();
       var rows = rankingRows();
       drawHudView(function () { drawHud(now, rows); });
       pipHole(dt);
@@ -1894,7 +1923,8 @@
       return race.user;
     }
     function groundAt(cx, cy) {
-      ray.setFromCamera({ x: cx / W * 2 - 1, y: -(cy / H * 2 - 1) }, cam);
+      var nx = VIEW ? (cx - VW.x) / VW.w : cx / W, ny = VIEW ? (cy - VW.y) / VW.h : cy / H;
+      ray.setFromCamera({ x: nx * 2 - 1, y: -(ny * 2 - 1) }, cam);
       return ray.ray.intersectPlane(ground, hitV) ? { x: hitV.x, z: hitV.z } : null;
     }
     function zoomAt(factor, cx, cy) {

@@ -206,6 +206,8 @@ EFFECT_META = {
          "tooltip": "Full-screen: the race fills the screen, your game sits as picture-in-picture on top (OBS Move filter); lobby shows a small card bottom-right"},
         {"key": "pip", "label": "Game picture-in-picture (x,y,w,h)", "type": "text", "default": "24,24,640,360",
          "tooltip": "Only for the full-screen layout: where the game sits, in pixels – cameras and texts keep clear of it"},
+        {"key": "view", "label": "Race area (x,y,w,h)", "type": "text", "default": "", "placeholder": "688,24,1208,680",
+         "tooltip": "Only for the full-screen layout: draw the race only in this rectangle (gold frame), the rest stays transparent so OBS can show the blurred game behind it. Empty = race fills the screen"},
     ],
     "commands": [
         {"q": "cmd=join&id=%userId%&user=%user%&color=%color%&car=%rawInput%&sub=%isSubscribed%&tier=%subscriptionTier%",

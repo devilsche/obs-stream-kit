@@ -14,7 +14,8 @@
        ?finish=<s> (nur Vorschau) – Nachlauf nach dem Sieger (5–40); echte Rennen: Server-Vorgabe 15 s
        ?track=<n> (nur Vorschau) – Strecke aus der Favoritenliste
        ?layout=stage – Rennbühne als Vollbild-Hintergrund (1920×1080), das Spiel als Bild-im-Bild darüber;
-       ?pip=x,y,w,h – Lage des Bild-im-Bild in Pixeln (Standard 24,24,640,360) */
+       ?pip=x,y,w,h – Lage des Bild-im-Bild in Pixeln (Standard 24,24,640,360)
+       ?view=x,y,w,h – Rennen nur in diesem Rechteck (z. B. 688,24,1208,680), Rest durchsichtig, Goldrahmen */
     @font-face {
       font-family: 'DM Sans';
       src: url('../assets/DM-Sans.woff2') format('woff2');
@@ -109,6 +110,7 @@
       var preview = /^(1|true|yes|on)$/i.test(params.get('preview') || '');
       var finish = parseFloat(params.get('finish'));
       var pip = (params.get('pip') || '').split(',').map(Number);
+      var view = (params.get('view') || '').split(',').map(Number);
       var race = CarRace.start({
         canvas: document.getElementById('gl'),
         hud: document.getElementById('hud'),
@@ -118,6 +120,7 @@
         track: params.get('track'),
         layout: params.get('layout') === 'stage' ? 'stage' : null,
         pip: pip.length === 4 && pip.every(function (n) { return isFinite(n) && n >= 0; }) ? pip : null,
+        view: view.length === 4 && view.every(function (n) { return isFinite(n) && n >= 0; }) && view[2] > 0 && view[3] > 0 ? view : null,
         finish: isFinite(finish) ? finish : null,
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
         onPreviewInfo: function (text, canAdd, canStart) {
