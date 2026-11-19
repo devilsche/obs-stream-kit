@@ -98,7 +98,8 @@ Feld zöge zu weit auseinander.
   Leitplanken, Wiese, ein paar Bäume/Tribünen (einfache Geometrie, keine großen Modelle).
 - Strecke so dimensioniert, dass 2–3 Runden ≈ 60 s für ein Durchschnittsauto ergeben (siehe Maßstab).
 - Ideallinie, Kurvenradien und Bremszonen werden aus der Kurve berechnet.
-- Strecke je Rennen zufällig aus einer Liste guter Seeds (Favoriten im Code), Vorschau kann den Seed setzen.
+- Strecken mit Links- UND Rechtskurven (Schikanen, S-Kurven, Haarnadel, Gegenkurven), keine kreisähnlichen Ovale (Nutzerwunsch).
+- Zum Start **3 kuratierte Strecken** mit unterschiedlichem Charakter (Nutzerwunsch); je Rennen zufällig eine davon, Vorschau kann sie wählen.
 - Später möglich: Strecken-Editor (Punkte setzen) als Erweiterung.
 
 ## Fahrlogik (Ansatz A)
