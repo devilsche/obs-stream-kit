@@ -1253,7 +1253,8 @@
         // kompakt, endet über der Streamer-Kamera (bei 1080p ab y 539): ab 6 Fahrern zwei Spalten (1–5 | 6–10)
         var x0 = PIP[0] / UIK, y0 = (PIP[1] + PIP[3] + 16) / UIK, w = PIP[2] / UIK, pad = 3, n = Math.max(1, rows.length);
         var cols = n > 5 ? 2 : 1, perCol = Math.ceil(n / cols), colW = w / cols, bottom = 265;   // 530 px bei 1080p (logisch 540er)
-        var rowH = Math.min(12, (bottom - y0 - pad * 2) / perCol), fName = Math.min(7.5, rowH * 0.62), fCar = Math.min(6, rowH * 0.5);
+        // bei 1080p: Zeile ~19 px, Name 12 px, Platz 11 px, Automodell 10 px (logisch die Hälfte)
+        var rowH = Math.min(9.5, (bottom - y0 - pad * 2) / perCol), fName = Math.min(6, rowH * 0.63), fCar = Math.min(5, rowH * 0.53), fPlace = Math.min(5.5, rowH * 0.58);
         var h = perCol * rowH + pad * 2, bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
         hud.save();
         hud.shadowColor = 'rgba(0,0,0,0.4)'; hud.shadowBlur = 10; hud.shadowOffsetY = 2;
@@ -1261,7 +1262,8 @@
         hud.restore();
         roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 7); hud.lineWidth = 1; hud.strokeStyle = withAlpha(TK.accent, 0.85); hud.stroke();
         hud.save(); roundRect(hud, x0, y0, w, h, 7); hud.clip();
-        hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 2; hud.shadowOffsetY = 1; hud.textBaseline = 'middle';
+        hud.shadowColor = 'rgba(0,0,0,0.75)'; hud.shadowBlur = 1; hud.shadowOffsetY = 0.5;   // feiner Schatten für die kleine Schrift
+        hud.textBaseline = 'middle';
         var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
         rows.forEach(function (row, i) {
           var r = row.r;
@@ -1270,8 +1272,8 @@
           var y = y0 + pad + clamp(r.rankY - col * perCol, -0.5, perCol - 0.5) * rowH + rowH / 2;
           if (r.flash > 0) { hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fillRect(cx0 + 2, y - rowH / 2 + 1, colW - 4, rowH - 2); }
           hud.globalAlpha = row.dnf ? 0.6 : 1;
-          var px = cx0 + pad + 2, placeW = fName * 2.2;
-          hud.textAlign = 'right'; hud.font = font(800, fName); hud.fillStyle = row.dnf ? dim : TK.accent;
+          var px = cx0 + pad + 2, placeW = fPlace * 2.3;
+          hud.textAlign = 'right'; hud.font = font(800, fPlace); hud.fillStyle = row.dnf ? dim : TK.accent;
           hud.fillText(fitText(hud, row.place, placeW), px + placeW, y);
           if (!row.dnf) { hud.fillStyle = r.color; hud.fillRect(px + placeW + 4, y - rowH * 0.32, 3, rowH * 0.64); }
           var nx = px + placeW + 10, right = cx0 + colW - pad - 2;
@@ -1279,7 +1281,7 @@
           var avail = right - nx;
           hud.font = font(500, fCar);
           var car = r.modelName || '', carW = car ? Math.min(hud.measureText(car).width, avail * 0.45) : 0;
-          if (carW < 24) carW = 0;   // zu eng: Automodell weglassen
+          if (carW < 20) carW = 0;   // zu eng: Automodell weglassen
           hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 700, fName); hud.fillStyle = row.fin ? TK.accent : white;
           hud.fillText(fitText(hud, r.shown, avail - (carW ? carW + 8 : 0)), nx, y);
           if (carW) { hud.textAlign = 'right'; hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, carW), right, y + 0.5); }
