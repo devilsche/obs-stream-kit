@@ -203,6 +203,35 @@
         </div>
       </section>
 
+      <section aria-labelledby="h-driver">
+        <h2 id="h-driver">Driver</h2>
+        <p class="muted small-text">A rubber duck sits in the driver's seat during races. Without your own seat it is placed automatically (left seat, behind the windscreen, sized to fit under the roof). “Place driver”: click the seat in the 3D view – the duck sits on that spot (keep “Click through glass” ticked to reach the seat behind the windows). Size, Height and Turn fine-tune it; “Auto place” goes back to the automatic seat.</p>
+        <div class="row">
+          <input type="checkbox" id="showDriver" checked>
+          <label for="showDriver">Show driver</label>
+        </div>
+        <div class="row" role="group" aria-label="Driver seat">
+          <button type="button" id="pickDriver" aria-pressed="false">Place driver (click the seat)</button>
+          <button type="button" id="driverAuto" class="small">Auto place</button>
+        </div>
+        <div class="row">
+          <label for="driverSize">Size</label>
+          <input type="range" id="driverSize" min="0.1" max="1.6" step="0.01" value="0.5" aria-describedby="driverSizeOut">
+          <output id="driverSizeOut" for="driverSize">–</output>
+        </div>
+        <div class="row">
+          <label for="driverHeight">Height</label>
+          <input type="range" id="driverHeight" min="-0.6" max="0.6" step="0.01" value="0" aria-describedby="driverHeightOut">
+          <output id="driverHeightOut" for="driverHeight">–</output>
+        </div>
+        <div class="row">
+          <label for="driverTurn">Turn</label>
+          <input type="range" id="driverTurn" min="-90" max="90" step="1" value="0" aria-describedby="driverTurnOut">
+          <output id="driverTurnOut" for="driverTurn">0°</output>
+        </div>
+        <p class="muted small-text" id="driverInfo" aria-live="polite"></p>
+      </section>
+
       <section aria-labelledby="h-race">
         <h2 id="h-race">Race stats</h2>
         <p class="muted small-text">Real values for the chat car race. Until you change something they are an estimate (known car or car class), shown after each field. Cornering grip and braking matter most on the twisty tracks, top speed only a little; the race squeezes the differences, so a slow car keeps a small chance.</p>
@@ -254,6 +283,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
@@ -380,6 +410,29 @@
         var xs = wheels.map(function (o) { var w = new THREE.Vector3(); o.getWorldPosition(w); return w.x; }), maxX = Math.max.apply(null, xs.concat([-1e9]));
         wheels.forEach(function (o, i) { if (flagged ? o.userData.front : xs[i] > 0 && xs[i] > maxX - tpl.userData.dims.L * 0.08) o.rotation.y = s; });
         holder.add(car);
+        // Fahrer-Ente (eigener Sitz oder Schätzung); Höhe/Drehung aus den Reglern stecken im Sitz
+        if ($('showDriver').checked && window.RubberDuck) { var st = driverSeat(); if (st) TC.addDriver(car, cur.key, { seat: st, template: tpl }); }
+      }
+      // Sitz für Vorschau und Speichern: eigener Sitz (def.seat) oder die Schätzung
+      function driverSeat() {
+        if (!tpl) return null;
+        var st = def.seat && def.seat.s > 0 ? def.seat : TC.seatOf(cur.key, tpl);
+        return st ? { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0 } : null;
+      }
+      function driverFill() {
+        var st = driverSeat(), u = TC.UNIT;
+        if (!st) { $('driverInfo').textContent = ''; return; }
+        $('driverSize').value = (st.s / u).toFixed(2); $('driverSizeOut').textContent = Math.round(st.s / u * 100) + ' cm';
+        var base = def.seat && def.seat.base != null ? def.seat.base : st.y;
+        $('driverHeight').value = ((st.y - base) / u).toFixed(2); $('driverHeightOut').textContent = Math.round((st.y - base) / u * 100) + ' cm';
+        $('driverTurn').value = Math.round((st.r || 0) * 180 / Math.PI); $('driverTurnOut').textContent = Math.round((st.r || 0) * 180 / Math.PI) + '°';
+        $('driverInfo').textContent = def.seat ? 'Own seat.' : 'Automatic seat (place it yourself if the duck sits wrong).';
+      }
+      // eigener Sitz aus dem aktuellen (ggf. geschätzten) Sitz anlegen, base = Sitzhöhe ohne Höhen-Regler
+      function ownSeat() {
+        if (!def.seat) { var st = driverSeat(); if (!st) return null; def.seat = { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0, base: st.y }; }
+        if (def.seat.base == null) def.seat.base = def.seat.y;
+        return def.seat;
       }
       // keepView: gleiche Kamera behalten (Neuaufbau nach Picken, Umdrehen …), sonst passend zum Auto zoomen
       function load(key, keepView) {
@@ -424,7 +477,7 @@
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
         $('texOff').checked = !!def.texOff; $('smoothWheels').checked = !!def.smoothWheels; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
-        raceFill(); paints(); zones();
+        raceFill(); paints(); zones(); driverFill();
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
       // Felgen = Farbbereich „Rims“ (id rim). Alte Einstellungen (rimParts, rim, Felge je Set) einmalig umrechnen;
@@ -613,6 +666,7 @@
         picking = picking === w ? null : w;
         $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickFront').setAttribute('aria-pressed', String(picking === 'steer')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
         $('pickCut').setAttribute('aria-pressed', String(picking === 'cut')); if (picking !== 'cut') cutCancel();
+        $('pickDriver').setAttribute('aria-pressed', String(picking === 'driver'));
         canvas.classList.toggle('picking', !!picking); zones();
         var wheelMode = function (x) { return x === 'wheel' || x === 'steer'; };
         if (wheelMode(picking) && !wheelMode(was)) {
@@ -714,7 +768,7 @@
       // Treffer fast deckungsgleich (< 2 mm, z. B. Wappen auf dem Kotflügel), gewinnt das kleinere Teil (die Plakette)
       function pickHit(hits, through) {
         var ok = hits.filter(function (h) {
-          if (!h.object.isMesh) return false;
+          if (!h.object.isMesh || h.object.userData.driver) return false;   // die Fahrer-Ente ist nicht wählbar
           var m = Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex] : h.object.material;
           if (!m || m.visible === false) return false;
           if (!through) return true;   // durchsichtige Teile wählbar
@@ -740,6 +794,13 @@
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
         if (picking === 'cut') { cutClick(hit); return; }
+        if (picking === 'driver') {
+          // Klickpunkt in Auto-Koordinaten (Vorlage), Ente sitzt darauf; Größe bleibt
+          var carObj = holder.children[0]; if (!carObj) return;
+          var lp = carObj.worldToLocal(hit.point.clone()), st0 = ownSeat(); if (!st0) return;
+          def.seat = { x: +lp.x.toFixed(4), y: +lp.y.toFixed(4), z: +lp.z.toFixed(4), s: st0.s, r: st0.r || 0, base: +lp.y.toFixed(4) };
+          setPick('driver'); driverFill(); show(); say('Driver placed. Adjust size, height and turn, then save.'); return;
+        }
         if (picking === 'split') {
           var kd = (TC.meta(cur.key) || {}).kids || {}, isKid = Object.keys(kd).some(function (q) { return kd[q].indexOf(key) >= 0; });
           if (isKid) { say('Already split: ' + key); return; }
@@ -778,6 +839,12 @@
       });
       $('addPaint').addEventListener('click', function () { def.paints.push({ c: 0xc8151b, w: 1 }); shown = def.paints.length - 1; paints(); show(); editSet(shown); });
       $('addOrig').addEventListener('click', function () { def.paints.push({ c: null, w: 1 }); shown = def.paints.length - 1; paints(); show(); });
+      $('showDriver').addEventListener('change', show);
+      $('pickDriver').addEventListener('click', function () { setPick('driver'); if (picking === 'driver') say('Click the seat in the 3D view.'); });
+      $('driverAuto').addEventListener('click', function () { delete def.seat; TC.forgetSeat(cur.key); driverFill(); show(); say('Driver placed automatically.'); });
+      $('driverSize').addEventListener('input', function () { var st = ownSeat(); if (!st) return; st.s = +(+$('driverSize').value * TC.UNIT).toFixed(4); driverFill(); show(); });
+      $('driverHeight').addEventListener('input', function () { var st = ownSeat(); if (!st) return; st.y = +(st.base + +$('driverHeight').value * TC.UNIT).toFixed(4); driverFill(); show(); });
+      $('driverTurn').addEventListener('input', function () { var st = ownSeat(); if (!st) return; st.r = +(+$('driverTurn').value * Math.PI / 180).toFixed(4); driverFill(); show(); });
       $('steer').addEventListener('input', function () { $('steerOut').textContent = Math.round(+$('steer').value * 180 / Math.PI) + '°'; show(); });
 
       function api(method, url, body) {
@@ -841,6 +908,7 @@
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
+        if (def.seat && def.seat.s > 0) d.seat = { x: def.seat.x, y: def.seat.y, z: def.seat.z, s: def.seat.s, r: def.seat.r || 0, base: def.seat.base != null ? def.seat.base : def.seat.y };
         if (def.cutParts && def.cutParts.length) d.cutParts = def.cutParts.slice(0, 60);
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);

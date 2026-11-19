@@ -899,14 +899,133 @@
     if (!set || typeof set !== 'object') set = {};
     return t ? paintTemplate(t, color, set.r, { zones: set.z, sub: set.sub }) : new THREE.Group();
   }
+  // ── Fahrer (Gummiente im Auto) ──
+  // Sitz je Fahrzeug: seat = {x, y, z, s, r} in den Koordinaten der fertigen Vorlage (Mitte im Auto, Front +x,
+  // links = −z, Boden −H/2); s = Höhe der Ente in Auto-Einheiten, r = Drehung um y. Gespeichert im Car editor,
+  // sonst geschätzt: Fahrerplatz links (Linkslenker) vorn im Innenraum, Größe so, dass die Ente mit Abstand
+  // unter Dach, zwischen Tür und Mitte und zwischen Armaturenbrett und Lehne passt (offenes Cockpit: Kopf darf
+  // herausschauen). Die Ente aus js/rubber-duck.js ist 2,2 hoch, Boden bei y = −0.55, Schnabel +x.
+  var DUCK_H = 2.2, DUCK_FLOOR = -0.55, DUCK_W = 1.9 / 2.2, DUCK_L = 2.4 / 2.2;
+  var SEATS = {};
+  function hullMeshes(t) {
+    var list = [];
+    t.updateMatrixWorld(true);
+    t.traverse(function (o) {
+      if (!o.isMesh || o.userData.driver || !o.geometry || !o.geometry.attributes.position) return;
+      for (var p = o; p; p = p.parent) if (/^Wheel /.test(p.name || '') || p.userData.driver) return;
+      var m = [].concat(o.material)[0]; if (m && m.visible === false) return;
+      list.push(o);
+    });
+    return list;
+  }
+  // alle Trefferhöhen einer senkrechten Linie (von oben nach unten) bzw. Abstand bis zum ersten Treffer
+  function castAll(ray, meshes, o, d) {
+    ray.set(o, d); ray.far = Infinity;
+    return ray.intersectObjects(meshes, false).map(function (h) { return h.distance; });
+  }
+  function autoSeat(t) {
+    var D = t.userData.dims || { L: 4.4, W: 1.8, H: 1.3 }, L = D.L, W = D.W, H = D.H, y0 = -H / 2;
+    var meshes = hullMeshes(t), ray = new THREE.Raycaster();
+    ray.params.Line = { threshold: 0 }; ray.params.Points = { threshold: 0 };
+    var down = new THREE.Vector3(0, -1, 0);
+    // senkrechte Linien von oben: alle Flächenhöhen, absteigend
+    function column(x, z) {
+      var hs = castAll(ray, meshes, new THREE.Vector3(x, H, z).applyMatrix4(t.matrixWorld), down).map(function (dd) { return H - dd; });
+      return hs.sort(function (a, b) { return b - a; });
+    }
+    // Punkte von Teilen nach Namen (Material oder Knoten) in Vorlagen-Koordinaten
+    function namedPts(rx, notRx) {
+      var pts = [], v = new THREE.Vector3();
+      meshes.forEach(function (o) {
+        var nm = [].concat(o.material).map(function (m) { return (m && m.name) || ''; }).join(' '), chain = '';
+        for (var p = o; p && p !== t; p = p.parent) chain += ' ' + (p.name || '');
+        if (!rx.test(nm + chain) || (notRx && notRx.test(nm + chain))) return;
+        var pa = o.geometry.attributes.position, st = Math.max(1, Math.floor(pa.count / 400));
+        for (var i = 0; i < pa.count; i += st) pts.push(v.fromBufferAttribute(pa, i).applyMatrix4(o.matrixWorld).clone());
+      });
+      return pts;
+    }
+    function boxOf(pts) { var b = new THREE.Box3(); pts.forEach(function (p) { b.expandByPoint(p); }); return b; }
+    var unitM = UNIT, zd = -W * 0.22, sx = null, open = false;
+    // 1. Lenkrad (30 von 70 Modellen): Fahrer sitzt ~0,45 m dahinter, auf seiner Höhe quer
+    var sw = namedPts(/steer|lenkrad|steering/i, /column|säule|lock|stalk|paddle|shift/i).filter(function (p) { return p.y > y0 + H * 0.3 && p.y < y0 + H * 0.85; });
+    if (sw.length > 10) {
+      var sb = boxOf(sw), sc = sb.getCenter(new THREE.Vector3()), ss = sb.getSize(new THREE.Vector3());
+      if (Math.max(ss.y, ss.z) < 0.7 * unitM) { sx = sc.x - 0.45 * unitM; zd = sc.z; }
+    }
+    // 2. sonst Scheiben über der Gürtellinie (Glashaus): Fahrer hinter der Frontscheibe
+    if (sx == null) {
+      var gl = namedPts(/glass|glas|window|windshield|windscreen|scheibe/i, /lamp|light|head|tail|mirror|spiegel|indicator/i).filter(function (p) { return p.y > y0 + H * 0.66; });
+      if (gl.length > 10) {
+        var gb = boxOf(gl), glen = gb.max.x - gb.min.x;
+        // Frontscheibe = vorderes Ende des Glashauses; offene Autos haben nur die Scheibe (kurz)
+        sx = glen > 0.6 * unitM ? gb.max.x - Math.min(glen * 0.45, 1.1 * unitM) : gb.min.x - 0.3 * unitM;
+        if (gb.max.z - gb.min.z < W * 0.3) zd = (gb.min.z + gb.max.z) / 2;   // schmale Scheibe: Einsitzer mittig
+      }
+    }
+    if (sx == null) sx = L * 0.05;
+    // Sitzhöhe: senkrecht von oben an (sx, zd): oberste Fläche unterhalb der Gürtellinie = Sitz/Boden;
+    // darüber die nächste Fläche = Dach (fehlt sie: offen)
+    var hs = column(sx, zd), seat = null, roof = Infinity;
+    // Sitzfläche liegt tief (Polster ~ 25–45 % der Höhe); Lenkrad, Armaturenbrett, Kopfstützen liegen darüber
+    for (var j = 0; j < hs.length; j++) if (hs[j] < y0 + H * 0.45 && hs[j] > y0 + H * 0.05) { seat = hs[j]; break; }
+    if (seat != null) for (j = hs.length - 1; j >= 0; j--) if (hs[j] > seat + H * 0.25) { roof = hs[j]; break; }
+    if (seat == null) seat = y0 + H * 0.3;
+    // Dach muss über dem Sitz deutlich Platz lassen, sonst ist es keine Kabine (z. B. Motorhaube getroffen)
+    open = roof === Infinity || roof > y0 + H * 1.2;
+    var col = { x: sx, c: { lo: seat, hi: roof, gap: open ? H * 0.9 : roof - seat, open: open } };
+    var seatY = col.c.lo, free = col.c.open ? Infinity : col.c.hi - seatY;
+    // Größe: Dach (0,85 der freien Höhe), Breite und Länge mit Abstand; offenes Cockpit: Kopf darf heraus
+    var s = Math.min(col.c.open ? H * 0.5 : free * 0.85, H * 0.6), z = zd, x = col.x, zd0 = zd;
+    // Größe: Dach (0,85 der freien Höhe), Tür außen und Armaturenbrett vorn mit Abstand; die Ente darf in Lehne und
+    // Mittelkonsole einsinken (sitzt im Schalensitz) – sonst würde sie an den Sitzwangen winzig
+    var outward = zd0 <= 0 ? -1 : 1;
+    function dist(px, py, pz, dx, dz) { var h = castAll(ray, meshes, new THREE.Vector3(px, py, pz), new THREE.Vector3(dx, 0, dz))[0]; return h == null ? Infinity : h; }
+    for (var it = 0; it < 2; it++) {
+      var yc = seatY + s * 0.45, door = dist(x, yc, z, 0, outward), dash = dist(x, yc + s * 0.2, z, 1, 0);
+      if (door < Infinity) s = Math.min(s, door * 2 * 0.95 / DUCK_W);
+      if (dash < Infinity) s = Math.min(s, dash * 0.95 / (DUCK_L / 2));
+    }
+    s = Math.max(s, H * 0.15);
+    // Kopf nie durchs Dach: senkrecht über der Ente nachmessen (geschlossene Kabine)
+    if (!col.c.open) {
+      var b0 = H * 0.05, upd = castAll(ray, meshes, new THREE.Vector3(x, seatY + b0, z), new THREE.Vector3(0, 1, 0))[0];
+      if (upd != null) s = Math.min(s, (upd + b0) * 0.88);
+    }
+    return { x: +x.toFixed(4), y: +seatY.toFixed(4), z: +z.toFixed(4), s: +s.toFixed(4), r: 0, auto: true, open: !!col.c.open };
+  }
+  // gespeicherter Sitz (Car editor) oder Schätzung; t = Vorlage (ohne: geladene Vorlage des Autos)
+  function seatOf(key, t) {
+    var v = vehicle(key).seat;
+    if (v && typeof v === 'object' && isFinite(v.x) && isFinite(v.y) && isFinite(v.z) && v.s > 0) return { x: +v.x, y: +v.y, z: +v.z, s: +v.s, r: +v.r || 0 };
+    t = t || TPL[key]; if (!t) return null;
+    if (!SEATS[key]) SEATS[key] = autoSeat(t);
+    return SEATS[key];
+  }
+  // Ente als Kind des Autos (Kopie aus build()) an den Sitz setzen, Schnabel nach vorn (+x); gibt die Ente zurück.
+  // Ändert weder Teile-Schlüssel noch Radgruppen (Vorlage bleibt unberührt). opts: {color, outfit, seat}
+  function addDriver(car, key, opts) {
+    opts = opts || {};
+    if (!root.RubberDuck || !car) return null;
+    var st = opts.seat || seatOf(key || car.userData.key, opts.template); if (!st) return null;
+    var duck = root.RubberDuck.build({ color: opts.color, outfit: opts.outfit });
+    var k = st.s / DUCK_H;
+    duck.scale.setScalar(k); duck.position.set(st.x, st.y - DUCK_FLOOR * k, st.z); duck.rotation.y = st.r || 0;
+    duck.name = 'Driver'; duck.userData.driver = true;
+    duck.traverse(function (o) { o.userData.driver = true; });
+    // Vorlage liegt in car.children[0] (wrap) – Sitz gilt in Auto-Koordinaten, also direkt am Auto
+    car.add(duck);
+    return duck;
+  }
   function dims(key) { var t = TPL[key] || TPL[MODELS[0]]; return t ? t.userData.dims : { L: 4.4, W: 1.8, H: 1.4, belt: 0.9 }; }
   function random() { var m = MODELS[Math.floor(Math.random() * MODELS.length)], p = pickPaint(m); return { model: m, color: p.c }; }
 
   root.ToyCars = {
     ready: ready, build: build, dims: dims, pickPaint: pickPaint, paintAt: paintAt, random: random, applyCustom: applyCustom, prepare: prepare,
     meta: function (k) { return META[k]; }, editMode: function (on) { EDIT = !!on; },
-    forget: function (k) { delete TPL[k]; delete loading[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
+    forget: function (k) { delete TPL[k]; delete loading[k]; delete SEATS[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
-    loadCatalog: loadCatalog, loadModel: loadModel, mergeForRace: mergeForRace, vehicle: vehicle, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
+    loadCatalog: loadCatalog, loadModel: loadModel, mergeForRace: mergeForRace, vehicle: vehicle,
+    seatOf: seatOf, autoSeat: autoSeat, addDriver: addDriver, forgetSeat: function (k) { delete SEATS[k]; }, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
   };
 })(typeof window !== 'undefined' ? window : this);
