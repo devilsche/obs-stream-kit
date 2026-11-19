@@ -1058,7 +1058,7 @@
     // (Pole), hält je Auto 1,6 s schräg vorn von der Außenseite; die letzten 2 s Totale der Startaufstellung mit
     // Startampel 3-2-1. Feste Schlüsselbilder (für alle Instanzen gleich); reduzierte Bewegung: stehende
     // Startaufstellung mit Fahrerliste.
-    var INTRO_BASE = 2.0, INTRO_PER = 1.6, INTRO_TILT = 20 * Math.PI / 180;
+    var INTRO_BASE = 5.0, INTRO_PER = 2.2, INTRO_TILT = 20 * Math.PI / 180;   // wie fx/race.py
     function introSeconds(n) { return INTRO_BASE + INTRO_PER * n; }
     function gridSlot(i) {
       var c = race.gridSim.cars[i], p = race.T.at(c.s);
@@ -1074,9 +1074,12 @@
     // (gehalten, Namen sichtbar), dann die Fahrer von hinten nach vorn – einzeln, wenn je Fahrer ≥ 1,15 s bleiben,
     // sonst als Startreihe (zwei) bzw. bei sehr wenig Zeit alle zusammen –, die letzte Karte endet vor der Startampel
     // (letzte 2 s). Im Vollbild beginnt die Totale später sichtbar (Einblenden), darum dort länger.
-    var INTRO_LIGHTS = 2.0, INTRO_MIN = 2.0;   // unter 2 s je Fahrer: Startreihen bzw. alle zusammen
+    // Ablauf: 0–2,5 s reinschwenken (von hoch und weit auf die Startaufstellung), bis 4,5 s Totale halten (alle Autos
+    // und Namen), dann langsam von hinten nach vorn (unter 2,5 s je Fahrer: Startreihen bzw. alle zusammen; jede
+    // Karte ≥ 1,5 s), die letzten 3 s Totale mit Startampel; alles ease-in-out
+    var INTRO_SWING = 2.5, INTRO_WIDE = 4.5, INTRO_LIGHTS = 3.0, INTRO_MIN = 2.5;
     function introPlan(n) {
-      var total = introSeconds(n), wide = STAGE ? 2.8 : 2.0, avail = total - wide - INTRO_LIGHTS, groups = [], gs;
+      var total = introSeconds(n), wide = INTRO_WIDE, avail = total - wide - INTRO_LIGHTS, groups = [], gs;
       for (gs = 1; gs <= 2; gs++) if (avail / Math.ceil(n / gs) >= INTRO_MIN) break;
       if (gs > 2) gs = n;   // zu knapp: alle auf einmal
       // Gruppen von hinten nach vorn; Paare = Startreihen (Startplätze 2r+1, 2r+2)
@@ -1090,7 +1093,9 @@
       function unwrap(o) { while (o - prevOrb > Math.PI) o -= 2 * Math.PI; while (o - prevOrb < -Math.PI) o += 2 * Math.PI; prevOrb = o; return o; }
       var fit = camFit(race.order.map(function (r, i) { var sl = gridSlot(i); return { x: sl.x, z: sl.z }; })) || { x: 0, z: 0, px: PX_MAX };
       var high = { x: fit.x, z: fit.z, y: 0, px: fit.px, tilt: TILT, orb: 0, wide: 1, focus: -1 };
-      keys.push(Object.assign({ t: 0 }, high), Object.assign({ t: plan.wide }, high));
+      // reinschwenken: von hoch, weit und seitlich versetzt auf die Totale, dann halten
+      var far = Object.assign({}, high, { px: high.px * 0.45, tilt: 72 * Math.PI / 180, orb: -0.7 });
+      keys.push(Object.assign({ t: 0 }, far), Object.assign({ t: INTRO_SWING }, high), Object.assign({ t: plan.wide }, high));
       plan.groups.forEach(function (g, k) {
         var t0 = plan.wide + k * plan.per, sl = g.map(gridSlot), rs = g.map(function (i) { return race.order[i]; });
         var cx = 0, cz = 0, md = 0; sl.forEach(function (q) { cx += q.x / sl.length; cz += q.z / sl.length; md += q.d / sl.length; });
@@ -1106,7 +1111,7 @@
         keys.push(Object.assign({ t: t0 + plan.per * 0.5, orb: orb + 0.03 }, base), Object.assign({ t: t0 + plan.per, orb: orb - 0.03 }, base));
       });
       high.orb = unwrap(0);
-      keys.push(Object.assign({ t: plan.total - INTRO_LIGHTS + 0.6 }, high), Object.assign({ t: plan.total }, high));
+      keys.push(Object.assign({ t: plan.total - INTRO_LIGHTS + 1.0 }, high), Object.assign({ t: plan.total }, high));
       // Deko entlang der Fahrt ausblenden (beim Rennstart wieder da)
       var tanH = Math.tan(FOV * Math.PI / 360) * (W / H), segs = [], intro = { keys: keys, at: race.introAt, n: n, plan: plan };
       for (var t = 0; t <= plan.total; t += 0.2) {
@@ -1123,7 +1128,7 @@
       if (introT < pl.wide || k < 0 || k >= pl.groups.length) return null;
       var st = introT - pl.wide - k * pl.per;
       // Karte ab 30 % der Zeit, 350 ms ein-, 300 ms ausblenden
-      return { ids: pl.groups[k], st: st, a: smooth01((st - pl.per * 0.3) / 0.35) * smooth01((pl.per - st) / 0.3) };
+      return { ids: pl.groups[k], st: st, a: smooth01((st - pl.per * 0.25) / 0.35) * smooth01((pl.per - st) / 0.3) };
     }
     // Schlüsselbild-Interpolation (wie die Siegerehrung)
     function shotAt(K, t) { return podiumShotAt({ keys: K }, t); }
@@ -1828,7 +1833,8 @@
           if (!reduce) {
             ishot = race.introShot = shotAt(race.intro.keys, introT);
             // die ersten 0,55 s aus der bisherigen Kamera hinein überblenden, danach direkt den Schlüsselbildern folgen
-            var b0 = smooth01(introT / 0.55), q0 = race.intro.cam0;
+            // kleines Fenster: aus der Countdown-Kamera hineinblenden; Vollbild: 3D war unsichtbar, gleich der Schwenk
+            var b0 = STAGE ? 1 : smooth01(introT / INTRO_SWING), q0 = race.intro.cam0;
             camFix = { x: lerp(q0.x, ishot.x, b0), z: lerp(q0.z, ishot.z, b0), y: lerp(q0.y, ishot.y, b0),
               px: Math.exp(lerp(Math.log(q0.px), Math.log(ishot.px), b0)), tilt: lerp(q0.tilt, ishot.tilt, b0), orb: lerp(q0.orb, ishot.orb, b0), direct: true };
           }

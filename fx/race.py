@@ -27,8 +27,8 @@ NITRO_COST = 50
 BUMP_COST = 100
 EVENT_LEAD = 1.5   # Ereignisse gelten 1,5 s nach Eingang, damit alle Overlays sie vor Eintritt haben
 FINISH_WINDOW = 15
-INTRO_BASE = 2.0   # Vorstellung der Fahrer vor dem Start: 2 s + 1,6 s je Fahrer (Overlay fliegt übers Feld)
-INTRO_PER = 1.6
+INTRO_BASE = 5.0   # Vorstellung der Fahrer vor dem Start: 5 s + 2,2 s je Fahrer (Overlay: reinschwenken,
+INTRO_PER = 2.2    # Totale halten, langsam von hinten nach vorn, Ampel) – 10 Fahrer ≈ 27 s
 
 
 def intro_seconds(n):
