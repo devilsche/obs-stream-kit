@@ -21,7 +21,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, abort, request, 
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -656,3 +656,120 @@ def duck_greet(token):
     if not _push_greet(g.tenant_id, user, outfit, GREET_GAP):
         return _no_store(jsonify({"ok": True, "greet": False}))
     return _no_store(jsonify({"ok": True, "greet": True, "outfit": outfit}))
+
+
+# --- Car Race ---
+
+_UNRESOLVED = re.compile(r"^%.*%$")
+_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
+RACE_COLOR = "#f2b705"
+RACE_ADMIN = ("cancel", "start", "remove", "void")
+
+
+def _arg(name) -> str:
+    """Query-Wert; leer oder unaufgelöste Streamer.bot-Variable (%…%) = fehlend."""
+    v = (request.args.get(name) or "").strip()
+    return "" if _UNRESOLVED.match(v) else v
+
+
+def _race_cars():
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    try:
+        with open(os.path.join(root, "data", "car-rain", "catalog.json"), encoding="utf-8") as f:
+            cat = json.load(f)
+    except (OSError, ValueError):
+        cat = []
+    return (cat if isinstance(cat, list) else []), car_models.load(root, "vehicles")
+
+
+def _race_say_board(rows) -> str:
+    if not rows:
+        return "No races yet."
+    return "Top 3: " + ", ".join("%d. %s %d pts" % (i, r["display"], r["points"])
+                                 for i, r in enumerate(rows[:3], 1))
+
+
+@bp_fx.route("/s/<token>/api/fx/car-race", methods=["GET"])
+def car_race_cmd(token):
+    """Chat-/Dashboard-Befehle des Autorennens (GET, damit Streamer.bot sie abrufen kann)."""
+    if g.tenant_id is None:
+        abort(404)
+    cmd = (request.args.get("cmd") or "").strip().lower()
+    now = time.time()
+    if cmd == "join":
+        if _flag(request.args.get("test")):
+            uid, display = race.next_test_id(g.tenant_id, now)
+            login = uid
+        else:
+            login = _arg("user").lstrip("@")
+            uid = _arg("id") or login.lower()
+            display = login[:25]
+            if not uid:
+                return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
+        color = _arg("color")
+        color = color if _COLOR_RE.match(color) else RACE_COLOR
+        out = race.join(g.tenant_id, uid, login or uid, display or uid, color.lower(), now, _race_cars())
+        return _no_store(jsonify(out))
+    if cmd in RACE_ADMIN:
+        out = race.admin(g.tenant_id, cmd, now, user_id=_arg("id"))
+        if cmd == "void" and out.get("ok"):
+            try:
+                _with_conn(lambda conn: race_db.void(conn, g.tenant_id, out["race_id"]))
+                out["say"] = "Last race voided."
+            except Exception:
+                log.exception("fx car-race: void failed")
+                out.update({"ok": False, "say": "void failed"})
+        return _no_store(jsonify(out))
+    if cmd == "board":
+        scope = "all" if request.args.get("scope") == "all" else "month"
+        try:
+            rows = _with_conn(lambda conn: race_db.board(conn, g.tenant_id, scope, limit=20))
+        except Exception:
+            log.exception("fx car-race: board failed")
+            rows = []
+        return _no_store(jsonify({"rows": rows, "say": _race_say_board(rows)}))
+    return jsonify({"ok": False, "say": "unknown command"}), 400
+
+
+@bp_fx.route("/s/<token>/api/fx/car-race/state")
+def car_race_state(token):
+    if g.tenant_id is None:
+        abort(404)
+    return _no_store(jsonify(race.state(g.tenant_id, time.time())))
+
+
+@bp_fx.route("/s/<token>/api/fx/car-race/result", methods=["POST"])
+def car_race_result(token):
+    """Das Overlay meldet die Platzierung (Startreihenfolge; Zahl oder null = DNF)."""
+    if g.tenant_id is None:
+        abort(404)
+    body = request.get_json(silent=True) or {}
+    race_id, places = body.get("race_id"), body.get("places")
+    if not isinstance(race_id, str) or not isinstance(places, list):
+        return jsonify({"ok": False, "error": "race_id/places fehlen"}), 400
+    try:
+        rows = race.accept_result(g.tenant_id, race_id, places, time.time())
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    if rows is None:
+        return jsonify({"ok": True, "counted": False, "points": {}})
+
+    def save(conn):
+        if not race_db.record(conn, g.tenant_id, race_id, rows):
+            return None
+        board = race_db.board(conn, g.tenant_id, "month", limit=100000)
+        return {r["user_id"]: (i, r["points"]) for i, r in enumerate(board, 1)}
+    try:
+        ranks = _with_conn(save)
+    except Exception:
+        log.exception("fx car-race: Ergebnis speichern fehlgeschlagen")
+        return jsonify({"ok": True, "counted": False, "points": {}})
+    if ranks is None:
+        return jsonify({"ok": True, "counted": False, "points": {}})
+    field = len(rows)
+    pts = {}
+    for r in rows:
+        rank, total = ranks.get(r["user_id"], (None, 0))
+        pts[r["user_id"]] = {"gained": race_db.points(r["place"], field), "month_total": total,
+                             "month_rank": rank}
+    return jsonify({"ok": True, "counted": True, "points": pts})

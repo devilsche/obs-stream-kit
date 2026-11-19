@@ -357,6 +357,7 @@ Overlays mit transparentem Hintergrund (1920×1080), liegen in `effects/`. Alle 
 | `effects/winter.html` | Winterdeko ohne Weihnachten: Eiszapfen, Raureif, Schneedecke, Schneemann (wächst mit Subs), Follower-Mini-Schneemänner — schippen, kratzen, Eiszapfen abbrechen, Schneebälle | Dauerhaft |
 | `effects/spring.html` | Frühlingsdeko: Blumenwiese mit Follower-Blumen, Kirschblütenzweig, Bienen und Schmetterlinge — gießen, Unkraut zupfen | Dauerhaft |
 | `effects/summer.html` | Sommerdeko: Sonne, Strand mit Follower-Sandburgen, Hitzeflimmern, Abend mit Glühwürmchen — Hitzewelle abkühlen, Eis schmilzt | Dauerhaft |
+| Car Race (Endpoints) | Chat-Autorennen, Overlay folgt: `!race` meldet an (3–10 Fahrer, ab dem 3. Countdown 60 s, beim 10. sofort Start; Streamer.bot → `GET /s/<token>/api/fx/car-race?cmd=join&id=%userId%&user=%user%&color=%color%`, Antwort enthält `say`). Weitere `cmd`: `board&scope=month\|all`, `cancel`, `start`, `remove&id=`, `void` (letztes Rennen ungültig), `join&test=1` (Testfahrer). `GET …/car-race/state` für das Overlay, `POST …/car-race/result` mit `{race_id, places}` (Startreihenfolge, Platz oder `null` = DNF). Punkte: geschlagene Fahrer + 1 Siegbonus, DNF = 0; Rangliste je Monat und ewig. Pause 2 min nach dem Rennen | Rennen ≤ 90 s |
 | `effects/questionmarks.html` | Fragezeichen (Video) | ~9s |
 | `effects/explosion.html` | Explosion (Video) | ~14s |
 | `effects/particle-swirl.html` | Partikel-Wirbel (Video) | ~6s |
