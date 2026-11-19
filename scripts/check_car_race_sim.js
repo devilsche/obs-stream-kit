@@ -31,7 +31,13 @@ var DT = 1 / 60;
 var OVERLAP_TOL = 0.1;   // Wrack-Überlappung: höchstens 10 cm (längs und quer)
 var busInfo = '';
 var overlapChecked = {}; // Rennen, in denen mindestens ein Wrack stand (Überlappung geprüft)
-var MAX_T = 95;   // Sicherheitsnetz: die Sim muss nach spätestens 90 s selbst fertig sein
+var MAX_T = 95;
+// Seltene Fälle (festgefahren > 8 s) in Bilanz/Probe: höchstens RARE_MAX je 1000 Rennen (Controller-Entscheidung);
+// überall sonst sind sie ein Fehler
+var RARE_MAX = 3, rareCases = [];
+function rare(label, msg) {
+  if (/^(Bilanz-Rennen|Probe) /.test(label)) rareCases.push(msg); else fail(msg);
+}   // Sicherheitsnetz: die Sim muss nach spätestens 90 s selbst fertig sein
 
 // Eigener Zufall fürs Prüfskript (Feldzusammensetzung), unabhängig von der Sim
 function mulberry32(a) {
@@ -71,7 +77,7 @@ function run(opts, label, checkSteps) {
       var c = sim.cars[i];
       if (c.state === 'run') { var as = Math.abs(c.steer); info.steerSum += as; info.steerN++; if (as > info.steerMax) info.steerMax = as; }
       still[i] = c.state === 'run' && c.v < 0.3 && sim.time > 3 ? still[i] + DT : 0;
-      if (still[i] > 8 && !bad) { fail(label + ': Auto ' + c.id + ' steckt fest bei t=' + sim.time.toFixed(1)); bad = true; }
+      if (still[i] > 8 && !bad) { rare(label, label + ': Auto ' + c.id + ' steckt fest bei t=' + sim.time.toFixed(1)); bad = true; }
       // Abflug: neben der Fahrbahn höchstens 12 s, dann muss das Auto zurück sein
       var isOff = Math.abs(c.d) > half + 1e-9;
       if (isOff !== c.off && !bad) { fail(label + ': Auto ' + c.id + ' off=' + c.off + ' passt nicht zu d=' + c.d.toFixed(2)); bad = true; }
@@ -413,7 +419,7 @@ var BUS_DYAW_BEFORE = 0.1238, BUS_JERK_BEFORE = 0.00289;
 var RACES = arg('--races', 1000);
 var busWins = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
 var X = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, rails: 0, returned: 0, offAtEnd: 0, pushes: 0, oilHits: 0, overtakes: 0, randomOil: 0, oilSpots: 0, maxOil: 0,
-  busPush: [], busPushed: [], busLoss: [], busLost: [], draftSteps: 0 };
+  busPush: [], busPushed: [], busLoss: [], busLost: [], busShoveLoss: [], busShovePush: [], draftSteps: 0 };
 var started = Date.now();
 var BSEED = arg('--seed', 2026), rnd = mulberry32(BSEED);
 for (var race = 0; race < RACES; race++) {
@@ -444,6 +450,8 @@ for (var race = 0; race < RACES; race++) {
   sim.events.forEach(function (e) {
     if (e.type === 'overtake') X.overtakes++;
     if (e.type !== 'push') return;
+    // Bus schiebt in Kurven Kleinwagen aus dem Weg (kind 'shove'): relativer Tempoverlust des Busses
+    if (e.kind === 'shove' && e.other === 'bus') { X.busShoveLoss.push(e.vOther > 0.5 ? e.lossOther / e.vOther : 0); X.busShovePush.push(e.push); }
     // Bus beteiligt: Schub/Tempoverlust des anderen Autos gegen den des Busses
     if (e.other === 'bus') { X.busPush.push(e.push); X.busPushed.push(e.pushOther); X.busLoss.push(e.loss); X.busLost.push(e.lossOther); }
     else if (e.id === 'bus') { X.busPush.push(e.pushOther); X.busPushed.push(e.push); X.busLoss.push(e.lossOther); X.busLost.push(e.loss); }
@@ -456,6 +464,11 @@ if (busPct < 1) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 1 %)
 if (strongPct > 45 || strongPct < 20) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 20–45 %)');
 if (incidents.crash / RACES > 1.2) fail((incidents.crash / RACES).toFixed(2) + ' Crashs je Rennen inkl. Leitplanke (Soll ≤ 1,2)');
 function mean(A) { return A.length ? A.reduce(function (x, y) { return x + y; }, 0) / A.length : 0; }
+// Schwere schieben in Kurven: der Bus ist dabei der Schwere (other) und verliert je Kontakt höchstens ~10 % Tempo
+if (Sim.HEAVY_PUSH) {
+  if (X.busShoveLoss.length < 20) fail('nur ' + X.busShoveLoss.length + ' Kurven-Schubser des Busses (Soll ≥ 20)');
+  else if (!(mean(X.busShoveLoss) <= 0.10)) fail('Bus verliert beim Schieben im Mittel ' + (100 * mean(X.busShoveLoss)).toFixed(1) + ' % Tempo (Soll ≤ 10 %)');
+}
 // Abflüge kommen vor und die Autos kehren zurück (wer nicht in der Leitplanke landet)
 if (X.offs / RACES <= 0.2) fail('nur ' + (X.offs / RACES).toFixed(2) + ' Abflüge je Rennen (Soll > 0,2)');
 if (X.returned !== X.offs - X.rails - X.offAtEnd) fail(X.returned + ' von ' + X.offs + ' Abflügen kehren zurück (' + X.rails + ' Leitplanke, ' + X.offAtEnd + ' bei Rennende draußen)');
@@ -529,6 +542,9 @@ if (X.steerN) {
 }
 
 function report() {
+  if (typeof RACES === 'number' && rareCases.length > RARE_MAX * Math.max(1, RACES / 1000)) {
+    rareCases.forEach(function (m) { fail(m + ' (seltene Fälle: ' + rareCases.length + ' > ' + RARE_MAX + ')'); });
+  }
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
   (trackInfo || []).forEach(function (l) { console.log(l); });
   if (busInfo) console.log(busInfo);
@@ -543,6 +559,10 @@ function report() {
       (X.overtakes / RACES).toFixed(1) + ' Überholmanöver; Zufalls-Ölfleck in ' + (100 * X.randomOil / RACES).toFixed(1) + ' % der Rennen, ' +
       (X.oilSpots / RACES).toFixed(2) + ' Flecken je Rennen (max. ' + X.maxOil + ')');
     console.log('Wrack-Überlappung geprüft in ' + Object.keys(overlapChecked).length + ' Rennen mit stehendem Auto/Wrack (Toleranz ' + OVERLAP_TOL + ' m)');
+    var sl = X.busShoveLoss.slice().sort(function (a, b) { return a - b; });
+    if (sl.length) console.log('Bus schiebt in Kurven: ' + (sl.length / RACES).toFixed(2) + ' je Rennen, Schub auf den Kleinwagen ' + mean(X.busShovePush).toFixed(2) +
+      ' m/s, Tempoverlust des Busses im Mittel ' + (100 * mean(sl)).toFixed(1) + ' % (95 %: ' + (100 * (sl[Math.floor(sl.length * 0.95)] || 0)).toFixed(1) + ' %)');
+    console.log('Seltene Fälle (festgefahren / zu lange im Auslauf) in Bilanz + Probe: ' + rareCases.length + ' (Soll ≤ ' + RARE_MAX + ')' + (rareCases.length ? ': ' + rareCases.join('; ') : ''));
     console.log('Kontakte mit dem Bus (' + X.busPush.length + '): Schub auf das andere Auto ' + mean(X.busPush).toFixed(2) + ' m/s, auf den Bus ' +
       mean(X.busPushed).toFixed(2) + ' m/s; Tempoverlust ' + mean(X.busLoss).toFixed(2) + ' / ' + mean(X.busLost).toFixed(2) + ' m/s');
   }

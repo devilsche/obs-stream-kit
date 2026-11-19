@@ -51,6 +51,9 @@
  *         dann bis Rennende liegen – ein festes Hindernis (auf der Fahrbahn oder im Auslauf), nur ein Schubser
  *         eines schwereren/auffahrenden Autos versetzt es ein Stück; burn = Sim-Zeit des Ausscheidens
  *         (Feuer/Rauch ab hier), sonst null. Bei Rennende nicht im Ziel (reason 'time') ist kein Wrack.
+ *       Schwere gegen Leichte (HEAVY_PUSH): ab 2,5-facher Masse (Bus, Truck gegen Kleinwagen) weicht das schwere
+ *       Fahrzeug in Kurven nicht aus und bremst nicht, es schiebt das leichtere zur Seite ('push', kind 'shove');
+ *       Leichte schieben Schwere nicht, Wracks bleiben fest.
  *       Wracks und stehende Dreher/Crashs sind nie durchfahrbar: die anderen lenken auf der Fahrbahn vorbei,
  *       notfalls durch den Auslauf (höchstens 8 m/s, im Kies 6 m/s), oder stellen sich an; wer länger als 4 s
  *       steht, quetscht sich auf der freien Seite durch den Auslauf. Auffahren auf ein Wrack ist ein Kontakt
@@ -63,7 +66,7 @@
  *         'off'      Wagenmitte verlässt den Asphalt (Abflug in der Kurve, auf Öl oder geschubst),
  *         'oil'      id fährt über einen Ölfleck (Grip bricht 0,5 s ein),
  *         'push'     Kontakt: id = das leichtere (stärker geschubste) Auto, other = das schwerere;
- *                    kind 'rear'|'side', push/pushOther = seitlicher Schub (m/s), loss/lossOther = Tempoverlust (m/s),
+ *                    kind 'rear'|'side'|'shove' (Schwerer schiebt in der Kurve), v/vOther = Tempo vorher, push/pushOther = seitlicher Schub (m/s), loss/lossOther = Tempoverlust (m/s),
  *         'dnf'      ausgeschieden, reason 'crash'|'rail'|'time' (time = bei Rennende nicht im Ziel).
  *       sim.hazards = [{ s, d, r, from, src }] Ölflecken (Mitte bei s/d, Radius r 1,5–2,5 m), from = Sim-Zeit des
  *         Erscheinens, src = 'track' (Zufallsfleck, ~60 % der Rennen, ab Start oder ab Runde 2) oder id des Autos,
@@ -120,6 +123,8 @@
   var PUSH_FRIC = 9;          // Abbau des seitlichen Schubs (m/s²)
   var CONTACT_MIN = 1.5;      // Auffahren erst ab 1,5 m/s Annäherung ist ein Kontakt
   var HARD_PUSH = 8;          // harter Schubser (Auffahren ab 8 m/s): kann Öl verlieren
+  var HEAVY_PUSH = true;      // Schwere schieben in Kurven Leichtere aus dem Weg (false = aus)
+  var BULLY = 2.5;            // ab 2,5-facher Masse (Bus, Truck gegen Kleinwagen)
   var HEAVY = 2;              // ab doppelter Masse drängt ein Auto seitlich einfach in die Spur
   // Öl
   var OIL_CHANCE = 0.6;       // Anteil der Rennen mit Zufallsfleck
@@ -582,15 +587,17 @@
     // Kontakt: der Schwerere schubst den Leichteren zur Seite und bremst ihn (Masse aus Gewicht und Länge)
     function contact(i, j, closing, kind) {
       var key = Math.min(i, j) * 64 + Math.max(i, j), time = steps * DT;
-      if (lastContact[key] !== undefined && time - lastContact[key] < (kind === 'side' ? 2.5 : 0.8)) return;
+      if (lastContact[key] !== undefined && time - lastContact[key] < (kind === 'side' ? 2.5 : kind === 'shove' ? 0.4 : 0.8)) return;
       lastContact[key] = time;
       counts.pushes++;
       var mi = P[i].mass, mj = P[j].mass, fi = mj / (mi + mj), fj = mi / (mi + mj);
+      var v0i = cars[i].v, v0j = cars[j].v;
       var dir = cars[j].d - cars[i].d;
+      if (kind === 'shove' && Math.abs(dir) <= 0.3) dir = crvAt(cars[j].s) > 0 ? -1 : 1;    // direkt davor: nach außen
       dir = Math.abs(dir) > 0.15 ? (dir > 0 ? 1 : -1) : (rnd() < 0.5 ? -1 : 1);   // j weg von i
       var res = [[i, fi, -dir], [j, fj, dir]].map(function (e) {
         var k = e[0], f = e[1], c = cars[k], p = P[k];
-        var shove = Math.min(9, PUSH_K * closing * f * 2), loss = Math.min(c.v, closing * f * 0.7);
+        var shove = Math.min(9, PUSH_K * closing * f * 2), loss = Math.min(c.v, closing * f * 0.7 * (kind === 'shove' && f < 0.5 ? 0.5 : 1));
         p.pushV = clamp(p.pushV + e[2] * shove, -9, 9);
         c.v -= loss;
         // Dreher-Chance: klein, für das leichtere Auto größer (Bus räumt ab, umgekehrt kaum)
@@ -598,8 +605,18 @@
         return { shove: Math.round(shove * 100) / 100, loss: Math.round(loss * 100) / 100 };
       });
       var light = fj >= fi ? 1 : 0, lk = light ? j : i, hk = light ? i : j;
-      emit('push', lk, hk, { kind: kind, push: res[light].shove, loss: res[light].loss, pushOther: res[1 - light].shove, lossOther: res[1 - light].loss });
+      var vv = [v0i, v0j];
+      emit('push', lk, hk, { kind: kind, push: res[light].shove, loss: res[light].loss, pushOther: res[1 - light].shove, lossOther: res[1 - light].loss,
+        v: Math.round(vv[light] * 100) / 100, vOther: Math.round(vv[1 - light] * 100) / 100 });
       if (kind === 'rear' && closing >= HARD_PUSH && rnd() < OIL_CRASH) addOil(cars[lk].s, cars[lk].d, cars[lk].id);
+    }
+
+    // Schwer gegen leicht in Kurven: der Schwere weicht nicht aus und bremst nicht, er schiebt den Leichten
+    // vor sich her und zur Seite (Wracks bleiben fest; wer im Stau steht, wird nicht geschoben)
+    function bullies(i, j) {
+      var c = cars[i];
+      return HEAVY_PUSH && c.state === 'run' && !sim.done && !isWreck(j) && cars[j].state !== 'dnf' && cars[j].v > 3 &&
+        P[i].mass >= BULLY * P[j].mass && (Math.abs(crvAt(c.s)) > CORNER_K || Math.abs(crvAt(c.s + 8)) > CORNER_K);
     }
 
     function finishCheck(c, p, sim) {
@@ -681,7 +698,7 @@
                 var g = gap(c, cars[j]);
                 if (g <= 0) continue;
                 if (g < SLIP_RANGE && g < sg && Math.abs(cars[j].d - c.d) < 2.5 && cars[j].v > 3 && !cars[j].off) { sg = g; slipJ = j; }
-                if (g < ag && latOverlap(i, j, c.d)) { ag = g; ahead = j; }
+                if (g < ag && latOverlap(i, j, c.d) && !bullies(i, j)) { ag = g; ahead = j; }
               }
               var slip = slipJ >= 0 && !c.off;
               if (slip && c.state === 'run' && !sim.done) c.draft = cars[slipJ].id;
@@ -867,6 +884,11 @@
               var gg = gap(cars[i], cars[j]), mg = minGap(i, j);
               if (gg >= 0 && gg < mg) {          // j vor i, zu dicht
                 var closing = cars[i].v - cars[j].v;
+                if (bullies(i, j)) {                 // Schwerer schiebt den Leichten vor sich her und zur Seite
+                  if (it === 0) contact(i, j, Math.max(2, closing + 1.5), 'shove');
+                  cars[j].s += (mg - gg);
+                  continue;
+                }
                 if (it === 0 && closing > CONTACT_MIN && !sim.done) {
                   // Einschlag in ein Wrack: Schubs, mit Schwung ein Crash
                   if (frozen(j) && closing >= HARD_PUSH && cars[i].state === 'run') startEvent(i, cars[i], P[i], 'crash');
@@ -984,6 +1006,6 @@
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
     // gute Strecken-Seeds: node scripts/check_car_race_sim.js --find 30 (Regeln + Siegerzeit 57–67 s)
     TRACKS: [1, 2, 3],
-    LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
+    HEAVY_PUSH: HEAVY_PUSH, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
   };
 });
