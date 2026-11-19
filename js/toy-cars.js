@@ -250,7 +250,12 @@
       if (!o.isMesh) return;
       var roll = rollKeys.indexOf(o.userData.pkey) >= 0, steer = steerKeys.indexOf(o.userData.pkey) >= 0;
       if (!roll && !steer) return;
-      var b = new THREE.Box3().setFromObject(o), c = new THREE.Vector3(); b.getCenter(c); parts.push({ o: o, c: c, b: b, roll: roll, steer: steer });
+      var b = new THREE.Box3().setFromObject(o), c = new THREE.Vector3(); b.getCenter(c);
+      // versehentlich gewählte Karosserieteile (größer als knapp die halbe Wagenlänge) nicht ans Rad hängen –
+      // sie würden mitlenken/mitrollen und die ganze Front „ins Rad ziehen“
+      var bs = new THREE.Vector3(); b.getSize(bs);
+      if (Math.max(bs.x, bs.y, bs.z) > len * 0.45) { if (root.console) console.warn('ToyCars: wheel part ignored (too big): ' + o.userData.pkey); return; }
+      parts.push({ o: o, c: c, b: b, roll: roll, steer: steer });
     });
     var groups = [], flagged = steerKeys.length > 0;
     ['l', 'r'].forEach(function (side) {
@@ -334,6 +339,10 @@
           }
         }
         kids[o.userData.pkey] = [];
+        // fast alles in einem Stück (z. B. Monza-Motorraum: 32 724 von 32 730 Dreiecken): Zerlegung bleibt (Schlüssel
+        // stabil), der Editor rät aber zu „Cut a part“
+        var big = 0; isl.forEach(function (tris) { big = Math.max(big, tris.length); });
+        if (big > ntri * 0.9) splitFail[o.userData.pkey] = 'dominant';
         isl.forEach(function (tris, j) {
           var m = new THREE.Mesh(subGeo(o.geometry, tris), o.material);
           m.name = o.name + '.' + j; m.renderOrder = o.renderOrder;

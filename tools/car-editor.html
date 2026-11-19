@@ -406,6 +406,7 @@
           if (splitCheck) {   // „Split a part“ ohne Ergebnis: sagen warum
             var sm = TC.meta(cur.key) || {}, sk = splitCheck; splitCheck = null;
             if (!(sm.kids || {})[sk]) say(sm.splitFail && sm.splitFail[sk] === 'many' ? 'Too many tiny pieces to split – use “Cut a part”.' : 'One smooth connected surface – no seams to split at. Use “Cut a part”.');
+            else if (sm.splitFail && sm.splitFail[sk] === 'dominant') say('Split ' + sk + ': only small bits came off – the main surface has no seams. Use “Cut a part” on the big piece.');
           }
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
           $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – use a colour zone below.';
@@ -672,6 +673,16 @@
         TC.forget(cur.key); var keep = clone(def); load(cur.key, true); def = keep; fill();
       });
       // baugleiches Teil an allen anderen Rädern (gleiche Dreieckszahl und Größe), für „Same part on all wheels“
+      // baugleiches Teil auf der anderen Wagenseite: gleiche Eckenzahl, Mitte quer gespiegelt (± 2 cm)
+      function mirrorPart(key) {
+        if (!tpl) return null;
+        var me = null, P = {}; tpl.updateMatrixWorld(true);
+        tpl.traverse(function (o) { if (!o.isMesh) return; P[o.userData.pkey] = { c: new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()), n: o.geometry.attributes.position.count }; if (o.userData.pkey === key) me = P[key]; });
+        if (!me || Math.abs(me.c.z) < 0.05) return null;
+        var want = new THREE.Vector3(me.c.x, me.c.y, -me.c.z), best = null, bd = 0.02;
+        Object.keys(P).forEach(function (k) { var o = P[k]; if (k === key || o.n !== me.n) return; var d = o.c.distanceTo(want); if (d < bd) { bd = d; best = k; } });
+        return best;
+      }
       function twins(key) {
         if (!$('allWheels').checked || !tpl) return [key];
         function wheelOf(o) { for (var p = o; p; p = p.parent) if (/^Wheel /.test(p.name || '')) return p; return null; }
@@ -751,8 +762,11 @@
           // zwei unabhängige Listen: rollt (dreht beim Fahren) und lenkt; ein Teil darf in beiden sein
           var mine = picking === 'steer' ? 'steerParts' : 'wheelParts';
           var L = (def[mine] || []).slice(), j1 = L.indexOf(key);
-          if (j1 >= 0) L.splice(j1, 1); else L.push(key);
-          def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'steer' ? 'Steers: ' : 'Rolls: ')) + key); return;
+          // „Same part on all wheels“: beim Rad-Wählen gibt es noch keine Radgruppen – das baugleiche Teil auf der
+          // anderen Wagenseite (gespiegelt) wird mitgenommen, sonst bleibt eine Seite ohne Räder (Monza SP2)
+          var mate = $('allWheels').checked ? mirrorPart(key) : null;
+          [key].concat(mate ? [mate] : []).forEach(function (k2) { var j = L.indexOf(k2); if (j1 >= 0) { if (j >= 0) L.splice(j, 1); } else if (j < 0) L.push(k2); });
+          def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'steer' ? 'Steers: ' : 'Rolls: ')) + key + (mate ? ' (+ other side)' : '')); return;
         }
       });
       $('note').addEventListener('input', function () { def.note = $('note').value; });
