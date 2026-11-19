@@ -751,31 +751,49 @@ def car_race_result(token):
     body = request.get_json(silent=True) or {}
     race_id, places = body.get("race_id"), body.get("places")
     if not isinstance(race_id, str) or not isinstance(places, list):
-        return jsonify({"ok": False, "error": "race_id/places fehlen"}), 400
+        return jsonify({"ok": False, "error": "race_id/places missing"}), 400
     try:
         rows = race.accept_result(g.tenant_id, race_id, places, time.time())
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+    def month_ranks(conn):
+        board = race_db.board(conn, g.tenant_id, "month", limit=100000)
+        return {r["user_id"]: (i, r["points"]) for i, r in enumerate(board, 1)}
+
+    def points_view(ranks, gained):
+        return {uid: {"gained": gp, "month_total": ranks.get(uid, (None, 0))[1],
+                      "month_rank": ranks.get(uid, (None, 0))[0]} for uid, gp in gained.items()}
+
+    def stored(conn):
+        gained = race_db.stored_points(conn, g.tenant_id, race_id)
+        return points_view(month_ranks(conn), gained) if gained else {}
+
     if rows is None:
-        return jsonify({"ok": True, "counted": False, "points": {}})
+        # doppelte Meldung (z. B. zweite Overlay-Instanz): gespeicherte Punkte mitgeben
+        try:
+            pts = _with_conn(stored)
+        except Exception:
+            pts = {}
+        return jsonify({"ok": True, "counted": False, "points": pts})
 
     def save(conn):
         if not race_db.record(conn, g.tenant_id, race_id, rows):
             return None
-        board = race_db.board(conn, g.tenant_id, "month", limit=100000)
-        return {r["user_id"]: (i, r["points"]) for i, r in enumerate(board, 1)}
+        return month_ranks(conn)
     try:
         ranks = _with_conn(save)
     except Exception:
         log.exception("fx car-race: Ergebnis speichern fehlgeschlagen")
+        race.release(g.tenant_id, race_id)
         return jsonify({"ok": True, "counted": False, "points": {}})
     if ranks is None:
-        return jsonify({"ok": True, "counted": False, "points": {}})
+        race.confirm(g.tenant_id, race_id)
+        try:
+            pts = _with_conn(stored)
+        except Exception:
+            pts = {}
+        return jsonify({"ok": True, "counted": False, "points": pts})
     race.confirm(g.tenant_id, race_id)
     field = len(rows)
-    pts = {}
-    for r in rows:
-        rank, total = ranks.get(r["user_id"], (None, 0))
-        pts[r["user_id"]] = {"gained": race_db.points(r["place"], field), "month_total": total,
-                             "month_rank": rank}
-    return jsonify({"ok": True, "counted": True, "points": pts})
+    gained = {r["user_id"]: race_db.points(r["place"], field) for r in rows}
+    return jsonify({"ok": True, "counted": True, "points": points_view(ranks, gained)})

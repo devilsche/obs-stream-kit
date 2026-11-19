@@ -101,3 +101,29 @@ def test_car_stats(conn):
     st = {x["car_key"]: x for x in race_db.car_stats(conn, 1)}
     assert st["x"]["races"] == 3 and st["x"]["wins"] == 2
     assert st["y"]["races"] == 1 and st["y"]["wins"] == 0
+
+
+def test_unique_index_rejects_duplicate_rows(conn):
+    race_db.record(conn, 1, "r1", [r("a", 1), r("b", 2)])
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute("INSERT INTO fx_race_result (tenant_id, race_id, at, user_id, field, points) "
+                     "VALUES (1, 'r1', 'x', 'a', 2, 1)")
+
+
+def test_record_integrity_error_means_already_recorded(conn):
+    # Wettlauf: die Existenzprüfung sieht noch nichts, der Unique-Index schlägt zu
+    race_db.record(conn, 1, "r1", [r("a", 1), r("b", 2)])
+    real = conn.execute
+    class Blind:
+        def __getattr__(self, n): return getattr(conn, n)
+        def execute(self, sql, *a):
+            if sql.startswith("SELECT 1"):
+                return real("SELECT 1 WHERE 0")
+            return real(sql, *a)
+    assert race_db.record(Blind(), 1, "r1", [r("a", 1), r("b", 2)]) is False
+    assert len(pts(conn, "r1")) == 2
+
+
+def test_stored_points(conn):
+    race_db.record(conn, 1, "r1", [r("a", 1), r("b", 2)])
+    assert race_db.stored_points(conn, 1, "r1") == {"a": 2, "b": 0}

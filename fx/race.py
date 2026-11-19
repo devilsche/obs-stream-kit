@@ -256,16 +256,16 @@ def accept_result(tenant_id, race_id, places, now):
         t = _get(tenant_id)
         _advance(t, now)
         if t["phase"] not in ("race", "podium", "cooldown") or t.get("race_id") != race_id or t["counted"] \
-                or t["starts_at"] is None or now > t["starts_at"] + RESULT_WINDOW:
+                or t.get("saving") == race_id or t["starts_at"] is None or now > t["starts_at"] + RESULT_WINDOW:
             return None
         racers = t["racers"]
         if not isinstance(places, list) or len(places) != len(racers):
-            raise ValueError("places passt nicht zur Fahrerzahl")
+            raise ValueError("places does not match the number of racers")
         if any(p is not None and (isinstance(p, bool) or not isinstance(p, int)) for p in places):
-            raise ValueError("Platzierungen müssen Zahlen oder null sein")
+            raise ValueError("places must be numbers or null")
         fin = sorted(p for p in places if p is not None)
         if fin != list(range(1, len(fin) + 1)):
-            raise ValueError("Platzierungen müssen 1..k ohne Lücken sein")
+            raise ValueError("places must be 1..k without gaps")
         rows = [{"user_id": r["user_id"], "login": r["login"], "display": r["display"],
                  "place": p, "car_key": r["car_key"] or ""} for r, p in zip(racers, places)]
         t["race_end"] = now
@@ -279,7 +279,16 @@ def accept_result(tenant_id, race_id, places, now):
             # Testfahrer vergeben nie Punkte: Rennen wird nicht gespeichert
             t["counted"] = True
             return None
+        t["saving"] = race_id  # bis confirm/release: weitere Meldungen gelten als „schon dabei“
         return rows
+
+
+def release(tenant_id, race_id):
+    """Bei Schreibfehler aufrufen: hebt die Speichersperre auf, ein neuer Versuch ist möglich."""
+    with _LOCK:
+        t = _get(tenant_id)
+        if t.get("saving") == race_id:
+            t["saving"] = None
 
 
 def confirm(tenant_id, race_id):
@@ -288,5 +297,6 @@ def confirm(tenant_id, race_id):
     with _LOCK:
         t = _get(tenant_id)
         if t.get("race_id") == race_id:
+            t["saving"] = None
             t["counted"] = True
             t["last_counted"] = race_id

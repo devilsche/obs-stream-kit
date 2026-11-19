@@ -785,7 +785,7 @@
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
       }
       function current() { var c = {}; list.forEach(function (e) { var v = TC.vehicle(e.key); if (Object.keys(v).length) c[e.key] = v; }); return c; }
-      // Race stats: Felder zeigen den Schätzwert, solange nichts gespeichert ist; daneben steht immer die Schätzung
+      // Race stats: Felder zeigen den Schätzwert, solange nichts gespeichert ist; gespeichert werden nur Abweichungen von der Schätzung; daneben steht immer die Schätzung
       function raceEst(id, v) { $(id + 'Est').textContent = 'est. ' + v; }
       function raceFill() {
         var g = CarRaceStats.guess(cur), r = Object.assign({}, g), c = CarRaceStats.clean(def.race);

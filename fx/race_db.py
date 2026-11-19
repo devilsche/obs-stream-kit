@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS fx_race_result (
 );
 CREATE INDEX IF NOT EXISTS ix_fx_race_result_race ON fx_race_result(tenant_id, race_id);
 CREATE INDEX IF NOT EXISTS ix_fx_race_result_at ON fx_race_result(tenant_id, at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fx_race_result_user ON fx_race_result(tenant_id, race_id, user_id);
 """
 
 # Prod: als postgres-Superuser mit search_path = obs anlegen
@@ -48,6 +49,7 @@ CREATE TABLE IF NOT EXISTS fx_race_result (
 );
 CREATE INDEX IF NOT EXISTS ix_fx_race_result_race ON fx_race_result(tenant_id, race_id);
 CREATE INDEX IF NOT EXISTS ix_fx_race_result_at ON fx_race_result(tenant_id, at);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fx_race_result_user ON fx_race_result(tenant_id, race_id, user_id);
 """
 
 
@@ -78,15 +80,33 @@ def record(conn, tenant_id: int, race_id: str, rows: list, at=None) -> bool:
         return False
     at = at or _now()
     field = len(rows)
-    for row in rows:
-        place = row.get("place")
-        conn.execute(
-            "INSERT INTO fx_race_result (tenant_id, race_id, at, user_id, login, display, place, "
-            "field, points, car_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (tenant_id, race_id, at, row["user_id"], row.get("login", ""), row.get("display", ""),
-             place, field, points(place, field), row.get("car_key", "")))
-    conn.commit()
+    try:
+        for row in rows:
+            place = row.get("place")
+            conn.execute(
+                "INSERT INTO fx_race_result (tenant_id, race_id, at, user_id, login, display, place, "
+                "field, points, car_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (tenant_id, race_id, at, row["user_id"], row.get("login", ""), row.get("display", ""),
+                 place, field, points(place, field), row.get("car_key", "")))
+        conn.commit()
+    except Exception as e:
+        # Unique-Index (tenant_id, race_id, user_id): parallel schon gespeichert
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        if type(e).__name__ == "IntegrityError" or "unique" in str(e).lower():
+            return False
+        raise
     return True
+
+
+def stored_points(conn, tenant_id: int, race_id: str) -> dict:
+    """user_id → Punkte dieses Rennens aus der DB (für doppelte Meldungen)."""
+    rows = conn.execute(
+        "SELECT user_id, points FROM fx_race_result WHERE tenant_id = ? AND race_id = ?",
+        (tenant_id, race_id)).fetchall()
+    return {x["user_id"]: x["points"] for x in rows}
 
 
 def void(conn, tenant_id: int, race_id: str) -> bool:

@@ -290,6 +290,7 @@ def test_result_endpoint_counts_once_and_gives_points(conn, tmp_path, clock):
     assert r["points"]["b"]["month_rank"] == 1 and r["points"]["b"]["month_total"] == 3
     again = c.post("/s/tok/api/fx/car-race/result", json={"race_id": s["race_id"], "places": [1, 2, 3]}).get_json()
     assert again["counted"] is False
+    assert again["points"]["b"]["gained"] == 3 and again["points"]["b"]["month_total"] == 3
     assert conn.execute("SELECT COUNT(*) FROM fx_race_result").fetchone()[0] == 3
     b = c.get("/s/tok/api/fx/car-race?cmd=board&scope=all").get_json()
     assert b["rows"][0]["user_id"] == "b" and b["say"].startswith("Top 3: 1. b 3 pts")
@@ -355,3 +356,19 @@ def test_user_id_is_capped(conn, tmp_path, clock):
     c = _client(conn, tmp_path)
     r = _join(c, "x" * 100).get_json()
     assert len(r["state"]["racers"][0]["user_id"]) == 64
+
+
+def test_concurrent_double_accept_only_first_gets_rows(cars):
+    rid = start_race(cars)
+    assert race.accept_result(TID, rid, [2, 1, None], T + 30) is not None
+    # zweite Instanz meldet, bevor confirm() lief
+    assert race.accept_result(TID, rid, [2, 1, None], T + 30) is None
+
+
+def test_release_allows_retry_after_failed_write(cars):
+    rid = start_race(cars)
+    assert race.accept_result(TID, rid, [1, 2, 3], T + 30) is not None
+    race.release(TID, rid)
+    assert race.accept_result(TID, rid, [1, 2, 3], T + 30) is not None
+    race.confirm(TID, rid)
+    assert race.accept_result(TID, rid, [1, 2, 3], T + 31) is None

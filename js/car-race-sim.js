@@ -1041,7 +1041,7 @@
 
   return {
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
-    // gute Strecken-Seeds: node scripts/check_car_race_sim.js --find 30 (Regeln + Siegerzeit 57–67 s)
+    // drei kuratierte Strecken, Reihenfolge fest
     TRACKS: [1, 2, 3],
     HEAVY_PUSH: HEAVY_PUSH, REAL: REAL, REF: REF, lapTime: lapTime, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
   };
