@@ -339,7 +339,7 @@
       var d = model.userData.dims || ToyCars.dims(r.key);
       if (!d || !(d.L > 0)) return;
       var k = r.len / d.L;
-      model.scale.setScalar(k); model.position.y = d.H / 2 * k;
+      model.scale.setScalar(k); model.position.y = d.H / 2 * k + 0.03;   // Asphalt liegt 3 cm über dem Boden (sonst sinken die Reifen ein)
       if (r.body) r.holder.remove(r.body);   // Kisten-Geometrie wird mit dem Fahrer entsorgt
       r.holder.add(model); r.body = model; r.isModel = true;
       r.height = d.H * k; r.w = d.W * k;
