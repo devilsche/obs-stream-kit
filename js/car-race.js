@@ -893,7 +893,9 @@
     var FXT = {
       smoke: softTex([[0, 'rgba(240,240,240,0.9)'], [0.5, 'rgba(222,222,222,0.42)'], [1, 'rgba(210,210,210,0)']]),
       dust: softTex([[0, 'rgba(216,198,158,0.9)'], [0.5, 'rgba(200,180,140,0.4)'], [1, 'rgba(190,170,130,0)']]),
-      spark: softTex([[0, 'rgba(255,250,215,1)'], [0.35, 'rgba(255,170,50,0.9)'], [1, 'rgba(255,80,0,0)']])
+      spark: softTex([[0, 'rgba(255,250,215,1)'], [0.35, 'rgba(255,170,50,0.9)'], [1, 'rgba(255,80,0,0)']]),
+      flame: softTex([[0, 'rgba(255,245,200,1)'], [0.3, 'rgba(255,170,40,0.85)'], [0.65, 'rgba(230,70,10,0.4)'], [1, 'rgba(160,30,0,0)']]),
+      soot: softTex([[0, 'rgba(46,42,40,0.9)'], [0.55, 'rgba(56,52,50,0.45)'], [1, 'rgba(70,66,64,0)']])
     };
     // Ölfleck: unregelmäßige dunkle Lache mit Glanzrand (feste Zufallsfolge, für alle Instanzen gleich)
     var oilTex = canvasTex(128, 128, function (g) {
@@ -926,15 +928,16 @@
     function puff(kind, x, y, z, o) {
       o = o || {};
       if (puffs.length >= MAXP) return;   // voll: neues Teilchen verwerfen statt das älteste hart zu entfernen
-      var spark = kind === 'spark';
+      var spark = kind === 'spark', glow = spark || kind === 'flame';
       var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FXT[kind], transparent: true, depthWrite: false, opacity: 0,
-        blending: spark ? THREE.AdditiveBlending : THREE.NormalBlending }));
+        blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending }));
       sp.position.set(x, y, z); scene.add(sp);
       var rnd = Math.random;
       puffs.push({ s: sp, age: 0, life: o.life || (spark ? 0.35 + rnd() * 0.2 : 1.2 + rnd() * 0.9),
         size0: o.size || (spark ? 0.25 : 0.7 + rnd() * 0.5), grow: o.grow != null ? o.grow : (spark ? 0 : 1.6 + rnd() * 1.4),
         vel: new THREE.Vector3((rnd() - 0.5) * (spark ? 9 : 1.2), spark ? 1.5 + rnd() * 3 : 0.4 + rnd() * 0.8, (rnd() - 0.5) * (spark ? 9 : 1.2)),
-        a: o.a || (spark ? 1 : 0.5), grav: spark ? -9 : 0.2 });
+        a: o.a || (spark ? 1 : 0.5), grav: o.grav != null ? o.grav : spark ? -9 : 0.2, flick: !!o.flick && !reduce, ph: rnd() * 6.3 });
+      if (o.vel) puffs[puffs.length - 1].vel.copy(o.vel);
     }
     function burst(kind, x, z, n, o) { for (var i = 0; i < (reduce ? Math.min(n, 2) : n); i++) puff(kind, x + (Math.random() - 0.5) * 1.2, (o && o.y) || 0.4, z + (Math.random() - 0.5) * 1.2, o); }
     function stepPuffs(dt) {
@@ -949,7 +952,58 @@
         pv3.copy(q.s.position).project(cam);
         var px = (pv3.x * 0.5 + 0.5) * W, py = (1 - (pv3.y * 0.5 + 0.5)) * H, edge = Math.min(px, W - px, py, H - py);
         var ef = clamp(edge / (Math.min(W, H) * 0.12), 0, 1);
-        q.s.material.opacity = q.a * Math.min(1, q.age / 0.12) * (1 - k) * ef;
+        q.s.material.opacity = q.a * Math.min(1, q.age / 0.12) * (1 - k) * ef * (q.flick ? 0.7 + 0.3 * Math.sin(q.age * 28 + q.ph) : 1);
+      }
+    }
+    // ---- Wracks: ausgebrannt abfackeln ----
+    // Ab burn: Flammen (additiv, flackernd) am Motorende und in der Mitte, dunkle Rauchsäule mit leichtem Wind;
+    // nach ~10 s fallen die Flammen in sich zusammen (bis 12,5 s), danach schwelt es nur noch. Lack verkohlt
+    // in 3 s (Material-Kopien je Wrack, einmalig). Reduzierte Bewegung: nur wenig ruhiger Rauch, kein Flackern.
+    var WIND = new THREE.Vector3(0.9, 0, -0.3), CHAR = new THREE.Color(0x0c0a09);
+    function charMaterials(r) {
+      r.charBody = r.body; r.charMats = [];
+      var seen = {};
+      r.body.traverse(function (o) {
+        if (!o.isMesh) return;
+        var list = [].concat(o.material).map(function (m) {
+          if (!m || !m.color) return m;
+          if (seen[m.uuid]) return seen[m.uuid];
+          var c = seen[m.uuid] = own2(r, m.clone());
+          r.charMats.push({ m: c, from: m.color.clone() });
+          return c;
+        });
+        o.material = Array.isArray(o.material) ? list : list[0];
+      });
+    }
+    function wreckFx(r, age, dt) {
+      if (age < 0) return;
+      if (r.charBody !== r.body) charMaterials(r);   // auch nach einem späten Modell-Tausch
+      var k = clamp(age / 3, 0, 1) * 0.88;
+      if (r.charK !== k) {
+        r.charK = k;
+        r.charMats.forEach(function (x) {
+          x.m.color.copy(x.from).lerp(CHAR, k);
+          if ('roughness' in x.m) x.m.roughness = lerp(x.m.roughness, 1, k * 0.2);
+          if ('clearcoat' in x.m) x.m.clearcoat = 0;
+          if ('metalness' in x.m) x.m.metalness = Math.min(x.m.metalness, 0.3);
+        });
+      }
+      var fire = age < 10 ? 1 : Math.max(0, 1 - (age - 10) / 2.5), y0 = r.height * 0.7;
+      if (reduce) {   // ruhig: nur gelegentlich ein kleines Rauchwölkchen
+        if (Math.random() < dt * 1.2) puff('soot', r.holder.position.x, y0 + 0.4, r.holder.position.z, { size: 0.6, grow: 1.2, life: 3, a: 0.4, vel: new THREE.Vector3(0.2, 0.6, 0) });
+        return;
+      }
+      var eng = rearOf(r, false), cx = r.holder.position.x, cz = r.holder.position.z;
+      if (fire > 0 && Math.random() < dt * 24 * fire) {
+        var atEng = Math.random() < 0.6, fx = atEng ? eng.x : cx, fz = atEng ? eng.z : cz;
+        puff('flame', fx + (Math.random() - 0.5) * r.w * 0.6, y0, fz + (Math.random() - 0.5) * r.w * 0.6,
+          { size: 0.5 + Math.random() * 0.5 * fire, grow: 0.3, life: 0.45 + Math.random() * 0.3, a: 0.9 * (0.4 + 0.6 * fire), flick: true, grav: 0,
+            vel: new THREE.Vector3(WIND.x * 0.5 + (Math.random() - 0.5) * 0.4, 1.6 + Math.random(), WIND.z * 0.5 + (Math.random() - 0.5) * 0.4) });
+      }
+      if (Math.random() < dt * (fire > 0 ? 7 : 3)) {
+        puff('soot', cx + (Math.random() - 0.5) * r.w * 0.5, y0 + 0.6, cz + (Math.random() - 0.5) * r.w * 0.5,
+          { size: 0.7 + 0.5 * fire, grow: 2.6 + fire, life: 3.2 + Math.random(), a: 0.35 + 0.25 * fire, grav: 0.1,
+            vel: new THREE.Vector3(WIND.x + (Math.random() - 0.5) * 0.3, 1.6 + fire * 0.8, WIND.z + (Math.random() - 0.5) * 0.3) });
       }
     }
     function clearPuffs() { puffs.forEach(function (q) { scene.remove(q.s); q.s.material.dispose(); }); puffs = []; }
@@ -1090,6 +1144,7 @@
             puff(c.off ? 'dust' : 'smoke', bk.x + (Math.random() - 0.5), 0.35, bk.z + (Math.random() - 0.5), { a: c.off ? 0.45 : 0.4 });
           }
           updateDraft(r, c.draft != null && !sim.done ? race.order[idx[c.draft]] : null, dt);
+          if (c.wreck && c.burn != null) wreckFx(r, sim.time - c.burn, dt);
         });
         processEvents(sim, idx);
         updateOil(sim);
