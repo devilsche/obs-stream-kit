@@ -408,31 +408,16 @@ def boost(tenant_id, user_id, kind, query, now, pay):
             return {"ok": False, "say": "!%s only works for racers while the race is running" % kind}
         if (kind, user_id) in t["boosted"]:
             return {"ok": False, "say": "you already used %s this race" % kind}
+        # Bump hat kein Ziel: die Sim rempelt das nächste Auto direkt voraus (oder daneben) an,
+        # sobald der Fahrer nah genug dran ist (bis 8 s, sonst verpufft es); q wird ignoriert
         ev = {"t": round(now - t["starts_at"] + EVENT_LEAD, 2), "type": kind, "id": user_id}
-        if kind == "bump":
-            others = [r for r in t["racers"] if r["user_id"] != user_id and not r.get("test")]
-            if not (query or "").strip():
-                return {"ok": False, "say": "usage: !bump <driver>"}
-            names = [r["display"] for r in others]
-            i, hits = race_shop.find_name(query, names)
-            if i is None and not hits:
-                i, hits = race_shop.find_name(query, [r["login"] or "" for r in others])
-            if i is None:
-                if hits:
-                    return {"ok": False, "say": "which one? " + ", ".join(names[h] for h in hits)}
-                me_hit, _ = race_shop.find_name(query, [me["display"]])
-                if me_hit is not None:
-                    return {"ok": False, "say": "you can't bump yourself"}
-                return {"ok": False, "say": "no driver like '%s' in this race" % query[:30]}
-            target = others[i]
-            ev["target"] = target["user_id"]
         if not pay(cost):
             return {"ok": False, "say": "%s costs %d coins" % (kind, cost), "poor": True}
         t["boosted"].add((kind, user_id))
         t["events"].append(ev)
         if kind == "nitro":
             return {"ok": True, "say": "fires the nitro!", "event": ev}
-        return {"ok": True, "say": "bumps %s!" % target["display"], "event": ev}
+        return {"ok": True, "say": "is hunting the car ahead…", "event": ev}
 
 
 def release(tenant_id, race_id):

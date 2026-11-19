@@ -73,12 +73,15 @@
  *         'push'     Kontakt: id = das leichtere (stärker geschubste) Auto, other = das schwerere;
  *                    kind 'rear'|'side'|'shove' (Schwerer schiebt in der Kurve), v/vOther = Tempo vorher, push/pushOther = seitlicher Schub (m/s), loss/lossOther = Tempoverlust (m/s),
  *         'dnf'      ausgeschieden, reason 'crash'|'rail'|'time' (time = bei Rennende nicht im Ziel),
- *         'nitro'    id zündet Nitro (von außen, siehe events), 'bump' id rempelt other an (von außen).
+ *         'nitro'    id zündet Nitro (von außen, siehe events), 'bump' id rempelt other an, 'bumpmiss' Rempler
+ *                    verpufft (von außen).
  *       Ereignisse von außen (Zuschauer-Aktionen): create({ …, events }) bzw. sim.setEvents(list) mit
  *         [{ t, type: 'nitro'|'bump', id, target? }] (t = Sim-Zeit in s). Wirken im ersten Schritt mit time ≥ t.
  *         Nitro: +25 % Zielgeschwindigkeit (nur auf Geraden), Endgeschwindigkeit und Beschleunigung für 3,5 s (nicht im Ziel/DNF).
- *         Bump: seitlicher Stoß auf target wie ein Kontakt (Massenverhältnis Auslöser/Ziel), Tempoverlust,
- *         Dreher-Chance 30 % × Massenfaktor (Zufall aus dem Seed, gezogen im Ereignis-Schritt).
+ *         Bump (ohne Ziel): der Auslöser ist bis zu 8 s „scharf“ (cars[i].hunting, fährt 5 % dichter auf) und
+ *         rempelt das erste Auto an, das direkt voraus (≤ 1,5 Autolängen, seitlich ≤ 2,5 m) oder daneben ist:
+ *         seitlicher Stoß wie ein Kontakt (Massenverhältnis), Tempoverlust, Dreher-Chance 30 % × Massenfaktor
+ *         (Zufall aus dem Seed) → 'bump' (id, other); ohne Treffer nach 8 s → 'bumpmiss' (id).
  *         setEvents liefert true, wenn ein noch nicht angewandtes Ereignis schon in der Vergangenheit liegt –
  *         dann muss der Aufrufer die Sim neu aufbauen und vorspulen (sonst wären Instanzen nicht mehr gleich).
  *         Ohne Ereignisse ist alles wie vorher (keine zusätzlichen Zufallszahlen).
@@ -143,7 +146,7 @@
   var GRAVEL_V = 6;           // so schnell rollt ein Auto neben der Fahrbahn zurück (m/s)
   var RAIL_V = 4;             // Einschlag in die Leitplanke ab diesem Tempo (m/s) = DNF
   // Kontakt / Schubsen
-  var NITRO_T = 3.5, NITRO_K = 1.25, BUMP_CLOSING = 6, BUMP_SPIN = 0.3;   // Zuschauer-Aktionen
+  var NITRO_T = 3.5, NITRO_K = 1.25, BUMP_CLOSING = 6, BUMP_SPIN = 0.3, BUMP_ARM = 8, BUMP_HUNT = 1.05;   // Zuschauer-Aktionen
   var PUSH_K = 0.9;           // seitlicher Schub (m/s) je m/s Annäherung × 2 × Massenanteil des anderen
   var PUSH_FRIC = 9;          // Abbau des seitlichen Schubs (m/s²)
   var CONTACT_MIN = 1.5;      // Auffahren erst ab 1,5 m/s Annäherung ist ein Kontakt
@@ -464,16 +467,42 @@
           if (c.place !== null || c.state === 'dnf' || P[i].parked) continue;
           P[i].nitroT = NITRO_T; emit('nitro', i);
         } else {
-          var j = idx(e.target);
-          if (j < 0 || j === i || cars[j].place !== null || cars[j].state === 'dnf' || P[j].parked) continue;
-          var mi = P[i].mass, mj = P[j].mass, f = mi / (mi + mj), cj = cars[j], pj = P[j];
-          var dir = Math.abs(cj.d - c.d) > 0.15 ? (cj.d > c.d ? 1 : -1) : (rnd() < 0.5 ? -1 : 1);
-          var shove = Math.min(9, PUSH_K * BUMP_CLOSING * f * 2), loss = Math.min(cj.v, BUMP_CLOSING * f * 0.7);
-          pj.pushV = clamp(pj.pushV + dir * shove, -9, 9);
-          cj.v -= loss;
+          // Bump ohne Ziel: scharf schalten, getroffen wird das nächste Auto, sobald es in Reichweite ist
+          if (c.place !== null || c.state === 'dnf' || P[i].parked) continue;
+          P[i].bumpUntil = e.t + BUMP_ARM; c.hunting = true;
+        }
+      }
+    }
+    // Scharfe Rempler je Schritt: Auto direkt voraus (Längsabstand ≤ 1,5 Autolängen, seitlich ≤ 2,5 m), sonst
+    // daneben; Treffer = Stoß nach Massenverhältnis wie ein Kontakt, Dreher-Chance; nach BUMP_ARM s verpufft es
+    function huntBumps(time) {
+      for (var i = 0; i < cars.length; i++) {
+        var c = cars[i], p = P[i];
+        if (p.bumpUntil == null) continue;
+        if (sim.done || c.place !== null || c.state === 'dnf' || p.parked) { p.bumpUntil = null; c.hunting = false; continue; }
+        var best = -1, bestG = Infinity, side = -1;
+        for (var j = 0; j < cars.length; j++) {
+          if (j === i) continue;
+          var cj = cars[j];
+          if (cj.place !== null || cj.state === 'dnf' || P[j].parked || isWreck(j)) continue;
+          var g = gap(c, cj), dd = Math.abs(cj.d - c.d), half = (p.st.len + P[j].st.len) / 2;
+          if (g > 0 && g <= Math.max(1.5 * p.st.len, half + 1) && dd <= 2.5) { if (g < bestG) { bestG = g; best = j; } }
+          else if (Math.abs(g) < half && dd <= 3.5 && side < 0) side = j;
+        }
+        var hit = best >= 0 ? best : side;
+        if (hit >= 0) {
+          var ch = cars[hit], ph = P[hit], mi = p.mass, mj = ph.mass, f = mi / (mi + mj);
+          var dir = Math.abs(ch.d - c.d) > 0.15 ? (ch.d > c.d ? 1 : -1) : (rnd() < 0.5 ? -1 : 1);
+          var shove = Math.min(9, PUSH_K * BUMP_CLOSING * f * 2), loss = Math.min(ch.v, BUMP_CLOSING * f * 0.7);
+          ph.pushV = clamp(ph.pushV + dir * shove, -9, 9);
+          ch.v -= loss;
           var spin = rnd() < BUMP_SPIN * clamp(2 * f, 0, 1.6);
-          if (spin && cj.state === 'run' && !cj.off) startEvent(j, cj, pj, 'spin');
-          emit('bump', i, j, { push: Math.round(shove * 100) / 100, loss: Math.round(loss * 100) / 100, spin: !!spin });
+          if (spin && ch.state === 'run' && !ch.off) startEvent(hit, ch, ph, 'spin');
+          emit('bump', i, hit, { push: Math.round(shove * 100) / 100, loss: Math.round(loss * 100) / 100, spin: !!spin, side: best < 0 });
+          p.bumpUntil = null; c.hunting = false;
+        } else if (time >= p.bumpUntil - 1e-9) {
+          emit('bumpmiss', i);
+          p.bumpUntil = null; c.hunting = false;
         }
       }
     }
@@ -524,7 +553,7 @@
       cars.push({
         id: c.id, s: rowS[i >> 1], d: (i % 2 === 0 ? 1 : -1) * 2.3, v: 0, lap: 0, pos: i + 1,
         yaw: T.at(rowS[i >> 1]).yaw, roll: 0, pitch: 0, steer: 0, spin: 0, state: 'run', place: null, finish: null,
-        draft: null, off: false, wreck: false, burn: null, x: 0, z: 0
+        draft: null, off: false, wreck: false, burn: null, hunting: false, x: 0, z: 0
       });
       // Achsen in der Startaufstellung: gerade hintereinander, Wagenmitte = Startplatz
       var pp = P[P.length - 1], cc = cars[cars.length - 1];
@@ -726,7 +755,7 @@
         steps++;
         var time = steps * DT, i, j, c, p, h, hz;
         var wasDone = sim.done;
-        if (ext.length) applyExt(time);
+        if (ext.length) { applyExt(time); huntBumps(time); }
         if (pendingOil) {              // Zufallsfleck ab Runde 2
           for (i = 0; i < cars.length; i++) if (cars[i].lap >= 2) break;
           if (i < cars.length) { pendingOil.from = Math.round(time * 1000) / 1000; hazards.push(pendingOil); pendingOil = null; }
@@ -736,7 +765,7 @@
           c = cars[i]; p = P[i];
           var v0 = c.v;
           if (p.oilT > 0) p.oilT -= DT;
-          var nitro = p.nitroT > 0 && c.place === null && !p.parked ? NITRO_K : 1;
+          var nitro = (p.nitroT > 0 && c.place === null && !p.parked ? NITRO_K : 1) * (p.bumpUntil != null ? BUMP_HUNT : 1);   // scharf: etwas dichter auffahren
           if (p.nitroT > 0) p.nitroT -= DT;
           c.draft = null;
           if (c.state === 'spin' || c.state === 'crash' || (c.state === 'dnf' && p.parked)) {

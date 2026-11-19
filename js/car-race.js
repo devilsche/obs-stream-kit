@@ -1705,6 +1705,21 @@
     }
 
     // Ereignisse seit dem letzten Bild (nach Neuladen/fastForward nur die der letzten 1,5 s)
+    // scharfer Rempler: dezenter rot-oranger Ring unter dem Auto, solange es das nächste Auto jagt
+    var huntGeo = new THREE.RingGeometry(0.75, 1, 40); huntGeo.rotateX(-Math.PI / 2);
+    function huntMarker(r, on, dt) {
+      if (!r.hunt) {
+        if (!on) return;
+        var mat = own2(r, new THREE.MeshBasicMaterial({ color: 0xff6a2a, transparent: true, opacity: 0, depthWrite: false }));
+        r.hunt = { mesh: new THREE.Mesh(huntGeo, mat), a: 0, t: 0 };
+        r.hunt.mesh.position.y = 0.09; r.holder.add(r.hunt.mesh);
+      }
+      var H2 = r.hunt; H2.a = ease(H2.a, on ? 1 : 0, 0.25, dt); H2.t += dt;
+      var pulse = reduce ? 1 : 0.8 + 0.2 * Math.sin(H2.t * 4);
+      H2.mesh.visible = H2.a > 0.01;
+      H2.mesh.material.opacity = 0.55 * H2.a * pulse;
+      H2.mesh.scale.set(r.len * 0.7, 1, r.len * 0.7);
+    }
     function addTag(word, a, b, color, t0) {
       if (!race.tags) race.tags = [];
       race.tags.push({ word: word, a: a, b: b, color: color, t0: t0 });
@@ -1733,6 +1748,7 @@
           o.jolt = 1; r.jolt = Math.max(r.jolt || 0, 0.4);
           addTag('BUMP!', r.display, o.display, '#ff4a3d', e.t);
         }
+        else if (e.type === 'bumpmiss') addTag('MISSED', r.display, null, TK.dim, e.t);
         else if (e.type === 'dnf' && e.reason !== 'time') burst('smoke', p.x, p.z, 4);
       }
     }
@@ -1852,6 +1868,7 @@
           }
           updateDraft(r, c.draft != null && !sim.done ? race.order[idx[c.draft]] : null, dt);
           if (c.wreck && c.burn != null) wreckFx(r, sim.time - c.burn, dt);
+          huntMarker(r, !!c.hunting && !sim.done, dt);
           // Nitro: Flammen aus dem Auspuff und Fahrtwind-Streifen (reduzierte Bewegung: nur das Schild)
           if (r.nitroUntil != null && sim.time < r.nitroUntil && !reduce) {
             var nb = rearOf(r, true), ny = r.holder.rotation.y, bx = -Math.cos(ny), bz = Math.sin(ny);
@@ -2022,7 +2039,6 @@
       var alive = race.sim.cars.filter(function (c) { return c.place === null && c.state !== 'dnf'; });
       if (alive.length < (type === 'bump' ? 2 : 1)) return;
       var a = alive[Math.floor(Math.random() * alive.length)], ev = { t: Math.round((race.sim.time + 1.5) * 1000) / 1000, type: type, id: a.id };
-      if (type === 'bump') { var others = alive.filter(function (c) { return c !== a; }); ev.target = others[Math.floor(Math.random() * others.length)].id; }
       pv.race_events = (pv.race_events || []).concat([ev]);
       apply(pvView());
     }

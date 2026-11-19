@@ -592,17 +592,16 @@ def test_boost_only_in_race_phase(conn, tmp_path, clock):
     assert race_db.coins(conn, TID, "1") == 500
 
 
-def test_bump_target_matching_and_self(conn, tmp_path, clock):
+def test_bump_has_no_target_and_ignores_q(conn, tmp_path, clock):
     c = _client(conn, tmp_path)
     starts = _running(c, clock, ("Ann", "Bob", "Bobby", "Cy"))
     race_db.add_coins(conn, TID, "1", "Ann", 250)
-    assert "usage" in q(c, cmd="bump", id="1", user="Ann", q="")["say"]
-    assert "which one?" in q(c, cmd="bump", id="1", user="Ann", q="bo")["say"]
-    assert "can't bump yourself" in q(c, cmd="bump", id="1", user="Ann", q="ann")["say"]
-    assert "no driver" in q(c, cmd="bump", id="1", user="Ann", q="zzzz")["say"]
-    assert race_db.coins(conn, TID, "1") == 250
-    r = q(c, cmd="bump", id="1", user="Ann", q="cy")
-    assert r["ok"] is True and r["say"] == "@Ann bumps Cy!" and race_db.coins(conn, TID, "1") == 150
-    assert q(c, cmd="bump", id="1", user="Ann", q="cy")["ok"] is False
+    r = q(c, cmd="bump", id="1", user="Ann")
+    assert r["ok"] is True and r["say"] == "@Ann is hunting the car ahead…" and race_db.coins(conn, TID, "1") == 150
+    assert q(c, cmd="bump", id="1", user="Ann", q="cy")["ok"] is False   # einmal pro Rennen
+    assert race_db.coins(conn, TID, "1") == 150
+    race_db.add_coins(conn, TID, "2", "Bob", 100)
+    assert q(c, cmd="bump", id="2", user="Bob", q="whoever")["ok"] is True   # q wird ignoriert
     ev = c.get("/s/tok/api/fx/car-race/state").get_json()["race_events"]
-    assert ev == [{"t": round(clock["now"] - starts + 1.5, 2), "type": "bump", "id": "1", "target": "4"}]
+    t = round(clock["now"] - starts + 1.5, 2)
+    assert ev == [{"t": t, "type": "bump", "id": "1"}, {"t": t, "type": "bump", "id": "2"}]

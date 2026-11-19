@@ -840,7 +840,7 @@ def _race_garage_cmd(cmd, now):
 
 
 def _race_boost_cmd(cmd, now):
-    """nitro (50 Coins) | bump&q=<Fahrer> (100 Coins) → Response."""
+    """nitro (50 Coins) | bump (100 Coins, rempelt das nächste Auto voraus an; q wird ignoriert) → Response."""
     uid, display = _who()
     if not uid:
         return _no_store(jsonify({"ok": False, "say": "missing user"})), 400

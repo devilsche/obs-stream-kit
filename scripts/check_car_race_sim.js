@@ -431,7 +431,7 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   var m = Sim.create(base()); m.fastForward(20); m.setEvents([]);
   if (full(m) !== ref) fail('setEvents([]) mitten im Rennen ändert das Rennen');
   var id0 = field[2].id, id1 = field[1].id;
-  var ev = [{ t: 20, type: 'nitro', id: id0 }, { t: 30, type: 'bump', id: id0, target: id1 }];
+  var ev = [{ t: 20, type: 'nitro', id: id0 }, { t: 30, type: 'bump', id: id0 }];
   // gleiche Ereignisse → gleiches Rennen, auch mit Vorspulen bzw. setEvents vor dem Ereignis
   var a = full(Sim.create(base(ev)));
   var b = Sim.create(base(ev)); b.fastForward(25.3);
@@ -459,13 +459,30 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   var gain = Math.max.apply(null, gainBy[Sim.TRACKS[0]]);
   if (!(gain > 3)) fail('Nitro bringt auf dem Speedway zu wenig Strecke: ' + fmt(gainBy[Sim.TRACKS[0]]) + ' m');
   Sim.TRACKS.forEach(function (tr) { if (gainBy[tr].some(function (g) { return g < -0.3; })) fail('Nitro kostet Strecke (Strecke ' + tr + '): ' + fmt(gainBy[tr]) + ' m'); });
-  // Anrempeln schiebt das Ziel zur Seite
-  var b0 = Sim.create(base()), b1 = Sim.create(base([{ t: 30, type: 'bump', id: id0, target: id1 }]));
-  b0.fastForward(30.6); b1.fastForward(30.6);
-  var dd = Math.abs(b1.cars[1].d - b0.cars[1].d);
-  if (!(dd > 0.5)) fail('Anrempeln verschiebt das Ziel zu wenig: ' + dd.toFixed(2) + ' m');
-  if (!b1.events.some(function (e) { return e.type === 'bump' && e.id === id0 && e.other === id1; })) fail('kein bump-Ereignis');
-  console.log('Zuschauer-Aktionen: Nitro auf dem Speedway bis +' + gain.toFixed(1) + ' m in 3,5 s, Anrempeln seitlich ' + dd.toFixed(2) + ' m');
+  // Anrempeln (ohne Ziel): jeder scharfe Rempler löst sich binnen 8 s auf (bump oder bumpmiss); mindestens ein
+  // Treffer in der Probe, und der Getroffene wird seitlich verschoben
+  var hits = 0, dd = 0, ids = field.map(function (f) { return f.id; });
+  [10, 18, 26, 34].forEach(function (T0) {
+    ids.forEach(function (bid, bi) {
+      var b1 = Sim.create(base([{ t: T0, type: 'bump', id: bid }]));
+      b1.fastForward(T0 + 8.2);
+      var res = b1.events.filter(function (e) { return (e.type === 'bump' || e.type === 'bumpmiss') && e.id === bid; });
+      var armed = !b1.events.some(function (e) { return e.id === bid && e.type === 'dnf' && e.t <= T0; }) && b1.cars[bi].place === null;
+      if (res.length > 1) fail('Rempler von ' + bid + ' bei ' + T0 + ' s löst sich mehrfach auf');
+      if (!res.length && armed && !b1.done) fail('Rempler von ' + bid + ' bei ' + T0 + ' s löst sich nicht auf');
+      if (b1.cars[bi].hunting) fail('Rempler von ' + bid + ' nach 8 s noch scharf');
+      var hit = res[0] && res[0].type === 'bump' ? res[0] : null;
+      if (!hit) return;
+      hits++;
+      // seitliche Verschiebung des Getroffenen: Vergleich mit dem Rennen ohne Rempler kurz nach dem Treffer
+      var oi = ids.indexOf(hit.other), b0 = Sim.create(base()), bh = Sim.create(base([{ t: T0, type: 'bump', id: bid }]));
+      b0.fastForward(hit.t + 0.6); bh.fastForward(hit.t + 0.6);
+      dd = Math.max(dd, Math.abs(bh.cars[oi].d - b0.cars[oi].d));
+    });
+  });
+  if (!hits) fail('kein Rempler trifft in der Probe');
+  if (!(dd > 0.3)) fail('Anrempeln verschiebt das Ziel zu wenig: ' + dd.toFixed(2) + ' m');
+  console.log('Zuschauer-Aktionen: Nitro auf dem Speedway bis +' + gain.toFixed(1) + ' m in 3,5 s, Anrempeln ' + hits + ' Treffer, seitlich bis ' + dd.toFixed(2) + ' m');
 })();
 
 // ---- 3b. Lange Fahrzeuge (Einspurmodell): Bus auf der Hairpin-Strecke ----
