@@ -171,21 +171,13 @@
         </div>
       </section>
       <section aria-labelledby="h-parts">
-        <h2 id="h-parts">Which parts get the colours</h2>
-        <p class="muted small-text">Press a button, then click on the car: each click adds or removes exactly that part. Paint parts show pink while picking. “Clear paint” empties the list so only what you click counts. Rims are a colour zone (“Rims”) like the others.</p>
-        <div class="row" role="group" aria-label="Paint parts">
-          <button type="button" id="pickPaint" aria-pressed="false">Pick paint parts</button>
-          <button type="button" id="clearPaint" class="small">Clear paint</button>
-        </div>
-        <div class="row">
-          <button type="button" id="pickAuto" class="small">Back to automatic</button>
-        </div>
+        <h2 id="h-parts">Parts</h2>
+        <p class="muted small-text">The paint colour goes to the automatically detected paint material. To colour single parts (body, rims, trim …) use a colour zone below.</p>
         <div class="row" role="group" aria-label="Split parts">
           <button type="button" id="pickSplit" aria-pressed="false">Split a part</button>
           <button type="button" id="joinSplit" class="small">Join split parts</button>
         </div>
         <p class="muted small-text">If one click marks too much (e.g. the whole rim with the hub): press “Split a part”, click it – it falls apart into its pieces (parts without seams split at their edges: side wall, roof, single window panes), then pick as usual. Windows: untick “Click through glass” first. Picks on the whole part carry over to all pieces.</p>
-        <p class="small-text" id="partList"></p>
         <p class="muted small-text" id="pickHint" aria-live="polite"></p>
         <div class="row">
           <input type="checkbox" id="texOff">
@@ -346,24 +338,18 @@
       }
 
       // ── Fahrzeug ──
-      var picking = null;   // 'paint' | 'rim' | null
+      var picking = null;   // 'wheel' | 'steer' | 'split' | 'zone:<id>' | null
       function partKeys(which) {
         var m = TC.meta(cur.key) || {};
-        return def.paintParts || m.autoPaintParts || [];
+        return m.autoPaintParts || [];
       }
       function show() {
         while (holder.children.length) holder.remove(holder.children[0]);
         if (!tpl) return;
         var p = def.paints && def.paints.length ? def.paints[Math.min(shown, def.paints.length - 1)] : { c: null };
         var pc = p.c == null ? null : p.c, hint = '';
-        // nach dem Picken immer sichtbar machen, was gewählt ist: erste Lackfarbe der Liste, sonst pink/cyan
-        if (pc == null && def.paintParts) {
-          var first = (def.paints || []).filter(function (q) { return q.c != null; })[0];
-          if (first) pc = first.c; else { pc = 0xff3fb4; hint = 'Pink = your paint parts. Add a paint to see the real colour.'; }
-        }
-        if (picking === 'paint') { pc = 0xff3fb4; hint = ''; }   // Auswahl sichtbar machen
         $('pickHint').textContent = hint;
-        var car = TC.paintTemplate(tpl, pc, null, { paintParts: partKeys('paint'), rimParts: [], zoneList: def.zones, zones: p.z, texOff: picking === 'paint' ? true : !!def.texOff });
+        var car = TC.paintTemplate(tpl, pc, null, { paintParts: partKeys('paint'), rimParts: [], zoneList: def.zones, zones: p.z, texOff: !!def.texOff });
         var zp = zonePicking();
         if (zp) {
           // gerade gewählter Bereich: gelb, damit man sieht, was dazugehört (auch bei Schwarz)
@@ -406,14 +392,14 @@
           tpl = t; $('msg').hidden = true;
           var mt = TC.meta(cur.key);
           if (mt && mt.norm) {
-            ['paintParts', 'rimParts', 'wheelParts', 'steerParts'].forEach(function (k) { if (def[k]) def[k] = mt.norm(def[k]); });
+            ['rimParts', 'wheelParts', 'steerParts'].forEach(function (k) { if (def[k]) def[k] = mt.norm(def[k]); });
             (def.zones || []).forEach(function (z) { z.parts = mt.norm(z.parts || []); });
             zones();
           }
           if (!keepView) { orbit.dist = Math.max(9, t.userData.dims.L * 2.2); orbit.t.set(0, 0.6, 0); }
-          migrateRims(t);
+          migrateRims(t); migratePaint();
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
-          $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – pick the paint parts below.';
+          $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – use a colour zone below.';
           listParts();
           var nw = 0; t.traverse(function (o) { if (/^Wheel /.test(o.name)) nw++; });
           $('steerInfo').textContent = nw >= 4 ? 'Wheels are separate parts (' + nw + '), set straight on loading.' : 'Wheels are not separate on this model – steering has no effect.';
@@ -453,6 +439,19 @@
         delete def.rimParts; delete def.rim; delete def.rimTexOff; delete def.rimMats;
         zones(); paints();
         if (old) say('Rims are now the colour zone “Rims”. Save to keep it.');
+      }
+      // Alt: eigene Lackteile (paintParts) → Farbbereich „Paint“; Lackfarbe je Set wird dessen Bereichsfarbe.
+      // Grundfarbe bleibt Original (null), damit Sets mit „Original colour“ unverändert bleiben.
+      function migratePaint() {
+        if (!def.paintParts) return;
+        var parts = def.paintParts.slice();
+        if (!def.zones.some(function (z) { return z.id === 'paint'; })) {
+          def.zones.push({ id: 'paint', name: 'Paint', c: null, f: 'gloss', flat: !!def.texOff, parts: parts });
+        }
+        def.paints.forEach(function (p) { if (p.c != null) { p.z = p.z || {}; p.z.paint = p.c; } });
+        delete def.paintParts;
+        zones(); paints(); show();
+        say('Paint parts are now the colour zone “Paint”. Save to keep it.');
       }
       function ownColour(label, val, dflt, set) {
         var wrap = el('span', 'row'), cb = el('input'), c = el('input'), id = 'oc' + (ownColour.n = (ownColour.n || 0) + 1), lab = el('label', null, label);
@@ -588,10 +587,9 @@
       $('rework').addEventListener('change', function () { def.rework = $('rework').checked; });
       // ── Teile per Klick wählen ──
       function listParts() {
-        if (!cur || !TC.meta(cur.key)) { $('partList').textContent = ''; return; }
+        if (!cur || !TC.meta(cur.key)) return;
         var nf = (def.steerParts || []).length;
         $('wheelList').textContent = def.wheelParts || nf ? 'Own wheels: ' + (def.wheelParts || []).length + ' rolling parts, ' + (nf ? nf + ' steering parts, ' : 'foremost axle steers, ') + (TC.meta(cur.key).wheels || 0) + ' wheels built.' : 'Automatic wheels (' + (TC.meta(cur.key).wheels || 0) + ' found).';
-        $('partList').textContent = 'Paint: ' + partKeys('paint').length + ' parts' + (def.paintParts ? '' : ' (automatic)');
       }
       // Modell mit geänderten Einstellungen neu aufbereiten (Räder, Richtung …), Eingaben behalten
       function reprepare(patch) {
@@ -603,7 +601,6 @@
       function setPick(w) {
         var was = picking;
         picking = picking === w ? null : w;
-        $('pickPaint').setAttribute('aria-pressed', String(picking === 'paint'));
         $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickFront').setAttribute('aria-pressed', String(picking === 'steer')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
         canvas.classList.toggle('picking', !!picking); zones();
         var wheelMode = function (x) { return x === 'wheel' || x === 'steer'; };
@@ -626,9 +623,6 @@
         delete def.splitParts; reprepare({ splitParts: undefined }); say('Split parts joined again.');
       });
       $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; delete def.steerParts; delete def.frontWheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); $('pickFront').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined, steerParts: undefined, frontWheelParts: undefined }); });
-      $('pickPaint').addEventListener('click', function () { setPick('paint'); });
-      $('pickAuto').addEventListener('click', function () { delete def.paintParts; delete def.rimParts; delete def.paintMats; delete def.rimMats; listParts(); show(); });
-      $('clearPaint').addEventListener('click', function () { def.paintParts = []; listParts(); show(); say('Paint parts cleared – click the ones you want.'); });
       $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
       $('smoothWheels').addEventListener('change', function () { def.smoothWheels = $('smoothWheels').checked; reprepare({ smoothWheels: def.smoothWheels || undefined }); });
       $('straight').addEventListener('change', function () {
@@ -692,7 +686,6 @@
           tw.forEach(function (k2) {
             if (had) { var j0 = zp.parts.indexOf(k2); if (j0 >= 0) zp.parts.splice(j0, 1); return; }
             def.zones.forEach(function (z) { var j = z.parts.indexOf(k2); if (j >= 0) z.parts.splice(j, 1); });
-            ['paintParts'].forEach(function (k) { if (def[k]) { var j = def[k].indexOf(k2); if (j >= 0) def[k].splice(j, 1); } });
             if (zp.parts.indexOf(k2) < 0) zp.parts.push(k2);
           });
           zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key + (tw.length > 1 ? ' (+' + (tw.length - 1) + ' on the other wheels)' : '')); return;
@@ -704,12 +697,6 @@
           if (j1 >= 0) L.splice(j1, 1); else L.push(key);
           def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'steer' ? 'Steers: ' : 'Rolls: ')) + key); return;
         }
-        var prop = 'paintParts';
-        var list = partKeys(picking).slice(), i = list.indexOf(key);
-        // eigene Lackteile: Textur ersetzen ist fast immer nötig (sonst Lackfarbe × dunkle Atlas-Textur) – einmal automatisch an
-        if (picking === 'paint' && !def.paintParts && def.texOff == null) { def.texOff = true; $('texOff').checked = true; }
-        if (i >= 0) list.splice(i, 1); else list.push(key);
-        def[prop] = list; listParts(); show(); say((i >= 0 ? 'Removed: ' : 'Added: ') + key);
       });
       $('note').addEventListener('input', function () { def.note = $('note').value; });
       // Umdrehen: Vorlage mit der neuen Richtung neu aufbauen (gilt erst nach dem Speichern auch im Regen)
@@ -767,7 +754,6 @@
         if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', flat: !!z.flat, o: z.f === 'glass' && z.o != null ? z.o : undefined, parts: (z.parts || []).slice(0, 400) }; });
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.flip) d.flip = true;
-        if (def.paintParts) d.paintParts = def.paintParts.slice(0, 400);
         if (def.texOff) d.texOff = true;
         if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
