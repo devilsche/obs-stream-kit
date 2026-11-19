@@ -385,8 +385,9 @@
     }
 
     // Lage eines Autos aus Strecke + Zustand; Räder: weiche Lenkung, Drehung aus der gefahrenen Strecke
-    function placeCar(r, T, s, d, yaw, roll, pitch, steer, dt) {
-      var p = T.at(s), x = p.x + p.nx * d, z = p.z + p.nz * d;
+    // Lage eines Autos aus Weltposition (Wagenmitte zwischen den Achsen) und Gier – im Rennen aus der Sim
+    // (Einspurmodell: cars[i].x/z/yaw), in der Startaufstellung aus der Strecke
+    function placeCar(r, x, z, yaw, roll, pitch, steer, dt) {
       if (r.lastX != null) {
         var dist = Math.min(6, Math.hypot(x - r.lastX, z - r.lastZ));
         r.wheelAngle = (r.wheelAngle + dist / r.wheelR) % (Math.PI * 2000);
@@ -538,7 +539,7 @@
       snap();
     }
     function snap() {
-      race.prev = race.sim.cars.map(function (c) { return { s: c.s, d: c.d, yaw: c.yaw, roll: c.roll, pitch: c.pitch, steer: c.steer }; });
+      race.prev = race.sim.cars.map(function (c) { return { s: c.s, d: c.d, x: c.x, z: c.z, yaw: c.yaw, roll: c.roll, pitch: c.pitch, steer: c.steer }; });
     }
     function advanceSim(target) {
       var sim = race.sim, DT = sim.DT || 1 / 60;
@@ -799,7 +800,13 @@
     function introSeconds(n) { return INTRO_BASE + INTRO_PER * n; }
     function gridSlot(i) {
       var c = race.gridSim.cars[i], p = race.T.at(c.s);
-      return { x: p.x + p.nx * c.d, z: p.z + p.nz * c.d, p: p, d: c.d };
+      return { x: c.x != null ? c.x : p.x + p.nx * c.d, z: c.z != null ? c.z : p.z + p.nz * c.d, p: p, d: c.d };
+    }
+    // Versatz der Sim-Wagenmitte gegenüber at(s) + n·d am Startplatz (0, falls die Sim kein x/z liefert)
+    function slotOffset(c) {
+      if (c.x == null) return { x: 0, z: 0 };
+      var p = race.T.at(c.s);
+      return { x: c.x - (p.x + p.nx * c.d), z: c.z - (p.z + p.nz * c.d) };
     }
     function buildIntro() {
       var n = race.order.length, keys = [], prevOrb = null;
@@ -1406,7 +1413,9 @@
           r.disp.s += clamp(dsv, -dt * Math.min(18, Math.abs(dsv) * 2.2), dt * Math.min(18, Math.abs(dsv) * 2.2));
           r.disp.d += clamp(ddv, -dt * 4, dt * 4);
           var lean = Math.abs(dsv) > 0.3 ? clamp(Math.atan2(ddv * 0.4, Math.abs(dsv) + 2), -0.25, 0.25) : 0;
-          placeCar(r, T, r.disp.s, r.disp.d, T.at(r.disp.s).yaw + lean, 0, 0, lean * 2, dt);
+          // Startaufstellung entlang der Strecke; Versatz zur Sim-Wagenmitte des Startplatzes, damit der Start nahtlos ist
+          var gp = T.at(r.disp.s), off = slotOffset(c);
+          placeCar(r, gp.x + gp.nx * r.disp.d + off.x, gp.z + gp.nz * r.disp.d + off.z, T.at(r.disp.s).yaw + lean, 0, 0, lean * 2, dt);
           pts.push({ x: r.holder.position.x, z: r.holder.position.z });
           // während des Vorbeiflugs keine Schilder (die Fahrerkarte zeigt den Fahrer), in der Totale wieder
           labels.push({ r: r, place: String(r.grid), show: !ishot || ishot.wide > 0.5, order: i });
@@ -1418,7 +1427,7 @@
         sim.cars.forEach(function (c, i) { idx[c.id] = i; });
         sim.cars.forEach(function (c, i) {
           var p = race.prev[i] || c, r = race.order[i];
-          placeCar(r, T, lerp(p.s, c.s, a), lerp(p.d, c.d, a), lerp(p.yaw, c.yaw, a), lerp(p.roll, c.roll, a), lerp(p.pitch, c.pitch, a), lerp(p.steer, c.steer, a), dt);
+          placeCar(r, lerp(p.x, c.x, a), lerp(p.z, c.z, a), lerp(p.yaw, c.yaw, a), lerp(p.roll, c.roll, a), lerp(p.pitch, c.pitch, a), lerp(p.steer, c.steer, a), dt);
           // Stoß-Ruck nach Kontakt/Crash (kurz, bei reduzierter Bewegung aus)
           if (r.jolt > 0) {
             if (!reduce) { var j = r.jolt * r.jolt; r.holder.position.y = 0.12 * j; r.holder.rotation.x += 0.07 * j * Math.sin(r.jolt * 25); }
