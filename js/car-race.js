@@ -271,8 +271,8 @@
     }
 
     // ---- Autos ----
-    // Modell laden – eine Stelle, damit die leichte Renn-Version (.race.glb, Task 5) hier umgestellt werden kann
-    function loadCarModel(entry) { return ToyCars.loadModel(entry); }
+    // Modell laden – eine Stelle; immer die leichte Renn-Version (.race.glb, fällt serverseitig auf das volle Modell zurück)
+    function loadCarModel(entry) { return ToyCars.loadModel(entry, { race: true }); }
     function catalogEntry(key) {
       if (!key) return null;
       var list = ToyCars.catalog ? ToyCars.catalog() : [];
@@ -653,8 +653,8 @@
       });
       return best || { x: p.x + p.nx * (HALF + 22), z: p.z + p.nz * (HALF + 22) };
     }
-    // Sieger in voller Qualität: heute sind alle Modelle voll (leichte Renn-Modelle, Task 5, fehlen noch) –
-    // hier später das volle Modell nachladen (Fallback: Renn-Version). Jetzt nur: steht noch die Kiste, Modell laden.
+    // Sieger: steht noch die Kiste, Modell laden. Volles Modell nachladen ist bewusst nicht eingebaut –
+    // ToyCars.build() nutzt eine Vorlage je Modell-Schlüssel, ein Austausch bräuchte eine zweite Vorlage.
     function upgradeWinnerModel(c) {
       var r = c.r;
       if (r.isModel || !r.entry) return;

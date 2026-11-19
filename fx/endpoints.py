@@ -568,16 +568,19 @@ def car_catalog(token):
 _UID_RE = re.compile(r"^[0-9a-f]{32}$")
 
 
-@bp_fx.route("/s/<token>/api/fx/cars/model/<uid>.glb")
-def car_model_file(token, uid):
+@bp_fx.route("/s/<token>/api/fx/cars/model/<uid>.glb", defaults={"race": False})
+@bp_fx.route("/s/<token>/api/fx/cars/model/<uid>.race.glb", defaults={"race": True})
+def car_model_file(token, uid, race=False):
     """Ein aufbereitetes Modell; lange cachebar (Datei ändert sich nur mit neuer Aufbereitung)."""
     if g.tenant_id is None or not _UID_RE.match(uid):
         abort(404)
     root = current_app.config.get("_PROJECT_ROOT") or "."
     d = os.path.join(root, "data", "car-rain")
-    if not os.path.exists(os.path.join(d, uid + ".glb")):
+    # leichte Renn-Version (Texturen ≤ 256 px); fehlt sie, kommt das volle Modell
+    name = uid + ".race.glb" if race and os.path.exists(os.path.join(d, uid + ".race.glb")) else uid + ".glb"
+    if not os.path.exists(os.path.join(d, name)):
         abort(404)
-    return send_from_directory(os.path.abspath(d), uid + ".glb", mimetype="model/gltf-binary", max_age=7 * 86400)
+    return send_from_directory(os.path.abspath(d), name, mimetype="model/gltf-binary", max_age=7 * 86400)
 
 
 @bp_fx.route("/s/<token>/api/fx/cars/custom.js")

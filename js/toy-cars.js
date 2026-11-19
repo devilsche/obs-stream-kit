@@ -393,11 +393,13 @@
     delete ud.wheels; delete ud.paintMats; delete ud.rimMats; delete ud.rimFromPaint;
     return car;
   }
-  function loadModel(e) {
+  // opts.race: leichte Renn-Version (<uid>.race.glb, Texturen ≤ 256 px; der Server liefert sonst das volle Modell).
+  // Die Vorlage liegt unter demselben Schlüssel wie das volle Modell (build() sucht dort) – eine Seite lädt nur eine Variante.
+  function loadModel(e, opts) {
     if (TPL[e.key]) return Promise.resolve(TPL[e.key]);
     if (loading[e.key]) return loading[e.key];
     return (loading[e.key] = new Promise(function (res, rej) {
-      new THREE.GLTFLoader().load(BASE + 'api/fx/cars/model/' + e.uid + '.glb', function (gl) {
+      new THREE.GLTFLoader().load(BASE + 'api/fx/cars/model/' + e.uid + (opts && opts.race ? '.race.glb' : '.glb'), function (gl) {
         try { TPL[e.key] = prepare(gl.scene, e); res(TPL[e.key]); } catch (err) { rej(err); }
       }, null, rej);
     }));

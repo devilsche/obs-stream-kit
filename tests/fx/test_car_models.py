@@ -84,6 +84,27 @@ def test_catalog_and_model_files(tmp_path):
     assert c.get("/s/t/api/fx/cars/model/ffffffffffffffffffffffffffffffff.glb").status_code == 404
 
 
+def test_race_model_falls_back_to_full_model(tmp_path):
+    d = tmp_path / "data" / "car-rain"
+    d.mkdir(parents=True)
+    uid = "0123456789abcdef0123456789abcdef"
+    (d / (uid + ".glb")).write_bytes(b"FULL")
+    r = _client(str(tmp_path)).get("/s/t/api/fx/cars/model/" + uid + ".race.glb")
+    assert r.status_code == 200 and r.data == b"FULL"
+    assert _client(str(tmp_path)).get("/s/t/api/fx/cars/model/" + "f" * 32 + ".race.glb").status_code == 404
+
+
+def test_race_model_served_when_present(tmp_path):
+    d = tmp_path / "data" / "car-rain"
+    d.mkdir(parents=True)
+    uid = "0123456789abcdef0123456789abcdef"
+    (d / (uid + ".glb")).write_bytes(b"FULL")
+    (d / (uid + ".race.glb")).write_bytes(b"RACE")
+    c = _client(str(tmp_path))
+    assert c.get("/s/t/api/fx/cars/model/" + uid + ".race.glb").data == b"RACE"
+    assert c.get("/s/t/api/fx/cars/model/" + uid + ".glb").data == b"FULL"
+
+
 def test_catalog_missing_is_empty(tmp_path):
     assert _client(str(tmp_path)).get("/s/t/api/fx/cars/catalog.json").json == []
 

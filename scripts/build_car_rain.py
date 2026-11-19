@@ -8,7 +8,10 @@ Für jedes im Car-Picker behaltene Auto (Server: data/car-picks.json, data/car-s
   5. nach data/car-rain/<uid>.glb auf den Server, dazu data/car-rain/catalog.json
 Die Dateien kommen nicht ins Repo (öffentlich; manche Lizenzen erlauben keine Weitergabe der Datei).
 
-Aufruf:  python3 scripts/build_car_rain.py [--only <uid> …] [--tris <max>]
+  6. dazu <uid>.race.glb: Kopie mit Texturen ≤ RACE_TEX (Car Race lädt bis zu 10 Autos im Countdown); Katalogfeld raceBytes
+
+Aufruf:  python3 scripts/build_car_rain.py [--only <uid> …] [--tris <max>] [--race-only]
+  --race-only: nur die Renn-Versionen aller Katalog-Autos aus den fertigen Server-GLBs nachbauen (kein gltfpack, keine Neuvermessung)
   --tris: eigene Obergrenze für diesen Lauf (z. B. 400000 für ein fein modelliertes Auto, dessen Felgen sonst eckig werden)
 """
 import io
@@ -16,6 +19,7 @@ import json
 import math
 import os
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -38,6 +42,7 @@ class _All(set):
 ALL = _All()
 MAX_TRIS = 120000   # darunter bleibt ein Modell unvereinfacht (runde Räder!); Teile werden beim Laden zusammengefasst
 MAX_TEX = 1024
+RACE_TEX = 256     # Renn-Version (<uid>.race.glb): Geometrie identisch, nur Texturen kleiner
 WORK = os.path.join(tempfile.gettempdir(), "car-rain-build")
 # typische Längen (m) für Nicht-Pkw, sonst 4,5 m
 LEN = [(r"trolza|bus\b|megapolis", 12.5), (r"ural|truck|lkw", 7.4), (r"ct680|caterpillar|semi", 7.0), (r"g63|g-class|g class", 4.9), (r"krabby patty", 1.0)]
@@ -65,8 +70,8 @@ def glb_write(path, g, binc):
     open(path, "wb").write(b"glTF" + struct.pack("<II", 2, 12 + len(body)) + body)
 
 
-def shrink_textures(path):
-    """Bilder im GLB auf MAX_TEX verkleinern; Pufferabschnitte neu packen."""
+def shrink_textures(path, max_px=MAX_TEX):
+    """Bilder im GLB auf max_px verkleinern; Pufferabschnitte neu packen."""
     from PIL import Image
     g, binc = glb_read(path)
     imgs = {im["bufferView"]: i for i, im in enumerate(g.get("images", [])) if "bufferView" in im}
@@ -81,8 +86,8 @@ def shrink_textures(path):
             im = g["images"][imgs[vi]]
             try:
                 pic = Image.open(io.BytesIO(data))
-                if max(pic.size) > MAX_TEX:
-                    pic.thumbnail((MAX_TEX, MAX_TEX))
+                if max(pic.size) > max_px:
+                    pic.thumbnail((max_px, max_px))
                     buf = io.BytesIO()
                     if pic.mode in ("RGBA", "LA", "P") and "A" in pic.getbands():
                         pic.save(buf, "PNG", optimize=True)
@@ -234,6 +239,34 @@ def slug(name, used):
     return s
 
 
+def make_race(full, race):
+    """Renn-Version: Kopie des fertigen GLB mit kleinen Texturen; gibt die Dateigröße zurück."""
+    shutil.copyfile(full, race)
+    shrink_textures(race, RACE_TEX)
+    return os.path.getsize(race)
+
+
+def race_only():
+    """Für jedes Auto im Server-Katalog <uid>.race.glb bauen und raceBytes eintragen."""
+    os.makedirs(WORK, exist_ok=True)
+    catalog = remote_json("data/car-rain/catalog.json")
+    full_sum = race_sum = 0
+    for e in catalog:
+        uid = e["uid"]
+        full, race = os.path.join(WORK, uid + ".glb"), os.path.join(WORK, uid + ".race.glb")
+        subprocess.run(SCP + ["root@31.70.95.217:%s/data/car-rain/%s.glb" % (REMOTE, uid), full], check=True)
+        e["raceBytes"] = make_race(full, race)
+        subprocess.run(SCP + [race, "root@31.70.95.217:%s/data/car-rain/%s.race.glb" % (REMOTE, uid)], check=True)
+        full_sum += e.get("bytes") or os.path.getsize(full)
+        race_sum += e["raceBytes"]
+        print("%-40s %6.1f MB -> %5.1f MB" % (e["name"][:40], os.path.getsize(full) / 1e6, e["raceBytes"] / 1e6), flush=True)
+    path = os.path.join(WORK, "catalog.json")
+    json.dump(catalog, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    subprocess.run(SCP + [path, "root@31.70.95.217:%s/data/car-rain/catalog.json" % REMOTE], check=True)
+    subprocess.run(SSH + ["chown", "-R", "obskit:obskit", REMOTE + "/data/car-rain"], check=True)
+    print("raceBytes gesamt: %.1f MB (bytes gesamt: %.1f MB), %d Autos" % (race_sum / 1e6, full_sum / 1e6, len(catalog)))
+
+
 def main(only=None, max_tris=MAX_TRIS):
     os.makedirs(WORK, exist_ok=True)
     cands = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "cars", "candidates.json"), encoding="utf-8"))
@@ -277,6 +310,9 @@ def main(only=None, max_tris=MAX_TRIS):
                  "wheels": sc.get("wheels"), "front": front, "frontWhy": why, "len": length, "tris": info["tris"],
                  "bytes": os.path.getsize(dst)}
         subprocess.run(SCP + [dst, "root@31.70.95.217:%s/data/car-rain/%s.glb" % (REMOTE, uid)], check=True)
+        race = os.path.join(WORK, uid + ".race.glb")
+        entry["raceBytes"] = make_race(dst, race)
+        subprocess.run(SCP + [race, "root@31.70.95.217:%s/data/car-rain/%s.race.glb" % (REMOTE, uid)], check=True)
         catalog.append(entry)
         print("%-40s %7d tris %6.1f MB front=%+d (%s)" % (c["name"][:40], info["tris"], entry["bytes"] / 1e6, front, why), flush=True)
     path = os.path.join(WORK, "catalog.json")
@@ -288,7 +324,9 @@ def main(only=None, max_tris=MAX_TRIS):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    if "--all" in args:
+    if "--race-only" in args:
+        race_only()
+    elif "--all" in args:
         main(ALL)
     else:
         mt = int(args[args.index("--tris") + 1]) if "--tris" in args else MAX_TRIS
