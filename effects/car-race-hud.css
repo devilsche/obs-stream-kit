@@ -22,7 +22,9 @@
      data-layout  stage = Vollbild-Layout (unter dem Bild-im-Bild), window = kleines Fenster (links oben)
      data-cols    2 = ab 7 Fahrern im Vollbild zwei Spalten (Plätze 1–5 links, 6–10 rechts)
      data-count   Anzahl Fahrer
-     hidden       ausgeblendet (Lobby, Fahrervorstellung, Siegerehrung)
+     data-visible gesetzt = sichtbar; fehlt es, blendet die Liste aus (Lobby, Vorstellung, Siegerehrung, erste 4 s
+                  nach dem Start) – Übergang über --rank-fade
+     hidden       ganz weg (vor dem ersten und nach dem Rennen)
    Attribute an der Zeile:
      data-pos     aktueller Platz 1–10 – bestimmt die Höhe (Verschiebung unten); Platztausch gleitet
      data-state   run = fährt, done = im Ziel, dnf = ausgeschieden
@@ -68,6 +70,7 @@
   --rank-shadow: 0 0.1vh 0.6vh rgba(0, 0, 0, 0.35);
   /* --- Bewegung -------------------------------------------------------------------------------------- */
   --rank-swap: 0.35s;              /* Dauer des Platztauschs */
+  --rank-fade: 0.6s;               /* Ein-/Ausblenden der ganzen Liste */
 
   /* Lage: kleines Fenster = links oben */
   position: absolute; left: 3.5vh; top: 3.5vh;
@@ -76,7 +79,9 @@
   margin: 0; padding: 0; list-style: none;
   font-family: var(--rank-font); color: var(--rank-text);
   pointer-events: none;
+  opacity: 0; transition: opacity var(--rank-fade) ease;
 }
+.race-rank[data-visible] { opacity: 1; }
 .race-rank[hidden] { display: none; }
 
 /* kleines Fenster: Schrift relativ größer (das Fenster ist klein) */
@@ -161,4 +166,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .race-rank__row { transition: none; }
+  .race-rank { transition-duration: 0.2s; }
 }

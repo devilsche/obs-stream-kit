@@ -103,6 +103,7 @@
       cam.updateProjectionMatrix();
     }
     // fn mit W/H = freier Bereich ausführen (Bildausschnitte der Kameras, HUD)
+    function vh(n) { return FULLH * n / 100; }   // n % der Fensterhöhe (logische Pixel)
     function inView(fn) {
       if (!STAGE) return fn();
       var sw = W, sh = H; W = VW.w; H = VW.h;
@@ -793,7 +794,7 @@
       var list = (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; });
       var w = 240, pad = 12, fName = 11, fCar = 9, rowH = 29, m = 12;
       var counting = st.phase === 'countdown' && st.starts_at != null;
-      var headH = pad + 15 + 8 + 34 + 10, ctaH = 24, h = headH + ctaH + list.length * rowH + pad * 0.6;
+      var cdF = Math.min(34, vh(3.5)), headH = pad + 15 + 8 + cdF + 10, ctaH = 24, h = headH + ctaH + list.length * rowH + pad * 0.6;
       var x0 = W - m - w, y0 = H - m - h;
       var bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
       // Feld: weicher Schatten, Körper halbtransparent, Kopf kräftiger, Goldrand (kaum gerundet)
@@ -815,10 +816,10 @@
       hud.font = font(900, 15); hud.fillStyle = white; hud.fillText('CAR RACE', tx, ty);
       hud.textAlign = 'right'; hud.font = font(800, 13); hud.fillStyle = TK.accent; hud.fillText(list.length + '/10', x0 + w - pad, ty);
       hud.textAlign = 'left';
-      var by = ty + 8 + 30;
+      var by = ty + 8 + cdF * 0.88;
       if (counting) {
         var left = Math.max(0, Math.ceil(st.starts_at - now)), t = Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2);
-        hud.font = font(900, 34); hud.fillStyle = white; hud.fillText(t, tx, by);
+        hud.font = font(900, cdF); hud.fillStyle = white; hud.fillText(t, tx, by);
         var cw = hud.measureText(t).width;
         hud.font = font(600, 10); hud.fillStyle = dim; hud.fillText('until the start', tx + cw + 8, by - 3);
       } else {
@@ -1066,7 +1067,7 @@
     // (gehalten, Namen sichtbar), dann die Fahrer von hinten nach vorn – einzeln, wenn je Fahrer ≥ 1,15 s bleiben,
     // sonst als Startreihe (zwei) bzw. bei sehr wenig Zeit alle zusammen –, die letzte Karte endet vor der Startampel
     // (letzte 2 s). Im Vollbild beginnt die Totale später sichtbar (Einblenden), darum dort länger.
-    var INTRO_LIGHTS = 2.0, INTRO_MOVE = 0.35, INTRO_MIN = 1.15;
+    var INTRO_LIGHTS = 2.0, INTRO_MIN = 2.0;   // unter 2 s je Fahrer: Startreihen bzw. alle zusammen
     function introPlan(n) {
       var total = introSeconds(n), wide = STAGE ? 2.8 : 2.0, avail = total - wide - INTRO_LIGHTS, groups = [], gs;
       for (gs = 1; gs <= 2; gs++) if (avail / Math.ceil(n / gs) >= INTRO_MIN) break;
@@ -1094,7 +1095,8 @@
         // Autos im oberen Teil des Bildes, unten Platz für die Fahrerkarte(n)
         var y = hgt * 0.5 - (H * (g.length > 1 ? 0.2 : 0.14)) / (px * cosT);
         var base = { x: cx, z: cz, y: y, px: px, tilt: INTRO_TILT, wide: 0, focus: g[0] };
-        keys.push(Object.assign({ t: t0 + INTRO_MOVE, orb: orb + 0.05 }, base), Object.assign({ t: t0 + plan.per, orb: orb - 0.05 }, base));
+        // ruhig gleiten: die erste Hälfte der Zeit fährt die Kamera weich (ease-in-out) heran, dann hält sie fast still
+        keys.push(Object.assign({ t: t0 + plan.per * 0.5, orb: orb + 0.03 }, base), Object.assign({ t: t0 + plan.per, orb: orb - 0.03 }, base));
       });
       high.orb = unwrap(0);
       keys.push(Object.assign({ t: plan.total - INTRO_LIGHTS + 0.6 }, high), Object.assign({ t: plan.total }, high));
@@ -1113,7 +1115,8 @@
       var pl = race.intro.plan, k = Math.floor((introT - pl.wide) / pl.per);
       if (introT < pl.wide || k < 0 || k >= pl.groups.length) return null;
       var st = introT - pl.wide - k * pl.per;
-      return { ids: pl.groups[k], st: st, a: clamp((st - 0.05) / 0.08, 0, 1) * clamp((pl.per - st) / 0.08, 0, 1) };
+      // Karte ab 30 % der Zeit, 350 ms ein-, 300 ms ausblenden
+      return { ids: pl.groups[k], st: st, a: smooth01((st - pl.per * 0.3) / 0.35) * smooth01((pl.per - st) / 0.3) };
     }
     // Schlüsselbild-Interpolation (wie die Siegerehrung)
     function shotAt(K, t) { return podiumShotAt({ keys: K }, t); }
@@ -1180,7 +1183,7 @@
       if (wideA <= 0) return;
       hud.save(); hud.globalAlpha = wideA;
       hud.textBaseline = 'middle'; hud.textAlign = 'center';
-      hud.font = font(800, fs * 1.1);
+      hud.font = font(800, Math.min(fs * 1.1, vh(3)));
       var title = 'RACE RESULTS', tw = hud.measureText(title).width + rh * 1.2;
       pill(hud, (W - tw) / 2, m, tw, rh * 1.25);
       hud.fillStyle = TK.accent; hud.fillText(title, W / 2, m + rh * 0.65);
@@ -1337,6 +1340,7 @@
     }
     function updateRankDom(rows) {
       if (!rankEl) return;
+      if (race && race.stage === 'race' && race.sim && race.sim.time < 4) return;   // Start nicht zustellen
       rankShown = true;
       if (!rankHead) { rankHead = document.createElement('li'); rankHead.className = 'race-rank__head'; rankEl.insertBefore(rankHead, rankEl.firstChild); }
       setText(rankHead, towerHeader(rows).replace(' / ', ' / '));
@@ -1355,11 +1359,12 @@
         setText(d.gap, gap);
       });
       if (rankEl.hidden) rankEl.hidden = false;
+      setAttr(rankEl, 'data-visible', '');
     }
     // am Ende jedes Bildes: nicht gezeigt → ausblenden; nach dem Rennen leeren
     function endRankFrame() {
       if (!rankEl) return;
-      if (!rankShown && !rankEl.hidden) rankEl.hidden = true;
+      if (!rankShown) setAttr(rankEl, 'data-visible', null);   // blendet per CSS aus (car-race-hud.css)
       rankShown = false;
     }
     function clearRankDom() {
@@ -1390,7 +1395,7 @@
       var left = race.startsAt != null ? race.startsAt - now : null;
       // Aktions-Schilder „NITRO! Name“ / „BUMP! A → B“ (2,2 s, auch bei reduzierter Bewegung)
       if (race.stage === 'race' && race.sim && race.tags && race.tags.length) {
-        var tgs = race.sim.time, tfz = clamp(H * 0.05, 14, 26), ty3 = m + rh * 1.6 + tfz * 2.2;
+        var tgs = race.sim.time, tfz = vh(2.4), ty3 = m + rh * 1.6 + vh(2.8) * 2.2;
         race.tags = race.tags.filter(function (g) { return tgs - g.t0 < 2.2; });
         race.tags.forEach(function (g, gi) {
           var ga = smooth01((tgs - g.t0) / 0.2) * smooth01((2.2 - (tgs - g.t0)) / 0.35); if (ga <= 0) return;
@@ -1413,7 +1418,7 @@
         if (ha > 0 && hr2) {
           var word = hh.type === 'dnf' ? 'OUT!' : hh.type === 'crash' ? 'CRASH!' : 'SPIN!';
           hud.save(); hud.globalAlpha = ha;
-          var tf = clamp(H * 0.06, 16, 32);
+          var tf = vh(2.8);
           hud.font = font(900, tf); var ww = hud.measureText(word + ' ').width;
           hud.font = font(700, tf); var nn = fitText(hud, hr2.display, W * 0.4), nw2 = hud.measureText(nn).width;
           var tw2 = ww + nw2 + tf * 1.2, ty2 = m + rh * 1.6;
@@ -1443,7 +1448,7 @@
     // Startampel in den letzten 2 s vor dem Start: drei rote Lichter gehen nacheinander an, dazu 3-2-1
     function drawLights(left) {
       if (!(left > 0 && left <= 2)) return;
-      var lit = Math.min(3, Math.floor((2 - left) / (2 / 3)) + 1), rad = clamp(H * 0.04, 9, 22), gap = rad * 2.8;
+      var lit = Math.min(3, Math.floor((2 - left) / (2 / 3)) + 1), rad = vh(1.2), gap = rad * 2.8;
       var cx = W / 2, cy = Math.round(Math.min(W * 0.045, H * 0.07)) + rad * 1.6;
       pill(hud, cx - gap * 1.5 - rad * 0.4, cy - rad * 1.4, gap * 3 + rad * 0.8, rad * 2.8);
       for (var i = 0; i < 3; i++) {
@@ -1456,16 +1461,17 @@
     function drawIntroCard(introT) {
       var c = introCardAt(introT);
       if (!c || c.a <= 0) return;
-      var m = Math.round(Math.min(W * 0.045, H * 0.07)), k = c.ids.length > 1 ? 0.72 : 1, bottom = H - m;
+      var m = Math.round(Math.min(W * 0.045, H * 0.07)), k = 1, bottom = H - m;
       hud.save(); hud.globalAlpha = c.a;
-      hud.translate(reduce ? 0 : (1 - smooth01((c.st - 0.05) / 0.25)) * -24, 0);
+      hud.translate(reduce ? 0 : (1 - c.a) * -10, 0);   // ruhig: kurz einblenden mit kleinem Versatz
       // Gruppe: Karten übereinander, vorderer Startplatz unten
       c.ids.slice().sort(function (a, b) { return b - a; }).forEach(function (i) { bottom -= driverCard(race.order[i], m, bottom, k) + 6; });
       hud.restore();
     }
     // eine Fahrerkarte (Unterkante bei yBottom), k = Größe; Rückgabe: Höhe
     function driverCard(r, x0, yBottom, k) {
-      var m = Math.round(Math.min(W * 0.045, H * 0.07)), f1 = clamp(H * 0.12, 30, 72) * k, f2 = clamp(H * 0.075, 18, 44) * k, f3 = Math.max(16, clamp(H * 0.05, 16, 28) * k);
+      // Bauchbinde: Startplatz 2,2 vh, Name 2,6 vh, Automodell 1,8 vh
+      var m = Math.round(Math.min(W * 0.045, H * 0.07)), f1 = vh(2.2) * k, f2 = vh(2.6) * k, f3 = vh(1.8) * k;
       var ch = f1 * 0.4 + f2 * 1.25 + f3 * 1.35 + f3 * 0.6, y0 = yBottom - ch, pad = f3 * 0.8;
       hud.font = font(900, f1); var pw = hud.measureText('P' + r.grid).width;
       var maxText = W - 2 * m - pw - pad * 3 - 8 - (r.tier ? f2 * 1.1 : 0);
@@ -1502,9 +1508,9 @@
     }
     // große Zahl in der Mitte, pulst je Sekunde (bei reduzierter Bewegung ruhig)
     function bigText(t, frac) {
-      var k = reduce ? 1 : 1 + 0.25 * clamp(frac, 0, 1), sz = H * 0.2 * k;
+      var sz = vh(3.5);   // Schlagzeilen höchstens 3,5 vh, ruhig (kein Pulsieren)
       hud.save();
-      hud.globalAlpha = clamp(reduce ? 1 : 0.35 + frac, 0, 1);
+      hud.globalAlpha = clamp(0.5 + frac, 0, 1);
       hud.font = font(900, sz); hud.textAlign = 'center'; hud.textBaseline = 'middle';
       hud.lineWidth = sz * 0.08; hud.strokeStyle = withAlpha(TK.surface, 0.9); hud.strokeText(t, W / 2, H * 0.42);
       hud.fillStyle = TK.accent; hud.fillText(t, W / 2, H * 0.42);
