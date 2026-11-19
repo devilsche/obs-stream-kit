@@ -109,15 +109,20 @@ Feld zöge zu weit auseinander.
 - Federung: sichtbares Wanken/Nicken, leichter Zeitverlust auf welligen Abschnitten.
 - Überholen: dicht hinter einem langsameren Auto weicht `d` aus; Windschatten gibt kleinen Tempobonus.
 - Zufall (aus Seed): Verbremser, Dreher (kurzer Halt, Auto dreht sich), guter/schlechter Start.
-  Gewichtung so, dass Außenseiter realistisch gewinnen können.
+  Gewichtung so, dass Außenseiter realistisch gewinnen können: Pech-Ereignisse (Dreher, Crash mit längerem
+  Stillstand) werden mit dem Tempo wahrscheinlicher, Windschatten hilft Hinterherfahrenden, Start mit Glücksanteil.
+  Messlatte (Nutzerwunsch „ob ein Truck oder Bus jemals erster wird?“): über 1000 simulierte Rennen gewinnt der
+  Bus gegen ein starkes Feld mindestens 2 %, das stärkste Auto höchstens 45 %.
 - Räder drehen und lenken über die vorhandene Rad-Struktur (`Spin`, Lenk-Pivot), weich wie im Burnout.
-- Ziel: Platzierung = Reihenfolge beim Überqueren der Ziellinie; Nachzügler werden nach dem Sieger in
-  höchstens ~10 s „ins Ziel gezogen“ (Rest nach aktueller Position gewertet).
+- Ziel (vom Nutzer festgelegt): Platzierung = Reihenfolge beim Überqueren der Ziellinie. Nach dem Sieger bleiben
+  höchstens **X Sekunden** (Standard 15 s, einstellbar), dann ist Schluss. Wer bis dahin nicht im Ziel ist, ist
+  **DNF: ohne Platz, ohne Punkte** (in Rangliste und Podest als „DNF“). Ein schwerer Crash kann ebenfalls DNF sein.
 
 ## Werte je Auto („Race stats“ im Car editor)
 
 Neuer Abschnitt im Car editor, gespeichert im Fahrzeug (`data/car-vehicles.json`), z. B.
-`race: {hp, kg, vmax, handling, susp, brakes, drive: "fwd"|"rwd"|"awd", len}`.
+`race: {on, power, speed, handling, susp, brakes, weight, drive: "fwd"|"rwd"|"awd", len}` – **Verhältnis-Werte 1–10**,
+keine echten PS/km/h (Nutzerwunsch: nur im Verhältnis; ein Bus ist eben langsamer als ein Lambo).
 - Startwerte: geschätzt nach Modell/Klasse (Liste im Code, z. B. Sportwagen/Limousine/Truck/Bus/Spaß-Auto),
   der Nutzer korrigiert.
 - Welche Autos mitfahren dürfen: alle im Katalog, die im Mix sind (`mix`) – im Editor zusätzlich
@@ -125,10 +130,11 @@ Neuer Abschnitt im Car editor, gespeichert im Fahrzeug (`data/car-vehicles.json`
 
 ## Leichte Renn-Modelle
 
-Katalog-Modelle sind 2–15 MB. Das Build-Skript erzeugt je Auto zusätzlich eine Renn-Version
-(~10–15k Dreiecke, Texturen 512 px, Ziel < 1 MB), ausgeliefert z. B. als `api/fx/cars/model/<uid>.race.glb`.
-**Teile-Schlüssel müssen gleich bleiben**, damit Farbzonen, Lack- und Radteile aus dem Car editor passen
-(Vereinfachung je Mesh, keine Netze zusammenfassen/umbenennen; Prüfung im Node-Prüfstand). Siegerehrung lädt
+Katalog-Modelle sind 2–15 MB, den größten Teil machen Texturen aus. Das Build-Skript erzeugt je Auto zusätzlich
+eine Renn-Version mit **unveränderter Geometrie** und Texturen auf 256 px, ausgeliefert als
+`api/fx/cars/model/<uid>.race.glb` (fehlt sie: das normale Modell). Entscheidung Claude: keine Vereinfachung,
+weil jede Geometrie-Änderung die Teile-Schlüssel verschiebt (beim Trolza-Neubau gesehen) und Farbzonen, Lack-
+und Radteile dann nicht mehr passen. Geladen wird während des 60-s-Countdowns, Browser-Cache 7 Tage. Siegerehrung lädt
 den Sieger in voller Qualität nach (Fallback: Renn-Version).
 
 ## Daten und Schnittstellen
@@ -149,8 +155,10 @@ den Sieger in voller Qualität nach (Fallback: Renn-Version).
   und Anzeigename werden mitgespeichert (Anzeige = zuletzt bekannter Name). Umbenennung teilt keine Punkte.
 
 **Punkte (dauerhaft, DB je Tenant, Muster `fx/season_db.py`):**
-- Tabelle `fx_race_result (tenant_id, race_id, at, user_id, login, display, place, field, points, car_key, void)`.
+- Tabelle `fx_race_result (tenant_id, race_id, at, user_id, login, display, place, field, points, car_key, void)`;
+  `place` NULL = DNF.
 - Punkte = Anzahl geschlagener Fahrer + 1 Bonus für den Sieg (3 Fahrer: 3/1/0; 10 Fahrer: 10/8/7/…/0).
+  Geschlagen zählen alle hinter einem, auch DNF. DNF = 0 Punkte, zählt als Rennen, nicht als Ergebnis.
 - Monatsstand und ewige Liste werden aus den Ergebnissen berechnet (Summe Punkte, Rennen, Siege, Podien,
   bestes Ergebnis). Monatsmeister = Monatserster nach Punkten (Gleichstand: mehr Siege, dann früher erreicht).
 - Auto-Statistik nebenbei: Siege/Rennen je `car_key` (zeigt, ob die Werte ausgewogen sind).
