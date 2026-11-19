@@ -194,6 +194,12 @@ EFFECT_META = {
         {"key": "model", "label": "Car", "type": "select", "default": "mix", "options": [["mix", "Random mix"]],
          "tooltip": "Random car from the mix, all cars of one brand, or exactly one car (list from the Car overview)"},
     ]},
+    # Car Race (js/car-race.js): Fenster 16:9, Standard 640×360 (bis 960×540); Befehle/Knöpfe folgen mit dem Podest
+    "car-race.html": {"size": "640×360", "switches": [
+        {"key": "finish", "label": "Finish window", "type": "select", "default": "15",
+         "options": [["5", "5 s"], ["10", "10 s"], ["15", "15 s"], ["20", "20 s"], ["30", "30 s"], ["40", "40 s"]],
+         "tooltip": "Seconds after the winner crosses the line; whoever is not through by then is DNF"},
+    ]},
     "item-rain.html": {"switches": [
         {"key": "kind", "label": "What rains", "type": "select", "default": "sushi",
          "options": [["sushi", "Sushi"], ["balloon", "Balloons (rising)"],
@@ -967,7 +973,7 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
         if meta.get("hidden"):
             continue
         out.append({"key": key, "label": key.replace("-", " ").title(),
-                    "file": fn, "size": size, "desc": desc,
+                    "file": fn, "size": meta.get("size", size), "desc": desc,
                     "params": list(params) if params else [],
                     "switches": meta.get("switches", []),
                     "commands": meta.get("commands", []),

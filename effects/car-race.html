@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Car Race</title>
+  <!-- Theme-Tokens (--theme-*): der Server injiziert data-theme aufs <html> (sonst Entry-Default) -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <style>
+    /* Car Race (js/car-race.js): Chat-Autorennen mit echten 3D-Autos auf einer Spielzeug-Strecke.
+       Fenster 16:9, Standard 640×360 (bis 960×540); die Größe ändert nur den Ausschnitt.
+       Unsichtbar in Lobby/Leerlauf, blendet ab dem 3. Fahrer mit Startaufstellung + Countdown ein.
+       ?preview=1 – lokale Testlobby ohne Server · ?finish=<s> – Nachlauf nach dem Sieger (5–40, Standard 15)
+       ?track=<n> (nur Vorschau) – Strecke aus der Favoritenliste */
+    @font-face {
+      font-family: 'DM Sans';
+      src: url('../assets/DM-Sans.woff2') format('woff2');
+      font-weight: 100 900;
+      font-style: normal;
+      font-display: block;
+    }
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: transparent; }
+
+    /* Bühne: blendet als Ganzes ein/aus; Rand-Fade über eine Maske, nichts endet hart am Fensterrand */
+    .stage {
+      position: fixed; inset: 0; opacity: 0; transition: opacity 0.6s ease;
+      -webkit-mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%),
+                          linear-gradient(to bottom, transparent 0, #000 5%, #000 95%, transparent 100%);
+      -webkit-mask-composite: source-in;
+      mask-image: linear-gradient(to right, transparent 0, #000 3%, #000 97%, transparent 100%),
+                  linear-gradient(to bottom, transparent 0, #000 5%, #000 95%, transparent 100%);
+      mask-composite: intersect;
+    }
+    .stage.is-on { opacity: 1; }
+    .layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+    /* Vorschau-Knöpfe (nur ?preview=1), außerhalb der Maske */
+    .preview-bar {
+      position: fixed; left: 0; right: 0; bottom: 8px; z-index: 2;
+      display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap;
+      font: 600 13px/1.2 var(--theme-font-body, 'DM Sans', sans-serif);
+    }
+    .preview-bar[hidden] { display: none; }
+    .preview-bar button {
+      min-height: 28px; min-width: 24px; padding: 4px 12px; cursor: pointer;
+      font: inherit; color: #fff; background: #5e2a79;
+      border: 1px solid #f2b705; border-radius: 6px;
+    }
+    .preview-bar button:hover { background: #73359a; }
+    .preview-bar button:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
+    .preview-bar button:disabled { cursor: default; opacity: 0.55; }
+    .preview-info {
+      color: #fff; background: rgba(20, 12, 30, 0.8); padding: 4px 10px; border-radius: 6px;
+    }
+
+    /* Farb-Proben: das HUD (Canvas) liest hieraus die aufgelösten Theme-Farben */
+    .tokens { display: none; }
+    .tk-surface { color: var(--theme-surface, #1d1128); }
+    .tk-text { color: var(--theme-text, #ffffff); }
+    .tk-dim { color: var(--theme-text-dim, #c9bdd6); }
+    .tk-accent { color: var(--theme-accent, #f2b705); }
+    .tk-border { color: var(--theme-primary, #5e2a79); }
+    .tk-font { font-family: var(--theme-font-display, 'DM Sans', sans-serif); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage { transition-duration: 0.3s; }
+    }
+  </style>
+</head>
+<body>
+  <main class="stage" id="stage">
+    <canvas id="gl" class="layer" aria-hidden="true"></canvas>
+    <canvas id="hud" class="layer" aria-hidden="true"></canvas>
+  </main>
+  <div class="preview-bar" id="preview-bar" hidden>
+    <button type="button" id="pv-add">Add test racer</button>
+    <button type="button" id="pv-start">Start now</button>
+    <p class="preview-info" id="pv-info" aria-live="polite"></p>
+  </div>
+  <div class="tokens" aria-hidden="true">
+    <i class="tk-surface"></i><i class="tk-text"></i><i class="tk-dim"></i>
+    <i class="tk-accent"></i><i class="tk-border"></i><i class="tk-font"></i>
+  </div>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="../js/vendor/three-r128-BufferGeometryUtils.js"></script>
+  <script src="../js/vendor/three-r128-RoomEnvironment.js"></script>
+  <script src="../js/glb-fix.js"></script>
+  <script src="../js/car-stage.js"></script>
+  <script src="../js/toy-cars.js"></script>
+  <script src="../api/fx/cars/custom.js"></script>
+  <script src="../js/car-race-sim.js"></script>
+  <script src="../js/car-race-stats.js"></script>
+  <script src="../js/car-race.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var params = new URLSearchParams(location.search);
+      var preview = /^(1|true|yes|on)$/i.test(params.get('preview') || '');
+      var finish = parseFloat(params.get('finish'));
+      var race = CarRace.start({
+        canvas: document.getElementById('gl'),
+        hud: document.getElementById('hud'),
+        stage: document.getElementById('stage'),
+        base: '../',
+        preview: preview,
+        track: params.get('track'),
+        finish: isFinite(finish) ? finish : null,
+        reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
+        onPreviewInfo: function (text, canAdd, canStart) {
+          document.getElementById('pv-info').textContent = text;
+          document.getElementById('pv-add').disabled = !canAdd;
+          document.getElementById('pv-start').disabled = !canStart;
+        }
+      });
+      if (preview) {
+        document.getElementById('preview-bar').hidden = false;
+        document.getElementById('pv-add').addEventListener('click', function () { race.addTestRacer(); });
+        document.getElementById('pv-start').addEventListener('click', function () { race.startNow(); });
+      }
+    })();
+  </script>
+</body>
+</html>
