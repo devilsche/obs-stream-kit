@@ -700,15 +700,17 @@ def car_race_cmd(token):
         if _flag(request.args.get("test")):
             uid, display = race.next_test_id(g.tenant_id, now)
             login = uid
+            test = True
         else:
+            test = False
             login = _arg("user").lstrip("@")
-            uid = _arg("id") or login.lower()
+            uid = (_arg("id") or login.lower())[:64]
             display = login[:25]
             if not uid:
                 return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
         color = _arg("color")
         color = color if _COLOR_RE.match(color) else RACE_COLOR
-        out = race.join(g.tenant_id, uid, login or uid, display or uid, color.lower(), now, _race_cars())
+        out = race.join(g.tenant_id, uid, login or uid, display or uid, color.lower(), now, _race_cars(), test=test)
         return _no_store(jsonify(out))
     if cmd in RACE_ADMIN:
         out = race.admin(g.tenant_id, cmd, now, user_id=_arg("id"))
@@ -766,6 +768,7 @@ def car_race_result(token):
         return jsonify({"ok": True, "counted": False, "points": {}})
     if ranks is None:
         return jsonify({"ok": True, "counted": False, "points": {}})
+    race.confirm(g.tenant_id, race_id)
     field = len(rows)
     pts = {}
     for r in rows:

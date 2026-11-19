@@ -125,7 +125,7 @@ def next_test_id(tenant_id, now):
         return "test%d" % n, "Tester%d" % n
 
 
-def join(tenant_id, user_id, login, display, color, now, cars):
+def join(tenant_id, user_id, login, display, color, now, cars, test=False):
     """Anmeldung. `cars` = (Katalog-Liste, Fahrzeug-Dict). → {ok, say, state}."""
     catalog, vehicles = cars if cars else ([], {})
     with _LOCK:
@@ -148,7 +148,7 @@ def join(tenant_id, user_id, login, display, color, now, cars):
             return _refuse(t, now, "grid full")
         car = pick_car(catalog, vehicles, t["rng"], {r["car_key"] for r in t["racers"]})
         t["racers"].append({"grid": len(t["racers"]) + 1, "user_id": user_id, "login": login,
-                            "display": display, "color": color, **car})
+                            "display": display, "color": color, "test": bool(test), **car})
         n = len(t["racers"])
         if n >= MAX:
             _go(t, now)
@@ -235,19 +235,19 @@ def accept_result(tenant_id, race_id, places, now):
     with _LOCK:
         t = _get(tenant_id)
         _advance(t, now)
-        if t["phase"] not in ("race", "cooldown") or t.get("race_id") != race_id or t["counted"] \
-                or t["result"] is not None or t["starts_at"] is None or now > t["starts_at"] + RESULT_WINDOW:
+        if t["phase"] not in ("race", "podium", "cooldown") or t.get("race_id") != race_id or t["counted"] \
+                or t["starts_at"] is None or now > t["starts_at"] + RESULT_WINDOW:
             return None
         racers = t["racers"]
         if not isinstance(places, list) or len(places) != len(racers):
             raise ValueError("places passt nicht zur Fahrerzahl")
+        if any(p is not None and (isinstance(p, bool) or not isinstance(p, int)) for p in places):
+            raise ValueError("Platzierungen müssen Zahlen oder null sein")
         fin = sorted(p for p in places if p is not None)
-        if any(isinstance(p, bool) or not isinstance(p, int) for p in fin) or fin != list(range(1, len(fin) + 1)):
+        if fin != list(range(1, len(fin) + 1)):
             raise ValueError("Platzierungen müssen 1..k ohne Lücken sein")
         rows = [{"user_id": r["user_id"], "login": r["login"], "display": r["display"],
                  "place": p, "car_key": r["car_key"] or ""} for r, p in zip(racers, places)]
-        t["counted"] = True
-        t["last_counted"] = race_id
         t["race_end"] = now
         t["result"] = sorted(({"user_id": r["user_id"], "display": r["display"], "place": p}
                               for r, p in zip(racers, places)),
@@ -255,4 +255,18 @@ def accept_result(tenant_id, race_id, places, now):
         t["phase"] = "podium"
         t["podium_until"] = now + PODIUM
         t["ends_at"] = t["podium_until"]
+        if any(r.get("test") for r in racers):
+            # Testfahrer vergeben nie Punkte: Rennen wird nicht gespeichert
+            t["counted"] = True
+            return None
         return rows
+
+
+def confirm(tenant_id, race_id):
+    """Nach erfolgreichem Speichern aufrufen: erst jetzt gilt das Rennen als gezählt
+    (und ist per void ansprechbar); bei Schreibfehler bleibt ein neuer Versuch möglich."""
+    with _LOCK:
+        t = _get(tenant_id)
+        if t.get("race_id") == race_id:
+            t["counted"] = True
+            t["last_counted"] = race_id

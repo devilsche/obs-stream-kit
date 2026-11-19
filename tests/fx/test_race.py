@@ -119,6 +119,7 @@ def test_cancel_start_remove_void(cars):
     assert race.admin(TID, "void", T + 1)["ok"] is False  # noch nichts gezählt
     rid = st(T + 1)["race_id"]
     race.accept_result(TID, rid, [1, 2, 3], T + 20)
+    race.confirm(TID, rid)
     v = race.admin(TID, "void", T + 21)
     assert v["ok"] is True and v["race_id"] == rid
     assert race.admin(TID, "void", T + 22)["ok"] is False
@@ -132,6 +133,7 @@ def test_result_counts_once_and_only_in_window(cars):
     assert [(r["user_id"], r["place"]) for r in rows] == [("a", 2), ("b", 1), ("c", None)]
     assert st(T + 30)["phase"] == "podium"
     assert [x["user_id"] for x in st(T + 30)["result"]] == ["b", "a", "c"]
+    race.confirm(TID, rid)
     assert race.accept_result(TID, rid, [3, 2, 1], T + 31) is None
 
 
@@ -143,7 +145,7 @@ def test_late_result_after_window_is_not_counted(cars):
 
 def test_invalid_places_are_rejected(cars):
     rid = start_race(cars)
-    for bad in ([1, 2], [1, 1, 2], [1, 3, None], [0, 1, 2], [1, 2, 3, 4]):
+    for bad in ([1, 2], [1, 1, 2], [1, 3, None], [0, 1, 2], [1, 2, 3, 4], ["a", 1, 2], [[1], 1, 2], [True, 2, 3]):
         with pytest.raises(ValueError):
             race.accept_result(TID, rid, bad, T + 10)
     assert race.accept_result(TID, rid, [None, None, None], T + 10) is not None
@@ -281,3 +283,37 @@ def test_unknown_tenant_404(conn, tmp_path):
     assert c.get("/s/tok/api/fx/car-race?cmd=join&id=1&user=a").status_code == 404
     assert c.get("/s/tok/api/fx/car-race/state").status_code == 404
     assert c.post("/s/tok/api/fx/car-race/result", json={}).status_code == 404
+
+
+def test_race_with_test_racer_is_never_recorded(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    _join(c, "a")
+    _join(c, "b")
+    c.get("/s/tok/api/fx/car-race?cmd=join&test=1")
+    c.get("/s/tok/api/fx/car-race?cmd=start")
+    rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
+    r = c.post("/s/tok/api/fx/car-race/result", json={"race_id": rid, "places": [1, 2, 3]}).get_json()
+    assert r["counted"] is False
+    assert conn.execute("SELECT COUNT(*) FROM fx_race_result").fetchone()[0] == 0
+    assert c.get("/s/tok/api/fx/car-race/state").get_json()["phase"] == "podium"
+
+
+def test_failed_write_can_be_retried_and_void_ignores_unstored(conn, tmp_path, clock, monkeypatch):
+    c = _client(conn, tmp_path)
+    for u in "abc":
+        _join(c, u)
+    c.get("/s/tok/api/fx/car-race?cmd=start")
+    rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
+    real = race_db.record
+    monkeypatch.setattr(race_db, "record", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("db")))
+    body = {"race_id": rid, "places": [1, 2, 3]}
+    assert c.post("/s/tok/api/fx/car-race/result", json=body).get_json()["counted"] is False
+    assert c.get("/s/tok/api/fx/car-race?cmd=void").get_json()["ok"] is False
+    monkeypatch.setattr(race_db, "record", real)
+    assert c.post("/s/tok/api/fx/car-race/result", json=body).get_json()["counted"] is True
+
+
+def test_user_id_is_capped(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    r = _join(c, "x" * 100).get_json()
+    assert len(r["state"]["racers"][0]["user_id"]) == 64
