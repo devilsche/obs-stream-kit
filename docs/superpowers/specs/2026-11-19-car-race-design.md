@@ -109,6 +109,7 @@ Feld zöge zu weit auseinander.
 - Federung: sichtbares Wanken/Nicken, leichter Zeitverlust auf welligen Abschnitten.
 - Überholen: dicht hinter einem langsameren Auto weicht `d` aus; Windschatten gibt kleinen Tempobonus.
 - Kontakt (Nutzerwunsch): Berühren sich zwei Autos, schubst das schwerere/größere (Masse aus Weight und Länge) das leichtere zur Seite und bremst es; kleine Dreher-Chance für das leichtere. Ein Bus räumt also Kleinwagen ab, umgekehrt kaum.
+- Abflug (Nutzerwunsch): zu schnell in der Kurve → das Auto rutscht nach außen über den Rand ins Gras/Kiesbett, verliert Zeit und fährt zurück; selten Einschlag in die Leitplanke = DNF. Strecke bekommt dafür Auslaufzonen.
 - Zufall (aus Seed): Verbremser, Dreher (kurzer Halt, Auto dreht sich), guter/schlechter Start.
   Gewichtung so, dass Außenseiter realistisch gewinnen können: Pech-Ereignisse (Dreher, Crash mit längerem
   Stillstand) werden mit dem Tempo wahrscheinlicher, Windschatten hilft Hinterherfahrenden, Start mit Glücksanteil.
