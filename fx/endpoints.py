@@ -685,6 +685,14 @@ def _race_cars():
     return (cat if isinstance(cat, list) else []), car_models.load(root, "vehicles")
 
 
+def _clean_car_name(name):
+    """Katalogname fürs Chat-Echo: Quellenvermerke und FREE-Marker entfernen."""
+    n = re.sub(r"\|?\s*www\.vecarz\.com", "", name or "", flags=re.I)
+    n = re.sub(r"\[\s*FREE\s*\]", "", n, flags=re.I)
+    n = re.sub(r"^\s*FREE\s+", "", n, flags=re.I)
+    return re.sub(r"\s+", " ", n).strip(" |-") or "?"
+
+
 def _race_say_board(rows) -> str:
     if not rows:
         return "No races yet."
@@ -715,6 +723,23 @@ def car_race_cmd(token):
         color = color if _COLOR_RE.match(color) else RACE_COLOR
         out = race.join(g.tenant_id, uid, login or uid, display or uid, color.lower(), now, _race_cars(), test=test)
         return _no_store(jsonify(out))
+    if cmd == "mycar":
+        login = _arg("user").lstrip("@")
+        uid = (_arg("id") or login.lower())[:64]
+        if not uid:
+            return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
+        display = (login or uid)[:25]
+        r, total, ph, left = race.lookup(g.tenant_id, uid, now)
+        if r:
+            catalog = _race_cars()[0]
+            name = _clean_car_name(race._car_name(catalog, r["car_key"]))
+            say = "@%s you're driving the %s (grid %d/%d)" % (display, name, r["grid"], total)
+            return _no_store(jsonify({"ok": True, "say": say}))
+        if ph in ("podium", "cooldown"):
+            say = "@%s you're not in a race – next race opens in %d s" % (display, left)
+        else:
+            say = "@%s you're not in a race – type !race to join" % display
+        return _no_store(jsonify({"ok": False, "say": say}))
     if cmd in RACE_ADMIN:
         out = race.admin(g.tenant_id, cmd, now, user_id=_arg("id"))
         if cmd == "void" and out.get("ok"):

@@ -372,3 +372,21 @@ def test_release_allows_retry_after_failed_write(cars):
     assert race.accept_result(TID, rid, [1, 2, 3], T + 30) is not None
     race.confirm(TID, rid)
     assert race.accept_result(TID, rid, [1, 2, 3], T + 31) is None
+
+
+def test_mycar_in_race_not_in_race_and_unresolved(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    q = lambda **k: c.get("/s/tok/api/fx/car-race", query_string={"cmd": "mycar", **k})
+    r = q(id="9", user="Zed").get_json()
+    assert r["ok"] is False and r["say"] == "@Zed you're not in a race – type !race to join"
+    _join(c, "%userId%", "Alice")
+    _join(c, "2", "Bob")
+    r = q(id="2", user="Bob").get_json()
+    assert r["ok"] is True and r["say"].startswith("@Bob you're driving the Car ") and r["say"].endswith("(grid 2/2)")
+    assert q(id="%userId%", user="Alice").get_json()["say"].endswith("(grid 1/2)")
+    assert q(id="%userId%", user="%user%").status_code == 400
+
+
+def test_clean_car_name():
+    assert endpoints._clean_car_name("FREE Audi R8 | www.vecarz.com") == "Audi R8"
+    assert endpoints._clean_car_name("Golf [FREE]") == "Golf"

@@ -72,7 +72,7 @@ def test_car_race_has_chat_commands_and_dashboard_controls():
     ctl = [dict(parse_qsl(c["q"])) for c in meta["controls"]]
     assert {"start", "cancel", "void"} <= {c["cmd"] for c in ctl}
     assert {"cmd": "join", "test": "1"} in ctl
-    valid = {"join", "board"} | set(RACE_ADMIN)
+    valid = {"join", "board", "mycar"} | set(RACE_ADMIN)
     for c in meta["controls"] + meta["commands"]:
         assert dict(parse_qsl(c["q"]))["cmd"] in valid, c
     for c in meta["controls"]:

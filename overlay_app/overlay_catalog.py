@@ -210,6 +210,7 @@ EFFECT_META = {
     "commands": [
         {"q": "cmd=join&id=%userId%&user=%user%&color=%color%", "label": "!race: join the next race",
          "who": "viewers"},
+        {"q": "cmd=mycar&id=%userId%&user=%user%", "label": "!drive: which car am I driving", "who": "viewers"},
         {"q": "cmd=board&scope=month", "label": "!racestats: top 3 this month", "who": "viewers"},
         {"q": "cmd=board&scope=all", "label": "!racestats all: all-time top 3", "who": "viewers"},
         {"q": "cmd=start", "label": "Start the race now (3+ racers in the lobby)", "who": "mods", "group": "Mods"},

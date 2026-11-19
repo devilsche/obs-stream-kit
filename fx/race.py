@@ -180,6 +180,19 @@ def join(tenant_id, user_id, login, display, color, now, cars, test=False):
         return {"ok": True, "say": say, "state": _view(t, now)}
 
 
+def lookup(tenant_id, user_id, now):
+    """Nur lesend: (Fahrer-Dict oder None, Anzahl Fahrer, Phase, Sekunden bis zum nächsten Rennen)."""
+    with _LOCK:
+        t = _get(tenant_id)
+        _advance(t, now)
+        ph = t["phase"]
+        left = max(int(round(_cool_end(t) - now)), 0) if ph in ("podium", "cooldown") else 0
+        r = None
+        if ph in ("lobby", "countdown", "intro", "race", "podium"):
+            r = next((dict(x) for x in t["racers"] if x["user_id"] == user_id), None)
+        return r, len(t["racers"]), ph, left
+
+
 def _cool_end(t):
     return t["cool_until"] if t["phase"] == "cooldown" else t["race_end"] + COOLDOWN
 
