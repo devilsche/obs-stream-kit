@@ -1072,7 +1072,8 @@
     function pvCars() {
       return (ToyCars.catalog ? ToyCars.catalog() : []).filter(function (e) {
         var v = ToyCars.vehicle(e.key) || {};
-        return v.mix !== false && !(v.race && v.race.on === false);
+        // wie der Server: nicht im Mix, „Takes part in races“ aus oder „Needs rework“ markiert → nicht in die Testlobby
+        return v.mix !== false && !(v.race && v.race.on === false) && !v.rework;
       });
     }
     function previewReset() {
