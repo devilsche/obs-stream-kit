@@ -21,7 +21,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, abort, request, 
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, race_shop, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -685,12 +685,161 @@ def _race_cars():
     return (cat if isinstance(cat, list) else []), car_models.load(root, "vehicles")
 
 
-def _clean_car_name(name):
-    """Katalogname fürs Chat-Echo: Quellenvermerke und FREE-Marker entfernen."""
-    n = re.sub(r"\|?\s*www\.vecarz\.com", "", name or "", flags=re.I)
-    n = re.sub(r"\[\s*FREE\s*\]", "", n, flags=re.I)
-    n = re.sub(r"^\s*FREE\s+", "", n, flags=re.I)
-    return re.sub(r"\s+", " ", n).strip(" |-") or "?"
+_clean_car_name = race_shop.clean_name
+
+
+def _who():
+    """(user_id, Anzeigename) aus id/user; user_id leer = fehlt."""
+    login = _arg("user").lstrip("@")
+    uid = (_arg("id") or login.lower())[:64]
+    return uid, (login or uid)[:25]
+
+
+def _say(display, text):
+    return "@%s %s" % (display, text)
+
+
+def _names(entries):
+    return ", ".join(race_shop.clean_name(c.get("name") or c["key"]) for c in entries)
+
+
+def _no_match(display, q, hits):
+    if hits:
+        return _say(display, "which one? %s" % _names(hits))
+    return _say(display, "no car matches \"%s\"" % q[:40])
+
+
+def _race_join(now):
+    """cmd=join: car=<Text> (eigenes Auto aus der Garage), sub/tier (Sub-Tier für dieses Rennen),
+    pick=<Text>&reward=1 (Kanalpunkte: genau dieses Auto einmalig; bei Fehler refund:true)."""
+    color = _arg("color")
+    color = (color if _COLOR_RE.match(color) else RACE_COLOR).lower()
+    if _flag(request.args.get("test")):
+        uid, display = race.next_test_id(g.tenant_id, now)
+        return _no_store(jsonify(race.join(g.tenant_id, uid, uid, display, color, now, _race_cars(), test=True)))
+    login = _arg("user").lstrip("@")
+    uid = (_arg("id") or login.lower())[:64]
+    display = (login or uid)[:25]
+    if not uid:
+        return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
+    sub = race_shop.tier(_arg("sub"), _arg("tier"))
+    reward = _flag(request.args.get("reward"))
+    cars = _race_cars()
+    pool = race.eligible(*cars)
+
+    def refuse(say):
+        out = {"ok": False, "say": say}
+        if reward:
+            out["refund"] = True
+        return _no_store(jsonify(out))
+
+    car_key = None
+    if reward:
+        q = _arg("pick") or _arg("car")
+        if not q:
+            return refuse(_say(display, "type the car name with the reward – points refunded"))
+        entry, hits = race_shop.find_car(q, pool)
+        if entry is None:
+            return refuse(_no_match(display, q, hits) + " – points refunded")
+        car_key = entry["key"]
+    elif _arg("car"):
+        q = _arg("car")
+        entry, hits = race_shop.find_car(q, pool)
+        if entry is None:
+            return refuse(_no_match(display, q, hits))
+        name = race_shop.clean_name(entry.get("name"))
+        try:
+            owned, have = _with_conn(lambda conn: (race_db.owns(conn, g.tenant_id, uid, entry["key"]),
+                                                   race_db.coins(conn, g.tenant_id, uid)))
+        except Exception:
+            log.exception("fx car-race: garage lookup failed")
+            return refuse(_say(display, "garage unavailable, try !race without a car"))
+        if not owned:
+            return refuse(_say(display, "you don't own the %s – !buy it for %d coins (you have %d)"
+                               % (name, race_shop.price(entry["key"], entry), have)))
+        car_key = entry["key"]
+    out = race.join(g.tenant_id, uid, login or uid, display, color, now, cars,
+                    sub=sub, car_key=car_key, swap=bool(car_key))
+    if reward:
+        out["refund"] = not out["ok"]
+        if not out["ok"]:
+            out["say"] = _say(display, out["say"] + " – points refunded")
+    return _no_store(jsonify(out))
+
+
+def _race_garage_cmd(cmd, now):
+    """coins | garage | buy | reroll | paint | givecoins → Response."""
+    uid, display = _who()
+    if not uid:
+        return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
+    if cmd == "reroll":
+        out = race.reroll(g.tenant_id, uid, now, _race_cars())
+        return _no_store(jsonify({"ok": out["ok"], "say": _say(display, out["say"])}))
+    if cmd == "paint":
+        if not race_shop.tier(_arg("sub"), _arg("tier")):
+            return _no_store(jsonify({"ok": False, "say": _say(display, "sub paints are a sub perk")}))
+        q = _arg("q")
+        p = race_shop.find_paint(q) if q else None
+        if p is None:
+            sets = ", ".join(race_shop.PAINTS.values())
+            return _no_store(jsonify({"ok": False, "say": _say(display, "sub paints: %s (off to reset)" % sets)}))
+        now_too = race.set_paint(g.tenant_id, uid, None if p == "off" else p, now)
+        if p == "off":
+            say = "sub paint off"
+        else:
+            say = "%s paint set%s" % (race_shop.PAINTS[p], " – live for this race" if now_too else
+                                      " for your next race")
+        return _no_store(jsonify({"ok": True, "say": _say(display, say), "paint": None if p == "off" else p}))
+    catalog = _race_cars()[0]
+    try:
+        if cmd == "coins":
+            n = _with_conn(lambda conn: race_db.coins(conn, g.tenant_id, uid))
+            return _no_store(jsonify({"ok": True, "coins": n, "say": _say(display, "you have %d race coins" % n)}))
+        if cmd == "garage":
+            keys, n = _with_conn(lambda conn: (race_db.garage(conn, g.tenant_id, uid),
+                                               race_db.coins(conn, g.tenant_id, uid)))
+            if not keys:
+                say = "your garage is empty · %d coins – !buy <car>" % n
+            else:
+                names = [race_shop.car_name(catalog, k) for k in keys]
+                shown = ", ".join(names[:12]) + (" +%d more" % (len(names) - 12) if len(names) > 12 else "")
+                say = "garage: %s · %d coins – !race <car>" % (shown, n)
+            return _no_store(jsonify({"ok": True, "cars": keys, "coins": n, "say": _say(display, say)}))
+        if cmd == "buy":
+            q = _arg("q")
+            if not q:
+                return _no_store(jsonify({"ok": False, "say": _say(display, "usage: !buy <car>")}))
+            entry, hits = race_shop.find_car(q, race.eligible(*_race_cars()))
+            if entry is None:
+                return _no_store(jsonify({"ok": False, "say": _no_match(display, q, hits)}))
+            name = race_shop.clean_name(entry.get("name"))
+            cost = race_shop.price(entry["key"], entry)
+            status, left = _with_conn(lambda conn: race_db.buy(conn, g.tenant_id, uid, entry["key"], cost))
+            if status == "owned":
+                say = "you already own the %s – !race %s" % (name, q[:30])
+            elif status == "poor":
+                say = "the %s costs %d coins – you have %d" % (name, cost, left)
+            else:
+                say = "bought the %s for %d coins – %d left. Drive it with !race %s" % (name, cost, left, q[:30])
+            return _no_store(jsonify({"ok": status == "ok", "status": status, "coins": left,
+                                      "say": _say(display, say)}))
+        if cmd == "givecoins":
+            try:
+                n = int(_arg("n"))
+            except ValueError:
+                n = 0
+            if not n or abs(n) > 100000:
+                return _no_store(jsonify({"ok": False, "say": "n must be a number (±100000)"})), 400
+            total = _with_conn(lambda conn: race_db.add_coins(conn, g.tenant_id, uid, display, n))
+            say = "%s %d race coins – now %d" % ("got" if n > 0 else "lost", abs(n), total)
+            return _no_store(jsonify({"ok": True, "coins": total, "say": _say(display, say)}))
+    except Exception:
+        log.exception("fx car-race: %s failed", cmd)
+        return _no_store(jsonify({"ok": False, "say": _say(display, "garage unavailable, try again later")}))
+    return jsonify({"ok": False, "say": "unknown command"}), 400
+
+
+RACE_GARAGE = ("coins", "garage", "buy", "reroll", "paint", "givecoins")
 
 
 def _race_say_board(rows) -> str:
@@ -708,21 +857,9 @@ def car_race_cmd(token):
     cmd = (request.args.get("cmd") or "").strip().lower()
     now = time.time()
     if cmd == "join":
-        if _flag(request.args.get("test")):
-            uid, display = race.next_test_id(g.tenant_id, now)
-            login = uid
-            test = True
-        else:
-            test = False
-            login = _arg("user").lstrip("@")
-            uid = (_arg("id") or login.lower())[:64]
-            display = login[:25]
-            if not uid:
-                return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
-        color = _arg("color")
-        color = color if _COLOR_RE.match(color) else RACE_COLOR
-        out = race.join(g.tenant_id, uid, login or uid, display or uid, color.lower(), now, _race_cars(), test=test)
-        return _no_store(jsonify(out))
+        return _race_join(now)
+    if cmd in RACE_GARAGE:
+        return _race_garage_cmd(cmd, now)
     if cmd == "mycar":
         login = _arg("user").lstrip("@")
         uid = (_arg("id") or login.lower())[:64]
@@ -732,7 +869,7 @@ def car_race_cmd(token):
         r, total, ph, left = race.lookup(g.tenant_id, uid, now)
         if r:
             catalog = _race_cars()[0]
-            name = _clean_car_name(race._car_name(catalog, r["car_key"]))
+            name = race_shop.car_name(catalog, r["car_key"])
             say = "@%s you're driving the %s (grid %d/%d)" % (display, name, r["grid"], total)
             return _no_store(jsonify({"ok": True, "say": say}))
         if ph in ("podium", "cooldown"):

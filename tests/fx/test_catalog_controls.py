@@ -63,7 +63,7 @@ def test_rain_and_snow_are_hidden():
 
 def test_car_race_has_chat_commands_and_dashboard_controls():
     """Car Race: Streamer.bot-Befehle und Dashboard-Knöpfe gehen an /api/fx/car-race (eigener Endpoint)."""
-    from fx.endpoints import RACE_ADMIN
+    from fx.endpoints import RACE_ADMIN, RACE_GARAGE
     meta = EFFECT_META["car-race.html"]
     cmds = [dict(parse_qsl(c["q"])) for c in meta["commands"]]
     join = [c for c in cmds if c.get("cmd") == "join"]
@@ -72,7 +72,9 @@ def test_car_race_has_chat_commands_and_dashboard_controls():
     ctl = [dict(parse_qsl(c["q"])) for c in meta["controls"]]
     assert {"start", "cancel", "void"} <= {c["cmd"] for c in ctl}
     assert {"cmd": "join", "test": "1"} in ctl
-    valid = {"join", "board", "mycar"} | set(RACE_ADMIN)
+    valid = {"join", "board", "mycar"} | set(RACE_ADMIN) | set(RACE_GARAGE)
+    assert set(RACE_GARAGE) <= {c["cmd"] for c in cmds}
+    assert any(c.get("reward") == "1" and "pick" in c for c in join)
     for c in meta["controls"] + meta["commands"]:
         assert dict(parse_qsl(c["q"]))["cmd"] in valid, c
     for c in meta["controls"]:

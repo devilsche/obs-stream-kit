@@ -446,3 +446,103 @@ def test_one_real_racer_gets_no_coins(conn, tmp_path, clock):
     c = _client(conn, tmp_path)
     _test_race(c, clock, "a", 2, [1, 2, 3])
     assert conn.execute("SELECT COUNT(*) FROM fx_race_wallet").fetchone()[0] == 0
+
+
+# --- Garage (G2): Befehle ---
+
+def q(c, **k):
+    return c.get("/s/tok/api/fx/car-race", query_string=k).get_json()
+
+
+def test_sub_join_via_endpoint_and_unresolved_sub(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    q(c, cmd="join", id="a", user="A", sub="True", tier="2000")
+    q(c, cmd="join", id="b", user="B", sub="%isSubscribed%", tier="%subscriptionTier%")
+    rs = c.get("/s/tok/api/fx/car-race/state").get_json()["racers"]
+    assert [x["sub"] for x in rs] == [2000, 0]
+    assert all(isinstance(x["paint"], int) for x in rs)
+
+
+def test_coins_buy_garage_and_race_with_own_car(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    r = q(c, cmd="coins", id="7", user="Ann")
+    assert r["say"] == "@Ann you have 0 race coins"
+    assert q(c, cmd="buy", id="7", user="Ann", q="Car 2")["say"] == "@Ann the Car 2 costs 400 coins – you have 0"
+    assert q(c, cmd="givecoins", id="7", user="Ann", n="500")["say"] == "@Ann got 500 race coins – now 500"
+    r = q(c, cmd="buy", id="7", user="Ann", q="car 2")
+    assert r["ok"] is True and r["say"] == "@Ann bought the Car 2 for 400 coins – 100 left. Drive it with !race car 2"
+    assert q(c, cmd="buy", id="7", user="Ann", q="Car 2")["status"] == "owned"
+    assert q(c, cmd="buy", id="7", user="Ann", q="car")["say"].startswith("@Ann which one? Car 0, Car 1")
+    assert q(c, cmd="buy", id="7", user="Ann", q="%rawInput%")["say"] == "@Ann usage: !buy <car>"
+    g = q(c, cmd="garage", id="7", user="Ann")
+    assert g["cars"] == ["k2"] and g["say"] == "@Ann garage: Car 2 · 100 coins – !race <car>"
+    assert q(c, cmd="garage", id="8", user="Bo")["say"].startswith("@Bo your garage is empty · 0 coins")
+    # nicht besessen → Absage, kein Join
+    r = q(c, cmd="join", id="7", user="Ann", car="Car 1")
+    assert r["ok"] is False and "don't own the Car 1" in r["say"] and "refund" not in r
+    r = q(c, cmd="join", id="7", user="Ann", car="Car 2")
+    assert r["ok"] is True and r["state"]["racers"][0]["car_key"] == "k2"
+    # unaufgelöstes %rawInput% = Zufallsauto
+    assert q(c, cmd="join", id="8", user="Bo", car="%rawInput%")["ok"] is True
+    # andere Tenants sehen nichts
+    c2 = _client(conn, tmp_path / "t2", tenant_id=2)
+    assert q(c2, cmd="coins", id="7", user="Ann")["coins"] == 0
+
+
+def test_channel_point_pick_and_refund(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    r = q(c, cmd="join", id="5", user="Cy", pick="car 3", reward="1")
+    assert r["ok"] is True and r["refund"] is False and r["state"]["racers"][0]["car_key"] == "k3"
+    # schon in der Lobby: Auto wird getauscht
+    r = q(c, cmd="join", id="5", user="Cy", pick="car 1", reward="1")
+    assert r["ok"] is True and r["refund"] is False and r["say"] == "@Cy switched to the Car 1"
+    assert len(r["state"]["racers"]) == 1 and r["state"]["racers"][0]["car_key"] == "k1"
+    r = q(c, cmd="join", id="5", user="Cy", pick="Ferrari", reward="1")
+    assert r["ok"] is False and r["refund"] is True and r["say"].endswith("points refunded")
+    r = q(c, cmd="join", id="6", user="Di", pick="%rawInput%", reward="1")
+    assert r["refund"] is True
+    for u in "ab":
+        _join(c, u)
+    c.get("/s/tok/api/fx/car-race?cmd=start")
+    r = q(c, cmd="join", id="6", user="Di", pick="car 2", reward="1")
+    assert r["ok"] is False and r["refund"] is True
+
+
+def test_reroll_only_subs_once_same_class_in_lobby(conn, tmp_path, clock, monkeypatch):
+    from fx import race_shop
+    monkeypatch.setattr(race_shop, "class_of", lambda key, entry=None: "a" if key in ("k0", "k1") else "b")
+    c = _client(conn, tmp_path)
+    q(c, cmd="join", id="s", user="Sub", sub="True", tier="1000", pick="car 0", reward="1")
+    q(c, cmd="join", id="n", user="Non")
+    assert q(c, cmd="reroll", id="n", user="Non")["say"] == "@Non !reroll is a sub perk"
+    assert q(c, cmd="reroll", id="x", user="X")["say"] == "@X you're not in the lobby – type !race to join"
+    r = q(c, cmd="reroll", id="s", user="Sub")
+    assert r["ok"] is True and r["say"] == "@Sub rerolled – now driving the Car 1"
+    assert q(c, cmd="reroll", id="s", user="Sub")["say"] == "@Sub you already rerolled this race"
+
+
+def test_paint_only_subs_remembered_for_next_race(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    assert q(c, cmd="paint", id="s", user="Sub", q="gold")["say"] == "@Sub sub paints are a sub perk"
+    r = q(c, cmd="paint", id="s", user="Sub", q="", sub="True", tier="1000")
+    assert r["ok"] is False and r["say"] == "@Sub sub paints: Gold, Purple, Carbon (off to reset)"
+    r = q(c, cmd="paint", id="s", user="Sub", q="gold", sub="True", tier="1000")
+    assert r["say"] == "@Sub Gold paint set for your next race"
+    q(c, cmd="join", id="s", user="Sub", sub="True", tier="1000")
+    q(c, cmd="join", id="n", user="Non")
+    rs = c.get("/s/tok/api/fx/car-race/state").get_json()["racers"]
+    assert [x["sub_paint"] for x in rs] == ["gold", None]
+    r = q(c, cmd="paint", id="s", user="Sub", q="carbon", sub="True", tier="3000")
+    assert r["say"] == "@Sub Carbon paint set – live for this race"
+    assert c.get("/s/tok/api/fx/car-race/state").get_json()["racers"][0]["sub_paint"] == "carbon"
+    q(c, cmd="paint", id="s", user="Sub", q="off", sub="True", tier="1000")
+    assert c.get("/s/tok/api/fx/car-race/state").get_json()["racers"][0]["sub_paint"] is None
+
+
+def test_givecoins_validation_and_missing_user(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    assert c.get("/s/tok/api/fx/car-race", query_string={"cmd": "givecoins", "id": "1", "user": "A",
+                                                          "n": "abc"}).status_code == 400
+    assert c.get("/s/tok/api/fx/car-race", query_string={"cmd": "coins", "id": "%userId%",
+                                                          "user": "%user%"}).status_code == 400
+    assert q(c, cmd="givecoins", id="1", user="A", n="-20")["coins"] == 0
