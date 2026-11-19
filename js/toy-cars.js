@@ -532,7 +532,7 @@
   function carbonUV(car) {
     var inv = null, v = new THREE.Vector3(), n = new THREE.Vector3();
     car.traverse(function (x) {
-      if (!x.isMesh || Array.isArray(x.material) || !x.material.userData.carbon) return;
+      if (!x.isMesh || Array.isArray(x.material) || !x.material.userData.carbon || x.material.alphaMap) return;   // Plaketten-Maske braucht die Modell-UVs
       if (!inv) { car.updateMatrixWorld(true); inv = new THREE.Matrix4().copy(car.matrixWorld).invert(); }
       var M = new THREE.Matrix4().multiplyMatrices(inv, x.matrixWorld), id = x.geometry.uuid + ':' + M.elements.map(function (e) { return e.toFixed(4); }).join(',');
       var g = CARBON_GEO[id];
@@ -587,6 +587,13 @@
     };
     c.customProgramCacheKey = function () { return 'detail'; };
   }
+  // Textur nur noch als Schnittmaske (Alpha), Farbe kommt allein aus der Bereichsfarbe
+  function cutOnly(c) {
+    c.onBeforeCompile = function (sh) {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '#ifdef USE_MAP\n  diffuseColor.a *= texture2D( map, vUv ).a;\n#endif');
+    };
+    c.customProgramCacheKey = function () { return 'cutonly'; };
+  }
   // op: Deckkraft bei Glas (0.05–1), sonst ohne Bedeutung
   function zoneMat(m, hex, f, flat, op) {
     var k = 'z:' + f + ':' + m.uuid + ':' + hex + (flat ? ':flat' : '') + (f === 'glass' ? ':' + (op != null ? op : '') : '');
@@ -597,15 +604,17 @@
       // Darum Helligkeit anheben, Farbton behalten (Gold-Chrom geht weiter)
       if (f === 'chrome') { var hsl = {}; c.color.getHSL(hsl); c.color.setHSL(hsl.h, hsl.s * 0.6, Math.max(hsl.l, 0.8)); c.envMapIntensity = 1.4; }
       c.color.convertSRGBToLinear();
-      if (flat || !c.map) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; } else detailMap(c);
+      // ausgeschnittene Textur (alphaTest, Logos/Gitter): bei „Flat colour“ bleibt sie nur als Schnittmaske
+      if (flat && c.map && m.alphaTest > 0 && !c.alphaMap) cutOnly(c);
+      else if (flat || !c.map) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; } else detailMap(c);
       c.metalnessMap = null; c.roughnessMap = null;
       c.metalness = F[0]; c.roughness = F[1];
       // Glas: bleibt durchsichtig, die Farbe tönt nur (getönte Scheiben, farbige Lampengläser); mindestens 0,3 ohne Regler
       if (f === 'glass') { c.transparent = true; c.opacity = op != null ? Math.max(0.05, Math.min(1, op)) : Math.max(0.3, Math.min(m.transparent ? m.opacity : 1, 0.55)); c.depthWrite = false; c.alphaTest = 0; }
       // alle anderen Oberflächen sind deckend – auch auf Scheiben (sonst blieb z. B. „Gloss“ auf der Frontscheibe
       // bei 30 % Deckkraft und wirkte unsichtbar); ausgeschnittene Texturen (alphaTest) bleiben ausgeschnitten
-      else { c.transparent = false; c.opacity = 1; c.depthWrite = true; if (!c.map) c.alphaTest = 0; if ('transmission' in c) c.transmission = 0; }
-      if (isCarbon(f)) {
+      else { c.transparent = false; c.opacity = 1; c.depthWrite = true; if (!c.map && !c.alphaMap) c.alphaTest = 0; if ('transmission' in c) c.transmission = 0; }
+      if (isCarbon(f) && !(m.alphaTest > 0 && m.map && !m.alphaMap)) {   // Schnitt über die Textur-Alpha: dann ohne Gewebe
         var ct = carbonTex();
         c.map = ct; c.onBeforeCompile = function () {}; c.customProgramCacheKey = function () { return 'carbon'; };
         c.normalMap = null; c.aoMap = null; c.bumpMap = ct; c.bumpScale = 0.004;

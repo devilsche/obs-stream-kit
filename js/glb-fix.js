@@ -43,6 +43,51 @@
   function isGlassName(n) { return /glass|glas|window|scheibe|windshield/i.test(n || '') && !isLampName(n); }
   // Lampengläser (bernstein, Scheinwerfer, Rückleuchten) bleiben durchscheinend, sonst verschwinden die Lampen
   function isLampName(n) { return /amber|bronze|lamp|light|head|tail|indicator|blinker|clear|lens/i.test(n || ''); }
+  // Plaketten aus Spiele-Exporten (SF90 Spider „BadgeA“: Pferd hinten, Schriftzug, Wappen) haben keine Alpha-
+  // Maske: das Motiv steckt in der Normal-Map (Relief) bzw. als Farbe auf einer einheitlichen Grundfarbe, die
+  // Fläche drumherum zeigt sonst einen grauen Rand. Maske: Normal-Map weicht von flach ab ODER Farbe weicht von der
+  // Grundfarbe ab (1 px aufgeweitet) → alphaMap + alphaTest. Nur wenn die Grundfarbe ≥ 30 % des Bildes ausmacht.
+  var DECAL = /badge|emblem|logo|decal|sticker/i;
+  function cutMask(base, nrm, w, h) {
+    var n = w * h, cnt = {}, best = null, i;
+    for (i = 0; i < n; i++) { var q = (base[i * 4] >> 3) + ',' + (base[i * 4 + 1] >> 3) + ',' + (base[i * 4 + 2] >> 3); cnt[q] = (cnt[q] || 0) + 1; if (!best || cnt[q] > cnt[best]) best = q; }
+    if (!best || cnt[best] < n * 0.3) return null;
+    var bg = [0, 0, 0], bn = 0;
+    for (i = 0; i < n; i++) if ((base[i * 4] >> 3) + ',' + (base[i * 4 + 1] >> 3) + ',' + (base[i * 4 + 2] >> 3) === best) { bg[0] += base[i * 4]; bg[1] += base[i * 4 + 1]; bg[2] += base[i * 4 + 2]; bn++; }
+    bg = bg.map(function (x) { return x / bn; });
+    var keep = new Uint8Array(n);
+    for (i = 0; i < n; i++) {
+      var cd = Math.max(Math.abs(base[i * 4] - bg[0]), Math.abs(base[i * 4 + 1] - bg[1]), Math.abs(base[i * 4 + 2] - bg[2]));
+      var dv = Math.max(Math.abs(nrm[i * 4] - 128), Math.abs(nrm[i * 4 + 1] - 128));
+      keep[i] = cd > 12 || dv > 10 ? 1 : 0;
+    }
+    var out = new Uint8Array(n);
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var k = 0;
+      for (var dy = -1; dy <= 1 && !k; dy++) for (var dx = -1; dx <= 1 && !k; dx++) {
+        var yy = y + dy, xx = x + dx; if (yy >= 0 && yy < h && xx >= 0 && xx < w && keep[yy * w + xx]) k = 1;
+      }
+      out[y * w + x] = k ? 255 : 0;
+    }
+    return out;
+  }
+  function decalCutout(m) {
+    try {
+      var img = m.map.image, nimg = m.normalMap.image; if (!img || !nimg || typeof document === 'undefined') return;
+      var w = Math.min(img.width || 0, 1024), h = Math.min(img.height || 0, 1024); if (!w || !h) return;
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h; var g = cv.getContext('2d');
+      g.drawImage(img, 0, 0, w, h); var base = g.getImageData(0, 0, w, h).data;
+      g.clearRect(0, 0, w, h); g.drawImage(nimg, 0, 0, w, h); var nrm = g.getImageData(0, 0, w, h).data;
+      var mask = cutMask(base, nrm, w, h); if (!mask) return;
+      var id = g.createImageData(w, h);
+      for (var i = 0; i < w * h; i++) { id.data[i * 4] = id.data[i * 4 + 1] = id.data[i * 4 + 2] = mask[i]; id.data[i * 4 + 3] = 255; }
+      g.putImageData(id, 0, 0);
+      var t = new THREE.CanvasTexture(cv), s = m.map;
+      t.flipY = s.flipY; t.wrapS = s.wrapS; t.wrapT = s.wrapT; t.repeat.copy(s.repeat); t.offset.copy(s.offset);
+      t.center.copy(s.center); t.rotation = s.rotation; t.matrixAutoUpdate = s.matrixAutoUpdate; if (!s.matrixAutoUpdate) t.matrix.copy(s.matrix);
+      m.alphaMap = t; m.alphaTest = 0.5; m.transparent = false; m.depthWrite = true;
+    } catch (e) { /* ohne Canvas (Node) oder fremde Bildquelle: Plakette bleibt wie sie ist */ }
+  }
   function tinted(m) { var c = m.color; return !!c && Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b) > 0.25; }
   // Vertex-Farben mit Alpha (COLOR_0 als VEC4): three r128 multipliert das Alpha in die Deckkraft. Spiele-Exporte
   // (Ferrari Roma, SF90, GT3 Touring …) speichern dort eine Maske ≈ 0 → Teile schreiben Alpha 0, in OBS sieht man
@@ -94,6 +139,8 @@
       // Texturen mit Transparenz (Logos, Embleme, Aufkleber, Gitter): ausschneiden statt einfärben,
       // dann gibt es keine Sortierfehler und keinen dunklen Kasten ums Logo
       m.transparent = false; m.opacity = 1; m.alphaTest = 0.5; m.depthWrite = true;
+    } else if (DECAL.test(m.name || '') && m.map && m.normalMap && !see) {
+      decalCutout(m);
     }
     m.needsUpdate = true;
   }
@@ -474,5 +521,5 @@
     obj.userData.paintMats = paint; obj.userData.rimMats = rims;
   }
 
-  root.GlbFix = { prepare: prepare, setPaint: setPaint, setRims: setRims };
+  root.GlbFix = { prepare: prepare, setPaint: setPaint, setRims: setRims, cutMask: cutMask };
 })(typeof window !== 'undefined' ? window : this);
