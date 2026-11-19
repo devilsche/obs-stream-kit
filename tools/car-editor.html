@@ -698,6 +698,25 @@
         Object.keys(best).forEach(function (u) { if (best[u].d < s0.r * 1.5 + 0.02 && out.indexOf(best[u].k) < 0) out.push(best[u].k); });
         return out;
       }
+      // Treffer wählen: through = „Click through glass“. Durchklicken nur bei echtem Glas (durchsichtig ohne
+      // Ausschnitt-Maske, oder Glas-Name); ausgeschnittene Plaketten (alphaTest/alphaMap) zählen als fest. Liegen
+      // Treffer fast deckungsgleich (< 2 mm, z. B. Wappen auf dem Kotflügel), gewinnt das kleinere Teil (die Plakette)
+      function pickHit(hits, through) {
+        var ok = hits.filter(function (h) {
+          if (!h.object.isMesh) return false;
+          var m = Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex] : h.object.material;
+          if (!m || m.visible === false) return false;
+          if (!through) return true;   // durchsichtige Teile wählbar
+          var cut = m.alphaTest > 0 || !!m.alphaMap;
+          var glass = /glass|glas|window|scheibe|windshield/i.test(m.name || '') || (m.transparent && m.opacity < 0.95 && !cut);
+          return !glass;
+        });
+        if (!ok.length) return null;
+        var size = function (h) { var g = h.object.geometry; if (!g.boundingSphere) g.computeBoundingSphere(); return g.boundingSphere.radius * h.object.matrixWorld.getMaxScaleOnAxis(); };
+        var best = ok[0], near = 0.002 * (holder.children[0] && holder.children[0].userData.dims ? holder.children[0].userData.dims.L / 4.4 : 1);
+        ok.forEach(function (h) { if (h.distance - ok[0].distance < near && size(h) < size(best)) best = h; });
+        return best;
+      }
       var down = null, ray = new THREE.Raycaster();
       canvas.addEventListener('pointerdown', function (e) { down = { x: e.clientX, y: e.clientY }; });
       canvas.addEventListener('pointerup', function (e) {
@@ -706,13 +725,7 @@
         var r = canvas.getBoundingClientRect();
         ray.setFromCamera(new THREE.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), cam);
         // Glas und Durchsichtiges überspringen: der Klick geht durch die Scheibe auf das Teil dahinter
-        var hit = ray.intersectObject(holder, true).filter(function (h) {
-          if (!h.object.isMesh) return false;
-          var m = Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex] : h.object.material;
-          if (!m || m.visible === false) return false;
-          if (!$('clickGlass').checked) return true;   // durchsichtige Teile wählbar
-          return !m.transparent && m.opacity >= 0.95 && !/glass|glas|window|scheibe|windshield/i.test(m.name || '');
-        })[0];
+        var hit = pickHit(ray.intersectObject(holder, true), $('clickGlass').checked);
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
         if (picking === 'cut') { cutClick(hit); return; }
