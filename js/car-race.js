@@ -445,7 +445,8 @@
     var tmpV = new THREE.Vector3();
     // Schilder: Text, Größe, Gedränge (hinteres kleiner/blasser), Rand-Fade, Ein-/Ausblenden
     function updateLabels(list, dt) {
-      var hpx = clamp(H * 0.055, 13, 30), tanV = Math.tan(FOV * Math.PI / 360);
+      var podium = race && race.stage === 'podium';
+      var hpx = podium ? podiumHpx() : clamp(H * 0.055, 13, 30), tanV = Math.tan(FOV * Math.PI / 360);
       var placed = [];
       list.forEach(function (it) {
         var r = it.r, L = r.label, up = r.flash > 0;
@@ -453,11 +454,11 @@
         tmpV.set(r.holder.position.x, r.holder.position.y + r.height + 0.9, r.holder.position.z).project(cam);
         var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H, wpx = hpx * L.boxW / LABEL_H;
         var crowd = placed.some(function (o) { return Math.abs(o.px - px) < (o.w + wpx) / 2 && Math.abs(o.py - py) < hpx * 1.1; });
-        r.labelK = ease(r.labelK, crowd && !up ? 0 : 1, 0.2, dt);
+        r.labelK = ease(r.labelK, crowd && !up && !podium ? 0 : 1, 0.2, dt);
         // Überholt: kurzer Puls (bei reduzierter Bewegung nur der Akzentrand)
         var pulse = up && !reduce ? 1 + 0.18 * Math.sin(Math.min(1, (FLASH - r.flash) / 0.5) * Math.PI) : 1;
         var k = lerp(0.62, 1, r.labelK) * pulse, edge = Math.min(px, W - px, py, H - py);
-        var ef = clamp((edge - hpx * 0.5) / (hpx * 2), 0, 1);
+        var ef = podium ? 1 : clamp((edge - hpx * 0.5) / (hpx * 2), 0, 1);   // Podest: Kamera hält die Schilder im Bild
         L.vis = ease(L.vis, it.show ? 1 : 0, 0.25, dt);
         var sy = hpx * k / H * 2 * tanV;
         L.sprite.scale.set(sy * LABEL_W / LABEL_H, sy, 1);
@@ -631,12 +632,30 @@
         if (r.streak) r.streak.meshes.forEach(function (m) { m.visible = false; });
         if (!onPodium[r.id]) { r.holder.visible = false; r.label.sprite.visible = false; }
       });
-      var px = clamp(W * 0.72 / (total + 4), PX_MIN, 24);
-      race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts,
-        cam: { x: spot.x, z: spot.z, y: 1.6, px: px } };
+      race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts };
+      race.podium.cam = podiumCam(race.podium, spot, total);
       race.stage = 'podium';
       race.fadeAt = srvNow() + PODIUM_HOLD;
       upgradeWinnerModel(cars[0]);
+    }
+    // Podest-Kamera: nah und flach (30°), so dass die drei Autos samt Schildern das Fenster füllen;
+    // oben bleibt Platz für den Titel, unten für die Punkte-Schilder und die DNF-Zeile
+    var PODIUM_TILT = 30 * Math.PI / 180;
+    function podiumHpx() { return clamp(H * 0.1, 34, 56); }
+    function podiumCam(pd, spot, total) {
+      var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fsP = clamp(H * 0.05, 16, 26);
+      var hpx = podiumHpx(), labelW = hpx * 4.2;
+      var xs = pd.cars.map(function (c) { return c.x; }), spanC = Math.max(1, Math.max.apply(null, xs) - Math.min.apply(null, xs));
+      var stack = Math.max.apply(null, pd.cars.map(function (c) { return c.top + c.r.height + 0.9; }));
+      var topR = m + rh * 1.6 + hpx, botR = m + fsP * 3.2 + (pd.dnf.length ? rh * 1.4 : 0);
+      var cosT = Math.cos(PODIUM_TILT), sinT = Math.sin(PODIUM_TILT);
+      var pxW = Math.min((W - 2 * m - labelW) / spanC, (W - 2 * m) / (total + 1));
+      var pxH = (H - topR - botR) / (stack * cosT + 4 * sinT);
+      var px = clamp(Math.min(pxW, pxH), PX_MIN, 90);
+      // Mitte des Stapels (Boden bis Schild) auf die Mitte des freien Bereichs legen
+      var off = (topR + (H - botR)) / 2 - H / 2;
+      var cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
+      return { x: cx, z: spot.z, y: stack / 2 + off / (px * cosT), px: px, tilt: PODIUM_TILT, orb: 0 };
     }
     // freier Platz fürs Podest kurz vor der Ziellinie (Seite egal), sonst weiter draußen
     function podiumSpot(width) {
@@ -672,16 +691,20 @@
       pill(hud, (W - tw) / 2, m, tw, rh * 1.25);
       hud.fillStyle = TK.accent; hud.fillText(title, W / 2, m + rh * 0.65);
       // Punkte je Podestplatz unter dem Block: „+10 → 47 pts · #2 this month“
+      // zweizeilig, damit drei Schilder nebeneinander passen: „+10 → 47 pts“ / „#2 this month“ (Text ≥ 16 px)
+      var fsP = clamp(H * 0.05, 16, 26);
       pd.cars.forEach(function (c) {
         if (!c.pts) return;
-        var t = '+' + (c.pts.gained | 0) + ' → ' + (c.pts.month_total | 0) + ' pts' + (c.pts.month_rank ? ' · #' + c.pts.month_rank + ' this month' : '');
-        tmpV.set(c.x, 0, c.z + 2.6).project(cam);
-        var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H + rh * 0.5;
-        hud.font = font(700, fs * 0.85);
-        var w = hud.measureText(t).width + rh * 0.8;
-        px = clamp(px, m + w / 2, W - m - w / 2); py = clamp(py, m + rh * 2, H - m - rh * 2.4);
-        pill(hud, px - w / 2, py - rh * 0.5, w, rh);
-        hud.fillStyle = c.place === 1 ? TK.accent : TK.text; hud.fillText(t, px, py);
+        var t1 = '+' + (c.pts.gained | 0) + ' \u2192 ' + (c.pts.month_total | 0) + ' pts', t2 = c.pts.month_rank ? '#' + c.pts.month_rank + ' this month' : '';
+        tmpV.set(c.x, 0.25, c.z + 2.0).project(cam);
+        var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H + 6;
+        hud.font = font(800, fsP); var w1 = hud.measureText(t1).width;
+        hud.font = font(600, fsP); var w2 = t2 ? hud.measureText(t2).width : 0;
+        var w = Math.max(w1, w2) + fsP * 1.1, h = fsP * (t2 ? 2.6 : 1.5);
+        px = clamp(px, m + w / 2, W - m - w / 2); py = clamp(py, m + rh * 2, H - m - h - (pd.dnf.length ? rh * 1.4 : 0));
+        pill(hud, px - w / 2, py, w, h);
+        hud.font = font(800, fsP); hud.fillStyle = c.place === 1 ? TK.accent : TK.text; hud.fillText(t1, px, py + fsP * 0.78);
+        if (t2) { hud.font = font(600, fsP); hud.fillStyle = TK.text; hud.fillText(t2, px, py + fsP * 1.88); }
       });
       if (pd.dnf.length) {
         hud.font = font(600, fs * 0.8);
@@ -723,9 +746,12 @@
       c.x = ease(c.x, fit.x + c.vx * tauP, tauP, dt); c.z = ease(c.z, fit.z + c.vz * tauP, tauP, dt);
       c.lp = ease(c.lp, Math.log(fit.px), tauZ, dt);
       c.ty = ease(c.ty || 0, fit.y || 0, tauP, dt);   // Blickhöhe (Podest: auf die Autos statt auf den Boden)
+      // Neigung und Umlaufwinkel (Podest: flacher, langsames Schwenken); weich übergeblendet
+      c.tilt = ease(c.tilt == null ? TILT : c.tilt, fit.tilt != null ? fit.tilt : TILT, tauZ, dt);
+      c.orb = ease(c.orb || 0, fit.orb || 0, tauP, dt);
       var px = Math.exp(c.lp), visW = W / px, tanH = Math.tan(FOV * Math.PI / 360) * (W / H);
-      var D = visW / (2 * tanH);
-      cam.position.set(c.x, c.ty + D * Math.sin(TILT), c.z + D * Math.cos(TILT));
+      var D = visW / (2 * tanH), hor = D * Math.cos(c.tilt);
+      cam.position.set(c.x + hor * Math.sin(c.orb), c.ty + D * Math.sin(c.tilt), c.z + hor * Math.cos(c.orb));
       cam.lookAt(c.x, c.ty, c.z);
     }
 
@@ -1000,6 +1026,8 @@
           var wn = pd.cars[0];
           puff('spark', wn.x + (Math.random() - 0.5) * wn.r.len, wn.top + wn.r.height + 1.5 + Math.random(), wn.z + (Math.random() - 0.5) * 2, { life: 0.9, size: 0.3 });
         }
+        // langsames Schwenken um das Podest (±0,22 rad, Periode ~25 s); bei reduzierter Bewegung steht die Kamera
+        pd.cam.orb = reduce ? 0 : 0.22 * Math.sin(pd.t * 0.25);
         camFix = pd.cam;
       } else if (race.stage === 'grid') {
         if (race.gridSim) race.order.forEach(function (r, i) {
