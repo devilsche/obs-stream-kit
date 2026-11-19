@@ -322,18 +322,42 @@ def test_unknown_tenant_404(conn, tmp_path):
     assert c.post("/s/tok/api/fx/car-race/result", json={}).status_code == 404
 
 
-def test_race_with_test_racer_is_never_recorded(conn, tmp_path, clock):
-    c = _client(conn, tmp_path)
-    _join(c, "a")
-    _join(c, "b")
-    c.get("/s/tok/api/fx/car-race?cmd=join&test=1")
+def _test_race(c, clock, reals, tests, places):
+    for u in reals:
+        _join(c, u)
+    for _ in range(tests):
+        c.get("/s/tok/api/fx/car-race?cmd=join&test=1")
     c.get("/s/tok/api/fx/car-race?cmd=start")
     rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
-    clock["now"] = T + I3 + 1
-    r = c.post("/s/tok/api/fx/car-race/result", json={"race_id": rid, "places": [1, 2, 3]}).get_json()
+    clock["now"] = T + I3 + 10  # Vorstellung dauert mit mehr Fahrern länger
+    return c.post("/s/tok/api/fx/car-race/result", json={"race_id": rid, "places": places}).get_json()
+
+
+def test_race_with_test_racers_counts_real_racers_reranked(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    # Start: a, b, test1..3 ; Ziel: test1, b, test2, a, test3 -> echt: b=1, a=2
+    r = _test_race(c, clock, "ab", 3, [4, 2, 1, 3, 5])
+    assert r["counted"] is True
+    assert set(r["points"]) == {"a", "b"}
+    assert r["points"]["b"]["gained"] == 2 and r["points"]["a"]["gained"] == 0
+    rows = conn.execute("SELECT user_id, place, field FROM fx_race_result ORDER BY user_id").fetchall()
+    assert [(x["user_id"], x["place"], x["field"]) for x in rows] == [("a", 2, 2), ("b", 1, 2)]
+    board = c.get("/s/tok/api/fx/car-race?cmd=board&scope=all").get_json()
+    assert {x["user_id"] for x in board["rows"]} == {"a", "b"}
+
+
+def test_race_with_one_real_racer_is_not_recorded(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    r = _test_race(c, clock, "a", 2, [1, 2, 3])
     assert r["counted"] is False
     assert conn.execute("SELECT COUNT(*) FROM fx_race_result").fetchone()[0] == 0
     assert c.get("/s/tok/api/fx/car-race/state").get_json()["phase"] == "podium"
+
+
+def test_real_dnf_stays_dnf_with_test_racers(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    r = _test_race(c, clock, "ab", 1, [None, 2, 1])
+    assert r["counted"] is True and r["points"]["a"]["gained"] == 0 and r["points"]["b"]["gained"] == 2
 
 
 def test_failed_write_can_be_retried_and_void_ignores_unstored(conn, tmp_path, clock, monkeypatch):

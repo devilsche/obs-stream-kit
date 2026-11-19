@@ -279,8 +279,14 @@ def accept_result(tenant_id, race_id, places, now):
         fin = sorted(p for p in places if p is not None)
         if fin != list(range(1, len(fin) + 1)):
             raise ValueError("places must be 1..k without gaps")
+        # Nur echte Fahrer werden gewertet: Testfahrer bekommen keine Zeilen/Punkte, die echten
+        # Zielplätze werden ohne sie neu vergeben (Zielreihenfolge bleibt), DNF bleibt DNF
+        real = [(r, p) for r, p in zip(racers, places) if not r.get("test")]
+        order = {r["user_id"]: i for i, (r, p) in enumerate(sorted(
+            ((r, p) for r, p in real if p is not None), key=lambda x: x[1]), 1)}
         rows = [{"user_id": r["user_id"], "login": r["login"], "display": r["display"],
-                 "place": p, "car_key": r["car_key"] or ""} for r, p in zip(racers, places)]
+                 "place": order.get(r["user_id"]) if p is not None else None,
+                 "car_key": r["car_key"] or ""} for r, p in real]
         t["race_end"] = now
         t["result"] = sorted(({"user_id": r["user_id"], "display": r["display"], "place": p}
                               for r, p in zip(racers, places)),
@@ -288,8 +294,8 @@ def accept_result(tenant_id, race_id, places, now):
         t["phase"] = "podium"
         t["podium_until"] = now + PODIUM
         t["ends_at"] = t["podium_until"]
-        if any(r.get("test") for r in racers):
-            # Testfahrer vergeben nie Punkte: Rennen wird nicht gespeichert
+        if len(rows) < 2:
+            # weniger als 2 echte Fahrer: Rennen wird nicht gespeichert
             t["counted"] = True
             return None
         t["saving"] = race_id  # bis confirm/release: weitere Meldungen gelten als „schon dabei“
