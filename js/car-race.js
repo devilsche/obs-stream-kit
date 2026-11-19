@@ -111,6 +111,10 @@
     resize();
     root.addEventListener('resize', resize);
     if (STAGE && stageEl) stageEl.classList.toggle('is-stage', true);
+    // Klänge (js/car-race-sound.js): in OBS sofort, im Browser-Tab erst nach dem ersten Klick/Tastendruck
+    var snd = root.CarRaceSound ? CarRaceSound.create({ enabled: opts.sound !== false, volume: opts.volume }) : null;
+    if (snd) ['pointerdown', 'keydown'].forEach(function (ev) { root.addEventListener(ev, function () { snd.resume(); }); });
+    var sndSeen = null, sndLit = 0;   // schon bekannte Fahrer (Pling nur für neue), Startampel-Stufe
 
     // ---- Theme-Farben aus den Proben im HTML (aufgelöst, also auch color-mix & Co.) ----
     var TK = { surface: '#1d1128', text: '#ffffff', dim: '#c9bdd6', accent: '#f2b705', border: '#5e2a79', font: "'DM Sans', sans-serif" };
@@ -598,6 +602,7 @@
       buildTrack(T);
     }
     function teardown() {
+      if (snd) snd.silence();
       if (!race) return;
       Object.keys(race.racers).forEach(function (id) { disposeRacer(race.racers[id]); });
       clearOil(); clearPuffs(); clearRankDom();
@@ -638,6 +643,7 @@
       var t = srvNow() - race.startsAt;
       race.hl = null; race.hlLast = -1e9; race.hlIdx = 0;
       if (t > 0.5) { stepTo(Math.min(t, 120)); race.cam = null; }   // Neuladen: dieselbe Rennsituation
+      else if (snd && visible) snd.go();
       snap();
     }
     function snap() {
@@ -688,6 +694,7 @@
     var waitLogged = false;
     function apply(st) {
       var ph = st.phase;
+      soundJoins(st);
       if (STAGE) applyStage(st);
       if (!preview && !race && (ph === 'idle' || ph === 'lobby') && !waitLogged) {
         waitLogged = true;   // leere Seite erklärbar machen (Dashboard-Link ohne ?preview=1)
@@ -717,6 +724,13 @@
       }
     }
     // Vollbild-Layout: in lobby/countdown nur eine Lobby-Karte unten rechts, die 3D-Bühne erst ab der Vorstellung
+    function soundJoins(st) {
+      if (!snd) return;
+      var ph = st.phase, ids = (st.racers || []).map(function (r) { return r.user_id; });
+      if (ph !== 'lobby' && ph !== 'countdown') { sndSeen = null; return; }
+      if (sndSeen) ids.forEach(function (id) { if (!sndSeen[id]) snd.join(); });
+      sndSeen = {}; ids.forEach(function (id) { sndSeen[id] = 1; });
+    }
     function applyStage(st) {
       var ph = st.phase;
       lobbyCard = (ph === 'lobby' || ph === 'countdown') && (st.racers || []).length ? st : null;
@@ -940,6 +954,7 @@
       race.stage = 'podium';
       race.fadeAt = srvNow() + PODIUM_HOLD;
       upgradeWinnerModel(cars[0]);
+      if (snd) { snd.silence(); snd.cheer(); snd.fanfare(); }
       cars.forEach(function (c) { if (!c.r.isModel) queueModel(c.r); });   // im Rennen nicht geladene Podest-Autos jetzt
     }
     // Podest-Kamera: nah und flach (30°), so dass die drei Autos samt Schildern das Fenster füllen;
@@ -1079,7 +1094,9 @@
     // Karte ≥ 1,5 s), die letzten 3 s Totale mit Startampel; alles ease-in-out
     var INTRO_SWING = 2.5, INTRO_WIDE = 4.5, INTRO_LIGHTS = 3.0, INTRO_MIN = 2.5;
     function introPlan(n) {
-      var total = introSeconds(n), wide = INTRO_WIDE, avail = total - wide - INTRO_LIGHTS, groups = [], gs;
+      // Dauer vom Server (starts_at − intro_at), sonst nach Formel; zu kurz: Schwenk/Totale stauchen
+      var total = race.startsAt != null && race.introAt != null && race.startsAt > race.introAt ? race.startsAt - race.introAt : introSeconds(n);
+      var wide = Math.min(INTRO_WIDE, total * 0.3), avail = Math.max(0.5, total - wide - INTRO_LIGHTS), groups = [], gs;
       // immer je Startreihe (2 Autos nebeneinander), Restzeit gleichmäßig auf die Reihen verteilt
       gs = 2;
       // Gruppen von hinten nach vorn; Paare = Startreihen (Startplätze 2r+1, 2r+2)
@@ -1095,7 +1112,7 @@
       var high = { x: fit.x, z: fit.z, y: 0, px: fit.px, tilt: TILT, orb: 0, wide: 1, focus: -1 };
       // reinschwenken: von hoch, weit und seitlich versetzt auf die Totale, dann halten
       var far = Object.assign({}, high, { px: high.px * 0.45, tilt: 72 * Math.PI / 180, orb: -0.7 });
-      keys.push(Object.assign({ t: 0 }, far), Object.assign({ t: INTRO_SWING }, high), Object.assign({ t: plan.wide }, high));
+      keys.push(Object.assign({ t: 0 }, far), Object.assign({ t: Math.min(INTRO_SWING, plan.wide * 0.6) }, high), Object.assign({ t: plan.wide }, high));
       plan.groups.forEach(function (g, k) {
         var t0 = plan.wide + k * plan.per, sl = g.map(gridSlot), rs = g.map(function (i) { return race.order[i]; });
         var cx = 0, cz = 0, md = 0; sl.forEach(function (q) { cx += q.x / sl.length; cz += q.z / sl.length; md += q.d / sl.length; });
@@ -1459,8 +1476,10 @@
     }
     // Startampel in den letzten 2 s vor dem Start: drei rote Lichter gehen nacheinander an, dazu 3-2-1
     function drawLights(left) {
-      if (!(left > 0 && left <= 2)) return;
+      if (!(left > 0 && left <= 2)) { sndLit = 0; return; }
       var lit = Math.min(3, Math.floor((2 - left) / (2 / 3)) + 1), rad = vh(1.2), gap = rad * 2.8;
+      if (snd && lit > sndLit) snd.beep();
+      sndLit = lit;
       var cx = W / 2, cy = Math.round(Math.min(W * 0.045, H * 0.07)) + rad * 1.6;
       pill(hud, cx - gap * 1.5 - rad * 0.4, cy - rad * 1.4, gap * 3 + rad * 0.8, rad * 2.8);
       for (var i = 0; i < 3; i++) {
@@ -1739,6 +1758,14 @@
         if (sim.time - e.t > 1.5) continue;
         var r = race.order[idx[e.id]], o = e.other != null ? race.order[idx[e.other]] : null;
         if (!r) continue;
+        if (snd && visible && sim.time - e.t <= 0.3) {
+          if (e.type === 'overtake') snd.whoosh();
+          else if (e.type === 'spin') snd.squeal();
+          else if (e.type === 'off') snd.gravel();
+          else if (e.type === 'crash' || e.type === 'bump') snd.thud(true);
+          else if (e.type === 'push') snd.thud(false);
+          else if (e.type === 'nitro') snd.nitro();
+        }
         var p = r.holder.position, back = rearOf(r, true);
         if (e.type === 'overtake') { r.flash = FLASH; }
         else if (e.type === 'spin') burst('smoke', back.x, back.z, 5);
@@ -1826,7 +1853,7 @@
         var inIntro = introT >= 0 && race.gridSim && race.order.length >= 3 && race.dropAt == null;
         var ishot = null;
         if (inIntro) {
-          if (!race.intro || race.intro.at !== race.introAt || race.intro.n !== race.order.length) {
+          if (!race.intro || race.intro.at !== race.introAt || race.intro.n !== race.order.length || race.intro.plan.total !== race.startsAt - race.introAt) {
             endIntro();
             race.intro = inView(buildIntro);
             var c0 = race.cam || { x: 0, z: 0, lp: Math.log(PX_MAX), ty: 0, tilt: TILT, orb: 0 };
@@ -1887,6 +1914,15 @@
           }
         });
         processEvents(sim, idx);
+        if (snd) {
+          var vs = 0, nv = 0, fireMax = 0;
+          sim.cars.forEach(function (c) {
+            if (c.state !== 'dnf' && c.place === null) { vs += c.v; nv++; }
+            if (c.wreck && c.burn != null) { var fa = sim.time - c.burn; fireMax = Math.max(fireMax, fa < 0 ? 0 : fa < 10 ? 1 : Math.max(0.25, 1 - (fa - 10) / 2.5)); }
+          });
+          snd.engine(visible && !sim.done, nv ? vs / nv : 0, race.hl ? highlightWeight(sim) : 0);
+          snd.fire(visible ? fireMax : 0);
+        }
         updateOil(sim);
         if (!reduce) streakTex.offset.x = (streakTex.offset.x - dt * 1.6) % 1;
         if (sim.done && !race.ended) finishRace();

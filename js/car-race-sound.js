@@ -1,0 +1,159 @@
+/* Car Race – Klänge, komplett mit Web Audio erzeugt (keine Audiodateien, keine Lizenzfragen).
+ *
+ *   var s = CarRaceSound.create({ enabled, volume })   → null, wenn kein Web Audio
+ *   s.resume()                       AudioContext starten (Browser-Tab: nach dem ersten Klick/Tastendruck)
+ *   s.join()                         leises „Pling“ (Fahrer meldet sich an)
+ *   s.beep(), s.go()                 Startampel: kurzer Piep je Licht, höherer Startton
+ *   s.engine(on, speed, boost)       Motorbrummen des Feldes (Rauschen + tiefe Oszillatoren), Tonhöhe folgt dem
+ *                                    mittleren Tempo (m/s); boost 0..1 = lauter (Unfall-Zoom)
+ *   s.nitro()                        Zischen + Turbopfeifen
+ *   s.thud(heavy)                    metallischer Schlag (Rempler, Crash)
+ *   s.squeal(), s.gravel()           Reifenquietschen (Dreher), Kies (Abflug)
+ *   s.whoosh()                       kurzes Vorbeirauschen (Überholen, höchstens alle 0,4 s)
+ *   s.fire(level)                    Knistern der Wrack-Brände, 0 = aus (je Bild aufrufen)
+ *   s.cheer(), s.fanfare()           Siegerehrung: Jubel (Rauschen schwillt an) + kurze Fanfare
+ *   s.silence()                      Dauerklänge aus (Motor, Feuer)
+ *
+ * Alles läuft über einen Master-Pegel und einen Kompressor/Begrenzer – nie laute Spitzen, insgesamt dezent.
+ */
+(function (root) {
+  'use strict';
+
+  function create(opts) {
+    opts = opts || {};
+    if (opts.enabled === false) return null;
+    var AC = root.AudioContext || root.webkitAudioContext;
+    if (!AC) return null;
+    var ctx;
+    try { ctx = new AC(); } catch (e) { return null; }
+    var vol = Math.max(0, Math.min(1, opts.volume == null ? 0.5 : +opts.volume));
+
+    // Master: Pegel → Kompressor/Begrenzer → Ausgang
+    var comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -20; comp.knee.value = 12; comp.ratio.value = 10; comp.attack.value = 0.004; comp.release.value = 0.25;
+    var master = ctx.createGain(); master.gain.value = vol * 0.6;
+    master.connect(comp); comp.connect(ctx.destination);
+
+    // gemeinsamer Rauschpuffer (2 s weißes Rauschen; feste Folge, damit nichts zufällig klingt)
+    var noiseBuf = (function () {
+      var n = ctx.sampleRate * 2, b = ctx.createBuffer(1, n, ctx.sampleRate), d = b.getChannelData(0), a = 1234567;
+      for (var i = 0; i < n; i++) { a = (a * 1103515245 + 12345) & 0x7fffffff; d[i] = a / 0x3fffffff - 1; }
+      return b;
+    })();
+    function now() { return ctx.currentTime; }
+    function noise(loop) { var s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = !!loop; return s; }
+    function env(g, t, a, peak, d) {   // Hüllkurve: Anstieg a, Spitze, Abklingen d
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), t + a);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + a + d);
+    }
+    function tone(type, f, t, a, peak, d, f2) {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(f, t);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + a + d);
+      env(g, t, a, peak, d); o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + a + d + 0.05);
+    }
+    function burst(filterType, f, q, t, a, peak, d, f2) {
+      var s = noise(false), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+      fl.type = filterType; fl.frequency.setValueAtTime(f, t); fl.Q.value = q || 1;
+      if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + a + d);
+      env(g, t, a, peak, d); s.connect(fl); fl.connect(g); g.connect(master);
+      s.start(t, Math.random() * 1.5); s.stop(t + a + d + 0.05);
+    }
+
+    // ---- Dauerklänge ----
+    var eng = null, fireG = null, fireNext = 0, lastWhoosh = -1;
+    function engineNodes() {
+      if (eng) return eng;
+      var out = ctx.createGain(); out.gain.value = 0; out.connect(master);
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380; lp.connect(out);
+      var o1 = ctx.createOscillator(), o2 = ctx.createOscillator();
+      o1.type = 'sawtooth'; o2.type = 'sawtooth'; o1.frequency.value = 48; o2.frequency.value = 49.5;
+      var og = ctx.createGain(); og.gain.value = 0.35; o1.connect(og); o2.connect(og); og.connect(lp);
+      var n = noise(true), bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 260; bp.Q.value = 0.8;
+      var ng = ctx.createGain(); ng.gain.value = 0.5; n.connect(bp); bp.connect(ng); ng.connect(out);
+      o1.start(); o2.start(); n.start();
+      return (eng = { out: out, o1: o1, o2: o2, bp: bp, lp: lp });
+    }
+
+    var api = {
+      ctx: ctx,
+      resume: function () { if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(function () {}); },
+      join: function () { var t = now(); tone('sine', 1320, t, 0.005, 0.12, 0.3); tone('sine', 1980, t + 0.04, 0.005, 0.05, 0.25); },
+      beep: function () { tone('square', 880, now(), 0.005, 0.07, 0.16); },
+      go: function () { var t = now(); tone('square', 1320, t, 0.005, 0.09, 0.55); tone('sine', 660, t, 0.005, 0.05, 0.5); },
+      engine: function (on, speed, boost) {
+        if (!on && !eng) return;
+        var e = engineNodes(), t = now(), v = Math.max(0, speed || 0);
+        e.out.gain.setTargetAtTime(on ? 0.11 * (1 + 0.8 * (boost || 0)) : 0, t, on ? 0.4 : 0.25);
+        e.o1.frequency.setTargetAtTime(42 + v * 3.2, t, 0.3);
+        e.o2.frequency.setTargetAtTime(43.5 + v * 3.25, t, 0.3);
+        e.bp.frequency.setTargetAtTime(180 + v * 18, t, 0.3);
+        e.lp.frequency.setTargetAtTime(300 + v * 14, t, 0.3);
+      },
+      nitro: function () {
+        var t = now();
+        burst('highpass', 2500, 0.7, t, 0.05, 0.12, 1.1);
+        tone('sine', 1400, t + 0.05, 0.08, 0.05, 0.8, 3200);
+      },
+      thud: function (heavy) {
+        var t = now(), k = heavy ? 1 : 0.6;
+        tone('sine', 110, t, 0.004, 0.25 * k, 0.28, 38);
+        burst('bandpass', 1700, 6, t, 0.002, 0.12 * k, 0.12);
+        tone('triangle', 620, t + 0.01, 0.002, 0.05 * k, 0.35, 540);
+      },
+      squeal: function () {
+        var t = now(), o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), g = ctx.createGain(), bp = ctx.createBiquadFilter();
+        o.type = 'sawtooth'; o.frequency.value = 1050; lfo.frequency.value = 23; lg.gain.value = 40;
+        lfo.connect(lg); lg.connect(o.frequency);
+        bp.type = 'bandpass'; bp.frequency.value = 1500; bp.Q.value = 4;
+        env(g, t, 0.04, 0.045, 0.65); o.connect(bp); bp.connect(g); g.connect(master);
+        o.start(t); lfo.start(t); o.stop(t + 0.75); lfo.stop(t + 0.75);
+      },
+      gravel: function () {
+        var t = now();
+        for (var i = 0; i < 6; i++) burst('lowpass', 900, 0.7, t + i * 0.07, 0.01, 0.06, 0.12);
+      },
+      whoosh: function () {
+        var t = now();
+        if (t - lastWhoosh < 0.4) return;
+        lastWhoosh = t;
+        burst('bandpass', 400, 1.2, t, 0.12, 0.05, 0.28, 2200);
+      },
+      fire: function (level) {
+        level = Math.max(0, Math.min(1, level || 0));
+        if (!fireG && level <= 0) return;
+        var t = now();
+        if (!fireG) {
+          fireG = ctx.createGain(); fireG.gain.value = 0; fireG.connect(master);
+          var n = noise(true), lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 650;
+          n.connect(lp); lp.connect(fireG); n.start();
+        }
+        fireG.gain.setTargetAtTime(0.05 * level, t, 0.3);
+        // Knacken: kurze Knackser in unregelmäßigen Abständen
+        if (level > 0 && t >= fireNext) { burst('highpass', 2200, 0.8, t, 0.001, 0.05 * level, 0.04); fireNext = t + 0.05 + Math.random() * 0.25 / level; }
+      },
+      cheer: function () {
+        var t = now();
+        [700, 1100, 1700].forEach(function (f, i) {
+          var s = noise(false), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+          bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 0.9;
+          g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.06 / (i + 1), t + 1.0);
+          g.gain.setValueAtTime(0.06 / (i + 1), t + 2.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 4.6);
+          s.connect(bp); bp.connect(g); g.connect(master); s.start(t, i * 0.4); s.stop(t + 4.7);
+        });
+      },
+      fanfare: function () {
+        var t = now() + 0.3;
+        [[523.25, 659.25, 783.99], [587.33, 739.99, 880], [659.25, 830.61, 987.77, 1318.51]].forEach(function (ch, k) {
+          ch.forEach(function (f) { tone('sawtooth', f, t + k * 0.32, 0.02, 0.03, k === 2 ? 0.9 : 0.28); });
+        });
+      },
+      silence: function () { api.engine(false); if (fireG) fireG.gain.setTargetAtTime(0, now(), 0.2); }
+    };
+    return api;
+  }
+
+  root.CarRaceSound = { create: create };
+})(typeof window !== 'undefined' ? window : this);
