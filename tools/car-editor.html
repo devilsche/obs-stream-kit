@@ -78,7 +78,9 @@
       .stage { height: 55vh; }
       .panel { border-left: 0; border-top: 1px solid var(--line); }
     }
-  </style>
+      .driver-row input[type="range"] { flex: 1 1 8em; min-width: 6em; }
+    .driver-num { width: 5.5em; }
+</style>
 </head>
 <body>
   <a class="skip" href="#panel">Skip to the editor controls</a>
@@ -205,7 +207,7 @@
 
       <section aria-labelledby="h-driver">
         <h2 id="h-driver">Driver</h2>
-        <p class="muted small-text">A rubber duck sits in the driver's seat during races. Without your own seat it is placed automatically (left seat, behind the windscreen, sized to fit under the roof). “Place driver”: click the seat in the 3D view – the duck sits on that spot (keep “Click through glass” ticked to reach the seat behind the windows). Size, Height and Turn fine-tune it; “Auto place” goes back to the automatic seat.</p>
+        <p class="muted small-text">A rubber duck sits in the driver's seat during races. Without your own seat it is placed automatically (left seat, behind the windscreen, sized to fit under the roof). “Place driver”: click the seat in the 3D view – the duck sits on that spot (keep “Click through glass” ticked to reach the seat behind the windows). Fine-tune with the sliders and number fields or drag the duck with Move/Rotate; “Auto place” goes back to the automatic seat.</p>
         <div class="row">
           <input type="checkbox" id="showDriver" checked>
           <label for="showDriver">Show driver</label>
@@ -214,20 +216,45 @@
           <button type="button" id="pickDriver" aria-pressed="false">Place driver (click the seat)</button>
           <button type="button" id="driverAuto" class="small">Auto place</button>
         </div>
-        <div class="row">
-          <label for="driverSize">Size</label>
-          <input type="range" id="driverSize" min="0.1" max="1.6" step="0.01" value="0.5" aria-describedby="driverSizeOut">
-          <output id="driverSizeOut" for="driverSize">–</output>
+        <div class="row" role="group" aria-label="Move the driver in the 3D view">
+          <button type="button" id="driverMove" aria-pressed="false">Move (drag arrows)</button>
+          <button type="button" id="driverRotate" aria-pressed="false">Rotate (drag rings)</button>
         </div>
-        <div class="row">
-          <label for="driverHeight">Height</label>
-          <input type="range" id="driverHeight" min="-0.6" max="0.6" step="0.01" value="0" aria-describedby="driverHeightOut">
-          <output id="driverHeightOut" for="driverHeight">–</output>
+        <p class="muted small-text" id="driverKeys">While Move or Rotate is on: arrow keys move forward/back and left/right (Shift = 5×), Page Up/Page Down height, Q/E turn, Esc ends.</p>
+        <div class="row driver-row">
+          <label for="dX">Forward / back (cm)</label>
+          <input type="range" id="dX" class="driver-in" data-k="dX">
+          <input type="number" id="dXN" class="driver-in driver-num" data-k="dX" aria-label="Forward / back in cm">
         </div>
-        <div class="row">
-          <label for="driverTurn">Turn</label>
-          <input type="range" id="driverTurn" min="-90" max="90" step="1" value="0" aria-describedby="driverTurnOut">
-          <output id="driverTurnOut" for="driverTurn">0°</output>
+        <div class="row driver-row">
+          <label for="dZ">Left / right (cm)</label>
+          <input type="range" id="dZ" class="driver-in" data-k="dZ">
+          <input type="number" id="dZN" class="driver-in driver-num" data-k="dZ" aria-label="Left / right in cm">
+        </div>
+        <div class="row driver-row">
+          <label for="dY">Height (cm)</label>
+          <input type="range" id="dY" class="driver-in" data-k="dY">
+          <input type="number" id="dYN" class="driver-in driver-num" data-k="dY" aria-label="Height in cm">
+        </div>
+        <div class="row driver-row">
+          <label for="dS">Size (cm)</label>
+          <input type="range" id="dS" class="driver-in" data-k="dS">
+          <input type="number" id="dSN" class="driver-in driver-num" data-k="dS" aria-label="Size in cm">
+        </div>
+        <div class="row driver-row">
+          <label for="dR">Turn (°)</label>
+          <input type="range" id="dR" class="driver-in" data-k="dR">
+          <input type="number" id="dRN" class="driver-in driver-num" data-k="dR" aria-label="Turn in °">
+        </div>
+        <div class="row driver-row">
+          <label for="dP">Tilt (nose up/down) (°)</label>
+          <input type="range" id="dP" class="driver-in" data-k="dP">
+          <input type="number" id="dPN" class="driver-in driver-num" data-k="dP" aria-label="Tilt (nose up/down) in °">
+        </div>
+        <div class="row driver-row">
+          <label for="dL">Lean (sideways) (°)</label>
+          <input type="range" id="dL" class="driver-in" data-k="dL">
+          <input type="number" id="dLN" class="driver-in driver-num" data-k="dL" aria-label="Lean (sideways) in °">
         </div>
         <p class="muted small-text" id="driverInfo" aria-live="polite"></p>
       </section>
@@ -284,6 +311,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-TransformControls.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
@@ -342,6 +370,7 @@
       canvas.addEventListener('pointerdown', function (e) { if (!(e.button === 1 || e.button === 2 || e.shiftKey) && !Object.keys(pts).length) refocus(); pts[e.pointerId] = { x: e.clientX, y: e.clientY, pan: e.button === 1 || e.button === 2 || e.shiftKey }; canvas.setPointerCapture(e.pointerId); });
       canvas.addEventListener('pointermove', function (e) {
         if (!pts[e.pointerId]) return;
+        if (window.__gizmoDrag) return;   // Ente wird gezogen: Kamera bleibt
         var ids = Object.keys(pts);
         if (ids.length === 2) {
           var a = pts[ids[0]], b = pts[ids[1]], d0 = Math.hypot(a.x - b.x, a.y - b.y);
@@ -412,27 +441,41 @@
         holder.add(car);
         // Fahrer-Ente (eigener Sitz oder Schätzung); Höhe/Drehung aus den Reglern stecken im Sitz
         if ($('showDriver').checked && window.RubberDuck) { var st = driverSeat(); if (st) TC.addDriver(car, cur.key, { seat: st, template: tpl }); }
+        if (typeof gizmoAttach === 'function') gizmoAttach();
       }
       // Sitz für Vorschau und Speichern: eigener Sitz (def.seat) oder die Schätzung
       function driverSeat() {
         if (!tpl) return null;
         var st = def.seat && def.seat.s > 0 ? def.seat : TC.seatOf(cur.key, tpl);
-        return st ? { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0 } : null;
+        return st ? { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0, p: st.p || 0, l: st.l || 0 } : null;
       }
+      // Regler je Achse: Einheit cm (Auto-Einheiten / UNIT) bzw. Grad; Bereiche nach Autogröße
+      var DRV = { dX: { k: 'x', cm: 1 }, dZ: { k: 'z', cm: 1 }, dY: { k: 'y', cm: 1 }, dS: { k: 's', cm: 1 }, dR: { k: 'r', deg: 180 }, dP: { k: 'p', deg: 30 }, dL: { k: 'l', deg: 30 } };
       function driverFill() {
-        var st = driverSeat(), u = TC.UNIT;
-        if (!st) { $('driverInfo').textContent = ''; return; }
-        $('driverSize').value = (st.s / u).toFixed(2); $('driverSizeOut').textContent = Math.round(st.s / u * 100) + ' cm';
-        var base = def.seat && def.seat.base != null ? def.seat.base : st.y;
-        $('driverHeight').value = ((st.y - base) / u).toFixed(2); $('driverHeightOut').textContent = Math.round((st.y - base) / u * 100) + ' cm';
-        $('driverTurn').value = Math.round((st.r || 0) * 180 / Math.PI); $('driverTurnOut').textContent = Math.round((st.r || 0) * 180 / Math.PI) + '°';
+        var st = driverSeat(), u = TC.UNIT, d = tpl ? tpl.userData.dims : null;
+        if (!st || !d) { $('driverInfo').textContent = ''; return; }
+        var half = { x: d.L / 2, z: d.W / 2, y: d.H / 2 };
+        Object.keys(DRV).forEach(function (id) {
+          var q = DRV[id], v = st[q.k] || 0, val, lo, hi, step;
+          if (q.deg) { val = Math.round(v * 180 / Math.PI); lo = -q.deg; hi = q.deg; step = 1; }
+          else if (q.k === 's') { val = +(v / u * 100).toFixed(1); lo = 10; hi = Math.max(200, Math.round(d.H / u * 100)); step = 0.5; }
+          else { val = +(v / u * 100).toFixed(1); hi = Math.round(half[q.k] / u * 100); lo = -hi; step = 0.5; }
+          [$(id), $(id + 'N')].forEach(function (el) { el.min = lo; el.max = hi; el.step = step; el.value = val; });
+        });
         $('driverInfo').textContent = def.seat ? 'Own seat.' : 'Automatic seat (place it yourself if the duck sits wrong).';
       }
-      // eigener Sitz aus dem aktuellen (ggf. geschätzten) Sitz anlegen, base = Sitzhöhe ohne Höhen-Regler
+      // eigener Sitz aus dem aktuellen (ggf. geschätzten) Sitz anlegen
       function ownSeat() {
-        if (!def.seat) { var st = driverSeat(); if (!st) return null; def.seat = { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0, base: st.y }; }
-        if (def.seat.base == null) def.seat.base = def.seat.y;
+        if (!def.seat) { var st = driverSeat(); if (!st) return null; def.seat = { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0, p: 0, l: 0 }; }
+        delete def.seat.base;
         return def.seat;
+      }
+      // Wert aus Regler/Zahlenfeld in den Sitz
+      function driverSet(id, raw) {
+        var st = ownSeat(), q = DRV[id]; if (!st || !q || raw === '' || isNaN(+raw)) return;
+        st[q.k] = q.deg ? +(+raw * Math.PI / 180).toFixed(4) : +(+raw / 100 * TC.UNIT).toFixed(4);
+        if (q.k === 's') st.s = Math.max(0.05 * TC.UNIT, st.s);
+        driverFill(); show();
       }
       // keepView: gleiche Kamera behalten (Neuaufbau nach Picken, Umdrehen …), sonst passend zum Auto zoomen
       function load(key, keepView) {
@@ -798,7 +841,7 @@
           // Klickpunkt in Auto-Koordinaten (Vorlage), Ente sitzt darauf; Größe bleibt
           var carObj = holder.children[0]; if (!carObj) return;
           var lp = carObj.worldToLocal(hit.point.clone()), st0 = ownSeat(); if (!st0) return;
-          def.seat = { x: +lp.x.toFixed(4), y: +lp.y.toFixed(4), z: +lp.z.toFixed(4), s: st0.s, r: st0.r || 0, base: +lp.y.toFixed(4) };
+          def.seat = { x: +lp.x.toFixed(4), y: +lp.y.toFixed(4), z: +lp.z.toFixed(4), s: st0.s, r: st0.r || 0, p: st0.p || 0, l: st0.l || 0 };
           setPick('driver'); driverFill(); show(); say('Driver placed. Adjust size, height and turn, then save.'); return;
         }
         if (picking === 'split') {
@@ -842,9 +885,46 @@
       $('showDriver').addEventListener('change', show);
       $('pickDriver').addEventListener('click', function () { setPick('driver'); if (picking === 'driver') say('Click the seat in the 3D view.'); });
       $('driverAuto').addEventListener('click', function () { delete def.seat; TC.forgetSeat(cur.key); driverFill(); show(); say('Driver placed automatically.'); });
-      $('driverSize').addEventListener('input', function () { var st = ownSeat(); if (!st) return; st.s = +(+$('driverSize').value * TC.UNIT).toFixed(4); driverFill(); show(); });
-      $('driverHeight').addEventListener('input', function () { var st = ownSeat(); if (!st) return; st.y = +(st.base + +$('driverHeight').value * TC.UNIT).toFixed(4); driverFill(); show(); });
-      $('driverTurn').addEventListener('input', function () { var st = ownSeat(); if (!st) return; st.r = +(+$('driverTurn').value * Math.PI / 180).toFixed(4); driverFill(); show(); });
+      Array.prototype.forEach.call(document.querySelectorAll('.driver-in'), function (el) {
+        el.addEventListener('input', function () { driverSet(el.dataset.k, el.value); });
+      });
+      // Ziehen im 3D-Bild (TransformControls): Move = Pfeile, Rotate = Ringe; Kamera steht beim Ziehen still
+      var gizmo = new THREE.TransformControls(cam, canvas), gizmoMode = null; gizmo.setSize(0.7); scene.add(gizmo);
+      gizmo.addEventListener('dragging-changed', function (ev) { window.__gizmoDrag = !!ev.value; });
+      function driverObj() { var c = holder.children[0], d = null; if (c) c.traverse(function (o) { if (!d && o.name === 'Driver') d = o; }); return d; }
+      function gizmoAttach() { var d = gizmoMode && driverObj(); if (d) { gizmo.setMode(gizmoMode === 'rotate' ? 'rotate' : 'translate'); gizmo.attach(d); } else gizmo.detach(); }
+      function gizmoSet(mode) {
+        gizmoMode = gizmoMode === mode ? null : mode;
+        $('driverMove').setAttribute('aria-pressed', String(gizmoMode === 'move')); $('driverRotate').setAttribute('aria-pressed', String(gizmoMode === 'rotate'));
+        if (gizmoMode) { ownSeat(); if (!$('showDriver').checked) { $('showDriver').checked = true; show(); } }
+        gizmoAttach();
+      }
+      $('driverMove').addEventListener('click', function () { gizmoSet('move'); });
+      $('driverRotate').addEventListener('click', function () { gizmoSet('rotate'); });
+      // Lage der Ente → Sitz (Ente hängt direkt am Auto, Boden bei −0,55 × Maßstab, Drehung YXZ = Turn, Lean, Tilt)
+      gizmo.addEventListener('objectChange', function () {
+        var d = gizmo.object, st = ownSeat(); if (!d || !st) return;
+        var k = d.scale.x;
+        st.x = +d.position.x.toFixed(4); st.z = +d.position.z.toFixed(4); st.y = +(d.position.y - 0.55 * k).toFixed(4);
+        st.r = +d.rotation.y.toFixed(4); st.p = +d.rotation.z.toFixed(4); st.l = +d.rotation.x.toFixed(4);
+        driverFill();
+      });
+      // Tastatur: Pfeile x/z, Bild auf/ab Höhe, Q/E drehen (Shift = 5×), Esc beendet
+      document.addEventListener('keydown', function (e) {
+        if (!gizmoMode) return;
+        var tag = (e.target && e.target.tagName) || '';
+        if (/INPUT|TEXTAREA|SELECT/.test(tag) && e.key !== 'Escape') return;
+        if (e.key === 'Escape') { e.preventDefault(); gizmoSet(gizmoMode); return; }
+        var st = ownSeat(); if (!st) return;
+        var f = e.shiftKey ? 5 : 1, cm = 0.005 * TC.UNIT * f, deg = Math.PI / 180 * f, done = true;
+        if (e.key === 'ArrowUp') st.x += cm; else if (e.key === 'ArrowDown') st.x -= cm;
+        else if (e.key === 'ArrowLeft') st.z -= cm; else if (e.key === 'ArrowRight') st.z += cm;
+        else if (e.key === 'PageUp') st.y += cm; else if (e.key === 'PageDown') st.y -= cm;
+        else if (e.key === 'q' || e.key === 'Q') st.r += deg; else if (e.key === 'e' || e.key === 'E') st.r -= deg;
+        else done = false;
+        if (!done) return;
+        e.preventDefault(); ['x', 'y', 'z', 'r'].forEach(function (k2) { st[k2] = +st[k2].toFixed(4); }); driverFill(); show();
+      });
       $('steer').addEventListener('input', function () { $('steerOut').textContent = Math.round(+$('steer').value * 180 / Math.PI) + '°'; show(); });
 
       function api(method, url, body) {
@@ -908,7 +988,7 @@
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
-        if (def.seat && def.seat.s > 0) d.seat = { x: def.seat.x, y: def.seat.y, z: def.seat.z, s: def.seat.s, r: def.seat.r || 0, base: def.seat.base != null ? def.seat.base : def.seat.y };
+        if (def.seat && def.seat.s > 0) d.seat = { x: def.seat.x, y: def.seat.y, z: def.seat.z, s: def.seat.s, r: def.seat.r || 0, p: def.seat.p || 0, l: def.seat.l || 0 };
         if (def.cutParts && def.cutParts.length) d.cutParts = def.cutParts.slice(0, 60);
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);

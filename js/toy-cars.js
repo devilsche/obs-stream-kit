@@ -900,8 +900,9 @@
     return t ? paintTemplate(t, color, set.r, { zones: set.z, sub: set.sub }) : new THREE.Group();
   }
   // ── Fahrer (Gummiente im Auto) ──
-  // Sitz je Fahrzeug: seat = {x, y, z, s, r} in den Koordinaten der fertigen Vorlage (Mitte im Auto, Front +x,
-  // links = −z, Boden −H/2); s = Höhe der Ente in Auto-Einheiten, r = Drehung um y. Gespeichert im Car editor,
+  // Sitz je Fahrzeug: seat = {x, y, z, s, r, p, l} in den Koordinaten der fertigen Vorlage (Mitte im Auto, Front +x,
+  // links = −z, Boden −H/2); s = Höhe der Ente in Auto-Einheiten, r = Drehung um y, p = Neigung (Schnabel hoch,
+  // um z), l = seitlich (um x); ältere Sitze ohne p/l bleiben gültig. Gespeichert im Car editor,
   // sonst geschätzt: Fahrerplatz links (Linkslenker) vorn im Innenraum, Größe so, dass die Ente mit Abstand
   // unter Dach, zwischen Tür und Mitte und zwischen Armaturenbrett und Lehne passt (offenes Cockpit: Kopf darf
   // herausschauen). Die Ente aus js/rubber-duck.js ist 2,2 hoch, Boden bei y = −0.55, Schnabel +x.
@@ -1012,7 +1013,7 @@
   // gespeicherter Sitz (Car editor) oder Schätzung; t = Vorlage (ohne: geladene Vorlage des Autos)
   function seatOf(key, t) {
     var v = vehicle(key).seat;
-    if (v && typeof v === 'object' && isFinite(v.x) && isFinite(v.y) && isFinite(v.z) && v.s > 0) return { x: +v.x, y: +v.y, z: +v.z, s: +v.s, r: +v.r || 0 };
+    if (v && typeof v === 'object' && isFinite(v.x) && isFinite(v.y) && isFinite(v.z) && v.s > 0) return { x: +v.x, y: +v.y, z: +v.z, s: +v.s, r: +v.r || 0, p: +v.p || 0, l: +v.l || 0 };
     t = t || TPL[key]; if (!t) return null;
     if (!SEATS[key]) SEATS[key] = autoSeat(t);
     return SEATS[key];
@@ -1025,7 +1026,9 @@
     var st = opts.seat || seatOf(key || car.userData.key, opts.template); if (!st) return null;
     var duck = root.RubberDuck.build({ color: opts.color, outfit: opts.outfit });
     var k = st.s / DUCK_H;
-    duck.scale.setScalar(k); duck.position.set(st.x, st.y - DUCK_FLOOR * k, st.z); duck.rotation.y = st.r || 0;
+    // Drehung: Turn um y, dann Lean (x, seitlich) und Tilt (z, Schnabel hoch/runter) – Reihenfolge YXZ
+    duck.scale.setScalar(k); duck.position.set(st.x, st.y - DUCK_FLOOR * k, st.z);
+    duck.rotation.order = 'YXZ'; duck.rotation.set(+st.l || 0, +st.r || 0, +st.p || 0);
     duck.name = 'Driver'; duck.userData.driver = true;
     duck.traverse(function (o) { o.userData.driver = true; });
     // Vorlage liegt in car.children[0] (wrap) – Sitz gilt in Auto-Koordinaten, also direkt am Auto
