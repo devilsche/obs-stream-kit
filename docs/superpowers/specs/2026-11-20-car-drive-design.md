@@ -29,3 +29,18 @@ Katalog in voller Qualität, auf den Car-Race-Strecken, gegen KI-Gegner.
 ## Schritt 1 (MVP)
 Menü, ein Auto fahren auf allen Strecken mit Tastatur+Gamepad, Arcade-Physik, Kies/Leitplanke, Verfolgerkamera,
 HUD mit Rundenzeit/Bestzeit, 3 Runden, Gegner aus der Sim (bis 7), Positionsanzeige, Zielbildschirm.
+
+## Schritt 2 – Mehrspieler (freigegeben, „go“ 2026-11-20)
+
+- Streamer öffnet eine Session (`!drive open` / Knopf in Car Drive) → Server erzeugt Raum mit Code, Chat bekommt
+  `stream-overlay.com/drive/<code>`.
+- Zuschauer: Seite `/drive/<code>`, Twitch-Login (Name/ID für Punkte), Auto aus der Garage oder Zufall, leichtere
+  Grafikstufe (Renn-Modelle, niedrigere Auflösung) wählbar.
+- Netz: eigener kleiner WebSocket-Dienst (`obs-drive`, Speicherbremse wie die anderen), Raum je Tenant, max. 8 Fahrer.
+  Jeder Client rechnet sein Auto selbst (Arcade-Modell aus Schritt 1) und sendet ~20 Hz Zustand (Position, Lage, Tempo,
+  Lenkung, Runde); Server verteilt, Clients interpolieren (100 ms Puffer). Start/Countdown/Ziel kommen vom Server.
+- Plausibilitätsprüfung auf dem Server (Höchsttempo je Auto, Rundenzeit-Minimum, Sprungweite) → verdächtige Runden
+  zählen nicht.
+- Kontakt zwischen Spielern: jeder Client schubst sich selbst beim Überlappen (masseabhängig), kein Server-Physikrechnen.
+- Stream: Car-Race-Overlay bekommt einen Modus „live“ (TV-Kamera, Rangliste) für diese Sessions.
+- Wertung: Platzierung → Punkte/Coins wie im Chat-Rennen (nur plausible Ergebnisse).
