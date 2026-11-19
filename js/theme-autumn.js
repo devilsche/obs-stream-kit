@@ -1328,7 +1328,7 @@
         // Laub fällt stetig, mit Wind deutlich mehr (Schalter leaves)
         // nasses Laub ist schwer: Wind löst nur noch ~30 % davon
         var w = Math.abs(B.windBase), heavy = 1 - 0.7 * W8.wet;
-        spawnAcc = B.partOn('leaves') ? spawnAcc + (2.5 + 9 * w * heavy) * dt : 0;
+        spawnAcc = B.partOn('leaves') && !S.leafOff ? spawnAcc + (2.5 + 9 * w * heavy) * dt : 0;
         while (spawnAcc >= 1) {
           spawnAcc--;
           spawn({ x: rand(-200, W + 200) - B.windBase * 400, y: -40 });
@@ -1385,6 +1385,7 @@
       update: function (s) {
         s = s || {};
         B.apply(s);
+        S.leafOff = s.leafrate === 0;
         var lv = s.seasonLevels || {};
         if (typeof lv.leaves === 'number') {
           S.target = Math.max(0, Math.min(100, lv.leaves));

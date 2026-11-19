@@ -204,7 +204,7 @@ def advance(conn, tenant_id, now, theme: str, w: dict, rate: float = 1.0, flower
         if w.get("blizzard", 0) > 0.5:
             # Schneesturm pustet den Laubhaufen weg
             lv["leaves"] = _clamp(lv["leaves"] - 25 * m)
-        else:
+        elif rate > 0:
             lv["leaves"] = _clamp(lv["leaves"] + (1 + 2 * min(1, abs(w.get("wind", 0)))) * rate * m)
         if w.get("rain", 0) > 0.2 and data.get("fires"):
             # Regen löscht laufende Feuer nach ein paar Sekunden (wie im Overlay)

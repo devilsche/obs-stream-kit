@@ -207,7 +207,7 @@ EFFECTS = {
             "sbws": _sb_ws,
             # Deko-Thema (Teil 3: Winter mit Xmas-Zeit)
             "theme": _choice("auto", "winter", "spring", "summer", "autumn", "none"),
-            "leafrate": _float_range(0.25, 4),
+            "leafrate": _float_range(0, 4),  # 0 = Laubfall aus
             "xmasfrom": _xmas_from,
             "xmasto": _mmdd,
             "snowrate": _float_range(0.25, 4),
@@ -361,7 +361,7 @@ EFFECTS = {
             "faces": _flag,
             "colors": _choice("classic", "golden", "maple", "theme"),
             # Laub-Regeln: % pro Minute Laubfall, % pro Rechenzug
-            "leafrate": _int_range(1, 300),
+            "leafrate": _int_range(0, 300),  # 0 = Laubfall aus
             "rake": _int_range(1, 50),
         },
         "args": {

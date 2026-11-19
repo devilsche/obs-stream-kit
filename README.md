@@ -605,7 +605,7 @@ Gleiches Prinzip wie der Weihnachtsschmuck: eine Source, jedes Element einzeln a
 | `pumpkins` | `1` / `0` | `1` |
 | `faces` | `1` / `0` — geschnitzte, flackernd leuchtende Gesichter | `0` |
 | `colors` | `classic`, `golden`, `maple` (Rotahorn), `theme` (Lila/Gold) | `classic` |
-| `leafrate` | 1–300 % pro Minute Laubfall (20 = nach 5 min voll) | `20` |
+| `leafrate` | 0–300 % pro Minute Laubfall (`0` = aus: kein Laub fällt, der Haufen wächst nicht; 20 = nach 5 min voll) | `20` |
 | `rake` | 1–50 % pro Rechenzug | `5` |
 
 **Befehle** (`https://stream-overlay.com/s/<token>/api/fx/autumn?cmd=…`, Streamer.bot **Fetch URL**):

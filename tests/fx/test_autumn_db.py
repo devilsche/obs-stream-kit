@@ -124,3 +124,8 @@ def test_endpoint_persists_pumpkins_and_resolves_toggle(conn):
 
     body = c.get("/s/tok/api/fx/autumn/poll?since=1").get_json()
     assert [x["cmd"] for x in body["commands"]] == ["leaffall"]
+
+
+def test_autumn_leafrate_zero_allowed():
+    out = commands.parse("autumn", {"cmd": "set", "leafrate": "0"})
+    assert out["params"] == {"leafrate": 0}

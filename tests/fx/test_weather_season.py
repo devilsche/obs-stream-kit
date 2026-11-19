@@ -223,3 +223,8 @@ def test_rain_puts_out_running_fires_on_the_server(conn):
     advance(conn, 1, 11, "autumn", dict(W, rain=1))
     # nach ein paar Sekunden Regen ist es aus, nichts mehr zu löschen
     assert use(conn, 1, "extinguish", "", 16)["done"] == 0
+
+
+def test_leafrate_zero_stops_pile_growth(conn):
+    advance(conn, 1, 0, "autumn", W, 0)
+    assert advance(conn, 1, 600, "autumn", {**W, "wind": 1}, 0)["levels"]["leaves"] == 0

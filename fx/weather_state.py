@@ -188,5 +188,6 @@ def resolve(conn, tenant_id: int, opts: dict, now=None, paused: bool = False) ->
     except Exception:
         log.exception("weather: season failed for tenant %s", tenant_id)
         season = {"levels": {}, "top": {}}
-    state.update(seasonLevels=season["levels"], seasonTop=season["top"])
+    state.update(seasonLevels=season["levels"], seasonTop=season["top"],
+                 leafrate=opts.get("leafrate", 1.0) if theme == "autumn" else 1.0)
     return state

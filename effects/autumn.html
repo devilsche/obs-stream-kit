@@ -242,7 +242,7 @@
         pumpkins: [flag, true],
         faces: [flag, false],
         colors: [choice('classic', 'golden', 'maple', 'theme'), 'classic'],
-        leafrate: [num(1, 300), 20],
+        leafrate: [num(0, 300), 20],
         rake: [num(1, 50), 5]
       };
       var DENSITY = { light: 3, medium: 7, heavy: 16 };   // Blätter pro Sekunde
@@ -501,7 +501,7 @@
         if (!keepLeaders) { LV.leaders = {}; LV.falling = false; }
       }
       function leafAdvance(t) {
-        if (!LV.falling) return;
+        if (!LV.falling || !(cur.leafrate > 0)) return;
         var end = Math.min(t, LV.until);
         if (end > LV.since) LV.level = Math.min(100, LV.level + cur.leafrate / 60 * (end - LV.since));
         LV.since = Math.max(LV.since, end);
@@ -701,7 +701,7 @@
 
         // Fallendes Laub: ständig ein wenig, beim Laubfall deutlich mehr
         var rate = cur.falling ? DENSITY[cur.density] : 0;
-        if (LV.falling) rate = Math.max(rate, DENSITY.medium) * 1.8;
+        if (LV.falling && cur.leafrate > 0) rate = Math.max(rate, DENSITY.medium) * 1.8;
         spawnAcc += rate * dt;
         while (spawnAcc >= 1) {
           spawnAcc--;
