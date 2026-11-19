@@ -114,7 +114,8 @@
     });
 
     // ---- Strecke ----
-    var trackGroup = null, trackOwned = [], trackNear = null;   // trackNear(x, z, R): liegt Strecke näher als R?
+    var trackGroup = null, trackOwned = [], trackNear = null;
+    var trackDecor = { objs: [], trees: null };   // Deko, die dem Podest-Blick im Weg stehen kann   // trackNear(x, z, R): liegt Strecke näher als R?
     function own(x) { trackOwned.push(x); return x; }
     function buildTrack(T) {
       disposeTrack();
@@ -215,6 +216,7 @@
       var beam = new THREE.Mesh(own(new THREE.BoxGeometry(0.5, 0.9, span)), purple); beam.position.set(0, 4.6, mid); gantry.add(beam);
       var stripe = new THREE.Mesh(own(new THREE.BoxGeometry(0.52, 0.18, span + 0.02)), gold); stripe.position.set(0, 4.6, mid); gantry.add(stripe);
       gantry.position.set(p0.x, 0, p0.z); gantry.rotation.y = p0.yaw; g.add(gantry);
+      trackDecor = { objs: [{ o: gantry, r: HALF + 13 }], trees: null };
 
       // Tribüne neben der Startgeraden, auf der Seite mit Platz
       var standMat = own(new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.8 }));
@@ -238,6 +240,7 @@
         var roof = new THREE.Mesh(own(new THREE.BoxGeometry(23, 0.3, 7.5)), purple);
         roof.position.set(0, 5.6, 0); st.add(roof);
         st.position.set(x, 0, z); st.rotation.y = pS.yaw; g.add(st);
+        trackDecor.objs.push({ o: st, r: 12 });
         return true;
       });
 
@@ -260,6 +263,7 @@
           ps.set(s[0], (1.6 + 2.1) * s[2], s[1]); mtx.compose(ps, q, sc); crowns.setMatrixAt(i, mtx);
         });
         g.add(trunks); g.add(crowns);
+        trackDecor.trees = { spots: spots, trunks: trunks, crowns: crowns };
       }
       trackNear = nearTrack;
       scene.add(g);
@@ -634,6 +638,7 @@
       });
       race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts };
       race.podium.cam = podiumCam(race.podium, spot, total);
+      clearPodiumView(race.podium.cam, total);
       race.stage = 'podium';
       race.fadeAt = srvNow() + PODIUM_HOLD;
       upgradeWinnerModel(cars[0]);
@@ -656,6 +661,30 @@
       var off = (topR + (H - botR)) / 2 - H / 2;
       var cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
       return { x: cx, z: spot.z, y: stack / 2 + off / (px * cosT), px: px, tilt: PODIUM_TILT, orb: 0 };
+    }
+    // Deko aus dem Blick räumen (für alle Instanzen gleich, rein aus Geometrie): alles im Podest-Bereich und im
+    // Korridor zwischen Podest und Kamera über den ganzen Schwenk (±0,22 rad) wird ausgeblendet
+    function clearPodiumView(pc, total) {
+      var tanH = Math.tan(FOV * Math.PI / 360) * (W / H), D = (W / pc.px) / (2 * tanH), hor = D * Math.cos(pc.tilt) + 4;
+      var half = total / 2 + 4, cams = [-0.24, -0.12, 0, 0.12, 0.24].map(function (a) { return [pc.x + hor * Math.sin(a), pc.z + hor * Math.cos(a)]; });
+      function blocks(x, z, rad) {
+        if (Math.hypot(x - pc.x, z - pc.z) < half + 3 + rad) return true;
+        return cams.some(function (c) {   // Abstand zur Strecke Podest → Kamera, Korridor so breit wie das Podest
+          var dx = c[0] - pc.x, dz = c[1] - pc.z, L2 = dx * dx + dz * dz;
+          var t = clamp(((x - pc.x) * dx + (z - pc.z) * dz) / L2, 0, 1);
+          return Math.hypot(x - (pc.x + dx * t), z - (pc.z + dz * t)) < half + rad;
+        });
+      }
+      trackDecor.objs.forEach(function (d) { if (blocks(d.o.position.x, d.o.position.z, d.r)) d.o.visible = false; });
+      var tr = trackDecor.trees;
+      if (tr) {
+        var zero = new THREE.Matrix4().makeScale(0, 0, 0), hit = false;
+        tr.spots.forEach(function (sp, i) {
+          if (!blocks(sp[0], sp[1], 2.5)) return;
+          tr.trunks.setMatrixAt(i, zero); tr.crowns.setMatrixAt(i, zero); hit = true;
+        });
+        if (hit) { tr.trunks.instanceMatrix.needsUpdate = true; tr.crowns.instanceMatrix.needsUpdate = true; }
+      }
     }
     // freier Platz fürs Podest kurz vor der Ziellinie (Seite egal), sonst weiter draußen
     function podiumSpot(width) {
