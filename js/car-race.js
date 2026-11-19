@@ -10,6 +10,9 @@
  * Modelle laden (bis dahin Ersatz-Kiste in Lackfarbe) · race: Simulation aus seed, nach Neuladen per
  * fastForward(now − starts_at) an dieselbe Stelle · sim.done: Ergebnis einmal POSTen, showPodium(), ausblenden.
  * Uhr: Serverzeit aus state.now (Versatz zur eigenen Uhr, geglättet).
+ * Sichtbar aus der Sim: Auslauf (Kiesbett an Kurven-Außenseiten, Leitplanke an dessen Rand), Ölflecken (sim.hazards),
+ * Windschatten (cars[i].draft), Ereignisse (sim.events: overtake → Schild leuchtet + Rangliste gleitet, spin/crash →
+ * Qualm, off → Staub, push → Funken + Ruck, dnf → graues Schild). Nach fastForward nur Ereignisse der letzten 1,5 s.
  * Darstellung in Metern (wie die Simulation); ToyCars-Modelle werden auf die Länge aus den Race stats skaliert.
  * Farben je Fahrer (Chatfarbe, Lack) nur im Canvas/WebGL – keine Inline-Styles.
  */
@@ -22,6 +25,7 @@
   var TILT = 58 * Math.PI / 180, FOV = 30;
   var POLL_MS = 1000, HOLD = 5, FADE = 0.6;
   var LABEL_W = 512, LABEL_H = 112;
+  var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -130,11 +134,15 @@
         }
         return false;
       }
-      // Band entlang der Strecke: Seitenversatz a…b, Höhe ya/yb (Wand: a = b, ya ≠ yb); keep(i) je Abschnitt
-      function strip(a, b, ya, yb, mat, vLen, keep) {
+      // Auslauf je Rasterpunkt (links/rechts, m) – dahinter steht die Leitplanke
+      var runL = T.runoff ? T.runoff.left : [], runR = T.runoff ? T.runoff.right : [];
+      function runAt(i, sd) { var v = (sd > 0 ? runL : runR)[i % n]; return v > 0 ? v : 0; }
+      // Band entlang der Strecke: Seitenversatz a…b (Zahl oder Funktion des Rasterindex), Höhe ya/yb
+      // (Wand: a = b, ya ≠ yb); keep(i) je Abschnitt
+      function strip(a0, b0, ya, yb, mat, vLen, keep) {
         var pos = [], uv = [], idx = [];
         for (var i = 0; i <= n; i++) {
-          var p = P[i % n];
+          var p = P[i % n], a = typeof a0 === 'function' ? a0(i % n) : a0, b = typeof b0 === 'function' ? b0(i % n) : b0;
           pos.push(p.x + p.nx * a, ya, p.z + p.nz * a, p.x + p.nx * b, yb, p.z + p.nz * b);
           uv.push(0, i * ds / vLen, 1, i * ds / vLen);
           if (i < n && (!keep || keep(i))) { var o = i * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
@@ -166,13 +174,24 @@
       function curvy(i) { return Math.abs(P[i].curv) > 1 / 60 || Math.abs(P[(i + 1) % n].curv) > 1 / 60; }
       strip(HALF, HALF + 0.9, 0.05, 0.05, curb, 4, curvy);
       strip(-HALF - 0.9, -HALF, 0.05, 0.05, curb, 4, curvy);
+      // Kiesbett im Auslauf an Kurven-Außenseiten (±14 m um die Kurve), wo der Auslauf > 3 m ist; sonst Gras
+      var gravelTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [196, 178, 140], 0.45, rnd); }, true));
+      var gravel = own(new THREE.MeshStandardMaterial({ map: gravelTex, roughness: 1, metalness: 0, side: THREE.DoubleSide }));
+      var outside = { 1: new Uint8Array(n), '-1': new Uint8Array(n) }, W14 = Math.round(14 / ds);
+      for (var ci = 0; ci < n; ci++) {
+        if (Math.abs(P[ci].curv) <= 1 / 60) continue;
+        var outSd = P[ci].curv > 0 ? -1 : 1;   // Linkskurve → außen = rechts
+        for (var k = -W14; k <= W14; k++) outside[outSd][(ci + k + n) % n] = 1;
+      }
+      [1, -1].forEach(function (sd) {
+        strip(function (i) { return sd * (HALF + 0.9); }, function (i) { return sd * (HALF + Math.max(0.9, runAt(i, sd))); }, 0.035, 0.035, gravel, 5,
+          function (i) { return outside[sd][i] && outside[sd][(i + 1) % n] && runAt(i, sd) > 3 && runAt(i + 1, sd) > 3; });
+      });
+      // Leitplanken am Außenrand des Auslaufs (die Sim lässt dort nicht weiter)
       var rail = own(new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }));
       [1, -1].forEach(function (sd) {
-        var off = sd * (HALF + 3.5);
-        strip(off, off, 0.25, 0.85, rail, 10, function (i) {
-          var p = P[i], q = P[(i + 1) % n];
-          return !nearTrack(p.x + p.nx * off, p.z + p.nz * off, HALF + 2.5) && !nearTrack(q.x + q.nx * off, q.z + q.nz * off, HALF + 2.5);
-        });
+        var off = function (i) { return sd * (HALF + runAt(i, sd) + 0.3); };
+        strip(off, off, 0.25, 0.85, rail, 10);
       });
 
       // Start/Ziel: Schachbrett über die Fahrbahn + Portal
@@ -185,13 +204,15 @@
       line.position.set(p0.x, 0.06, p0.z); g.add(line);
       var purple = own(new THREE.MeshStandardMaterial({ color: 0x5e2a79, roughness: 0.5 }));
       var gold = own(new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.4, metalness: 0.3 }));
-      var gantry = new THREE.Group();
-      [1, -1].forEach(function (sd) {
+      // Portal: Pfosten hinter den Leitplanken (lokal z = −Normale: links = −z)
+      var gantry = new THREE.Group(), postL = HALF + runAt(0, 1) + 0.8, postR = HALF + runAt(0, -1) + 0.8;
+      [-postL, postR].forEach(function (z) {
         var post = new THREE.Mesh(own(new THREE.BoxGeometry(0.4, 4.6, 0.4)), purple);
-        post.position.set(0, 2.3, sd * (HALF + 1.2)); gantry.add(post);
+        post.position.set(0, 2.3, z); gantry.add(post);
       });
-      var beam = new THREE.Mesh(own(new THREE.BoxGeometry(0.5, 0.9, T.width + 2.8)), purple); beam.position.y = 4.6; gantry.add(beam);
-      var stripe = new THREE.Mesh(own(new THREE.BoxGeometry(0.52, 0.18, T.width + 2.82)), gold); stripe.position.y = 4.6; gantry.add(stripe);
+      var span = postL + postR + 0.4, mid = (postR - postL) / 2;
+      var beam = new THREE.Mesh(own(new THREE.BoxGeometry(0.5, 0.9, span)), purple); beam.position.set(0, 4.6, mid); gantry.add(beam);
+      var stripe = new THREE.Mesh(own(new THREE.BoxGeometry(0.52, 0.18, span + 0.02)), gold); stripe.position.set(0, 4.6, mid); gantry.add(stripe);
       gantry.position.set(p0.x, 0, p0.z); gantry.rotation.y = p0.yaw; g.add(gantry);
 
       // Tribüne neben der Startgeraden, auf der Seite mit Platz
@@ -204,8 +225,9 @@
       var crowdMat = own(new THREE.MeshStandardMaterial({ map: crowdTex, roughness: 0.9 }));
       var sMid = 28, pS = T.at(sMid);
       [1, -1].some(function (sd) {
-        var off = sd * (HALF + 13), x = pS.x + pS.nx * off, z = pS.z + pS.nz * off;
-        var ok = [-10, 0, 10].every(function (k) { var q = T.at(sMid + k); return !nearTrack(q.x + q.nx * off, q.z + q.nz * off, HALF + 9); });
+        // hinter jedem möglichen Auslauf (max. 12 m) – auch dem eines anderen Streckenteils
+        var off = sd * (HALF + 12 + 5), x = pS.x + pS.nx * off, z = pS.z + pS.nz * off;
+        var ok = [-10, 0, 10].every(function (k) { var q = T.at(sMid + k); return !nearTrack(q.x + q.nx * off, q.z + q.nz * off, HALF + 12 + 4); });
         if (!ok) return false;
         var st = new THREE.Group();
         for (var r = 0; r < 4; r++) {
@@ -224,7 +246,7 @@
       var spots = [];
       for (var t = 0; t < 900 && spots.length < 90; t++) {
         var x = lerp(minX - 60, maxX + 60, rnd()), z = lerp(minZ - 60, maxZ + 60, rnd());
-        if (nearTrack(x, z, HALF + 7) || !nearTrack(x, z, 70)) continue;
+        if (nearTrack(x, z, HALF + 15) || !nearTrack(x, z, 70)) continue;   // nie im Auslauf
         if (spots.some(function (s) { return (s[0] - x) * (s[0] - x) + (s[1] - z) * (s[1] - z) < 9; })) continue;
         spots.push([x, z, 0.7 + rnd() * 0.7]);
       }
@@ -268,7 +290,7 @@
         w: clamp(st.len * 0.42, 1.7, 2.6), h: clamp(st.len * 0.3, 1.2, 3.2),
         holder: new THREE.Group(), body: null, owned: [], wheels: [], isModel: false,
         steer: 0, wheelAngle: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55), lastX: null, lastZ: null,
-        disp: null, label: null, labelK: 1, labelText: '', gone: false
+        disp: null, label: null, labelK: 1, labelText: '', gone: false, flash: 0, jolt: 0, rankY: null
       };
       r.holder.rotation.order = 'YXZ';
       var shadow = new THREE.Mesh(own2(r, new THREE.PlaneGeometry(1, 1)), own2(r, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })));
@@ -335,6 +357,7 @@
       r.gone = true;
       scene.remove(r.holder);
       if (r.label) { scene.remove(r.label.sprite); r.label.tex.dispose(); r.label.sprite.material.dispose(); }
+      if (r.streak) r.streak.meshes.forEach(function (m) { scene.remove(m); });
       r.owned.forEach(function (x) { if (x.dispose) x.dispose(); });   // Modell-Materialien gehören ToyCars (geteilt)
     }
 
@@ -369,25 +392,35 @@
       g.beginPath(); g.moveTo(x + rad, y); g.arcTo(x + w, y, x + w, y + h, rad); g.arcTo(x + w, y + h, x, y + h, rad);
       g.arcTo(x, y + h, x, y, rad); g.arcTo(x, y, x + w, y, rad); g.closePath();
     }
-    function drawLabel(r, place, force) {
-      var text = place + '\u0000' + r.display;
+    // mode: '' normal · 'up' gerade überholt (Akzentrand, Pfeil nach oben, leuchtet) · 'dnf' ausgegraut
+    function drawLabel(r, place, force, mode) {
+      mode = mode || '';
+      var text = place + '\u0000' + r.display + '\u0000' + mode;
       if (!force && text === r.labelText) return;
-      r.labelText = text;
+      r.labelText = text; r.labelPlace = place; r.labelMode = mode;
       var L = r.label, g = L.g;
       g.clearRect(0, 0, LABEL_W, LABEL_H);
       var fs = 50, pad = 22, gap = 14, bw = 7;
       g.font = font(800, fs);
-      var pw = g.measureText(place).width, name = r.display;
+      var aw = mode === 'up' ? fs * 0.62 : 0;   // Platz für den Pfeil
+      var pw = g.measureText(place).width + aw, name = r.display;
       g.font = font(700, fs);
-      var maxName = LABEL_W - 2 * pad - pw - gap - 2 * bw;
+      var maxName = LABEL_W - 2 * pad - pw - gap - 2 * bw - (mode === 'up' ? 16 : 0);
       while (name.length > 1 && g.measureText(name).width > maxName) name = name.slice(0, -2) + '…';
       var nw = g.measureText(name).width, boxW = Math.min(LABEL_W - 2 * bw, pw + gap + nw + 2 * pad), x0 = (LABEL_W - boxW) / 2, y0 = bw, bh = LABEL_H - 2 * bw;
       roundRect(g, x0, y0, boxW, bh, 22);
-      g.fillStyle = withAlpha(TK.surface, 0.86); g.fill();
-      g.lineWidth = bw; g.strokeStyle = r.color; g.stroke();
+      g.fillStyle = withAlpha(TK.surface, mode === 'dnf' ? 0.7 : 0.86); g.fill();
+      if (mode === 'up') { g.fillStyle = withAlpha(TK.accent, 0.25); g.fill(); }
+      g.lineWidth = bw; g.strokeStyle = mode === 'up' ? TK.accent : mode === 'dnf' ? TK.dim : r.color; g.stroke();
       g.textBaseline = 'middle';
-      g.font = font(800, fs); g.fillStyle = TK.accent; g.fillText(place, x0 + pad, LABEL_H / 2 + 2);
-      g.font = font(700, fs); g.fillStyle = TK.text; g.fillText(name, x0 + pad + pw + gap, LABEL_H / 2 + 2);
+      var tx = x0 + pad;
+      if (mode === 'up') {   // Pfeil nach oben (gezeichnet, kein Zeichen aus der Schrift)
+        var ah = fs * 0.62, ay = LABEL_H / 2;
+        g.beginPath(); g.moveTo(tx, ay + ah * 0.4); g.lineTo(tx + ah * 0.5, ay - ah * 0.5); g.lineTo(tx + ah, ay + ah * 0.4); g.closePath();
+        g.fillStyle = TK.accent; g.fill(); tx += aw;
+      }
+      g.font = font(800, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.accent; g.fillText(place, tx, LABEL_H / 2 + 2);
+      g.font = font(700, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.text; g.fillText(name, x0 + pad + pw + gap, LABEL_H / 2 + 2);
       L.boxW = boxW + 2 * bw;
       L.tex.needsUpdate = true;
     }
@@ -397,20 +430,22 @@
       var hpx = clamp(H * 0.055, 13, 30), tanV = Math.tan(FOV * Math.PI / 360);
       var placed = [];
       list.forEach(function (it) {
-        var r = it.r, L = r.label;
-        drawLabel(r, it.place);
+        var r = it.r, L = r.label, up = r.flash > 0;
+        drawLabel(r, it.place, false, it.dnf ? 'dnf' : up ? 'up' : '');
         tmpV.set(r.holder.position.x, r.height + 0.9, r.holder.position.z).project(cam);
         var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H, wpx = hpx * L.boxW / LABEL_H;
         var crowd = placed.some(function (o) { return Math.abs(o.px - px) < (o.w + wpx) / 2 && Math.abs(o.py - py) < hpx * 1.1; });
-        r.labelK = ease(r.labelK, crowd ? 0 : 1, 0.2, dt);
-        var k = lerp(0.62, 1, r.labelK), edge = Math.min(px, W - px, py, H - py);
+        r.labelK = ease(r.labelK, crowd && !up ? 0 : 1, 0.2, dt);
+        // Überholt: kurzer Puls (bei reduzierter Bewegung nur der Akzentrand)
+        var pulse = up && !reduce ? 1 + 0.18 * Math.sin(Math.min(1, (FLASH - r.flash) / 0.5) * Math.PI) : 1;
+        var k = lerp(0.62, 1, r.labelK) * pulse, edge = Math.min(px, W - px, py, H - py);
         var ef = clamp((edge - hpx * 0.5) / (hpx * 2), 0, 1);
         L.vis = ease(L.vis, it.show ? 1 : 0, 0.25, dt);
         var sy = hpx * k / H * 2 * tanV;
         L.sprite.scale.set(sy * LABEL_W / LABEL_H, sy, 1);
         L.sprite.position.set(r.holder.position.x, r.height + 0.9, r.holder.position.z);
-        L.sprite.material.opacity = lerp(0.45, 1, r.labelK) * ef * L.vis * (tmpV.z < 1 ? 1 : 0);
-        L.sprite.renderOrder = 100 - it.order;   // vordere Plätze liegen oben
+        L.sprite.material.opacity = lerp(0.45, 1, r.labelK) * (it.dnf ? 0.6 : 1) * ef * L.vis * (tmpV.z < 1 ? 1 : 0);
+        L.sprite.renderOrder = up ? 200 : 100 - it.order;   // vordere Plätze (und der Überholende) liegen oben
         placed.push({ px: px, py: py, w: wpx * k });
       });
     }
@@ -431,13 +466,14 @@
         finishWindow: preview && finishOpt != null ? finishOpt : (st.finish_window || 15),   // ?finish nur in der Vorschau: echte Rennen nehmen den Server-Wert, damit jede Instanz dasselbe Ergebnis rechnet
         startsAt: st.starts_at, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
         sim: null, simKey: '', prev: null, alpha: 1, ended: false, fadeAt: null, endedAt: null, shownAt: srvNow(),
-        cam: null, lastLeader: null
+        cam: null, lastLeader: null, evIdx: 0, oil: []
       };
       buildTrack(T);
     }
     function teardown() {
       if (!race) return;
       Object.keys(race.racers).forEach(function (id) { disposeRacer(race.racers[id]); });
+      clearOil(); clearPuffs();
       disposeTrack();
       race = null;
     }
@@ -471,7 +507,7 @@
     function startSim() {
       race.sim = CarRaceSim.create({ seed: race.seed, track: race.T, laps: race.laps, finishWindow: race.finishWindow, cars: simCars() });
       race.simKey = race.rosterKey + '@' + race.startsAt;
-      race.stage = 'race'; race.ended = false;
+      race.stage = 'race'; race.ended = false; race.evIdx = 0; clearOil();
       var t = srvNow() - race.startsAt;
       if (t > 0.5) { race.sim.fastForward(Math.min(t, 120)); race.cam = null; }   // Neuladen: dieselbe Rennsituation
       snap();
@@ -607,8 +643,16 @@
       var pw = rh * 7.4, ph = rows.length * rh + rh * 0.4;
       pill(hud, m, m, pw, ph);
       hud.textBaseline = 'middle';
+      // Zeilen gleiten beim Platztausch (bei reduzierter Bewegung sofort)
+      var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
       rows.forEach(function (row, i) {
-        var y = m + rh * 0.2 + i * rh + rh / 2;
+        var r = row.r;
+        r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
+        var y = m + rh * 0.2 + r.rankY * rh + rh / 2;
+        if (r.flash > 0) {   // gerade überholt: Zeile kurz in Akzentfarbe hinterlegt
+          roundRect(hud, m + rh * 0.15, y - rh * 0.46, pw - rh * 0.3, rh * 0.92, rh * 0.2);
+          hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fill();
+        }
         hud.globalAlpha = row.dnf ? 0.6 : 1;
         hud.font = font(800, fs); hud.textAlign = 'right';
         hud.fillStyle = row.dnf ? TK.dim : TK.accent;
@@ -660,6 +704,149 @@
       hud.restore();
     }
 
+    // ---- Effekte: Partikel (Qualm, Staub, Funken), Ölflecken, Windschatten-Schlieren ----
+    // Alle Partikel blenden am Bildrand aus (nichts poppt); bei reduzierter Bewegung nur wenige, keine Dauer-Ströme
+    function softTex(stops) {
+      return canvasTex(64, 64, function (g) {
+        var gr = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+        stops.forEach(function (st) { gr.addColorStop(st[0], st[1]); });
+        g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+      });
+    }
+    var FXT = {
+      smoke: softTex([[0, 'rgba(240,240,240,0.9)'], [0.5, 'rgba(222,222,222,0.42)'], [1, 'rgba(210,210,210,0)']]),
+      dust: softTex([[0, 'rgba(216,198,158,0.9)'], [0.5, 'rgba(200,180,140,0.4)'], [1, 'rgba(190,170,130,0)']]),
+      spark: softTex([[0, 'rgba(255,250,215,1)'], [0.35, 'rgba(255,170,50,0.9)'], [1, 'rgba(255,80,0,0)']])
+    };
+    // Ölfleck: unregelmäßige dunkle Lache mit Glanzrand (feste Zufallsfolge, für alle Instanzen gleich)
+    var oilTex = canvasTex(128, 128, function (g) {
+      var rr = CarRaceSim.rng(4711);
+      for (var i = 0; i < 7; i++) {
+        var x = 64 + (rr() - 0.5) * 50, y = 64 + (rr() - 0.5) * 50, rad = 22 + rr() * 26;
+        var gr = g.createRadialGradient(x, y, rad * 0.2, x, y, rad);
+        gr.addColorStop(0, 'rgba(12,10,16,0.95)'); gr.addColorStop(0.75, 'rgba(18,16,26,0.85)'); gr.addColorStop(1, 'rgba(18,16,26,0)');
+        g.fillStyle = gr; g.beginPath(); g.arc(x, y, rad, 0, Math.PI * 2); g.fill();
+      }
+      g.globalCompositeOperation = 'source-atop';
+      var hl = g.createLinearGradient(20, 20, 108, 108);
+      hl.addColorStop(0, 'rgba(120,90,200,0.25)'); hl.addColorStop(0.5, 'rgba(60,160,170,0.18)'); hl.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = hl; g.fillRect(0, 0, 128, 128);
+    });
+    // Windschatten: feine helle Schliere, an beiden Enden weich
+    var streakTex = canvasTex(128, 16, function (g, w, h) {
+      for (var y = 2; y < h; y += 5) {
+        var gr = g.createLinearGradient(0, 0, w, 0);
+        gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.3, 'rgba(255,255,255,0.8)');
+        gr.addColorStop(0.55, 'rgba(255,255,255,0.25)'); gr.addColorStop(0.8, 'rgba(255,255,255,0.7)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = gr; g.fillRect(0, y, w, 1.5);
+      }
+    });
+    streakTex.wrapS = THREE.RepeatWrapping;
+    var streakGeo = new THREE.PlaneGeometry(1, 1); streakGeo.rotateX(-Math.PI / 2);   // flach: Länge x, Breite z
+    var oilGeo = new THREE.CircleGeometry(1, 28); oilGeo.rotateX(-Math.PI / 2);
+
+    var puffs = [], MAXP = reduce ? 12 : 160, pv3 = new THREE.Vector3();
+    function puff(kind, x, y, z, o) {
+      o = o || {};
+      if (puffs.length >= MAXP) { var old = puffs.shift(); scene.remove(old.s); old.s.material.dispose(); }
+      var spark = kind === 'spark';
+      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FXT[kind], transparent: true, depthWrite: false, opacity: 0,
+        blending: spark ? THREE.AdditiveBlending : THREE.NormalBlending }));
+      sp.position.set(x, y, z); scene.add(sp);
+      var rnd = Math.random;
+      puffs.push({ s: sp, age: 0, life: o.life || (spark ? 0.35 + rnd() * 0.2 : 1.2 + rnd() * 0.9),
+        size0: o.size || (spark ? 0.25 : 0.7 + rnd() * 0.5), grow: o.grow != null ? o.grow : (spark ? 0 : 1.6 + rnd() * 1.4),
+        vel: new THREE.Vector3((rnd() - 0.5) * (spark ? 9 : 1.2), spark ? 1.5 + rnd() * 3 : 0.4 + rnd() * 0.8, (rnd() - 0.5) * (spark ? 9 : 1.2)),
+        a: o.a || (spark ? 1 : 0.5), grav: spark ? -9 : 0.2 });
+    }
+    function burst(kind, x, z, n, o) { for (var i = 0; i < (reduce ? Math.min(n, 2) : n); i++) puff(kind, x + (Math.random() - 0.5) * 1.2, (o && o.y) || 0.4, z + (Math.random() - 0.5) * 1.2, o); }
+    function stepPuffs(dt) {
+      for (var i = puffs.length - 1; i >= 0; i--) {
+        var q = puffs[i]; q.age += dt;
+        if (q.age >= q.life) { scene.remove(q.s); q.s.material.dispose(); puffs.splice(i, 1); continue; }
+        var k = q.age / q.life;
+        q.s.position.addScaledVector(q.vel, dt); q.vel.multiplyScalar(1 - dt * 1.2); q.vel.y += dt * q.grav;
+        if (q.s.position.y < 0.1) { q.s.position.y = 0.1; q.vel.y = 0; }
+        q.s.scale.setScalar(q.size0 + q.grow * k);
+        // Rand-Fade: Abstand zum Bildrand in Pixeln
+        pv3.copy(q.s.position).project(cam);
+        var px = (pv3.x * 0.5 + 0.5) * W, py = (1 - (pv3.y * 0.5 + 0.5)) * H, edge = Math.min(px, W - px, py, H - py);
+        var ef = clamp(edge / (Math.min(W, H) * 0.12), 0, 1);
+        q.s.material.opacity = q.a * Math.min(1, q.age / 0.12) * (1 - k) * ef;
+      }
+    }
+    function clearPuffs() { puffs.forEach(function (q) { scene.remove(q.s); q.s.material.dispose(); }); puffs = []; }
+    function rearOf(r, back) {
+      var y = r.holder.rotation.y, f = (back ? -0.45 : 0.45) * r.len;
+      return { x: r.holder.position.x + Math.cos(y) * f, z: r.holder.position.z - Math.sin(y) * f };
+    }
+
+    // Ölflecken aus sim.hazards: ab „from“ weich einblenden, bleiben bis Rennende
+    function updateOil(sim) {
+      var hz = sim.hazards || [];
+      for (var i = 0; i < hz.length; i++) {
+        var h = hz[i], m = race.oil[i];
+        if (!m) {
+          var mat = new THREE.MeshStandardMaterial({ map: oilTex, transparent: true, depthWrite: false, opacity: 0, roughness: 0.08, metalness: 0.6, color: 0xffffff });
+          m = race.oil[i] = new THREE.Mesh(oilGeo, mat);
+          var p = race.T.at(h.s);
+          m.position.set(p.x + p.nx * h.d, 0.065 + i * 0.002, p.z + p.nz * h.d);
+          m.scale.set(h.r, 1, h.r); m.rotation.y = i * 2.1;
+          scene.add(m);
+        }
+        m.material.opacity = 0.92 * clamp((sim.time - h.from) / 0.8, 0, 1);
+      }
+    }
+    function clearOil() {
+      if (!race || !race.oil) return;
+      race.oil.forEach(function (m) { scene.remove(m); m.material.dispose(); });
+      race.oil = [];
+    }
+
+    // Windschatten: zwei Schlieren zwischen Heck des Vordermanns und Front des Hintermanns
+    function updateDraft(r, leader, dt) {
+      if (!r.streak) {
+        var mat = own2(r, new THREE.MeshBasicMaterial({ map: streakTex, transparent: true, depthWrite: false, opacity: 0, blending: THREE.AdditiveBlending }));
+        r.streak = { mat: mat, vis: 0, meshes: [0, 1].map(function () { var m = new THREE.Mesh(streakGeo, mat); scene.add(m); return m; }) };
+      }
+      var S = r.streak;
+      S.vis = ease(S.vis, leader ? 1 : 0, 0.3, dt);
+      S.mat.opacity = 0.28 * S.vis;
+      S.meshes.forEach(function (m) { m.visible = S.vis > 0.02 && !!(leader || S.from); });
+      if (!leader) return;
+      var a = rearOf(leader, true), b = rearOf(r, false), dx = a.x - b.x, dz = a.z - b.z, len = Math.hypot(dx, dz);
+      if (len < 0.5 || len > 30) { S.meshes.forEach(function (m) { m.visible = false; }); return; }
+      S.from = true;
+      var ux = dx / len, uz = dz / len, rot = Math.atan2(-dz, dx);
+      S.meshes.forEach(function (m, k) {
+        var off = (k ? 1 : -1) * Math.min(r.w, leader.w) * 0.28;
+        m.position.set((a.x + b.x) / 2 - uz * off, 0.55 + k * 0.25, (a.z + b.z) / 2 + ux * off);
+        m.rotation.y = rot; m.scale.set(len, 1, 0.45);
+      });
+    }
+
+    // Ereignisse seit dem letzten Bild (nach Neuladen/fastForward nur die der letzten 1,5 s)
+    function processEvents(sim, idx) {
+      var ev = sim.events || [];
+      for (; race.evIdx < ev.length; race.evIdx++) {
+        var e = ev[race.evIdx];
+        if (sim.time - e.t > 1.5) continue;
+        var r = race.order[idx[e.id]], o = e.other != null ? race.order[idx[e.other]] : null;
+        if (!r) continue;
+        var p = r.holder.position, back = rearOf(r, true);
+        if (e.type === 'overtake') { r.flash = FLASH; }
+        else if (e.type === 'spin') burst('smoke', back.x, back.z, 5);
+        else if (e.type === 'crash') { burst('smoke', p.x, p.z, 7); if (e.rail) burst('spark', p.x, p.z, 10, { y: 0.6 }); r.jolt = 1; }
+        else if (e.type === 'off') burst('dust', back.x, back.z, 6, { y: 0.3 });
+        else if (e.type === 'push') {
+          var mx = o ? (p.x + o.holder.position.x) / 2 : p.x, mz = o ? (p.z + o.holder.position.z) / 2 : p.z;
+          burst('spark', mx, mz, 7, { y: 0.6 });
+          r.jolt = 1; if (o) o.jolt = Math.max(o.jolt || 0, 0.5);
+        } else if (e.type === 'oil') burst('smoke', back.x, back.z, 2, { a: 0.3 });
+        else if (e.type === 'dnf' && e.reason !== 'time') burst('smoke', p.x, p.z, 4);
+      }
+    }
+
     // ---- Bildschleife ----
     var lastTs = null, idleCleared = false;
     function frame(ts) {
@@ -697,14 +884,29 @@
       } else {
         advanceSim(now - race.startsAt);
         var sim = race.sim, a = race.alpha;
+        var ids = sim.standings(), idx = {};
+        sim.cars.forEach(function (c, i) { idx[c.id] = i; });
         sim.cars.forEach(function (c, i) {
           var p = race.prev[i] || c, r = race.order[i];
           placeCar(r, T, lerp(p.s, c.s, a), lerp(p.d, c.d, a), lerp(p.yaw, c.yaw, a), lerp(p.roll, c.roll, a), lerp(p.pitch, c.pitch, a), lerp(p.steer, c.steer, a), dt);
+          // Stoß-Ruck nach Kontakt/Crash (kurz, bei reduzierter Bewegung aus)
+          if (r.jolt > 0) {
+            if (!reduce) { var j = r.jolt * r.jolt; r.holder.position.y = 0.12 * j; r.holder.rotation.x += 0.07 * j * Math.sin(r.jolt * 25); }
+            r.jolt = Math.max(0, r.jolt - dt * 3.5);
+          }
+          if (r.flash > 0) r.flash = Math.max(0, r.flash - dt);
+          // neben der Bahn: Staub/Kies aus dem Heck; Dreher: Reifenqualm (nur ohne reduzierte Bewegung)
+          if (!reduce && c.v > 3 && ((c.off && Math.random() < dt * 10) || (c.state === 'spin' && Math.random() < dt * 12))) {
+            var bk = rearOf(r, true);
+            puff(c.off ? 'dust' : 'smoke', bk.x + (Math.random() - 0.5), 0.35, bk.z + (Math.random() - 0.5), { a: c.off ? 0.45 : 0.4 });
+          }
+          updateDraft(r, c.draft != null && !sim.done ? race.order[idx[c.draft]] : null, dt);
         });
+        processEvents(sim, idx);
+        updateOil(sim);
+        if (!reduce) streakTex.offset.x = (streakTex.offset.x - dt * 1.6) % 1;
         if (sim.done && !race.ended) finishRace();
-        // Kamera-Ziel: alle, die noch fahren (vorn zuerst); sind alle durch, das ganze Feld ohne DNF
-        var ids = sim.standings(), idx = {};
-        sim.cars.forEach(function (c, i) { idx[c.id] = i; });
+        // Kamera-Ziel: alle, die noch fahren (vorn zuerst, auch neben der Bahn); sind alle durch, das ganze Feld ohne DNF
         var active = ids.filter(function (id) { var c = sim.cars[idx[id]]; return c.place == null && c.state !== 'dnf' && !sim.done; });
         if (!active.length) active = ids.filter(function (id) { var c = sim.cars[idx[id]]; return c.state !== 'dnf' && !(sim.done && c.place == null); });
         if (!active.length) active = ids;
@@ -712,9 +914,10 @@
         ids.forEach(function (id, o) {
           var c = sim.cars[idx[id]], r = race.order[idx[id]];
           var dnf = c.place == null && (c.state === 'dnf' || sim.done);
-          labels.push({ r: r, place: dnf ? 'DNF' : String(c.place != null ? c.place : c.pos), show: true, order: o });
+          labels.push({ r: r, place: dnf ? 'DNF' : String(c.place != null ? c.place : c.pos), show: true, order: o, dnf: dnf });
         });
       }
+      stepPuffs(dt);
       updateCamera(pts, dt);
       cam.updateMatrixWorld();
       updateLabels(labels, dt);
@@ -791,7 +994,7 @@
     if (document.fonts && document.fonts.load) {
       document.fonts.load('700 40px "DM Sans"').then(function () {
         readTokens();
-        if (race) race.order.forEach(function (r) { drawLabel(r, r.labelText.split('\u0000')[0] || '', true); });
+        if (race) race.order.forEach(function (r) { drawLabel(r, r.labelPlace || '', true, r.labelMode); });
       }).catch(function () {});
     }
     var catReady = (ToyCars.loadCatalog ? ToyCars.loadCatalog() : Promise.resolve([])).catch(function () { return []; });
