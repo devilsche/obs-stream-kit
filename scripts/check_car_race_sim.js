@@ -262,6 +262,30 @@ for (race = 0; race < PROBE; race++) {
 var topPct = 100 * topWins / PROBE;
 if (topPct < 35) fail('lauter 10er gegen neun 5er gewinnt nur ' + topPct.toFixed(1) + ' % (Soll ≥ 35 %)');
 
+/* Race-stats-Schätzung (js/car-race-stats.js): Klassen und gültige Bereiche */
+var Stats = require(path.join(__dirname, '..', 'js', 'car-race-stats.js'));
+var FIX = [
+  { key: 'trolza', name: 'Trolza 5265.00 "Megapolis"', brand: 'Trolza', len: 12 },
+  { key: 'lambo', name: 'Lamborghini Aventador', brand: 'Lamborghini', len: 4.8 },
+  { key: 'hoon', name: 'Hoonicorn- A tribute to Ken Block (Updated)', brand: 'Ford', len: 4.4 },
+  { key: 'ural', name: 'Ural-4320', brand: 'Ural', len: 7.6 },
+  { key: 'krabby', name: 'Krabby Patty Wagon', brand: 'Fun', len: 4 },
+  { key: 'm5', name: '2003 BMW M5', brand: 'BMW', len: 4.9 },
+  { key: 'golf', name: 'VW Golf', brand: 'VW' }
+];
+var G = {};
+FIX.forEach(function (e) {
+  var g = G[e.key] = Stats.guess(e);
+  Stats.KEYS.forEach(function (k) { if (!(g[k] >= 1 && g[k] <= 10)) fail('guess ' + e.key + '.' + k + ' = ' + g[k] + ' außerhalb 1–10'); });
+  if (['fwd', 'rwd', 'awd'].indexOf(g.drive) < 0) fail('guess ' + e.key + ' drive ' + g.drive);
+  if (!(g.len >= 2 && g.len <= 20)) fail('guess ' + e.key + ' len ' + g.len);
+  if (g.on !== true) fail('guess ' + e.key + ' on ≠ true');
+});
+if (!(G.trolza.speed <= 3 && G.trolza.weight >= 9)) fail('Trolza: speed ≤ 3 und weight ≥ 9 erwartet');
+if (!(G.lambo.speed >= 9)) fail('Lamborghini: speed ≥ 9 erwartet');
+if (G.hoon.power !== 10) fail('Hoonicorn: power = 10 erwartet');
+if (G.golf.len !== 4.5) fail('Golf ohne len: Rückfall 4,5 erwartet');
+
 function report() {
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
   trackInfo.forEach(function (l) { console.log(l); });

@@ -209,6 +209,30 @@
         </div>
       </section>
 
+      <section aria-labelledby="h-race">
+        <h2 id="h-race">Race stats</h2>
+        <p class="muted small-text">Relative values for the chat car race (1–10, no real units). Until you change something the values are an estimate from the car class. Above 5 matters strongly, below 5 only slightly; a heavy car is slower off the line.</p>
+        <div class="row">
+          <input type="checkbox" id="raceOn">
+          <label for="raceOn">Takes part in races</label>
+        </div>
+        <div class="row"><label for="racePower">Power</label><input type="range" id="racePower" class="race-in" data-k="power" min="1" max="10" step="1" value="5"><output id="racePowerOut" for="racePower">5</output></div>
+        <div class="row"><label for="raceSpeed">Top speed</label><input type="range" id="raceSpeed" class="race-in" data-k="speed" min="1" max="10" step="1" value="5"><output id="raceSpeedOut" for="raceSpeed">5</output></div>
+        <div class="row"><label for="raceHandling">Handling</label><input type="range" id="raceHandling" class="race-in" data-k="handling" min="1" max="10" step="1" value="5"><output id="raceHandlingOut" for="raceHandling">5</output></div>
+        <div class="row"><label for="raceSusp">Suspension</label><input type="range" id="raceSusp" class="race-in" data-k="susp" min="1" max="10" step="1" value="5"><output id="raceSuspOut" for="raceSusp">5</output></div>
+        <div class="row"><label for="raceBrakes">Brakes</label><input type="range" id="raceBrakes" class="race-in" data-k="brakes" min="1" max="10" step="1" value="5"><output id="raceBrakesOut" for="raceBrakes">5</output></div>
+        <div class="row"><label for="raceWeight">Weight</label><input type="range" id="raceWeight" class="race-in" data-k="weight" min="1" max="10" step="1" value="5"><output id="raceWeightOut" for="raceWeight">5</output></div>
+        <div class="row">
+          <label for="raceDrive">Drive</label>
+          <select id="raceDrive"><option value="fwd">FWD</option><option value="rwd">RWD</option><option value="awd">AWD</option></select>
+        </div>
+        <div class="row">
+          <label for="raceLen">Length (m)</label>
+          <input type="number" id="raceLen" min="2" max="20" step="0.1" value="4.5">
+        </div>
+        <div class="row"><button type="button" id="raceReset" class="small">Reset to estimate</button></div>
+      </section>
+
       <section aria-labelledby="h-steer">
         <h2 id="h-steer">Steering (preview)</h2>
         <div class="row">
@@ -234,6 +258,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
@@ -403,7 +428,7 @@
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
         $('texOff').checked = !!def.texOff; $('smoothWheels').checked = !!def.smoothWheels; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
-        paints(); zones();
+        raceFill(); paints(); zones();
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
       // Felgen = Farbbereich „Rims“ (id rim). Alte Einstellungen (rimParts, rim, Felge je Set) einmalig umrechnen;
@@ -702,6 +727,29 @@
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
       }
       function current() { var c = {}; list.forEach(function (e) { var v = TC.vehicle(e.key); if (Object.keys(v).length) c[e.key] = v; }); return c; }
+      // Race stats: Regler zeigen den Schätzwert, solange nichts gespeichert ist; jede Änderung speichert alle Felder
+      function raceFill() {
+        var r = CarRaceStats.guess(cur), c = CarRaceStats.clean(def.race);
+        Object.keys(c).forEach(function (k) { r[k] = c[k]; });
+        $('raceOn').checked = r.on !== false;
+        CarRaceStats.KEYS.forEach(function (k) {
+          var el = document.querySelector('.race-in[data-k="' + k + '"]');
+          el.value = r[k]; $(el.id + 'Out').textContent = String(r[k]);
+        });
+        $('raceDrive').value = r.drive; $('raceLen').value = r.len;
+      }
+      function raceRead() {
+        var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: Math.min(20, Math.max(2, +$('raceLen').value || 4.5)) };
+        CarRaceStats.KEYS.forEach(function (k) {
+          var el = document.querySelector('.race-in[data-k="' + k + '"]');
+          r[k] = +el.value; $(el.id + 'Out').textContent = String(r[k]);
+        });
+        return r;
+      }
+      function raceChanged() { def.race = raceRead(); }
+      Array.prototype.forEach.call(document.querySelectorAll('.race-in'), function (el) { el.addEventListener('input', raceChanged); });
+      ['raceOn', 'raceDrive', 'raceLen'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
+      $('raceReset').addEventListener('click', function () { delete def.race; raceFill(); say('Race stats reset to the estimate. Save to keep it.', 'ok'); });
       $('save').addEventListener('click', function () {
         var zids = def.zones.map(function (z) { return z.id; });
         var d = { mix: def.mix !== false, paints: def.paints.map(function (p) {
@@ -716,6 +764,7 @@
         if (def.texOff) d.texOff = true;
         if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
+        if (def.race) d.race = CarRaceStats.clean(def.race);
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
