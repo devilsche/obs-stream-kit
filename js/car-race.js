@@ -792,61 +792,64 @@
     function drawLobbyCard(now) {
       var st = lobbyCard; if (!st) return;
       var list = (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; });
-      var w = 240, pad = 12, fName = 11, fCar = 9, rowH = 29, m = 12;
-      var counting = st.phase === 'countdown' && st.starts_at != null;
-      var cdF = Math.min(34, vh(3.5)), headH = pad + 15 + 8 + cdF + 10, ctaH = 24, h = headH + ctaH + list.length * rowH + pad * 0.6;
+      // kompakte Infobox (keine Schlagzeile): Titel 2,2 vh, Status 2,8 vh (Countdown 3,2 vh), Aufruf 1,8 vh,
+      // Zeilen Name 1,7 vh / Auto 1,3 vh; höchstens 22 % der Bildbreite
+      var fT = vh(2.2), fS = vh(2.8), fC = vh(3.2), fA = vh(1.8), fName = vh(1.7), fCar = vh(1.3), pad = vh(0.9), m = vh(1.2);
+      var w = Math.min(FULLW * 0.22, W - 2 * m), rowH = fName * 1.25 + fCar * 1.25 + vh(0.35);
+      var counting = st.phase === 'countdown' && st.starts_at != null, fStat = counting ? fC : fS;
+      var headH = pad + fT * 1.15 + vh(0.4) + fStat * 1.1 + pad * 0.6, ctaH = fA * 1.9, h = headH + ctaH + list.length * rowH + pad * 0.5;
       var x0 = W - m - w, y0 = H - m - h;
       var bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
       // Feld: weicher Schatten, Körper halbtransparent, Kopf kräftiger, Goldrand (kaum gerundet)
       hud.save();
-      hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 14; hud.shadowOffsetY = 3;
-      roundRect(hud, x0, y0, w, h, 3); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
+      hud.shadowColor = 'rgba(0,0,0,0.4)'; hud.shadowBlur = 10; hud.shadowOffsetY = 2;
+      roundRect(hud, x0, y0, w, h, 2); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
       hud.restore();
-      hud.save(); roundRect(hud, x0, y0, w, h, 3); hud.clip();
+      hud.save(); roundRect(hud, x0, y0, w, h, 2); hud.clip();
       hud.fillStyle = withAlpha(bg, 0.9); hud.fillRect(x0, y0, w, headH);
-      hud.fillStyle = FRAME_GOLD; hud.fillRect(x0, y0, 4, headH);   // Goldbalken am Kopf
+      hud.fillStyle = FRAME_GOLD; hud.fillRect(x0, y0, vh(0.3), headH);   // Goldbalken am Kopf
       hud.restore();
-      roundRect(hud, x0 + 0.75, y0 + 0.75, w - 1.5, h - 1.5, 2); hud.lineWidth = 1.5; hud.strokeStyle = FRAME_GOLD;   // 3 px Gold bei 1080p, kaum gerundet
-      hud.stroke();
+      roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 2); hud.lineWidth = 1; hud.strokeStyle = FRAME_GOLD; hud.stroke();
       // Text mit leichtem Schatten (bleibt auch über hellem Spielbild lesbar)
       hud.save();
-      hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 2; hud.shadowOffsetY = 1;
+      hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 1.5; hud.shadowOffsetY = 0.5;
       hud.textBaseline = 'alphabetic'; hud.textAlign = 'left';
-      var tx = x0 + pad + 4, ty = y0 + pad + 13;
-      hud.font = font(900, 15); hud.fillStyle = white; hud.fillText('CAR RACE', tx, ty);
-      hud.textAlign = 'right'; hud.font = font(800, 13); hud.fillStyle = TK.accent; hud.fillText(list.length + '/10', x0 + w - pad, ty);
+      var tx = x0 + pad + vh(0.3), ty = y0 + pad + fT * 0.9;
+      hud.font = font(800, fT); hud.fillStyle = white; hud.fillText('CAR RACE', tx, ty);
+      hud.textAlign = 'right'; hud.font = font(700, fT * 0.85); hud.fillStyle = TK.accent; hud.fillText(list.length + '/10', x0 + w - pad, ty);
       hud.textAlign = 'left';
-      var by = ty + 8 + cdF * 0.88;
+      var by = ty + vh(0.4) + fStat * 0.95;
       if (counting) {
         var left = Math.max(0, Math.ceil(st.starts_at - now)), t = Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2);
-        hud.font = font(900, cdF); hud.fillStyle = white; hud.fillText(t, tx, by);
+        hud.font = font(800, fC); hud.fillStyle = white; hud.fillText(t, tx, by);
         var cw = hud.measureText(t).width;
-        hud.font = font(600, 10); hud.fillStyle = dim; hud.fillText('until the start', tx + cw + 8, by - 3);
+        hud.font = font(600, fCar); hud.fillStyle = dim; hud.fillText('until the start', tx + cw + vh(0.6), by - vh(0.2));
       } else {
         var need = Math.max(0, 3 - list.length);
-        hud.font = font(800, 18); hud.fillStyle = white;
-        hud.fillText(need ? need + (need === 1 ? ' more racer to start' : ' more racers to start') : 'Starting soon', tx, by - 6);
+        hud.font = font(700, fS); hud.fillStyle = white;
+        hud.fillText(fitText(hud, need ? need + (need === 1 ? ' more racer to start' : ' more racers to start') : 'Starting soon', w - pad * 2), tx, by);
       }
       // Aufruf
-      hud.font = font(800, 11.5); hud.fillStyle = TK.accent;
-      hud.fillText('Type !race to join', tx, y0 + headH + 16);
+      hud.font = font(700, fA); hud.fillStyle = TK.accent;
+      hud.fillText('Type !race to join', tx, y0 + headH + fA * 1.35);
       // Startliste
-      var nowMs = performance.now();
+      var nowMs = performance.now(), cx = x0 + pad, numW = fName * 1.4;
       list.forEach(function (r, i) {
         var id = r.user_id; if (lobbySeen[id] == null) lobbySeen[id] = nowMs;
-        var a = reduce ? 1 : smooth01((nowMs - lobbySeen[id]) / 350), dx = (1 - a) * 24;
+        var a = reduce ? 1 : smooth01((nowMs - lobbySeen[id]) / 350), dx = (1 - a) * 10;
         var ry = y0 + headH + ctaH + i * rowH, e = catalogEntry(r.car_key), car = e ? shortName(e.name || r.car_key, 24) : '';
         hud.globalAlpha = a;
         hud.shadowColor = 'transparent';
-        hud.fillStyle = hexColor(r.color, '#9146ff'); hud.fillRect(x0 + pad + dx, ry + 3, 3, rowH - 8);   // Chatfarbe als Balken
+        hud.fillStyle = hexColor(r.color, '#9146ff'); hud.fillRect(cx + dx, ry + vh(0.2), vh(0.25), rowH - vh(0.5));   // Chatfarbe als Balken
         hud.shadowColor = 'rgba(0,0,0,0.6)';
+        var nx = cx + vh(0.6) + numW + dx, nameY = ry + fName * 1.05, carY = nameY + fCar * 1.3;
         hud.textAlign = 'right'; hud.font = font(800, fName); hud.fillStyle = TK.accent;
-        hud.fillText(String(r.grid), x0 + pad + 22 + dx, ry + 13);
+        hud.fillText(String(r.grid), cx + vh(0.6) + numW - vh(0.4) + dx, nameY);
         var tr = subTier(r.sub), so = tr ? fName * 1.1 : 0;
-        if (tr) drawStar(hud, x0 + pad + 30 + dx + fName * 0.45, ry + 9.5, fName * 0.45, tr);
+        if (tr) drawStar(hud, nx + fName * 0.45, nameY - fName * 0.35, fName * 0.42, tr);
         hud.textAlign = 'left'; hud.font = font(700, fName); hud.fillStyle = white;
-        hud.fillText(fitText(hud, String(r.display || r.user_id), w - pad * 2 - 30 - so), x0 + pad + 30 + dx + so, ry + 13);
-        if (car) { hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, w - pad * 2 - 30), x0 + pad + 30 + dx, ry + 24); }
+        hud.fillText(fitText(hud, String(r.display || r.user_id), x0 + w - pad - nx - so), nx + so, nameY);
+        if (car) { hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, x0 + w - pad - nx), nx, carY); }
         hud.globalAlpha = 1;
       });
       hud.restore();
