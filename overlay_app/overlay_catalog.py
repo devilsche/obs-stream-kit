@@ -194,11 +194,12 @@ EFFECT_META = {
         {"key": "model", "label": "Car", "type": "select", "default": "mix", "options": [["mix", "Random mix"]],
          "tooltip": "Random car from the mix, all cars of one brand, or exactly one car (list from the Car overview)"},
     ]},
-    # Car Race (js/car-race.js): Fenster 16:9, Standard 640×360 (bis 960×540); Befehle/Knöpfe folgen mit dem Podest
+    # Car Race (js/car-race.js): Fenster 16:9, Standard 640×360 (bis 960×540); Befehle/Knöpfe folgen mit dem Podest.
+    # Nachlauf nach dem Sieger gibt der Server vor (fest 15 s); ?finish= wirkt nur in der Vorschau.
     "car-race.html": {"size": "640×360", "switches": [
-        {"key": "finish", "label": "Finish window", "type": "select", "default": "15",
-         "options": [["5", "5 s"], ["10", "10 s"], ["15", "15 s"], ["20", "20 s"], ["30", "30 s"], ["40", "40 s"]],
-         "tooltip": "Seconds after the winner crosses the line; whoever is not through by then is DNF"},
+        {"key": "preview", "label": "Preview with test racers", "type": "select", "default": "0",
+         "options": [["0", "Off"], ["1", "On"]],
+         "tooltip": "For testing in the browser: local lobby with test racers, no server. Must be off in OBS"},
     ]},
     "item-rain.html": {"switches": [
         {"key": "kind", "label": "What rains", "type": "select", "default": "sushi",

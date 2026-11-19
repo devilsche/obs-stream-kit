@@ -6,7 +6,7 @@
  *                                               (oder genau model, bzw. model=brand:<Marke> nur diese Marke)
  *   ToyCars.MODELS          geladene Modelle (Schlüssel), aus denen der Regen zieht
  *   ToyCars.has(key), ToyCars.dims(key) → { L, W, H, belt }, ToyCars.pickPaint(key) → { c, r?, z? } (Farbset)
- *   ToyCars.paintAt(key, i) → Farbset Nummer i aus dem Editor (sonst wie pickPaint)
+ *   ToyCars.paintAt(key, i) → Farbset Nummer i aus dem Editor (ungültig: erstes Set, ohne Sets Originalfarbe)
  *   ToyCars.build(key, color) → THREE.Group (Mitte im Auto, Länge in x, Front +x, ~4,4 Einheiten je 4,5 m)
  *   ToyCars.applyCustom({ vehicles }) – Lackfarben, Felgenfarbe, Mix aus dem Auto-Editor (/api/fx/cars/custom.js)
  *   ToyCars.prepare(gltfScene, entry) → Vorlage (für Editor/Übersicht)
@@ -450,11 +450,12 @@
     for (var i = 0; i < list.length; i++) { r -= list[i].w || 1; if (r <= 0) return setOf(list[i]); }
     return setOf(list[0]);
   }
-  // Farbset Nummer i aus dem Editor (Car Race: der Server würfelt den Index); fehlt es: zufällig nach Gewicht
+  // Farbset Nummer i aus dem Editor (Car Race: der Server würfelt den Index); ungültiger Index → erstes Set,
+  // ohne Sets Originalfarbe – nie zufällig, damit jede Overlay-Instanz dieselben Farben zeigt
   function paintAt(key, i) {
     var list = vehicle(key).paints;
-    if (Array.isArray(list) && list[i | 0] && i >= 0) return setOf(list[i | 0]);
-    return pickPaint(key);
+    if (!Array.isArray(list) || !list.length) return { c: null };
+    return setOf(list[i >= 0 && list[i | 0] ? i | 0 : 0]);
   }
   // Oberflächen der Farbbereiche: [Metall, Rauheit, Klarlack]
   var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], shiny: [0.35, 0.1, 1], chrome: [1, 0.06, 0], glass: [0, 0.04, 1] };

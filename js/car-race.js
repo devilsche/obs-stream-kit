@@ -428,7 +428,7 @@
       var T = CarRaceSim.track(tr);
       race = {
         id: st.race_id, seed: st.seed | 0, T: T, laps: st.laps || 3,
-        finishWindow: finishOpt != null ? finishOpt : (st.finish_window || 15),
+        finishWindow: preview && finishOpt != null ? finishOpt : (st.finish_window || 15),   // ?finish nur in der Vorschau: echte Rennen nehmen den Server-Wert, damit jede Instanz dasselbe Ergebnis rechnet
         startsAt: st.starts_at, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
         sim: null, simKey: '', prev: null, alpha: 1, ended: false, fadeAt: null, endedAt: null, shownAt: srvNow(),
         cam: null, lastLeader: null
@@ -488,8 +488,13 @@
     }
 
     // Server-Zustand übernehmen (auch der Vorschau-Zustand läuft hier durch)
+    var waitLogged = false;
     function apply(st) {
       var ph = st.phase;
+      if (!preview && !race && (ph === 'idle' || ph === 'lobby') && !waitLogged) {
+        waitLogged = true;   // leere Seite erklärbar machen (Dashboard-Link ohne ?preview=1)
+        if (root.console && console.info) console.info('Car Race: waiting for !race \u2013 add ?preview=1 to test');
+      }
       if (ph === 'countdown' || ph === 'race') {
         if (!st.race_id || finished[st.race_id]) return;
         if (race && race.id === st.race_id && race.dropAt != null) { race.dropAt = null; }   // wieder genug Fahrer
