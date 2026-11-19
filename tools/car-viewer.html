@@ -76,7 +76,7 @@
         // volle Qualität: Original von Sketchfab über den Server (Cache); sonst die leichte Fassung für den Regen
         var m0 = /([0-9a-f]{32})/.exec(c.url || ''), full = m0 ? '/app/api/cars/preview/' + m0[1] + '.glb' : null;
         p.textContent = full ? 'Loading the full-quality model … the first time the server fetches it from Sketchfab, this can take up to a minute.' : 'Loading …';
-        function light() { loader.load('/s/__WIDGET_TOKEN__/api/fx/cars/model/' + c.uid + '.glb', got, null, function () { p.textContent = 'Could not load this model.'; }); }
+        function light() { loader.load('/s/__WIDGET_TOKEN__/api/fx/cars/model/' + c.uid + '.glb' + (c.bytes ? '?v=' + c.bytes : ''), got, null, function () { p.textContent = 'Could not load this model.'; }); }
         if (full) loader.load(full, got, null, light); else light();
         function got(gl) {
           if (current !== c.uid) return;

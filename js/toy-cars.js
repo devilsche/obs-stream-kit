@@ -413,7 +413,9 @@
     if (TPL[e.key]) return Promise.resolve(TPL[e.key]);
     if (loading[e.key]) return loading[e.key];
     return (loading[e.key] = new Promise(function (res, rej) {
-      new THREE.GLTFLoader().load(BASE + 'api/fx/cars/model/' + e.uid + (opts && opts.race ? '.race.glb' : '.glb'), function (gl) {
+      // ?v=Dateigröße: nach einem Neubau holt der Browser die neue Datei statt der 7 Tage gecachten alten
+      var race = opts && opts.race, ver = (race ? e.raceBytes : e.bytes) || 0;
+      new THREE.GLTFLoader().load(BASE + 'api/fx/cars/model/' + e.uid + (race ? '.race.glb' : '.glb') + (ver ? '?v=' + ver : ''), function (gl) {
         try { TPL[e.key] = prepare(gl.scene, e); res(TPL[e.key]); } catch (err) { rej(err); }
       }, null, rej);
     }));
