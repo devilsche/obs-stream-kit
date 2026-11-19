@@ -308,7 +308,7 @@
     });
     // „Split a part“ im Car editor: einzelne Teile fein zerlegen (an harten Kanten/UV-Nähten, ohne Verschweißen);
     // Stücke heißen <Teil>.<n>; Auswahlen auf das ganze Teil gelten für alle Stücke, Stücke ohne Zerlegung fürs ganze Teil
-    var kids = {}, exists = {};
+    var kids = {}, exists = {}, splitFail = {}, cutKids = {};
     if (Array.isArray(v.splitParts) && v.splitParts.length) {
       var todo = [];
       scene.traverse(function (o) { if (o.isMesh && !Array.isArray(o.material) && v.splitParts.indexOf(o.userData.pkey) >= 0) todo.push(o); });
@@ -323,8 +323,15 @@
           // nur wenn alles andere scheitert (z. B. Caterpillar-Rahmen: 2260 Flächen, ein Klumpen nach Berührung):
           // in zusammenhängende Stücke (verschweißt) zerlegen, bis 1000 Stücke – bisher gelungene Zerlegungen bleiben gleich
           var welded = islandsOf(o.geometry);
-          if (welded.length < 2 || welded.length > 1000) return;
-          isl = welded;
+          if (welded.length >= 2 && welded.length <= 1000) isl = welded;
+          else {
+            // letzte, feinere Stufe (erst wenn alles davor scheitert, alte Zerlegungen bleiben gleich):
+            // schon ab 15° Knick trennen, sonst Textur-Inseln bis 1000 Stücke
+            var fine = facesOf(o.geometry, 15), uvi = islandsOf(o.geometry, true);
+            if (fine.length >= 2 && fine.length <= 1000) isl = fine;
+            else if (uvi.length >= 2 && uvi.length <= 1000) isl = uvi;
+            else { splitFail[o.userData.pkey] = welded.length < 2 && fine.length < 2 ? 'smooth' : 'many'; return; }
+          }
         }
         kids[o.userData.pkey] = [];
         isl.forEach(function (tris, j) {
@@ -337,6 +344,33 @@
         o.parent.remove(o);
       });
     }
+    // „Cut a part“ im Car editor: Teil an einer Ebene zerschneiden (cutParts: [{key, p: [nx, ny, nz, d]}], Ebene in
+    // Modell-Koordinaten = Lage im geladenen glTF-Szenenknoten, unabhängig von Kamera und Skalierung). Dreiecke nach
+    // der Seite ihres Mittelpunkts; Stücke heißen <Teil>|a (n·x + d ≥ 0) und <Teil>|b, wieder schneidbar (<Teil>|a|b …)
+    (Array.isArray(v.cutParts) ? v.cutParts : []).forEach(function (c) {
+      if (!c || typeof c.key !== 'string' || !Array.isArray(c.p) || c.p.length !== 4) return;
+      var o = null; scene.traverse(function (x) { if (!o && x.isMesh && !Array.isArray(x.material) && x.userData.pkey === c.key) o = x; });
+      if (!o) return;
+      scene.updateMatrixWorld(true);
+      var M = new THREE.Matrix4().multiplyMatrices(new THREE.Matrix4().copy(scene.matrixWorld).invert(), o.matrixWorld);
+      var g = o.geometry, pos = g.attributes.position, idx = g.index ? g.index.array : null, nt = (idx ? idx.length : pos.count) / 3;
+      var A = [], B = [], P = new THREE.Vector3(), Q = new THREE.Vector3(), R = new THREE.Vector3();
+      for (var t = 0; t < nt; t++) {
+        P.fromBufferAttribute(pos, idx ? idx[t * 3] : t * 3).applyMatrix4(M); Q.fromBufferAttribute(pos, idx ? idx[t * 3 + 1] : t * 3 + 1).applyMatrix4(M);
+        R.fromBufferAttribute(pos, idx ? idx[t * 3 + 2] : t * 3 + 2).applyMatrix4(M); P.add(Q).add(R).multiplyScalar(1 / 3);
+        (c.p[0] * P.x + c.p[1] * P.y + c.p[2] * P.z + c.p[3] >= 0 ? A : B).push(t);
+      }
+      if (!A.length || !B.length) return;
+      cutKids[c.key] = [];
+      [['a', A], ['b', B]].forEach(function (side) {
+        var m = new THREE.Mesh(subGeo(g, side[1]), o.material);
+        m.name = o.name + '|' + side[0]; m.renderOrder = o.renderOrder;
+        m.position.copy(o.position); m.quaternion.copy(o.quaternion); m.scale.copy(o.scale);
+        m.userData = Object.assign({}, o.userData, { pkey: c.key + '|' + side[0] });
+        cutKids[c.key].push(m.userData.pkey); o.parent.add(m);
+      });
+      o.parent.remove(o);
+    });
     var byBase = {};
     scene.traverse(function (o) {
       if (!o.isMesh) return; exists[o.userData.pkey] = 1;
@@ -348,7 +382,9 @@
       var out = [];
       list.forEach(function (k) {
         var add = kids[k] || (!exists[k] && byBase[k]) || (!exists[k] && /\.\d+$/.test(k) && exists[k.replace(/\.\d+$/, '')] ? [k.replace(/\.\d+$/, '')] : [k]);
-        add.forEach(function (x) { if (out.indexOf(x) < 0) out.push(x); if (twin[x] && out.indexOf(twin[x]) < 0) out.push(twin[x]); });
+        // zerschnittene Teile: Auswahl auf dem ganzen Teil gilt für alle Stücke (auch mehrfach geschnitten)
+        var cut = []; (function exp(list) { list.forEach(function (x) { if (cutKids[x]) exp(cutKids[x]); else cut.push(x); }); })(add);
+        cut.forEach(function (x) { if (out.indexOf(x) < 0) out.push(x); if (twin[x] && out.indexOf(twin[x]) < 0) out.push(twin[x]); });
       });
       return out;
     }
@@ -366,6 +402,7 @@
     }
     var ownWheels = own && wheelKeys && (wheelKeys.length || (v.steerParts || []).length) ? buildWheels(scene, wheelKeys, v.steerParts || []) : 0;
     var ud = scene.userData;
+    ud.modelRoot = true;   // Car editor „Cut a part“: Schnittebene in den Koordinaten dieses Knotens
     // „Smooth wheel shading“ im Car editor: alle Teile an den Rädern weich schattieren
     if (v.smoothWheels) {
       var sm = [];
@@ -400,7 +437,7 @@
       if (ms.some(function (m) { return m && autoPaint[m.uuid]; })) autoPaintParts.push(o.userData.pkey);
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
-    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, twin: twin, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
+    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, twin: twin, splitFail: splitFail, cutKids: cutKids, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     // Längsachse und Front-Schätzung wie bisher über Box3 (sonst kippt bei knappen Überhängen die Fahrtrichtung)

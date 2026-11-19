@@ -175,9 +175,10 @@
         <p class="muted small-text">The paint colour goes to the automatically detected paint material. To colour single parts (body, rims, trim …) use a colour zone below.</p>
         <div class="row" role="group" aria-label="Split parts">
           <button type="button" id="pickSplit" aria-pressed="false">Split a part</button>
-          <button type="button" id="joinSplit" class="small">Join split parts</button>
+          <button type="button" id="pickCut" aria-pressed="false">Cut a part (click it, then 2 points)</button>
+          <button type="button" id="joinSplit" class="small">Join split and cut parts</button>
         </div>
-        <p class="muted small-text">If one click marks too much (e.g. the whole rim with the hub): press “Split a part”, click it – it falls apart into its pieces (parts without seams split at their edges: side wall, roof, single window panes), then pick as usual. Windows: untick “Click through glass” first. Picks on the whole part carry over to all pieces.</p>
+        <p class="muted small-text">If one click marks too much (e.g. the whole rim with the hub): press “Split a part”, click it – it falls apart into its pieces (parts without seams split at their edges: side wall, roof, single window panes), then pick as usual. Windows: untick “Click through glass” first. Picks on the whole part carry over to all pieces. If a part has no seams (one smooth surface, e.g. body panels joined from the mirror to the engine cover): press “Cut a part”, click the part, then click two points – it is cut straight along that line as seen from the camera (Esc cancels; cut pieces can be cut again). Badges whose motif is only painted in the texture can't be split; their frame is cut away automatically.</p>
         <p class="muted small-text" id="pickHint" aria-live="polite"></p>
         <div class="row">
           <input type="checkbox" id="texOff">
@@ -338,7 +339,8 @@
       }
 
       // ── Fahrzeug ──
-      var picking = null;   // 'wheel' | 'steer' | 'split' | 'zone:<id>' | null
+      var picking = null;   // 'wheel' | 'steer' | 'split' | 'cut' | 'zone:<id>' | null
+      var splitCheck = null;   // zuletzt geteiltes Teil: nach dem Neuladen prüfen, ob es zerfallen ist
       function partKeys(which) {
         var m = TC.meta(cur.key) || {};
         return m.autoPaintParts || [];
@@ -398,6 +400,10 @@
           }
           if (!keepView) { orbit.dist = Math.max(9, t.userData.dims.L * 2.2); orbit.t.set(0, 0.6, 0); }
           migrateRims(t); migratePaint();
+          if (splitCheck) {   // „Split a part“ ohne Ergebnis: sagen warum
+            var sm = TC.meta(cur.key) || {}, sk = splitCheck; splitCheck = null;
+            if (!(sm.kids || {})[sk]) say(sm.splitFail && sm.splitFail[sk] === 'many' ? 'Too many tiny pieces to split – use “Cut a part”.' : 'One smooth connected surface – no seams to split at. Use “Cut a part”.');
+          }
           var meta = TC.meta(cur.key) || { paint: [], rim: [] };
           $('paintInfo').textContent = meta.paint.length ? 'Paint material: ' + meta.paint.map(function (m) { return m.userData.key; }).join(', ') : 'No paint material found – use a colour zone below.';
           listParts();
@@ -602,6 +608,7 @@
         var was = picking;
         picking = picking === w ? null : w;
         $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickFront').setAttribute('aria-pressed', String(picking === 'steer')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
+        $('pickCut').setAttribute('aria-pressed', String(picking === 'cut')); if (picking !== 'cut') cutCancel();
         canvas.classList.toggle('picking', !!picking); zones();
         var wheelMode = function (x) { return x === 'wheel' || x === 'steer'; };
         if (wheelMode(picking) && !wheelMode(was)) {
@@ -618,10 +625,41 @@
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
       $('pickFront').addEventListener('click', function () { setPick('steer'); });
       $('pickSplit').addEventListener('click', function () { setPick('split'); });
+      $('pickCut').addEventListener('click', function () { setPick('cut'); if (picking === 'cut') say('Cut a part: click the part you want to cut.'); });
       $('joinSplit').addEventListener('click', function () {
-        if (!def.splitParts || !def.splitParts.length) { say('No split parts.'); return; }
-        delete def.splitParts; reprepare({ splitParts: undefined }); say('Split parts joined again.');
+        if (!(def.splitParts || []).length && !(def.cutParts || []).length) { say('No split or cut parts.'); return; }
+        delete def.splitParts; delete def.cutParts; reprepare({ splitParts: undefined, cutParts: undefined }); say('Split and cut parts joined again.');
       });
+      // „Cut a part“: Teil anklicken, dann zwei Punkte → Schnittebene durch beide Punkte und die Blickrichtung,
+      // gespeichert in Modell-Koordinaten (cutParts: [{key, p: [nx, ny, nz, d]}]), angewandt in ToyCars.prepare
+      var cutState = null, cutMarks = new THREE.Group(); cutMarks.name = 'cutMarks'; scene.add(cutMarks);
+      function cutCancel() { cutState = null; while (cutMarks.children.length) cutMarks.remove(cutMarks.children[0]); }
+      function cutClick(hit) {
+        if (!cutState) {
+          var key = hit.object.userData.pkey; if (!key) return;
+          cutState = { key: key, obj: hit.object, pts: [] };
+          say('Cut ' + key + ': click two points on it for the cut line (Esc cancels).'); return;
+        }
+        var p = hit.point.clone(); cutState.pts.push(p);
+        var dot = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false }));
+        dot.position.copy(p); dot.renderOrder = 10; cutMarks.add(dot);
+        if (cutState.pts.length < 2) { say('First point set – click the second point.'); return; }
+        var a = cutState.pts[0], b = cutState.pts[1];
+        var ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial({ color: 0xff3b30, depthTest: false }));
+        ln.renderOrder = 10; cutMarks.add(ln);
+        var root = cutState.obj; while (root && !root.userData.modelRoot) root = root.parent;
+        if (!root || a.distanceTo(b) < 1e-4) { say('Could not cut here – try two points further apart.'); cutCancel(); return; }
+        root.updateMatrixWorld(true);
+        var inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+        var dir = new THREE.Vector3().subVectors(a, cam.position).normalize().transformDirection(inv);
+        var q1 = a.clone().applyMatrix4(inv), q2 = b.clone().applyMatrix4(inv);
+        var n = new THREE.Vector3().subVectors(q2, q1).cross(dir).normalize();
+        var plane = [n.x, n.y, n.z, -n.dot(q1)].map(function (x) { return +x.toPrecision(7); });
+        def.cutParts = (def.cutParts || []).concat([{ key: cutState.key, p: plane }]);
+        var done = cutState.key; cutCancel();
+        reprepare({ cutParts: def.cutParts.slice() }); say('Cut: ' + done + ' – now pick the pieces (' + done + '|a, ' + done + '|b).');
+      }
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && picking === 'cut' && cutState) { e.preventDefault(); cutCancel(); say('Cut cancelled.'); } });
       $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; delete def.steerParts; delete def.frontWheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); $('pickFront').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined, steerParts: undefined, frontWheelParts: undefined }); });
       $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
       $('smoothWheels').addEventListener('change', function () { def.smoothWheels = $('smoothWheels').checked; reprepare({ smoothWheels: def.smoothWheels || undefined }); });
@@ -674,9 +712,12 @@
         })[0];
         if (!hit) return;
         var key = hit.object.userData.pkey; if (!key) return;
+        if (picking === 'cut') { cutClick(hit); return; }
         if (picking === 'split') {
           var kd = (TC.meta(cur.key) || {}).kids || {}, isKid = Object.keys(kd).some(function (q) { return kd[q].indexOf(key) >= 0; });
           if (isKid) { say('Already split: ' + key); return; }
+          if (key.indexOf('|') >= 0) { say('Cut pieces cannot be split – use “Cut a part” on it again.'); return; }
+          splitCheck = key;
           def.splitParts = (def.splitParts || []).concat([key]);
           reprepare({ splitParts: def.splitParts.slice() }); say('Split: ' + key + ' – now pick the pieces.'); return;
         }
@@ -761,6 +802,7 @@
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
+        if (def.cutParts && def.cutParts.length) d.cutParts = def.cutParts.slice(0, 60);
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);
         }
