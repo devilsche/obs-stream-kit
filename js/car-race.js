@@ -74,6 +74,7 @@
 
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, premultipliedAlpha: true });
     renderer.setClearColor(0x000000, 0);
+    renderer.localClippingEnabled = true;   // Enten-Fahrer werden an der Karosserie abgeschnitten (ToyCars.updateDriverClip)
     var scene = new THREE.Scene();
     if (root.CarStage) CarStage.setup(renderer, scene, { exposure: 1.1 });
     var cam = new THREE.PerspectiveCamera(FOV, 16 / 9, 1, 4000);
@@ -778,7 +779,13 @@
     // Projektionen (Schilder, Partikel-Randblende) im Rechteck view rechnen: W/H = Rechteck, Koordinaten darin
     function inViewport(fn) { return VIEW ? inView(fn) : fn(); }
     // Szene zeichnen: mit view nur ins Rechteck (Viewport + Scissor), der Rest bleibt durchsichtig
+    // Schnittebenen der Enten mit den Autos mitbewegen (nur Enten mit Ebenen kosten etwas)
+    function updateDuckClips() {
+      if (!race || !ToyCars.updateDriverClip) return;
+      race.order.forEach(function (r) { if (r.duck && r.holder.visible) ToyCars.updateDriverClip(r.duck); });
+    }
     function renderScene() {
+      updateDuckClips();
       if (!VIEW || !renderer.setViewport) { renderer.render(scene, cam); return; }
       var PH = Math.round(H * UIK), x = VIEW[0], y = PH - VIEW[1] - VIEW[3], w = VIEW[2], h = VIEW[3];
       renderer.setScissorTest(false); renderer.setViewport(0, 0, Math.round(W * UIK), PH); renderer.clear();
