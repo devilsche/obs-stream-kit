@@ -621,7 +621,7 @@
       }
     }
     function startSim() {
-      race.sim = CarRaceSim.create({ seed: race.seed, track: race.T, laps: race.laps, finishWindow: race.finishWindow, cars: simCars() });
+      race.sim = CarRaceSim.create({ seed: race.seed, track: race.T, laps: race.laps, finishWindow: race.finishWindow, cars: simCars(), events: race.ext || [] });
       race.simKey = race.rosterKey + '@' + race.startsAt;
       race.stage = 'race'; race.ended = false; race.evIdx = 0; clearOil(); endIntro();
       var t = srvNow() - race.startsAt;
@@ -697,6 +697,7 @@
           // Start vorgezogen (10. Fahrer) oder Feld kurz vor dem Start geändert: neu aufsetzen
           race.startsAt = st.starts_at; syncRacers(st.racers); startSim();
         }
+        takeRaceEvents(st.race_events);
         if (race.order.length && race.fadeAt == null) show(true);
       } else if (race && race.dropAt == null && (!race.sim || (race.stage === 'race' && (ph === 'idle' || ph === 'lobby')))) {
         // Lobby wieder unter 3 Fahrern, Rennen abgebrochen oder Server neu gestartet: ausblenden, dann aufräumen.
@@ -820,6 +821,18 @@
         hud.globalAlpha = 1;
       });
       hud.restore();
+    }
+    // Zuschauer-Aktionen (Nitro/Anrempeln) an die Sim: liegt ein neues Ereignis schon in der Vergangenheit der
+    // Sim, wird sie aus dem Seed neu aufgebaut und vorgespult – so bleiben alle Instanzen gleich
+    function takeRaceEvents(list) {
+      if (!race || !Array.isArray(list)) return;
+      var key = JSON.stringify(list);
+      if (key === race.extKey) return;
+      race.extKey = key; race.ext = list.slice();
+      if (race.sim && race.stage === 'race' && race.sim.setEvents && race.sim.setEvents(race.ext)) {
+        var cam0 = race.cam, tags0 = race.tags;
+        startSim(); race.cam = cam0; race.tags = tags0;   // Kamera springt nicht, Schilder bleiben
+      }
     }
     function rosterOf(list) {
       return (list || []).slice().sort(function (a, b) { return a.grid - b.grid; }).map(function (r) { return r.user_id; }).join('|');
@@ -1362,6 +1375,24 @@
       else drawTower(rows, now, m, m, rh * 8.6, rh * 0.9, H - m);
       // Countdown
       var left = race.startsAt != null ? race.startsAt - now : null;
+      // Aktions-Schilder „NITRO! Name“ / „BUMP! A → B“ (2,2 s, auch bei reduzierter Bewegung)
+      if (race.stage === 'race' && race.sim && race.tags && race.tags.length) {
+        var tgs = race.sim.time, tfz = clamp(H * 0.05, 14, 26), ty3 = m + rh * 1.6 + tfz * 2.2;
+        race.tags = race.tags.filter(function (g) { return tgs - g.t0 < 2.2; });
+        race.tags.forEach(function (g, gi) {
+          var ga = smooth01((tgs - g.t0) / 0.2) * smooth01((2.2 - (tgs - g.t0)) / 0.35); if (ga <= 0) return;
+          var body = g.b ? g.a + ' \u2192 ' + g.b : g.a;
+          hud.save(); hud.globalAlpha = ga;
+          hud.font = font(900, tfz); var w1 = hud.measureText(g.word + ' ').width;
+          hud.font = font(700, tfz); var bodyT = fitText(hud, body, W * 0.45), w2 = hud.measureText(bodyT).width;
+          var tw3 = w1 + w2 + tfz * 1.2, yy = ty3 + gi * tfz * 1.9;
+          pill(hud, (W - tw3) / 2, yy, tw3, tfz * 1.6);
+          hud.textAlign = 'left'; hud.textBaseline = 'middle';
+          hud.font = font(900, tfz); hud.fillStyle = g.color; hud.fillText(g.word, (W - tw3) / 2 + tfz * 0.6, yy + tfz * 0.8);
+          hud.font = font(700, tfz); hud.fillStyle = legible(TK.text, TK.surface, 7); hud.fillText(bodyT, (W - tw3) / 2 + tfz * 0.6 + w1, yy + tfz * 0.8);
+          hud.restore();
+        });
+      }
       // Highlight-Schild „CRASH! Name“ (auch bei reduzierter Bewegung)
       if (race.stage === 'race' && race.hl && race.sim) {
         var hs = race.sim.time, hh = race.hl, ha = hs >= hh.t0 && hs <= hh.until + 0.3 ? smooth01((hs - hh.t0) / 0.25) * smooth01((hh.until + 0.3 - hs) / 0.4) : 0;
@@ -1648,6 +1679,11 @@
     }
 
     // Ereignisse seit dem letzten Bild (nach Neuladen/fastForward nur die der letzten 1,5 s)
+    function addTag(word, a, b, color, t0) {
+      if (!race.tags) race.tags = [];
+      race.tags.push({ word: word, a: a, b: b, color: color, t0: t0 });
+      if (race.tags.length > 3) race.tags.shift();
+    }
     function processEvents(sim, idx) {
       var ev = sim.events || [];
       for (; race.evIdx < ev.length; race.evIdx++) {
@@ -1665,6 +1701,12 @@
           burst('spark', mx, mz, 7, { y: 0.6 });
           r.jolt = 1; if (o) o.jolt = Math.max(o.jolt || 0, 0.5);
         } else if (e.type === 'oil') burst('smoke', back.x, back.z, 2, { a: 0.3 });
+        else if (e.type === 'nitro') { r.nitroUntil = e.t + 3.5; addTag('NITRO!', r.display, null, TK.accent, e.t); }
+        else if (e.type === 'bump' && o) {
+          burst('spark', o.holder.position.x, o.holder.position.z, 9, { y: 0.6 });
+          o.jolt = 1; r.jolt = Math.max(r.jolt || 0, 0.4);
+          addTag('BUMP!', r.display, o.display, '#ff4a3d', e.t);
+        }
         else if (e.type === 'dnf' && e.reason !== 'time') burst('smoke', p.x, p.z, 4);
       }
     }
@@ -1784,6 +1826,14 @@
           }
           updateDraft(r, c.draft != null && !sim.done ? race.order[idx[c.draft]] : null, dt);
           if (c.wreck && c.burn != null) wreckFx(r, sim.time - c.burn, dt);
+          // Nitro: Flammen aus dem Auspuff und Fahrtwind-Streifen (reduzierte Bewegung: nur das Schild)
+          if (r.nitroUntil != null && sim.time < r.nitroUntil && !reduce) {
+            var nb = rearOf(r, true), ny = r.holder.rotation.y, bx = -Math.cos(ny), bz = Math.sin(ny);
+            if (Math.random() < dt * 30) puff('flame', nb.x + (Math.random() - 0.5) * r.w * 0.4, r.height * 0.35, nb.z + (Math.random() - 0.5) * r.w * 0.4,
+              { size: 0.45, grow: 0.25, life: 0.3, a: 0.95, grav: 0, vel: new THREE.Vector3(bx * 6, 0.4, bz * 6) });
+            if (Math.random() < dt * 18) puff('smoke', r.holder.position.x + (Math.random() - 0.5) * r.w, r.height * (0.4 + Math.random() * 0.5), r.holder.position.z + (Math.random() - 0.5) * r.w,
+              { size: 0.18, grow: 0.1, life: 0.35, a: 0.35, grav: 0, vel: new THREE.Vector3(bx * 14, 0, bz * 14) });
+          }
         });
         processEvents(sim, idx);
         updateOil(sim);
@@ -1906,7 +1956,7 @@
     function previewReset() {
       pvResetAt = null;
       var trackOpt = parseInt(opts.track, 10);
-      pv = { phase: 'lobby', race_id: 'preview-' + Date.now().toString(36), seed: Math.floor(Math.random() * 2147483647),
+      pv = { race_events: [], phase: 'lobby', race_id: 'preview-' + Date.now().toString(36), seed: Math.floor(Math.random() * 2147483647),
         track: isFinite(trackOpt) ? trackOpt : Math.floor(Math.random() * 1000), laps: 3, finish_window: 15, starts_at: null, racers: [] };
       pvN = 0;
       for (var i = 0; i < 3; i++) addTestRacer();
@@ -1939,6 +1989,16 @@
     }
     // wie fx/race.py: Startaufstellung schließen, Fahrer vorstellen, dann Rennen
     function pvIntro(at) { pv.phase = 'intro'; pv.intro_at = at; pv.starts_at = at + introSeconds(pv.racers.length); }
+    // Vorschau: Nitro bzw. Anrempeln für einen zufälligen Testfahrer, 1,5 s in der Zukunft (wie der Server)
+    function previewAction(type) {
+      if (!pv || pv.phase !== 'race' || !race || !race.sim || race.sim.done) return;
+      var alive = race.sim.cars.filter(function (c) { return c.place === null && c.state !== 'dnf'; });
+      if (alive.length < (type === 'bump' ? 2 : 1)) return;
+      var a = alive[Math.floor(Math.random() * alive.length)], ev = { t: Math.round((race.sim.time + 1.5) * 1000) / 1000, type: type, id: a.id };
+      if (type === 'bump') { var others = alive.filter(function (c) { return c !== a; }); ev.target = others[Math.floor(Math.random() * others.length)].id; }
+      pv.race_events = (pv.race_events || []).concat([ev]);
+      apply(pvView());
+    }
     function pvView() { return Object.assign({ now: Date.now() / 1000 }, pv, { racers: pv.racers.slice() }); }
     function previewInfo() {
       if (!opts.onPreviewInfo || !pv) return;
@@ -1971,7 +2031,7 @@
       requestAnimationFrame(frame);
     });
 
-    return { addTestRacer: addTestRacer, startNow: startNow, _state: function () { return race; }, _cam: function () { return cam; }, _introCardAt: introCardAt };   // _state/_cam: nur für Tests
+    return { addTestRacer: addTestRacer, startNow: startNow, nitro: function () { previewAction('nitro'); }, bump: function () { previewAction('bump'); }, _state: function () { return race; }, _cam: function () { return cam; }, _introCardAt: introCardAt };   // _state/_cam: nur für Tests
   }
 
   root.CarRace = { start: start };

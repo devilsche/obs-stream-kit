@@ -420,6 +420,54 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   if (st.length !== field.length) fail('standings() hat falsche Länge');
 })();
 
+// ---- 3a. Zuschauer-Aktionen (Nitro, Anrempeln) ----
+(function () {
+  var field = mixedField(mulberry32(11), 6);
+  var base = function (ev) { var o = { seed: 4242, track: Sim.TRACKS[1], laps: 3, finishWindow: 15, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
+  function full(sim) { while (!sim.done && sim.time < MAX_T) sim.step(); return JSON.stringify([sim.result(), sim.events, sim.cars, sim.hazards]); }
+  // ohne Ereignisse: genau wie vorher (auch mit leerer Liste und setEvents([]) mitten im Rennen)
+  var ref = full(Sim.create(base()));
+  if (full(Sim.create(base([]))) !== ref) fail('events: [] ändert das Rennen');
+  var m = Sim.create(base()); m.fastForward(20); m.setEvents([]);
+  if (full(m) !== ref) fail('setEvents([]) mitten im Rennen ändert das Rennen');
+  var id0 = field[2].id, id1 = field[1].id;
+  var ev = [{ t: 20, type: 'nitro', id: id0 }, { t: 30, type: 'bump', id: id0, target: id1 }];
+  // gleiche Ereignisse → gleiches Rennen, auch mit Vorspulen bzw. setEvents vor dem Ereignis
+  var a = full(Sim.create(base(ev)));
+  var b = Sim.create(base(ev)); b.fastForward(25.3);
+  if (full(b) !== a) fail('Ereignisse + fastForward weichen ab');
+  var c = Sim.create(base()); c.fastForward(10); if (c.setEvents(ev)) fail('setEvents meldet „zu spät“, obwohl die Ereignisse in der Zukunft liegen');
+  if (full(c) !== a) fail('setEvents vor dem Ereignis weicht vom Rennen mit create({events}) ab');
+  var late = Sim.create(base()); late.fastForward(22);
+  if (!late.setEvents(ev)) fail('setEvents erkennt ein schon vergangenes Ereignis nicht');
+  if (a === ref) fail('Ereignisse ändern das Rennen nicht');
+  // Nitro bringt Strecke (wirkt auf Geraden, 3,5 s): der Führende zündet zu mehreren Zeitpunkten, Vergleich 3,5 s
+  // später – auf dem Speedway bester Zeitpunkt > 3 m, auf allen Strecken nie schlechter als −0,3 m
+  var gainBy = {};
+  Sim.TRACKS.forEach(function (tr) {
+    var ob = function (ev) { var o = { seed: 4242, track: tr, laps: 3, finishWindow: 15, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
+    gainBy[tr] = [12, 16, 20, 24, 28, 31].map(function (T0) {
+      var probe = Sim.create(ob()); probe.fastForward(T0);
+      var lid = probe.standings()[0], li = field.map(function (f) { return f.id; }).indexOf(lid);
+      var n0 = Sim.create(ob()), n1 = Sim.create(ob([{ t: T0, type: 'nitro', id: lid }]));
+      n0.fastForward(T0 + 3.5); n1.fastForward(T0 + 3.5);
+      if (!n1.events.some(function (e) { return e.type === 'nitro' && e.id === lid; })) fail('kein nitro-Ereignis bei ' + T0 + ' s');
+      return n1.cars[li].s - n0.cars[li].s;
+    });
+  });
+  function fmt(a) { return a.map(function (g) { return g.toFixed(2); }).join(', '); }
+  var gain = Math.max.apply(null, gainBy[Sim.TRACKS[0]]);
+  if (!(gain > 3)) fail('Nitro bringt auf dem Speedway zu wenig Strecke: ' + fmt(gainBy[Sim.TRACKS[0]]) + ' m');
+  Sim.TRACKS.forEach(function (tr) { if (gainBy[tr].some(function (g) { return g < -0.3; })) fail('Nitro kostet Strecke (Strecke ' + tr + '): ' + fmt(gainBy[tr]) + ' m'); });
+  // Anrempeln schiebt das Ziel zur Seite
+  var b0 = Sim.create(base()), b1 = Sim.create(base([{ t: 30, type: 'bump', id: id0, target: id1 }]));
+  b0.fastForward(30.6); b1.fastForward(30.6);
+  var dd = Math.abs(b1.cars[1].d - b0.cars[1].d);
+  if (!(dd > 0.5)) fail('Anrempeln verschiebt das Ziel zu wenig: ' + dd.toFixed(2) + ' m');
+  if (!b1.events.some(function (e) { return e.type === 'bump' && e.id === id0 && e.other === id1; })) fail('kein bump-Ereignis');
+  console.log('Zuschauer-Aktionen: Nitro auf dem Speedway bis +' + gain.toFixed(1) + ' m in 3,5 s, Anrempeln seitlich ' + dd.toFixed(2) + ' m');
+})();
+
 // ---- 3b. Lange Fahrzeuge (Einspurmodell): Bus auf der Hairpin-Strecke ----
 // Gierwinkel ruhiger als mit dem alten starren Modell (gemessen vor dem Umbau: max. 0,1238 rad/Schritt,
 // mittlere Änderung der Gierrate 0,00289 rad) und die Hinterachse schneidet enge Kurven innen.

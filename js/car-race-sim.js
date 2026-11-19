@@ -72,7 +72,16 @@
  *         'oil'      id fährt über einen Ölfleck (Grip bricht 0,5 s ein),
  *         'push'     Kontakt: id = das leichtere (stärker geschubste) Auto, other = das schwerere;
  *                    kind 'rear'|'side'|'shove' (Schwerer schiebt in der Kurve), v/vOther = Tempo vorher, push/pushOther = seitlicher Schub (m/s), loss/lossOther = Tempoverlust (m/s),
- *         'dnf'      ausgeschieden, reason 'crash'|'rail'|'time' (time = bei Rennende nicht im Ziel).
+ *         'dnf'      ausgeschieden, reason 'crash'|'rail'|'time' (time = bei Rennende nicht im Ziel),
+ *         'nitro'    id zündet Nitro (von außen, siehe events), 'bump' id rempelt other an (von außen).
+ *       Ereignisse von außen (Zuschauer-Aktionen): create({ …, events }) bzw. sim.setEvents(list) mit
+ *         [{ t, type: 'nitro'|'bump', id, target? }] (t = Sim-Zeit in s). Wirken im ersten Schritt mit time ≥ t.
+ *         Nitro: +25 % Zielgeschwindigkeit (nur auf Geraden), Endgeschwindigkeit und Beschleunigung für 3,5 s (nicht im Ziel/DNF).
+ *         Bump: seitlicher Stoß auf target wie ein Kontakt (Massenverhältnis Auslöser/Ziel), Tempoverlust,
+ *         Dreher-Chance 30 % × Massenfaktor (Zufall aus dem Seed, gezogen im Ereignis-Schritt).
+ *         setEvents liefert true, wenn ein noch nicht angewandtes Ereignis schon in der Vergangenheit liegt –
+ *         dann muss der Aufrufer die Sim neu aufbauen und vorspulen (sonst wären Instanzen nicht mehr gleich).
+ *         Ohne Ereignisse ist alles wie vorher (keine zusätzlichen Zufallszahlen).
  *       sim.hazards = [{ s, d, r, from, src }] Ölflecken (Mitte bei s/d, Radius r 1,5–2,5 m), from = Sim-Zeit des
  *         Erscheinens, src = 'track' (Zufallsfleck, ~60 % der Rennen, ab Start oder ab Runde 2) oder id des Autos,
  *         dessen Crash/Schubser ihn hinterlassen hat. Höchstens 3, bleiben bis Rennende.
@@ -134,6 +143,7 @@
   var GRAVEL_V = 6;           // so schnell rollt ein Auto neben der Fahrbahn zurück (m/s)
   var RAIL_V = 4;             // Einschlag in die Leitplanke ab diesem Tempo (m/s) = DNF
   // Kontakt / Schubsen
+  var NITRO_T = 3.5, NITRO_K = 1.25, BUMP_CLOSING = 6, BUMP_SPIN = 0.3;   // Zuschauer-Aktionen
   var PUSH_K = 0.9;           // seitlicher Schub (m/s) je m/s Annäherung × 2 × Massenanteil des anderen
   var PUSH_FRIC = 9;          // Abbau des seitlichen Schubs (m/s²)
   var CONTACT_MIN = 1.5;      // Auffahren erst ab 1,5 m/s Annäherung ist ein Kontakt
@@ -432,6 +442,41 @@
     var cars = [], P = [];
     var steps = 0, finCount = 0, deadline = Infinity;
     var events = [], hazards = [], pendingOil = null, lastContact = {};
+    var ext = [], extDone = {};   // Ereignisse von außen (Nitro/Bump) und schon angewandte (Schlüssel)
+    function extKey(e) { return e.t + '|' + e.type + '|' + e.id + '|' + (e.target || ''); }
+    function setExt(list) {
+      ext = (list || []).filter(function (e) { return e && (e.type === 'nitro' || e.type === 'bump') && isFinite(+e.t); })
+        .map(function (e) { return { t: +e.t, type: e.type, id: e.id, target: e.target }; })
+        .sort(function (a, b) { return a.t - b.t || (extKey(a) < extKey(b) ? -1 : 1); });
+      var time = steps * DT;
+      return ext.some(function (e) { return !extDone[extKey(e)] && e.t < time - 1e-9; });
+    }
+    function idx(id) { for (var q = 0; q < cars.length; q++) if (cars[q].id === id) return q; return -1; }
+    function applyExt(time) {
+      for (var q = 0; q < ext.length; q++) {
+        var e = ext[q], k = extKey(e);
+        if (extDone[k] || e.t > time + 1e-9) continue;
+        extDone[k] = true;
+        var i = idx(e.id);
+        if (i < 0 || sim.done) continue;
+        var c = cars[i];
+        if (e.type === 'nitro') {
+          if (c.place !== null || c.state === 'dnf' || P[i].parked) continue;
+          P[i].nitroT = NITRO_T; emit('nitro', i);
+        } else {
+          var j = idx(e.target);
+          if (j < 0 || j === i || cars[j].place !== null || cars[j].state === 'dnf' || P[j].parked) continue;
+          var mi = P[i].mass, mj = P[j].mass, f = mi / (mi + mj), cj = cars[j], pj = P[j];
+          var dir = Math.abs(cj.d - c.d) > 0.15 ? (cj.d > c.d ? 1 : -1) : (rnd() < 0.5 ? -1 : 1);
+          var shove = Math.min(9, PUSH_K * BUMP_CLOSING * f * 2), loss = Math.min(cj.v, BUMP_CLOSING * f * 0.7);
+          pj.pushV = clamp(pj.pushV + dir * shove, -9, 9);
+          cj.v -= loss;
+          var spin = rnd() < BUMP_SPIN * clamp(2 * f, 0, 1.6);
+          if (spin && cj.state === 'run' && !cj.off) startEvent(j, cj, pj, 'spin');
+          emit('bump', i, j, { push: Math.round(shove * 100) / 100, loss: Math.round(loss * 100) / 100, spin: !!spin });
+        }
+      }
+    }
 
     // Startaufstellung: 2 nebeneinander, Pole (Index 0) vorn links, Reihenabstand nach Autolänge
     var rowS = [], prevLen = 0, sRow = 0;
@@ -474,7 +519,7 @@
         // Darstellung (Einspurmodell): Vorder-/Hinterachse in Weltkoordinaten, Richtung Hinter- → Vorderachse
         wb: wheelbase(st.len), fx: 0, fz: 0, rx: 0, rz: 0, hdg: 0,
         // Abflug / Schubs / Öl
-        offTo: null, offLat: 0, pushV: 0, atRail: false, oilT: 0, oilS: -1e9, avoidKey: -1, avoidOk: false
+        offTo: null, offLat: 0, pushV: 0, atRail: false, oilT: 0, oilS: -1e9, avoidKey: -1, avoidOk: false, nitroT: 0
       });
       cars.push({
         id: c.id, s: rowS[i >> 1], d: (i % 2 === 0 ? 1 : -1) * 2.3, v: 0, lap: 0, pos: i + 1,
@@ -672,13 +717,16 @@
       return cars[a].s > cars[b].s + HYST;
     }
 
+    if (opts.events) setExt(opts.events);
     var sim = {
       DT: DT, track: T, cars: cars, time: 0, done: false, laps: laps, counts: counts,
       events: events, hazards: hazards,
+      setEvents: function (list) { return setExt(list); },
       step: function () {
         steps++;
         var time = steps * DT, i, j, c, p, h, hz;
         var wasDone = sim.done;
+        if (ext.length) applyExt(time);
         if (pendingOil) {              // Zufallsfleck ab Runde 2
           for (i = 0; i < cars.length; i++) if (cars[i].lap >= 2) break;
           if (i < cars.length) { pendingOil.from = Math.round(time * 1000) / 1000; hazards.push(pendingOil); pendingOil = null; }
@@ -688,6 +736,8 @@
           c = cars[i]; p = P[i];
           var v0 = c.v;
           if (p.oilT > 0) p.oilT -= DT;
+          var nitro = p.nitroT > 0 && c.place === null && !p.parked ? NITRO_K : 1;
+          if (p.nitroT > 0) p.nitroT -= DT;
           c.draft = null;
           if (c.state === 'spin' || c.state === 'crash' || (c.state === 'dnf' && p.parked)) {
             p.timer += DT;
@@ -739,11 +789,13 @@
               }
               var slip = slipJ >= 0 && !c.off;
               if (slip && c.state === 'run' && !sim.done) c.draft = cars[slipJ].id;
-              var vtop = p.st.vmax / (slip ? 1 : SLIP_BONUS);
+              var vtop = p.st.vmax / (slip ? 1 : SLIP_BONUS) * nitro;
               // Ideallinie: vor Kurven nach innen; wer daneben fährt, ist in Kurven langsamer (Überholen kostet)
               var line = clamp(crvAt(c.s + 10) * 50, -2.5, 2.5) + p.lineOff;
               var offLine = 1 - OFF_LINE * Math.max(0, Math.abs(c.d - line) - 0.5);
-              var target = Math.min(profAt(p, c.s) * (cruise ? 0.75 : p.push * offLine), vtop);
+              // Nitro hebt nur das Tempo auf Geraden (Profil an der Endgeschwindigkeit), nicht die Kurvengrenze
+              var prof = profAt(p, c.s), boost = nitro > 1 && prof >= p.st.vmax * 0.97 ? nitro : 1;
+              var target = Math.min(prof * boost * (cruise ? 0.75 : p.push * offLine), vtop);
               if (p.slowT > 0) { p.slowT -= DT; target = Math.min(target, p.slowV); }
               if (c.off) target = Math.min(target, GRAVEL_V);
               // an Wracks vorbei nur langsam (voraus bis 25 m oder daneben)
@@ -757,14 +809,14 @@
                 target = Math.min(target, Math.max(0, cars[ahead].v + Math.max(0, free - 0.5) * 2));
               }
               if (c.v < target) {
-                var a = p.st.acc * (1 - Math.pow(c.v / vtop, DRAG_EXP));
+                var a = p.st.acc * nitro * (1 - Math.pow(c.v / vtop, DRAG_EXP));
                 if (c.v < 8 && c.lap <= 1) a *= p.st.launch * p.luck;   // Antrieb + Startglück beim Losfahren
                 if (c.off) a *= 0.5;                                   // im Kies dreht das Rad durch
                 c.v = Math.min(target, c.v + Math.max(a, 0.3) * DT);
               } else {
                 c.v = Math.max(target, c.v - (c.off ? GRAVEL_DECEL : p.st.brake * 1.3) * DT);
               }
-              c.v = clamp(c.v, 0, p.st.vmax);
+              c.v = clamp(c.v, 0, p.st.vmax * nitro);
               // Öl: Grip bricht für OIL_TIME s ein
               for (h = 0; h < hazards.length; h++) {
                 hz = hazards[h];
