@@ -23,7 +23,7 @@
   // Kamera: Pixel je Meter (4,5-m-Auto 20…60 px); die Fenstergröße ändert nur den Ausschnitt
   var PX_MIN = 20 / 4.5, PX_MAX = 60 / 4.5;
   var TILT = 58 * Math.PI / 180, FOV = 30;
-  var POLL_MS = 1000, HOLD = 5, FADE = 0.6;
+  var POLL_MS = 1000, HOLD = 5, FADE = 0.6, PODIUM_HOLD = 12;
   var LABEL_W = 512, LABEL_H = 112;
   var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
@@ -113,7 +113,7 @@
     });
 
     // ---- Strecke ----
-    var trackGroup = null, trackOwned = [];
+    var trackGroup = null, trackOwned = [], trackNear = null;   // trackNear(x, z, R): liegt Strecke näher als R?
     function own(x) { trackOwned.push(x); return x; }
     function buildTrack(T) {
       disposeTrack();
@@ -260,6 +260,7 @@
         });
         g.add(trunks); g.add(crowns);
       }
+      trackNear = nearTrack;
       scene.add(g);
     }
     function disposeTrack() {
@@ -432,7 +433,7 @@
       list.forEach(function (it) {
         var r = it.r, L = r.label, up = r.flash > 0;
         drawLabel(r, it.place, false, it.dnf ? 'dnf' : up ? 'up' : '');
-        tmpV.set(r.holder.position.x, r.height + 0.9, r.holder.position.z).project(cam);
+        tmpV.set(r.holder.position.x, r.holder.position.y + r.height + 0.9, r.holder.position.z).project(cam);
         var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H, wpx = hpx * L.boxW / LABEL_H;
         var crowd = placed.some(function (o) { return Math.abs(o.px - px) < (o.w + wpx) / 2 && Math.abs(o.py - py) < hpx * 1.1; });
         r.labelK = ease(r.labelK, crowd && !up ? 0 : 1, 0.2, dt);
@@ -443,7 +444,7 @@
         L.vis = ease(L.vis, it.show ? 1 : 0, 0.25, dt);
         var sy = hpx * k / H * 2 * tanV;
         L.sprite.scale.set(sy * LABEL_W / LABEL_H, sy, 1);
-        L.sprite.position.set(r.holder.position.x, r.height + 0.9, r.holder.position.z);
+        L.sprite.position.set(r.holder.position.x, r.holder.position.y + r.height + 0.9, r.holder.position.z);
         L.sprite.material.opacity = lerp(0.45, 1, r.labelK) * (it.dnf ? 0.6 : 1) * ef * L.vis * (tmpV.z < 1 ? 1 : 0);
         L.sprite.renderOrder = up ? 200 : 100 - it.order;   // vordere Plätze (und der Überholende) liegen oben
         placed.push({ px: px, py: py, w: wpx * k });
@@ -567,10 +568,111 @@
         if (race && race.id === id) showPodium(result, resp);
       });
     }
-    // Haken für Task 7 (Podest, Punkte, Monatsrang aus resp.points): vorerst Endstand ~5 s halten, dann ausblenden
+    // ---- Siegerehrung ----
+    // Podest neben der Ziellinie, hinter jedem möglichen Auslauf; Plätze 1–3 auf Blöcken (2 · 1 · 3),
+    // Punkte aus der Server-Antwort (nur gezählte Rennen), DNF-Liste klein darunter; ~12 s, dann ausblenden.
+    var PODIUM_COL = { 1: ['#f2b705', 0xf2b705], 2: ['#c3c9d2', 0xc3c9d2], 3: ['#c07a3e', 0xc07a3e] };
     function showPodium(result, response) {
-      race.podium = { result: result, response: response };
-      race.fadeAt = srvNow() + HOLD;
+      var top = result.filter(function (x) { return x.place != null && x.place <= 3; }).sort(function (a, b) { return a.place - b.place; });
+      var byId = {}; race.order.forEach(function (r) { byId[r.id] = r; });
+      var pts = response && response.counted && response.points ? response.points : null;
+      var cars = top.map(function (x) { return { r: byId[x.id], place: x.place, pts: pts ? pts[x.id] || null : null }; }).filter(function (c) { return c.r; });
+      if (!cars.length) {   // niemand im Ziel: Endstand halten, dann ausblenden
+        race.podium = { result: result, response: response };
+        race.fadeAt = srvNow() + HOLD;
+        return;
+      }
+      var dnf = result.filter(function (x) { return x.place == null; }).map(function (x) { return byId[x.id]; }).filter(Boolean);
+      // Blöcke: Breite nach Autolänge, Reihenfolge links → rechts 2 · 1 · 3
+      var seq = [2, 1, 3].map(function (pl) { return cars.filter(function (c) { return c.place === pl; })[0]; }).filter(Boolean);
+      var widths = seq.map(function (c) { return Math.max(5, c.r.len * 0.95 + 1.2); }), total = widths.reduce(function (a, b) { return a + b; }, 0);
+      var spot = podiumSpot(total + 2);
+      var g = new THREE.Group(); g.position.set(spot.x, 0, spot.z); trackGroup.add(g);
+      var plinth = new THREE.Mesh(own(new THREE.BoxGeometry(total + 2, 0.25, 6)), own(new THREE.MeshStandardMaterial({ color: 0x5e2a79, roughness: 0.6 })));
+      plinth.position.y = 0.125; g.add(plinth);
+      var x = -total / 2;
+      seq.forEach(function (c, i) {
+        var bw = widths[i], h = c.place === 1 ? 1.7 : c.place === 2 ? 1.2 : 0.85, col = PODIUM_COL[c.place];
+        var side = own(new THREE.MeshStandardMaterial({ color: col[1], roughness: 0.35, metalness: 0.4 }));
+        var front = own(new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.2, map: own(canvasTex(128, 96, function (q, w, hh) {
+          q.fillStyle = col[0]; q.fillRect(0, 0, w, hh);
+          q.fillStyle = 'rgba(20,12,30,0.85)'; q.font = font(900, 72); q.textAlign = 'center'; q.textBaseline = 'middle';
+          q.fillText(String(c.place), w / 2, hh / 2 + 4);
+        })) }));
+        var block = new THREE.Mesh(own(new THREE.BoxGeometry(bw - 0.2, h, 4)), [side, side, side, side, front, side]);
+        block.position.set(x + bw / 2, 0.25 + h / 2, 0); g.add(block);
+        c.x = spot.x + x + bw / 2; c.z = spot.z; c.top = 0.25 + h;
+        x += bw;
+        // Auto aufs Podest: leicht zur Kamera gedreht, Räder gerade
+        var r = c.r;
+        r.holder.position.set(c.x, c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
+        r.steer = 0; r.wheels.forEach(function (w) { if (w.front) w.pivot.rotation.y = 0; });
+      });
+      // Übrige Autos, Schlieren und Schilder ausblenden
+      var onPodium = {}; cars.forEach(function (c) { onPodium[c.r.id] = 1; });
+      race.order.forEach(function (r) {
+        if (r.streak) r.streak.meshes.forEach(function (m) { m.visible = false; });
+        if (!onPodium[r.id]) { r.holder.visible = false; r.label.sprite.visible = false; }
+      });
+      var px = clamp(W * 0.72 / (total + 4), PX_MIN, 24);
+      race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts,
+        cam: { x: spot.x, z: spot.z, y: 1.6, px: px } };
+      race.stage = 'podium';
+      race.fadeAt = srvNow() + PODIUM_HOLD;
+      upgradeWinnerModel(cars[0]);
+    }
+    // freier Platz fürs Podest kurz vor der Ziellinie (Seite egal), sonst weiter draußen
+    function podiumSpot(width) {
+      var T = race.T, HALF = T.width / 2, p = T.at(-14), best = null;
+      [HALF + 22, HALF + 32, HALF + 45].some(function (off) {
+        return [1, -1].some(function (sd) {
+          var x = p.x + p.nx * off * sd, z = p.z + p.nz * off * sd;
+          var free = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]].every(function (k) {
+            return !trackNear || !trackNear(x + k[0] * width / 2, z + k[1] * 3.5, HALF + 12 + 3);
+          });
+          if (free) best = { x: x, z: z };
+          return free;
+        });
+      });
+      return best || { x: p.x + p.nx * (HALF + 22), z: p.z + p.nz * (HALF + 22) };
+    }
+    // Sieger in voller Qualität: heute sind alle Modelle voll (leichte Renn-Modelle, Task 5, fehlen noch) –
+    // hier später das volle Modell nachladen (Fallback: Renn-Version). Jetzt nur: steht noch die Kiste, Modell laden.
+    function upgradeWinnerModel(c) {
+      var r = c.r;
+      if (r.isModel || !r.entry) return;
+      loadCarModel(r.entry).then(function () {
+        if (r.gone || !race || race.stage !== 'podium') return;
+        setModel(r);
+        r.holder.position.set(c.x, c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
+      }).catch(function () {});
+    }
+    function drawPodiumHud() {
+      var pd = race.podium, m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
+      hud.textBaseline = 'middle'; hud.textAlign = 'center';
+      hud.font = font(800, fs * 1.1);
+      var title = 'RACE RESULTS', tw = hud.measureText(title).width + rh * 1.2;
+      pill(hud, (W - tw) / 2, m, tw, rh * 1.25);
+      hud.fillStyle = TK.accent; hud.fillText(title, W / 2, m + rh * 0.65);
+      // Punkte je Podestplatz unter dem Block: „+10 → 47 pts · #2 this month“
+      pd.cars.forEach(function (c) {
+        if (!c.pts) return;
+        var t = '+' + (c.pts.gained | 0) + ' → ' + (c.pts.month_total | 0) + ' pts' + (c.pts.month_rank ? ' · #' + c.pts.month_rank + ' this month' : '');
+        tmpV.set(c.x, 0, c.z + 2.6).project(cam);
+        var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H + rh * 0.5;
+        hud.font = font(700, fs * 0.85);
+        var w = hud.measureText(t).width + rh * 0.8;
+        px = clamp(px, m + w / 2, W - m - w / 2); py = clamp(py, m + rh * 2, H - m - rh * 2.4);
+        pill(hud, px - w / 2, py - rh * 0.5, w, rh);
+        hud.fillStyle = c.place === 1 ? TK.accent : TK.text; hud.fillText(t, px, py);
+      });
+      if (pd.dnf.length) {
+        hud.font = font(600, fs * 0.8);
+        var d = fitText(hud, 'DNF: ' + pd.dnf.map(function (r) { return r.display; }).join(' · '), W - 2 * m - rh);
+        var dw = hud.measureText(d).width + rh * 0.8, dy = H - m - rh * 1.8;
+        pill(hud, (W - dw) / 2, dy - rh * 0.45, dw, rh * 0.9);
+        hud.fillStyle = TK.dim; hud.fillText(d, W / 2, dy);
+      }
     }
 
     // ---- Kamera ----
@@ -590,22 +692,24 @@
       // Inhalt etwas rechts der Mitte: links steht die Rangliste
       return { x: (minX + maxX) / 2 - (W * 0.11) / px, z: (minZ + maxZ) / 2, px: px };
     }
-    function updateCamera(points, dt) {
-      var fit = camFit(points);
+    // fixed: festes Ziel {x, z, px} (Podest) statt Feld-Anpassung
+    function updateCamera(points, dt, fixed) {
+      var fit = fixed || camFit(points);
       if (!fit) return;
       var c = race.cam, tauP = reduce ? 1.6 : 0.8, tauZ = reduce ? 2.6 : 1.3;
       if (!c) c = race.cam = { x: fit.x, z: fit.z, lp: Math.log(fit.px), tx: fit.x, tz: fit.z, vx: 0, vz: 0 };
       // Vorhalt: geschätzte Geschwindigkeit des Ziels, damit die Dämpfung nicht hinterherhängt
-      var vx = (fit.x - c.tx) / Math.max(dt, 1e-3), vz = (fit.z - c.tz) / Math.max(dt, 1e-3);
+      var vx = fixed ? 0 : (fit.x - c.tx) / Math.max(dt, 1e-3), vz = fixed ? 0 : (fit.z - c.tz) / Math.max(dt, 1e-3);
       var vmax = 30, vl = Math.hypot(vx, vz); if (vl > vmax) { vx *= vmax / vl; vz *= vmax / vl; }
       c.vx = ease(c.vx, vx, 0.5, dt); c.vz = ease(c.vz, vz, 0.5, dt);
       c.tx = fit.x; c.tz = fit.z;
       c.x = ease(c.x, fit.x + c.vx * tauP, tauP, dt); c.z = ease(c.z, fit.z + c.vz * tauP, tauP, dt);
       c.lp = ease(c.lp, Math.log(fit.px), tauZ, dt);
+      c.ty = ease(c.ty || 0, fit.y || 0, tauP, dt);   // Blickhöhe (Podest: auf die Autos statt auf den Boden)
       var px = Math.exp(c.lp), visW = W / px, tanH = Math.tan(FOV * Math.PI / 360) * (W / H);
       var D = visW / (2 * tanH);
-      cam.position.set(c.x, D * Math.sin(TILT), c.z + D * Math.cos(TILT));
-      cam.lookAt(c.x, 0, c.z);
+      cam.position.set(c.x, c.ty + D * Math.sin(TILT), c.z + D * Math.cos(TILT));
+      cam.lookAt(c.x, c.ty, c.z);
     }
 
     // ---- HUD (2D-Canvas) ----
@@ -638,6 +742,7 @@
       hud.setTransform(dpr, 0, 0, dpr, 0, 0);
       hud.clearRect(0, 0, W, H);
       if (!race) return;
+      if (race.stage === 'podium') { drawPodiumHud(); return; }
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
       var pw = rh * 7.4, ph = rows.length * rh + rh * 0.4;
@@ -748,7 +853,7 @@
     var puffs = [], MAXP = reduce ? 12 : 160, pv3 = new THREE.Vector3();
     function puff(kind, x, y, z, o) {
       o = o || {};
-      if (puffs.length >= MAXP) { var old = puffs.shift(); scene.remove(old.s); old.s.material.dispose(); }
+      if (puffs.length >= MAXP) return;   // voll: neues Teilchen verwerfen statt das älteste hart zu entfernen
       var spark = kind === 'spark';
       var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FXT[kind], transparent: true, depthWrite: false, opacity: 0,
         blending: spark ? THREE.AdditiveBlending : THREE.NormalBlending }));
@@ -868,8 +973,18 @@
       // lokal starten, sobald der Countdown abgelaufen ist (der Server zieht beim nächsten Poll nach)
       if (race.stage === 'grid' && race.startsAt != null && now >= race.startsAt && race.order.length >= 3 && race.dropAt == null) startSim();
 
-      var pts = [], labels = [];
-      if (race.stage === 'grid') {
+      var pts = [], labels = [], camFix = null;
+      if (race.stage === 'podium') {
+        var pd = race.podium;
+        pd.t += dt;
+        pd.cars.forEach(function (c, k) { labels.push({ r: c.r, place: String(c.place), show: true, order: k }); });
+        // Goldfunken über dem Sieger (kurz, mit Rand-Fade; bei reduzierter Bewegung nicht)
+        if (!reduce && pd.t < 4 && Math.random() < dt * 14) {
+          var wn = pd.cars[0];
+          puff('spark', wn.x + (Math.random() - 0.5) * wn.r.len, wn.top + wn.r.height + 1.5 + Math.random(), wn.z + (Math.random() - 0.5) * 2, { life: 0.9, size: 0.3 });
+        }
+        camFix = pd.cam;
+      } else if (race.stage === 'grid') {
         if (race.gridSim) race.order.forEach(function (r, i) {
           var c = race.gridSim.cars[i];
           if (!r.disp) r.disp = { s: c.s, d: c.d };
@@ -918,7 +1033,7 @@
         });
       }
       stepPuffs(dt);
-      updateCamera(pts, dt);
+      updateCamera(pts, dt, camFix);
       cam.updateMatrixWorld();
       updateLabels(labels, dt);
       renderer.render(scene, cam);

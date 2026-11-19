@@ -196,10 +196,28 @@ EFFECT_META = {
     ]},
     # Car Race (js/car-race.js): Fenster 16:9, Standard 640×360 (bis 960×540); Befehle/Knöpfe folgen mit dem Podest.
     # Nachlauf nach dem Sieger gibt der Server vor (fest 15 s); ?finish= wirkt nur in der Vorschau.
-    "car-race.html": {"size": "640×360", "switches": [
+    # Befehle/Knöpfe gehen an /api/fx/car-race (eigener Endpoint, nicht fx/commands.py).
+    "car-race.html": {"size": "640×360", "preview_query": "preview=1", "switches": [
         {"key": "preview", "label": "Preview with test racers", "type": "select", "default": "0",
          "options": [["0", "Off"], ["1", "On"]],
          "tooltip": "For testing in the browser: local lobby with test racers, no server. Must be off in OBS"},
+    ],
+    "commands": [
+        {"q": "cmd=join&id=%userId%&user=%user%&color=%color%", "label": "!race: join the next race",
+         "who": "viewers"},
+        {"q": "cmd=board&scope=month", "label": "!racestats: top 3 this month", "who": "viewers"},
+        {"q": "cmd=board&scope=all", "label": "!racestats all: all-time top 3", "who": "viewers"},
+        {"q": "cmd=start", "label": "Start the race now (3+ racers in the lobby)", "who": "mods", "group": "Mods"},
+        {"q": "cmd=cancel", "label": "Cancel the lobby", "who": "mods", "group": "Mods"},
+        {"q": "cmd=remove&id=%targetUserId%", "label": "Remove a racer from the lobby (id = Twitch user id, test racers: test1, test2 …)",
+         "who": "mods", "group": "Mods"},
+        {"q": "cmd=void", "label": "Void the last counted race (takes its points back)", "who": "mods", "group": "Mods"},
+    ],
+    "controls": [
+        {"q": "cmd=join&test=1", "label": "Add test racer", "icon": "person_add"},
+        {"q": "cmd=start", "label": "Start now", "icon": "play_arrow"},
+        {"q": "cmd=cancel", "label": "Cancel lobby", "icon": "close"},
+        {"q": "cmd=void", "label": "Void last race", "icon": "block"},
     ]},
     "item-rain.html": {"switches": [
         {"key": "kind", "label": "What rains", "type": "select", "default": "sushi",
@@ -979,5 +997,6 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
                     "switches": meta.get("switches", []),
                     "commands": meta.get("commands", []),
                     "controls": meta.get("controls", []),
+                    "preview_query": meta.get("preview_query", ""),
                     "live": _live_keys(subdir, key, meta.get("switches", []))})
     return out

@@ -7,6 +7,8 @@ from overlay_app.overlay_catalog import EFFECT_META, list_dir_sources
 
 def test_every_control_is_a_valid_command_without_placeholders():
     for fn, meta in EFFECT_META.items():
+        if fn == "car-race.html":   # eigener Endpoint, siehe test_car_race_…
+            continue
         for c in meta.get("controls", []):
             assert "%" not in c["q"], c
             assert c["icon"] and c["label"]
@@ -57,3 +59,23 @@ def test_weather_has_controls_and_live_keys():
 def test_rain_and_snow_are_hidden():
     keys = {s["key"] for s in list_dir_sources(".", "effects", switches_map=EFFECT_META)}
     assert "rain" not in keys and "snow" not in keys and "weather" in keys
+
+
+def test_car_race_has_chat_commands_and_dashboard_controls():
+    """Car Race: Streamer.bot-Befehle und Dashboard-Knöpfe gehen an /api/fx/car-race (eigener Endpoint)."""
+    from fx.endpoints import RACE_ADMIN
+    meta = EFFECT_META["car-race.html"]
+    cmds = [dict(parse_qsl(c["q"])) for c in meta["commands"]]
+    join = [c for c in cmds if c.get("cmd") == "join"]
+    assert join and {"id", "user", "color"} <= set(join[0])
+    assert {"month", "all"} <= {c.get("scope") for c in cmds if c.get("cmd") == "board"}
+    ctl = [dict(parse_qsl(c["q"])) for c in meta["controls"]]
+    assert {"start", "cancel", "void"} <= {c["cmd"] for c in ctl}
+    assert {"cmd": "join", "test": "1"} in ctl
+    valid = {"join", "board"} | set(RACE_ADMIN)
+    for c in meta["controls"] + meta["commands"]:
+        assert dict(parse_qsl(c["q"]))["cmd"] in valid, c
+    for c in meta["controls"]:
+        assert "%" not in c["q"] and c["icon"] and c["label"]
+    # Dashboard-Vorschau startet die lokale Testlobby
+    assert meta.get("preview_query") == "preview=1"

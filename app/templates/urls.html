@@ -3,7 +3,7 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='', controls=[], live=[]) %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='', controls=[], live=[], preview_q='') %}
 <button type="button" class="url-card" hidden
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
@@ -14,6 +14,7 @@
         {% if chrome_preview %}data-chrome-preview="true"{% endif %}
         {% if preview_size %}data-preview-w="{{ preview_size[0] }}" data-preview-h="{{ preview_size[1] }}"{% endif %}
         {% if commands %}data-commands='{{ commands|tojson }}' data-fx="{{ fx }}"{% endif %}
+        {% if preview_q %}data-preview-q="{{ preview_q }}"{% endif %}
         {% if controls or live %}data-controls='{{ controls|tojson }}' data-live='{{ live|tojson }}'{% endif %}
         data-switches='{{ switches|tojson }}' data-params='{{ params|tojson }}'>
   <span class="url-card__corner" aria-hidden="true"></span>
@@ -99,7 +100,7 @@ G1R_STEAM_NAME=</code></pre>
                     base_url~'/s/'~token~'/effects/'~e.file,'effects/'~e.file,
                     e.size,e.desc,e.switches or [],e.params or [],False,'','stream',None,
                     e.commands or [],base_url~'/s/'~token~'/api/fx/'~e.key,
-                    e.controls or [],e.live or []) }}
+                    e.controls or [],e.live or [],e.preview_query or '') }}
         {% endfor %}
         {% for t in transitions %}
         {{ src_card('overlay','Transition',t.label,
@@ -674,7 +675,8 @@ G1R_STEAM_NAME=</code></pre>
                        path: card.dataset.path,
                        previewW: parseInt(card.dataset.previewW || '0'),
                        previewH: parseInt(card.dataset.previewH || '0'),
-                       fx: card.dataset.fx || "", liveKeys: liveKeys });
+                       fx: card.dataset.fx || "", liveKeys: liveKeys,
+                       previewQ: card.dataset.previewQ || "" });
     view.hidden = true;
     detailView.hidden = false;
     document.getElementById("urlBack").focus();
@@ -1369,7 +1371,11 @@ G1R_STEAM_NAME=</code></pre>
         if (m && !vollbild) { ausschnitt = m; anwenden(); }
         nachmessen();
       };
-      frame.src = buildUrl(base, scope);
+      // Vorschau-Parameter der Source (z. B. Car Race: preview=1 = lokale Testlobby), nur im Vorschau-Fenster
+      let pvSrc = buildUrl(base, scope);
+      const pq = (meta && meta.previewQ) || "";
+      if (pq && !new RegExp("[?&]" + pq.split("=")[0] + "=").test(pvSrc)) pvSrc += (pvSrc.indexOf("?") < 0 ? "?" : "&") + pq;
+      frame.src = pvSrc;
       modal.showModal();
     });
   }
