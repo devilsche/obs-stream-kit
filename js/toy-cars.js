@@ -811,9 +811,14 @@
       carbonUV(car);
       return car;
     }
-    if (color != null) meta.paint.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
+    // o.sub = { c, f }: feste Lackierung (Car Race, Sub-Farbsets) – nur der Lack (automatischer Lack und
+    // Farbbereich „Paint“) mit Farbe und Oberfläche über zoneMat; Scheiben, Reifen, übrige Bereiche bleiben
+    var sp = o.sub && o.sub.c != null ? o.sub : null;
+    if (sp) meta.paint.forEach(function (m) { swap[m.uuid] = zoneMat(m, sp.c, sp.f || 'gloss', false); });
+    else if (color != null) meta.paint.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
     if (rim != null) meta.rim.forEach(function (m) { swap[m.uuid] = colourMat(m, rim, 'r', rimTex); });
     (Array.isArray(v.zones) ? v.zones : []).forEach(function (z) {
+      if (sp && z.id === 'paint') { ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, sp.c, sp.f || 'gloss', false); }); return; }
       var zc = zoneColour(z, o.zones);
       if (zc != null) ((meta.zones || {})[z.id] || []).forEach(function (m) { swap[m.uuid] = zoneMat(m, zc, z.f, z.flat, z.o); });
     });
@@ -825,11 +830,11 @@
     carbonUV(car);
     return car;
   }
-  // set (optional): Farbset aus pickPaint – Felge und Bereichsfarben dazu
+  // set (optional): Farbset aus pickPaint – Felge und Bereichsfarben dazu; set.sub = { c, f } feste Lackierung
   function build(key, color, set) {
     var t = TPL[key] || TPL[MODELS[0]];
     if (!set || typeof set !== 'object') set = {};
-    return t ? paintTemplate(t, color, set.r, { zones: set.z }) : new THREE.Group();
+    return t ? paintTemplate(t, color, set.r, { zones: set.z, sub: set.sub }) : new THREE.Group();
   }
   function dims(key) { var t = TPL[key] || TPL[MODELS[0]]; return t ? t.userData.dims : { L: 4.4, W: 1.8, H: 1.4, belt: 0.9 }; }
   function random() { var m = MODELS[Math.floor(Math.random() * MODELS.length)], p = pickPaint(m); return { model: m, color: p.c }; }

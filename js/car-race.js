@@ -31,6 +31,22 @@
     return String(n || '').replace(/\|\s*www\.\S+/gi, '').replace(/\[\s*free\s*\]/gi, '').replace(/\bfree\b/gi, '')
       .replace(/\s{2,}/g, ' ').replace(/^[\s|\-\u2013\u00b7]+|[\s|\-\u2013\u00b7]+$/g, '');
   }
+  // Sub-Abzeichen: Stern in Tier-Farbe (T1 Silber, T2 Gold, T3 Lila mit Goldrand) – auf dunklem Grund ≥ 4,5:1
+  var SUB_STAR = { 1: ['#d4dae3', null], 2: ['#f2b705', null], 3: ['#b98cff', '#f2b705'] };
+  function subTier(sub) { var t = Math.round((+sub || 0) / 1000); return t >= 1 && t <= 3 ? t : 0; }
+  function drawStar(g, cx, cy, r, tier) {
+    var c = SUB_STAR[tier]; if (!c) return;
+    g.save(); g.beginPath();
+    for (var i = 0; i < 10; i++) {
+      var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+      g[i ? 'lineTo' : 'moveTo'](cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+    }
+    g.closePath(); g.fillStyle = c[0]; g.fill();
+    g.lineWidth = Math.max(1, r * 0.14); g.strokeStyle = c[1] || 'rgba(0,0,0,0.55)'; g.stroke();
+    g.restore();
+  }
+  // Sub-Lackierungen (state: paint = Set-Name): Gold glänzend metallic, Kanal-Lila glänzend, Carbon glänzend
+  var SUB_PAINTS = { gold: { c: 0xd4a017, f: 'shiny' }, purple: { c: 0x5e2a79, f: 'gloss' }, carbon: { c: 0x2b2b30, f: 'carbonGloss' } };
   function shortName(n, max) { n = cleanName(n); return n.length > max ? n.slice(0, max - 1) + '\u2026' : n; }
   var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
@@ -317,10 +333,14 @@
       var key = src.car_key || null, entry = catalogEntry(key);
       var raw = root.CarRaceStats ? CarRaceStats.of(key || '', entry || undefined) : { len: 4.5 };
       var st = CarRaceSim.stats(raw);
-      var set = key && ToyCars.paintAt ? ToyCars.paintAt(key, src.paint | 0) : { c: null };
+      // paint: Zahl = Farbset-Index aus dem Car editor, Text = Sub-Lackierung (gold/purple/carbon); sub = Tier
+      var subPaint = SUB_PAINTS[typeof src.paint === 'string' ? src.paint : src.sub_paint] || null;
+      var setIdx = typeof src.paint === 'number' ? src.paint : (src.paint_index | 0);
+      var set = key && ToyCars.paintAt ? ToyCars.paintAt(key, setIdx) : { c: null };
+      if (subPaint) set = Object.assign({}, set, { c: subPaint.c, sub: subPaint });
       var r = {
         id: src.user_id, grid: src.grid, display: String(src.display || src.user_id || '?'), color: hexColor(src.color, '#9146ff'),
-        key: key, uid: src.uid, entry: entry, paint: src.paint | 0, set: set, stats: st, len: st.len,
+        key: key, uid: src.uid, entry: entry, paint: setIdx, set: set, stats: st, len: st.len, tier: subTier(src.sub),
         w: clamp(st.len * 0.42, 1.7, 2.6), h: clamp(st.len * 0.3, 1.2, 3.2),
         holder: new THREE.Group(), body: null, owned: [], wheels: [], isModel: false,
         steer: 0, wheelAngle: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55), lastX: null, lastZ: null,
@@ -447,7 +467,7 @@
     // withModel: zweite, kleinere Zeile mit dem Automodell unter dem Namensfeld
     function drawLabel(r, place, force, mode, withModel) {
       mode = mode || ''; withModel = !!withModel && !!r.modelName && mode !== 'dnf';
-      var text = place + '\u0000' + r.shown + '\u0000' + mode + (withModel ? '\u0000m' : '');
+      var text = place + '\u0000' + r.shown + '\u0000' + mode + (withModel ? '\u0000m' : '') + '\u0000' + r.tier;
       if (!force && text === r.labelText) return;
       r.labelText = text; r.labelPlace = place; r.labelMode = mode; r.label.withModel = withModel;
       var L = r.label, g = L.g;
@@ -457,6 +477,8 @@
       var aw = mode === 'up' ? fs * 0.62 : 0;   // Platz für den Pfeil
       var pw = g.measureText(place).width + aw, name = r.shown;
       g.font = font(700, fs);
+      var sw = r.tier ? fs * 0.95 : 0;   // Platz für den Sub-Stern
+      pw += sw;
       var maxName = LABEL_W - 2 * pad - pw - gap - 2 * bw - (mode === 'up' ? 16 : 0);
       while (name.length > 1 && g.measureText(name).width > maxName) name = name.slice(0, -2) + '…';
       var nw = g.measureText(name).width, boxW = Math.min(LABEL_W - 2 * bw, pw + gap + nw + 2 * pad), x0 = (LABEL_W - boxW) / 2, y0 = bw, bh = LABEL_H - 2 * bw;
@@ -472,6 +494,7 @@
         g.fillStyle = TK.accent; g.fill(); tx += aw;
       }
       g.font = font(800, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.accent; g.fillText(place, tx, LABEL_H / 2 + 2);
+      if (r.tier) drawStar(g, x0 + pad + pw - sw / 2 + 4, LABEL_H / 2, fs * 0.36, r.tier);
       g.font = font(700, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.text; g.fillText(name, x0 + pad + pw + gap, LABEL_H / 2 + 2);
       if (withModel) {
         g.font = font(600, 30);
@@ -762,8 +785,10 @@
         hud.shadowColor = 'rgba(0,0,0,0.6)';
         hud.textAlign = 'right'; hud.font = font(800, fName); hud.fillStyle = TK.accent;
         hud.fillText(String(r.grid), x0 + pad + 22 + dx, ry + 13);
+        var tr = subTier(r.sub), so = tr ? fName * 1.1 : 0;
+        if (tr) drawStar(hud, x0 + pad + 30 + dx + fName * 0.45, ry + 9.5, fName * 0.45, tr);
         hud.textAlign = 'left'; hud.font = font(700, fName); hud.fillStyle = white;
-        hud.fillText(fitText(hud, String(r.display || r.user_id), w - pad * 2 - 30), x0 + pad + 30 + dx, ry + 13);
+        hud.fillText(fitText(hud, String(r.display || r.user_id), w - pad * 2 - 30 - so), x0 + pad + 30 + dx + so, ry + 13);
         if (car) { hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, w - pad * 2 - 30), x0 + pad + 30 + dx, ry + 24); }
         hud.globalAlpha = 1;
       });
@@ -1195,7 +1220,9 @@
           hud.textAlign = 'right'; hud.font = font(800, fName); hud.fillStyle = row.dnf ? dim : TK.accent;
           hud.fillText(fitText(hud, row.place, placeW), px + placeW, y);
           if (!row.dnf) { hud.fillStyle = r.color; hud.fillRect(px + placeW + 4, y - rowH * 0.32, 3, rowH * 0.64); }
-          var nx = px + placeW + 10, right = cx0 + colW - pad - 2, avail = right - nx;
+          var nx = px + placeW + 10, right = cx0 + colW - pad - 2;
+          if (r.tier) { drawStar(hud, nx + fName * 0.45, y, fName * 0.42, r.tier); nx += fName * 1.05; }
+          var avail = right - nx;
           hud.font = font(500, fCar);
           var car = r.modelName || '', carW = car ? Math.min(hud.measureText(car).width, avail * 0.45) : 0;
           if (carW < 24) carW = 0;   // zu eng: Automodell weglassen
@@ -1250,10 +1277,12 @@
           }
           hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
           hud.fillStyle = row.fin ? TK.accent : TK.text;
-          var nm = fitText(hud, row.r.shown, (pw - rh * 2.25) * 0.55);
-          hud.fillText(nm, rx + rh * 1.95, y);
+          var st0 = row.r.tier ? fs * 1.05 : 0;   // Sub-Stern vor dem Namen
+          if (row.r.tier) drawStar(hud, rx + rh * 1.95 + fs * 0.45, y, fs * 0.42, row.r.tier);
+          var nm = fitText(hud, row.r.shown, (pw - rh * 2.25) * 0.55 - st0);
+          hud.fillText(nm, rx + rh * 1.95 + st0, y);
           if (row.r.modelName) {   // Automodell kleiner und gedämpft dahinter
-            var nx = rx + rh * 1.95 + hud.measureText(nm).width + rh * 0.3;
+            var nx = rx + rh * 1.95 + st0 + hud.measureText(nm).width + rh * 0.3;
             hud.font = font(500, fs * 0.82); hud.fillStyle = TK.dim;
             hud.fillText(fitText(hud, row.r.modelName, rx + pw - rh * 0.3 - nx), nx, y + fs * 0.05);
           }
@@ -1332,10 +1361,10 @@
       var ch = f1 * 0.4 + f2 * 1.25 + f3 * 1.35 + f3 * 0.6, y0 = H - m - ch, x0 = m, pad = f3 * 0.8;
       hud.save(); hud.globalAlpha = a;
       hud.font = font(900, f1); var pw = hud.measureText('P' + r.grid).width;
-      var maxText = W - 2 * m - pw - pad * 3 - 8;
+      var maxText = W - 2 * m - pw - pad * 3 - 8 - (r.tier ? f2 * 1.1 : 0);
       hud.font = font(800, f2); var nm = fitText(hud, r.display, maxText), nw = hud.measureText(nm).width;
       hud.font = font(600, f3); var md = fitText(hud, r.modelName || '', maxText), mw = hud.measureText(md).width;
-      var cw = Math.min(W - 2 * m, 8 + pad * 3 + pw + Math.max(nw, mw));
+      var cw = Math.min(W - 2 * m, 8 + pad * 3 + pw + Math.max(nw + (r.tier ? f2 * 1.1 : 0), mw));   // inkl. Sub-Stern
       var slide = reduce ? 0 : (1 - clamp((st - 0.4) / 0.3, 0, 1)) * -24;
       hud.translate(slide, 0);
       roundRect(hud, x0, y0, cw, ch, f3 * 0.5); hud.fillStyle = withAlpha(TK.surface, 0.9); hud.fill();
@@ -1344,6 +1373,7 @@
       hud.textBaseline = 'middle'; hud.textAlign = 'left';
       hud.font = font(900, f1); hud.fillStyle = TK.accent; hud.fillText('P' + r.grid, x0 + 8 + pad, y0 + ch / 2);
       var tx = x0 + 8 + pad * 2 + pw;
+      if (r.tier) { drawStar(hud, tx + f2 * 0.45, y0 + ch * 0.38, f2 * 0.45, r.tier); tx += f2 * 1.1; }
       hud.font = font(800, f2); hud.fillStyle = TK.text; hud.fillText(nm, tx, y0 + ch * 0.38);
       hud.font = font(600, f3); hud.fillStyle = TK.dim; hud.fillText(md, tx, y0 + ch * 0.72);
       hud.restore();
@@ -1808,7 +1838,11 @@
       pvN++;
       pv.racers.push({ grid: pv.racers.length + 1, user_id: 'test' + pvN, display: 'Tester' + pvN, color: PREVIEW_COLORS[(pvN - 1) % PREVIEW_COLORS.length],
         car_key: pick ? pick.key : null, uid: pick ? pick.uid : null,
-        paint: Array.isArray(paints) && paints.length ? Math.floor(Math.random() * paints.length) : 0 });
+        paint: Array.isArray(paints) && paints.length ? Math.floor(Math.random() * paints.length) : 0,
+        // Vorschau zeigt Sub-Stern und Sub-Lackierung zufällig, damit beides zu sehen ist
+        sub: [0, 0, 1000, 2000, 3000][Math.floor(Math.random() * 5)] });
+      var last = pv.racers[pv.racers.length - 1];
+      if (last.sub && Math.random() < 0.6) last.paint = ['gold', 'purple', 'carbon'][Math.floor(Math.random() * 3)];
       var now = Date.now() / 1000;
       if (pv.racers.length >= 10) pvIntro(now);
       else if (pv.racers.length >= 3 && pv.phase === 'lobby') { pv.phase = 'countdown'; pv.starts_at = now + 60; }
