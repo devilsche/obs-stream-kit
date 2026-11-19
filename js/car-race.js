@@ -943,6 +943,7 @@
       var fit = fixed || camFit(points);
       if (!fit) return;
       var c = race.cam, tauP = reduce ? 1.6 : 0.8, tauZ = reduce ? 2.6 : 1.3;
+      if (fit.fast) { tauP = 0.15; tauZ = 0.15; }   // Handzoom: direkt, nur leicht geglättet
       if (!c) c = race.cam = { x: fit.x, z: fit.z, lp: Math.log(fit.px), tx: fit.x, tz: fit.z, vx: 0, vz: 0 };
       if (fit.direct) {   // Kamerafahrt mit festen Schlüsselbildern: schon geglättet, direkt übernehmen
         c.x = c.tx = fit.x; c.z = c.tz = fit.z; c.lp = Math.log(fit.px); c.ty = fit.y; c.tilt = fit.tilt; c.orb = fit.orb; c.vx = c.vz = 0;
@@ -1463,11 +1464,70 @@
           }
         }
       }
+      var ut = (race.stage === 'race' || race.stage === 'end' || (race.stage === 'grid' && !camFix)) ? userTarget() : null;
+      if (ut) camFix = ut;   // Handzoom hat Vorrang vor Automatik und Unfall-Highlight
       updateCamera(pts, dt, camFix);
       cam.updateMatrixWorld();
       updateLabels(labels, dt);
       renderer.render(scene, cam);
       drawHud(now, rankingRows());
+    }
+
+    // ---- Maus/Tastatur: kurz heranzoomen (nur im Browser; OBS hat keine Maus) ----
+    // Mausrad zoomt auf den Punkt unter dem Zeiger (Strahl auf den Boden), linke Taste ziehen verschiebt,
+    // + / − zoomen zur Bildmitte, Esc zurück; nach 3 s ohne Eingabe gleitet die Kamera zurück zur Automatik.
+    // Nur im Rennen und im Countdown – Vorstellung und Siegerehrung bleiben unberührt.
+    var USER_IDLE = 3, ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), ray = new THREE.Raycaster(), hitV = new THREE.Vector3();
+    function userAllowed() {
+      if (!race || !visible || !race.cam) return false;
+      if (race.stage === 'race' || race.stage === 'end') return true;
+      return race.stage === 'grid' && !(race.introAt != null && srvNow() >= race.introAt);
+    }
+    function userCam() {
+      var c = race.cam;
+      if (!race.user) race.user = { x: c.x, z: c.z, px: Math.exp(c.lp) };
+      race.user.last = performance.now();
+      return race.user;
+    }
+    function groundAt(cx, cy) {
+      ray.setFromCamera({ x: cx / W * 2 - 1, y: -(cy / H * 2 - 1) }, cam);
+      return ray.ray.intersectPlane(ground, hitV) ? { x: hitV.x, z: hitV.z } : null;
+    }
+    function zoomAt(factor, cx, cy) {
+      var u = userCam(), p = cx == null ? null : groundAt(cx, cy);
+      var npx = clamp(u.px * factor, PX_MIN, PX_MAX * 4), k = u.px / npx;
+      if (p) { u.x = p.x + (u.x - p.x) * k; u.z = p.z + (u.z - p.z) * k; }   // Punkt unter dem Zeiger bleibt stehen
+      u.px = npx;
+    }
+    root.addEventListener('wheel', function (e) {
+      if (!userAllowed()) return;
+      e.preventDefault();   // Seite nicht scrollen
+      zoomAt(Math.exp(-clamp(e.deltaY, -300, 300) * 0.0025), e.clientX, e.clientY);
+    }, { passive: false });
+    var drag = null;
+    root.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 || !userAllowed() || (e.target && e.target.closest && e.target.closest('button'))) return;
+      drag = { x: e.clientX, y: e.clientY };
+    });
+    root.addEventListener('pointermove', function (e) {
+      if (!drag || !userAllowed()) return;
+      var u = userCam(), tilt = race.cam.tilt == null ? TILT : race.cam.tilt;
+      u.x -= (e.clientX - drag.x) / u.px; u.z -= (e.clientY - drag.y) / (u.px * Math.sin(tilt));
+      drag = { x: e.clientX, y: e.clientY };
+    });
+    root.addEventListener('pointerup', function () { drag = null; });
+    root.addEventListener('keydown', function (e) {
+      if (!userAllowed()) return;
+      if (e.key === '+' || e.key === '=') { zoomAt(1.25, null); e.preventDefault(); }
+      else if (e.key === '-' || e.key === '_') { zoomAt(0.8, null); e.preventDefault(); }
+      else if (e.key === 'Escape' && race.user) { race.user = null; e.preventDefault(); }
+    });
+    // Ziel der Handkamera (oder null, wenn die Automatik übernimmt)
+    function userTarget() {
+      var u = race && race.user;
+      if (!u) return null;
+      if (!userAllowed() || performance.now() - u.last > USER_IDLE * 1000) { race.user = null; return null; }
+      return { x: u.x, z: u.z, px: u.px, fast: true };
     }
 
     // ---- Server-Poll ----
