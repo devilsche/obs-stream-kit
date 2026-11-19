@@ -692,30 +692,82 @@
         hud.clearRect(x, y, w, h);   // Schatten nicht ins Loch
       }
     }
+    // ---- Lobby-Karte (Vollbild-Layout, lobby/countdown) ----
+    // Anmeldetafel unten rechts: halbtransparentes dunkles Feld (~74 %, Kopf mit Countdown kräftiger), dünner
+    // Akzentrand, Countdown als größtes Element, darunter der Aufruf mit Platzzahl und die Startliste
+    // (Startplatz, Name fast weiß mit leichtem Schatten, Chatfarbe nur als Balken, Automodell kleiner darunter).
+    // Neue Fahrer gleiten von rechts herein (reduzierte Bewegung: ohne). Logische Größen (540er), Text ≥ 22/18 px bei 1080p.
+    var lobbySeen = {};
+    function rgbOf(css) { var m = /rgba?\(\s*([\d.]+)[ ,]+([\d.]+)[ ,]+([\d.]+)/.exec(css || ''); return m ? [+m[1], +m[2], +m[3]] : null; }
+    function lum(c) { return c.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }).reduce(function (a, v, i) { return a + v * [0.2126, 0.7152, 0.0722][i]; }, 0); }
+    // Textfarbe so weit Richtung Weiß (dunkler Grund) bzw. Schwarz schieben, bis der Kontrast ≥ min ist
+    function legible(fg, bg, min) {
+      var f = rgbOf(fg), b = rgbOf(bg); if (!f || !b) return fg;
+      var lb = lum(b), to = lb < 0.4 ? 255 : 0;
+      for (var k = 0; k <= 1.0001; k += 0.1) {
+        var c = f.map(function (v) { return v + (to - v) * k; }), lf = lum(c);
+        if ((Math.max(lf, lb) + 0.05) / (Math.min(lf, lb) + 0.05) >= min) return 'rgb(' + c.map(Math.round).join(',') + ')';
+      }
+      return to ? '#ffffff' : '#000000';
+    }
     function drawLobbyCard(now) {
       var st = lobbyCard; if (!st) return;
-      var fs = 13, rh = fs * 1.5, m = 12, list = (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; });
-      var w = 210, h = fs * 4.4 + list.length * rh + (st.phase === 'countdown' ? fs * 1.6 : 0) + fs * 0.6;
+      var list = (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; });
+      var w = 240, pad = 12, fName = 11, fCar = 9, rowH = 29, m = 12;
+      var counting = st.phase === 'countdown' && st.starts_at != null;
+      var headH = pad + 15 + 8 + 34 + 10, ctaH = 24, h = headH + ctaH + list.length * rowH + pad * 0.6;
       var x0 = W - m - w, y0 = H - m - h;
-      pill(hud, x0, y0, w, h);
-      hud.textBaseline = 'middle'; hud.textAlign = 'left';
-      hud.font = font(900, fs * 1.4); hud.fillStyle = TK.accent; hud.fillText('Car Race', x0 + fs, y0 + fs * 1.4);
-      hud.font = font(600, fs * 0.9); hud.fillStyle = TK.dim; hud.fillText('Type !race to join \u00b7 ' + list.length + '/10', x0 + fs, y0 + fs * 2.9);
-      var y = y0 + fs * 4.4;
-      list.forEach(function (r) {
-        var e = catalogEntry(r.car_key), car = e ? shortName(e.name || r.car_key, 20) : '';
-        hud.beginPath(); hud.arc(x0 + fs * 1.3, y, fs * 0.32, 0, Math.PI * 2); hud.fillStyle = hexColor(r.color, '#9146ff'); hud.fill();
-        hud.font = font(700, fs); hud.fillStyle = TK.text;
-        var nm = fitText(hud, String(r.display || r.user_id), w * 0.42); hud.fillText(nm, x0 + fs * 2.1, y);
-        hud.font = font(500, fs * 0.85); hud.fillStyle = TK.dim;
-        hud.fillText(fitText(hud, car, w - fs * 2.6 - w * 0.45), x0 + fs * 2.1 + w * 0.45, y);
-        y += rh;
-      });
-      if (st.phase === 'countdown' && st.starts_at != null) {
-        var left = Math.max(0, Math.ceil(st.starts_at - now));
-        hud.font = font(800, fs * 1.1); hud.fillStyle = TK.text; hud.textAlign = 'center';
-        hud.fillText('STARTS IN ' + Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2), x0 + w / 2, y + fs * 0.4);
+      var bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
+      // Feld: weicher Schatten, Körper halbtransparent, Kopf kräftiger, dünner Akzentrand
+      hud.save();
+      hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 14; hud.shadowOffsetY = 3;
+      roundRect(hud, x0, y0, w, h, 10); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
+      hud.restore();
+      hud.save(); roundRect(hud, x0, y0, w, h, 10); hud.clip();
+      hud.fillStyle = withAlpha(bg, 0.9); hud.fillRect(x0, y0, w, headH);
+      hud.fillStyle = TK.accent; hud.fillRect(x0, y0, 4, headH);   // Akzentbalken am Kopf
+      hud.restore();
+      roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 10); hud.lineWidth = 1; hud.strokeStyle = withAlpha(TK.accent, 0.85); hud.stroke();
+      // Text mit leichtem Schatten (bleibt auch über hellem Spielbild lesbar)
+      hud.save();
+      hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 2; hud.shadowOffsetY = 1;
+      hud.textBaseline = 'alphabetic'; hud.textAlign = 'left';
+      var tx = x0 + pad + 4, ty = y0 + pad + 13;
+      hud.font = font(900, 15); hud.fillStyle = white; hud.fillText('CAR RACE', tx, ty);
+      hud.textAlign = 'right'; hud.font = font(800, 13); hud.fillStyle = TK.accent; hud.fillText(list.length + '/10', x0 + w - pad, ty);
+      hud.textAlign = 'left';
+      var by = ty + 8 + 30;
+      if (counting) {
+        var left = Math.max(0, Math.ceil(st.starts_at - now)), t = Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2);
+        hud.font = font(900, 34); hud.fillStyle = white; hud.fillText(t, tx, by);
+        var cw = hud.measureText(t).width;
+        hud.font = font(600, 10); hud.fillStyle = dim; hud.fillText('until the start', tx + cw + 8, by - 3);
+      } else {
+        var need = Math.max(0, 3 - list.length);
+        hud.font = font(800, 18); hud.fillStyle = white;
+        hud.fillText(need ? need + (need === 1 ? ' more racer to start' : ' more racers to start') : 'Starting soon', tx, by - 6);
       }
+      // Aufruf
+      hud.font = font(800, 11.5); hud.fillStyle = TK.accent;
+      hud.fillText('Type !race to join', tx, y0 + headH + 16);
+      // Startliste
+      var nowMs = performance.now();
+      list.forEach(function (r, i) {
+        var id = r.user_id; if (lobbySeen[id] == null) lobbySeen[id] = nowMs;
+        var a = reduce ? 1 : smooth01((nowMs - lobbySeen[id]) / 350), dx = (1 - a) * 24;
+        var ry = y0 + headH + ctaH + i * rowH, e = catalogEntry(r.car_key), car = e ? shortName(e.name || r.car_key, 24) : '';
+        hud.globalAlpha = a;
+        hud.shadowColor = 'transparent';
+        hud.fillStyle = hexColor(r.color, '#9146ff'); hud.fillRect(x0 + pad + dx, ry + 3, 3, rowH - 8);   // Chatfarbe als Balken
+        hud.shadowColor = 'rgba(0,0,0,0.6)';
+        hud.textAlign = 'right'; hud.font = font(800, fName); hud.fillStyle = TK.accent;
+        hud.fillText(String(r.grid), x0 + pad + 22 + dx, ry + 13);
+        hud.textAlign = 'left'; hud.font = font(700, fName); hud.fillStyle = white;
+        hud.fillText(fitText(hud, String(r.display || r.user_id), w - pad * 2 - 30), x0 + pad + 30 + dx, ry + 13);
+        if (car) { hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, w - pad * 2 - 30), x0 + pad + 30 + dx, ry + 24); }
+        hud.globalAlpha = 1;
+      });
+      hud.restore();
     }
     function rosterOf(list) {
       return (list || []).slice().sort(function (a, b) { return a.grid - b.grid; }).map(function (r) { return r.user_id; }).join('|');
