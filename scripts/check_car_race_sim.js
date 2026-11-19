@@ -28,6 +28,8 @@ function arg(name, def) {
 }
 
 var DT = 1 / 60;
+var OVERLAP_TOL = 0.1;   // Wrack-Überlappung: höchstens 10 cm (längs und quer)
+var overlapChecked = {}; // Rennen, in denen mindestens ein Wrack stand (Überlappung geprüft)
 var MAX_T = 95;   // Sicherheitsnetz: die Sim muss nach spätestens 90 s selbst fertig sein
 
 // Eigener Zufall fürs Prüfskript (Feldzusammensetzung), unabhängig von der Sim
@@ -57,6 +59,7 @@ function run(opts, label, checkSteps) {
   var bad = false, still = opts.cars.map(function () { return 0; }), prevYaw = null, prevLap = null;
   var offT = opts.cars.map(function () { return 0; }), wasOff = opts.cars.map(function () { return false; });
   var info = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, returned: 0, offAtEnd: 0 };
+  var wreckPos = opts.cars.map(function () { return null; });
   var ids = {}; opts.cars.forEach(function (c) { ids[c.id] = 1; });
   var evSeen = 0, prevOrder = sim.standings(), lastT = 0;
   while (!sim.done && sim.time < MAX_T) {
@@ -103,6 +106,41 @@ function run(opts, label, checkSteps) {
       sim.cars.forEach(function (c) { if (order[c.pos - 1] !== c.id && !bad) { fail(label + ': pos von ' + c.id + ' passt nicht zu standings()'); bad = true; } });
     }
     prevOrder = order;
+    // Wracks: fest (bewegen sich nur bei einem Schubser), keine Überlappung mit anderen Autos
+    // (in jedem Rennen, auch über die ganze Bilanz – geprüft werden nur Paare mit einem Wrack)
+    if (!bad) {
+      var pushed = null, W = [];
+      for (i = 0; i < sim.cars.length; i++) {
+        c = sim.cars[i];
+        if (c.wreck !== (c.burn !== null) || (c.burn !== null && c.burn > sim.time + 1e-3)) { fail(label + ': Auto ' + c.id + ' wreck/burn passen nicht (' + c.wreck + '/' + c.burn + ')'); bad = true; break; }
+        var wp = wreckPos[i];
+        if (wp && c.v === 0 && (Math.abs(c.s - wp.s) > 1e-9 || Math.abs(c.d - wp.d) > 1e-9)) {
+          // ein Schubser wirkt bis zu 1,5 s nach (Schub klingt ab)
+          if (!pushed) {
+            pushed = {};
+            for (var q = sim.events.length - 1; q >= 0 && sim.events[q].t > sim.time - 1.5; q--) {
+              if (sim.events[q].type === 'push') { pushed[sim.events[q].id] = 1; pushed[sim.events[q].other] = 1; }
+            }
+          }
+          if (!pushed[c.id]) { fail(label + ': Wrack ' + c.id + ' bewegt sich ohne Schubser bei t=' + sim.time.toFixed(2)); bad = true; break; }
+        }
+        wreckPos[i] = c.wreck && c.v === 0 ? { s: c.s, d: c.d } : null;
+        if (c.wreck || ((c.state === 'spin' || c.state === 'crash') && c.v < 1)) W.push(i);
+      }
+      if (W.length) overlapChecked[label] = 1;
+      W.forEach(function (wi) {
+        for (var j2 = 0; j2 < sim.cars.length && !bad; j2++) {
+          if (j2 === wi) continue;
+          var a1 = sim.cars[wi], a2 = sim.cars[j2], L2 = sim.track.len;
+          var g2 = ((a2.s - a1.s) % L2 + L2 * 1.5) % L2 - L2 / 2;
+          var lon = (opts.cars[wi].stats.len + opts.cars[j2].stats.len) / 2 - Math.abs(g2);
+          var lat = (Sim.carWidth(opts.cars[wi].stats.len) + Sim.carWidth(opts.cars[j2].stats.len)) / 2 - Math.abs(a1.d - a2.d);
+          if (lon > OVERLAP_TOL && lat > OVERLAP_TOL) {
+            fail(label + ': ' + a2.id + ' überlappt Wrack ' + a1.id + ' (' + lon.toFixed(2) + ' × ' + lat.toFixed(2) + ' m) bei t=' + sim.time.toFixed(2)); bad = true;
+          }
+        }
+      });
+    }
     // Ölflecken: höchstens 3, Felder gültig
     if (sim.hazards.length > 3 && !bad) { fail(label + ': ' + sim.hazards.length + ' Ölflecken (Soll ≤ 3)'); bad = true; }
     if (!checkSteps || bad) continue;
@@ -460,6 +498,7 @@ function report() {
       ' bei Rennende draußen), ' + (X.pushes / RACES).toFixed(2) + ' Kontakte, ' + (X.oilHits / RACES).toFixed(2) + ' Ölkontakte, ' +
       (X.overtakes / RACES).toFixed(1) + ' Überholmanöver; Zufalls-Ölfleck in ' + (100 * X.randomOil / RACES).toFixed(1) + ' % der Rennen, ' +
       (X.oilSpots / RACES).toFixed(2) + ' Flecken je Rennen (max. ' + X.maxOil + ')');
+    console.log('Wrack-Überlappung geprüft in ' + Object.keys(overlapChecked).length + ' Rennen mit stehendem Auto/Wrack (Toleranz ' + OVERLAP_TOL + ' m)');
     console.log('Kontakte mit dem Bus (' + X.busPush.length + '): Schub auf das andere Auto ' + mean(X.busPush).toFixed(2) + ' m/s, auf den Bus ' +
       mean(X.busPushed).toFixed(2) + ' m/s; Tempoverlust ' + mean(X.busLoss).toFixed(2) + ' / ' + mean(X.busLost).toFixed(2) + ' m/s');
   }

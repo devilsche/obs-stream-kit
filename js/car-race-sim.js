@@ -30,7 +30,8 @@
  *       sim.fastForward(t)    Schritte bis sim.time ≥ t (gleiches Ergebnis wie durchlaufen, inkl. events/hazards)
  *       sim.time, sim.done, sim.track,
  *       sim.counts = { spins, crashes, crashDnf, slides, offs, rails, pushes, oilHits }
- *       sim.cars[i] = { id, s, d, v, lap, pos, yaw, roll, pitch, steer, spin, state, place, finish, draft, off }
+ *       sim.cars[i] = { id, s, d, v, lap, pos, yaw, roll, pitch, steer, spin, state, place, finish, draft, off,
+ *                       wreck, burn }
  *         s = gefahrene Meter ab Start/Ziel (Startaufstellung negativ), d = Seitenversatz (m, > 0 links;
  *         neben der Fahrbahn bis zur Leitplanke möglich: |d| ≤ width/2 + Auslauf),
  *         lap = 0 in der Aufstellung, dann 1..laps; pos = aktuelle Position (1 = vorn, = standings());
@@ -40,7 +41,16 @@
  *         state 'run'|'spin'|'crash'|'dnf'|'done' (keine neuen Werte: ein Auto im Gras ist 'run' mit off = true),
  *         place = Zielplatz oder null, finish = Zielzeit (s) oder null,
  *         draft = id des Vordermanns, solange Windschatten wirkt, sonst null,
- *         off = true, solange die Wagenmitte neben dem Asphalt ist (Gras/Kiesbett: Staub, Holpern).
+ *         off = true, solange die Wagenmitte neben dem Asphalt ist (Gras/Kiesbett: Staub, Holpern),
+ *         wreck = true ab dem Ausscheiden durch Crash/Leitplanke (state 'dnf'): das Wrack rollt aus und bleibt
+ *         dann bis Rennende liegen – ein festes Hindernis (auf der Fahrbahn oder im Auslauf), nur ein Schubser
+ *         eines schwereren/auffahrenden Autos versetzt es ein Stück; burn = Sim-Zeit des Ausscheidens
+ *         (Feuer/Rauch ab hier), sonst null. Bei Rennende nicht im Ziel (reason 'time') ist kein Wrack.
+ *       Wracks und stehende Dreher/Crashs sind nie durchfahrbar: die anderen lenken auf der Fahrbahn vorbei,
+ *       notfalls durch den Auslauf (höchstens 8 m/s, im Kies 6 m/s), oder stellen sich an; wer länger als 4 s
+ *       steht, quetscht sich auf der freien Seite durch den Auslauf. Auffahren auf ein Wrack ist ein Kontakt
+ *       ('push'), ab 8 m/s zusätzlich ein Crash (kann Öl hinterlassen).
+ *   CarRaceSim.carWidth(len) → Breite (m) eines Autos aus seiner Länge (Grundfläche len × Breite).
  *       sim.events = [{ t, type, id, other? , …}] in Zeitreihenfolge (t = Sim-Zeit in s, auf ms gerundet):
  *         'overtake' id zieht an other vorbei (genau dann, wenn sich die Reihenfolge von standings() ändert;
  *                    nur vor Rennende, ohne Ausgeschiedene; 1 m Hysterese gegen Flackern),
@@ -112,6 +122,8 @@
   var OIL_TIME = 0.5;         // so lange wirkt das Öl nach (s)
   var OIL_CRASH = 0.3;        // Chance auf einen Fleck nach Crash, Leitplanke oder hartem Schubser
   var OIL_SEE = 0.85;         // Chance, einen Fleck rechtzeitig zu sehen und auszuweichen
+  var WRECK_V = 8;            // an einem Wrack vorbei höchstens 8 m/s
+  var STUCK_T = 4;            // wer so lange steht, quetscht sich durch den Auslauf
   var HYST = 1;               // Positionswechsel erst ab 1 m Vorsprung (kein Flackern)
   var TWO_PI = Math.PI * 2;
 
@@ -356,6 +368,9 @@
     };
   }
 
+  // Breite eines Autos (m) aus seiner Länge – auch fürs Overlay/Prüfskript
+  function carWidth(len) { return clamp(len * 0.42, 1.7, 2.6); }
+
   // ---- Rennen ----
   function create(opts) {
     var T = typeof opts.track === 'object' && opts.track ? opts.track : track(opts.track | 0);
@@ -376,7 +391,7 @@
     }
 
     opts.cars.forEach(function (c, i) {
-      var st = c.stats, w = clamp(st.len * 0.42, 1.7, 2.6);
+      var st = c.stats, w = carWidth(st.len);
       var lim = HALF - w / 2 - 0.1;
       // Geschwindigkeitsprofil: Kurvengrenze aus Grip und Radius, Wellen kosten je nach Federung,
       // dann rückwärts Bremszonen einrechnen
@@ -402,7 +417,7 @@
         push: form * (0.985 + rnd() * 0.03),        // wie nah am Limit (pro Runde neu)
         pushLap: 0,
         dT: (i % 2 === 0 ? 1 : -1) * 2.3,
-        stuck: 0, ghostT: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
+        stuck: 0, detourT: 0, detourJ: -1, detourAge: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
         dDot: 0, latAng: 0, latCurv: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55),
         // Abflug / Schubs / Öl
         offTo: null, offLat: 0, pushV: 0, atRail: false, oilT: 0, oilS: -1e9, avoidKey: -1, avoidOk: false
@@ -410,7 +425,7 @@
       cars.push({
         id: c.id, s: rowS[i >> 1], d: (i % 2 === 0 ? 1 : -1) * 2.3, v: 0, lap: 0, pos: i + 1,
         yaw: T.at(rowS[i >> 1]).yaw, roll: 0, pitch: 0, steer: 0, spin: 0, state: 'run', place: null, finish: null,
-        draft: null, off: false
+        draft: null, off: false, wreck: false, burn: null
       });
     });
     var order = cars.map(function (c, i) { return i; });   // aktuelle Reihenfolge (Indizes), mit Hysterese
@@ -449,7 +464,7 @@
     // Darf das Auto die Fahrbahn verlassen (Abflug, Schubs, schon draußen)?
     function freeLat(i) {
       var p = P[i];
-      return p.offTo !== null || p.pushV !== 0 || p.atRail || Math.abs(cars[i].d) > p.lim + 1e-9;
+      return p.offTo !== null || p.pushV !== 0 || p.atRail || p.detourT > 0 || Math.abs(cars[i].d) > p.lim + 1e-9;
     }
     function emit(type, i, j, extra) {
       var e = { t: Math.round(steps * DT * 1000) / 1000, type: type, id: cars[i].id };
@@ -464,11 +479,11 @@
     // Längsabstand b vor a entlang der Strecke (−L/2 … L/2)
     function gap(a, b) { return mod(b.s - a.s + L / 2, L) - L / 2; }
     function minGap(i, j) { return (P[i].st.len + P[j].st.len) / 2 + 0.4; }
+    // Seitliche Überlappung (keine Ausnahme: auch Wracks sind fest)
     function latOverlap(i, j, di) {
-      if ((P[i].ghostT > 0 && isWreck(j)) || (P[j].ghostT > 0 && isWreck(i))) return false;
       return Math.abs(di - cars[j].d) < (P[i].w + P[j].w) / 2 + 0.25;
     }
-    // Berührt Auto i gerade ein anderes (ohne Ausnahme für Wracks)?
+    // Berührt Auto i gerade ein anderes?
     function touching(i) {
       for (var j = 0; j < cars.length; j++) {
         if (j === i) continue;
@@ -477,11 +492,13 @@
       }
       return false;
     }
-    // Wrack = steht nach Dreher/Crash (oder ausgeschieden) still
+    // Wrack = steht nach Dreher/Crash (oder ausgeschieden) still – ein festes Hindernis
     function isWreck(j) {
       var c = cars[j];
       return c.v < 1 && (c.state === 'crash' || c.state === 'spin' || P[j].parked);
     }
+    // ausgeschieden und stehen geblieben: bewegt sich nur noch, wenn es geschubst wird
+    function frozen(j) { return P[j].parked && cars[j].v === 0; }
     // Ist die Spur bei Seitenversatz dd für Auto i frei? Zählt nur, wer daneben oder bis `extra` Meter
     // davor fährt – Autos dahinter passen sich an (sonst warten sich mehrere Autos gegenseitig fest)
     function laneFree(i, dd, extra) {
@@ -528,7 +545,7 @@
         p.dT = out * p.lim;
         emit('crash', i);
         if (rnd() < DNF_CHANCE * clamp(c.v / 16, 0.3, 1.6)) {
-          p.parked = true; counts.crashDnf++; c.state = 'dnf';
+          p.parked = true; counts.crashDnf++; c.state = 'dnf'; c.wreck = true; c.burn = Math.round(steps * DT * 1000) / 1000;
           emit('dnf', i, null, { reason: 'crash' });
         }
         if (rnd() < OIL_CRASH) addOil(c.s, c.d, c.id);
@@ -538,7 +555,7 @@
     function railCrash(i) {
       var c = cars[i], p = P[i], sd = c.d > 0 ? 1 : -1;
       counts.crashes++; counts.rails++;
-      c.state = 'dnf'; p.parked = true; p.atRail = true; p.offTo = null; p.pushV = 0; p.slowT = 0;
+      c.state = 'dnf'; p.parked = true; c.wreck = true; c.burn = Math.round(steps * DT * 1000) / 1000; p.atRail = true; p.offTo = null; p.pushV = 0; p.slowT = 0;
       p.timer = 0; p.dur = 3; p.yawTo = (rnd() < 0.5 ? -1 : 1) * (0.6 + rnd() * 0.7); p.dT = c.d;
       emit('crash', i, null, { rail: true });
       emit('dnf', i, null, { reason: 'rail' });
@@ -611,6 +628,8 @@
               if (c.state === 'crash' && p.timer > p.dur - 0.6) p.yawOff = p.yawTo * Math.max(0, (p.dur - p.timer) / 0.6);
             }
             if (c.state === 'crash' && p.parked) c.state = 'dnf';
+            // ausgeschiedenes Wrack: bleibt liegen, wo es zum Stehen gekommen ist (nur Schubser versetzen es)
+            if (p.parked && c.v === 0) p.dT = c.d;
             // erst weiterfahren, wenn sich niemand mehr am Wrack vorbeischiebt (sonst Ruck beim Auflösen)
             if (p.timer >= p.dur && c.state !== 'dnf' && touching(i)) p.timer = p.dur;
             else if (p.timer >= p.dur && c.state !== 'dnf') {
@@ -624,11 +643,17 @@
               p.dT = p.offTo;
               if (Math.abs(c.d - p.offTo) < 0.05 || c.v < 1) p.offTo = null;
             } else {
-              // Notausgang gegen Verkeilen: wer 1,5 s hinter einem Wrack festsitzt, darf sich 2,5 s lang
-              // daran vorbeischieben (Wracks blockieren ihn dann nicht mehr)
-              p.stuck = c.v < 0.3 ? p.stuck + DT : 0;
-              if (p.stuck > 1.5) { p.stuck = 0; p.ghostT = 2.5; }
-              if (p.ghostT > 0 && !touching(i)) p.ghostT -= DT;
+              // Wracks sind fest: wer länger als STUCK_T s steht, quetscht sich durch den Auslauf (unten)
+              p.stuck = c.v < 0.3 && time > 3 ? p.stuck + DT : 0;
+              if (p.detourT > 0) p.detourT -= DT;
+              // Umweg um ein Wrack: halten, bis es hinter uns liegt
+              // (Ende: vorbei, das Wrack fährt wieder/ist weit weg, oder spätestens nach 8 s)
+              if (p.detourJ >= 0) {
+                p.detourAge += DT;
+                var dg = gap(c, cars[p.detourJ]);
+                if (dg < -minGap(i, p.detourJ) - 1 || dg > 40 || !isWreck(p.detourJ) || p.detourAge > 8) p.detourJ = -1;
+                else p.detourT = Math.max(p.detourT, 0.2);
+              }
               var cruise = c.state !== 'run' || sim.done;      // im Ziel / nach Rennende: locker weiter
               var outside = Math.abs(c.d) > p.lim + 1e-9;      // neben der Fahrbahn: zurück auf die Strecke
               // Auto vorn (gleiche Spur) für Windschatten und Folgen
@@ -649,6 +674,12 @@
               var target = Math.min(profAt(p, c.s) * (cruise ? 0.75 : p.push * offLine), vtop);
               if (p.slowT > 0) { p.slowT -= DT; target = Math.min(target, p.slowV); }
               if (c.off) target = Math.min(target, GRAVEL_V);
+              // an Wracks vorbei nur langsam (voraus bis 25 m oder daneben)
+              for (j = 0; j < cars.length; j++) {
+                if (j === i || !isWreck(j)) continue;
+                var wg = gap(c, cars[j]);
+                if (wg > -minGap(i, j) && wg < 25) { target = Math.min(target, WRECK_V); break; }
+              }
               if (ahead >= 0) {                                  // nicht auffahren
                 var free = ag - minGap(i, ahead);
                 target = Math.min(target, Math.max(0, cars[ahead].v + Math.max(0, free - 0.5) * 2));
@@ -692,21 +723,53 @@
               }
               if (c.state !== 'run' && c.state !== 'done' && c.state !== 'dnf') { p.accel = (c.v - v0) / DT; continue; }
               if (p.offTo !== null) { p.accel = (c.v - v0) / DT; continue; }
-              if (outside) {
+              // Festgefahren (kein Platz an Wrack/Stau vorbei): durch den Auslauf auf der freien Seite
+              if (p.stuck > STUCK_T && !sim.done && p.slowT <= 0) {
+                // nächstgelegene freie Spur neben der Fahrbahn (in 0,5-m-Schritten bis zur Leitplanke)
+                var esc = null;
+                [1, -1].forEach(function (sd) {
+                  for (var off2 = p.lim + 0.5; off2 <= railLim(i, sd) - 0.3 + 1e-9; off2 += 0.5) {
+                    var cand = sd * off2;
+                    if (!laneFree(i, cand, 3)) continue;
+                    if (esc === null || Math.abs(cand - c.d) < Math.abs(esc - c.d)) esc = cand;
+                    break;
+                  }
+                });
+                if (esc !== null) { p.dT = esc; p.detourT = 3; p.detourJ = ahead >= 0 && isWreck(ahead) ? ahead : -1; p.detourAge = 0; p.stuck = 0; }
+              }
+              if (p.detourJ >= 0 || (p.detourT > 0 && Math.abs(p.dT) > p.lim)) {
+                // auf dem Umweg: Seite halten, aber immer mit genug Abstand zum Wrack (es kann verrutscht sein)
+                if (p.detourJ >= 0) {
+                  var wj = cars[p.detourJ], sdd = p.dT >= wj.d ? 1 : -1;
+                  var need = wj.d + sdd * ((p.w + P[p.detourJ].w) / 2 + 0.6);
+                  var cap = sdd * (railLim(i, sdd) - 0.3);
+                  if (sdd * need > sdd * p.dT) p.dT = sdd > 0 ? Math.min(need, cap) : Math.max(need, cap);
+                }
+              } else if (outside) {
                 // zurück: zum nächsten Fahrbahnrand, eingefädelt wird nur in eine freie Lücke (Schritt 2)
                 p.dT = (c.d > 0 ? 1 : -1) * (p.lim - 0.3);
               } else if (p.slowT <= 0) {               // auch im Ziel: Wracks umfahren
                 // Überholen: langsameres Auto dicht vorn → Seite wechseln, wenn dort Platz ist
+                var wreckAhead = ahead >= 0 && isWreck(ahead);
                 if (ahead >= 0 && ag < minGap(i, ahead) + 4 + Math.max(0, c.v - cars[ahead].v) * 2.5 &&
                     (cars[ahead].v < c.v * 0.99 || cars[ahead].state !== 'run')) {
-                  var off = (P[i].w + P[ahead].w) / 2 + 0.8, best = null;
-                  [cars[ahead].d + off, cars[ahead].d - off, 0, p.lim * 0.5, -p.lim * 0.5].forEach(function (cand) {
-                    cand = clamp(cand, -p.lim, p.lim);
+                  var off = (P[i].w + P[ahead].w) / 2 + 0.8, best = null, bestSc = 0;
+                  var cands = [cars[ahead].d + off, cars[ahead].d - off, 0, p.lim * 0.5, -p.lim * 0.5].map(function (x) { return clamp(x, -p.lim, p.lim); });
+                  // vor einem Wrack notfalls durch den Auslauf (Grenze: Leitplanke hier und am Wrack)
+                  if (wreckAhead) [1, -1].forEach(function (sd) {
+                    var rl = Math.min(railLim(i, sd), HALF + runAt(cars[ahead].s, sd) - p.w / 2 - 0.1) - 0.3;
+                    if (rl > p.lim) cands.push(sd * Math.min(rl, Math.max(p.lim + 0.5, Math.abs(cars[ahead].d + sd * off))));
+                  });
+                  cands.forEach(function (cand) {
                     if (Math.abs(cand - cars[ahead].d) < (P[i].w + P[ahead].w) / 2 + 0.3) return;
                     if (!laneFree(i, cand, 0.5 + c.v * 0.2)) return;
-                    if (best === null || Math.abs(cand - c.d) < Math.abs(best - c.d)) best = cand;
+                    var sc = Math.abs(cand - c.d) + (Math.abs(cand) > p.lim + 1e-9 ? 4 : 0);   // Fahrbahn bevorzugt
+                    if (best === null || sc < bestSc) { best = cand; bestSc = sc; }
                   });
-                  if (best !== null) p.dT = best;
+                  if (best !== null) {
+                    p.dT = best;
+                    if (Math.abs(best) > p.lim + 1e-9) { p.detourT = Math.max(p.detourT, 1); if (p.detourJ !== ahead) p.detourAge = 0; p.detourJ = ahead; }
+                  }
                 } else if (time > 4 && laneFree(i, clamp(line, -p.lim, p.lim), 2)) {
                   p.dT = clamp(line, -p.lim, p.lim);
                 }
@@ -752,7 +815,7 @@
             var bl = blockers(i, nd);
             if (bl.length) {
               var heavy = c.state === 'run' && !c.off && p.pushV === 0 && bl.every(function (j2) {
-                return p.mass >= HEAVY * P[j2].mass && cars[j2].state !== 'dnf';
+                return p.mass >= HEAVY * P[j2].mass;
               });
               // deutlich schwerer (Bus gegen Kleinwagen): drängt einfach rein und schubst den anderen weg
               // (selbst bleibt es diesen Schritt stehen – keine Überlappung)
@@ -761,7 +824,7 @@
               if (!heavy) {
                 p.pushV = 0;
                 // Wrack, das nicht an den Rand rutschen kann (Auto daneben): an den anderen Rand
-                if ((c.state === 'crash' || p.parked) && c.v < 2 && Math.abs(p.dT) >= p.lim - 1e-9) p.dT = -p.dT;
+                if ((c.state === 'crash' || p.parked) && !frozen(i) && c.v < 2 && Math.abs(p.dT) >= p.lim - 1e-9) p.dT = -p.dT;
               }
             }
           }
@@ -775,6 +838,8 @@
           p.dDot = (nd - c.d) / DT;
           c.d = clamp(nd, Math.min(lo, c.d), Math.max(hi, c.d));
           c.s += c.v * DT;
+          // im Auslauf: wird er nach vorn schmaler, bleibt das Auto vor der Leitplanke
+          if (Math.abs(c.d) > p.lim) c.d = clamp(c.d, -railLim(i, -1), railLim(i, 1));
         }
         // 3) Keine Durchdringung: hinteres Auto zurücksetzen und bremsen; Auffahren mit Schwung = Kontakt
         for (var it = 0; it < 2; it++) {
@@ -784,8 +849,14 @@
               var gg = gap(cars[i], cars[j]), mg = minGap(i, j);
               if (gg >= 0 && gg < mg) {          // j vor i, zu dicht
                 var closing = cars[i].v - cars[j].v;
-                if (it === 0 && closing > CONTACT_MIN && !sim.done && !isWreck(j)) contact(i, j, closing, 'rear');
-                cars[i].s -= (mg - gg);
+                if (it === 0 && closing > CONTACT_MIN && !sim.done) {
+                  // Einschlag in ein Wrack: Schubs, mit Schwung ein Crash
+                  if (frozen(j) && closing >= HARD_PUSH && cars[i].state === 'run') startEvent(i, cars[i], P[i], 'crash');
+                  contact(i, j, closing, 'rear');
+                }
+                // ein stehendes Wrack wird nicht zurückgeschoben – dann rückt das vordere Auto auf
+                if (frozen(i) && !frozen(j)) cars[j].s += (mg - gg);
+                else cars[i].s -= (mg - gg);
                 if (cars[i].v > cars[j].v) cars[i].v = cars[j].v;
               }
             }
@@ -878,6 +949,6 @@
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
     // gute Strecken-Seeds: node scripts/check_car_race_sim.js --find 30 (Regeln + Siegerzeit 57–67 s)
     TRACKS: [1, 2, 3],
-    LAYOUTS: LAYOUTS, rng: rng, track: track, stats: stats, create: create
+    LAYOUTS: LAYOUTS, carWidth: carWidth, rng: rng, track: track, stats: stats, create: create
   };
 });
