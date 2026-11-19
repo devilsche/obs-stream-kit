@@ -40,7 +40,7 @@ MAX_TRIS = 120000   # darunter bleibt ein Modell unvereinfacht (runde Räder!); 
 MAX_TEX = 1024
 WORK = os.path.join(tempfile.gettempdir(), "car-rain-build")
 # typische Längen (m) für Nicht-Pkw, sonst 4,5 m
-LEN = [(r"trolza|bus\b|megapolis", 12.5), (r"ural|truck|lkw", 7.4), (r"ct680|caterpillar|semi", 7.0), (r"g63|g-class|g class", 4.9), (r"krabby patty", 1.8)]
+LEN = [(r"trolza|bus\b|megapolis", 12.5), (r"ural|truck|lkw", 7.4), (r"ct680|caterpillar|semi", 7.0), (r"g63|g-class|g class", 4.9), (r"krabby patty", 1.0)]
 
 
 def remote_json(path):
