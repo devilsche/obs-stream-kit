@@ -2000,5 +2000,27 @@
   "url": "https://sketchfab.com/3d-models/bmw-e39-free-531a5a93da5d493d9918eb36f011c20d",
   "thumb": "https://media.sketchfab.com/models/531a5a93da5d493d9918eb36f011c20d/thumbnails/312b7ebabc1a41a4bbcd2cac33c8adbb/820f6a538e284ed1936917fae72929d0.jpeg",
   "wish": true
+ },
+ {
+  "uid": "86ee7c1a83334576933ab431542269d5",
+  "brand": "BMW",
+  "name": "1973 BMW 3.0 CSL RHD (E9)",
+  "author": "Ddiaz Design",
+  "license": "CC Attribution-NonCommercial-ShareAlike",
+  "faces": 86494,
+  "url": "https://sketchfab.com/3d-models/1973-bmw-30-csl-rhd-e9-86ee7c1a83334576933ab431542269d5",
+  "thumb": "https://media.sketchfab.com/models/86ee7c1a83334576933ab431542269d5/thumbnails/8860b994a7464e17b3aa8bd2d0e6825b/965062054eb14efb9a70b37767dbdcea.jpeg",
+  "wish": true
+ },
+ {
+  "uid": "89cf6f42b3f9476ca61fed1c177e7a5e",
+  "brand": "Other",
+  "name": "Krabby Patty Wagon",
+  "author": "Rafa Andrade",
+  "license": "CC Attribution",
+  "faces": 124664,
+  "url": "https://sketchfab.com/3d-models/krabby-patty-wagon-89cf6f42b3f9476ca61fed1c177e7a5e",
+  "thumb": "https://media.sketchfab.com/models/89cf6f42b3f9476ca61fed1c177e7a5e/thumbnails/8a7ed36e6edb473096d2fccee0d56cf2/fb966ea4695644f9a9144275fc57ded4.jpeg",
+  "wish": true
  }
 ]
