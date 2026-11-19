@@ -546,3 +546,63 @@ def test_givecoins_validation_and_missing_user(conn, tmp_path, clock):
     assert c.get("/s/tok/api/fx/car-race", query_string={"cmd": "coins", "id": "%userId%",
                                                           "user": "%user%"}).status_code == 400
     assert q(c, cmd="givecoins", id="1", user="A", n="-20")["coins"] == 0
+
+
+# --- Nitro und Anrempeln ---
+
+def _running(c, clock, names=("Ann", "Bob", "Cy")):
+    for i, n in enumerate(names):
+        _join(c, str(i + 1), n)
+    race.admin(TID, "start", T)
+    clock["now"] = T + race.intro_seconds(len(names)) + 10
+    return T + race.intro_seconds(len(names))
+
+
+def test_nitro_once_costs_and_event_in_state(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    starts = _running(c, clock)
+    race_db.add_coins(conn, TID, "1", "Ann", 120)
+    r = q(c, cmd="nitro", id="1", user="Ann")
+    assert r["ok"] is True and r["say"] == "@Ann fires the nitro!"
+    assert race_db.coins(conn, TID, "1") == 70
+    assert q(c, cmd="nitro", id="1", user="Ann")["ok"] is False
+    assert race_db.coins(conn, TID, "1") == 70
+    ev = c.get("/s/tok/api/fx/car-race/state").get_json()["race_events"]
+    assert ev == [{"t": round(clock["now"] - starts + 1.5, 2), "type": "nitro", "id": "1"}]
+
+
+def test_nitro_insufficient_and_not_in_race(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    _running(c, clock)
+    race_db.add_coins(conn, TID, "1", "Ann", 49)
+    r = q(c, cmd="nitro", id="1", user="Ann")
+    assert r["ok"] is False and "50 coins" in r["say"] and race_db.coins(conn, TID, "1") == 49
+    race_db.add_coins(conn, TID, "9", "Zed", 500)
+    assert q(c, cmd="nitro", id="9", user="Zed")["ok"] is False
+    assert race_db.coins(conn, TID, "9") == 500
+    assert c.get("/s/tok/api/fx/car-race/state").get_json()["race_events"] == []
+
+
+def test_boost_only_in_race_phase(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    for i, n in enumerate(("Ann", "Bob", "Cy")):
+        _join(c, str(i + 1), n)
+    race_db.add_coins(conn, TID, "1", "Ann", 500)
+    assert q(c, cmd="nitro", id="1", user="Ann")["ok"] is False
+    assert race_db.coins(conn, TID, "1") == 500
+
+
+def test_bump_target_matching_and_self(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    starts = _running(c, clock, ("Ann", "Bob", "Bobby", "Cy"))
+    race_db.add_coins(conn, TID, "1", "Ann", 250)
+    assert "usage" in q(c, cmd="bump", id="1", user="Ann", q="")["say"]
+    assert "which one?" in q(c, cmd="bump", id="1", user="Ann", q="bo")["say"]
+    assert "can't bump yourself" in q(c, cmd="bump", id="1", user="Ann", q="ann")["say"]
+    assert "no driver" in q(c, cmd="bump", id="1", user="Ann", q="zzzz")["say"]
+    assert race_db.coins(conn, TID, "1") == 250
+    r = q(c, cmd="bump", id="1", user="Ann", q="cy")
+    assert r["ok"] is True and r["say"] == "@Ann bumps Cy!" and race_db.coins(conn, TID, "1") == 150
+    assert q(c, cmd="bump", id="1", user="Ann", q="cy")["ok"] is False
+    ev = c.get("/s/tok/api/fx/car-race/state").get_json()["race_events"]
+    assert ev == [{"t": round(clock["now"] - starts + 1.5, 2), "type": "bump", "id": "1", "target": "4"}]

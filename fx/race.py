@@ -23,6 +23,9 @@ LOBBY_TTL = 300
 COOLDOWN = 120
 RESULT_WINDOW = 120
 LAPS = 3
+NITRO_COST = 50
+BUMP_COST = 100
+EVENT_LEAD = 1.5   # Ereignisse gelten 1,5 s nach Eingang, damit alle Overlays sie vor Eintritt haben
 FINISH_WINDOW = 15
 INTRO_BASE = 2.0   # Vorstellung der Fahrer vor dem Start: 2 s + 1,6 s je Fahrer (Overlay fliegt übers Feld)
 INTRO_PER = 1.6
@@ -49,7 +52,7 @@ def _new_race(now):
     return {"phase": "lobby", "race_id": "%x-%x" % (int(now), seed), "seed": seed,
             "track": rng.getrandbits(31), "rng": rng, "racers": [], "first_at": now,
             "starts_at": None, "ends_at": now + LOBBY_TTL, "podium_until": None,
-            "cool_until": None, "counted": False, "result": None}
+            "cool_until": None, "counted": False, "result": None, "events": [], "boosted": set()}
 
 
 def _get(tenant_id):
@@ -301,6 +304,7 @@ def _view(t, now):
     out["racers"] = [{**{k: r[k] for k in ("grid", "user_id", "display", "color", "car_key", "uid", "paint")},
                       "sub": r.get("sub", 0), "sub_paint": r.get("sub_paint")}
                      for r in t["racers"]]
+    out["race_events"] = sorted((dict(e) for e in t.get("events", [])), key=lambda e: e["t"])
     if t["result"] and t["phase"] in ("podium", "cooldown"):
         out["result"] = t["result"]
     return out
@@ -390,6 +394,45 @@ def accept_result(tenant_id, race_id, places, now):
             return None
         t["saving"] = race_id  # bis confirm/release: weitere Meldungen gelten als „schon dabei“
         return rows
+
+
+def boost(tenant_id, user_id, kind, query, now, pay):
+    """Nitro/Bump im laufenden Rennen. `pay(cost)` zieht die Coins atomar ab (True/False) und wird
+    erst nach allen Prüfungen unter der Sperre aufgerufen. → {ok, say} (say ohne @-Präfix)."""
+    cost = NITRO_COST if kind == "nitro" else BUMP_COST
+    with _LOCK:
+        t = _get(tenant_id)
+        _advance(t, now)
+        me = next((r for r in t["racers"] if r["user_id"] == user_id), None) if t["phase"] == "race" else None
+        if me is None or me.get("test") or t["starts_at"] is None or now < t["starts_at"]:
+            return {"ok": False, "say": "!%s only works for racers while the race is running" % kind}
+        if (kind, user_id) in t["boosted"]:
+            return {"ok": False, "say": "you already used %s this race" % kind}
+        ev = {"t": round(now - t["starts_at"] + EVENT_LEAD, 2), "type": kind, "id": user_id}
+        if kind == "bump":
+            others = [r for r in t["racers"] if r["user_id"] != user_id and not r.get("test")]
+            if not (query or "").strip():
+                return {"ok": False, "say": "usage: !bump <driver>"}
+            names = [r["display"] for r in others]
+            i, hits = race_shop.find_name(query, names)
+            if i is None and not hits:
+                i, hits = race_shop.find_name(query, [r["login"] or "" for r in others])
+            if i is None:
+                if hits:
+                    return {"ok": False, "say": "which one? " + ", ".join(names[h] for h in hits)}
+                me_hit, _ = race_shop.find_name(query, [me["display"]])
+                if me_hit is not None:
+                    return {"ok": False, "say": "you can't bump yourself"}
+                return {"ok": False, "say": "no driver like '%s' in this race" % query[:30]}
+            target = others[i]
+            ev["target"] = target["user_id"]
+        if not pay(cost):
+            return {"ok": False, "say": "%s costs %d coins" % (kind, cost), "poor": True}
+        t["boosted"].add((kind, user_id))
+        t["events"].append(ev)
+        if kind == "nitro":
+            return {"ok": True, "say": "fires the nitro!", "event": ev}
+        return {"ok": True, "say": "bumps %s!" % target["display"], "event": ev}
 
 
 def release(tenant_id, race_id):

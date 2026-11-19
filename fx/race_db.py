@@ -228,6 +228,23 @@ def add_coins(conn, tenant_id: int, user_id: str, display: str, n: int) -> int:
     return coins(conn, tenant_id, user_id)
 
 
+def spend(conn, tenant_id: int, user_id: str, cost: int) -> bool:
+    """Atomar abziehen, nur wenn genug da ist (eine UPDATE-Bedingung). → True bei Erfolg."""
+    try:
+        cur = conn.execute(
+            "UPDATE fx_race_wallet SET coins = coins - ?, updated_at = ? "
+            "WHERE tenant_id = ? AND user_id = ? AND coins >= ?",
+            (cost, _now(), tenant_id, user_id, cost))
+        if cur.rowcount != 1:
+            _rollback(conn)
+            return False
+        conn.commit()
+        return True
+    except Exception:
+        _rollback(conn)
+        raise
+
+
 def garage(conn, tenant_id: int, user_id: str) -> list:
     """Gekaufte Auto-Schlüssel, älteste zuerst."""
     rows = conn.execute("SELECT car_key FROM fx_race_garage WHERE tenant_id = ? AND user_id = ? "

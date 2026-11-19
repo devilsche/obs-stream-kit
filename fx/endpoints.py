@@ -839,6 +839,28 @@ def _race_garage_cmd(cmd, now):
     return jsonify({"ok": False, "say": "unknown command"}), 400
 
 
+def _race_boost_cmd(cmd, now):
+    """nitro (50 Coins) | bump&q=<Fahrer> (100 Coins) → Response."""
+    uid, display = _who()
+    if not uid:
+        return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
+
+    def pay(cost):
+        return _with_conn(lambda conn: race_db.spend(conn, g.tenant_id, uid, cost))
+    try:
+        out = race.boost(g.tenant_id, uid, cmd, _arg("q"), now, pay)
+    except Exception:
+        log.exception("fx car-race: %s failed", cmd)
+        return _no_store(jsonify({"ok": False, "say": _say(display, "garage unavailable, try again later")}))
+    if out.get("poor"):
+        try:
+            have = _with_conn(lambda conn: race_db.coins(conn, g.tenant_id, uid))
+            out["say"] += " – you have %d" % have
+        except Exception:
+            pass
+    return _no_store(jsonify({"ok": out["ok"], "say": _say(display, out["say"])}))
+
+
 RACE_GARAGE = ("coins", "garage", "buy", "reroll", "paint", "givecoins")
 
 
@@ -860,6 +882,8 @@ def car_race_cmd(token):
         return _race_join(now)
     if cmd in RACE_GARAGE:
         return _race_garage_cmd(cmd, now)
+    if cmd in ("nitro", "bump"):
+        return _race_boost_cmd(cmd, now)
     if cmd == "mycar":
         login = _arg("user").lstrip("@")
         uid = (_arg("id") or login.lower())[:64]

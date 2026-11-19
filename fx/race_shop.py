@@ -161,6 +161,26 @@ def find_car(query, catalog):
     return None, out[:4]
 
 
+def find_name(query, names):
+    """Unscharfe Namenssuche (z. B. Anrempeln): (Index, []) bei eindeutigem Treffer, sonst (None, Vorschläge als Indizes)."""
+    n = norm(query)
+    if not n:
+        return None, []
+    items = [(i, norm(x)) for i, x in enumerate(names)]
+    exact = [i for i, x in items if x == n]
+    if len(exact) == 1:
+        return exact[0], []
+    for test in (lambda x: x.startswith(n), lambda x: n in x):
+        hit = [i for i, x in items if x and test(x)]
+        if len(hit) == 1:
+            return hit[0], []
+        if hit:
+            return None, hit[:4]
+    by = {x: i for i, x in items if x}
+    close = [by[x] for x in difflib.get_close_matches(n, list(by), n=3, cutoff=0.7)]
+    return (close[0], []) if len(close) == 1 else (None, close)
+
+
 def find_paint(query):
     """Sub-Lackierung: Set-ID, "off" zum Zurücksetzen, None wenn unbekannt."""
     n = norm(query)
