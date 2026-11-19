@@ -48,7 +48,8 @@
   // Sub-Lackierungen (state: paint = Set-Name): Gold glänzend metallic, Kanal-Lila glänzend, Carbon glänzend
   var SUB_PAINTS = { gold: { c: 0xd4a017, f: 'shiny' }, purple: { c: 0x5e2a79, f: 'gloss' }, carbon: { c: 0x2b2b30, f: 'carbonGloss' } };
   function shortName(n, max) { n = cleanName(n); return n.length > max ? n.slice(0, max - 1) + '\u2026' : n; }
-  var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
+  var FLASH = 1.4;
+  var FRAME_GOLD = '#f2b705';   // Kanal-Gold für Rahmen/Kanten (nicht der Theme-Akzent, der z. B. hellblau sein kann)          // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -733,9 +734,9 @@
       hud.clearRect(x - 10, y - 10, w + 20, h + 20);   // HUD nie über dem Spiel
       if (frameA > 0.01) {
         hud.save(); hud.globalAlpha = frameA;
-        hud.shadowColor = 'rgba(0,0,0,0.55)'; hud.shadowBlur = 22;
-        roundRect(hud, x - 3, y - 3, w + 6, h + 6, 8);
-        hud.lineWidth = 6; hud.strokeStyle = TK.accent; hud.stroke();
+        hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 10;
+        roundRect(hud, x - 1.5, y - 1.5, w + 3, h + 3, 3);
+        hud.lineWidth = 3; hud.strokeStyle = FRAME_GOLD; hud.stroke();
         hud.restore();
         hud.clearRect(x, y, w, h);   // Schatten nicht ins Loch
       }
@@ -766,16 +767,17 @@
       var headH = pad + 15 + 8 + 34 + 10, ctaH = 24, h = headH + ctaH + list.length * rowH + pad * 0.6;
       var x0 = W - m - w, y0 = H - m - h;
       var bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
-      // Feld: weicher Schatten, Körper halbtransparent, Kopf kräftiger, dünner Akzentrand
+      // Feld: weicher Schatten, Körper halbtransparent, Kopf kräftiger, Goldrand (kaum gerundet)
       hud.save();
       hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 14; hud.shadowOffsetY = 3;
-      roundRect(hud, x0, y0, w, h, 10); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
+      roundRect(hud, x0, y0, w, h, 3); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
       hud.restore();
-      hud.save(); roundRect(hud, x0, y0, w, h, 10); hud.clip();
+      hud.save(); roundRect(hud, x0, y0, w, h, 3); hud.clip();
       hud.fillStyle = withAlpha(bg, 0.9); hud.fillRect(x0, y0, w, headH);
-      hud.fillStyle = TK.accent; hud.fillRect(x0, y0, 4, headH);   // Akzentbalken am Kopf
+      hud.fillStyle = FRAME_GOLD; hud.fillRect(x0, y0, 4, headH);   // Goldbalken am Kopf
       hud.restore();
-      roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 10); hud.lineWidth = 1; hud.strokeStyle = withAlpha(TK.accent, 0.85); hud.stroke();
+      roundRect(hud, x0 + 0.75, y0 + 0.75, w - 1.5, h - 1.5, 2); hud.lineWidth = 1.5; hud.strokeStyle = FRAME_GOLD;   // 3 px Gold bei 1080p, kaum gerundet
+      hud.stroke();
       // Text mit leichtem Schatten (bleibt auch über hellem Spielbild lesbar)
       hud.save();
       hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 2; hud.shadowOffsetY = 1;
@@ -1250,45 +1252,93 @@
       hud.save(); hud.setTransform(k, 0, 0, k, 0, 0);
       W = FULLW; H = FULLH;
       try {
-        // kompakt, endet über der Streamer-Kamera (bei 1080p ab y 539): ab 6 Fahrern zwei Spalten (1–5 | 6–10)
-        var x0 = PIP[0] / UIK, y0 = (PIP[1] + PIP[3] + 16) / UIK, w = PIP[2] / UIK, pad = 3, n = Math.max(1, rows.length);
-        var cols = n > 5 ? 2 : 1, perCol = Math.ceil(n / cols), colW = w / cols, bottom = 265;   // 530 px bei 1080p (logisch 540er)
-        // bei 1080p: Zeile ~19 px, Name 12 px, Platz 11 px, Automodell 10 px (logisch die Hälfte)
-        var rowH = Math.min(9.5, (bottom - y0 - pad * 2) / perCol), fName = Math.min(6, rowH * 0.63), fCar = Math.min(5, rowH * 0.53), fPlace = Math.min(5.5, rowH * 0.58);
-        var h = perCol * rowH + pad * 2, bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
-        hud.save();
-        hud.shadowColor = 'rgba(0,0,0,0.4)'; hud.shadowBlur = 10; hud.shadowOffsetY = 2;
-        roundRect(hud, x0, y0, w, h, 7); hud.fillStyle = withAlpha(bg, 0.74); hud.fill();
-        hud.restore();
-        roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 7); hud.lineWidth = 1; hud.strokeStyle = withAlpha(TK.accent, 0.85); hud.stroke();
-        hud.save(); roundRect(hud, x0, y0, w, h, 7); hud.clip();
-        hud.shadowColor = 'rgba(0,0,0,0.75)'; hud.shadowBlur = 1; hud.shadowOffsetY = 0.5;   // feiner Schatten für die kleine Schrift
-        hud.textBaseline = 'middle';
-        var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
-        rows.forEach(function (row, i) {
-          var r = row.r;
-          r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
-          var col = Math.floor(i / perCol), cx0 = x0 + col * colW;
-          var y = y0 + pad + clamp(r.rankY - col * perCol, -0.5, perCol - 0.5) * rowH + rowH / 2;
-          if (r.flash > 0) { hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fillRect(cx0 + 2, y - rowH / 2 + 1, colW - 4, rowH - 2); }
-          hud.globalAlpha = row.dnf ? 0.6 : 1;
-          var px = cx0 + pad + 2, placeW = fPlace * 2.3;
-          hud.textAlign = 'right'; hud.font = font(800, fPlace); hud.fillStyle = row.dnf ? dim : TK.accent;
-          hud.fillText(fitText(hud, row.place, placeW), px + placeW, y);
-          if (!row.dnf) { hud.fillStyle = r.color; hud.fillRect(px + placeW + 4, y - rowH * 0.32, 3, rowH * 0.64); }
-          var nx = px + placeW + 10, right = cx0 + colW - pad - 2;
-          if (r.tier) { drawStar(hud, nx + fName * 0.45, y, fName * 0.42, r.tier); nx += fName * 1.05; }
-          var avail = right - nx;
-          hud.font = font(500, fCar);
-          var car = r.modelName || '', carW = car ? Math.min(hud.measureText(car).width, avail * 0.45) : 0;
-          if (carW < 20) carW = 0;   // zu eng: Automodell weglassen
-          hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 700, fName); hud.fillStyle = row.fin ? TK.accent : white;
-          hud.fillText(fitText(hud, r.shown, avail - (carW ? carW + 8 : 0)), nx, y);
-          if (carW) { hud.textAlign = 'right'; hud.font = font(500, fCar); hud.fillStyle = dim; hud.fillText(fitText(hud, car, carW), right, y + 0.5); }
-          hud.globalAlpha = 1;
-        });
-        hud.restore();
+        // unter dem Bild-im-Bild, bis ~560 px bei 1080p; Zeilen ~20 px; passt es nicht, zwei Türme nebeneinander
+        var x0 = PIP[0] / UIK, y0 = (PIP[1] + PIP[3] + 16) / UIK, wMax = PIP[2] / UIK, rowH = 10, bottom = 280;
+        drawTower(rows, now, x0, y0, Math.min(wMax, 200), rowH, bottom, wMax);
       } finally { W = sw; H = sh; hud.restore(); }
+    }
+    // Zeitenturm im Fernseh-Stil: Kopfzeile (Runde), je Fahrer eine Zeile mit Platz im Kasten (P1–P3 Gold/Silber/
+    // Bronze), Chatfarben-Strich, Sub-Stern, NAME fett in Großbuchstaben (schmal gezogen, auf die Breite gekürzt),
+    // rechts Abstand zum Führenden („+1.2s“, „+1 LAP“, Führender „LEADER“, Sieger „WINNER“), DNF gedimmt.
+    // Dunkler halbtransparenter Streifen (~80 %), 1-px-Trennlinien. Passt der Turm nicht in die Höhe und ist
+    // wMax breiter, werden es zwei Türme nebeneinander.
+    var PODIUM_BOX = { 1: ['#f2b705', '#1b1020'], 2: ['#c3c9d2', '#1b1020'], 3: ['#c07a3e', '#1b1020'] };
+    function towerHeader(rows) {
+      if (race.stage === 'grid') return race.laps + ' LAPS';
+      if (race.stage === 'end' || (race.sim && race.sim.done)) return 'FINAL';
+      var lead = rows[0] && rows[0].c;
+      return lead && lead.place != null ? 'FINISH' : 'LAP ' + clamp(lead ? lead.lap : 1, 1, race.laps) + ' / ' + race.laps;
+    }
+    function towerGap(row, rows) {
+      var c = row.c; if (!c) return '';
+      if (row.dnf) return 'DNF';
+      var sim = race.sim, L = race.T.len, lead = rows[0] && rows[0].c;
+      if (c.place === 1) return 'WINNER';
+      if (c.place != null) {
+        var win = null; sim.cars.forEach(function (o) { if (o.place === 1) win = o; });
+        return win && win.finish != null && c.finish != null ? '+' + (c.finish - win.finish).toFixed(1) + 's' : '';
+      }
+      if (row === rows[0] || !lead) return 'LEADER';
+      var ref = lead.place != null ? race.laps * L : lead.s, d = ref - c.s;
+      if (d >= L) { var laps = Math.floor(d / L); return '+' + laps + (laps === 1 ? ' LAP' : ' LAPS'); }
+      return '+' + (d / Math.max(lead.v || 0, 8)).toFixed(1) + 's';
+    }
+    function drawTower(rows, now, x0, y0, w, rowH, bottom, wMax) {
+      var n = rows.length, headH = Math.round(rowH * 1.15);
+      var fit = Math.max(1, Math.floor((bottom - y0 - headH) / rowH)), towers = n > fit && wMax && wMax >= w * 1.6 ? 2 : 1;
+      var per = towers > 1 ? Math.ceil(n / towers) : n, tw = towers > 1 ? Math.min(w, (wMax - 6) / 2) : w;
+      if (towers === 1 && n > fit) rowH = Math.max(7, (bottom - y0 - headH) / n);   // notfalls flacher
+      var fNum = rowH * 0.6, fName = rowH * 0.62, fGap = rowH * 0.52, bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
+      var totalW = towers > 1 ? tw * 2 + 6 : tw;
+      // Kopfzeile über die ganze Breite
+      hud.save();
+      hud.shadowColor = 'rgba(0,0,0,0.35)'; hud.shadowBlur = 6; hud.shadowOffsetY = 1;
+      hud.fillStyle = withAlpha(bg, 0.92); hud.fillRect(x0, y0, totalW, headH);
+      hud.restore();
+      hud.fillStyle = FRAME_GOLD; hud.fillRect(x0, y0, 3, headH);
+      hud.textBaseline = 'middle'; hud.textAlign = 'left'; hud.font = font(800, rowH * 0.6); hud.fillStyle = white;
+      hud.fillText(towerHeader(rows), x0 + 8, y0 + headH / 2 + 0.5);
+      var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
+      for (var t = 0; t < towers; t++) {
+        var tx = x0 + t * (tw + 6), ty = y0 + headH, cnt = Math.max(0, Math.min(per, n - t * per));
+        hud.fillStyle = withAlpha(bg, 0.8); hud.fillRect(tx, ty, tw, cnt * rowH);
+        hud.fillStyle = 'rgba(255,255,255,0.08)';
+        for (var j = 1; j < cnt; j++) hud.fillRect(tx, ty + j * rowH, tw, 1 / UIK);
+      }
+      hud.save();
+      hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 1; hud.shadowOffsetY = 0.5;
+      rows.forEach(function (row, i) {
+        var r = row.r;
+        r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
+        var t = towers > 1 ? Math.floor(i / per) : 0, tx = x0 + t * (tw + 6);
+        var y = y0 + headH + clamp(r.rankY - t * per, -0.5, per - 0.5) * rowH;
+        hud.save(); hud.beginPath(); hud.rect(tx, y0 + headH, tw, per * rowH); hud.clip();
+        if (r.flash > 0) { hud.fillStyle = withAlpha(TK.accent, 0.28 * r.flash / FLASH); hud.fillRect(tx, y, tw, rowH); }
+        hud.globalAlpha = row.dnf ? 0.55 : 1;
+        // Platz im Kasten
+        var bs = rowH - 2, box = PODIUM_BOX[+row.place] || null;
+        hud.fillStyle = box ? box[0] : 'rgba(255,255,255,0.14)'; hud.fillRect(tx + 1, y + 1, bs, bs);
+        hud.textAlign = 'center'; hud.font = font(800, fNum); hud.fillStyle = box ? box[1] : white;
+        hud.fillText(row.dnf ? '–' : String(row.place), tx + 1 + bs / 2, y + rowH / 2 + 0.3);
+        // Chatfarbe als Strich
+        if (!row.dnf) { hud.fillStyle = r.color; hud.fillRect(tx + bs + 3, y + 2, 1.5, rowH - 4); }
+        var nx = tx + bs + 7;
+        if (r.tier) { drawStar(hud, nx + fName * 0.42, y + rowH / 2, fName * 0.42, r.tier); nx += fName * 1.0; }
+        // rechts: Abstand
+        var gap = towerGap(row, rows);
+        hud.textAlign = 'right'; hud.font = font(700, fGap); hud.fillStyle = row.dnf ? dim : gap === 'LEADER' || gap === 'WINNER' ? FRAME_GOLD : dim;
+        var gw = gap ? hud.measureText(gap).width : 0;
+        hud.fillText(gap, tx + tw - 4, y + rowH / 2 + 0.3);
+        // NAME: fett, Großbuchstaben, leicht schmal gezogen, auf den Platz gekürzt
+        var avail = tx + tw - 4 - (gw ? gw + 6 : 0) - nx, cond = 0.88;
+        hud.font = font(800, fName); hud.textAlign = 'left'; hud.fillStyle = row.fin && row.place === '1' ? FRAME_GOLD : white;
+        hud.save(); hud.translate(nx, y + rowH / 2 + 0.3); hud.scale(cond, 1);
+        hud.fillText(fitText(hud, String(r.shown).toUpperCase(), avail / cond), 0, 0);
+        hud.restore();
+        hud.globalAlpha = 1;
+        hud.restore();
+      });
+      hud.restore();
     }
     // HUD zeichnen: ganzes Canvas leeren, dann im freien Bereich (Vollbild) bzw. im ganzen Fenster
     function drawHudView(fn) {
@@ -1307,57 +1357,9 @@
       }
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
-      // Vollbild: Rangliste in der Spalte unter dem Bild-im-Bild (eigene Funktion, außerhalb des freien Bereichs)
+      // Zeitenturm: Vollbild in der Spalte unter dem Bild-im-Bild, sonst links oben (Kopfzeile mit der Runde)
       if (STAGE) drawStageRanking(rows, now);
-      else {
-        var pw = rh * 11.5, ph = rows.length * rh + rh * 0.4;   // Platz · Name · Automodell
-        var rx = m;
-        pill(hud, rx, m, pw, ph);
-        hud.textBaseline = 'middle';
-        // Zeilen gleiten beim Platztausch (bei reduzierter Bewegung sofort)
-        var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
-        rows.forEach(function (row, i) {
-          var r = row.r;
-          r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
-          var y = m + rh * 0.2 + r.rankY * rh + rh / 2;
-          if (r.flash > 0) {   // gerade überholt: Zeile kurz in Akzentfarbe hinterlegt
-            roundRect(hud, rx + rh * 0.15, y - rh * 0.46, pw - rh * 0.3, rh * 0.92, rh * 0.2);
-            hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fill();
-          }
-          hud.globalAlpha = row.dnf ? 0.6 : 1;
-          hud.font = font(800, fs); hud.textAlign = 'right';
-          hud.fillStyle = row.dnf ? TK.dim : TK.accent;
-          hud.fillText(row.place, rx + rh * (row.dnf ? 1.7 : 1.15), y);
-          if (!row.dnf) {
-            hud.beginPath(); hud.arc(rx + rh * 1.55, y, rh * 0.17, 0, Math.PI * 2); hud.fillStyle = row.r.color; hud.fill();
-          }
-          hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
-          hud.fillStyle = row.fin ? TK.accent : TK.text;
-          var st0 = row.r.tier ? fs * 1.05 : 0;   // Sub-Stern vor dem Namen
-          if (row.r.tier) drawStar(hud, rx + rh * 1.95 + fs * 0.45, y, fs * 0.42, row.r.tier);
-          var nm = fitText(hud, row.r.shown, (pw - rh * 2.25) * 0.55 - st0);
-          hud.fillText(nm, rx + rh * 1.95 + st0, y);
-          if (row.r.modelName) {   // Automodell kleiner und gedämpft dahinter
-            var nx = rx + rh * 1.95 + st0 + hud.measureText(nm).width + rh * 0.3;
-            hud.font = font(500, fs * 0.82); hud.fillStyle = TK.dim;
-            hud.fillText(fitText(hud, row.r.modelName, rx + pw - rh * 0.3 - nx), nx, y + fs * 0.05);
-          }
-          hud.globalAlpha = 1;
-        });
-      }
-      // Runde rechts oben
-      var lapText = null;
-      if (race.stage === 'grid') lapText = race.laps + ' LAPS';
-      else if (race.stage === 'end') lapText = 'FINAL';
-      else {
-        var lead = rows[0] && rows[0].c;
-        lapText = lead && lead.place != null ? 'FINISH' : 'LAP ' + clamp(lead ? lead.lap : 1, 1, race.laps) + '/' + race.laps;
-      }
-      hud.font = font(800, fs * 1.05);
-      var lw = hud.measureText(lapText).width + rh * 0.9;
-      var lx = STAGE ? m : W - m - lw;
-      pill(hud, lx, m, lw, rh * 1.15);
-      hud.textAlign = 'center'; hud.fillStyle = TK.text; hud.fillText(lapText, lx + lw / 2, m + rh * 0.6);
+      else drawTower(rows, now, m, m, rh * 8.6, rh * 0.9, H - m);
       // Countdown
       var left = race.startsAt != null ? race.startsAt - now : null;
       // Highlight-Schild „CRASH! Name“ (auch bei reduzierter Bewegung)
