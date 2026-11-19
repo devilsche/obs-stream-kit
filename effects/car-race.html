@@ -12,7 +12,9 @@
        Unsichtbar in Lobby/Leerlauf, blendet ab dem 3. Fahrer mit Startaufstellung + Countdown ein.
        ?preview=1 – lokale Testlobby ohne Server (im Dashboard „Preview with test racers“, in OBS aus)
        ?finish=<s> (nur Vorschau) – Nachlauf nach dem Sieger (5–40); echte Rennen: Server-Vorgabe 15 s
-       ?track=<n> (nur Vorschau) – Strecke aus der Favoritenliste */
+       ?track=<n> (nur Vorschau) – Strecke aus der Favoritenliste
+       ?layout=stage – Rennbühne als Vollbild-Hintergrund (1920×1080), das Spiel als Bild-im-Bild darüber;
+       ?pip=x,y,w,h – Lage des Bild-im-Bild in Pixeln (Standard 24,24,640,360) */
     @font-face {
       font-family: 'DM Sans';
       src: url('../assets/DM-Sans.woff2') format('woff2');
@@ -34,6 +36,10 @@
       mask-composite: intersect;
     }
     .stage.is-on { opacity: 1; }
+    /* Vollbild-Bühne: kein Rand-Fade (füllt den ganzen Bildschirm), 3D erst ab der Fahrervorstellung */
+    .stage.is-stage { -webkit-mask-image: none; mask-image: none; }
+    .stage.is-stage #gl { opacity: 0; transition: opacity 0.8s ease; }
+    .stage.is-stage.is-3d #gl { opacity: 1; }
     .layer { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 
     /* Vorschau-Knöpfe (nur ?preview=1), außerhalb der Maske */
@@ -65,7 +71,7 @@
     .tk-font { font-family: var(--theme-font-display, 'DM Sans', sans-serif); }
 
     @media (prefers-reduced-motion: reduce) {
-      .stage { transition-duration: 0.3s; }
+      .stage, .stage.is-stage #gl { transition-duration: 0.3s; }
     }
   </style>
 </head>
@@ -100,6 +106,7 @@
       var params = new URLSearchParams(location.search);
       var preview = /^(1|true|yes|on)$/i.test(params.get('preview') || '');
       var finish = parseFloat(params.get('finish'));
+      var pip = (params.get('pip') || '').split(',').map(Number);
       var race = CarRace.start({
         canvas: document.getElementById('gl'),
         hud: document.getElementById('hud'),
@@ -107,6 +114,8 @@
         base: '../',
         preview: preview,
         track: params.get('track'),
+        layout: params.get('layout') === 'stage' ? 'stage' : null,
+        pip: pip.length === 4 && pip.every(function (n) { return isFinite(n) && n >= 0; }) ? pip : null,
         finish: isFinite(finish) ? finish : null,
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
         onPreviewInfo: function (text, canAdd, canStart) {

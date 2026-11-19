@@ -201,6 +201,11 @@ EFFECT_META = {
         {"key": "preview", "label": "Preview with test racers", "type": "select", "default": "0",
          "options": [["0", "Off"], ["1", "On"]],
          "tooltip": "For testing in the browser: local lobby with test racers, no server. Must be off in OBS"},
+        {"key": "layout", "label": "Layout", "type": "select", "default": "window",
+         "options": [["window", "Small window (16:9)"], ["stage", "Full-screen race stage (1920×1080)"]],
+         "tooltip": "Full-screen: the race fills the screen, your game sits as picture-in-picture on top (OBS Move filter); lobby shows a small card bottom-right"},
+        {"key": "pip", "label": "Game picture-in-picture (x,y,w,h)", "type": "text", "default": "24,24,640,360",
+         "tooltip": "Only for the full-screen layout: where the game sits, in pixels – cameras and texts keep clear of it"},
     ],
     "commands": [
         {"q": "cmd=join&id=%userId%&user=%user%&color=%color%", "label": "!race: join the next race",

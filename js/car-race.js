@@ -42,6 +42,10 @@
     var finishOpt = opts.finish != null && isFinite(opts.finish) ? clamp(+opts.finish, 5, 40) : null;
     var stageEl = opts.stage || null, canvas = opts.canvas, hudCanvas = opts.hud;
     var W = 640, H = 360, dpr = 1;
+    // Layout „stage“: Rennen als Vollbild-Hintergrund (1920×1080), das Spiel als Bild-im-Bild oben links darüber.
+    // Rechnung in logischen Pixeln (Höhe 540, UIK = Bildhöhe / 540), damit alle Größen wie im 960×540-Fenster
+    // wirken; Kameras zielen auf die Mitte des freien Bereichs VW (ohne Bild-im-Bild), das HUD liegt darin.
+    var STAGE = opts.layout === 'stage', UIK = 1, PIP = opts.pip || [24, 24, 640, 360], VW = { x: 0, y: 0, w: 640, h: 360 }, FULLW = 640, FULLH = 360;
 
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, premultipliedAlpha: true });
     renderer.setClearColor(0x000000, 0);
@@ -52,14 +56,32 @@
     var maxAniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1;
 
     function resize() {
-      W = Math.max(64, root.innerWidth || 640); H = Math.max(36, root.innerHeight || 360);
-      dpr = Math.min(2, root.devicePixelRatio || 1);
-      renderer.setPixelRatio(dpr); renderer.setSize(W, H, false);
-      hudCanvas.width = Math.round(W * dpr); hudCanvas.height = Math.round(H * dpr);
-      cam.aspect = W / H; cam.updateProjectionMatrix();
+      var PW = Math.max(64, root.innerWidth || 640), PH = Math.max(36, root.innerHeight || 360);
+      UIK = STAGE ? PH / 540 : 1;
+      W = FULLW = PW / UIK; H = FULLH = PH / UIK;
+      dpr = STAGE ? 1 : Math.min(2, root.devicePixelRatio || 1);   // Vollbild: Pixelverhältnis 1 (Leistung neben dem Spiel)
+      renderer.setPixelRatio(dpr); renderer.setSize(PW, PH, false);
+      hudCanvas.width = Math.round(PW * dpr); hudCanvas.height = Math.round(PH * dpr);
+      cam.aspect = W / H;
+      if (STAGE) {
+        // freier Bereich: rechts neben oder unter dem Bild-im-Bild (+24 px Rand) – der größere
+        var m = 24, px0 = (PIP[0] + PIP[2] + m) / UIK, py0 = (PIP[1] + PIP[3] + m) / UIK;
+        var right = { x: px0, y: 0, w: W - px0, h: H }, below = { x: 0, y: py0, w: W, h: H - py0 };
+        VW = right.w * right.h >= below.w * below.h ? right : below;
+        // Bildmitte der Kamera in die Mitte des freien Bereichs schieben (außermittige Projektion)
+        cam.setViewOffset(W, H, W / 2 - (VW.x + VW.w / 2), H / 2 - (VW.y + VW.h / 2), W, H);
+      } else VW = { x: 0, y: 0, w: W, h: H };
+      cam.updateProjectionMatrix();
+    }
+    // fn mit W/H = freier Bereich ausführen (Bildausschnitte der Kameras, HUD)
+    function inView(fn) {
+      if (!STAGE) return fn();
+      var sw = W, sh = H; W = VW.w; H = VW.h;
+      try { return fn(); } finally { W = sw; H = sh; }
     }
     resize();
     root.addEventListener('resize', resize);
+    if (STAGE && stageEl) stageEl.classList.toggle('is-stage', true);
 
     // ---- Theme-Farben aus den Proben im HTML (aufgelöst, also auch color-mix & Co.) ----
     var TK = { surface: '#1d1128', text: '#ffffff', dim: '#c9bdd6', accent: '#f2b705', border: '#5e2a79', font: "'DM Sans', sans-serif" };
@@ -476,6 +498,7 @@
     }
 
     // ---- Rennen (lokaler Zustand) ----
+    var lobbyCard = null;   // Vollbild: Zustand für die Lobby-Karte (lobby/countdown), sonst null
     var race = null, visible = false, finished = {};   // finished: race_ids, die hier schon zu Ende gefahren sind
     function show(on) {
       if (on === visible) return;
@@ -586,6 +609,7 @@
     var waitLogged = false;
     function apply(st) {
       var ph = st.phase;
+      if (STAGE) applyStage(st);
       if (!preview && !race && (ph === 'idle' || ph === 'lobby') && !waitLogged) {
         waitLogged = true;   // leere Seite erklärbar machen (Dashboard-Link ohne ?preview=1)
         if (root.console && console.info) console.info('Car Race: waiting for !race \u2013 add ?preview=1 to test');
@@ -610,6 +634,42 @@
         // Lobby wieder unter 3 Fahrern, Rennen abgebrochen oder Server neu gestartet: ausblenden, dann aufräumen.
         // podium/cooldown während des eigenen Rennens: weiterfahren, das Ende kommt aus der Simulation
         show(false); race.dropAt = srvNow();
+      }
+    }
+    // Vollbild-Layout: in lobby/countdown nur eine Lobby-Karte unten rechts, die 3D-Bühne erst ab der Vorstellung
+    function applyStage(st) {
+      var ph = st.phase;
+      lobbyCard = (ph === 'lobby' || ph === 'countdown') && (st.racers || []).length ? st : null;
+      if (lobbyCard) show(true);
+      else if (ph !== 'intro' && ph !== 'race' && (!race || race.stage === 'grid')) show(false);
+    }
+    function is3D(now) {
+      if (!STAGE) return true;
+      return !!race && (race.stage !== 'grid' || (race.introAt != null && now >= race.introAt));
+    }
+    function drawLobbyCard(now) {
+      var st = lobbyCard; if (!st) return;
+      var fs = 13, rh = fs * 1.5, m = 12, list = (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; });
+      var w = 210, h = fs * 4.4 + list.length * rh + (st.phase === 'countdown' ? fs * 1.6 : 0) + fs * 0.6;
+      var x0 = W - m - w, y0 = H - m - h;
+      pill(hud, x0, y0, w, h);
+      hud.textBaseline = 'middle'; hud.textAlign = 'left';
+      hud.font = font(900, fs * 1.4); hud.fillStyle = TK.accent; hud.fillText('Car Race', x0 + fs, y0 + fs * 1.4);
+      hud.font = font(600, fs * 0.9); hud.fillStyle = TK.dim; hud.fillText('Type !race to join \u00b7 ' + list.length + '/10', x0 + fs, y0 + fs * 2.9);
+      var y = y0 + fs * 4.4;
+      list.forEach(function (r) {
+        var e = catalogEntry(r.car_key), car = e ? e.name || r.car_key : '';
+        hud.beginPath(); hud.arc(x0 + fs * 1.3, y, fs * 0.32, 0, Math.PI * 2); hud.fillStyle = hexColor(r.color, '#9146ff'); hud.fill();
+        hud.font = font(700, fs); hud.fillStyle = TK.text;
+        var nm = fitText(hud, String(r.display || r.user_id), w * 0.42); hud.fillText(nm, x0 + fs * 2.1, y);
+        hud.font = font(500, fs * 0.85); hud.fillStyle = TK.dim;
+        hud.fillText(fitText(hud, car, w - fs * 2.6 - w * 0.45), x0 + fs * 2.1 + w * 0.45, y);
+        y += rh;
+      });
+      if (st.phase === 'countdown' && st.starts_at != null) {
+        var left = Math.max(0, Math.ceil(st.starts_at - now));
+        hud.font = font(800, fs * 1.1); hud.fillStyle = TK.text; hud.textAlign = 'center';
+        hud.fillText('STARTS IN ' + Math.floor(left / 60) + ':' + ('0' + left % 60).slice(-2), x0 + w / 2, y + fs * 0.4);
       }
     }
     function rosterOf(list) {
@@ -675,7 +735,7 @@
       });
       race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts };
       race.podium.cam = podiumCam(race.podium, spot, total);
-      race.podium.keys = podiumShots(race.podium);
+      race.podium.keys = inView(function () { return podiumShots(race.podium); });
       clearPodiumView(race.podium, total);
       race.stage = 'podium';
       race.fadeAt = srvNow() + PODIUM_HOLD;
@@ -685,7 +745,8 @@
     // oben bleibt Platz für den Titel, unten für die Punkte-Schilder und die DNF-Zeile
     var PODIUM_TILT = 30 * Math.PI / 180;
     function podiumHpx() { return clamp(H * 0.1, 34, 56); }
-    function podiumCam(pd, spot, total) {
+    function podiumCam(pd, spot, total) { return inView(function () { return podiumCamRaw(pd, spot, total); }); }
+    function podiumCamRaw(pd, spot, total) {
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fsP = clamp(H * 0.05, 16, 26);
       var hpx = podiumHpx(), labelW = hpx * 4.2;
       var xs = pd.cars.map(function (c) { return c.x; }), spanC = Math.max(1, Math.max.apply(null, xs) - Math.min.apply(null, xs));
@@ -909,7 +970,7 @@
         if (!c.pts) return;
         var t1 = '+' + (c.pts.gained | 0) + ' \u2192 ' + (c.pts.month_total | 0) + ' pts', t2 = c.pts.month_rank ? '#' + c.pts.month_rank + ' this month' : '';
         tmpV.set(c.x, 0.25, c.z + 2.0).project(cam);
-        var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H + 6;
+        var px = (tmpV.x * 0.5 + 0.5) * FULLW - VW.x, py = (1 - (tmpV.y * 0.5 + 0.5)) * FULLH - VW.y + 6;
         hud.font = font(800, fsP); var w1 = hud.measureText(t1).width;
         hud.font = font(600, fsP); var w2 = t2 ? hud.measureText(t2).width : 0;
         var w = Math.max(w1, w2) + fsP * 1.1, h = fsP * (t2 ? 2.6 : 1.5);
@@ -929,9 +990,10 @@
     }
 
     // ---- Kamera ----
-    function camFit(points) {
+    function camFit(points) { return inView(function () { return camFitRaw(points); }); }
+    function camFitRaw(points) {
       // points: [{x, z}] in Reihenfolge (vorn zuerst); Spitzengruppe, solange die Zoom-Grenze hält
-      var effW = W * 0.78, MX = 9, MZ = 7, sinT = Math.sin(TILT);
+      var effW = STAGE ? W : W * 0.78, MX = 9, MZ = 7, sinT = Math.sin(TILT);
       var minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, px = PX_MAX, used = 0;
       for (var i = 0; i < points.length; i++) {
         var p = points[i];
@@ -943,7 +1005,8 @@
       if (!used) return null;
       px = clamp(px, PX_MIN, PX_MAX);
       // Inhalt etwas rechts der Mitte: links steht die Rangliste
-      return { x: (minX + maxX) / 2 - (W * 0.11) / px, z: (minZ + maxZ) / 2, px: px };
+      // Inhalt etwas rechts der Mitte: links steht die Rangliste (Vollbild: Rangliste rechts, Mitte bleibt)
+      return { x: (minX + maxX) / 2 - (STAGE ? 0 : (W * 0.11) / px), z: (minZ + maxZ) / 2, px: px };
     }
     // fixed: festes Ziel {x, z, px} (Podest) statt Feld-Anpassung
     function updateCamera(points, dt, fixed) {
@@ -1001,9 +1064,14 @@
       g.fillStyle = withAlpha(TK.surface, 0.82); g.fill();
       g.lineWidth = Math.max(1, h * 0.05); g.strokeStyle = TK.border; g.stroke();
     }
+    // HUD zeichnen: ganzes Canvas leeren, dann im freien Bereich (Vollbild) bzw. im ganzen Fenster
+    function drawHudView(fn) {
+      hud.setTransform(1, 0, 0, 1, 0, 0); hud.clearRect(0, 0, hudCanvas.width, hudCanvas.height);
+      var k = dpr * UIK;
+      hud.setTransform(k, 0, 0, k, VW.x * k, VW.y * k);
+      inView(fn);
+    }
     function drawHud(now, rows) {
-      hud.setTransform(dpr, 0, 0, dpr, 0, 0);
-      hud.clearRect(0, 0, W, H);
       if (!race) return;
       if (race.stage === 'podium') { drawPodiumHud(); return; }
       var introT = race.stage === 'grid' && race.introAt != null ? now - race.introAt : -1;
@@ -1014,7 +1082,8 @@
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
       var pw = rh * (preview ? 12 : 7.4), ph = rows.length * rh + rh * 0.4;
-      pill(hud, m, m, pw, ph);
+      var rx = STAGE ? W - m - pw : m;   // Vollbild: Rangliste rechts oben (links oben ist das Bild-im-Bild)
+      pill(hud, rx, m, pw, ph);
       hud.textBaseline = 'middle';
       // Zeilen gleiten beim Platztausch (bei reduzierter Bewegung sofort)
       var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
@@ -1023,19 +1092,19 @@
         r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
         var y = m + rh * 0.2 + r.rankY * rh + rh / 2;
         if (r.flash > 0) {   // gerade überholt: Zeile kurz in Akzentfarbe hinterlegt
-          roundRect(hud, m + rh * 0.15, y - rh * 0.46, pw - rh * 0.3, rh * 0.92, rh * 0.2);
+          roundRect(hud, rx + rh * 0.15, y - rh * 0.46, pw - rh * 0.3, rh * 0.92, rh * 0.2);
           hud.fillStyle = withAlpha(TK.accent, 0.3 * r.flash / FLASH); hud.fill();
         }
         hud.globalAlpha = row.dnf ? 0.6 : 1;
         hud.font = font(800, fs); hud.textAlign = 'right';
         hud.fillStyle = row.dnf ? TK.dim : TK.accent;
-        hud.fillText(row.place, m + rh * (row.dnf ? 1.7 : 1.15), y);
+        hud.fillText(row.place, rx + rh * (row.dnf ? 1.7 : 1.15), y);
         if (!row.dnf) {
-          hud.beginPath(); hud.arc(m + rh * 1.55, y, rh * 0.17, 0, Math.PI * 2); hud.fillStyle = row.r.color; hud.fill();
+          hud.beginPath(); hud.arc(rx + rh * 1.55, y, rh * 0.17, 0, Math.PI * 2); hud.fillStyle = row.r.color; hud.fill();
         }
         hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
         hud.fillStyle = row.fin ? TK.accent : TK.text;
-        hud.fillText(fitText(hud, row.r.shown, pw - rh * 2.25), m + rh * 1.95, y);
+        hud.fillText(fitText(hud, row.r.shown, pw - rh * 2.25), rx + rh * 1.95, y);
         hud.globalAlpha = 1;
       });
       // Runde rechts oben
@@ -1048,8 +1117,9 @@
       }
       hud.font = font(800, fs * 1.05);
       var lw = hud.measureText(lapText).width + rh * 0.9;
-      pill(hud, W - m - lw, m, lw, rh * 1.15);
-      hud.textAlign = 'center'; hud.fillStyle = TK.text; hud.fillText(lapText, W - m - lw / 2, m + rh * 0.6);
+      var lx = STAGE ? m : W - m - lw;
+      pill(hud, lx, m, lw, rh * 1.15);
+      hud.textAlign = 'center'; hud.fillStyle = TK.text; hud.fillText(lapText, lx + lw / 2, m + rh * 0.6);
       // Countdown
       var left = race.startsAt != null ? race.startsAt - now : null;
       // Highlight-Schild „CRASH! Name“ (auch bei reduzierter Bewegung)
@@ -1356,11 +1426,19 @@
       requestAnimationFrame(frame);
       var dt = lastTs == null ? 1 / 60 : Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
       if (preview) previewTick();
+      if (STAGE && stageEl) stageEl.classList.toggle('is-3d', is3D(srvNow()));
       if (!race) {
+        if (STAGE && lobbyCard) { renderer.clear(); drawHudView(function () { drawLobbyCard(srvNow()); }); idleCleared = false; return; }
         if (!idleCleared) { renderer.clear(); hud.setTransform(1, 0, 0, 1, 0, 0); hud.clearRect(0, 0, hudCanvas.width, hudCanvas.height); idleCleared = true; }
         return;
       }
       idleCleared = false;
+      if (STAGE && race.dropAt != null && race.stage === 'grid') { teardown(); return; }   // Lobby wieder unter 3: 3D war nie zu sehen
+      if (STAGE && !is3D(srvNow())) {   // Countdown im Vollbild: nur die Lobby-Karte, 3D lädt im Hintergrund
+        renderer.clear(); drawHudView(function () { drawLobbyCard(srvNow()); });
+        if (race.stage === 'grid' && race.startsAt != null && srvNow() >= race.startsAt && race.order.length >= 3 && race.dropAt == null) startSim();
+        return;
+      }
       var now = srvNow(), T = race.T;
       // Abbruch/Ende: ausgeblendet → aufräumen
       if (race.dropAt != null && !visible) { if (now - race.dropAt > FADE + 0.2) { teardown(); return; } }
@@ -1394,7 +1472,7 @@
         if (inIntro) {
           if (!race.intro || race.intro.at !== race.introAt || race.intro.n !== race.order.length) {
             endIntro();
-            race.intro = buildIntro();
+            race.intro = inView(buildIntro);
             var c0 = race.cam || { x: 0, z: 0, lp: Math.log(PX_MAX), ty: 0, tilt: TILT, orb: 0 };
             race.intro.cam0 = { x: c0.x, z: c0.z, px: Math.exp(c0.lp), y: c0.ty || 0, tilt: c0.tilt == null ? TILT : c0.tilt, orb: c0.orb || 0 };
           }
@@ -1468,7 +1546,7 @@
           if (hi >= 0 && base) {
             var hr = race.order[hi], hx = hr.holder.position.x, hz = hr.holder.position.z;
             if (oi >= 0) { var orr = race.order[oi]; if (Math.hypot(orr.holder.position.x - hx, orr.holder.position.z - hz) < 25) { hx = (hx + orr.holder.position.x) / 2; hz = (hz + orr.holder.position.z) / 2; } }
-            var hpx = clamp(0.35 * W / Math.max(hr.len, 3.5), PX_MIN, PX_MAX * 3);
+            var hpx = clamp(0.35 * VW.w / Math.max(hr.len, 3.5), PX_MIN, PX_MAX * 3);
             camFix = { x: lerp(base.x, hx, hw), z: lerp(base.z, hz, hw), px: Math.exp(lerp(Math.log(base.px), Math.log(hpx), hw)) };
           }
         }
@@ -1479,7 +1557,8 @@
       cam.updateMatrixWorld();
       updateLabels(labels, dt);
       renderer.render(scene, cam);
-      drawHud(now, rankingRows());
+      var rows = rankingRows();
+      drawHudView(function () { drawHud(now, rows); });
     }
 
     // ---- Maus/Tastatur: kurz heranzoomen (nur im Browser; OBS hat keine Maus) ----
@@ -1511,18 +1590,18 @@
     root.addEventListener('wheel', function (e) {
       if (!userAllowed()) return;
       e.preventDefault();   // Seite nicht scrollen
-      zoomAt(Math.exp(-clamp(e.deltaY, -300, 300) * 0.0025), e.clientX, e.clientY);
+      zoomAt(Math.exp(-clamp(e.deltaY, -300, 300) * 0.0025), e.clientX / UIK, e.clientY / UIK);
     }, { passive: false });
     var drag = null;
     root.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || !userAllowed() || (e.target && e.target.closest && e.target.closest('button'))) return;
-      drag = { x: e.clientX, y: e.clientY };
+      drag = { x: e.clientX / UIK, y: e.clientY / UIK };
     });
     root.addEventListener('pointermove', function (e) {
       if (!drag || !userAllowed()) return;
       var u = userCam(), tilt = race.cam.tilt == null ? TILT : race.cam.tilt;
-      u.x -= (e.clientX - drag.x) / u.px; u.z -= (e.clientY - drag.y) / (u.px * Math.sin(tilt));
-      drag = { x: e.clientX, y: e.clientY };
+      u.x -= (e.clientX / UIK - drag.x) / u.px; u.z -= (e.clientY / UIK - drag.y) / (u.px * Math.sin(tilt));
+      drag = { x: e.clientX / UIK, y: e.clientY / UIK };
     });
     root.addEventListener('pointerup', function () { drag = null; });
     root.addEventListener('keydown', function (e) {
@@ -1622,7 +1701,7 @@
       requestAnimationFrame(frame);
     });
 
-    return { addTestRacer: addTestRacer, startNow: startNow, _state: function () { return race; } };   // _state: nur für Tests
+    return { addTestRacer: addTestRacer, startNow: startNow, _state: function () { return race; }, _cam: function () { return cam; } };   // _state/_cam: nur für Tests
   }
 
   root.CarRace = { start: start };
