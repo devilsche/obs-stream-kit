@@ -22,7 +22,8 @@
  *       sim.cars[i] = { id, s, d, v, lap, pos, yaw, roll, pitch, steer, spin, state, place, finish }
  *         s = gefahrene Meter ab Start/Ziel (Startaufstellung negativ), d = Seitenversatz (m, > 0 links),
  *         lap = 0 in der Aufstellung, dann 1..laps; pos = aktuelle Position (1 = vorn);
- *         yaw/roll/pitch in rad (roll > 0 = Aufbau neigt nach rechts, pitch > 0 = Nase hoch),
+ *         yaw/roll/pitch in rad (yaw stetig, ohne 2π-Sprünge – darf frei interpoliert werden;
+ *         roll > 0 = Aufbau neigt nach rechts, pitch > 0 = Nase hoch),
  *         steer = Lenkwinkel der Vorderräder (rad), spin = Raddrehwinkel (rad, 0..2π),
  *         state 'run'|'spin'|'crash'|'dnf'|'done', place = Zielplatz oder null, finish = Zielzeit (s) oder null.
  *       sim.standings() → [id…]  aktuelle Reihenfolge
@@ -49,6 +50,9 @@
   var GRIP_BASE = 6.5;        // Querbeschleunigung (m/s²) bei handling 5 / weight 5
   var BRAKE_BASE = 8.0;       // Verzögerung (m/s²) bei brakes 5 / weight 5
   var DRAG_EXP = 4;           // Beschleunigung fällt mit (v / vtop)^4 ab
+  // Wirkung je Wertpunkt (relativ zu 5)
+  var K_POWER = 0.02, K_HANDLING = 0.012, K_BRAKES = 0.04;
+  var K_WEIGHT_ACC = 0.012, K_WEIGHT_GRIP = 0.002, K_WEIGHT_BRAKE = 0.02;
   var LAUNCH = { awd: 1.15, rwd: 1.0, fwd: 0.93 };   // Traktion beim Losfahren je Antrieb
   var FORM_SPREAD = 0.09;     // Tagesform des Fahrers: ±4,5 % am Kurvenlimit
   var OFF_LINE = 0.03;        // Tempoverlust in Kurven je Meter neben der Ideallinie (Überholen kostet)
@@ -200,10 +204,10 @@
     // speed 10 = 1,6 × speed 1, speed 5 = VTOP_BASE
     var vtop = VTOP_BASE * (1 + (sp - 5) * 0.6 / 11.4);
     return {
-      acc: ACC_BASE * (0.9 + 0.02 * p) * (1.06 - 0.012 * w),
+      acc: ACC_BASE * (1 + K_POWER * (p - 5)) * (1 - K_WEIGHT_ACC * (w - 5)),
       vmax: vtop * SLIP_BONUS,
-      grip: GRIP_BASE * (0.94 + 0.012 * h) * (1.01 - 0.002 * w),
-      brake: BRAKE_BASE * (0.8 + 0.04 * b) * (1.1 - 0.02 * w),
+      grip: GRIP_BASE * (1 + K_HANDLING * (h - 5)) * (1 - K_WEIGHT_GRIP * (w - 5)),
+      brake: BRAKE_BASE * (1 + K_BRAKES * (b - 5)) * (1 - K_WEIGHT_BRAKE * (w - 5)),
       susp: su / 10,
       launch: LAUNCH[raw.drive] || 1,
       len: len
@@ -256,11 +260,11 @@
         pushLap: 0,
         dT: (i % 2 === 0 ? 1 : -1) * 2.3,
         stuck: 0, ghostT: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
-        dDot: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55)
+        dDot: 0, latAng: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55)
       });
       cars.push({
         id: c.id, s: rowS[i >> 1], d: (i % 2 === 0 ? 1 : -1) * 2.3, v: 0, lap: 0, pos: i + 1,
-        yaw: 0, roll: 0, pitch: 0, steer: 0, spin: 0, state: 'run', place: null, finish: null
+        yaw: T.at(rowS[i >> 1]).yaw, roll: 0, pitch: 0, steer: 0, spin: 0, state: 'run', place: null, finish: null
       });
     });
 
@@ -447,12 +451,16 @@
         // 4) Runden, Ziel, Darstellung
         for (i = 0; i < cars.length; i++) {
           c = cars[i]; p = P[i];
-          c.lap = c.s < 0 ? 0 : Math.min(laps, Math.floor(c.s / L) + 1);
+          // Runde nie zurückzählen (Auffahrschutz kann ein Auto knapp hinter die Linie zurücksetzen)
+          c.lap = Math.max(c.lap, c.s < 0 ? 0 : Math.min(laps, Math.floor(c.s / L) + 1));
           finishCheck(c, p, sim);
           if (c.place !== null && c.state === 'run') c.state = 'done';
           var tp = T.at(c.s), crv = tp.curv;
-          var latAng = Math.atan2(p.dDot, Math.max(c.v, 1));
-          c.yaw = wrapAngle(tp.yaw + latAng + p.yawOff);
+          // Schräglage aus der Seitenbewegung, geglättet (sonst zuckt ein langsames Auto beim Spurwechsel)
+          p.latAng += (Math.atan2(p.dDot, Math.max(c.v, 4)) - p.latAng) * Math.min(1, DT * 10);
+          var latAng = p.latAng;
+          // stetig weiterzählen: kürzester Weg zum neuen Winkel, nie ein Sprung um 2π
+          c.yaw += wrapAngle(tp.yaw + latAng + p.yawOff - c.yaw);
           var wb = c.state === 'spin' ? -p.yawOff * 0.15 : Math.atan(0.6 * p.st.len * crv) + latAng * 1.5;
           c.steer += (clamp(wb, -0.6, 0.6) - c.steer) * Math.min(1, DT * 8);
           c.spin = mod(c.spin + c.v * DT / p.wheelR, TWO_PI);

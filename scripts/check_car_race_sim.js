@@ -52,7 +52,7 @@ function avgField(n) {
 function run(opts, label, checkSteps) {
   var sim = Sim.create(opts);
   var half = sim.track.width / 2;
-  var bad = false, still = opts.cars.map(function () { return 0; });
+  var bad = false, still = opts.cars.map(function () { return 0; }), prevYaw = null, prevLap = null;
   while (!sim.done && sim.time < MAX_T) {
     sim.step();
     // festgefahren? Ein fahrbereites Auto steht nie länger als 8 s (Crash davor dauert höchstens 6 s)
@@ -76,7 +76,11 @@ function run(opts, label, checkSteps) {
       if (c.v > st.vmax + 1e-9) { fail(label + ': Auto ' + c.id + ' v=' + c.v + ' > vmax=' + st.vmax); bad = true; break; }
       if (c.v < -1e-9) { fail(label + ': Auto ' + c.id + ' fährt rückwärts v=' + c.v); bad = true; break; }
       if (Math.abs(c.d) > half + 1e-9) { fail(label + ': Auto ' + c.id + ' d=' + c.d + ' außerhalb ±' + half); bad = true; break; }
+      if (prevYaw && Math.abs(c.yaw - prevYaw[i]) > 0.5) { fail(label + ': Auto ' + c.id + ' yaw springt um ' + (c.yaw - prevYaw[i]).toFixed(2) + ' rad'); bad = true; break; }
+      if (prevLap && c.lap < prevLap[i]) { fail(label + ': Auto ' + c.id + ' Runde zählt zurück'); bad = true; break; }
     }
+    prevYaw = sim.cars.map(function (c) { return c.yaw; });
+    prevLap = sim.cars.map(function (c) { return c.lap; });
   }
   if (!sim.done) fail(label + ': Rennen nach ' + MAX_T + ' s nicht fertig');
   if (!sim.cars.some(function (c) { return c.place !== null; })) fail(label + ': niemand im Ziel');
@@ -241,7 +245,20 @@ var secs = (Date.now() - started) / 1000;
 wtimes.sort(function (a, b) { return a - b; });
 var busPct = 100 * busWins / RACES, strongPct = 100 * strongWins / RACES;
 if (busPct < 2) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 2 %)');
-if (strongPct > 45) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll ≤ 45 %)');
+if (strongPct > 45 || strongPct < 20) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 20–45 %)');
+if (incidents.crash / RACES > 1.2) fail((incidents.crash / RACES).toFixed(2) + ' Crashs je Rennen (Soll ≤ ~1)');
+
+// ---- 5. Werte wirken: ein Auto mit lauter 10ern gegen neun mit lauter 5ern ----
+var TOP = { power: 10, speed: 10, handling: 10, susp: 10, brakes: 10, weight: 1, drive: 'awd', len: 4.5 };
+var PROBE = Math.max(100, Math.round(RACES / 5)), topWins = 0;
+for (race = 0; race < PROBE; race++) {
+  var pc = avgField(10), slot = race % 10;
+  pc[slot] = { id: 'top', stats: Sim.stats(TOP) };
+  var ps = run({ seed: race * 7919 + 1, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15, cars: pc }, 'Probe ' + race, false);
+  ps.result().forEach(function (e) { if (e.id === 'top' && e.place === 1) topWins++; });
+}
+var topPct = 100 * topWins / PROBE;
+if (topPct < 35) fail('lauter 10er gegen neun 5er gewinnt nur ' + topPct.toFixed(1) + ' % (Soll ≥ 35 %)');
 
 function report() {
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
@@ -250,7 +267,7 @@ function report() {
     console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) +
       ' %, stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +
       ' %; Siegerzeit Median ' + wtimes[Math.floor(wtimes.length / 2)].toFixed(1) + ' s (' + wtimes[0].toFixed(1) + '–' +
-      wtimes[wtimes.length - 1].toFixed(1) + ' s); je Rennen ' + (incidents.spin / RACES).toFixed(2) + ' Dreher, ' +
+      wtimes[wtimes.length - 1].toFixed(1) + ' s); 10er gegen 5er: ' + (typeof topPct === 'number' ? topPct.toFixed(1) : '–') + ' %; je Rennen ' + (incidents.spin / RACES).toFixed(2) + ' Dreher, ' +
       (incidents.crash / RACES).toFixed(2) + ' Crashs, ' + (incidents.dnf / RACES).toFixed(2) + ' Crash-DNF');
   }
   if (errors.length) {
