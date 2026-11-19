@@ -67,6 +67,7 @@
   'use strict';
 
   var DT = 1 / 60;
+  var MAX_STEER = 0.42;   // größter Lenkeinschlag der Vorderräder (rad, ca. 24°)
   var MAX_TIME = 90;          // Rennen endet spätestens nach 90 s
   var WIDTH = 10;             // Streckenbreite (m)
   var SLIP_RANGE = 25;        // Windschatten bis 25 m Abstand
@@ -402,7 +403,7 @@
         pushLap: 0,
         dT: (i % 2 === 0 ? 1 : -1) * 2.3,
         stuck: 0, ghostT: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
-        dDot: 0, latAng: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55),
+        dDot: 0, latAng: 0, latCurv: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55),
         // Abflug / Schubs / Öl
         offTo: null, offLat: 0, pushV: 0, atRail: false, oilT: 0, oilS: -1e9, avoidKey: -1, avoidOk: false
       });
@@ -805,12 +806,17 @@
           // Schräglage aus der Seitenbewegung, geglättet (sonst zuckt ein langsames Auto beim Spurwechsel)
           // (begrenzt auf ±0,7 rad und 0,12 rad je Schritt: Schubser und Abflüge drehen das Auto, ohne zu rucken)
           var latT = clamp(Math.atan2(p.dDot, Math.max(c.v, 4)), -0.7, 0.7);
+          var latPrev = p.latAng;
           p.latAng += clamp((latT - p.latAng) * Math.min(1, DT * 10), -0.12, 0.12);
           var latAng = p.latAng;
+          // Krümmung aus der Änderung des Seitenwinkels je gefahrenem Meter (geglättet), nicht der Winkel selbst
+          var latK = (latAng - latPrev) / (Math.max(c.v, 4) * DT);
+          p.latCurv += (clamp(latK, -0.15, 0.15) - p.latCurv) * Math.min(1, DT * 6);
           // stetig weiterzählen: kürzester Weg zum neuen Winkel, nie ein Sprung um 2π
           c.yaw += wrapAngle(tp.yaw + latAng + p.yawOff - c.yaw);
-          var wb = c.state === 'spin' ? -p.yawOff * 0.15 : Math.atan(0.6 * p.st.len * crv) + latAng * 1.5;
-          c.steer += (clamp(wb, -0.6, 0.6) - c.steer) * Math.min(1, DT * 8);
+          // Ackermann: Lenkwinkel = atan(Radstand · Krümmung); Radstand für die Lenkung auf 3,2 m gedeckelt (Bus!), max. ±0,42 rad
+          var wb = c.state === 'spin' ? -p.yawOff * 0.15 : Math.atan(Math.min(0.6 * p.st.len, 3.2) * (crv + p.latCurv));
+          c.steer += (clamp(wb, -MAX_STEER, MAX_STEER) - c.steer) * Math.min(1, DT * 8);
           c.spin = mod(c.spin + c.v * DT / p.wheelR, TWO_PI);
           var soft = 1.3 - p.st.susp, bump = bumpAt(c.s) + (c.off ? 0.6 : 0);   // im Kies holpert es
           var rollT = clamp(c.v * c.v * crv * 0.012 * soft, -0.12, 0.12);

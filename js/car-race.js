@@ -23,6 +23,7 @@
   // Kamera: Pixel je Meter (4,5-m-Auto 20…60 px); die Fenstergröße ändert nur den Ausschnitt
   var PX_MIN = 20 / 4.5, PX_MAX = 60 / 4.5;
   var TILT = 58 * Math.PI / 180, FOV = 30;
+  var MAX_STEER = 0.42;   // größter Lenkeinschlag der Vorderräder (rad), wie in der Simulation
   var POLL_MS = 1000, HOLD = 5, FADE = 0.6, PODIUM_HOLD = 12;
   var LABEL_W = 512, LABEL_H = 112;
   var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
@@ -372,7 +373,7 @@
       r.lastX = x; r.lastZ = z;
       r.holder.position.set(x, 0, z);
       r.holder.rotation.set(roll, yaw, pitch);
-      r.steer = ease(r.steer, clamp(steer, -0.6, 0.6), 0.12, dt, 1.6);
+      r.steer = ease(r.steer, clamp(steer, -MAX_STEER, MAX_STEER), 0.12, dt, 1.6);
       for (var i = 0; i < r.wheels.length; i++) {
         var w = r.wheels[i];
         if (w.spin) w.spin.rotation[w.spin.userData.ax || 'x'] = w.base - r.wheelAngle * w.sgn;

@@ -56,7 +56,7 @@ function run(opts, label, checkSteps) {
   var half = sim.track.width / 2;
   var bad = false, still = opts.cars.map(function () { return 0; }), prevYaw = null, prevLap = null;
   var offT = opts.cars.map(function () { return 0; }), wasOff = opts.cars.map(function () { return false; });
-  var info = { offs: 0, returned: 0, offAtEnd: 0 };
+  var info = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, returned: 0, offAtEnd: 0 };
   var ids = {}; opts.cars.forEach(function (c) { ids[c.id] = 1; });
   var evSeen = 0, prevOrder = sim.standings(), lastT = 0;
   while (!sim.done && sim.time < MAX_T) {
@@ -65,6 +65,7 @@ function run(opts, label, checkSteps) {
     // festgefahren? Ein fahrbereites Auto steht nie länger als 8 s (Crash davor dauert höchstens 6 s)
     for (var i = 0; i < sim.cars.length; i++) {
       var c = sim.cars[i];
+      if (c.state === 'run') { var as = Math.abs(c.steer); info.steerSum += as; info.steerN++; if (as > info.steerMax) info.steerMax = as; }
       still[i] = c.state === 'run' && c.v < 0.3 && sim.time > 3 ? still[i] + DT : 0;
       if (still[i] > 8 && !bad) { fail(label + ': Auto ' + c.id + ' steckt fest bei t=' + sim.time.toFixed(1)); bad = true; }
       // Abflug: neben der Fahrbahn höchstens 12 s, dann muss das Auto zurück sein
@@ -330,7 +331,7 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
 // ---- 4. Bilanz: Bus gegen 9 Zufallsautos (Werte je 3–9, jedes Rennen neu) ----
 var RACES = arg('--races', 1000);
 var busWins = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
-var X = { offs: 0, rails: 0, returned: 0, offAtEnd: 0, pushes: 0, oilHits: 0, overtakes: 0, randomOil: 0, oilSpots: 0, maxOil: 0,
+var X = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, rails: 0, returned: 0, offAtEnd: 0, pushes: 0, oilHits: 0, overtakes: 0, randomOil: 0, oilSpots: 0, maxOil: 0,
   busPush: [], busPushed: [], busLoss: [], busLost: [], draftSteps: 0 };
 var started = Date.now();
 var BSEED = arg('--seed', 2026), rnd = mulberry32(BSEED);
@@ -355,6 +356,7 @@ for (var race = 0; race < RACES; race++) {
   if (sim.counts) { incidents.spin += sim.counts.spins; incidents.crash += sim.counts.crashes; incidents.dnf += sim.counts.crashDnf; }
   wtimes.push(winnerTime(sim));
   X.offs += sim.counts.offs; X.rails += sim.counts.rails; X.pushes += sim.counts.pushes; X.oilHits += sim.counts.oilHits;
+  X.steerSum += sim.checkInfo.steerSum; X.steerN += sim.checkInfo.steerN; X.steerMax = Math.max(X.steerMax, sim.checkInfo.steerMax);
   X.returned += sim.checkInfo.returned; X.offAtEnd += sim.checkInfo.offAtEnd;
   if (sim.hazards.some(function (h) { return h.src === 'track'; })) X.randomOil++;
   X.oilSpots += sim.hazards.length; X.maxOil = Math.max(X.maxOil, sim.hazards.length);
@@ -437,6 +439,13 @@ if (!(g63.weight >= 7 && g63.handling <= 4 && g63.speed >= 5 && g63.speed <= 7))
 if (gn('Ferrari F40', 'Ferrari').drive !== 'rwd') fail('Ferrari: rwd erwartet');
 if (gn('Toyota Hilux Pickup', 'Toyota').weight !== 5 || gn('Kia Sportage', 'Kia').speed !== 5) fail('Pickup/Sportage dürfen nicht Kleinwagen/Sport sein');
 if (G.golf.len !== 4.5) fail('Golf ohne len: Rückfall 4,5 erwartet');
+
+if (X.steerN) {
+  var steerMean = X.steerSum / X.steerN;
+  if (!(steerMean < 0.15)) fail('Lenkwinkel: Mittel |steer| ' + steerMean.toFixed(3) + ' rad (Soll < 0,15)');
+  if (!(X.steerMax <= 0.42 + 1e-9)) fail('Lenkwinkel: Maximum ' + X.steerMax.toFixed(3) + ' rad (Soll ≤ 0,42)');
+  console.log('Lenkwinkel (fahrende Autos): Mittel |steer| ' + steerMean.toFixed(3) + ' rad, Maximum ' + X.steerMax.toFixed(3) + ' rad');
+}
 
 function report() {
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
