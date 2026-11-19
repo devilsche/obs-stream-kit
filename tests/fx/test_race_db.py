@@ -127,3 +127,94 @@ def test_record_integrity_error_means_already_recorded(conn):
 def test_stored_points(conn):
     race_db.record(conn, 1, "r1", [r("a", 1), r("b", 2)])
     assert race_db.stored_points(conn, 1, "r1") == {"a": 2, "b": 0}
+
+
+# --- Garage: Coins und Käufe ---
+
+def rs(uid, place, sub=0):
+    return {**r(uid, place), "sub": sub}
+
+
+def test_record_credits_coins_once_with_sub_multiplier(conn):
+    rows = [rs("a", 1, 1000), rs("b", 2), rs("c", 3, 3000), rs("d", 4), rs("e", None, 2000)]
+    assert race_db.record(conn, 1, "r1", rows) is True
+    got = {u: race_db.coins(conn, 1, u) for u in "abcde"}
+    assert got == {"a": 56, "b": 35, "c": 50, "d": 15, "e": 15}
+    # doppelte Meldung: weder Zeilen noch Coins
+    assert race_db.record(conn, 1, "r1", rows) is False
+    assert race_db.coins(conn, 1, "a") == 56
+    assert race_db.record(conn, 1, "r2", [rs("a", 2), rs("b", 1)]) is True
+    assert race_db.coins(conn, 1, "a") == 56 + 35 and race_db.coins(conn, 1, "b") == 35 + 45
+
+
+def test_coins_are_per_tenant(conn):
+    race_db.record(conn, 1, "r1", [rs("a", 1), rs("b", 2)])
+    race_db.record(conn, 2, "r1", [rs("a", 2), rs("b", 1)])
+    assert race_db.coins(conn, 1, "a") == 45 and race_db.coins(conn, 2, "a") == 35
+    assert race_db.coins(conn, 3, "a") == 0
+
+
+def test_failed_record_rolls_back_coins(conn):
+    race_db.record(conn, 1, "r1", [rs("a", 1), rs("b", 2)])
+    # parallele zweite Instanz: Unique-Index greift mitten im Schreiben
+    real_exec = conn.execute
+    rows = [rs("c", 1), rs("a", 2)]
+
+    class Wrap:
+        def __getattr__(self, n):
+            return getattr(conn, n)
+
+        def execute(self, sql, args=()):
+            if sql.startswith("SELECT 1 FROM fx_race_result"):
+                return real_exec("SELECT 1 WHERE 0")
+            return real_exec(sql, args)
+    conn.execute("INSERT INTO fx_race_result (tenant_id, race_id, at, user_id, field, points) "
+                 "VALUES (1, 'r2', 'x', 'a', 2, 0)")
+    conn.commit()
+    assert race_db.record(Wrap(), 1, "r2", rows) is False
+    assert race_db.coins(conn, 1, "c") == 0 and race_db.coins(conn, 1, "a") == 45
+
+
+def test_void_takes_coins_back_but_not_below_zero(conn):
+    race_db.record(conn, 1, "r1", [rs("a", 1), rs("b", 2)])
+    race_db.add_coins(conn, 1, "b", "b", 400)
+    assert race_db.buy(conn, 1, "b", "car", 400)[0] == "ok"   # b gibt die Rennen-Coins aus
+    assert race_db.void(conn, 1, "r1") is True
+    assert race_db.coins(conn, 1, "a") == 0 and race_db.coins(conn, 1, "b") == 0
+    assert race_db.void(conn, 1, "r1") is False
+
+
+def test_buy_ok_poor_owned_and_garage(conn):
+    assert race_db.buy(conn, 1, "a", "golf", 150) == ("poor", 0)
+    race_db.add_coins(conn, 1, "a", "Alice", 200)
+    assert race_db.buy(conn, 1, "a", "e39", 400) == ("poor", 200)
+    assert race_db.buy(conn, 1, "a", "golf", 150) == ("ok", 50)
+    assert race_db.buy(conn, 1, "a", "golf", 150) == ("owned", 50)
+    race_db.add_coins(conn, 1, "a", "Alice", 1000)
+    assert race_db.buy(conn, 1, "a", "e39", 400) == ("ok", 650)
+    assert race_db.garage(conn, 1, "a") == ["golf", "e39"]
+    assert race_db.owns(conn, 1, "a", "golf") and not race_db.owns(conn, 2, "a", "golf")
+    assert race_db.garage(conn, 2, "a") == []
+
+
+def test_buy_double_insert_rolls_back_payment(conn):
+    race_db.add_coins(conn, 1, "a", "a", 500)
+    # parallel schon gekauft (Zeile da, owns()-Prüfung verpasst): Abzug wird zurückgerollt
+    conn.execute("INSERT INTO fx_race_garage (tenant_id, user_id, car_key, bought_at) VALUES (1, 'a', 'golf', 'x')")
+    conn.commit()
+    real = race_db.owns
+    try:
+        race_db.owns = lambda *a: False
+        assert race_db.buy(conn, 1, "a", "golf", 150) == ("owned", 500)
+    finally:
+        race_db.owns = real
+    assert race_db.coins(conn, 1, "a") == 500
+
+
+def test_add_coins_negative_clamps_and_keeps_display(conn):
+    assert race_db.add_coins(conn, 1, "a", "Alice", -50) == 0
+    assert race_db.add_coins(conn, 1, "a", "Alice", 100) == 100
+    assert race_db.add_coins(conn, 1, "a", "", -30) == 70
+    assert race_db.add_coins(conn, 1, "a", "Alice", -500) == 0
+    row = conn.execute("SELECT display FROM fx_race_wallet WHERE tenant_id = 1 AND user_id = 'a'").fetchone()
+    assert row["display"] == "Alice"

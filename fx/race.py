@@ -12,6 +12,8 @@ steuern können. Phasen rücken lazy über `now` weiter (_advance).
 import random
 import threading
 
+from fx import race_shop
+
 MIN = 3
 MAX = 10
 COUNTDOWN = 60
@@ -31,12 +33,14 @@ def intro_seconds(n):
 
 _LOCK = threading.Lock()
 _T = {}  # tenant_id -> Zustand
+_PAINT = {}  # (tenant_id, user_id) -> Sub-Lackierung für die nächsten Rennen (nur im Speicher)
 
 
 def reset():
     """Zustand komplett verwerfen (Tests)."""
     with _LOCK:
         _T.clear()
+        _PAINT.clear()
 
 
 def _new_race(now):
@@ -99,29 +103,52 @@ def _advance(t, now):
             return
 
 
-def pick_car(cars, vehicles, rng, taken):
-    """Auto für einen Fahrer: Katalog-Einträge mit mix != False, race.on != False und ohne rework,
-    bevorzugt solche, die noch niemand in der Lobby fährt; Farbset nach Gewicht w.
-    Ohne passendes Auto car_key None (das Overlay zeichnet einen Platzhalter)."""
-    cands = []
+def eligible(cars, vehicles):
+    """Katalog-Einträge, die mitfahren dürfen: mix != False, race.on != False, ohne rework."""
+    out = []
     for c in cars or []:
         key = c.get("key")
         v = (vehicles or {}).get(key) or {}
         if not key or v.get("mix") is False or (v.get("race") or {}).get("on") is False \
                 or v.get("rework"):
             continue
-        cands.append(c)
+        out.append(c)
+    return out
+
+
+def _paint_for(key, vehicles, rng):
+    """Farbset-Index nach Gewicht w."""
+    paints = ((vehicles or {}).get(key) or {}).get("paints") or []
+    if paints:
+        weights = [max(float(p.get("w", 1) or 0), 0) for p in paints]
+        if sum(weights) > 0:
+            return rng.choices(range(len(paints)), weights=weights)[0]
+    return 0
+
+
+def pick_car(cars, vehicles, rng, taken, klass=None, exclude=None):
+    """Auto für einen Fahrer: Katalog-Einträge mit mix != False, race.on != False und ohne rework,
+    bevorzugt solche, die noch niemand in der Lobby fährt; Farbset nach Gewicht w.
+    klass/exclude (Reroll): nur diese Klasse, ohne dieses Auto.
+    Ohne passendes Auto car_key None (das Overlay zeichnet einen Platzhalter)."""
+    cands = eligible(cars, vehicles)
+    if klass:
+        cands = [c for c in cands if race_shop.class_of(c["key"], c) == klass]
+    if exclude:
+        cands = [c for c in cands if c["key"] != exclude]
     if not cands:
         return {"car_key": None, "uid": None, "paint": 0}
     free = [c for c in cands if c["key"] not in taken] or cands
     car = free[rng.randrange(len(free))]
-    paints = ((vehicles or {}).get(car["key"]) or {}).get("paints") or []
-    paint = 0
-    if paints:
-        weights = [max(float(p.get("w", 1) or 0), 0) for p in paints]
-        if sum(weights) > 0:
-            paint = rng.choices(range(len(paints)), weights=weights)[0]
-    return {"car_key": car["key"], "uid": car.get("uid"), "paint": paint}
+    return {"car_key": car["key"], "uid": car.get("uid"), "paint": _paint_for(car["key"], vehicles, rng)}
+
+
+def chosen_car(cars, vehicles, rng, key):
+    """Bestimmtes Auto (Garage/Kanalpunkte), nur wenn es mitfahren darf; sonst None."""
+    for c in eligible(cars, vehicles):
+        if c["key"] == key:
+            return {"car_key": key, "uid": c.get("uid"), "paint": _paint_for(key, vehicles, rng)}
+    return None
 
 
 def _car_name(cars, key):
@@ -129,6 +156,7 @@ def _car_name(cars, key):
         if c.get("key") == key:
             return c.get("name") or key
     return "?"
+
 
 
 def next_test_id(tenant_id, now):
@@ -143,8 +171,11 @@ def next_test_id(tenant_id, now):
         return "test%d" % n, "Tester%d" % n
 
 
-def join(tenant_id, user_id, login, display, color, now, cars, test=False):
-    """Anmeldung. `cars` = (Katalog-Liste, Fahrzeug-Dict). → {ok, say, state}."""
+def join(tenant_id, user_id, login, display, color, now, cars, test=False, sub=0, car_key=None, swap=False):
+    """Anmeldung. `cars` = (Katalog-Liste, Fahrzeug-Dict). sub = Sub-Tier (0/1000/2000/3000),
+    gilt nur für dieses Rennen. car_key = bestimmtes Auto (Garage/Kanalpunkte, vom Endpoint
+    geprüft); swap = schon angemeldet in Lobby/Countdown → Auto tauschen statt „already in“.
+    → {ok, say, state}."""
     catalog, vehicles = cars if cars else ([], {})
     with _LOCK:
         t = _get(tenant_id)
@@ -162,13 +193,26 @@ def join(tenant_id, user_id, login, display, color, now, cars, test=False):
             t.clear()
             t.update(_new_race(now))
             t["last_counted"] = keep
-        if any(r["user_id"] == user_id for r in t["racers"]):
+        mine = next((r for r in t["racers"] if r["user_id"] == user_id), None)
+        if mine and not (swap and car_key):
             return _refuse(t, now, "already in")
+        if car_key:
+            car = chosen_car(catalog, vehicles, t["rng"], car_key)
+            if car is None:
+                return _refuse(t, now, "car not available")
+        else:
+            car = pick_car(catalog, vehicles, t["rng"], {r["car_key"] for r in t["racers"]})
+        if mine:
+            mine.update(car)
+            say = "@%s switched to the %s" % (mine["display"], race_shop.car_name(catalog, car["car_key"]))
+            return {"ok": True, "say": say, "state": _view(t, now)}
         if len(t["racers"]) >= MAX:
             return _refuse(t, now, "grid full")
-        car = pick_car(catalog, vehicles, t["rng"], {r["car_key"] for r in t["racers"]})
+        sub = 0 if test else (sub if sub in (1000, 2000, 3000) else 0)
         t["racers"].append({"grid": len(t["racers"]) + 1, "user_id": user_id, "login": login,
-                            "display": display, "color": color, "test": bool(test), **car})
+                            "display": display, "color": color, "test": bool(test), "sub": sub,
+                            "sub_paint": _PAINT.get((tenant_id, user_id)) if sub else None,
+                            "rerolled": False, **car})
         n = len(t["racers"])
         if n >= MAX:
             _intro(t, now)
@@ -176,8 +220,53 @@ def join(tenant_id, user_id, login, display, color, now, cars, test=False):
             t["phase"] = "countdown"
             t["starts_at"] = now + COUNTDOWN
             t["ends_at"] = now + COUNTDOWN
-        say = "@%s is in! Car: %s – grid %d/%d" % (display, _car_name(catalog, car["car_key"]), n, MAX)
+        say = "@%s is in! Car: %s – grid %d/%d" % (display, race_shop.car_name(catalog, car["car_key"]), n, MAX)
         return {"ok": True, "say": say, "state": _view(t, now)}
+
+
+def reroll(tenant_id, user_id, now, cars):
+    """Nur Subs, einmal pro Rennen, nur Lobby/Countdown: anderes Zufallsauto derselben Klasse.
+    → {ok, say}, say ohne @-Präfix."""
+    catalog, vehicles = cars if cars else ([], {})
+    with _LOCK:
+        t = _get(tenant_id)
+        _advance(t, now)
+        r = next((x for x in t["racers"] if x["user_id"] == user_id), None) \
+            if t["phase"] in ("lobby", "countdown") else None
+        if r is None:
+            return {"ok": False, "say": "you're not in the lobby – type !race to join"}
+        if not r.get("sub"):
+            return {"ok": False, "say": "!reroll is a sub perk"}
+        if r.get("rerolled"):
+            return {"ok": False, "say": "you already rerolled this race"}
+        cur = r.get("car_key")
+        entry = next((c for c in catalog if c.get("key") == cur), None)
+        klass = race_shop.class_of(cur, entry) if cur else None
+        car = pick_car(catalog, vehicles, t["rng"], {x["car_key"] for x in t["racers"]}, klass=klass, exclude=cur)
+        if car["car_key"] is None:
+            return {"ok": False, "say": "no other car in this class"}
+        r.update(car)
+        r["rerolled"] = True
+        return {"ok": True, "say": "rerolled – now driving the %s" % race_shop.car_name(catalog, car["car_key"])}
+
+
+def set_paint(tenant_id, user_id, paint, now):
+    """Sub-Lackierung merken (None = zurücksetzen) und auf die aktuelle Lobby-Anmeldung
+    anwenden, falls der Fahrer dort als Sub steht. → True, wenn sie im aktuellen Rennen gilt."""
+    with _LOCK:
+        if paint:
+            _PAINT[(tenant_id, user_id)] = paint
+        else:
+            _PAINT.pop((tenant_id, user_id), None)
+        t = _get(tenant_id)
+        _advance(t, now)
+        if t["phase"] not in ("lobby", "countdown"):
+            return False
+        r = next((x for x in t["racers"] if x["user_id"] == user_id), None)
+        if r is None or not r.get("sub"):
+            return False
+        r["sub_paint"] = paint
+        return True
 
 
 def lookup(tenant_id, user_id, now):
@@ -209,7 +298,8 @@ def _view(t, now):
     out.update({"race_id": t["race_id"], "seed": t["seed"], "track": t["track"], "laps": LAPS,
                 "finish_window": FINISH_WINDOW, "starts_at": t["starts_at"], "intro_at": t.get("intro_at"),
                 "ends_at": t["podium_until"] if t["phase"] == "podium" else t["ends_at"]})
-    out["racers"] = [{k: r[k] for k in ("grid", "user_id", "display", "color", "car_key", "uid", "paint")}
+    out["racers"] = [{**{k: r[k] for k in ("grid", "user_id", "display", "color", "car_key", "uid", "paint")},
+                      "sub": r.get("sub", 0), "sub_paint": r.get("sub_paint")}
                      for r in t["racers"]]
     if t["result"] and t["phase"] in ("podium", "cooldown"):
         out["result"] = t["result"]
@@ -286,7 +376,7 @@ def accept_result(tenant_id, race_id, places, now):
             ((r, p) for r, p in real if p is not None), key=lambda x: x[1]), 1)}
         rows = [{"user_id": r["user_id"], "login": r["login"], "display": r["display"],
                  "place": order.get(r["user_id"]) if p is not None else None,
-                 "car_key": r["car_key"] or ""} for r, p in real]
+                 "car_key": r["car_key"] or "", "sub": r.get("sub", 0)} for r, p in real]
         t["race_end"] = now
         t["result"] = sorted(({"user_id": r["user_id"], "display": r["display"], "place": p}
                               for r, p in zip(racers, places)),

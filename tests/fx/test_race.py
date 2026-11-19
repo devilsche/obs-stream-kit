@@ -414,3 +414,35 @@ def test_mycar_in_race_not_in_race_and_unresolved(conn, tmp_path, clock):
 def test_clean_car_name():
     assert endpoints._clean_car_name("FREE Audi R8 | www.vecarz.com") == "Audi R8"
     assert endpoints._clean_car_name("Golf [FREE]") == "Golf"
+
+
+# --- Garage (G1): Sub-Tier je Rennen, Coins beim gewerteten Ergebnis ---
+
+def test_sub_tier_is_stored_per_race_and_shown_in_state(cars):
+    race.join(TID, "a", "a", "A", "#ffffff", T, cars, sub=2000)
+    race.join(TID, "b", "b", "B", "#ffffff", T, cars, sub=7)       # ungültig = kein Sub
+    race.join(TID, "t", "t", "T", "#ffffff", T, cars, test=True, sub=3000)
+    rs = st()["racers"]
+    assert [(x["sub"], x["sub_paint"]) for x in rs] == [(2000, None), (0, None), (0, None)]
+    race.admin(TID, "start", T)
+    rows = race.accept_result(TID, st()["race_id"], [1, 2, 3], T + I3 + 5)
+    assert {x["user_id"]: x["sub"] for x in rows} == {"a": 2000, "b": 0}
+
+
+def test_result_endpoint_credits_coins_once_never_test_racers(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    r = _test_race(c, clock, "ab", 1, [3, 1, 2])
+    assert r["counted"] is True
+    coins = {x["user_id"]: x["coins"] for x in conn.execute("SELECT user_id, coins FROM fx_race_wallet")}
+    assert coins == {"a": 35, "b": 45}   # echt neu vergeben: b 1., a 2.; Testfahrer nie
+    rid = c.get("/s/tok/api/fx/car-race/state").get_json()["race_id"]
+    assert c.post("/s/tok/api/fx/car-race/result", json={"race_id": rid, "places": [1, 2, 3]}).get_json()["counted"] is False
+    assert {x["user_id"]: x["coins"] for x in conn.execute("SELECT user_id, coins FROM fx_race_wallet")} == coins
+    c.get("/s/tok/api/fx/car-race?cmd=void")
+    assert {x["coins"] for x in conn.execute("SELECT coins FROM fx_race_wallet")} == {0}
+
+
+def test_one_real_racer_gets_no_coins(conn, tmp_path, clock):
+    c = _client(conn, tmp_path)
+    _test_race(c, clock, "a", 2, [1, 2, 3])
+    assert conn.execute("SELECT COUNT(*) FROM fx_race_wallet").fetchone()[0] == 0
