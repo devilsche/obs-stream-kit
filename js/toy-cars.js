@@ -120,6 +120,32 @@
     for (i = 0; i < n; i++) { var r = f(i); if (!g[r]) { g[r] = []; order.push(r); } g[r] = g[r].concat(isl[i]); }
     return order.map(function (r) { return g[r]; });
   }
+  // Flächen nach Richtung trennen: Dreiecke über gemeinsame Kanten (Ecken verschweißt) verbinden, aber nur,
+  // wenn ihre Flächen weniger als maxDeg abknicken – Seitenwand, Dach, Front werden eigene Stücke
+  function facesOf(geo, maxDeg) {
+    var pos = geo.attributes.position, idx = geo.index ? geo.index.array : null, nt = (idx ? idx.length : pos.count) / 3;
+    function vi(t, q) { return idx ? idx[t * 3 + q] : t * 3 + q; }
+    function key(i) { return Math.round(pos.getX(i) * 1e4) + ',' + Math.round(pos.getY(i) * 1e4) + ',' + Math.round(pos.getZ(i) * 1e4); }
+    var N = [], a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), t, q;
+    for (t = 0; t < nt; t++) {
+      a.fromBufferAttribute(pos, vi(t, 0)); b.fromBufferAttribute(pos, vi(t, 1)); c.fromBufferAttribute(pos, vi(t, 2));
+      N.push(new THREE.Vector3().crossVectors(b.sub(a), c.sub(a)).normalize());
+    }
+    var par = new Int32Array(nt); for (t = 0; t < nt; t++) par[t] = t;
+    function f(x) { while (par[x] !== x) x = par[x] = par[par[x]]; return x; }
+    var edges = {}, cos = Math.cos(maxDeg * Math.PI / 180);
+    for (t = 0; t < nt; t++) for (q = 0; q < 3; q++) {
+      var A = key(vi(t, q)), B = key(vi(t, (q + 1) % 3)), e = A < B ? A + '|' + B : B + '|' + A;
+      (edges[e] || (edges[e] = [])).push(t);
+    }
+    Object.keys(edges).forEach(function (e) {
+      var L = edges[e];
+      for (var i = 1; i < L.length; i++) if (N[L[0]].dot(N[L[i]]) >= cos) par[f(L[i])] = f(L[0]);
+    });
+    var groups = {}, order = [];
+    for (t = 0; t < nt; t++) { var r = f(t); if (!groups[r]) { groups[r] = []; order.push(r); } groups[r].push(t); }
+    return order.map(function (r) { return groups[r]; });
+  }
   function splitIslands(scene) {
     var list = [];
     scene.traverse(function (o) { if (o.isMesh && !o.isSkinnedMesh && !Array.isArray(o.material) && o.geometry && o.geometry.attributes.position) list.push(o); });
@@ -257,6 +283,11 @@
       scene.traverse(function (o) { if (o.isMesh && !Array.isArray(o.material) && v.splitParts.indexOf(o.userData.pkey) >= 0) todo.push(o); });
       todo.forEach(function (o) {
         var isl = islandsOf(o.geometry, true);
+        // ohne gemeinsame Ecken (jedes Dreieck einzeln gespeichert, z. B. der Trolza-Bus) oder ohne Nähte:
+        // nach Flächenrichtung trennen, sehr viele Flächen nach Berührung zusammenfassen
+        var ntri = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
+        if (isl.length < 2 || isl.length > 400 || isl.length === ntri) isl = facesOf(o.geometry, 35);
+        if (isl.length > 400) isl = clusterIslands(o.geometry, isl);
         if (isl.length < 2 || isl.length > 400) return;
         kids[o.userData.pkey] = [];
         isl.forEach(function (tris, j) {
