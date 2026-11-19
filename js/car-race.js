@@ -1080,8 +1080,8 @@
     var INTRO_SWING = 2.5, INTRO_WIDE = 4.5, INTRO_LIGHTS = 3.0, INTRO_MIN = 2.5;
     function introPlan(n) {
       var total = introSeconds(n), wide = INTRO_WIDE, avail = total - wide - INTRO_LIGHTS, groups = [], gs;
-      for (gs = 1; gs <= 2; gs++) if (avail / Math.ceil(n / gs) >= INTRO_MIN) break;
-      if (gs > 2) gs = n;   // zu knapp: alle auf einmal
+      // immer je Startreihe (2 Autos nebeneinander), Restzeit gleichmäßig auf die Reihen verteilt
+      gs = 2;
       // Gruppen von hinten nach vorn; Paare = Startreihen (Startplätze 2r+1, 2r+2)
       if (gs === 2) { for (var rr = Math.ceil(n / 2) - 1; rr >= 0; rr--) groups.push([2 * rr, 2 * rr + 1].filter(function (i) { return i < n; })); }
       else if (gs === 1) { for (var i = n - 1; i >= 0; i--) groups.push([i]); }
@@ -1477,7 +1477,9 @@
       hud.save(); hud.globalAlpha = c.a;
       hud.translate(reduce ? 0 : (1 - c.a) * -10, 0);   // ruhig: kurz einblenden mit kleinem Versatz
       // Gruppe: Karten übereinander, vorderer Startplatz unten
-      c.ids.slice().sort(function (a, b) { return b - a; }).forEach(function (i) { bottom -= driverCard(race.order[i], m, bottom, k) + 6; });
+      // Startreihe: Karten nebeneinander (Startplatz links der kleinere), unten bündig
+      var x = m;
+      c.ids.slice().sort(function (a, b) { return a - b; }).forEach(function (i) { x += driverCard(race.order[i], x, bottom, k).w + vh(0.8); });
       hud.restore();
     }
     // eine Fahrerkarte (Unterkante bei yBottom), k = Größe; Rückgabe: Höhe
@@ -1486,10 +1488,10 @@
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), f1 = vh(2.2) * k, f2 = vh(2.6) * k, f3 = vh(1.8) * k;
       var ch = f1 * 0.4 + f2 * 1.25 + f3 * 1.35 + f3 * 0.6, y0 = yBottom - ch, pad = f3 * 0.8;
       hud.font = font(900, f1); var pw = hud.measureText('P' + r.grid).width;
-      var maxText = W - 2 * m - pw - pad * 3 - 8 - (r.tier ? f2 * 1.1 : 0);
+      var maxText = (W - 2 * m) / 2 - vh(0.4) - pw - pad * 3 - 8 - (r.tier ? f2 * 1.1 : 0);   // halbe Breite je Karte
       hud.font = font(800, f2); var nm = fitText(hud, r.display, maxText), nw = hud.measureText(nm).width;
       hud.font = font(600, f3); var md = fitText(hud, r.modelName || '', maxText), mw = hud.measureText(md).width;
-      var cw = Math.min(W - 2 * m, 8 + pad * 3 + pw + Math.max(nw + (r.tier ? f2 * 1.1 : 0), mw));   // inkl. Sub-Stern
+      var cw = Math.min((W - 2 * m) / 2 - vh(0.4), 8 + pad * 3 + pw + Math.max(nw + (r.tier ? f2 * 1.1 : 0), mw));   // inkl. Sub-Stern, halbe Breite (zwei je Reihe)
       roundRect(hud, x0, y0, cw, ch, f3 * 0.5); hud.fillStyle = withAlpha(TK.surface, 0.9); hud.fill();
       hud.lineWidth = 2; hud.strokeStyle = TK.border; hud.stroke();
       hud.fillStyle = r.color; hud.fillRect(x0 + 2, y0 + f3 * 0.4, 6, ch - f3 * 0.8);   // Chatfarbe als Akzentbalken
@@ -1499,7 +1501,7 @@
       if (r.tier) { drawStar(hud, tx + f2 * 0.45, y0 + ch * 0.38, f2 * 0.45, r.tier); tx += f2 * 1.1; }
       hud.font = font(800, f2); hud.fillStyle = TK.text; hud.fillText(nm, tx, y0 + ch * 0.38);
       hud.font = font(600, f3); hud.fillStyle = TK.dim; hud.fillText(md, tx, y0 + ch * 0.72);
-      return ch;
+      return { h: ch, w: cw };
     }
     // Reduzierte Bewegung: Liste der Startaufstellung statt Vorbeiflug
     function drawGridList() {
