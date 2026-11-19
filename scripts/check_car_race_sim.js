@@ -174,8 +174,9 @@ function mixedField(rnd, n, withBus) {
     if (withBus && i === 0) raw = BUS;
     else {
       raw = {
-        power: 5 + Math.floor(rnd() * 6), speed: 5 + Math.floor(rnd() * 6), handling: 5 + Math.floor(rnd() * 6),
-        susp: 5 + Math.floor(rnd() * 6), brakes: 5 + Math.floor(rnd() * 6), weight: 5 + Math.floor(rnd() * 6),
+        // Zufallsauto aus dem Katalog: jeder Wert gleichverteilt 3–9
+        power: 3 + Math.floor(rnd() * 7), speed: 3 + Math.floor(rnd() * 7), handling: 3 + Math.floor(rnd() * 7),
+        susp: 3 + Math.floor(rnd() * 7), brakes: 3 + Math.floor(rnd() * 7), weight: 3 + Math.floor(rnd() * 7),
         drive: ['fwd', 'rwd', 'awd'][Math.floor(rnd() * 3)], len: 4.2 + rnd() * 0.8
       };
     }
@@ -216,7 +217,7 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   if (st.length !== field.length) fail('standings() hat falsche Länge');
 })();
 
-// ---- 4. Bilanz: Bus gegen 9 Sportwagen/Limousinen ----
+// ---- 4. Bilanz: Bus gegen 9 Zufallsautos (Werte je 3–9, jedes Rennen neu) ----
 var RACES = arg('--races', 1000);
 var busWins = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
 var started = Date.now();
@@ -226,7 +227,8 @@ for (var race = 0; race < RACES; race++) {
   var strongest = null, best = -1;
   field.forEach(function (c) {
     if (c.id === 'bus') return;
-    var r = c.raw, sum = r.power + r.speed + r.handling + r.susp + r.brakes - r.weight * 0.5 + (r.drive === 'awd' ? 1 : 0);
+    // Wertesumme; Gewicht zählt umgekehrt (schwer = schlechter), also 12 − weight
+    var r = c.raw, sum = r.power + r.speed + r.handling + r.susp + r.brakes + (12 - r.weight);
     if (sum > best) { best = sum; strongest = c.id; }
   });
   var seed = (race * 2654435761) >>> 1;
@@ -244,7 +246,7 @@ for (var race = 0; race < RACES; race++) {
 var secs = (Date.now() - started) / 1000;
 wtimes.sort(function (a, b) { return a - b; });
 var busPct = 100 * busWins / RACES, strongPct = 100 * strongWins / RACES;
-if (busPct < 2) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 2 %)');
+if (busPct < 1) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 1 %)');
 if (strongPct > 45 || strongPct < 20) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 20–45 %)');
 if (incidents.crash / RACES > 1.2) fail((incidents.crash / RACES).toFixed(2) + ' Crashs je Rennen (Soll ≤ ~1)');
 

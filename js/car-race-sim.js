@@ -45,23 +45,24 @@
   var SLIP_RANGE = 25;        // Windschatten bis 25 m Abstand
   var SLIP_BONUS = 1.04;      // +4 % Endgeschwindigkeit im Windschatten
   // Fahrphysik (spielzeughaft herunterskaliert; abgestimmt mit scripts/check_car_race_sim.js)
-  var VTOP_BASE = 30.0;       // freie Endgeschwindigkeit (m/s) bei speed 5 – auf der kurvigen Bahn selten erreicht
+  var VTOP_BASE = 26.0;       // freie Endgeschwindigkeit (m/s) bei speed 5
   var ACC_BASE = 5.0;         // Beschleunigung (m/s²) bei power 5 / weight 5
-  var GRIP_BASE = 6.5;        // Querbeschleunigung (m/s²) bei handling 5 / weight 5
+  var GRIP_BASE = 7.0;        // Querbeschleunigung (m/s²) bei handling 5 / weight 5
   var BRAKE_BASE = 8.0;       // Verzögerung (m/s²) bei brakes 5 / weight 5
   var DRAG_EXP = 4;           // Beschleunigung fällt mit (v / vtop)^4 ab
-  // Wirkung je Wertpunkt (relativ zu 5)
-  var K_POWER = 0.02, K_HANDLING = 0.012, K_BRAKES = 0.04;
-  var K_WEIGHT_ACC = 0.012, K_WEIGHT_GRIP = 0.002, K_WEIGHT_BRAKE = 0.02;
+  // Wirkung je Wertpunkt (relativ zu 5, gekrümmt über pts – oben steiler als unten)
+  var K_POWER = 0.045, K_HANDLING = 0.04, K_BRAKES = 0.035, K_SUSP = 0.018;   // Federung: Bodenhaftung
+  var K_WEIGHT_ACC = 0.017, K_WEIGHT_GRIP = 0.006, K_WEIGHT_BRAKE = 0.017;
+  var STAT_EXP = 4;           // Krümmung der Wertwirkung (siehe pts)
   var LAUNCH = { awd: 1.15, rwd: 1.0, fwd: 0.93 };   // Traktion beim Losfahren je Antrieb
-  var FORM_SPREAD = 0.09;     // Tagesform des Fahrers: ±4,5 % am Kurvenlimit
+  var FORM_SPREAD = 0.07;     // Tagesform des Fahrers: ±3,5 % am Kurvenlimit
   var OFF_LINE = 0.03;        // Tempoverlust in Kurven je Meter neben der Ideallinie (Überholen kostet)
   // Pech: Rate je Sekunde = RISK · (v / √(G_REF·R))^RISK_EXP · e^(12·(v/eigene Grenze − 1)),
-  // R höchstens R_RISK (Geraden zählen wie ein weiter Bogen: wer dort sehr schnell ist, riskiert auch etwas)
+  // nur in Kurven (R_RISK = ∞: auf Geraden praktisch kein Risiko)
   var G_REF = GRIP_BASE;      // Bezugs-Kurvengrenze (m/s²)
-  var RISK = 0.008;
+  var RISK = 0.02;
   var RISK_EXP = 8;
-  var R_RISK = 60;
+  var R_RISK = Infinity;
   var DNF_CHANCE = 0.12;      // Anteil der Crashs, die das Rennen beenden
   var TWO_PI = Math.PI * 2;
 
@@ -196,18 +197,23 @@
 
   // ---- Werte je Auto (Verhältnis-Werte 1–10 → Simulationsgrößen) ----
   function val(x, def) { x = Number(x); return isFinite(x) ? clamp(x, 1, 10) : def; }
+  // Wertpunkte relativ zu 5, gekrümmt: unten flach, oben steil (STAT_EXP = 1 wäre linear = v − 5).
+  // So setzt sich ein starkes Auto deutlich ab, während schwache Autos untereinander näher liegen.
+  function pts(v) { return 9 * (Math.pow((v - 1) / 9, STAT_EXP) - Math.pow(4 / 9, STAT_EXP)); }
   function stats(raw) {
     raw = raw || {};
     var p = val(raw.power, 5), sp = val(raw.speed, 5), h = val(raw.handling, 5), su = val(raw.susp, 5),
       b = val(raw.brakes, 5), w = val(raw.weight, 5);
     var len = Number(raw.len); if (!(len > 0)) len = 4.5;
-    // speed 10 = 1,6 × speed 1, speed 5 = VTOP_BASE
-    var vtop = VTOP_BASE * (1 + (sp - 5) * 0.6 / 11.4);
+    // speed 10 = 1,6 × speed 1, speed 5 = VTOP_BASE (dazwischen gekrümmt wie die übrigen Werte)
+    var c5 = Math.pow(4 / 9, STAT_EXP), sa = 1 / (1 + 0.6 * c5);
+    var vtop = VTOP_BASE * sa * (1 + 0.6 * Math.pow((sp - 1) / 9, STAT_EXP));
+    var ew = pts(11 - w) - pts(6);                // Gewicht umgekehrt: leicht = gut
     return {
-      acc: ACC_BASE * (1 + K_POWER * (p - 5)) * (1 - K_WEIGHT_ACC * (w - 5)),
+      acc: ACC_BASE * (1 + K_POWER * pts(p)) * (1 + K_WEIGHT_ACC * ew),
       vmax: vtop * SLIP_BONUS,
-      grip: GRIP_BASE * (1 + K_HANDLING * (h - 5)) * (1 - K_WEIGHT_GRIP * (w - 5)),
-      brake: BRAKE_BASE * (1 + K_BRAKES * (b - 5)) * (1 - K_WEIGHT_BRAKE * (w - 5)),
+      grip: GRIP_BASE * (1 + K_HANDLING * pts(h)) * (1 + K_SUSP * pts(su)) * (1 + K_WEIGHT_GRIP * ew),
+      brake: BRAKE_BASE * (1 + K_BRAKES * pts(b)) * (1 + K_WEIGHT_BRAKE * ew),
       susp: su / 10,
       launch: LAUNCH[raw.drive] || 1,
       len: len
@@ -289,6 +295,15 @@
       if ((P[i].ghostT > 0 && isWreck(j)) || (P[j].ghostT > 0 && isWreck(i))) return false;
       return Math.abs(di - cars[j].d) < (P[i].w + P[j].w) / 2 + 0.25;
     }
+    // Berührt Auto i gerade ein anderes (ohne Ausnahme für Wracks)?
+    function touching(i) {
+      for (var j = 0; j < cars.length; j++) {
+        if (j === i) continue;
+        if (Math.abs(gap(cars[i], cars[j])) < minGap(i, j) - 0.05 &&
+            Math.abs(cars[i].d - cars[j].d) < (P[i].w + P[j].w) / 2 + 0.25) return true;
+      }
+      return false;
+    }
     // Wrack = steht nach Dreher/Crash (oder ausgeschieden) still
     function isWreck(j) {
       var c = cars[j];
@@ -350,7 +365,9 @@
               if (c.state === 'crash' && p.timer > p.dur - 0.6) p.yawOff = p.yawTo * Math.max(0, (p.dur - p.timer) / 0.6);
             }
             if (c.state === 'crash' && p.parked) c.state = 'dnf';
-            if (p.timer >= p.dur && c.state !== 'dnf') {
+            // erst weiterfahren, wenn sich niemand mehr am Wrack vorbeischiebt (sonst Ruck beim Auflösen)
+            if (p.timer >= p.dur && c.state !== 'dnf' && touching(i)) p.timer = p.dur;
+            else if (p.timer >= p.dur && c.state !== 'dnf') {
               c.state = c.place !== null ? 'done' : sim.done ? 'dnf' : 'run'; p.yawOff = 0;
             }
           } else if (c.state === 'run' || c.state === 'done' || c.state === 'dnf') {
@@ -360,7 +377,7 @@
               // daran vorbeischieben (Wracks blockieren ihn dann nicht mehr)
               p.stuck = c.v < 0.3 ? p.stuck + DT : 0;
               if (p.stuck > 1.5) { p.stuck = 0; p.ghostT = 2.5; }
-              if (p.ghostT > 0) p.ghostT -= DT;
+              if (p.ghostT > 0 && !touching(i)) p.ghostT -= DT;
               var cruise = c.state !== 'run' || sim.done;      // im Ziel / nach Rennende: locker weiter
               // Auto vorn (gleiche Spur) für Windschatten und Folgen
               var ahead = -1, ag = Infinity, slip = false;
@@ -390,7 +407,6 @@
               }
               c.v = clamp(c.v, 0, p.st.vmax);
               // Pech: Risiko steigt mit Tempo über der Kurvengrenze
-              // (Geraden zählen wie ein weiter Bogen mit R = R_RISK: wer dort sehr schnell ist, riskiert auch etwas)
               var R = Math.min(R_RISK, 1 / Math.max(Math.abs(crvAt(c.s)), 1e-4));
               if (!cruise && c.state === 'run' && c.v > 4) {
                 var ratio = c.v / Math.sqrt(G_REF * R), own = c.v / Math.sqrt(p.st.grip * R);
