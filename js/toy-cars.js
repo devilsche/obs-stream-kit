@@ -974,25 +974,40 @@
     // Dach muss über dem Sitz deutlich Platz lassen, sonst ist es keine Kabine (z. B. Motorhaube getroffen)
     open = roof === Infinity || roof > y0 + H * 1.2;
     var col = { x: sx, c: { lo: seat, hi: roof, gap: open ? H * 0.9 : roof - seat, open: open } };
-    var seatY = col.c.lo, free = col.c.open ? Infinity : col.c.hi - seatY;
-    // Größe: Dach (0,85 der freien Höhe), Breite und Länge mit Abstand; offenes Cockpit: Kopf darf heraus
-    var s = Math.min(col.c.open ? H * 0.5 : free * 0.85, H * 0.6), z = zd, x = col.x, zd0 = zd;
-    // Größe: Dach (0,85 der freien Höhe), Tür außen und Armaturenbrett vorn mit Abstand; die Ente darf in Lehne und
-    // Mittelkonsole einsinken (sitzt im Schalensitz) – sonst würde sie an den Sitzwangen winzig
-    var outward = zd0 <= 0 ? -1 : 1;
-    function dist(px, py, pz, dx, dz) { var h = castAll(ray, meshes, new THREE.Vector3(px, py, pz), new THREE.Vector3(dx, 0, dz))[0]; return h == null ? Infinity : h; }
-    for (var it = 0; it < 2; it++) {
-      var yc = seatY + s * 0.45, door = dist(x, yc, z, 0, outward), dash = dist(x, yc + s * 0.2, z, 1, 0);
-      if (door < Infinity) s = Math.min(s, door * 2 * 0.95 / DUCK_W);
-      if (dash < Infinity) s = Math.min(s, dash * 0.95 / (DUCK_L / 2));
+    var seatY = col.c.lo, z = zd, x = col.x, s, outward = zd <= 0 ? -1 : 1, U = UNIT;
+    function hitsFrom(px, py, pz, dx, dy, dz) { return castAll(ray, meshes, new THREE.Vector3(px, py, pz), new THREE.Vector3(dx, dy, dz)); }
+    // Dach = erste Fläche oberhalb von ~70 % der Höhe über dem Sitz (Lenkrad, Sonnenblende darunter zählen nicht)
+    var ups = hitsFrom(x, seatY + H * 0.03, z, 0, 1, 0), roofY = null;
+    for (var j2 = 0; j2 < ups.length; j2++) { var yy = seatY + H * 0.03 + ups[j2]; if (yy >= y0 + H * 0.7) { roofY = yy; break; } }
+    var open = !!col.c.open || roofY == null;
+    if (!open) {
+      // Ente füllt die Kabine: Kopf knapp unters Dach; zu niedrig (< 0,55 m) → Sitz bis zum Boden absenken
+      s = (roofY - seatY) * 0.97;
+      if (s < 0.55 * U) {
+        var below = hs.filter(function (h) { return h < seatY - 1e-4 && h > y0 + H * 0.02; })[0];
+        if (below != null) { seatY = Math.max(below, roofY - 0.55 * U / 0.97); s = (roofY - seatY) * 0.97; }
+      }
+      // Kopf mittig ins Seitenfenster: Fenster auf der Fahrerseite um den Sitz herum
+      var win = namedPts(/glass|glas|window|windshield|windscreen|scheibe/i, /lamp|light|head|tail|mirror|spiegel|indicator/i).filter(function (p) {
+        return p.z * outward > W * 0.3 && Math.abs(p.x - x) < 0.35 * U && p.y > y0 + H * 0.4 && p.y < roofY;
+      });
+      if (win.length > 5) {
+        var wy = win.map(function (p) { return p.y; }), mid = (Math.min.apply(null, wy) + Math.max.apply(null, wy)) / 2;
+        // Kopfmitte liegt bei 73 % der Entenhöhe; Sitz so weit anheben, dass sie in Fensterhöhe kommt (Kopf bleibt unterm Dach)
+        if (seatY + 0.73 * s < mid) {
+          var k = 0.73 * 0.97, ns = (mid - k * roofY) / (1 - k);
+          if (ns > seatY) { var ss = (roofY - ns) * 0.97; if (ss >= Math.min(s, 0.45 * U)) { seatY = ns; s = ss; } }
+        }
+      }
+    } else {
+      // offenes Cockpit: Kopf deutlich über den Rand (Kopf ab ~55 % der Entenhöhe)
+      var side = column(x, z + outward * W * 0.18), rim = side.length ? side[0] : seatY + H * 0.3;
+      s = Math.min(Math.max((rim - seatY) / 0.55, 0.55 * U, H * 0.35), 0.95 * U);
     }
-    s = Math.max(s, H * 0.15);
-    // Kopf nie durchs Dach: senkrecht über der Ente nachmessen (geschlossene Kabine)
-    if (!col.c.open) {
-      var b0 = H * 0.05, upd = castAll(ray, meshes, new THREE.Vector3(x, seatY + b0, z), new THREE.Vector3(0, 1, 0))[0];
-      if (upd != null) s = Math.min(s, (upd + b0) * 0.88);
-    }
-    return { x: +x.toFixed(4), y: +seatY.toFixed(4), z: +z.toFixed(4), s: +s.toFixed(4), r: 0, auto: true, open: !!col.c.open };
+    // in der Hülle bleiben: zur Tür mindestens die halbe Entenbreite (0,43 × Höhe), sonst nach innen rücken
+    var hz = 0.43 * s, dr = hitsFrom(x, seatY + s * 0.5, z, 0, 0, outward)[0];
+    if (dr != null && dr < hz * 1.05) z -= outward * (hz * 1.05 - dr);
+    return { x: +x.toFixed(4), y: +seatY.toFixed(4), z: +z.toFixed(4), s: +s.toFixed(4), r: 0, auto: true, open: open };
   }
   // gespeicherter Sitz (Car editor) oder Schätzung; t = Vorlage (ohne: geladene Vorlage des Autos)
   function seatOf(key, t) {
