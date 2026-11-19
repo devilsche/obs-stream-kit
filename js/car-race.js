@@ -533,7 +533,8 @@
       race.simKey = race.rosterKey + '@' + race.startsAt;
       race.stage = 'race'; race.ended = false; race.evIdx = 0; clearOil(); endIntro();
       var t = srvNow() - race.startsAt;
-      if (t > 0.5) { race.sim.fastForward(Math.min(t, 120)); race.cam = null; }   // Neuladen: dieselbe Rennsituation
+      race.hl = null; race.hlLast = -1e9; race.hlIdx = 0;
+      if (t > 0.5) { stepTo(Math.min(t, 120)); race.cam = null; }   // Neuladen: dieselbe Rennsituation
       snap();
     }
     function snap() {
@@ -541,10 +542,43 @@
     }
     function advanceSim(target) {
       var sim = race.sim, DT = sim.DT || 1 / 60;
-      if (target - sim.time > 1) { sim.fastForward(target - DT); snap(); }
+      if (target - sim.time > 1) { stepTo(target - DT); snap(); }
       var guard = 0;
-      while (sim.time < target && guard++ < 240) { snap(); sim.step(); }
+      while (sim.time < target && guard++ < 240) { snap(); sim.step(); checkHighlight(sim); }
       race.alpha = clamp(1 - (sim.time - target) / DT, 0, 1);
+    }
+    // wie sim.fastForward, aber mit der Highlight-Entscheidung je Schritt (damit sie nach Neuladen gleich ausfällt)
+    function stepTo(t) {
+      var sim = race.sim, DT = sim.DT || 1 / 60, target = Math.round(t / DT);
+      while (Math.round(sim.time / DT) < target && !(sim.time > 200)) { sim.step(); checkHighlight(sim); }
+    }
+
+    // ---- Unfall-Highlights: kurz ranzoomen ----
+    // Entschieden je Simulationsschritt aus sim.events und dem Sim-Zustand dieses Schritts (für alle Instanzen
+    // gleich, kein Zufall): Ausfall > Crash > Dreher; höchstens eins zur Zeit, mindestens 6 s zwischen zwei Starts;
+    // keins, wenn der Führende in < 5 s im Ziel ist oder die Zielfrist läuft. Dauer 2,5 s (Sim-Zeit).
+    var HL_PRIO = { dnf: 3, crash: 2, spin: 1 }, HL_LEN = 2.5, HL_GAP = 6;
+    function checkHighlight(sim) {
+      var ev = sim.events || [];
+      for (; race.hlIdx < ev.length; race.hlIdx++) {
+        var e = ev[race.hlIdx], pr = HL_PRIO[e.type];
+        if (!pr || (e.type === 'dnf' && e.reason === 'time') || sim.done) continue;
+        if (sim.cars.some(function (c) { return c.place != null; })) continue;   // Zielfrist: Fokus aufs Ziel
+        var lead = null; sim.cars.forEach(function (c) { if (c.pos === 1) lead = c; });
+        if (lead && race.laps * race.T.len - lead.s < Math.max(lead.v, 8) * 5 + 5) continue;   // knappes Finale nicht verlassen
+        var h = race.hl;
+        if (h && e.t < h.t0 + 0.6 && pr > h.prio) { h.prio = pr; h.type = e.type; h.id = e.id; h.other = e.other; continue; }   // z. B. Crash → Ausfall
+        if ((!h || e.t >= h.until) && e.t - race.hlLast >= HL_GAP) {
+          race.hl = { t0: e.t, until: e.t + HL_LEN, prio: pr, type: e.type, id: e.id, other: e.other };
+          race.hlLast = e.t;
+        }
+      }
+    }
+    // Gewicht des Highlights jetzt (0..1, weich ein/aus) und Kamera-Ziel
+    function highlightWeight(sim) {
+      var h = race.hl;
+      if (!h || sim.time < h.t0 || sim.time > h.until) return 0;
+      return smooth01((sim.time - h.t0) / 0.5) * smooth01((h.until - sim.time) / 0.7);
     }
 
     // Server-Zustand übernehmen (auch der Vorschau-Zustand läuft hier durch)
@@ -1010,6 +1044,24 @@
       hud.textAlign = 'center'; hud.fillStyle = TK.text; hud.fillText(lapText, W - m - lw / 2, m + rh * 0.6);
       // Countdown
       var left = race.startsAt != null ? race.startsAt - now : null;
+      // Highlight-Schild „CRASH! Name“ (auch bei reduzierter Bewegung)
+      if (race.stage === 'race' && race.hl && race.sim) {
+        var hs = race.sim.time, hh = race.hl, ha = hs >= hh.t0 && hs <= hh.until + 0.3 ? smooth01((hs - hh.t0) / 0.25) * smooth01((hh.until + 0.3 - hs) / 0.4) : 0;
+        var hr2 = null; race.order.forEach(function (r) { if (r.id === hh.id) hr2 = r; });
+        if (ha > 0 && hr2) {
+          var word = hh.type === 'dnf' ? 'OUT!' : hh.type === 'crash' ? 'CRASH!' : 'SPIN!';
+          hud.save(); hud.globalAlpha = ha;
+          var tf = clamp(H * 0.06, 16, 32);
+          hud.font = font(900, tf); var ww = hud.measureText(word + ' ').width;
+          hud.font = font(700, tf); var nn = fitText(hud, hr2.display, W * 0.4), nw2 = hud.measureText(nn).width;
+          var tw2 = ww + nw2 + tf * 1.2, ty2 = m + rh * 1.6;
+          pill(hud, (W - tw2) / 2, ty2, tw2, tf * 1.6);
+          hud.textAlign = 'left'; hud.textBaseline = 'middle';
+          hud.font = font(900, tf); hud.fillStyle = hh.type === 'spin' ? TK.accent : '#ff4a3d'; hud.fillText(word, (W - tw2) / 2 + tf * 0.6, ty2 + tf * 0.8);
+          hud.font = font(700, tf); hud.fillStyle = hr2.color; hud.fillText(nn, (W - tw2) / 2 + tf * 0.6 + ww, ty2 + tf * 0.8);
+          hud.restore();
+        }
+      }
       if (race.stage === 'grid' && left != null && introT >= 0) {
         drawLights(left);
       } else if (race.stage === 'grid' && left != null) {
@@ -1396,6 +1448,21 @@
         });
       }
       stepPuffs(dt);
+      // Unfall-Highlight: Kamera zum Geschehen (Auto ~35 % der Bildbreite), dann zurück; reduzierte Bewegung: nur Schild
+      if (race.stage === 'race' && race.hl && !reduce) {
+        var hw = highlightWeight(race.sim);
+        if (hw > 0) {
+          var hi = -1, oi = -1;
+          race.sim.cars.forEach(function (c, i) { if (c.id === race.hl.id) hi = i; if (c.id === race.hl.other) oi = i; });
+          var base = camFit(pts);
+          if (hi >= 0 && base) {
+            var hr = race.order[hi], hx = hr.holder.position.x, hz = hr.holder.position.z;
+            if (oi >= 0) { var orr = race.order[oi]; if (Math.hypot(orr.holder.position.x - hx, orr.holder.position.z - hz) < 25) { hx = (hx + orr.holder.position.x) / 2; hz = (hz + orr.holder.position.z) / 2; } }
+            var hpx = clamp(0.35 * W / Math.max(hr.len, 3.5), PX_MIN, PX_MAX * 3);
+            camFix = { x: lerp(base.x, hx, hw), z: lerp(base.z, hz, hw), px: Math.exp(lerp(Math.log(base.px), Math.log(hpx), hw)) };
+          }
+        }
+      }
       updateCamera(pts, dt, camFix);
       cam.updateMatrixWorld();
       updateLabels(labels, dt);
