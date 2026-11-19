@@ -295,6 +295,11 @@
         disp: null, label: null, labelK: 1, labelText: '', gone: false, flash: 0, jolt: 0, rankY: null
       };
       r.holder.rotation.order = 'YXZ';
+      // Vorschau: Modellname mit anzeigen (zur Fehlersuche „welches Auto war das?“), echte Rennen nur der Chatname
+      var model = entry ? String(entry.name || key) : key ? String(key) : 'placeholder box';
+      if (model.length > 22) model = model.slice(0, 21) + '\u2026';
+      r.shown = preview ? r.display + ' \u00b7 ' + model : r.display;
+      if (preview && root.console) console.info('Car Race preview: grid ' + src.grid + ' ' + r.display + ' = ' + (key || '(no car)') + (entry ? ' (' + entry.name + ', front ' + (entry.front || 'auto') + ')' : ''));
       var shadow = new THREE.Mesh(own2(r, new THREE.PlaneGeometry(1, 1)), own2(r, new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false })));
       shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.07; r.shadow = shadow; r.holder.add(shadow);
       setBox(r);
@@ -349,6 +354,17 @@
         }
         wheels.push({ pivot: o, spin: spin, x: w.x, sgn: sgn, flag: o.userData.front, base: spin ? spin.rotation[spin.userData.ax || 'x'] : 0 });
       });
+      // Plausibilität: hängt an einer Radgruppe mehr als ein Rad (z. B. die Karosserie, weil die automatische
+      // Raderkennung bei Modellen aus wenigen Netzen zu viel greift), würde sie mitrollen/mitlenken und die
+      // Karosserie mit Renntempo um die Achse wirbeln („nur die Räder fahren“) – solche Gruppen bleiben stehen
+      var bad = [];
+      wheels = wheels.filter(function (w) {
+        var b = new THREE.Box3().setFromObject(w.pivot), sz = new THREE.Vector3(); b.getSize(sz);
+        var ok = !b.isEmpty() && sz.x <= r.len * 0.45 && sz.y <= Math.max(r.height * 0.9, 0.5);
+        if (!ok) bad.push(w.pivot.name);
+        return ok;
+      });
+      if (bad.length && root.console) console.warn('Car Race: ' + r.key + ' – wheel groups too big (body in the wheel?), not animated: ' + bad.join(', '));
       var maxX = Math.max.apply(null, wheels.map(function (w) { return w.x; }).concat([-1e9]));
       var flagged = wheels.some(function (w) { return w.flag != null; });
       wheels.forEach(function (w) { w.front = flagged ? !!w.flag : w.x > 0 && w.x > maxX - r.len * 0.08; });
@@ -397,15 +413,15 @@
     // mode: '' normal · 'up' gerade überholt (Akzentrand, Pfeil nach oben, leuchtet) · 'dnf' ausgegraut
     function drawLabel(r, place, force, mode) {
       mode = mode || '';
-      var text = place + '\u0000' + r.display + '\u0000' + mode;
+      var text = place + '\u0000' + r.shown + '\u0000' + mode;
       if (!force && text === r.labelText) return;
       r.labelText = text; r.labelPlace = place; r.labelMode = mode;
       var L = r.label, g = L.g;
       g.clearRect(0, 0, LABEL_W, LABEL_H);
-      var fs = 50, pad = 22, gap = 14, bw = 7;
+      var fs = preview ? 38 : 50, pad = 22, gap = 14, bw = 7;   // Vorschau: längerer Text (Modellname)
       g.font = font(800, fs);
       var aw = mode === 'up' ? fs * 0.62 : 0;   // Platz für den Pfeil
-      var pw = g.measureText(place).width + aw, name = r.display;
+      var pw = g.measureText(place).width + aw, name = r.shown;
       g.font = font(700, fs);
       var maxName = LABEL_W - 2 * pad - pw - gap - 2 * bw - (mode === 'up' ? 16 : 0);
       while (name.length > 1 && g.measureText(name).width > maxName) name = name.slice(0, -2) + '…';
@@ -746,7 +762,7 @@
       if (race.stage === 'podium') { drawPodiumHud(); return; }
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
-      var pw = rh * 7.4, ph = rows.length * rh + rh * 0.4;
+      var pw = rh * (preview ? 12 : 7.4), ph = rows.length * rh + rh * 0.4;
       pill(hud, m, m, pw, ph);
       hud.textBaseline = 'middle';
       // Zeilen gleiten beim Platztausch (bei reduzierter Bewegung sofort)
@@ -768,7 +784,7 @@
         }
         hud.textAlign = 'left'; hud.font = font(row.fin ? 800 : 600, fs);
         hud.fillStyle = row.fin ? TK.accent : TK.text;
-        hud.fillText(fitText(hud, row.r.display, pw - rh * 2.25), m + rh * 1.95, y);
+        hud.fillText(fitText(hud, row.r.shown, pw - rh * 2.25), m + rh * 1.95, y);
         hud.globalAlpha = 1;
       });
       // Runde rechts oben
