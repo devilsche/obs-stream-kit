@@ -793,6 +793,8 @@
     function showPodium(result, response) {
       var top = result.filter(function (x) { return x.place != null && x.place <= 3; }).sort(function (a, b) { return a.place - b.place; });
       var byId = {}; race.order.forEach(function (r) { byId[r.id] = r; });
+      // Punkte je Fahrer aus der Server-Antwort; Testfahrer stehen dort nie drin (keine Punkte-Zeile), echte Fahrer
+      // bekommen ihre Zeile auch in Rennen mit Testfahrern (Server zählt ab 2 echten Fahrern)
       var pts = response && response.counted && response.points ? response.points : null;
       var cars = top.map(function (x) { return { r: byId[x.id], place: x.place, pts: pts ? pts[x.id] || null : null }; }).filter(function (c) { return c.r; });
       if (!cars.length) {   // niemand im Ziel: Endstand halten, dann ausblenden
