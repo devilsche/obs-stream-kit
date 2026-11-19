@@ -31,7 +31,12 @@
  *       sim.time, sim.done, sim.track,
  *       sim.counts = { spins, crashes, crashDnf, slides, offs, rails, pushes, oilHits }
  *       sim.cars[i] = { id, s, d, v, lap, pos, yaw, roll, pitch, steer, spin, state, place, finish, draft, off,
- *                       wreck, burn }
+ *                       wreck, burn, x, z }
+ *         Darstellung als Einspurmodell (reine Ausgabe, die Fahrdynamik rechnet weiter mit s/d): die Vorderachse
+ *         fährt auf der Linie (s + Radstand/2, d), die Hinterachse wird wie an einer Deichsel nachgezogen und
+ *         schneidet Kurven innen (lange Fahrzeuge deutlich). x/z = Weltposition der Wagenmitte (zwischen den
+ *         Achsen), yaw = Richtung Hinter- → Vorderachse (+ Dreher/Crash). Fürs Rendern das Modell an (x, z) mit
+ *         yaw setzen statt an at(s) + n·d. Radstand = CarRaceSim.wheelbase(len) = 0,6 · len.
  *         s = gefahrene Meter ab Start/Ziel (Startaufstellung negativ), d = Seitenversatz (m, > 0 links;
  *         neben der Fahrbahn bis zur Leitplanke möglich: |d| ≤ width/2 + Auslauf),
  *         lap = 0 in der Aufstellung, dann 1..laps; pos = aktuelle Position (1 = vorn, = standings());
@@ -78,6 +83,7 @@
 
   var DT = 1 / 60;
   var MAX_STEER = 0.42;   // größter Lenkeinschlag der Vorderräder (rad, ca. 24°)
+  var YAW_SMOOTH = 25;    // leichte Glättung des Gierwinkels (1/s) gegen Mikro-Zittern
   var MAX_TIME = 90;          // Rennen endet spätestens nach 90 s
   var WIDTH = 10;             // Streckenbreite (m)
   var SLIP_RANGE = 25;        // Windschatten bis 25 m Abstand
@@ -370,12 +376,16 @@
 
   // Breite eines Autos (m) aus seiner Länge – auch fürs Overlay/Prüfskript
   function carWidth(len) { return clamp(len * 0.42, 1.7, 2.6); }
+  // Radstand (m): Abstand Vorder- zu Hinterachse, 0,6 × Länge (Bus 12 m → 7,2 m)
+  function wheelbase(len) { return 0.6 * len; }
 
   // ---- Rennen ----
   function create(opts) {
     var T = typeof opts.track === 'object' && opts.track ? opts.track : track(opts.track | 0);
     var raw = T._raw, n = raw.n, ds = raw.ds, L = T.len, HALF = T.width / 2;
     var laps = opts.laps || 3, finishWindow = opts.finishWindow == null ? 15 : opts.finishWindow;
+    // Weltposition (x, z) eines Punkts mit Streckenkoordinaten s / d
+    function worldAt(s, d) { var a = T.at(s); return [a.x + a.nx * d, a.z + a.nz * d]; }
     var rnd = rng(opts.seed | 0);
     var cars = [], P = [];
     var steps = 0, finCount = 0, deadline = Infinity;
@@ -419,14 +429,22 @@
         dT: (i % 2 === 0 ? 1 : -1) * 2.3,
         stuck: 0, detourT: 0, detourJ: -1, detourAge: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
         dDot: 0, latAng: 0, latCurv: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55),
+        // Darstellung (Einspurmodell): Vorder-/Hinterachse in Weltkoordinaten, Richtung Hinter- → Vorderachse
+        wb: wheelbase(st.len), fx: 0, fz: 0, rx: 0, rz: 0, hdg: 0,
         // Abflug / Schubs / Öl
         offTo: null, offLat: 0, pushV: 0, atRail: false, oilT: 0, oilS: -1e9, avoidKey: -1, avoidOk: false
       });
       cars.push({
         id: c.id, s: rowS[i >> 1], d: (i % 2 === 0 ? 1 : -1) * 2.3, v: 0, lap: 0, pos: i + 1,
         yaw: T.at(rowS[i >> 1]).yaw, roll: 0, pitch: 0, steer: 0, spin: 0, state: 'run', place: null, finish: null,
-        draft: null, off: false, wreck: false, burn: null
+        draft: null, off: false, wreck: false, burn: null, x: 0, z: 0
       });
+      // Achsen in der Startaufstellung: gerade hintereinander, Wagenmitte = Startplatz
+      var pp = P[P.length - 1], cc = cars[cars.length - 1];
+      var F0 = worldAt(cc.s + pp.wb / 2, cc.d), R0 = worldAt(cc.s - pp.wb / 2, cc.d);
+      pp.fx = F0[0]; pp.fz = F0[1]; pp.rx = R0[0]; pp.rz = R0[1];
+      pp.hdg = Math.atan2(-(F0[1] - R0[1]), F0[0] - R0[0]);
+      cc.x = (F0[0] + R0[0]) / 2; cc.z = (F0[1] + R0[1]) / 2; cc.yaw = cc.yaw + wrapAngle(pp.hdg - cc.yaw);
     });
     var order = cars.map(function (c, i) { return i; });   // aktuelle Reihenfolge (Indizes), mit Hysterese
 
@@ -883,10 +901,27 @@
           // Krümmung aus der Änderung des Seitenwinkels je gefahrenem Meter (geglättet), nicht der Winkel selbst
           var latK = (latAng - latPrev) / (Math.max(c.v, 4) * DT);
           p.latCurv += (clamp(latK, -0.15, 0.15) - p.latCurv) * Math.min(1, DT * 6);
-          // stetig weiterzählen: kürzester Weg zum neuen Winkel, nie ein Sprung um 2π
-          c.yaw += wrapAngle(tp.yaw + latAng + p.yawOff - c.yaw);
-          // Ackermann: Lenkwinkel = atan(Radstand · Krümmung); Radstand für die Lenkung auf 3,2 m gedeckelt (Bus!), max. ±0,42 rad
-          var wb = c.state === 'spin' ? -p.yawOff * 0.15 : Math.atan(Math.min(0.6 * p.st.len, 3.2) * (crv + p.latCurv));
+          // Darstellung als Einspurmodell (reine Ausgabe – Fahrdynamik, Kollisionen und s/d hängen nicht davon ab):
+          // die Vorderachse folgt der Fahrlinie (s + Radstand/2, d), die Hinterachse wird wie an einer Deichsel
+          // nachgezogen (Traktrix) und schneidet Kurven innen. Wird das Auto zurückversetzt (Auffahrschutz) oder
+          // bei kaum Fahrt seitlich versetzt, wandert das Heck mit, statt das Auto zu drehen.
+          var F = worldAt(c.s + p.wb / 2, c.d), ux = Math.cos(p.hdg), uz = -Math.sin(p.hdg);
+          var mvx = F[0] - p.fx, mvz = F[1] - p.fz, hx = F[0] - p.rx, hz = F[1] - p.rz, hl = Math.sqrt(hx * hx + hz * hz);
+          if (mvx * ux + mvz * uz < 0 || hl < 0.5 * p.wb) { p.rx += mvx; p.rz += mvz; }
+          else {
+            var crab = clamp(1 - c.v / 5, 0, 1), lat = mvx * -uz + mvz * ux;
+            p.rx += -uz * lat * crab; p.rz += ux * lat * crab;
+            hx = F[0] - p.rx; hz = F[1] - p.rz; hl = Math.sqrt(hx * hx + hz * hz);
+            p.rx = F[0] - hx / hl * p.wb; p.rz = F[1] - hz / hl * p.wb;
+          }
+          p.fx = F[0]; p.fz = F[1];
+          p.hdg += wrapAngle(Math.atan2(-(F[1] - p.rz), F[0] - p.rx) - p.hdg);   // stetig, ohne 2π-Sprung
+          c.x = (F[0] + p.rx) / 2; c.z = (F[1] + p.rz) / 2;                     // Wagenmitte zwischen den Achsen
+          // yaw = Richtung Hinter- → Vorderachse (+ Dreher/Crash), leicht geglättet gegen Mikro-Zittern
+          c.yaw += wrapAngle(p.hdg + p.yawOff - c.yaw) * Math.min(1, DT * YAW_SMOOTH);
+          // Ackermann: Lenkwinkel = atan(Radstand · Krümmung der Vorderachs-Bahn), max. ±0,42 rad
+          var crvF = crvAt(c.s + p.wb / 2), kF = crvF / Math.max(0.2, 1 - crvF * c.d) + p.latCurv;
+          var wb = c.state === 'spin' ? -p.yawOff * 0.15 : Math.atan(p.wb * kF);
           c.steer += (clamp(wb, -MAX_STEER, MAX_STEER) - c.steer) * Math.min(1, DT * 8);
           c.spin = mod(c.spin + c.v * DT / p.wheelR, TWO_PI);
           var soft = 1.3 - p.st.susp, bump = bumpAt(c.s) + (c.off ? 0.6 : 0);   // im Kies holpert es
@@ -949,6 +984,6 @@
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
     // gute Strecken-Seeds: node scripts/check_car_race_sim.js --find 30 (Regeln + Siegerzeit 57–67 s)
     TRACKS: [1, 2, 3],
-    LAYOUTS: LAYOUTS, carWidth: carWidth, rng: rng, track: track, stats: stats, create: create
+    LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
   };
 });

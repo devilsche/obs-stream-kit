@@ -29,6 +29,7 @@ function arg(name, def) {
 
 var DT = 1 / 60;
 var OVERLAP_TOL = 0.1;   // Wrack-Überlappung: höchstens 10 cm (längs und quer)
+var busInfo = '';
 var overlapChecked = {}; // Rennen, in denen mindestens ein Wrack stand (Überlappung geprüft)
 var MAX_T = 95;   // Sicherheitsnetz: die Sim muss nach spätestens 90 s selbst fertig sein
 
@@ -152,7 +153,7 @@ function run(opts, label, checkSteps) {
     for (i = 0; i < sim.cars.length; i++) {
       var st = opts.cars[i].stats;
       c = sim.cars[i];
-      var nums = [c.s, c.d, c.v, c.yaw, c.roll, c.pitch, c.steer, c.spin];
+      var nums = [c.s, c.d, c.v, c.x, c.z, c.yaw, c.roll, c.pitch, c.steer, c.spin];
       for (var k = 0; k < nums.length; k++) {
         if (typeof nums[k] !== 'number' || !isFinite(nums[k])) {
           fail(label + ': Auto ' + c.id + ' hat ungültigen Wert (' + nums.join(', ') + ') bei t=' + sim.time.toFixed(2));
@@ -366,6 +367,48 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   if (st.length !== field.length) fail('standings() hat falsche Länge');
 })();
 
+// ---- 3b. Lange Fahrzeuge (Einspurmodell): Bus auf der Hairpin-Strecke ----
+// Gierwinkel ruhiger als mit dem alten starren Modell (gemessen vor dem Umbau: max. 0,1238 rad/Schritt,
+// mittlere Änderung der Gierrate 0,00289 rad) und die Hinterachse schneidet enge Kurven innen.
+var BUS_DYAW_BEFORE = 0.1238, BUS_JERK_BEFORE = 0.00289;
+(function () {
+  var worst = 0, jerk = 0, nj = 0, inSum = 0, inN = 0;
+  var hair = Sim.TRACKS.filter(function (sd) { return Sim.track(sd).character === 'hairpin'; })[0];
+  for (var k = 0; k < 10; k++) {
+    var cars = [{ id: 'bus', stats: Sim.stats(BUS) }];
+    for (var i = 1; i < 6; i++) cars.push({ id: 'c' + i, stats: Sim.stats(AVG) });
+    var sim = Sim.create({ seed: 500 + k, track: hair, laps: 3, finishWindow: 15, cars: cars }), T = sim.track;
+    var wb = Sim.wheelbase(BUS.len), prev = null, prevD = null;
+    while (!sim.done) {
+      sim.step();
+      var c = sim.cars[0];
+      if (prev !== null && (c.state === 'run' || c.state === 'done') && sim.time > 2) {
+        var dy = c.yaw - prev;
+        worst = Math.max(worst, Math.abs(dy));
+        if (prevD !== null) { jerk += Math.abs(dy - prevD); nj++; }
+        prevD = dy;
+        // Hinterachse: von der Wagenmitte wb/2 nach hinten, auf die Strecke projiziert
+        var crvF = T.at(c.s + wb / 2).curv;
+        if (Math.abs(crvF) > 1 / 20 && c.v > 3 && c.state === 'run') {
+          var rx = c.x - Math.cos(c.yaw) * wb / 2, rz = c.z + Math.sin(c.yaw) * wb / 2, sr = c.s - wb / 2, a;
+          for (var q = 0; q < 4; q++) { a = T.at(sr); sr += (rx - a.x) * Math.cos(a.yaw) - (rz - a.z) * Math.sin(a.yaw); }
+          a = T.at(sr);
+          var dRear = (rx - a.x) * a.nx + (rz - a.z) * a.nz;
+          inSum += (dRear - c.d) * (crvF > 0 ? 1 : -1); inN++;
+        }
+      } else prevD = null;
+      prev = c.yaw;
+    }
+  }
+  var jm = jerk / nj, inward = inSum / inN;
+  busInfo = 'Bus auf ' + Sim.track(hair).name + ': max. |Δyaw| ' + worst.toFixed(4) + ' rad/Schritt (vorher ' + BUS_DYAW_BEFORE +
+    '), mittlere Gierraten-Änderung ' + jm.toFixed(5) + ' (vorher ' + BUS_JERK_BEFORE + '), Hinterachse in engen Kurven im Mittel ' +
+    inward.toFixed(2) + ' m weiter innen als die Vorderachse';
+  if (!(worst <= BUS_DYAW_BEFORE)) fail('Bus: max. |Δyaw| ' + worst.toFixed(4) + ' > vorher ' + BUS_DYAW_BEFORE);
+  if (!(jm <= BUS_JERK_BEFORE)) fail('Bus: Gierwinkel ruckelt (' + jm.toFixed(5) + ' > vorher ' + BUS_JERK_BEFORE + ')');
+  if (!(inward >= 0.5)) fail('Bus: Hinterachse schneidet enge Kurven nicht innen (' + inward.toFixed(2) + ' m, Soll ≥ 0,5)');
+})();
+
 // ---- 4. Bilanz: Bus gegen 9 Zufallsautos (Werte je 3–9, jedes Rennen neu) ----
 var RACES = arg('--races', 1000);
 var busWins = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
@@ -488,6 +531,7 @@ if (X.steerN) {
 function report() {
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
   (trackInfo || []).forEach(function (l) { console.log(l); });
+  if (busInfo) console.log(busInfo);
   if (typeof RACES !== 'undefined' && wtimes.length) {
     console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) +
       ' %, stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +
