@@ -303,7 +303,13 @@
         var ntri = (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3;
         if (isl.length < 2 || isl.length > 400 || isl.length === ntri) isl = facesOf(o.geometry, 35);
         if (isl.length > 400) isl = clusterIslands(o.geometry, isl);
-        if (isl.length < 2 || isl.length > 400) return;
+        if (isl.length < 2 || isl.length > 400) {
+          // nur wenn alles andere scheitert (z. B. Caterpillar-Rahmen: 2260 Flächen, ein Klumpen nach Berührung):
+          // in zusammenhängende Stücke (verschweißt) zerlegen, bis 1000 Stücke – bisher gelungene Zerlegungen bleiben gleich
+          var welded = islandsOf(o.geometry);
+          if (welded.length < 2 || welded.length > 1000) return;
+          isl = welded;
+        }
         kids[o.userData.pkey] = [];
         isl.forEach(function (tris, j) {
           var m = new THREE.Mesh(subGeo(o.geometry, tris), o.material);
