@@ -20,6 +20,16 @@
  *
  *   GlbFix.prepare(root) → root (Materialien werden in place angepasst), root.userData.interior = true/false
  *   GlbFix.setPaint(root, hex), GlbFix.setRims(root, hex) – Farbe setzen (null = Original)
+ *   opts.align: schräg abgestelltes Modell gerade drehen (nur Autos, ToyCars setzt es)
+ *
+ * Regressionsfälle (Prüfstand: Modell ohne Texturen durch GlbFix + ToyCars.prepare, Teile-Schlüssel und
+ * Radgruppen aller Katalog-Autos vorher/nachher vergleichen):
+ *   - ferrari-296-gt3: Auto im Original ~53° gedreht → align; Frontkamera zeigte 3/4-Ansicht
+ *   - mitsubishi-lancer-evo-ix: Material „INT_Rubber“ galt als Reifen → Vorderräder schief/zu hoch (NOT_TIRE)
+ *   - 2020-abt-sportline-audi-rs6, 1992-porsche-911-964-turbo-s, 2022-porsche-911-gt3-touring: Achsrichtung aus
+ *     ganzen Rad-Netzen verrauscht (±4–42°, links/rechts gegensinnig) → galten als eingeschlagen und wurden
+ *     verdreht „gerade gestellt“, vorn UND hinten (Gegenrad-Regel)
+ *   - bmw-m3-competition: Skin-Netze → scripts/build_car_rain.py bake_skins (nicht hier)
  */
 (function (root) {
   'use strict';
@@ -116,9 +126,41 @@
     });
     return n ? hit / n : 0;
   }
+  // schräg abgestelltes Modell (z. B. Ferrari 296 GT3: Auto im Original ~53° gedreht) gerade drehen: Gierwinkel,
+  // bei dem der Grundriss (xz-Hüllrechteck aller Punkte) am kleinsten ist. Nur bei deutlichem Gewinn (> 10 %
+  // weniger Fläche und > 3°), damit gerade Modelle unverändert bleiben. Inhalt kommt in eine Gruppe „Yaw“
+  // (Namen und Reihenfolge der Teile bleiben gleich → Teile-Schlüssel im Car editor ändern sich nicht).
+  function align(obj) {
+    obj.updateMatrixWorld(true);
+    var inv = new THREE.Matrix4().copy(obj.matrixWorld).invert(), P = [], v = new THREE.Vector3();
+    obj.traverse(function (o) {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+      var p = o.geometry.attributes.position, M = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld), step = Math.max(1, Math.floor(p.count / 1500));
+      for (var i = 0; i < p.count; i += step) { v.fromBufferAttribute(p, i).applyMatrix4(M); P.push(v.x, v.z); }
+    });
+    if (P.length < 20) return 0;
+    function area(d) {
+      var a = d * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+      for (var i = 0; i < P.length; i += 2) {
+        var x = P[i] * c + P[i + 1] * s, z = -P[i] * s + P[i + 1] * c;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z;
+      }
+      return (x1 - x0) * (z1 - z0);
+    }
+    var best = 0, bA = area(0), a0 = bA, d;
+    for (d = 1; d < 90; d++) { var A = area(d); if (A < bA) { bA = A; best = d; } }
+    for (d = best - 1; d <= best + 1; d += 0.1) { var A2 = area(d); if (A2 < bA) { bA = A2; best = d; } }
+    if (best > 45) best -= 90;   // kleinste Drehung, Längsachse landet auf x oder z
+    if (Math.abs(best) < 3 || bA > a0 * 0.9) return 0;
+    var g = new THREE.Group(); g.name = 'Yaw';
+    while (obj.children.length) g.add(obj.children[0]);
+    g.rotation.y = best * Math.PI / 180; obj.add(g); obj.updateMatrixWorld(true);
+    return best;
+  }
   function prepare(obj, opts) {
     opts = opts || {};
     isolate(obj);
+    if (opts.align) obj.userData.yaw = align(obj);
     var inside = false;
     obj.traverse(function (o) {
       if (o.isMesh) [].concat(o.material).forEach(function (m) { if (m && INTERIOR.test(m.name || '')) inside = true; });
@@ -137,7 +179,9 @@
     return obj;
   }
   // ── Räder ──
-  var TIRE = /tire|tyre|reifen|rubber|whitewall/i, NOT_TIRE = /trim|seal|strip|window|door|mat\b|pedal/i;
+  // Innenraum-Gummi (z. B. „INT_Rubber“ beim Lancer Evo IX: Fußmatten, Dichtungen im Motorraum) ist kein Reifen –
+  // sonst landen die Vorderräder in der Kabine, stehen ~45° schräg und hängen zu hoch im Radkasten
+  var TIRE = /tire|tyre|reifen|rubber|whitewall/i, NOT_TIRE = /trim|seal|strip|window|door|mat\b|pedal|interior|\bint_|_int\b/i;
   var RIM = /\brim|rim\b|rims|felge|hubcap|wheel|alloy|spoke/i, NOT_RIM = /steer|stitch|tire|tyre|lenk|trim|interior|\bint/i;
   var PAINT = /paint|carpaint|lack|main_color|maincolor|body_?colou?r|bodywork|exterior_?colou?r|\bbody\b|^body/i, NOT_PAINT = /under|interior|\bint|chassis|frame|plastic|black|glass/i;
   function matName(m) { return (m && m.name) || ''; }
@@ -318,8 +362,18 @@
       h.whole.forEach(function (o) { inner.attach(o); o.userData.wheelPart = true; });   // Weltlage bleibt
       // Rad auf die Querachse drehen, damit es sauber um die Spin-Achse dreht; nicht gerade stellen = die Drehung
       // außen wieder zurück (Rad bleibt sichtbar wie modelliert, dreht trotzdem um seine eigene Achse)
+      // eingeschlagen nur, wenn das Gegenrad derselben Achse in dieselbe Richtung zeigt: echte Lenkung dreht beide
+      // gleich, entgegengesetzte Winkel sind Messrauschen der Achsrichtung (ABT RS6: ganze Räder aus einem Netz,
+      // alle vier ±4,5° → „gerade stellen“ verdrehte vorn UND hinten)
+      var mate = null, md = Infinity;
+      out.forEach(function (o2) {
+        if (o2 === h.w || o2.key[0] === h.w.key[0]) return;
+        var d = Math.abs(o2.center.dot(lenAx) - h.w.center.dot(lenAx)); if (d < md) { md = d; mate = o2; }
+      });
+      var turned = Math.abs(h.w.steer) > 0.035 && (!mate || (mate.steer * h.w.steer > 0 && Math.abs(mate.steer) > 0.035));
+      // Rauschen über 2°: Rad gilt als gerade modelliert, dreht um die Querachse (sonst eiert es um die Schätzachse)
+      if (Math.abs(h.w.steer) > 0.035 && !turned) h.w.fix = 0;
       inner.rotation.y = h.w.fix;
-      var turned = Math.abs(h.w.steer) > 0.035;
       var keep = new THREE.Group(); keep.name = 'Keep'; keep.rotation.y = straight && turned ? 0 : -h.w.fix;
       // Drehgruppe: dreht das Rad um seine Achse, pivot.rotation.y lenkt
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';

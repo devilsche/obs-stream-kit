@@ -2,7 +2,8 @@
 
 Für jedes im Car-Picker behaltene Auto (Server: data/car-picks.json, data/car-scan.json):
   1. Original aus dem Server-Cache holen (data/car-cache/<uid>.glb)
-  2. mit gltfpack auf höchstens MAX_TRIS Dreiecke vereinfachen (Materialien und Teile bleiben erhalten)
+  2. mit gltfpack auf höchstens MAX_TRIS Dreiecke vereinfachen (Materialien und Teile bleiben erhalten);
+     Skin-Netze (Knochen) vorher fest umrechnen (bake_skins), gltfpack rechnet sie sonst kaputt
   3. Texturen auf höchstens MAX_TEX Pixel verkleinern
   4. Fahrtrichtung bestimmen (eingeschlagene Räder = vorn, sonst Lampen-Namen, sonst kürzerer Überhang)
   5. nach data/car-rain/<uid>.glb auf den Server, dazu data/car-rain/catalog.json
@@ -107,6 +108,118 @@ def shrink_textures(path, max_px=MAX_TEX):
         out += data
     g["buffers"][0]["byteLength"] = len(out)
     glb_write(path, g, out)
+
+
+_NP = {5120: "i1", 5121: "u1", 5122: "i2", 5123: "u2", 5125: "u4", 5126: "f4"}
+_NORM = {5120: 127.0, 5121: 255.0, 5122: 32767.0, 5123: 65535.0}
+
+
+def _acc(g, binc, i):
+    """Accessor als numpy-Array (count × Komponenten), normalisierte Ganzzahlen als 0..1."""
+    import numpy as np
+    a = g["accessors"][i]
+    nc = glb_scan.NC[a["type"]]
+    dt = np.dtype(_NP[a["componentType"]]).newbyteorder("<")
+    out = np.zeros((a["count"], nc), dtype=np.float64)
+    if "bufferView" in a:
+        bv = g["bufferViews"][a["bufferView"]]
+        base = bv.get("byteOffset", 0) + a.get("byteOffset", 0)
+        stride = bv.get("byteStride") or nc * dt.itemsize
+        raw = np.frombuffer(bytes(binc), dtype=np.uint8, count=stride * (a["count"] - 1) + nc * dt.itemsize, offset=base)
+        rows = np.lib.stride_tricks.as_strided(raw, shape=(a["count"], nc * dt.itemsize), strides=(stride, 1))
+        out = np.ascontiguousarray(rows).view(dt).reshape(a["count"], nc).astype(np.float64)
+    if a.get("normalized") and a["componentType"] in _NORM:
+        out = out / _NORM[a["componentType"]]
+    return out
+
+
+def bake_skins(src, dst):
+    """Skin-Netze (Sketchfab-Export mit Knochen, z. B. BMW M3 Competition) in feste Netze umrechnen.
+
+    gltfpack rechnet die Skin-Daten solcher Dateien kaputt (Karosserie ~250-fach vergrößert neben den
+    festen Rädern), und three r128 rechnet Skins anders als die glTF-Norm (Knotenlage des Netzes doppelt).
+    Darum vorher: Punkte = Σ Gewicht · Knochen-Weltlage · inverseBind · Punkt (glTF-Norm, wie der
+    Sketchfab-Viewer), zurück in die Knotenlage des Netzes; JOINTS/WEIGHTS und skin fallen weg.
+    Gibt True zurück, wenn etwas umgerechnet wurde (dst geschrieben)."""
+    import numpy as np
+    g, binc = glb_read(src)
+    nodes = g.get("nodes", [])
+    if not any("skin" in n and "mesh" in n for n in nodes):
+        return False
+    world = {}
+
+    def walk(i, M):
+        W = M @ np.array(glb_scan._local(nodes[i]), dtype=np.float64).reshape(4, 4)
+        world[i] = W
+        for c in nodes[i].get("children", []):
+            walk(c, W)
+    for sc in g.get("scenes", []):
+        for r in sc.get("nodes", []):
+            walk(r, np.eye(4))
+    binc = bytearray(binc)
+
+    def add(arr, ctype, atype, target=None):
+        data = np.ascontiguousarray(arr, dtype="<f4" if ctype == 5126 else "<u4").tobytes()
+        binc.extend(b"\0" * (-len(binc) % 4))
+        bv = {"buffer": 0, "byteOffset": len(binc), "byteLength": len(data)}
+        if target:
+            bv["target"] = target
+        binc.extend(data)
+        g["bufferViews"].append(bv)
+        acc = {"bufferView": len(g["bufferViews"]) - 1, "componentType": ctype, "count": len(arr), "type": atype}
+        if atype == "VEC3" and ctype == 5126:
+            acc["min"] = [float(x) for x in arr.min(axis=0)]
+            acc["max"] = [float(x) for x in arr.max(axis=0)]
+        g["accessors"].append(acc)
+        return len(g["accessors"]) - 1
+
+    n_done = 0
+    for ni, nd in enumerate(nodes):
+        if "skin" not in nd or "mesh" not in nd or ni not in world:
+            continue
+        sk = g["skins"][nd["skin"]]
+        ibm = _acc(g, binc, sk["inverseBindMatrices"]).reshape(-1, 4, 4).transpose(0, 2, 1) if "inverseBindMatrices" in sk \
+            else np.tile(np.eye(4), (len(sk["joints"]), 1, 1))
+        jm = np.stack([world.get(j, np.eye(4)) for j in sk["joints"]]) @ ibm          # je Knochen 4×4
+        to_local = np.linalg.inv(world[ni])
+        mesh = json.loads(json.dumps(g["meshes"][nd["mesh"]]))   # eigene Kopie (Netz könnte geteilt sein)
+        for p in mesh["primitives"]:
+            at = p["attributes"]
+            if "POSITION" not in at or "JOINTS_0" not in at or "WEIGHTS_0" not in at:
+                continue
+            pos = _acc(g, binc, at["POSITION"])
+            M = np.zeros((len(pos), 4, 4))
+            for s in range(4):
+                if "JOINTS_%d" % s not in at:
+                    break
+                J = _acc(g, binc, at["JOINTS_%d" % s]).astype(np.int64)
+                Wt = _acc(g, binc, at["WEIGHTS_%d" % s])
+                for c in range(4):
+                    M += Wt[:, c, None, None] * jm[np.clip(J[:, c], 0, len(jm) - 1)]
+            M = to_local[None] @ M
+            hp = np.concatenate([pos, np.ones((len(pos), 1))], axis=1)
+            at["POSITION"] = add(np.einsum("nij,nj->ni", M, hp)[:, :3], 5126, "VEC3", 34962)
+            L = M[:, :3, :3]
+            if "NORMAL" in at:
+                nrm = np.einsum("nji,nj->ni", np.linalg.inv(L), _acc(g, binc, at["NORMAL"]))
+                nrm /= np.maximum(np.linalg.norm(nrm, axis=1, keepdims=True), 1e-12)
+                at["NORMAL"] = add(nrm, 5126, "VEC3", 34962)
+            if "TANGENT" in at:
+                tg = _acc(g, binc, at["TANGENT"])
+                t3 = np.einsum("nij,nj->ni", L, tg[:, :3])
+                t3 /= np.maximum(np.linalg.norm(t3, axis=1, keepdims=True), 1e-12)
+                at["TANGENT"] = add(np.concatenate([t3, tg[:, 3:4]], axis=1), 5126, "VEC4", 34962)
+            for k in [k for k in at if k.startswith("JOINTS_") or k.startswith("WEIGHTS_")]:
+                del at[k]
+            p.pop("targets", None)
+        g["meshes"].append(mesh)
+        nd["mesh"] = len(g["meshes"]) - 1
+        del nd["skin"]
+        n_done += 1
+    g["buffers"][0]["byteLength"] = len(binc)
+    glb_write(dst, g, binc)
+    print("  %d Skin-Netze fest umgerechnet" % n_done, flush=True)
+    return True
 
 
 def front_sign(path, scan):
@@ -294,6 +407,9 @@ def main(only=None, max_tris=MAX_TRIS):
         subprocess.run(SCP + ["root@31.70.95.217:%s/data/car-cache/%s.glb" % (REMOTE, uid), src], check=True)
         tris = sc.get("tris") or glb_scan.scan(src)["tris"]
         ratio = min(1.0, max_tris / max(1, tris))
+        baked = os.path.join(WORK, uid + ".baked.glb")
+        if bake_skins(src, baked):
+            src = baked
         cmd = ["npx", "-y", "gltfpack", "-i", src, "-o", dst, "-km", "-kn", "-noq"]
         if ratio < 1:
             cmd += ["-si", "%.4f" % ratio]

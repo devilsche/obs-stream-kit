@@ -205,6 +205,20 @@
     g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
   }
 
+  // Hüllquader aus den Eckpunkten selbst (Weltlage): Box3.setFromObject in three r128 dreht nur den Quader der
+  // Geometrie mit – bei schräg liegenden Teilen (Ferrari 296 GT3, Teile-Achsen ~53° bzw. leicht gekippt) wird er
+  // zu groß, das Auto schwebt dann über dem Boden und wird zu klein skaliert
+  function exactBox(obj) {
+    obj.updateMatrixWorld(true);
+    var b = new THREE.Box3(), v = new THREE.Vector3();
+    obj.traverse(function (o) {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+      var p = o.geometry.attributes.position, M = o.matrixWorld;
+      for (var i = 0; i < p.count; i++) b.expandByPoint(v.fromBufferAttribute(p, i).applyMatrix4(M));
+    });
+    return b.isEmpty() ? new THREE.Box3().setFromObject(obj) : b;
+  }
+
   // Modell ausrichten, skalieren, mittig setzen; Räder/Lack über GlbFix
   // Räder aus selbst gewählten Teilen (Car editor „Pick wheel parts“): Teile nach Lage zu Rädern gruppieren
   // (Seite, dann entlang der Länge), je Rad Drehpunkt in der Mitte, Drehgruppe „Spin“ um die Querachse
@@ -254,7 +268,7 @@
       v = Object.assign({}, v, { steerParts: v.frontWheelParts.slice(), wheelParts: (v.wheelParts || []).concat(v.frontWheelParts) });
     // eigene Räder: ausdrücklich gewählte Radteile, sonst die gewählten Felgen (plus Reifen) – dann dreht nur das
     var own = Array.isArray(v.wheelParts) || Array.isArray(v.steerParts) || (Array.isArray(v.rimParts) && v.rimParts.length > 0);
-    if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own, straight: v.straight !== false });
+    if (root.GlbFix) GlbFix.prepare(scene, { wheels: !own, straight: v.straight !== false, align: true });
     splitIslands(scene);
     // feste Schlüssel je Material (Name, sonst Reihenfolge) – für die Auswahl im Car editor
     var all = [], seen = {}, names = {};
@@ -366,6 +380,7 @@
     META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
+    // Längsachse und Front-Schätzung wie bisher über Box3 (sonst kippt bei knappen Überhängen die Fahrtrichtung)
     var box = new THREE.Box3().setFromObject(scene), size = new THREE.Vector3(); box.getSize(size);
     var lx = size.x >= size.z, front = e.front || 0;
     if (!front) {
@@ -381,12 +396,11 @@
     var rot = new THREE.Group(); rot.add(scene);
     rot.rotation.y = lx ? (front > 0 ? 0 : Math.PI) : (front > 0 ? Math.PI / 2 : -Math.PI / 2);
     rot.updateMatrixWorld(true);
-    box.setFromObject(rot); box.getSize(size);
+    box = exactBox(rot); box.getSize(size);
     var k = (e.len || 4.5) * UNIT / Math.max(1e-6, size.x);
     var wrap = new THREE.Group(); wrap.add(rot); wrap.scale.setScalar(k);
-    wrap.updateMatrixWorld(true);
-    box.setFromObject(wrap); var c = new THREE.Vector3(); box.getCenter(c); box.getSize(size);
-    rot.position.sub(c.divideScalar(k));
+    var c = new THREE.Vector3(); box.getCenter(c); size.multiplyScalar(k);
+    rot.position.sub(c);
     var car = new THREE.Group(); car.add(wrap); car.name = e.key;
     car.userData.dims = { L: size.x, W: size.z, H: size.y, belt: size.y * 0.62 };
     car.userData.key = e.key;
