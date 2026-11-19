@@ -6,6 +6,8 @@
   <title>Car Race</title>
   <!-- Theme-Tokens (--theme-*): der Server injiziert data-theme aufs <html> (sonst Entry-Default) -->
   <link rel="stylesheet" href="../widgets/_theme.css">
+  <!-- Rangliste (Zeitenturm): Aussehen frei anpassbar, Vorschau tools/car-race-hud-preview.html -->
+  <link rel="stylesheet" href="car-race-hud.css">
   <style>
     /* Car Race (js/car-race.js): Chat-Autorennen mit echten 3D-Autos auf einer Spielzeug-Strecke.
        Fenster 16:9, Standard 640×360 (bis 960×540); die Größe ändert nur den Ausschnitt.
@@ -80,6 +82,7 @@
   <main class="stage" id="stage">
     <canvas id="gl" class="layer" aria-hidden="true"></canvas>
     <canvas id="hud" class="layer" aria-hidden="true"></canvas>
+    <ol class="race-rank" id="race-rank" data-layout="window" aria-label="Race standings" hidden></ol>
   </main>
   <div class="preview-bar" id="preview-bar" hidden>
     <button type="button" id="pv-add">Add test racer</button>
@@ -114,6 +117,7 @@
       var race = CarRace.start({
         canvas: document.getElementById('gl'),
         hud: document.getElementById('hud'),
+        rank: document.getElementById('race-rank'),
         stage: document.getElementById('stage'),
         base: '../',
         preview: preview,

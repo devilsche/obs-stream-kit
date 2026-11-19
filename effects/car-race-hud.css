@@ -1,0 +1,164 @@
+/* =====================================================================================================
+   Car Race – Rangliste (Zeitenturm) als HTML + CSS
+   -----------------------------------------------------------------------------------------------------
+   Diese Datei enthält NUR das Aussehen der Rangliste. js/car-race.js baut das Markup und setzt nur
+   Attribute (keine Inline-Styles). Zum Ausprobieren: tools/car-race-hud-preview.html im Browser öffnen,
+   hier ändern, neu laden.
+
+   Markup (von js/car-race.js erzeugt):
+     <ol class="race-rank" data-layout="stage|window" data-cols="1|2" data-count="n">
+       <li class="race-rank__head">LAP 2 / 3</li>                     Kopfzeile (Runde, „FINAL“, „3 LAPS“)
+       <li class="race-rank__row" data-pos="1" data-state="run|done|dnf" data-sub="0|1000|2000|3000"
+           data-podium="1|2|3" data-flash>                             eine Zeile je Fahrer
+         <span class="race-rank__pos">1</span>                        Platz („–“ bei DNF)
+         <svg class="race-rank__bar"><rect fill="#chatfarbe"/></svg>  Chatfarbe (Farbe als SVG-Attribut)
+         <svg class="race-rank__star">…</svg>                         Sub-Stern (nur bei Subs)
+         <span class="race-rank__name">Name</span>                    Name (gekürzt per CSS-Ellipse)
+         <span class="race-rank__gap">+1.2s</span>                    Abstand: „LEADER“, „WINNER“, „+1 LAP“, „DNF“
+       </li>
+     </ol>
+
+   Attribute an der Liste:
+     data-layout  stage = Vollbild-Layout (unter dem Bild-im-Bild), window = kleines Fenster (links oben)
+     data-cols    2 = ab 7 Fahrern im Vollbild zwei Spalten (Plätze 1–5 links, 6–10 rechts)
+     data-count   Anzahl Fahrer
+     hidden       ausgeblendet (Lobby, Fahrervorstellung, Siegerehrung)
+   Attribute an der Zeile:
+     data-pos     aktueller Platz 1–10 – bestimmt die Höhe (Verschiebung unten); Platztausch gleitet
+     data-state   run = fährt, done = im Ziel, dnf = ausgeschieden
+     data-sub     Sub-Tier (0 = kein Sub) – Farbe des Sterns
+     data-podium  1/2/3 nur für die ersten drei (Platz-Kasten in Gold/Silber/Bronze)
+     data-flash   gesetzt für ~1,4 s nach einem Überholmanöver
+     data-leader  gesetzt beim Führenden
+
+   Größen in vh, damit alles mit der Fensterhöhe skaliert (1 vh = 10,8 px bei 1080p, 3,6 px bei 360p).
+   ===================================================================================================== */
+
+.race-rank {
+  /* --- Größen ---------------------------------------------------------------------------------------- */
+  --rank-row-h: 1.85vh;            /* Zeilenhöhe (20 px bei 1080p) */
+  --rank-head-h: 2.1vh;            /* Höhe der Kopfzeile */
+  --rank-width: 18.5vh;            /* Breite einer Spalte (200 px bei 1080p) */
+  --rank-col-gap: 0.55vh;          /* Abstand zwischen zwei Spalten */
+  --rank-pos-w: var(--rank-row-h); /* Breite des Platz-Kastens (quadratisch) */
+  --rank-bar-w: 0.2vh;             /* Breite des Chatfarben-Strichs */
+  --rank-star: 1.05vh;             /* Größe des Sub-Sterns */
+  --rank-pad: 0.45vh;              /* Innenabstand links/rechts in der Zeile */
+  --rank-radius: 0;                /* Ecken (0 = eckig) */
+  /* --- Schrift --------------------------------------------------------------------------------------- */
+  --rank-font: var(--theme-font-display, 'DM Sans', sans-serif);
+  --rank-name-size: 1.15vh;        /* Name */
+  --rank-pos-size: 1.05vh;         /* Platzziffer */
+  --rank-gap-size: 0.95vh;         /* Abstand rechts */
+  --rank-head-size: 1.1vh;         /* Kopfzeile */
+  --rank-name-stretch: 88%;        /* Name schmaler laufen lassen (100 % = normal) */
+  /* --- Farben ---------------------------------------------------------------------------------------- */
+  --rank-bg: rgba(29, 17, 40, 0.8);        /* Zeilen-Hintergrund (dunkel, halbtransparent) */
+  --rank-head-bg: rgba(29, 17, 40, 0.92);  /* Kopfzeile */
+  --rank-sep: rgba(255, 255, 255, 0.08);   /* Trennlinie zwischen Zeilen */
+  --rank-text: #ffffff;                    /* Name, Kopfzeile */
+  --rank-dim: #c9bdd6;                     /* Abstand, DNF */
+  --rank-accent: #f2b705;                  /* LEADER/WINNER, Kopf-Strich (Kanal-Gold) */
+  --rank-pos-bg: rgba(255, 255, 255, 0.14);/* Platz-Kasten ab Platz 4 */
+  --rank-pos-text: #ffffff;
+  --rank-gold: #f2b705;  --rank-silver: #c3c9d2;  --rank-bronze: #c07a3e;  /* Platz-Kasten P1–P3 */
+  --rank-podium-text: #1b1020;             /* Ziffer auf Gold/Silber/Bronze */
+  --rank-flash: rgba(242, 183, 5, 0.28);   /* Hinterlegung nach Überholmanöver */
+  --rank-star-t1: #d4dae3;  --rank-star-t2: #f2b705;  --rank-star-t3: #b98cff;  /* Sub-Stern je Tier */
+  --rank-shadow: 0 0.1vh 0.6vh rgba(0, 0, 0, 0.35);
+  /* --- Bewegung -------------------------------------------------------------------------------------- */
+  --rank-swap: 0.35s;              /* Dauer des Platztauschs */
+
+  /* Lage: kleines Fenster = links oben */
+  position: absolute; left: 3.5vh; top: 3.5vh;
+  width: var(--rank-width);
+  height: calc(var(--rank-head-h) + var(--rank-row-h) * var(--rank-rows, 10));
+  margin: 0; padding: 0; list-style: none;
+  font-family: var(--rank-font); color: var(--rank-text);
+  pointer-events: none;
+}
+.race-rank[hidden] { display: none; }
+
+/* kleines Fenster: Schrift relativ größer (das Fenster ist klein) */
+.race-rank[data-layout="window"] {
+  --rank-row-h: 4.6vh; --rank-head-h: 5.2vh; --rank-width: 43vh; --rank-star: 2.6vh; --rank-pad: 1.1vh;
+  --rank-name-size: 2.9vh; --rank-pos-size: 2.7vh; --rank-gap-size: 2.4vh; --rank-head-size: 2.7vh; --rank-bar-w: 0.5vh;
+}
+/* Vollbild: direkt unter dem Bild-im-Bild (24,24 · 640×360 bei 1080p → ab y 400 px) */
+.race-rank[data-layout="stage"] { left: 2.22vh; top: 37vh; }
+.race-rank[data-cols="2"] { width: calc(var(--rank-width) * 2 + var(--rank-col-gap)); }
+
+/* Kopfzeile */
+.race-rank__head {
+  position: absolute; left: 0; top: 0; right: 0; height: var(--rank-head-h);
+  display: flex; align-items: center; padding-left: calc(var(--rank-pad) + 0.3vh);
+  background: var(--rank-head-bg); box-shadow: var(--rank-shadow); border-radius: var(--rank-radius);
+  border-left: 0.3vh solid var(--rank-accent);
+  font-size: var(--rank-head-size); font-weight: 800; letter-spacing: 0.04em;
+}
+
+/* Zeile: absolut, Höhe über data-pos (siehe unten), gleitet beim Platztausch */
+.race-rank__row {
+  position: absolute; left: 0; top: var(--rank-head-h); width: var(--rank-width); height: var(--rank-row-h);
+  display: flex; align-items: center; gap: 0.35vh; padding-right: var(--rank-pad); box-sizing: border-box;
+  background: var(--rank-bg); border-top: 1px solid var(--rank-sep);
+  transition: transform var(--rank-swap) ease, opacity 0.3s ease;
+}
+.race-rank__row[data-pos="1"] { border-top-color: transparent; }
+.race-rank__row[data-flash] { background: linear-gradient(var(--rank-flash), var(--rank-flash)), var(--rank-bg); }
+.race-rank__row[data-state="dnf"] { opacity: 0.55; }
+
+/* Platz-Kasten */
+.race-rank__pos {
+  flex: 0 0 var(--rank-pos-w); height: 100%; display: flex; align-items: center; justify-content: center;
+  background: var(--rank-pos-bg); color: var(--rank-pos-text);
+  font-size: var(--rank-pos-size); font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.race-rank__row[data-podium="1"] .race-rank__pos { background: var(--rank-gold); color: var(--rank-podium-text); }
+.race-rank__row[data-podium="2"] .race-rank__pos { background: var(--rank-silver); color: var(--rank-podium-text); }
+.race-rank__row[data-podium="3"] .race-rank__pos { background: var(--rank-bronze); color: var(--rank-podium-text); }
+
+/* Chatfarben-Strich (Farbe kommt als fill-Attribut im SVG) */
+.race-rank__bar { flex: 0 0 var(--rank-bar-w); width: var(--rank-bar-w); height: 70%; }
+.race-rank__row[data-state="dnf"] .race-rank__bar { visibility: hidden; }
+
+/* Sub-Stern: Farbe je Tier */
+.race-rank__star { flex: 0 0 var(--rank-star); width: var(--rank-star); height: var(--rank-star); fill: var(--rank-star-t1); stroke: rgba(0, 0, 0, 0.55); stroke-width: 1; }
+.race-rank__row[data-sub="2000"] .race-rank__star { fill: var(--rank-star-t2); }
+.race-rank__row[data-sub="3000"] .race-rank__star { fill: var(--rank-star-t3); stroke: var(--rank-gold); }
+
+/* Name: fett, Großbuchstaben, schmaler, mit Ellipse gekürzt */
+.race-rank__name {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: var(--rank-name-size); font-weight: 800; text-transform: uppercase; font-stretch: var(--rank-name-stretch);
+  text-shadow: 0 0.05vh 0.1vh rgba(0, 0, 0, 0.7);
+}
+.race-rank__row[data-state="done"][data-pos="1"] .race-rank__name { color: var(--rank-accent); }
+
+/* Abstand rechts */
+.race-rank__gap {
+  flex: 0 0 auto; color: var(--rank-dim); font-size: var(--rank-gap-size); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.race-rank__row[data-leader] .race-rank__gap { color: var(--rank-accent); }
+
+/* Lage je Platz (eine Spalte) */
+.race-rank__row[data-pos="1"]  { transform: translate(0, calc(var(--rank-row-h) * 0)); }
+.race-rank__row[data-pos="2"]  { transform: translate(0, calc(var(--rank-row-h) * 1)); }
+.race-rank__row[data-pos="3"]  { transform: translate(0, calc(var(--rank-row-h) * 2)); }
+.race-rank__row[data-pos="4"]  { transform: translate(0, calc(var(--rank-row-h) * 3)); }
+.race-rank__row[data-pos="5"]  { transform: translate(0, calc(var(--rank-row-h) * 4)); }
+.race-rank__row[data-pos="6"]  { transform: translate(0, calc(var(--rank-row-h) * 5)); }
+.race-rank__row[data-pos="7"]  { transform: translate(0, calc(var(--rank-row-h) * 6)); }
+.race-rank__row[data-pos="8"]  { transform: translate(0, calc(var(--rank-row-h) * 7)); }
+.race-rank__row[data-pos="9"]  { transform: translate(0, calc(var(--rank-row-h) * 8)); }
+.race-rank__row[data-pos="10"] { transform: translate(0, calc(var(--rank-row-h) * 9)); }
+/* zwei Spalten: 1–5 links, 6–10 rechts */
+.race-rank[data-cols="2"] .race-rank__row[data-pos="6"]  { transform: translate(calc(var(--rank-width) + var(--rank-col-gap)), 0); }
+.race-rank[data-cols="2"] .race-rank__row[data-pos="7"]  { transform: translate(calc(var(--rank-width) + var(--rank-col-gap)), calc(var(--rank-row-h) * 1)); }
+.race-rank[data-cols="2"] .race-rank__row[data-pos="8"]  { transform: translate(calc(var(--rank-width) + var(--rank-col-gap)), calc(var(--rank-row-h) * 2)); }
+.race-rank[data-cols="2"] .race-rank__row[data-pos="9"]  { transform: translate(calc(var(--rank-width) + var(--rank-col-gap)), calc(var(--rank-row-h) * 3)); }
+.race-rank[data-cols="2"] .race-rank__row[data-pos="10"] { transform: translate(calc(var(--rank-width) + var(--rank-col-gap)), calc(var(--rank-row-h) * 4)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .race-rank__row { transition: none; }
+}

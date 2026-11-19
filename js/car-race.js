@@ -595,7 +595,7 @@
     function teardown() {
       if (!race) return;
       Object.keys(race.racers).forEach(function (id) { disposeRacer(race.racers[id]); });
-      clearOil(); clearPuffs();
+      clearOil(); clearPuffs(); clearRankDom();
       disposeTrack();
       race = null;
     }
@@ -1289,22 +1289,6 @@
     // Vollbild: kompakte Rangliste direkt unter dem Bild-im-Bild (gleiche Breite), halbtransparent wie die Lobby-Karte;
     // je Zeile Platz, Chatfarben-Balken, Name (20 px bei 1080p) und rechtsbündig das Automodell (15 px, entfällt
     // ohne Platz) – alles per measureText auf die Spalte gekürzt. Bis 10 Zeilen; reicht der Platz nicht, werden sie flacher.
-    function drawStageRanking(rows, now) {
-      var k = dpr * UIK, sw = W, sh = H;
-      hud.save(); hud.setTransform(k, 0, 0, k, 0, 0);
-      W = FULLW; H = FULLH;
-      try {
-        // unter dem Bild-im-Bild, bis ~560 px bei 1080p; Zeilen ~20 px; passt es nicht, zwei Türme nebeneinander
-        var x0 = PIP[0] / UIK, y0 = (PIP[1] + PIP[3] + 16) / UIK, wMax = PIP[2] / UIK, rowH = 10, bottom = 280;
-        drawTower(rows, now, x0, y0, Math.min(wMax, 200), rowH, bottom, wMax);
-      } finally { W = sw; H = sh; hud.restore(); }
-    }
-    // Zeitenturm im Fernseh-Stil: Kopfzeile (Runde), je Fahrer eine Zeile mit Platz im Kasten (P1–P3 Gold/Silber/
-    // Bronze), Chatfarben-Strich, Sub-Stern, NAME fett in Großbuchstaben (schmal gezogen, auf die Breite gekürzt),
-    // rechts Abstand zum Führenden („+1.2s“, „+1 LAP“, Führender „LEADER“, Sieger „WINNER“), DNF gedimmt.
-    // Dunkler halbtransparenter Streifen (~80 %), 1-px-Trennlinien. Passt der Turm nicht in die Höhe und ist
-    // wMax breiter, werden es zwei Türme nebeneinander.
-    var PODIUM_BOX = { 1: ['#f2b705', '#1b1020'], 2: ['#c3c9d2', '#1b1020'], 3: ['#c07a3e', '#1b1020'] };
     function towerHeader(rows) {
       if (race.stage === 'grid') return race.laps + ' LAPS';
       if (race.stage === 'end' || (race.sim && race.sim.done)) return 'FINAL';
@@ -1325,62 +1309,63 @@
       if (d >= L) { var laps = Math.floor(d / L); return '+' + laps + (laps === 1 ? ' LAP' : ' LAPS'); }
       return '+' + (d / Math.max(lead.v || 0, 8)).toFixed(1) + 's';
     }
-    function drawTower(rows, now, x0, y0, w, rowH, bottom, wMax) {
-      var n = rows.length, headH = Math.round(rowH * 1.15);
-      var fit = Math.max(1, Math.floor((bottom - y0 - headH) / rowH)), towers = n > fit && wMax && wMax >= w * 1.6 ? 2 : 1;
-      var per = towers > 1 ? Math.ceil(n / towers) : n, tw = towers > 1 ? Math.min(w, (wMax - 6) / 2) : w;
-      if (towers === 1 && n > fit) rowH = Math.max(7, (bottom - y0 - headH) / n);   // notfalls flacher
-      var fNum = rowH * 0.6, fName = rowH * 0.62, fGap = rowH * 0.52, bg = TK.surface, white = legible(TK.text, bg, 7), dim = legible(TK.dim, bg, 4.5);
-      var totalW = towers > 1 ? tw * 2 + 6 : tw;
-      // Kopfzeile über die ganze Breite
-      hud.save();
-      hud.shadowColor = 'rgba(0,0,0,0.35)'; hud.shadowBlur = 6; hud.shadowOffsetY = 1;
-      hud.fillStyle = withAlpha(bg, 0.92); hud.fillRect(x0, y0, totalW, headH);
-      hud.restore();
-      hud.fillStyle = FRAME_GOLD; hud.fillRect(x0, y0, 3, headH);
-      hud.textBaseline = 'middle'; hud.textAlign = 'left'; hud.font = font(800, rowH * 0.6); hud.fillStyle = white;
-      hud.fillText(towerHeader(rows), x0 + 8, y0 + headH / 2 + 0.5);
-      var dtH = Math.min(0.1, Math.max(0, now - (race.hudT || now))); race.hudT = now;
-      for (var t = 0; t < towers; t++) {
-        var tx = x0 + t * (tw + 6), ty = y0 + headH, cnt = Math.max(0, Math.min(per, n - t * per));
-        hud.fillStyle = withAlpha(bg, 0.8); hud.fillRect(tx, ty, tw, cnt * rowH);
-        hud.fillStyle = 'rgba(255,255,255,0.08)';
-        for (var j = 1; j < cnt; j++) hud.fillRect(tx, ty + j * rowH, tw, 1 / UIK);
+    // ---- Rangliste als HTML (Aussehen komplett in effects/car-race-hud.css) ----
+    // Nur Attribute und Text werden gesetzt (keine Inline-Styles); die Chatfarbe steht als fill-Attribut im SVG.
+    var SVGNS = 'http://www.w3.org/2000/svg', rankEl = opts.rank || null, rankDom = {}, rankHead = null, rankShown = false;
+    if (rankEl) rankEl.setAttribute('data-layout', STAGE ? 'stage' : 'window');
+    function setAttr(el, k, v) { if (v == null || v === false) { if (el.hasAttribute(k)) el.removeAttribute(k); } else if (el.getAttribute(k) !== String(v)) el.setAttribute(k, String(v)); }
+    function setText(el, t) { if (el.textContent !== t) el.textContent = t; }
+    function rankRow(r) {
+      var d = rankDom[r.id];
+      if (d) return d;
+      var li = document.createElement('li'); li.className = 'race-rank__row';
+      var pos = document.createElement('span'); pos.className = 'race-rank__pos';
+      var bar = document.createElementNS(SVGNS, 'svg'); bar.setAttribute('class', 'race-rank__bar'); bar.setAttribute('viewBox', '0 0 2 20'); bar.setAttribute('preserveAspectRatio', 'none'); bar.setAttribute('aria-hidden', 'true');
+      var rect = document.createElementNS(SVGNS, 'rect'); rect.setAttribute('width', '2'); rect.setAttribute('height', '20'); rect.setAttribute('fill', r.color); bar.appendChild(rect);
+      li.appendChild(pos); li.appendChild(bar);
+      if (r.tier) {
+        var st = document.createElementNS(SVGNS, 'svg'); st.setAttribute('class', 'race-rank__star'); st.setAttribute('viewBox', '-10 -10 20 20'); st.setAttribute('aria-hidden', 'true');
+        var poly = document.createElementNS(SVGNS, 'polygon'), pts = [];
+        for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 4 : 9; pts.push((Math.cos(a) * rr).toFixed(2) + ',' + (Math.sin(a) * rr).toFixed(2)); }
+        poly.setAttribute('points', pts.join(' ')); st.appendChild(poly); li.appendChild(st);
       }
-      hud.save();
-      hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 1; hud.shadowOffsetY = 0.5;
+      var name = document.createElement('span'); name.className = 'race-rank__name';
+      var gap = document.createElement('span'); gap.className = 'race-rank__gap';
+      li.appendChild(name); li.appendChild(gap);
+      rankEl.appendChild(li);
+      return (rankDom[r.id] = { li: li, pos: pos, name: name, gap: gap });
+    }
+    function updateRankDom(rows) {
+      if (!rankEl) return;
+      rankShown = true;
+      if (!rankHead) { rankHead = document.createElement('li'); rankHead.className = 'race-rank__head'; rankEl.insertBefore(rankHead, rankEl.firstChild); }
+      setText(rankHead, towerHeader(rows).replace(' / ', ' / '));
+      setAttr(rankEl, 'data-count', rows.length);
+      setAttr(rankEl, 'data-cols', STAGE && rows.length > 6 ? 2 : 1);
       rows.forEach(function (row, i) {
-        var r = row.r;
-        r.rankY = r.rankY == null || reduce ? i : ease(r.rankY, i, 0.14, dtH);
-        var t = towers > 1 ? Math.floor(i / per) : 0, tx = x0 + t * (tw + 6);
-        var y = y0 + headH + clamp(r.rankY - t * per, -0.5, per - 0.5) * rowH;
-        hud.save(); hud.beginPath(); hud.rect(tx, y0 + headH, tw, per * rowH); hud.clip();
-        if (r.flash > 0) { hud.fillStyle = withAlpha(TK.accent, 0.28 * r.flash / FLASH); hud.fillRect(tx, y, tw, rowH); }
-        hud.globalAlpha = row.dnf ? 0.55 : 1;
-        // Platz im Kasten
-        var bs = rowH - 2, box = PODIUM_BOX[+row.place] || null;
-        hud.fillStyle = box ? box[0] : 'rgba(255,255,255,0.14)'; hud.fillRect(tx + 1, y + 1, bs, bs);
-        hud.textAlign = 'center'; hud.font = font(800, fNum); hud.fillStyle = box ? box[1] : white;
-        hud.fillText(row.dnf ? '–' : String(row.place), tx + 1 + bs / 2, y + rowH / 2 + 0.3);
-        // Chatfarbe als Strich
-        if (!row.dnf) { hud.fillStyle = r.color; hud.fillRect(tx + bs + 3, y + 2, 1.5, rowH - 4); }
-        var nx = tx + bs + 7;
-        if (r.tier) { drawStar(hud, nx + fName * 0.42, y + rowH / 2, fName * 0.42, r.tier); nx += fName * 1.0; }
-        // rechts: Abstand
-        var gap = towerGap(row, rows);
-        hud.textAlign = 'right'; hud.font = font(700, fGap); hud.fillStyle = row.dnf ? dim : gap === 'LEADER' || gap === 'WINNER' ? FRAME_GOLD : dim;
-        var gw = gap ? hud.measureText(gap).width : 0;
-        hud.fillText(gap, tx + tw - 4, y + rowH / 2 + 0.3);
-        // NAME: fett, Großbuchstaben, leicht schmal gezogen, auf den Platz gekürzt
-        var avail = tx + tw - 4 - (gw ? gw + 6 : 0) - nx, cond = 0.88;
-        hud.font = font(800, fName); hud.textAlign = 'left'; hud.fillStyle = row.fin && row.place === '1' ? FRAME_GOLD : white;
-        hud.save(); hud.translate(nx, y + rowH / 2 + 0.3); hud.scale(cond, 1);
-        hud.fillText(fitText(hud, String(r.shown).toUpperCase(), avail / cond), 0, 0);
-        hud.restore();
-        hud.globalAlpha = 1;
-        hud.restore();
+        var r = row.r, d = rankRow(r), gap = towerGap(row, rows), pl = +row.place;
+        setAttr(d.li, 'data-pos', i + 1);
+        setAttr(d.li, 'data-state', row.dnf ? 'dnf' : row.fin ? 'done' : 'run');
+        setAttr(d.li, 'data-sub', (r.tier || 0) * 1000);
+        setAttr(d.li, 'data-podium', !row.dnf && pl >= 1 && pl <= 3 ? pl : null);
+        setAttr(d.li, 'data-flash', r.flash > 0 ? '' : null);
+        setAttr(d.li, 'data-leader', gap === 'LEADER' || gap === 'WINNER' ? '' : null);
+        setText(d.pos, row.dnf ? '–' : String(row.place));
+        setText(d.name, String(r.shown));
+        setText(d.gap, gap);
       });
-      hud.restore();
+      if (rankEl.hidden) rankEl.hidden = false;
+    }
+    // am Ende jedes Bildes: nicht gezeigt → ausblenden; nach dem Rennen leeren
+    function endRankFrame() {
+      if (!rankEl) return;
+      if (!rankShown && !rankEl.hidden) rankEl.hidden = true;
+      rankShown = false;
+    }
+    function clearRankDom() {
+      if (!rankEl) return;
+      Object.keys(rankDom).forEach(function (id) { var li = rankDom[id].li; if (li.parentNode) li.parentNode.removeChild(li); });
+      rankDom = {}; rankEl.hidden = true;
     }
     // HUD zeichnen: ganzes Canvas leeren, dann im freien Bereich (Vollbild) bzw. im ganzen Fenster
     function drawHudView(fn) {
@@ -1400,8 +1385,7 @@
       var m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
       // Rangliste links oben
       // Zeitenturm: Vollbild in der Spalte unter dem Bild-im-Bild, sonst links oben (Kopfzeile mit der Runde)
-      if (STAGE) drawStageRanking(rows, now);
-      else drawTower(rows, now, m, m, rh * 8.6, rh * 0.9, H - m);
+      updateRankDom(rows);
       // Countdown
       var left = race.startsAt != null ? race.startsAt - now : null;
       // Aktions-Schilder „NITRO! Name“ / „BUMP! A → B“ (2,2 s, auch bei reduzierter Bewegung)
@@ -1758,7 +1742,7 @@
       if (lastTs != null && ts - lastTs < 15) return;   // 60-fps-Deckel (z. B. 144-Hz-Bildschirme)
       var dt = lastTs == null ? 1 / 60 : Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
       // Bildabstand statt reiner Rechenzeit: erfasst auch eine ausgelastete Grafikkarte
-      try { frameBody(ts, dt); } finally { if (race && visible && dt < 0.1) adaptRes(dt * 1000, dt); }
+      try { frameBody(ts, dt); } finally { endRankFrame(); if (race && visible && dt < 0.1) adaptRes(dt * 1000, dt); }
     }
     function frameBody(ts, dt) {
       if (preview) previewTick();
