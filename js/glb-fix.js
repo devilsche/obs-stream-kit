@@ -298,6 +298,8 @@
       var groups = g.groups && g.groups.length ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }];
       var idx = triIndex(g);
       var byNode = !strict && wheelNode(o, obj);
+      // Gummi im Innenraum (Knoten „cockpit_interior_rubber“ mit Material „rubber“, M5 E28) ist kein Reifen
+      for (var pn = o; pn && pn !== obj; pn = pn.parent) if (pn.name && /interior|cockpit|\bint_|_int\b/i.test(pn.name)) return;
       groups.forEach(function (gr) {
         var mm = mats[gr.materialIndex || 0] || mats[0];
         if (!byNode && !(strict ? isTire(mm) : isWheelMat(mm))) return;
@@ -462,7 +464,7 @@
       // Drehgruppe: dreht das Rad um seine Achse, pivot.rotation.y lenkt
       var spin = new THREE.Group(); spin.name = 'Spin'; spin.userData.ax = lx ? 'z' : 'x';
       spin.add(inner); keep.add(spin); h.pivot.add(keep);
-      res.push({ pivot: h.pivot, side: h.w.key[0], radius: h.w.radius, steer: h.w.steer });
+      res.push({ pivot: h.pivot, side: h.w.key[0], radius: h.w.radius, steer: h.w.steer, half: h.w.half });
     });
     return res;
   }

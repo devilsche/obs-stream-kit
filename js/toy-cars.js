@@ -205,6 +205,96 @@
     g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
   }
 
+  // Automatische Räder: Stücke, die ganz in einem Radzylinder liegen, aber nicht am Rad hängen, nachträglich
+  // anhängen. Grund: ein Netz für beide Reifen einer Achse (M5 E28, Golf R32, A45, G63 …) hat seine Mitte in der
+  // Wagenmitte und wurde von GlbFix nicht zugeordnet; nach dem Zerlegen in Stücke liegt jedes Stück in einem Rad.
+  // Erst nach dem Vergeben der Teile-Schlüssel (Schlüssel bleiben gleich). Bremssättel/Bremsen bleiben stehen.
+  function adoptWheelPieces(scene) {
+    var ws = scene.userData.wheels || []; if (ws.length < 2) return 0;
+    scene.updateMatrixWorld(true);
+    // Prüfung in der Lage wie modelliert (vor dem Geradestellen): GlbFix hängt Teile so an „inner“, dass deren Lage
+    // relativ zum Drehpunkt erhalten bleibt; inner dreht um fix → modellierte Achse = Querachse um −fix gedreht
+    var W = ws.map(function (w) {
+      var sp = w.pivot.getObjectByName('Spin'), c = new THREE.Vector3(); w.pivot.getWorldPosition(c);
+      if (!sp) return null;
+      var inner = sp.children[0] || sp, lat = new THREE.Vector3(sp.userData.ax === 'z' ? 0 : 1, 0, sp.userData.ax === 'z' ? 1 : 0);
+      var ax = lat.applyAxisAngle(new THREE.Vector3(0, 1, 0), -inner.rotation.y).transformDirection(w.pivot.matrixWorld);
+      var s = new THREE.Vector3(); w.pivot.getWorldScale(s);
+      return { c: c, ax: ax, R: w.radius * s.x, H: Math.max((w.half || 0) * 1.6, w.radius * 0.5) * s.x, inner: inner, pivot: w.pivot };
+    }).filter(Boolean);
+    // nur plausible Räder (Unterkante nahe der tiefsten, Radius wie der Median) – Schein-Räder in der Wagenmitte
+    // (LaFerrari) bekommen keine weiteren Teile
+    var rs = W.map(function (w) { return w.R; }).sort(function (a, b) { return a - b; }), med = rs[Math.floor(rs.length / 2)];
+    var lowB = Math.min.apply(null, W.map(function (w) { return w.c.y - w.R; }));
+    W = W.filter(function (w) { return w.R > med * 0.6 && w.R < med * 1.6 && w.c.y - w.R - lowB < med * 0.25; });
+    if (!W.length) return 0;
+    function inWheel(o) { for (var p = o; p && p !== scene; p = p.parent) if (/^Wheel /.test(p.name || '')) return true; return false; }
+    var todo = [], v = new THREE.Vector3(), d = new THREE.Vector3();
+    scene.traverse(function (o) {
+      if (!o.isMesh || inWheel(o) || !o.geometry.attributes.position) return;
+      // Bremse, Fahrwerk, Karosserie, Auspuff, Lampen bleiben stehen (liegen oft auch im Radbereich)
+      if (/calip|brake|bremse|sattel|chassis|body|engine|exhaust|light|lamp|shaft|arm\b|lowerarm|upperarm|axle|susp|shock|spring|strut|knuckle|hub(?!cap)|fender|arch|mud|frame|bumper|skirt|tie_?rod|link|lowr|sway|control|wishbone|damper|brace/i.test([].concat(o.material).map(function (m) { return (m && m.name) || ''; }).join(' ') + ' ' + (o.name || ''))) return;
+      var p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 400)), cnt = W.map(function () { return 0; }), n = 0;
+      for (var i = 0; i < p.count; i += step) {
+        v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); n++;
+        for (var j = 0; j < W.length; j++) {
+          d.copy(v).sub(W[j].c); var al = d.dot(W[j].ax), rad = d.addScaledVector(W[j].ax, -al).length();
+          if (rad <= W[j].R * 1.12 && Math.abs(al) <= W[j].H) { cnt[j]++; break; }
+        }
+      }
+      var best = cnt.indexOf(Math.max.apply(null, cnt));
+      if (n && cnt[best] >= n * 0.9) {
+        // ohne Rad-Namen nur Stücke mittig auf der Achse (Reifen, Scheibe, Felge) – außermittige namenlose Stücke
+        // sind meist Bremssättel, die sonst mitdrehen würden (M3 E92)
+        var named = /tire|tyre|reifen|rubber|rim|felge|wheel|whl|spoke|hubcap|alloy|nut|bolt|screw|lug/i.test([].concat(o.material).map(function (m) { return (m && m.name) || ''; }).join(' ') + ' ' + (o.name || ''));
+        if (!named) {
+          var b0 = new THREE.Box3(); for (i = 0; i < p.count; i += step) b0.expandByPoint(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld));
+          d.copy(b0.getCenter(new THREE.Vector3())).sub(W[best].c); var a1 = d.dot(W[best].ax);
+          if (d.addScaledVector(W[best].ax, -a1).length() > W[best].R * 0.2) return;
+        }
+        todo.push([o, W[best]]); return;
+      }
+      // Reifen ohne Namen (G63, 918: Material „Scene_-_Root“), größer als der erkannte Radius (der kam von der
+      // Felge): rund (in der Radebene gleich hoch wie breit), mittig auf der Achse, nicht viel größer als die Felge
+      var bb = new THREE.Box3(); for (i = 0; i < p.count; i += step) bb.expandByPoint(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld));
+      var cc = bb.getCenter(new THREE.Vector3());
+      for (var q = 0; q < W.length; q++) {
+        var w = W[q]; d.copy(cc).sub(w.c); var a0 = d.dot(w.ax);
+        if (d.addScaledVector(w.ax, -a0).length() > w.R * 0.25 || Math.abs(a0) > w.H * 1.5) continue;
+        var up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3().crossVectors(w.ax, up).normalize();
+        var eu = [Infinity, -Infinity], es = [Infinity, -Infinity], ea = [Infinity, -Infinity], rmax = 0;
+        for (i = 0; i < p.count; i += step) {
+          v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).sub(w.c);
+          var pu = v.dot(up), ps = v.dot(side), pa = v.dot(w.ax);
+          eu = [Math.min(eu[0], pu), Math.max(eu[1], pu)]; es = [Math.min(es[0], ps), Math.max(es[1], ps)]; ea = [Math.min(ea[0], pa), Math.max(ea[1], pa)];
+          rmax = Math.max(rmax, Math.sqrt(pu * pu + ps * ps));
+        }
+        var hu = eu[1] - eu[0], hs = es[1] - es[0];
+        if (rmax <= w.R * 1.8 && hu > w.R * 1.6 && Math.abs(hu - hs) < hu * 0.12 && ea[1] - ea[0] < hu * 0.6) {
+          // Reifenmitte (in der Radebene) als neue Drehmitte merken, sonst eiert das Rad um die Felgen-Schätzung
+          var mid = new THREE.Vector3(); mid.addScaledVector(up, (eu[0] + eu[1]) / 2).addScaledVector(side, (es[0] + es[1]) / 2);
+          if (!w.ring || hu > w.ring.size) w.ring = { off: mid, size: hu };
+          todo.push([o, w]); return;
+        }
+      }
+    });
+    todo.forEach(function (t) {
+      // Lage relativ zum (ungedrehten) Drehpunkt übernehmen – wie GlbFix es mit den übrigen Radteilen macht
+      var o = t[0], M = new THREE.Matrix4().copy(t[1].pivot.matrixWorld).invert().multiply(o.matrixWorld);
+      t[1].inner.add(o); M.decompose(o.position, o.quaternion, o.scale); o.userData.wheelPart = true;
+    });
+    // Drehpunkt auf die Reifenmitte legen (Weltlage aller Teile bleibt): pivot um off verschieben, inner zurück
+    W.forEach(function (w) {
+      if (!w.ring || w.ring.off.length() < w.R * 0.02) return;
+      var keep = w.inner.parent && w.inner.parent.parent, off = w.ring.off.clone();
+      w.pivot.position.add(off);
+      var back = off.clone().negate(); if (keep) back.applyAxisAngle(new THREE.Vector3(0, 1, 0), -keep.rotation.y);
+      back.applyAxisAngle(new THREE.Vector3(0, 1, 0), -w.inner.rotation.y);
+      w.inner.children.forEach(function (ch) { ch.position.add(back.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0)); });
+    });
+    return todo.length;
+  }
+
   // deckungsgleiche Doppel-Teile (gleiches Material, gleiche Dreieckszahl, gleiche Lage – z. B. SF90 Spider: jede
   // Scheibe zweimal): wer eines wählt, bekommt das andere mit, sonst deckt das ungefärbte Doppel die Farbe zu
   function twins(scene) {
@@ -311,6 +401,7 @@
       n++; pk[base] = (pk[base] || 0) + 1;
       o.userData.pkey = pk[base] > 1 ? base + '~' + pk[base] : base;
     });
+    if (!own) adoptWheelPieces(scene);
     // „Split a part“ im Car editor: einzelne Teile fein zerlegen (an harten Kanten/UV-Nähten, ohne Verschweißen);
     // Stücke heißen <Teil>.<n>; Auswahlen auf das ganze Teil gelten für alle Stücke, Stücke ohne Zerlegung fürs ganze Teil
     var kids = {}, exists = {}, splitFail = {}, cutKids = {};
