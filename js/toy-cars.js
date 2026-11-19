@@ -580,6 +580,50 @@
       }, null, rej);
     }));
   }
+  // Für viele Autos gleichzeitig (Car Race): alle Teile je Besitzer und Material zu einem Netz zusammenfassen –
+  // Besitzer = nächste bewegte Gruppe (Spin = rollt, „Wheel …“ = lenkt) oder das Auto selbst. Anders als mergeStatic
+  // auch die Radteile und Netze mit unterschiedlichen Zusatz-Attributen (nur gemeinsame bleiben). Einmal je Vorlage;
+  // Umfärben über build() bleibt möglich (Material-Zuordnung je Material-uuid). Rückgabe: Anzahl Netze danach.
+  function mergeForRace(t) {
+    var BGU = THREE.BufferGeometryUtils;
+    if (!BGU || !BGU.mergeBufferGeometries || t.userData.raceMerged) return 0;
+    t.updateMatrixWorld(true);
+    var groups = {}, list = [];
+    t.traverse(function (o) {
+      if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || !o.geometry || !o.geometry.attributes.position) return;
+      if (Object.keys(o.geometry.morphAttributes || {}).length) return;
+      var owner = t;
+      for (var p = o.parent; p && p !== t; p = p.parent) if (p.name === 'Spin' || /^Wheel /.test(p.name || '')) { owner = p; break; }
+      var k = owner.uuid + '|' + o.material.uuid + '|' + o.renderOrder;
+      (groups[k] || (groups[k] = { owner: owner, mat: o.material, order: o.renderOrder, list: [] })).list.push(o);
+    });
+    Object.keys(groups).forEach(function (k) {
+      var g = groups[k];
+      if (g.list.length < 2) return;
+      // nur Attribute, die alle Teile haben; gemischt indiziert/nicht indiziert → alle ohne Index
+      var names = Object.keys(g.list[0].geometry.attributes).filter(function (a) {
+        return g.list.every(function (o) { var x = o.geometry.attributes[a], y = g.list[0].geometry.attributes[a]; return x && x.itemSize === y.itemSize && !x.isInterleavedBufferAttribute; });
+      });
+      var mixed = g.list.some(function (o) { return !o.geometry.index; });
+      var inv = new THREE.Matrix4().copy(g.owner.matrixWorld).invert();
+      var geos = g.list.map(function (o) {
+        var src = mixed && o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, gg = new THREE.BufferGeometry();
+        names.forEach(function (a) { gg.setAttribute(a, src.attributes[a].clone()); });
+        if (!mixed && src.index) gg.setIndex(src.index.clone());
+        gg.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+        return gg;
+      });
+      var merged = null;
+      try { merged = BGU.mergeBufferGeometries(geos, false); } catch (err) { merged = null; }
+      if (!merged) return;
+      var mesh = new THREE.Mesh(merged, g.mat); mesh.renderOrder = g.order; mesh.userData.wheelPart = g.owner !== t;
+      g.owner.add(mesh);
+      g.list.forEach(function (o) { if (o.parent) o.parent.remove(o); });
+    });
+    t.userData.raceMerged = true;
+    var n = 0; t.traverse(function (o) { if (o.isMesh) n++; });
+    return n;
+  }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   // Katalog + Auswahl laden: auflösen, sobald das erste Modell fertig ist (oder nach timeout); die übrigen
@@ -844,6 +888,6 @@
     meta: function (k) { return META[k]; }, editMode: function (on) { EDIT = !!on; },
     forget: function (k) { delete TPL[k]; delete loading[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
-    loadCatalog: loadCatalog, loadModel: loadModel, vehicle: vehicle, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
+    loadCatalog: loadCatalog, loadModel: loadModel, mergeForRace: mergeForRace, vehicle: vehicle, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -63,7 +63,7 @@
     var base = opts.base || '../', preview = !!opts.preview, reduce = !!opts.reduceMotion;
     var finishOpt = opts.finish != null && isFinite(opts.finish) ? clamp(+opts.finish, 5, 40) : null;
     var stageEl = opts.stage || null, canvas = opts.canvas, hudCanvas = opts.hud;
-    var W = 640, H = 360, dpr = 1;
+    var W = 640, H = 360, dpr = 1, resScale = 1;   // resScale: anpassbare Render-Auflösung (Leistung)
     // Layout „stage“: Rennen als Vollbild-Hintergrund (1920×1080), das Spiel als Bild-im-Bild oben links darüber.
     // Rechnung in logischen Pixeln (Höhe 540, UIK = Bildhöhe / 540), damit alle Größen wie im 960×540-Fenster
     // wirken; Kameras zielen auf die Mitte des freien Bereichs VW (ohne Bild-im-Bild), das HUD liegt darin.
@@ -82,7 +82,7 @@
       UIK = STAGE ? PH / 540 : 1;
       W = FULLW = PW / UIK; H = FULLH = PH / UIK;
       dpr = STAGE ? 1 : Math.min(2, root.devicePixelRatio || 1);   // Vollbild: Pixelverhältnis 1 (Leistung neben dem Spiel)
-      renderer.setPixelRatio(dpr); renderer.setSize(PW, PH, false);
+      renderer.setPixelRatio(dpr * resScale); renderer.setSize(PW, PH, false);
       hudCanvas.width = Math.round(PW * dpr); hudCanvas.height = Math.round(PH * dpr);
       cam.aspect = W / H;
       if (STAGE) {
@@ -320,7 +320,31 @@
 
     // ---- Autos ----
     // Modell laden – eine Stelle; immer die leichte Renn-Version (.race.glb, fällt serverseitig auf das volle Modell zurück)
-    function loadCarModel(entry) { return ToyCars.loadModel(entry, { race: true }); }
+    // Modell laden (leichte Renn-Version) und für viele Autos zusammenfassen (ToyCars.mergeForRace: Teile je
+    // Material und bewegter Gruppe → ~40 statt mehrere hundert Zeichenaufrufe je Auto)
+    function loadCarModel(entry) {
+      return ToyCars.loadModel(entry, { race: true }).then(function (t) { if (ToyCars.mergeForRace) ToyCars.mergeForRace(t); return t; });
+    }
+    // Warteschlange: ein Modell nach dem anderen mit Luft dazwischen (Laden + Aufbereiten blockiert den Haupt-Thread);
+    // während des Rennens wird nichts geladen – die Ersatz-Kiste bleibt bis zur Siegerehrung
+    var loadQ = [], loadBusy = false;
+    function queueModel(r) { if (r.entry && loadQ.indexOf(r) < 0) { loadQ.push(r); pumpLoads(); } }
+    function pumpLoads() {
+      if (loadBusy || !loadQ.length) return;
+      if (race && (race.stage === 'race' || race.stage === 'end')) { setTimeout(pumpLoads, 1000); return; }
+      var r = loadQ.shift();
+      if (r.gone || r.isModel) { pumpLoads(); return; }
+      loadBusy = true;
+      loadCarModel(r.entry).then(function () {
+          if (r.gone) return;
+          if (race && race.stage === 'race') { loadQ.push(r); return; }
+          setModel(r);
+          // auf dem Podest: neu aufs Treppchen setzen (Höhe des Modells)
+          if (race && race.stage === 'podium' && race.podium && race.podium.cars) race.podium.cars.forEach(function (c) { if (c.r === r) seatOnBlock(c); });
+        })
+        .catch(function () { /* Ersatz-Kiste bleibt */ })
+        .then(function () { loadBusy = false; setTimeout(pumpLoads, 120); });
+    }
     function catalogEntry(key) {
       if (!key) return null;
       var list = ToyCars.catalog ? ToyCars.catalog() : [];
@@ -358,7 +382,7 @@
       makeLabel(r);
       scene.add(r.holder);
       if (entry) {
-        loadCarModel(entry).then(function () { if (!r.gone) setModel(r); }).catch(function () { /* Ersatz-Kiste bleibt */ });
+        queueModel(r);
       }
       return r;
     }
@@ -865,6 +889,7 @@
       race.stage = 'podium';
       race.fadeAt = srvNow() + PODIUM_HOLD;
       upgradeWinnerModel(cars[0]);
+      cars.forEach(function (c) { if (!c.r.isModel) queueModel(c.r); });   // im Rennen nicht geladene Podest-Autos jetzt
     }
     // Podest-Kamera: nah und flach (30°), so dass die drei Autos samt Schildern das Fenster füllen;
     // oben bleibt Platz für den Titel, unten für die Punkte-Schilder und die DNF-Zeile
@@ -1481,14 +1506,19 @@
     var streakGeo = new THREE.PlaneGeometry(1, 1); streakGeo.rotateX(-Math.PI / 2);   // flach: Länge x, Breite z
     var oilGeo = new THREE.CircleGeometry(1, 28); oilGeo.rotateX(-Math.PI / 2);
 
-    var puffs = [], MAXP = reduce ? 12 : 160, pv3 = new THREE.Vector3();
+    var puffs = [], POOL = {}, MAXP = reduce ? 12 : 160, pv3 = new THREE.Vector3();
     function puff(kind, x, y, z, o) {
       o = o || {};
       if (puffs.length >= MAXP) return;   // voll: neues Teilchen verwerfen statt das älteste hart zu entfernen
       var spark = kind === 'spark', glow = spark || kind === 'flame';
-      var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FXT[kind], transparent: true, depthWrite: false, opacity: 0,
-        blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending }));
-      sp.position.set(x, y, z); scene.add(sp);
+      // aus dem Pool je Art (keine neuen Sprites/Materialien im Rennen)
+      var pool = POOL[kind] || (POOL[kind] = []), sp = pool.pop();
+      if (!sp) {
+        sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: FXT[kind], transparent: true, depthWrite: false, opacity: 0,
+          blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending }));
+        sp.userData.kind = kind; scene.add(sp);
+      }
+      sp.visible = true; sp.material.opacity = 0; sp.position.set(x, y, z);
       var rnd = Math.random;
       puffs.push({ s: sp, age: 0, life: o.life || (spark ? 0.35 + rnd() * 0.2 : 1.2 + rnd() * 0.9),
         size0: o.size || (spark ? 0.25 : 0.7 + rnd() * 0.5), grow: o.grow != null ? o.grow : (spark ? 0 : 1.6 + rnd() * 1.4),
@@ -1500,7 +1530,7 @@
     function stepPuffs(dt) {
       for (var i = puffs.length - 1; i >= 0; i--) {
         var q = puffs[i]; q.age += dt;
-        if (q.age >= q.life) { scene.remove(q.s); q.s.material.dispose(); puffs.splice(i, 1); continue; }
+        if (q.age >= q.life) { q.s.visible = false; POOL[q.s.userData.kind].push(q.s); puffs.splice(i, 1); continue; }
         var k = q.age / q.life;
         q.s.position.addScaledVector(q.vel, dt); q.vel.multiplyScalar(1 - dt * 1.2); q.vel.y += dt * q.grav;
         if (q.s.position.y < 0.1) { q.s.position.y = 0.1; q.vel.y = 0; }
@@ -1563,7 +1593,7 @@
             vel: new THREE.Vector3(WIND.x + (Math.random() - 0.5) * 0.3, 1.6 + fire * 0.8, WIND.z + (Math.random() - 0.5) * 0.3) });
       }
     }
-    function clearPuffs() { puffs.forEach(function (q) { scene.remove(q.s); q.s.material.dispose(); }); puffs = []; }
+    function clearPuffs() { puffs.forEach(function (q) { q.s.visible = false; POOL[q.s.userData.kind].push(q.s); }); puffs = []; }
     function rearOf(r, back) {
       var y = r.holder.rotation.y, f = (back ? -0.45 : 0.45) * r.len;
       return { x: r.holder.position.x + Math.cos(y) * f, z: r.holder.position.z - Math.sin(y) * f };
@@ -1637,9 +1667,25 @@
 
     // ---- Bildschleife ----
     var lastTs = null, idleCleared = false;
+    // Leistung: höchstens 60 Bilder/s; misst die Bildzeit und senkt bei Bedarf die Render-Auflösung
+    // (1 → 0,75 → 0,66, per CSS hochskaliert), bei viel Luft wieder hoch; unsichtbar wird nicht gerendert
+    var ftAvg = 16, ftT = 0;
+    function adaptRes(ms, dt) {
+      ftAvg += (ms - ftAvg) * 0.05; ftT += dt;
+      if (ftT < 2) return;
+      var next = resScale;
+      if (ftAvg > 20 && resScale > 0.66) next = resScale > 0.75 ? 0.75 : 0.66;
+      else if (ftAvg < 12 && resScale < 1) next = resScale < 0.75 ? 0.75 : 1;
+      if (next !== resScale) { resScale = next; ftT = 0; renderer.setPixelRatio(dpr * resScale); renderer.setSize(Math.round(W * UIK), Math.round(H * UIK), false); }
+    }
     function frame(ts) {
       requestAnimationFrame(frame);
+      if (lastTs != null && ts - lastTs < 15) return;   // 60-fps-Deckel (z. B. 144-Hz-Bildschirme)
       var dt = lastTs == null ? 1 / 60 : Math.min(0.1, (ts - lastTs) / 1000); lastTs = ts;
+      // Bildabstand statt reiner Rechenzeit: erfasst auch eine ausgelastete Grafikkarte
+      try { frameBody(ts, dt); } finally { if (race && visible && dt < 0.1) adaptRes(dt * 1000, dt); }
+    }
+    function frameBody(ts, dt) {
       if (preview) previewTick();
       if (STAGE && stageEl) stageEl.classList.toggle('is-3d', is3D(srvNow()));
       if (!race) {
