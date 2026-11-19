@@ -48,8 +48,7 @@
   // Sub-Lackierungen (state: paint = Set-Name): Gold glänzend metallic, Kanal-Lila glänzend, Carbon glänzend
   var SUB_PAINTS = { gold: { c: 0xd4a017, f: 'shiny' }, purple: { c: 0x5e2a79, f: 'gloss' }, carbon: { c: 0x2b2b30, f: 'carbonGloss' } };
   function shortName(n, max) { n = cleanName(n); return n.length > max ? n.slice(0, max - 1) + '\u2026' : n; }
-  var FLASH = 1.4;
-  var FRAME_GOLD = '#f2b705';   // Kanal-Gold für Rahmen/Kanten (nicht der Theme-Akzent, der z. B. hellblau sein kann)          // s, so lange leuchtet das Schild nach einem Überholmanöver
+  var FLASH = 1.4;               // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -123,8 +122,12 @@
       });
       var f = document.querySelector('.tk-font');
       if (f && getComputedStyle(f).fontFamily) TK.font = getComputedStyle(f).fontFamily;
+      // helle Themes (Swiss, Editorial): Akzent als Schrift muss auf der Fläche lesbar bleiben (≥ 3:1)
+      TK.accent = legible(TK.accent, TK.surface, 3);
     }
     readTokens();
+    // aufgelöste Theme-Farbe (rgb()-Text) als three.js-Farbe, sonst Rückfall
+    function themeColor(css, fb) { try { return new THREE.Color(css || fb); } catch (e) { return new THREE.Color(fb); } }
     function font(weight, px) { return weight + ' ' + Math.round(px) + 'px ' + TK.font; }
     // Farbe mit Deckkraft (für Hintergründe aus Theme-Farben)
     function withAlpha(css, a) {
@@ -256,8 +259,9 @@
       var line = new THREE.Mesh(own(new THREE.PlaneGeometry(T.width, 1.6)), own(new THREE.MeshStandardMaterial({ map: checkTex, roughness: 0.7 })));
       line.rotation.set(-Math.PI / 2, p0.yaw + Math.PI / 2, 0, 'YXZ');   // Breite quer zur Fahrtrichtung
       line.position.set(p0.x, 0.06, p0.z); g.add(line);
-      var purple = own(new THREE.MeshStandardMaterial({ color: 0x5e2a79, roughness: 0.5 }));
-      var gold = own(new THREE.MeshStandardMaterial({ color: 0xf2b705, roughness: 0.4, metalness: 0.3 }));
+      // Portal und Tribünendach in den Theme-Farben (Primär + Akzent)
+      var purple = own(new THREE.MeshStandardMaterial({ color: themeColor(TK.border, 0x5e2a79), roughness: 0.5 }));
+      var gold = own(new THREE.MeshStandardMaterial({ color: themeColor(TK.accent, 0xf2b705), roughness: 0.4, metalness: 0.3 }));
       // Portal: Pfosten hinter den Leitplanken (lokal z = −Normale: links = −z)
       var gantry = new THREE.Group(), postL = HALF + runAt(0, 1) + 0.8, postR = HALF + runAt(0, -1) + 0.8;
       [-postL, postR].forEach(function (z) {
@@ -748,7 +752,7 @@
         hud.save(); hud.globalAlpha = frameA;
         hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 10;
         roundRect(hud, VIEW[0] - 1.5, VIEW[1] - 1.5, VIEW[2] + 3, VIEW[3] + 3, 3);
-        hud.lineWidth = 3; hud.strokeStyle = FRAME_GOLD; hud.stroke();
+        hud.lineWidth = 3; hud.strokeStyle = TK.accent; hud.stroke();
         hud.restore();
         return;
       }
@@ -766,7 +770,7 @@
         hud.save(); hud.globalAlpha = frameA;
         hud.shadowColor = 'rgba(0,0,0,0.45)'; hud.shadowBlur = 10;
         roundRect(hud, x - 1.5, y - 1.5, w + 3, h + 3, 3);
-        hud.lineWidth = 3; hud.strokeStyle = FRAME_GOLD; hud.stroke();
+        hud.lineWidth = 3; hud.strokeStyle = TK.accent; hud.stroke();
         hud.restore();
         hud.clearRect(x, y, w, h);   // Schatten nicht ins Loch
       }
@@ -807,9 +811,9 @@
       hud.restore();
       hud.save(); roundRect(hud, x0, y0, w, h, 2); hud.clip();
       hud.fillStyle = withAlpha(bg, 0.9); hud.fillRect(x0, y0, w, headH);
-      hud.fillStyle = FRAME_GOLD; hud.fillRect(x0, y0, vh(0.3), headH);   // Goldbalken am Kopf
+      hud.fillStyle = TK.accent; hud.fillRect(x0, y0, vh(0.3), headH);   // Akzentbalken am Kopf (Theme)
       hud.restore();
-      roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 2); hud.lineWidth = 1; hud.strokeStyle = FRAME_GOLD; hud.stroke();
+      roundRect(hud, x0 + 0.5, y0 + 0.5, w - 1, h - 1, 2); hud.lineWidth = 1; hud.strokeStyle = TK.accent; hud.stroke();
       // Text mit leichtem Schatten (bleibt auch über hellem Spielbild lesbar)
       hud.save();
       hud.shadowColor = 'rgba(0,0,0,0.6)'; hud.shadowBlur = 1.5; hud.shadowOffsetY = 0.5;
@@ -905,7 +909,7 @@
       var widths = seq.map(function (c) { return Math.max(5, c.r.len * 0.95 + 1.2); }), total = widths.reduce(function (a, b) { return a + b; }, 0);
       var spot = podiumSpot(total + 2);
       var g = new THREE.Group(); g.position.set(spot.x, 0, spot.z); trackGroup.add(g);
-      var plinth = new THREE.Mesh(own(new THREE.BoxGeometry(total + 2, 0.25, 6)), own(new THREE.MeshStandardMaterial({ color: 0x5e2a79, roughness: 0.6 })));
+      var plinth = new THREE.Mesh(own(new THREE.BoxGeometry(total + 2, 0.25, 6)), own(new THREE.MeshStandardMaterial({ color: themeColor(TK.border, 0x5e2a79), roughness: 0.6 })));
       plinth.position.y = 0.125; g.add(plinth);
       var x = -total / 2;
       seq.forEach(function (c, i) {

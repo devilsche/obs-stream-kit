@@ -19,6 +19,9 @@
     h2 { font-size: 17px; margin: 28px 0 8px; }
     p { margin: 0 0 12px; max-width: 72ch; color: #cfc6da; }
     code { color: #f2b705; }
+    .theme-pick label { margin-right: 8px; }
+    .theme-pick select { font: inherit; padding: 4px 8px; min-height: 28px; background: #1f1430; color: #f1ecf6; border: 1px solid #5e2a79; border-radius: 4px; }
+    .theme-pick select:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
     /* Fläche wie im Stream: ein „Spielbild“ (dunkle Verläufe) mit Bild-im-Bild-Platzhalter; 100vh der Rangliste
        entspricht hier der Höhe der Fläche, weil die Fläche die volle Fensterhöhe hat */
     .shot {
@@ -39,6 +42,13 @@
 <body>
   <main>
     <h1>Car Race ranking</h1>
+    <p class="theme-pick"><label for="theme">Theme</label>
+      <select id="theme">
+        <option value="entry">Entry</option><option value="terminal">Terminal</option><option value="aurora">Aurora</option>
+        <option value="midnight">Midnight</option><option value="editorial">Editorial</option><option value="azure">Azure</option>
+        <option value="swiss">Swiss</option><option value="oldcamp">Old Camp</option><option value="barrier">Barrier</option>
+        <option value="sect">Sect</option>
+      </select></p>
     <p>Edit <code>effects/car-race-hud.css</code> and reload. Each frame below fills the window height,
       like the OBS source does (sizes are in vh). Scroll to see 3, 6 and 10 racers and the small window.</p>
 
@@ -140,5 +150,13 @@
       <span class="shot__label">640 × 360 (scaled to this frame)</span>
     </section>
   </main>
+  <script>
+    /* Theme umschalten: setzt data-theme auf <html> (wie der Server beim Ausliefern der Source) */
+    (function () {
+      var sel = document.getElementById('theme'), cur = document.documentElement.getAttribute('data-theme') || 'entry';
+      sel.value = cur;
+      sel.addEventListener('change', function () { document.documentElement.setAttribute('data-theme', sel.value); });
+    })();
+  </script>
 </body>
 </html>

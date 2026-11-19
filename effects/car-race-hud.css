@@ -34,6 +34,9 @@
      data-leader  gesetzt beim Führenden
 
    Größen in vh, damit alles mit der Fensterhöhe skaliert (1 vh = 10,8 px bei 1080p, 3,6 px bei 360p).
+   Farben und Schrift kommen aus dem Theme des Kanals (--theme-*, widgets/_theme.css, der Server setzt
+   data-theme auf <html>). Jede Theme-Variable hat einen festen Rückfallwert – nie eine Variable als Rückfall
+   (zirkuläre Variablen machen in OBS den ganzen Wert ungültig). Medaillenfarben P1–P3 und Sub-Sterne bleiben fest.
    ===================================================================================================== */
 
 .race-rank {
@@ -46,26 +49,27 @@
   --rank-bar-w: 0.2vh;             /* Breite des Chatfarben-Strichs */
   --rank-star: 1.05vh;             /* Größe des Sub-Sterns */
   --rank-pad: 0.45vh;              /* Innenabstand links/rechts in der Zeile */
-  --rank-radius: 0;                /* Ecken (0 = eckig) */
+  --rank-radius: min(var(--theme-radius, 0px), 4px);   /* Ecken: Theme-Radius, höchstens 4 px */
   /* --- Schrift --------------------------------------------------------------------------------------- */
-  --rank-font: var(--theme-font-display, 'DM Sans', sans-serif);
+  --rank-font: var(--theme-font-display, 'DM Sans', sans-serif);   /* Schrift des Themes */
   --rank-name-size: 1.15vh;        /* Name */
   --rank-pos-size: 1.05vh;         /* Platzziffer */
   --rank-gap-size: 0.95vh;         /* Abstand rechts */
   --rank-head-size: 1.1vh;         /* Kopfzeile */
   --rank-name-stretch: 88%;        /* Name schmaler laufen lassen (100 % = normal) */
   /* --- Farben ---------------------------------------------------------------------------------------- */
-  --rank-bg: rgba(29, 17, 40, 0.8);        /* Zeilen-Hintergrund (dunkel, halbtransparent) */
-  --rank-head-bg: rgba(29, 17, 40, 0.92);  /* Kopfzeile */
+  --rank-bg: var(--theme-surface, rgba(29, 17, 40, 0.8));        /* Zeilen-Hintergrund (Theme-Fläche) */
+  --rank-bg-alpha: 80%;                                           /* Deckkraft der Zeilen (wenn color-mix geht) */
+  --rank-head-bg: var(--theme-surface-2, rgba(29, 17, 40, 0.92));/* Kopfzeile */
   --rank-sep: rgba(255, 255, 255, 0.08);   /* Trennlinie zwischen Zeilen */
-  --rank-text: #ffffff;                    /* Name, Kopfzeile */
-  --rank-dim: #c9bdd6;                     /* Abstand, DNF */
-  --rank-accent: #f2b705;                  /* LEADER/WINNER, Kopf-Strich (Kanal-Gold) */
-  --rank-pos-bg: rgba(255, 255, 255, 0.14);/* Platz-Kasten ab Platz 4 */
-  --rank-pos-text: #ffffff;
+  --rank-text: var(--theme-text, #ffffff);         /* Name, Kopfzeile */
+  --rank-dim: var(--theme-text-dim, #c9bdd6);      /* Abstand, DNF */
+  --rank-accent: var(--theme-accent, #f2b705);     /* LEADER/WINNER, Kopf-Strich */
+  --rank-pos-bg: rgba(255, 255, 255, 0.14);       /* Platz-Kasten ab Platz 4 */
+  --rank-pos-text: var(--theme-text, #ffffff);
   --rank-gold: #f2b705;  --rank-silver: #c3c9d2;  --rank-bronze: #c07a3e;  /* Platz-Kasten P1–P3 */
   --rank-podium-text: #1b1020;             /* Ziffer auf Gold/Silber/Bronze */
-  --rank-flash: rgba(242, 183, 5, 0.28);   /* Hinterlegung nach Überholmanöver */
+  --rank-flash: rgba(242, 183, 5, 0.28);           /* Hinterlegung nach Überholmanöver (Rückfall ohne color-mix) */
   --rank-star-t1: #d4dae3;  --rank-star-t2: #f2b705;  --rank-star-t3: #b98cff;  /* Sub-Stern je Tier */
   --rank-shadow: 0 0.1vh 0.6vh rgba(0, 0, 0, 0.35);
   /* --- Bewegung -------------------------------------------------------------------------------------- */
@@ -84,6 +88,9 @@
 .race-rank[data-visible] { opacity: 1; }
 .race-rank[hidden] { display: none; }
 
+/* helles Theme mit hellem Akzent: Akzent als Schrift aus der Primärfarbe (sonst kaum lesbar auf Weiß) */
+html[data-theme="swiss"] .race-rank { --rank-accent: var(--theme-primary, #1a7a3c); }
+
 /* kleines Fenster: Schrift relativ größer (das Fenster ist klein) */
 .race-rank[data-layout="window"] {
   --rank-row-h: 4.6vh; --rank-head-h: 5.2vh; --rank-width: 43vh; --rank-star: 2.6vh; --rank-pad: 1.1vh;
@@ -97,7 +104,7 @@
 .race-rank__head {
   position: absolute; left: 0; top: 0; right: 0; height: var(--rank-head-h);
   display: flex; align-items: center; padding-left: calc(var(--rank-pad) + 0.3vh);
-  background: var(--rank-head-bg); box-shadow: var(--rank-shadow); border-radius: var(--rank-radius);
+  background: var(--rank-head-bg); box-shadow: var(--rank-shadow); border-radius: var(--rank-radius) var(--rank-radius) 0 0;
   border-left: 0.3vh solid var(--rank-accent);
   font-size: var(--rank-head-size); font-weight: 800; letter-spacing: 0.04em;
 }
@@ -106,17 +113,21 @@
 .race-rank__row {
   position: absolute; left: 0; top: var(--rank-head-h); width: var(--rank-width); height: var(--rank-row-h);
   display: flex; align-items: center; gap: 0.35vh; padding-right: var(--rank-pad); box-sizing: border-box;
-  background: var(--rank-bg); border-top: 1px solid var(--rank-sep);
+  background: var(--rank-bg);
+  background: color-mix(in srgb, var(--rank-bg) var(--rank-bg-alpha), transparent);   /* halbtransparent, falls unterstützt */
+  border-top: 1px solid var(--rank-sep);
   transition: transform var(--rank-swap) ease, opacity 0.3s ease;
 }
 .race-rank__row[data-pos="1"] { border-top-color: transparent; }
 .race-rank__row[data-flash] { background: linear-gradient(var(--rank-flash), var(--rank-flash)), var(--rank-bg); }
+.race-rank__row[data-flash] { background: linear-gradient(color-mix(in srgb, var(--rank-accent) 28%, transparent), color-mix(in srgb, var(--rank-accent) 28%, transparent)), color-mix(in srgb, var(--rank-bg) var(--rank-bg-alpha), transparent); }
 .race-rank__row[data-state="dnf"] { opacity: 0.55; }
 
 /* Platz-Kasten */
 .race-rank__pos {
   flex: 0 0 var(--rank-pos-w); height: 100%; display: flex; align-items: center; justify-content: center;
-  background: var(--rank-pos-bg); color: var(--rank-pos-text);
+  background: var(--rank-pos-bg); background: color-mix(in srgb, var(--rank-text) 14%, transparent);   /* passt auch zu hellen Themes */
+  color: var(--rank-pos-text);
   font-size: var(--rank-pos-size); font-weight: 800; font-variant-numeric: tabular-nums;
 }
 .race-rank__row[data-podium="1"] .race-rank__pos { background: var(--rank-gold); color: var(--rank-podium-text); }
