@@ -24,7 +24,7 @@
   var PX_MIN = 20 / 4.5, PX_MAX = 60 / 4.5;
   var TILT = 58 * Math.PI / 180, FOV = 30;
   var MAX_STEER = 0.42;   // größter Lenkeinschlag der Vorderräder (rad), wie in der Simulation
-  var POLL_MS = 1000, HOLD = 5, FADE = 0.6, PODIUM_HOLD = 12;
+  var POLL_MS = 1000, HOLD = 5, FADE = 0.6, PODIUM_HOLD = 15;
   var LABEL_W = 512, LABEL_H = 112;
   var FLASH = 1.4;          // s, so lange leuchtet das Schild nach einem Überholmanöver
   var PREVIEW_COLORS = ['#ff4f4f', '#1e90ff', '#00c878', '#ffb000', '#b05cff', '#ff69b4', '#00d2d2', '#9acd32', '#ff7f24', '#f2f2f2'];
@@ -638,7 +638,8 @@
       });
       race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts };
       race.podium.cam = podiumCam(race.podium, spot, total);
-      clearPodiumView(race.podium.cam, total);
+      race.podium.keys = podiumShots(race.podium);
+      clearPodiumView(race.podium, total);
       race.stage = 'podium';
       race.fadeAt = srvNow() + PODIUM_HOLD;
       upgradeWinnerModel(cars[0]);
@@ -662,17 +663,66 @@
       var cx = (Math.min.apply(null, xs) + Math.max.apply(null, xs)) / 2;
       return { x: cx, z: spot.z, y: stack / 2 + off / (px * cosT), px: px, tilt: PODIUM_TILT, orb: 0 };
     }
-    // Deko aus dem Blick räumen (für alle Instanzen gleich, rein aus Geometrie): alles im Podest-Bereich und im
-    // Korridor zwischen Podest und Kamera über den ganzen Schwenk (±0,22 rad) wird ausgeblendet
-    function clearPodiumView(pc, total) {
-      var tanH = Math.tan(FOV * Math.PI / 360) * (W / H), D = (W / pc.px) / (2 * tanH), hor = D * Math.cos(pc.tilt) + 4;
-      var half = total / 2 + 4, cams = [-0.24, -0.12, 0, 0.12, 0.24].map(function (a) { return [pc.x + hor * Math.sin(a), pc.z + hor * Math.cos(a)]; });
+    // Kamerafahrt der Siegerehrung als feste Schlüsselbilder (Zeit in s ab Beginn, für alle Instanzen gleich):
+    // 0–3,6 alle drei von schräg vorn · 4,8–10 Umlauf um den Sieger (vorn ¾ → Seite → hinten ¾) ·
+    // je ~1,2 s Vorbeifahrt an Platz 2 und 3 · 15 zurück in die Totale. Zwischen den Bildern weich (smoothstep).
+    // Reduzierte Bewegung: Totale, dann ein harter Schnitt auf eine stehende Nahaufnahme des Siegers.
+    // Schlüssel: { t, x, z, y, px, tilt, orb, wide (0..1: Titel/Punkte sichtbar), focus (Auto-Index oder −1), cut }
+    var CLOSE_TILT = 28 * Math.PI / 180, PASS_TILT = 22 * Math.PI / 180;
+    function closeKey(c, t, orb, tilt, along, fill) {
+      var hpx = podiumHpx(), cosT = Math.cos(tilt);
+      // Auto füllt ~fill der Breite; Schild über dem Auto darf oben nicht anstoßen
+      var px = Math.min(fill * W / Math.max(c.r.len, 3.5), (H / 2 - 12 - hpx) / ((c.r.height / 2 + 0.9) * cosT));
+      var yaw = -0.3, ax = Math.cos(yaw) * along * c.r.len, az = -Math.sin(yaw) * along * c.r.len;
+      return { t: t, x: c.x + ax, z: c.z + az, y: c.top + c.r.height * 0.5, px: px, tilt: tilt, orb: orb, wide: 0, focus: -1 };
+    }
+    function podiumShots(pd) {
+      var w = pd.cam, cars = pd.cars, keys = [];
+      function wide(t, orb) { return { t: t, x: w.x, z: w.z, y: w.y, px: w.px, tilt: w.tilt, orb: orb, wide: 1, focus: -1 }; }
+      function idx(pl) { for (var i = 0; i < cars.length; i++) if (cars[i].place === pl) return i; return -1; }
+      var i1 = idx(1), i2 = idx(2), i3 = idx(3);
+      if (reduce) {
+        keys.push(wide(0, 0), wide(6.5, 0));
+        if (i1 >= 0) { var k = closeKey(cars[i1], 6.5, 0.55, CLOSE_TILT, 0, 0.55); k.focus = i1; k.cut = true; keys.push(k, Object.assign({}, k, { t: 15, cut: false })); }
+        return keys;
+      }
+      keys.push(wide(0, 0.12), wide(3.6, 0));
+      if (i1 >= 0) {
+        [[4.8, 0.6], [7.4, -0.3], [10, -1.15]].forEach(function (o) { var k = closeKey(cars[i1], o[0], o[1], CLOSE_TILT, 0, 0.55); k.focus = i1; keys.push(k); });
+      }
+      var t = 10;
+      [i2, i3].forEach(function (i) {
+        if (i < 0) return;
+        var a = closeKey(cars[i], t + 0.7, 0.25, PASS_TILT, 0.28, 0.6), b = closeKey(cars[i], t + 1.9, 0.25, PASS_TILT, -0.28, 0.6);
+        a.focus = b.focus = i; keys.push(a, b); t += 1.9;
+      });
+      keys.push(wide(Math.max(t + 1.1, 15), 0));
+      return keys;
+    }
+    function smooth01(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
+    function podiumShotAt(pd, t) {
+      var K = pd.keys, i = 0;
+      while (i < K.length - 1 && K[i + 1].t <= t) i++;
+      var a = K[i], b = K[Math.min(i + 1, K.length - 1)];
+      var f = b === a || b.cut ? 0 : smooth01((t - a.t) / Math.max(0.01, b.t - a.t));
+      return { x: lerp(a.x, b.x, f), z: lerp(a.z, b.z, f), y: lerp(a.y, b.y, f), px: Math.exp(lerp(Math.log(a.px), Math.log(b.px), f)),
+        tilt: lerp(a.tilt, b.tilt, f), orb: lerp(a.orb, b.orb, f), wide: lerp(a.wide, b.wide, f), focus: f < 0.5 ? a.focus : b.focus };
+    }
+    // Deko aus dem Blick räumen (für alle Instanzen gleich, rein aus Geometrie): alles im Podest-Bereich und in den
+    // Korridoren zwischen Blickpunkt und Kamera entlang der ganzen Kamerafahrt wird ausgeblendet
+    function clearPodiumView(pd, total) {
+      var pc = pd.cam, tanH = Math.tan(FOV * Math.PI / 360) * (W / H), segs = [], half = total / 2 + 4;
+      var tEnd = pd.keys[pd.keys.length - 1].t;
+      for (var t = 0; t <= tEnd + 0.01; t += 0.25) {
+        var k = podiumShotAt(pd, t), D = (W / k.px) / (2 * tanH), hor = D * Math.cos(k.tilt) + 3;
+        segs.push({ x: k.x, z: k.z, cx: k.x + hor * Math.sin(k.orb), cz: k.z + hor * Math.cos(k.orb), half: k.wide > 0.5 ? half : W / k.px / 2 + 2 });
+      }
       function blocks(x, z, rad) {
         if (Math.hypot(x - pc.x, z - pc.z) < half + 3 + rad) return true;
-        return cams.some(function (c) {   // Abstand zur Strecke Podest → Kamera, Korridor so breit wie das Podest
-          var dx = c[0] - pc.x, dz = c[1] - pc.z, L2 = dx * dx + dz * dz;
-          var t = clamp(((x - pc.x) * dx + (z - pc.z) * dz) / L2, 0, 1);
-          return Math.hypot(x - (pc.x + dx * t), z - (pc.z + dz * t)) < half + rad;
+        return segs.some(function (sg) {   // Abstand zur Strecke Blickpunkt → Kamera
+          var dx = sg.cx - sg.x, dz = sg.cz - sg.z, L2 = dx * dx + dz * dz || 1;
+          var u = clamp(((x - sg.x) * dx + (z - sg.z) * dz) / L2, 0, 1);
+          return Math.hypot(x - (sg.x + dx * u), z - (sg.z + dz * u)) < sg.half + rad;
         });
       }
       trackDecor.objs.forEach(function (d) { if (blocks(d.o.position.x, d.o.position.z, d.r)) d.o.visible = false; });
@@ -714,6 +764,9 @@
     }
     function drawPodiumHud() {
       var pd = race.podium, m = Math.round(Math.min(W * 0.045, H * 0.07)), rh = clamp(H * 0.05, 12, 28), fs = rh * 0.62;
+      var wideA = pd.shot ? clamp((pd.shot.wide - 0.3) / 0.6, 0, 1) : 1;   // Titel/Punkte nur in der Totale
+      if (wideA <= 0) return;
+      hud.save(); hud.globalAlpha = wideA;
       hud.textBaseline = 'middle'; hud.textAlign = 'center';
       hud.font = font(800, fs * 1.1);
       var title = 'RACE RESULTS', tw = hud.measureText(title).width + rh * 1.2;
@@ -742,6 +795,7 @@
         pill(hud, (W - dw) / 2, dy - rh * 0.45, dw, rh * 0.9);
         hud.fillStyle = TK.dim; hud.fillText(d, W / 2, dy);
       }
+      hud.restore();
     }
 
     // ---- Kamera ----
@@ -767,17 +821,23 @@
       if (!fit) return;
       var c = race.cam, tauP = reduce ? 1.6 : 0.8, tauZ = reduce ? 2.6 : 1.3;
       if (!c) c = race.cam = { x: fit.x, z: fit.z, lp: Math.log(fit.px), tx: fit.x, tz: fit.z, vx: 0, vz: 0 };
+      if (fit.direct) {   // Kamerafahrt mit festen Schlüsselbildern: schon geglättet, direkt übernehmen
+        c.x = c.tx = fit.x; c.z = c.tz = fit.z; c.lp = Math.log(fit.px); c.ty = fit.y; c.tilt = fit.tilt; c.orb = fit.orb; c.vx = c.vz = 0;
+        tauP = 0;
+      }
       // Vorhalt: geschätzte Geschwindigkeit des Ziels, damit die Dämpfung nicht hinterherhängt
       var vx = fixed ? 0 : (fit.x - c.tx) / Math.max(dt, 1e-3), vz = fixed ? 0 : (fit.z - c.tz) / Math.max(dt, 1e-3);
       var vmax = 30, vl = Math.hypot(vx, vz); if (vl > vmax) { vx *= vmax / vl; vz *= vmax / vl; }
-      c.vx = ease(c.vx, vx, 0.5, dt); c.vz = ease(c.vz, vz, 0.5, dt);
-      c.tx = fit.x; c.tz = fit.z;
-      c.x = ease(c.x, fit.x + c.vx * tauP, tauP, dt); c.z = ease(c.z, fit.z + c.vz * tauP, tauP, dt);
-      c.lp = ease(c.lp, Math.log(fit.px), tauZ, dt);
-      c.ty = ease(c.ty || 0, fit.y || 0, tauP, dt);   // Blickhöhe (Podest: auf die Autos statt auf den Boden)
-      // Neigung und Umlaufwinkel (Podest: flacher, langsames Schwenken); weich übergeblendet
-      c.tilt = ease(c.tilt == null ? TILT : c.tilt, fit.tilt != null ? fit.tilt : TILT, tauZ, dt);
-      c.orb = ease(c.orb || 0, fit.orb || 0, tauP, dt);
+      if (!fit.direct) {
+        c.vx = ease(c.vx, vx, 0.5, dt); c.vz = ease(c.vz, vz, 0.5, dt);
+        c.tx = fit.x; c.tz = fit.z;
+        c.x = ease(c.x, fit.x + c.vx * tauP, tauP, dt); c.z = ease(c.z, fit.z + c.vz * tauP, tauP, dt);
+        c.lp = ease(c.lp, Math.log(fit.px), tauZ, dt);
+        c.ty = ease(c.ty || 0, fit.y || 0, tauP, dt);   // Blickhöhe (Podest: auf die Autos statt auf den Boden)
+        // Neigung und Umlaufwinkel (Podest: flacher); weich übergeblendet
+        c.tilt = ease(c.tilt == null ? TILT : c.tilt, fit.tilt != null ? fit.tilt : TILT, tauZ, dt);
+        c.orb = ease(c.orb || 0, fit.orb || 0, tauP, dt);
+      }
       var px = Math.exp(c.lp), visW = W / px, tanH = Math.tan(FOV * Math.PI / 360) * (W / H);
       var D = visW / (2 * tanH), hor = D * Math.cos(c.tilt);
       cam.position.set(c.x + hor * Math.sin(c.orb), c.ty + D * Math.sin(c.tilt), c.z + hor * Math.cos(c.orb));
@@ -1103,15 +1163,17 @@
       if (race.stage === 'podium') {
         var pd = race.podium;
         pd.t += dt;
-        pd.cars.forEach(function (c, k) { labels.push({ r: c.r, place: String(c.place), show: true, order: k }); });
+        var shot = pd.shot = podiumShotAt(pd, pd.t);
+        // Schilder: in der Totale alle, in Nahaufnahmen nur das Auto im Bild (sonst angeschnitten)
+        pd.cars.forEach(function (c, k) { labels.push({ r: c.r, place: String(c.place), show: shot.wide > 0.5 || shot.focus === k, order: k }); });
         // Goldfunken über dem Sieger (kurz, mit Rand-Fade; bei reduzierter Bewegung nicht)
         if (!reduce && pd.t < 4 && Math.random() < dt * 14) {
           var wn = pd.cars[0];
           puff('spark', wn.x + (Math.random() - 0.5) * wn.r.len, wn.top + wn.r.height + 1.5 + Math.random(), wn.z + (Math.random() - 0.5) * 2, { life: 0.9, size: 0.3 });
         }
-        // langsames Schwenken um das Podest (±0,22 rad, Periode ~25 s); bei reduzierter Bewegung steht die Kamera
-        pd.cam.orb = reduce ? 0 : 0.22 * Math.sin(pd.t * 0.25);
-        camFix = pd.cam;
+        // Übergang aus der Rennkamera weich (1,2 s gedämpft), danach direkt den Schlüsselbildern folgen;
+        // reduzierte Bewegung: sofort (Schnitt statt Fahrt)
+        camFix = Object.assign({}, shot, { direct: reduce || pd.t > 1.2 });
       } else if (race.stage === 'grid') {
         if (race.gridSim) race.order.forEach(function (r, i) {
           var c = race.gridSim.cars[i];
