@@ -205,6 +205,22 @@
     g.setAttribute('normal', new THREE.BufferAttribute(out, 3));
   }
 
+  // deckungsgleiche Doppel-Teile (gleiches Material, gleiche Dreieckszahl, gleiche Lage – z. B. SF90 Spider: jede
+  // Scheibe zweimal): wer eines wählt, bekommt das andere mit, sonst deckt das ungefärbte Doppel die Farbe zu
+  function twins(scene) {
+    scene.updateMatrixWorld(true);
+    var all = new THREE.Box3().setFromObject(scene), sz = new THREE.Vector3(); all.getSize(sz);
+    var q = Math.max(sz.x, sz.y, sz.z, 1e-9) * 5e-4, seen = {}, out = {}, v = new THREE.Vector3();
+    scene.traverse(function (o) {
+      if (!o.isMesh || Array.isArray(o.material) || !o.geometry.attributes.position) return;
+      var p = o.geometry.attributes.position, b = new THREE.Box3();
+      for (var i = 0; i < p.count; i++) b.expandByPoint(v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld));
+      var k = (o.material.name || o.material.uuid) + '|' + p.count + '|' + b.min.toArray().concat(b.max.toArray()).map(function (x) { return Math.round(x / q); }).join(',');
+      if (seen[k] && !out[seen[k]]) { out[seen[k]] = o.userData.pkey; out[o.userData.pkey] = seen[k]; } else if (!seen[k]) seen[k] = o.userData.pkey;
+    });
+    return out;
+  }
+
   // Hüllquader aus den Eckpunkten selbst (Weltlage): Box3.setFromObject in three r128 dreht nur den Quader der
   // Geometrie mit – bei schräg liegenden Teilen (Ferrari 296 GT3, Teile-Achsen ~53° bzw. leicht gekippt) wird er
   // zu groß, das Auto schwebt dann über dem Boden und wird zu klein skaliert
@@ -326,12 +342,13 @@
       if (!o.isMesh) return; exists[o.userData.pkey] = 1;
       var m = /^(.*)\/\d+$/.exec(o.userData.pkey || ''); if (m) (byBase[m[1]] || (byBase[m[1]] = [])).push(o.userData.pkey);
     });
+    var twin = twins(scene);
     function norm(list) {
       if (!Array.isArray(list)) return list;
       var out = [];
       list.forEach(function (k) {
         var add = kids[k] || (!exists[k] && byBase[k]) || (!exists[k] && /\.\d+$/.test(k) && exists[k.replace(/\.\d+$/, '')] ? [k.replace(/\.\d+$/, '')] : [k]);
-        add.forEach(function (x) { if (out.indexOf(x) < 0) out.push(x); });
+        add.forEach(function (x) { if (out.indexOf(x) < 0) out.push(x); if (twin[x] && out.indexOf(twin[x]) < 0) out.push(twin[x]); });
       });
       return out;
     }
@@ -383,7 +400,7 @@
       if (ms.some(function (m) { return m && autoPaint[m.uuid]; })) autoPaintParts.push(o.userData.pkey);
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
-    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
+    META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, twin: twin, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     // Längsachse und Front-Schätzung wie bisher über Box3 (sonst kippt bei knappen Überhängen die Fahrtrichtung)
@@ -407,7 +424,7 @@
     var wrap = new THREE.Group(); wrap.add(rot); wrap.scale.setScalar(k);
     var c = new THREE.Vector3(); box.getCenter(c); size.multiplyScalar(k);
     rot.position.sub(c);
-    var car = new THREE.Group(); car.add(wrap); car.name = e.key;
+    var car = new THREE.Group(); car.add(wrap); car.name = e.key; car.updateMatrixWorld(true);
     car.userData.dims = { L: size.x, W: size.z, H: size.y, belt: size.y * 0.62 };
     car.userData.key = e.key;
     delete ud.wheels; delete ud.paintMats; delete ud.rimMats; delete ud.rimFromPaint;
@@ -482,7 +499,61 @@
     return setOf(list[i >= 0 && list[i | 0] ? i | 0 : 0]);
   }
   // Oberflächen der Farbbereiche: [Metall, Rauheit, Klarlack]
-  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], shiny: [0.35, 0.1, 1], chrome: [1, 0.06, 0], glass: [0, 0.04, 1] };
+  var FINISH = { matte: [0, 0.85, 0], satin: [0.1, 0.5, 0], gloss: [0.1, 0.22, 1], shiny: [0.35, 0.1, 1], chrome: [1, 0.06, 0], glass: [0, 0.04, 1],
+    carbon: [0.15, 0.55, 0], carbonGloss: [0.2, 0.15, 1] };
+  var CARBON_DEFAULT = 0x1a1a1a;   // Carbon ohne eigene Farbe: fast schwarz
+  function isCarbon(f) { return f === 'carbon' || f === 'carbonGloss'; }
+  // Kohlefaser: 2×2-Köper, einmal als Canvas erzeugt (64 px = 8×8 Bündel); hell/dunkel je Bündelrichtung, mit
+  // leichtem Glanzverlauf längs der Fasern. Ohne Canvas (Node) kein Muster, nur Farbe/Oberfläche
+  var CARBON_TEX;
+  function carbonTex() {
+    if (CARBON_TEX !== undefined) return CARBON_TEX;
+    CARBON_TEX = null;
+    try {
+      var N = 64, cv = document.createElement('canvas'); cv.width = cv.height = N;
+      var g = cv.getContext('2d'), cell = N / 8;
+      for (var y = 0; y < 8; y++) for (var x = 0; x < 8; x++) {
+        var warp = ((x + y) >> 1) % 2 === 0;   // 2×2-Köper: Richtung wechselt alle zwei Felder, diagonal versetzt
+        for (var t = 0; t < cell; t++) {
+          var f = Math.sin(Math.PI * (t + 0.5) / cell), l = Math.round((warp ? 70 : 150) + 70 * f);
+          g.fillStyle = 'rgb(' + l + ',' + l + ',' + l + ')';
+          if (warp) g.fillRect(x * cell + t, y * cell, 1, cell); else g.fillRect(x * cell, y * cell + t, cell, 1);
+        }
+      }
+      var tex = new THREE.CanvasTexture(cv);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 4;
+      CARBON_TEX = tex;
+    } catch (e) { CARBON_TEX = null; }
+    return CARBON_TEX;
+  }
+  // Carbon-Teile bekommen Kasten-UVs in Auto-Größe (eine Kachel = 8 cm → Bündel 1 cm), unabhängig von den
+  // Modell-UVs (Atlas-UVs ergäben riesige oder winzige Muster); Geometrie dafür einmal je Teil kopiert
+  var CARBON_GEO = {};
+  function carbonUV(car) {
+    var inv = null, v = new THREE.Vector3(), n = new THREE.Vector3();
+    car.traverse(function (x) {
+      if (!x.isMesh || Array.isArray(x.material) || !x.material.userData.carbon) return;
+      if (!inv) { car.updateMatrixWorld(true); inv = new THREE.Matrix4().copy(car.matrixWorld).invert(); }
+      var M = new THREE.Matrix4().multiplyMatrices(inv, x.matrixWorld), id = x.geometry.uuid + ':' + M.elements.map(function (e) { return e.toFixed(4); }).join(',');
+      var g = CARBON_GEO[id];
+      if (!g) {
+        g = x.geometry.clone();
+        var p = g.attributes.position, nr = g.attributes.normal, uv = new Float32Array(p.count * 2), NM = new THREE.Matrix3().getNormalMatrix(M);
+        var s = 1 / (0.08 * UNIT);   // Teile liegen in Auto-Einheiten (UNIT je Meter)
+        for (var i = 0; i < p.count; i++) {
+          v.fromBufferAttribute(p, i).applyMatrix4(M);
+          if (nr) n.fromBufferAttribute(nr, i).applyMatrix3(NM); else n.set(0, 1, 0);
+          var ax = Math.abs(n.x), ay = Math.abs(n.y), az = Math.abs(n.z);
+          if (ax >= ay && ax >= az) { uv[i * 2] = v.z * s; uv[i * 2 + 1] = v.y * s; }
+          else if (ay >= az) { uv[i * 2] = v.x * s; uv[i * 2 + 1] = v.z * s; }
+          else { uv[i * 2] = v.x * s; uv[i * 2 + 1] = v.y * s; }
+        }
+        g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+        CARBON_GEO[id] = g;
+      }
+      x.geometry = g;
+    });
+  }
   // mittlere (lineare) Helligkeit einer Textur, damit die Graustufen-Struktur im Mittel 1 ergibt
   var LUM = {};
   function texLum(tex) {
@@ -529,14 +600,23 @@
       if (flat || !c.map) { c.map = null; if (c.aoMap) c.aoMapIntensity = 0.35; } else detailMap(c);
       c.metalnessMap = null; c.roughnessMap = null;
       c.metalness = F[0]; c.roughness = F[1];
-      // Glas: bleibt durchsichtig, die Farbe tönt nur (getönte Scheiben, farbige Lampengläser)
-      if (f === 'glass') { c.transparent = true; c.opacity = op != null ? Math.max(0.05, Math.min(1, op)) : Math.min(m.transparent ? m.opacity : 1, 0.55); c.depthWrite = false; c.alphaTest = 0; }
-      if ('clearcoat' in c) { c.clearcoat = F[2]; c.clearcoatRoughness = 0.08; }
+      // Glas: bleibt durchsichtig, die Farbe tönt nur (getönte Scheiben, farbige Lampengläser); mindestens 0,3 ohne Regler
+      if (f === 'glass') { c.transparent = true; c.opacity = op != null ? Math.max(0.05, Math.min(1, op)) : Math.max(0.3, Math.min(m.transparent ? m.opacity : 1, 0.55)); c.depthWrite = false; c.alphaTest = 0; }
+      // alle anderen Oberflächen sind deckend – auch auf Scheiben (sonst blieb z. B. „Gloss“ auf der Frontscheibe
+      // bei 30 % Deckkraft und wirkte unsichtbar); ausgeschnittene Texturen (alphaTest) bleiben ausgeschnitten
+      else { c.transparent = false; c.opacity = 1; c.depthWrite = true; if (!c.map) c.alphaTest = 0; if ('transmission' in c) c.transmission = 0; }
+      if (isCarbon(f)) {
+        var ct = carbonTex();
+        c.map = ct; c.onBeforeCompile = function () {}; c.customProgramCacheKey = function () { return 'carbon'; };
+        c.normalMap = null; c.aoMap = null; c.bumpMap = ct; c.bumpScale = 0.004;
+        c.envMapIntensity = f === 'carbonGloss' ? 1.6 : 0.8; c.userData.carbon = true;
+      }
+      if ('clearcoat' in c) { c.clearcoat = F[2]; c.clearcoatRoughness = f === 'carbonGloss' ? 0.04 : 0.08; }
     }
     return PAINTS[k];
   }
   // Farbe eines Bereichs: Set-Farbe, sonst Grundfarbe; null = Original lassen
-  function zoneColour(z, over) { return over && over[z.id] != null ? over[z.id] : (z.c == null ? null : z.c); }
+  function zoneColour(z, over) { return over && over[z.id] != null ? over[z.id] : (z.c == null ? (isCarbon(z.f) ? CARBON_DEFAULT : null) : z.c); }
   function colourMat(m, hex, tag, texOff) {
     var k = tag + ':' + m.uuid + ':' + hex + (texOff ? ':t' : '');
     if (!PAINTS[k]) {
@@ -567,19 +647,21 @@
     if (rim === undefined) rim = v.rim;
     if (o.paintParts || o.rimParts || o.zoneList) {
       // je Teil umfärben (Material-Kopien je Original-Material und Farbe); Bereiche zuerst
-      var zl = o.zoneList || [];
+      var zl = o.zoneList || [], tw = meta.twin || {};
+      function has(list, k) { return !!list && (list.indexOf(k) >= 0 || (tw[k] != null && list.indexOf(tw[k]) >= 0)); }
       car.traverse(function (x) {
         if (!x.isMesh || Array.isArray(x.material)) return;
         var k = x.userData.pkey;
         for (var i = 0; i < zl.length; i++) {
-          if ((zl[i].parts || []).indexOf(k) < 0) continue;
+          if (!has(zl[i].parts || [], k)) continue;
           var zc = zoneColour(zl[i], o.zones);
           if (zc != null) x.material = zoneMat(x.material, zc, zl[i].f, zl[i].flat, zl[i].o);
           return;
         }
-        if (rim != null && o.rimParts && o.rimParts.indexOf(k) >= 0) x.material = colourMat(x.material, rim, 'r', rimTex);
-        else if (color != null && o.paintParts && o.paintParts.indexOf(k) >= 0) x.material = colourMat(x.material, color, 'p', texOff);
+        if (rim != null && has(o.rimParts, k)) x.material = colourMat(x.material, rim, 'r', rimTex);
+        else if (color != null && has(o.paintParts, k)) x.material = colourMat(x.material, color, 'p', texOff);
       });
+      carbonUV(car);
       return car;
     }
     if (color != null) meta.paint.forEach(function (m) { swap[m.uuid] = colourMat(m, color, 'p', texOff); });
@@ -593,6 +675,7 @@
       if (Array.isArray(x.material)) x.material = x.material.map(function (m) { return swap[m.uuid] || m; });
       else if (swap[x.material.uuid]) x.material = swap[x.material.uuid];
     });
+    carbonUV(car);
     return car;
   }
   // set (optional): Farbset aus pickPaint – Felge und Bereichsfarben dazu

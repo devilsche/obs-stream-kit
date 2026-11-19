@@ -531,7 +531,7 @@
       $('setClose').addEventListener('click', closeSet);
       $('setDlg').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeSet(); } });
       // ── Farbbereiche ──
-      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['shiny', 'Shiny'], ['chrome', 'Chrome (colour = tint)'], ['glass', 'Glass (see-through, colour = tint)']];
+      var FINISHES = [['matte', 'Matte'], ['satin', 'Satin'], ['gloss', 'Gloss'], ['shiny', 'Shiny'], ['chrome', 'Chrome (colour = tint)'], ['glass', 'Glass (see-through, colour = tint)'], ['carbon', 'Carbon (matte)'], ['carbonGloss', 'Carbon (shiny)']];
       function zonePicking() { var m = /^zone:(.+)$/.exec(picking || ''); return m ? def.zones.filter(function (z) { return z.id === m[1]; })[0] || null : null; }
       function zones() {
         var box = $('zones'); box.textContent = '';
