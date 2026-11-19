@@ -51,6 +51,13 @@ Subs bekommen faire Extras (nichts, was den Sieg kauft). Kanalpunkte erlauben ei
   einmalig für das nächste Rennen.
 - Nicht verfügbare Autos/kein Rennen offen → Streamer.bot erstattet die Kanalpunkte automatisch.
 
+## 4. Eingriffe der Zuschauer im Rennen (Nutzerwunsch, später)
+
+- `!nitro`: kurzer Boost für das eigene Auto (z. B. +15 % Tempo für 2 s, einmal pro Rennen; Coins oder Kanalpunkte).
+- `!bump <name>`: ein anderes Auto anrempeln (Schubser wie beim Kontakt, kleine Dreher-Chance; Kosten/Abklingzeit).
+- Technisch: Befehle gehen an den Server, der sie mit Rennzeit als Ereignis an alle Overlays verteilt; die Simulation
+  übernimmt sie deterministisch (gleiche Rennzeit → gleiches Ergebnis in jeder Instanz).
+
 ## Offene Entscheidungen (Nutzer)
 
 - Coin-Raten und Preise oben ok?
