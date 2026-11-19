@@ -40,8 +40,8 @@ class _All(set):
 
 
 ALL = _All()
-MAX_TRIS = 120000   # darunter bleibt ein Modell unvereinfacht (runde Räder!); Teile werden beim Laden zusammengefasst
-MAX_TEX = 1024
+MAX_TRIS = 2000000   # praktisch nie vereinfachen: volle Originalform (Nutzerwunsch); Teile werden beim Laden zusammengefasst
+MAX_TEX = 2048
 RACE_TEX = 256     # Renn-Version (<uid>.race.glb): Geometrie identisch, nur Texturen kleiner
 WORK = os.path.join(tempfile.gettempdir(), "car-rain-build")
 # typische Längen (m) für Nicht-Pkw, sonst 4,5 m
