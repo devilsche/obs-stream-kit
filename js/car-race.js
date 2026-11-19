@@ -426,6 +426,24 @@
     // Gummiente als Fahrer (ToyCars.addDriver, js/rubber-duck.js): einmal je Fahrer, nur in echten Modellen
     // (Ersatz-Kisten ohne Ente); Outfit nach !outfit des Zuschauers, Testfahrer in der Vorschau zufällig.
     // Verkohlt beim Wrack automatisch mit (charMaterials läuft über das ganze Modell)
+    // Scheiben im Rennen durchsichtiger, damit die Enten-Fahrer zu sehen sind (nur hier, nicht im Editor/Burnout):
+    // Glas = durchsichtig/halbdurchsichtig, Name nach Glas/Fenster oder Oberfläche „glass“; Tönung bleibt
+    var GLASS_RE = /glass|glas|window|windshield|windscreen|scheibe/i;
+    function clearGlass(model) {
+      model.traverse(function (o) {
+        if (!o.isMesh || (o.userData && o.userData.driver)) return;
+        [].concat(o.material).forEach(function (m) {
+          if (!m || m.userData.raceGlass) return;
+          var glass = (m.transparent && m.opacity < 1) || GLASS_RE.test(m.name || '') || (m.transmission > 0);
+          if (!glass) return;
+          m.userData.raceGlass = true;
+          m.transparent = true; m.opacity = 0.18; m.depthWrite = false;
+          if ('transmission' in m) m.transmission = 0;
+          m.envMapIntensity = Math.min(m.envMapIntensity != null ? m.envMapIntensity : 1, 0.5);
+          m.needsUpdate = true;
+        });
+      });
+    }
     var duckCache = {};   // Outfit → fertige Ente (Vorlage für Kopien)
     function addDuck(r, model) {
       if (!ToyCars.addDriver || !root.RubberDuck || r.duck) return;
@@ -457,6 +475,7 @@
       model.scale.setScalar(k); model.position.y = d.H / 2 * k + 0.03;   // Asphalt liegt 3 cm über dem Boden (sonst sinken die Reifen ein)
       if (r.body) r.holder.remove(r.body);   // Kisten-Geometrie wird mit dem Fahrer entsorgt
       r.holder.add(model); r.body = model; r.isModel = true;
+      clearGlass(model);
       addDuck(r, model);
       r.height = d.H * k; r.w = d.W * k;
       r.shadow.scale.set(r.len * 1.15, r.w * 1.4, 1);
