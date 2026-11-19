@@ -19,11 +19,16 @@
  *       anderen Streckenteil, innen in Kurven kleiner.
  *       corners = [{ s0, len, dir (+1 links / −1 rechts), minR, counter (gegen die Hauptdrehrichtung) }],
  *       Kurve = zusammenhängender Abschnitt mit |curv| > 1/60; longestStraight (m); turnDir = Hauptdrehrichtung.
- *   CarRaceSim.stats(raw) → { acc, vmax, grip, brake, susp, launch, len, mass }
- *       raw = Verhältnis-Werte aus dem Car editor { power, speed, handling, susp, brakes, weight } je 1–10,
- *       drive 'fwd'|'rwd'|'awd', len (m). Keine echten km/h/PS: nur das Verhältnis zählt.
+ *   CarRaceSim.stats(raw[, real]) → { acc, vmax, grip, brake, susp, launch, len, mass }
+ *       raw = echte Werte aus CarRaceStats { vmax km/h, acc 0–100 km/h in s, hp PS, kg, grip g, brake g,
+ *       drive 'fwd'|'rwd'|'awd', len m }; fehlende Werte = Bezugsauto CarRaceSim.REF (300 km/h, 3,5 s, 0,4 PS/kg,
+ *       1,1 g, 1,3 g, 1500 kg). Jede Größe wirkt als Verhältnis zum Bezugsauto, gestaucht mit dem Realismus-Faktor
+ *       real (Standard CarRaceSim.REAL = 0,5; 0 = alle gleich, 1 = volle Verhältnisse; Formel bei REAL unten).
+ *       Kurvenhaftung und Bremsen wirken stark, vmax wenig, Beschleunigung aus 0–100-Zeit und Leistungsgewicht.
+ *       Spielzeug-Tempo: Simulationswerte in m/s bzw. m/s², nicht die echten.
  *       vmax ist die absolute Grenze (mit Windschatten); frei fährt das Auto vmax / 1,04.
- *       mass = Masse für Kontakte aus Länge und weight (Bus ≈ 17, Kleinwagen ≈ 4).
+ *       mass = Masse für Kontakte aus kg (Bus 12 t ≈ 17, Bezugsauto 4,5, Golf 800 kg ≈ 3).
+ *   CarRaceSim.lapTime(stats, track) → berechnete Rundenzeit (s) eines Autos allein (ohne Zufall): Rundenpace.
  *   CarRaceSim.create({ seed, track, laps, finishWindow, cars: [{ id, stats }] }) → sim
  *       track = Strecken-Seed (oder fertiges track()-Objekt). cars in Startreihenfolge (Index 0 = Pole).
  *       sim.step()            ein fester Schritt DT = 1/60 s
@@ -92,15 +97,25 @@
   var SLIP_RANGE = 25;        // Windschatten bis 25 m Abstand
   var SLIP_BONUS = 1.04;      // +4 % Endgeschwindigkeit im Windschatten
   // Fahrphysik (spielzeughaft herunterskaliert; abgestimmt mit scripts/check_car_race_sim.js)
-  var VTOP_BASE = 26.0;       // freie Endgeschwindigkeit (m/s) bei speed 5
-  var ACC_BASE = 5.0;         // Beschleunigung (m/s²) bei power 5 / weight 5
-  var GRIP_BASE = 11.0;        // Querbeschleunigung (m/s²) bei handling 5 / weight 5
-  var BRAKE_BASE = 8.0;       // Verzögerung (m/s²) bei brakes 5 / weight 5
+  // Simulationsgrößen eines Bezugsautos (REF unten); echte Werte wirken als Verhältnis dazu
+  var VTOP_BASE = 26.0;       // freie Endgeschwindigkeit (m/s) des Bezugsautos
+  var ACC_BASE = 5.0;         // Beschleunigung (m/s²) des Bezugsautos
+  var GRIP_BASE = 11.0;       // Querbeschleunigung (m/s²) des Bezugsautos
+  var BRAKE_BASE = 8.0;       // Verzögerung (m/s²) des Bezugsautos
+  var MASS_BASE = 4.5;        // Kontakt-Masse des Bezugsautos
   var DRAG_EXP = 4;           // Beschleunigung fällt mit (v / vtop)^4 ab
-  // Wirkung je Wertpunkt (relativ zu 5, gekrümmt über pts – oben steiler als unten)
-  var K_POWER = 0.045, K_HANDLING = 0.04, K_BRAKES = 0.035, K_SUSP = 0.018;   // Federung: Bodenhaftung
-  var K_WEIGHT_ACC = 0.017, K_WEIGHT_GRIP = 0.006, K_WEIGHT_BRAKE = 0.017;
-  var STAT_EXP = 4;           // Krümmung der Wertwirkung (siehe pts)
+  // Bezugsauto (etwa Feld-Mittel des Katalogs): echte Werte, um die gestaucht wird
+  var REF = { vmax: 300, acc: 3.5, pw: 0.4, grip: 1.1, brake: 1.3, kg: 1500 };
+  // Realismus-Faktor: 0 = alle gleich, 1 = volle echte Verhältnisse. Wirkung je Größe =
+  // exp(REAL · Gewicht · S · tanh(ln(echt / Bezug) / S)): kleine Unterschiede wirken fast wie (echt / Bezug)^(REAL · Gewicht),
+  // Extreme werden gestaucht. Nach unten deutlich stärker (S = SAT_LO) als nach oben (SAT_HI): langsame Autos
+  // liegen dicht beieinander (Bus, Oldtimer behalten eine kleine Außenseiter-Chance), schnelle setzen sich ab
+  // (ein F1 gewinnt oft, aber nicht immer)
+  var REAL = 0.5;
+  var SAT_LO = 0.14, SAT_HI = 0.7;
+  // Gewichte je Größe: Kurvenhaftung und Bremsen stark (kurvige Strecken), vmax wenig (kurze Geraden)
+  var W_VMAX = 0.4, W_ACC = 0.7, W_GRIP = 1.1, W_BRAKE = 0.8;
+  var W_MASS = 1.3;           // Kontakt-Masse ungestaucht: (kg / Bezug)^(REAL · W_MASS)
   var LAUNCH = { awd: 1.15, rwd: 1.0, fwd: 0.93 };   // Traktion beim Losfahren je Antrieb
   var FORM_SPREAD = 0.065;    // Tagesform des Fahrers: ±3,25 % am Kurvenlimit
   var OFF_LINE = 0.03;        // Tempoverlust in Kurven je Meter neben der Ideallinie (Überholen kostet)
@@ -353,30 +368,52 @@
     trackCache[seed] = t;
     return t;
   }
-  // ---- Werte je Auto (Verhältnis-Werte 1–10 → Simulationsgrößen) ----
-  function val(x, def) { x = Number(x); return isFinite(x) ? clamp(x, 1, 10) : def; }
-  // Wertpunkte relativ zu 5, gekrümmt: unten flach, oben steil (STAT_EXP = 1 wäre linear = v − 5).
-  // So setzt sich ein starkes Auto deutlich ab, während schwache Autos untereinander näher liegen.
-  function pts(v) { return 9 * (Math.pow((v - 1) / 9, STAT_EXP) - Math.pow(4 / 9, STAT_EXP)); }
-  function stats(raw) {
+  // ---- Werte je Auto (echte Werte → Simulationsgrößen) ----
+  function num(x, lo, hi, def) { x = Number(x); return isFinite(x) && x > 0 ? clamp(x, lo, hi) : def; }
+  function stats(raw, real) {
     raw = raw || {};
-    var p = val(raw.power, 5), sp = val(raw.speed, 5), h = val(raw.handling, 5), su = val(raw.susp, 5),
-      b = val(raw.brakes, 5), w = val(raw.weight, 5);
+    var R = real == null ? REAL : clamp(Number(real) || 0, 0, 1);
+    var vmax = num(raw.vmax, 30, 420, REF.vmax), acc = num(raw.acc, 1.5, 60, REF.acc),
+      hp = num(raw.hp, 20, 2000, REF.pw * REF.kg), kg = num(raw.kg, 300, 40000, REF.kg),
+      grip = num(raw.grip, 0.2, 5, REF.grip), brake = num(raw.brake, 0.3, 6, REF.brake);
     var len = Number(raw.len); if (!(len > 0)) len = 4.5;
-    // speed 10 = 1,6 × speed 1, speed 5 = VTOP_BASE (dazwischen gekrümmt wie die übrigen Werte)
-    var c5 = Math.pow(4 / 9, STAT_EXP), sa = 1 / (1 + 0.6 * c5);
-    var vtop = VTOP_BASE * sa * (1 + 0.6 * Math.pow((sp - 1) / 9, STAT_EXP));
-    var ew = pts(11 - w) - pts(6);                // Gewicht umgekehrt: leicht = gut
+    // Beschleunigung: geometrisches Mittel aus 0–100-Zeit und Leistungsgewicht (PS je kg)
+    var accR = Math.sqrt(REF.acc / acc) * Math.sqrt(hp / kg / REF.pw);
+    function f(ratio, w) {
+      var x = Math.log(ratio), S = x < 0 ? SAT_LO : SAT_HI;
+      return Math.exp(R * w * S * Math.tanh(x / S));
+    }
     return {
-      acc: ACC_BASE * (1 + K_POWER * pts(p)) * (1 + K_WEIGHT_ACC * ew),
-      vmax: vtop * SLIP_BONUS,
-      grip: GRIP_BASE * (1 + K_HANDLING * pts(h)) * (1 + K_SUSP * pts(su)) * (1 + K_WEIGHT_GRIP * ew),
-      brake: BRAKE_BASE * (1 + K_BRAKES * pts(b)) * (1 + K_WEIGHT_BRAKE * ew),
-      susp: su / 10,
+      acc: ACC_BASE * f(accR, W_ACC),
+      vmax: VTOP_BASE * f(vmax / REF.vmax, W_VMAX) * SLIP_BONUS,
+      grip: GRIP_BASE * f(grip / REF.grip, W_GRIP),
+      brake: BRAKE_BASE * f(brake / REF.brake, W_BRAKE),
+      susp: clamp(0.2 + 0.3 * grip, 0.3, 0.9),       // Federung (Wellen, Wanken) aus der Haftung: Bus weich, Rennwagen straff
       launch: LAUNCH[raw.drive] || 1,
       len: len,
-      mass: len * (0.55 + 0.09 * w)               // Masse für Kontakte (Bus 12 m/weight 10 ≈ 17, Kleinwagen ≈ 4)
+      mass: MASS_BASE * Math.pow(kg / REF.kg, R * W_MASS)        // Masse für Kontakte (Bus 12 t ≈ 17, Golf 800 kg ≈ 3)
     };
+  }
+
+  // Berechnete Rundenzeit (s) eines Autos allein auf der Strecke (ohne Zufall, ohne Windschatten):
+  // Kurvenprofil mit Bremszonen wie in create(), vorwärts mit der Beschleunigung begrenzt. Für Ranglisten/Prüfungen.
+  function lapTime(st, T) {
+    T = typeof T === 'object' && T ? T : track(T | 0);
+    var raw = T._raw, n = raw.n, ds = raw.ds, prof = new Float64Array(n), k, pass, vtop = st.vmax / SLIP_BONUS;
+    for (k = 0; k < n; k++) prof[k] = Math.min(vtop, Math.sqrt(st.grip / Math.max(Math.abs(raw.CRV[k]), 1e-4)));
+    for (pass = 0; pass < 2; pass++) for (k = n - 1; k >= 0; k--) {
+      var nx = prof[(k + 1) % n]; prof[k] = Math.min(prof[k], Math.sqrt(nx * nx + 2 * st.brake * ds));
+    }
+    var v = prof[0], t = 0;
+    for (pass = 0; pass < 2; pass++) {
+      t = 0;
+      for (k = 0; k < n; k++) {
+        var a = st.acc * Math.max(0, 1 - Math.pow(v / vtop, DRAG_EXP));
+        var v2 = Math.min(prof[(k + 1) % n], Math.sqrt(v * v + 2 * a * ds));
+        t += 2 * ds / Math.max(v + v2, 0.1); v = v2;
+      }
+    }
+    return t;
   }
 
   // Breite eines Autos (m) aus seiner Länge – auch fürs Overlay/Prüfskript
@@ -1006,6 +1043,6 @@
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
     // gute Strecken-Seeds: node scripts/check_car_race_sim.js --find 30 (Regeln + Siegerzeit 57–67 s)
     TRACKS: [1, 2, 3],
-    HEAVY_PUSH: HEAVY_PUSH, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
+    HEAVY_PUSH: HEAVY_PUSH, REAL: REAL, REF: REF, lapTime: lapTime, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
   };
 });

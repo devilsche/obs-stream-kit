@@ -40,6 +40,7 @@
     button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible, canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     input, select { background: #0e131c; color: var(--text); border: 1px solid #4a5570; border-radius: 6px; padding: 4px 6px; font: inherit; min-height: 30px; box-sizing: border-box; }
     input[type=number] { width: 64px; }
+    input.race-num { width: 84px; }
     input[type=color] { width: 44px; padding: 2px; }
     input[type=range] { flex: 1; min-width: 110px; accent-color: var(--accent); }
     input[type=checkbox] { width: 20px; height: 20px; min-height: 0; accent-color: var(--accent); }
@@ -204,24 +205,26 @@
 
       <section aria-labelledby="h-race">
         <h2 id="h-race">Race stats</h2>
-        <p class="muted small-text">Relative values for the chat car race (1–10, no real units). Until you change something the values are an estimate from the car class. Above 5 matters strongly, below 5 only slightly; a heavy car is slower off the line.</p>
+        <p class="muted small-text">Real values for the chat car race. Until you change something they are an estimate (known car or car class), shown after each field. Cornering grip and braking matter most on the twisty tracks, top speed only a little; the race squeezes the differences, so a slow car keeps a small chance.</p>
         <div class="row">
           <input type="checkbox" id="raceOn">
           <label for="raceOn">Takes part in races</label>
         </div>
-        <div class="row"><label for="racePower">Power</label><input type="range" id="racePower" class="race-in" data-k="power" min="1" max="10" step="1" value="5"><output id="racePowerOut" for="racePower">5</output></div>
-        <div class="row"><label for="raceSpeed">Top speed</label><input type="range" id="raceSpeed" class="race-in" data-k="speed" min="1" max="10" step="1" value="5"><output id="raceSpeedOut" for="raceSpeed">5</output></div>
-        <div class="row"><label for="raceHandling">Handling</label><input type="range" id="raceHandling" class="race-in" data-k="handling" min="1" max="10" step="1" value="5"><output id="raceHandlingOut" for="raceHandling">5</output></div>
-        <div class="row"><label for="raceSusp">Suspension</label><input type="range" id="raceSusp" class="race-in" data-k="susp" min="1" max="10" step="1" value="5"><output id="raceSuspOut" for="raceSusp">5</output></div>
-        <div class="row"><label for="raceBrakes">Brakes</label><input type="range" id="raceBrakes" class="race-in" data-k="brakes" min="1" max="10" step="1" value="5"><output id="raceBrakesOut" for="raceBrakes">5</output></div>
-        <div class="row"><label for="raceWeight">Weight</label><input type="range" id="raceWeight" class="race-in" data-k="weight" min="1" max="10" step="1" value="5"><output id="raceWeightOut" for="raceWeight">5</output></div>
+        <div class="row"><label for="raceVmax">Top speed (km/h)</label><input type="number" id="raceVmax" class="race-in race-num" data-k="vmax" min="30" max="420" step="1" aria-describedby="raceVmaxEst"><span class="muted small-text" id="raceVmaxEst"></span></div>
+        <div class="row"><label for="raceAcc">0–100 km/h (s)</label><input type="number" id="raceAcc" class="race-in race-num" data-k="acc" min="1.5" max="60" step="0.1" aria-describedby="raceAccEst"><span class="muted small-text" id="raceAccEst"></span></div>
+        <div class="row"><label for="raceHp">Power (hp)</label><input type="number" id="raceHp" class="race-in race-num" data-k="hp" min="20" max="2000" step="1" aria-describedby="raceHpEst"><span class="muted small-text" id="raceHpEst"></span></div>
+        <div class="row"><label for="raceKg">Weight (kg)</label><input type="number" id="raceKg" class="race-in race-num" data-k="kg" min="300" max="40000" step="1" aria-describedby="raceKgEst"><span class="muted small-text" id="raceKgEst"></span></div>
+        <div class="row"><label for="raceGrip">Cornering grip (g)</label><input type="number" id="raceGrip" class="race-in race-num" data-k="grip" min="0.2" max="5" step="0.01" aria-describedby="raceGripEst"><span class="muted small-text" id="raceGripEst"></span></div>
+        <div class="row"><label for="raceBrake">Braking (g)</label><input type="number" id="raceBrake" class="race-in race-num" data-k="brake" min="0.3" max="6" step="0.01" aria-describedby="raceBrakeEst"><span class="muted small-text" id="raceBrakeEst"></span></div>
         <div class="row">
           <label for="raceDrive">Drive</label>
-          <select id="raceDrive"><option value="fwd">FWD</option><option value="rwd">RWD</option><option value="awd">AWD</option></select>
+          <select id="raceDrive" aria-describedby="raceDriveEst"><option value="fwd">FWD</option><option value="rwd">RWD</option><option value="awd">AWD</option></select>
+          <span class="muted small-text" id="raceDriveEst"></span>
         </div>
         <div class="row">
           <label for="raceLen">Length (m)</label>
-          <input type="number" id="raceLen" min="2" max="20" step="0.1" value="4.5">
+          <input type="number" id="raceLen" class="race-num" min="0.5" max="20" step="0.1" value="4.5" aria-describedby="raceLenEst">
+          <span class="muted small-text" id="raceLenEst"></span>
         </div>
         <div class="row"><button type="button" id="raceReset" class="small">Reset to estimate</button></div>
       </section>
@@ -755,23 +758,28 @@
           .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok || j.ok === false) throw new Error(j.error || ('HTTP ' + r.status)); return j; }); });
       }
       function current() { var c = {}; list.forEach(function (e) { var v = TC.vehicle(e.key); if (Object.keys(v).length) c[e.key] = v; }); return c; }
-      // Race stats: Regler zeigen den Schätzwert, solange nichts gespeichert ist; jede Änderung speichert alle Felder
+      // Race stats: Felder zeigen den Schätzwert, solange nichts gespeichert ist; daneben steht immer die Schätzung
+      function raceEst(id, v) { $(id + 'Est').textContent = 'est. ' + v; }
       function raceFill() {
-        var r = CarRaceStats.guess(cur), c = CarRaceStats.clean(def.race);
+        var g = CarRaceStats.guess(cur), r = Object.assign({}, g), c = CarRaceStats.clean(def.race);
         Object.keys(c).forEach(function (k) { r[k] = c[k]; });
         $('raceOn').checked = r.on !== false;
         CarRaceStats.KEYS.forEach(function (k) {
           var el = document.querySelector('.race-in[data-k="' + k + '"]');
-          el.value = r[k]; $(el.id + 'Out').textContent = String(r[k]);
+          el.value = r[k]; raceEst(el.id, g[k]);
         });
         $('raceDrive').value = r.drive; $('raceLen').value = r.len;
+        raceEst('raceDrive', g.drive.toUpperCase()); raceEst('raceLen', g.len);
       }
+      // leere oder ungültige Felder fallen auf die Schätzung zurück, sonst in den gültigen Bereich geklemmt
       function raceRead() {
-        var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: Math.min(20, Math.max(2, +$('raceLen').value || 4.5)) };
-        CarRaceStats.KEYS.forEach(function (k) {
-          var el = document.querySelector('.race-in[data-k="' + k + '"]');
-          r[k] = +el.value; $(el.id + 'Out').textContent = String(r[k]);
-        });
+        var g = CarRaceStats.guess(cur), R = CarRaceStats.RANGE;
+        function val(el, k) {
+          var n = el.value === '' ? NaN : +el.value;
+          return isFinite(n) ? Math.min(R[k][1], Math.max(R[k][0], n)) : g[k];
+        }
+        var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: val($('raceLen'), 'len') };
+        CarRaceStats.KEYS.forEach(function (k) { r[k] = val(document.querySelector('.race-in[data-k="' + k + '"]'), k); });
         return r;
       }
       // nur Abweichungen von der Schätzung speichern (plus on=false); sonst race entfernen – die Schätzung bleibt so lebendig
@@ -782,7 +790,11 @@
         if (!r.on) o.on = false;
         if (Object.keys(o).length) def.race = o; else delete def.race;
       }
-      Array.prototype.forEach.call(document.querySelectorAll('.race-in'), function (el) { el.addEventListener('input', raceChanged); });
+      Array.prototype.forEach.call(document.querySelectorAll('.race-in'), function (el) {
+        el.addEventListener('input', raceChanged);
+        // beim Verlassen den gültigen Wert (geklemmt bzw. Schätzung) zurückschreiben
+        el.addEventListener('change', function () { raceChanged(); el.value = raceRead()[el.dataset.k]; });
+      });
       ['raceOn', 'raceDrive', 'raceLen'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
       $('raceReset').addEventListener('click', function () { delete def.race; raceFill(); say('Race stats reset to the estimate. Save to keep it.', 'ok'); });
       $('save').addEventListener('click', function () {

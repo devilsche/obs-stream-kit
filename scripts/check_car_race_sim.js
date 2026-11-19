@@ -2,7 +2,7 @@
 /* Prüfskript für js/car-race-sim.js (Car Race: Strecke + deterministische Fahrsimulation).
  * Kein Test-Framework: gibt „OK“ aus oder eine Fehlerliste, Exit-Code ≠ 0 bei Fehler.
  *
- *   node scripts/check_car_race_sim.js            alle Prüfungen (inkl. Bilanz über 1000 Rennen)
+ *   node scripts/check_car_race_sim.js            alle Prüfungen (inkl. Bilanz über 1000 Rennen + Golf-Probe über 1000)
  *   node scripts/check_car_race_sim.js --races 200 Bilanz mit weniger Rennen (schneller beim Abstimmen)
  *   node scripts/check_car_race_sim.js --tracks    nur die Strecken prüfen und ihre Eigenschaften drucken
  *   node scripts/check_car_race_sim.js --seed 3    Bilanz mit anderer Stichprobe (Feld + Rennen-Seeds; Standard 2026)
@@ -49,8 +49,22 @@ function mulberry32(a) {
   };
 }
 
-var AVG = { power: 5, speed: 5, handling: 5, susp: 5, brakes: 5, weight: 5, drive: 'rwd', len: 4.5 };
-var BUS = { power: 2, speed: 2, handling: 2, susp: 4, brakes: 3, weight: 10, drive: 'rwd', len: 12 };
+var Stats = require(path.join(__dirname, '..', 'js', 'car-race-stats.js'));
+// Bezugsauto (echte Werte = CarRaceSim.REF → genau die Simulations-Grundwerte) und Bus aus der Tabelle
+var AVG = { vmax: 300, acc: 3.5, hp: 600, kg: 1500, grip: 1.1, brake: 1.3, drive: 'rwd', len: 4.5 };
+// Katalogautos aus der Tabelle; Länge je Auto (Katalog-len liegt nur auf dem Server, sonst 4,5 m)
+var LEN = { 'trolza-5265-00-megapolis': 12, 'caterpillar-ct680': 8, 'ural-4320-soviet-army-truck': 7.6, 'amg-w14-s1': 5.4,
+  'volkswagen-golf-gti-1976': 3.8, 'krabby-patty-wagon': 4 };
+function carRaw(key) { var r = Stats.guess({ key: key }); r.len = LEN[key] || 4.5; return r; }
+var BUS_KEY = 'trolza-5265-00-megapolis', W14_KEY = 'amg-w14-s1', GOLF_KEY = 'volkswagen-golf-gti-1976';
+var BUS = carRaw(BUS_KEY);
+var TKEYS = Object.keys(Stats.TABLE);
+var RACECARS = /w14|917k|rsr|296-gt3|992-gt3-r|dtm/;
+// Zufallsfeld: alle Tabellenautos ohne Bus/Truck/Ural/Krabby
+var POOL = TKEYS.filter(function (k) { return !/trolza|caterpillar|ural|krabby/.test(k); });
+// Straßensportwagen (W14-Probe): Straßenautos ab 270 km/h; Supersportwagen (Golf-Probe): ab 320 km/h
+var ROAD = POOL.filter(function (k) { return !RACECARS.test(k) && Stats.TABLE[k].vmax >= 270; });
+var SUPER = POOL.filter(function (k) { return !RACECARS.test(k) && Stats.TABLE[k].vmax >= 320; });
 
 function avgField(n) {
   var cars = [];
@@ -293,12 +307,26 @@ if (!Array.isArray(Sim.TRACKS) || Sim.TRACKS.length !== 3) fail('CarRaceSim.TRAC
 })();
 if (errors.length) report();
 
-var vr = Sim.stats({ speed: 10 }).vmax / Sim.stats({ speed: 1 }).vmax;
-if (!(vr > 1.55 && vr < 1.65)) fail('speed 10 / speed 1 = ' + vr.toFixed(2) + ' (Soll ≈ 1,6)');
-var def = Sim.stats({}), five = Sim.stats(AVG);
-['acc', 'vmax', 'grip', 'brake', 'susp', 'launch', 'len'].forEach(function (k) {
-  if (def[k] !== five[k]) fail('stats({}) weicht bei ' + k + ' von lauter 5ern ab');
+// echte Werte: Bezugsauto = Grundwerte, REAL 0 = alle gleich, mehr Haftung/Leistung = mehr Kurventempo/Beschleunigung
+if (!(Sim.REAL === 0.5)) fail('CarRaceSim.REAL = ' + Sim.REAL + ' (Standard 0,5)');
+var def = Sim.stats({}), ref = Sim.stats(AVG);
+['acc', 'vmax', 'grip', 'brake', 'launch', 'len'].forEach(function (k) {
+  if (Math.abs(def[k] - ref[k]) > 1e-9) fail('stats({}) weicht bei ' + k + ' vom Bezugsauto ab');
 });
+(function () {
+  var b0 = Sim.stats(BUS, 0), w0 = Sim.stats(carRaw(W14_KEY), 0);
+  ['acc', 'vmax', 'grip', 'brake'].forEach(function (k) { if (Math.abs(b0[k] - w0[k]) > 1e-9) fail('REAL 0: ' + k + ' von Bus und W14 nicht gleich'); });
+  var b = Sim.stats(BUS), w = Sim.stats(carRaw(W14_KEY)), b1 = Sim.stats(BUS, 1);
+  ['acc', 'vmax', 'grip', 'brake'].forEach(function (k) {
+    if (!(w[k] > ref[k] && ref[k] > b[k])) fail('stats: ' + k + ' nicht W14 > Bezug > Bus');
+    if (!(b1[k] < b[k])) fail('REAL 1: Bus-' + k + ' nicht schlechter als bei REAL 0,5');
+  });
+  if (!(b.mass > 3 * ref.mass)) fail('Bus-Masse ' + b.mass.toFixed(1) + ' nicht > 3 × Bezugsauto');
+  var hi = Sim.stats({ grip: 1.3 }), lo = Sim.stats({ grip: 0.8 });
+  if (!(hi.grip > ref.grip && ref.grip > lo.grip)) fail('grip wirkt nicht monoton');
+  var t = Sim.track(Sim.TRACKS[1]);
+  if (!(Sim.lapTime(w, t) < Sim.lapTime(ref, t) && Sim.lapTime(ref, t) < Sim.lapTime(b, t))) fail('lapTime: nicht W14 < Bezug < Bus');
+})();
 
 var r1 = Sim.rng(42), r2 = Sim.rng(42);
 for (var q = 0; q < 5; q++) if (r1() !== r2()) fail('rng(42) ist nicht deterministisch');
@@ -315,23 +343,17 @@ Sim.TRACKS.forEach(function (seed) {
 ['fast', 'twisty', 'hairpin'].forEach(function (ch) { if (!chars[ch]) fail('keine Strecke mit Charakter ' + ch); });
 
 // ---- 3. Determinismus + fastForward ----
-function mixedField(rnd, n, withBus) {
-  var cars = [];
-  for (var i = 0; i < n; i++) {
-    var raw;
-    if (withBus && i === 0) raw = BUS;
-    else {
-      raw = {
-        // Zufallsauto aus dem Katalog: jeder Wert gleichverteilt 3–9
-        power: 3 + Math.floor(rnd() * 7), speed: 3 + Math.floor(rnd() * 7), handling: 3 + Math.floor(rnd() * 7),
-        susp: 3 + Math.floor(rnd() * 7), brakes: 3 + Math.floor(rnd() * 7), weight: 3 + Math.floor(rnd() * 7),
-        drive: ['fwd', 'rwd', 'awd'][Math.floor(rnd() * 3)], len: 4.2 + rnd() * 0.8
-      };
-    }
-    cars.push({ id: withBus && i === 0 ? 'bus' : 'car' + i, raw: raw });
-  }
+function pickKeys(rnd, arr, n) {
+  var a = arr.slice(), out = [];
+  for (var i = 0; i < n; i++) out.push(a.splice(Math.floor(rnd() * a.length), 1)[0]);
+  return out;
+}
+// Feld aus n Katalogautos (aus pool, ohne Doppelte), optional plus ein festes Auto (extra = Schlüssel, id = Schlüssel)
+function mixedField(rnd, n, extra, pool) {
+  var cars = pickKeys(rnd, pool || POOL, n).map(function (k, i) { return { id: 'car' + i, key: k, raw: carRaw(k) }; });
+  if (extra) cars.push({ id: extra === BUS_KEY ? 'bus' : extra, key: extra, raw: carRaw(extra) });
   // Startaufstellung mischen (Anmeldereihenfolge ist zufällig)
-  for (i = cars.length - 1; i > 0; i--) {
+  for (var i = cars.length - 1; i > 0; i--) {
     var j = Math.floor(rnd() * (i + 1)), tmp = cars[i]; cars[i] = cars[j]; cars[j] = tmp;
   }
   return cars;
@@ -339,7 +361,7 @@ function mixedField(rnd, n, withBus) {
 function toSimCars(field) { return field.map(function (c) { return { id: c.id, stats: Sim.stats(c.raw) }; }); }
 
 (function () {
-  var field = mixedField(mulberry32(7), 8, true);
+  var field = mixedField(mulberry32(7), 7, BUS_KEY);
   var opts = function () { return { seed: 123456, track: Sim.TRACKS[0], laps: 3, finishWindow: 15, cars: toSimCars(field) }; };
   var a = run(opts(), 'Determinismus A', true), b = run(opts(), 'Determinismus B', false);
   var ra = JSON.stringify(a.result()), rb = JSON.stringify(b.result());
@@ -415,7 +437,7 @@ var BUS_DYAW_BEFORE = 0.1238, BUS_JERK_BEFORE = 0.00289;
   if (!(inward >= 0.5)) fail('Bus: Hinterachse schneidet enge Kurven nicht innen (' + inward.toFixed(2) + ' m, Soll ≥ 0,5)');
 })();
 
-// ---- 4. Bilanz: Bus gegen 9 Zufallsautos (Werte je 3–9, jedes Rennen neu) ----
+// ---- 4. Bilanz: Bus gegen 9 Zufallsautos aus der Tabelle (jedes Rennen neu) ----
 var RACES = arg('--races', 1000);
 var busWins = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
 var X = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, rails: 0, returned: 0, offAtEnd: 0, pushes: 0, oilHits: 0, overtakes: 0, randomOil: 0, oilSpots: 0, maxOil: 0,
@@ -423,13 +445,13 @@ var X = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, rails: 0, returned: 0, o
 var started = Date.now();
 var BSEED = arg('--seed', 2026), rnd = mulberry32(BSEED);
 for (var race = 0; race < RACES; race++) {
-  var field = mixedField(rnd, 10, true);
-  var strongest = null, best = -1;
+  var field = mixedField(rnd, 9, BUS_KEY);
+  var strongest = null, best = Infinity, trk = Sim.TRACKS[race % Sim.TRACKS.length];
   field.forEach(function (c) {
     if (c.id === 'bus') return;
-    // Wertesumme; Gewicht zählt umgekehrt (schwer = schlechter), also 12 − weight
-    var r = c.raw, sum = r.power + r.speed + r.handling + r.susp + r.brakes + (12 - r.weight);
-    if (sum > best) { best = sum; strongest = c.id; }
+    // stärkstes Auto = schnellste berechnete Runde auf dieser Strecke
+    var lt = Sim.lapTime(Sim.stats(c.raw), trk);
+    if (lt < best) { best = lt; strongest = c.id; }
   });
   var seed = ((race + (BSEED - 2026) * 100003) * 2654435761) >>> 1;
   var sim = run({ seed: seed, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15, cars: toSimCars(field) },
@@ -460,8 +482,8 @@ for (var race = 0; race < RACES; race++) {
 var secs = (Date.now() - started) / 1000;
 wtimes.sort(function (a, b) { return a - b; });
 var busPct = 100 * busWins / RACES, strongPct = 100 * strongWins / RACES;
-if (busPct < 1) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 1 %)');
-if (strongPct > 45 || strongPct < 20) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 20–45 %)');
+if (busPct < 0.5) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 0,5 %)');
+if (strongPct > 60 || strongPct < 25) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 25–60 %)');
 if (incidents.crash / RACES > 1.2) fail((incidents.crash / RACES).toFixed(2) + ' Crashs je Rennen inkl. Leitplanke (Soll ≤ 1,2)');
 function mean(A) { return A.length ? A.reduce(function (x, y) { return x + y; }, 0) / A.length : 0; }
 // Schwere schieben in Kurven: der Bus ist dabei der Schwere (other) und verliert je Kontakt höchstens ~10 % Tempo
@@ -483,55 +505,69 @@ else {
   if (!(mean(X.busLoss) >= 2 * mean(X.busLost))) fail('Tempoverlust durch den Bus ' + mean(X.busLoss).toFixed(2) + ' m/s, des Busses ' + mean(X.busLost).toFixed(2) + ' m/s (Soll ≥ 2×)');
 }
 
-// ---- 5. Werte wirken: ein Auto mit lauter 10ern gegen neun mit lauter 5ern ----
-var TOP = { power: 10, speed: 10, handling: 10, susp: 10, brakes: 10, weight: 1, drive: 'awd', len: 4.5 };
-var PROBE = Math.max(100, Math.round(RACES / 5)), topWins = 0;
+// ---- 5. Werte wirken: W14 gegen 9 Straßensportwagen, Golf GTI Mk1 gegen 9 Supersportwagen ----
+var PROBE = Math.max(100, Math.round(RACES / 5)), w14Wins = 0, prnd = mulberry32(BSEED + 1);
 for (race = 0; race < PROBE; race++) {
-  var pc = avgField(10), slot = race % 10;
-  pc[slot] = { id: 'top', stats: Sim.stats(TOP) };
-  var ps = run({ seed: race * 7919 + 1, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15, cars: pc }, 'Probe ' + race, false);
-  ps.result().forEach(function (e) { if (e.id === 'top' && e.place === 1) topWins++; });
+  var pf = mixedField(prnd, 9, W14_KEY, ROAD);
+  var ps = run({ seed: race * 7919 + 1, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15, cars: toSimCars(pf) }, 'Probe ' + race, false);
+  ps.result().forEach(function (e) { if (e.id === W14_KEY && e.place === 1) w14Wins++; });
 }
-var topPct = 100 * topWins / PROBE;
-if (topPct < 35) fail('lauter 10er gegen neun 5er gewinnt nur ' + topPct.toFixed(1) + ' % (Soll ≥ 35 %)');
+var w14Pct = 100 * w14Wins / PROBE;
+if (w14Pct < 45 || w14Pct > 85) fail('W14 gegen 9 Straßensportwagen gewinnt ' + w14Pct.toFixed(1) + ' % (Soll 45–85 %)');
+// Golf-Probe ohne Prüfungen je Schritt (nur Ergebnis), dafür viele Rennen: Außenseiter-Chance ist klein
+var GPROBE = RACES, golfWins = 0;
+for (race = 0; race < GPROBE; race++) {
+  var gs = Sim.create({ seed: race * 104729 + 3, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15,
+    cars: toSimCars(mixedField(prnd, 9, GOLF_KEY, SUPER)) });
+  while (!gs.done && gs.time < MAX_T) gs.step();
+  gs.result().forEach(function (e) { if (e.id === GOLF_KEY && e.place === 1) golfWins++; });
+}
+var golfPct = 100 * golfWins / GPROBE;
+if (golfPct < 0.3) fail('Golf GTI Mk1 gegen 9 Supersportwagen gewinnt ' + golfPct.toFixed(2) + ' % (Soll ≥ 0,3 %)');
 
-/* Race-stats-Schätzung (js/car-race-stats.js): Klassen und gültige Bereiche */
-var Stats = require(path.join(__dirname, '..', 'js', 'car-race-stats.js'));
+/* Race-stats-Schätzung (js/car-race-stats.js): Tabelle, Klassen und gültige Bereiche */
+function validRace(g, label) {
+  Stats.KEYS.forEach(function (k) {
+    var R = Stats.RANGE[k];
+    if (!(g[k] >= R[0] && g[k] <= R[1])) fail(label + '.' + k + ' = ' + g[k] + ' außerhalb ' + R[0] + '–' + R[1]);
+  });
+  if (['fwd', 'rwd', 'awd'].indexOf(g.drive) < 0) fail(label + ' drive ' + g.drive);
+  if (!(g.len >= 0.5 && g.len <= 20)) fail(label + ' len ' + g.len);
+  if (g.on !== true) fail(label + ' on ≠ true');
+}
 var FIX = [
   { key: 'trolza', name: 'Trolza 5265.00 "Megapolis"', brand: 'Trolza', len: 12 },
   { key: 'lambo', name: 'Lamborghini Aventador', brand: 'Lamborghini', len: 4.8 },
   { key: 'hoon', name: 'Hoonicorn- A tribute to Ken Block (Updated)', brand: 'Ford', len: 4.4 },
   { key: 'ural', name: 'Ural-4320', brand: 'Ural', len: 7.6 },
-  { key: 'krabby', name: 'Krabby Patty Wagon', brand: 'Fun', len: 4 },
+  { key: 'krabby', name: 'Krabby Patty Wagon', brand: 'Fun', len: 1 },
   { key: 'm5', name: '2003 BMW M5', brand: 'BMW', len: 4.9 },
   { key: 'golf', name: 'VW Golf', brand: 'VW' }
 ];
 var G = {};
-FIX.forEach(function (e) {
-  var g = G[e.key] = Stats.guess(e);
-  Stats.KEYS.forEach(function (k) { if (!(g[k] >= 1 && g[k] <= 10)) fail('guess ' + e.key + '.' + k + ' = ' + g[k] + ' außerhalb 1–10'); });
-  if (['fwd', 'rwd', 'awd'].indexOf(g.drive) < 0) fail('guess ' + e.key + ' drive ' + g.drive);
-  if (!(g.len >= 2 && g.len <= 20)) fail('guess ' + e.key + ' len ' + g.len);
-  if (g.on !== true) fail('guess ' + e.key + ' on ≠ true');
-});
-if (!(G.trolza.speed <= 3 && G.trolza.weight >= 9)) fail('Trolza: speed ≤ 3 und weight ≥ 9 erwartet');
-if (!(G.lambo.speed >= 9)) fail('Lamborghini: speed ≥ 9 erwartet');
-if (G.hoon.power !== 10) fail('Hoonicorn: power = 10 erwartet');
+FIX.forEach(function (e) { validRace(G[e.key] = Stats.guess(e), 'guess ' + e.key); });
+if (!(G.trolza.vmax <= 100 && G.trolza.kg >= 8000)) fail('Trolza: vmax ≤ 100 und kg ≥ 8000 erwartet');
+if (!(G.lambo.vmax >= 300)) fail('Lamborghini: vmax ≥ 300 erwartet');
+if (!(G.hoon.hp >= 800)) fail('Hoonicorn: hp ≥ 800 erwartet');
+if (G.krabby.len !== 1) fail('Krabby: Katalog-len 1 m muss bleiben');
+TKEYS.forEach(function (k) { validRace(Stats.guess({ key: k }), 'Tabelle ' + k); });
+var mk1 = Stats.guess({ key: GOLF_KEY, name: 'whatever', brand: 'VW' });
+if (!(mk1.vmax === 182 && mk1.hp === 110 && mk1.drive === 'fwd')) fail('Tabelle schlägt Klasse nicht: Golf Mk1 ' + JSON.stringify(mk1));
+if (Stats.guess({ key: 'ferrari-296-gt3' }).grip !== 1.6) fail('Tabelle: Ferrari 296 GT3 grip 1,6 erwartet');
+// clean(): alte 1–10-Felder verworfen, Bereiche geprüft
+var cl = Stats.clean({ on: false, power: 7, speed: 9, weight: 3, vmax: 250, acc: 0.5, kg: '1200', grip: 9, drive: 'awd', len: 0.6 });
+if (JSON.stringify(cl) !== JSON.stringify({ on: false, vmax: 250, kg: 1200, len: 0.6, drive: 'awd' })) fail('clean() falsch: ' + JSON.stringify(cl));
 var CAND = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', 'assets', 'cars', 'candidates.json'), 'utf8'));
 if (CAND.length < 100) fail('assets/cars/candidates.json zu klein: ' + CAND.length);
-CAND.forEach(function (e) {
-  var g = Stats.guess({ key: e.key || e.uid, name: e.name, brand: e.brand, len: e.len });
-  Stats.KEYS.forEach(function (k) { if (!(g[k] >= 1 && g[k] <= 10)) fail('Katalog "' + e.name + '": ' + k + ' = ' + g[k]); });
-  if (['fwd', 'rwd', 'awd'].indexOf(g.drive) < 0) fail('Katalog "' + e.name + '": drive ' + g.drive);
-  if (!(g.len >= 2 && g.len <= 20)) fail('Katalog "' + e.name + '": len ' + g.len);
-});
+CAND.forEach(function (e) { validRace(Stats.guess({ key: e.key || e.uid, name: e.name, brand: e.brand, len: e.len }), 'Katalog "' + e.name + '"'); });
 function gn(name, brand) { return Stats.guess({ key: 'x', name: name, brand: brand || '' }); }
 var p918 = gn('Porsche 918 Spyder 2015', 'Porsche'), w14 = gn('Amg W14 S1', 'Mercedes-Benz'), g63 = gn('Mersedes-Benz G63 AMG', 'Mercedes-Benz');
-if (!(p918.speed >= 9 && p918.weight <= 3)) fail('Porsche 918: Hypercar erwartet');
-if (!(w14.speed >= 9 && w14.weight <= 3)) fail('AMG W14: Hypercar erwartet');
-if (!(g63.weight >= 7 && g63.handling <= 4 && g63.speed >= 5 && g63.speed <= 7)) fail('G63: schwerer SUV erwartet');
+if (!(p918.vmax >= 330 && p918.grip >= 1.2)) fail('Porsche 918: Hypercar erwartet');
+if (!(w14.vmax >= 330 && w14.grip >= 1.2)) fail('AMG W14: Hypercar erwartet');
+if (!(g63.kg >= 2200 && g63.grip <= 0.8 && g63.vmax >= 200 && g63.vmax <= 240)) fail('G63: schwerer SUV erwartet');
 if (gn('Ferrari F40', 'Ferrari').drive !== 'rwd') fail('Ferrari: rwd erwartet');
-if (gn('Toyota Hilux Pickup', 'Toyota').weight !== 5 || gn('Kia Sportage', 'Kia').speed !== 5) fail('Pickup/Sportage dürfen nicht Kleinwagen/Sport sein');
+var sedan = gn('Some Sedan');
+if (gn('Toyota Hilux Pickup', 'Toyota').vmax !== sedan.vmax || gn('Kia Sportage', 'Kia').vmax !== sedan.vmax) fail('Pickup/Sportage dürfen nicht Kleinwagen/Sport sein');
 if (G.golf.len !== 4.5) fail('Golf ohne len: Rückfall 4,5 erwartet');
 
 if (X.steerN) {
@@ -552,7 +588,8 @@ function report() {
     console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) +
       ' %, stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +
       ' %; Siegerzeit Median ' + wtimes[Math.floor(wtimes.length / 2)].toFixed(1) + ' s (' + wtimes[0].toFixed(1) + '–' +
-      wtimes[wtimes.length - 1].toFixed(1) + ' s); 10er gegen 5er: ' + (typeof topPct === 'number' ? topPct.toFixed(1) : '–') + ' %; je Rennen ' + (incidents.spin / RACES).toFixed(2) + ' Dreher, ' +
+      wtimes[wtimes.length - 1].toFixed(1) + ' s); W14 gegen Straßensportwagen: ' + (typeof w14Pct === 'number' ? w14Pct.toFixed(1) : '–') +
+      ' %, Golf Mk1 gegen Supersportwagen: ' + (typeof golfPct === 'number' ? golfPct.toFixed(2) : '–') + ' %; je Rennen ' + (incidents.spin / RACES).toFixed(2) + ' Dreher, ' +
       (incidents.crash / RACES).toFixed(2) + ' Crashs (davon ' + (X.rails / RACES).toFixed(2) + ' Leitplanke), ' + (incidents.dnf / RACES).toFixed(2) + ' Crash-DNF');
     console.log('Zwischenfälle je Rennen: ' + (X.offs / RACES).toFixed(2) + ' Abflüge (' + X.returned + ' zurück, ' + X.rails + ' Leitplanke, ' + X.offAtEnd +
       ' bei Rennende draußen), ' + (X.pushes / RACES).toFixed(2) + ' Kontakte, ' + (X.oilHits / RACES).toFixed(2) + ' Ölkontakte, ' +
