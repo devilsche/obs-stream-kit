@@ -1013,7 +1013,7 @@
   // gespeicherter Sitz (Car editor) oder Schätzung; t = Vorlage (ohne: geladene Vorlage des Autos)
   function seatOf(key, t) {
     var v = vehicle(key).seat;
-    if (v && typeof v === 'object' && isFinite(v.x) && isFinite(v.y) && isFinite(v.z) && v.s > 0) return { x: +v.x, y: +v.y, z: +v.z, s: +v.s, r: +v.r || 0, p: +v.p || 0, l: +v.l || 0 };
+    if (v && typeof v === 'object' && isFinite(v.x) && isFinite(v.y) && isFinite(v.z) && v.s > 0) return { x: +v.x, y: +v.y, z: +v.z, s: +v.s, r: +v.r || 0, p: +v.p || 0, l: +v.l || 0, clip: v.clip && typeof v.clip === 'object' ? v.clip : undefined };
     t = t || TPL[key]; if (!t) return null;
     if (!SEATS[key]) SEATS[key] = autoSeat(t);
     return SEATS[key];
@@ -1033,7 +1033,60 @@
     duck.traverse(function (o) { o.userData.driver = true; });
     // Vorlage liegt in car.children[0] (wrap) – Sitz gilt in Auto-Koordinaten, also direkt am Auto
     car.add(duck);
+    // Schnittwände (seat.clip, Auto-Koordinaten): was jenseits liegt, wird nicht gezeichnet – Ente guckt nicht
+    // seitlich oder hinten heraus. Eigene Material-Kopien je Ente; Ebenen in Weltlage per updateDriverClip
+    var planes = clipPlanes(st.clip);
+    if (planes.length) {
+      duck.userData.clipLocal = planes; duck.userData.clipWorld = planes.map(function (p) { return p.clone(); });
+      duck.traverse(function (o) {
+        if (!o.isMesh) return;
+        o.material = Array.isArray(o.material) ? o.material.map(function (m) { var c = m.clone(); c.clippingPlanes = duck.userData.clipWorld; return c; })
+          : (function (m) { var c = m.clone(); c.clippingPlanes = duck.userData.clipWorld; return c; })(o.material);
+      });
+      updateDriverClip(duck);
+    }
     return duck;
+  }
+  // clip = {l, r, b, f, t}: linke Wand (z), rechte Wand (z), hinten (x), vorn (x), Dach (y) – sichtbar bleibt innen
+  function clipPlanes(c) {
+    var out = [];
+    if (!c || typeof c !== 'object') return out;
+    if (isFinite(c.l) && c.l !== null) out.push(new THREE.Plane(new THREE.Vector3(0, 0, 1), -c.l));    // z ≥ l
+    if (isFinite(c.r) && c.r !== null) out.push(new THREE.Plane(new THREE.Vector3(0, 0, -1), +c.r));   // z ≤ r
+    if (isFinite(c.b) && c.b !== null) out.push(new THREE.Plane(new THREE.Vector3(1, 0, 0), -c.b));    // x ≥ b
+    if (isFinite(c.f) && c.f !== null) out.push(new THREE.Plane(new THREE.Vector3(-1, 0, 0), +c.f));   // x ≤ f
+    if (isFinite(c.t) && c.t !== null) out.push(new THREE.Plane(new THREE.Vector3(0, -1, 0), +c.t));   // y ≤ t
+    return out;
+  }
+  // Schnittwände in Weltlage nachführen (jedes Bild, wenn sich das Auto bewegt): Ebenen hängen am Auto (Eltern der Ente)
+  function updateDriverClip(duck) {
+    if (!duck || !duck.userData.clipLocal) return;
+    var car = duck.parent; if (!car) return;
+    car.updateWorldMatrix(true, false);
+    var nm = new THREE.Matrix3().getNormalMatrix(car.matrixWorld);
+    duck.userData.clipLocal.forEach(function (p, i) { duck.userData.clipWorld[i].copy(p).applyMatrix4(car.matrixWorld, nm); });
+  }
+  // alle Fahrer unter einem Objekt (z. B. der ganzen Szene) nachführen
+  function updateDriverClips(rootObj) {
+    if (!rootObj) return;
+    rootObj.traverse(function (o) { if (o.name === 'Driver' && o.userData.clipLocal) updateDriverClip(o); });
+  }
+  // Wände aus der Kabine schätzen (Car editor „Auto walls“): Türinnenseiten, Frontscheibe, Heckscheibe/Rückwand, Dach
+  function autoWalls(key, t, st) {
+    t = t || TPL[key]; st = st || seatOf(key, t); if (!t || !st) return null;
+    var meshes = hullMeshes(t), ray = new THREE.Raycaster(), U = UNIT, D = t.userData.dims;
+    function hits(o, d) { return castAll(ray, meshes, o, d); }
+    var mid = new THREE.Vector3(st.x, st.y + st.s * 0.5, st.z), head = new THREE.Vector3(st.x, st.y + st.s * 0.8, st.z), c = {};
+    var hl = hits(mid, new THREE.Vector3(0, 0, -1)), hr = hits(mid, new THREE.Vector3(0, 0, 1));
+    if (hl.length) c.l = +(st.z - hl[0] + 0.005 * U).toFixed(4);
+    // rechts: Innenseite der anderen Tür (vorletzte Fläche), Konsole/Beifahrersitz dazwischen zählen nicht
+    if (hr.length) c.r = +(st.z + (hr.length > 1 ? hr[hr.length - 2] : hr[0]) - 0.005 * U).toFixed(4);
+    var hf = hits(head, new THREE.Vector3(1, 0, 0)), hb = hits(head, new THREE.Vector3(-1, 0, 0)).filter(function (d) { return d > 0.12 * U; });
+    if (hf.length) c.f = +(st.x + hf[0] - 0.005 * U).toFixed(4);
+    if (hb.length) c.b = +(st.x - hb[0] + 0.005 * U).toFixed(4);
+    var hu = hits(new THREE.Vector3(st.x, st.y + st.s * 0.5, st.z), new THREE.Vector3(0, 1, 0)).filter(function (d) { return st.y + st.s * 0.5 + d > -D.H / 2 + D.H * 0.7; });
+    if (hu.length) c.t = +(st.y + st.s * 0.5 + hu[0] - 0.005 * U).toFixed(4);
+    return c;
   }
   function dims(key) { var t = TPL[key] || TPL[MODELS[0]]; return t ? t.userData.dims : { L: 4.4, W: 1.8, H: 1.4, belt: 0.9 }; }
   function random() { var m = MODELS[Math.floor(Math.random() * MODELS.length)], p = pickPaint(m); return { model: m, color: p.c }; }
@@ -1044,6 +1097,6 @@
     forget: function (k) { delete TPL[k]; delete loading[k]; delete SEATS[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
     loadCatalog: loadCatalog, loadModel: loadModel, mergeForRace: mergeForRace, vehicle: vehicle,
-    seatOf: seatOf, autoSeat: autoSeat, addDriver: addDriver, forgetSeat: function (k) { delete SEATS[k]; }, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
+    seatOf: seatOf, autoSeat: autoSeat, addDriver: addDriver, updateDriverClip: updateDriverClip, updateDriverClips: updateDriverClips, autoWalls: autoWalls, forgetSeat: function (k) { delete SEATS[k]; }, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
   };
 })(typeof window !== 'undefined' ? window : this);

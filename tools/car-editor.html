@@ -80,6 +80,8 @@
     }
       .driver-row input[type="range"] { flex: 1 1 8em; min-width: 6em; }
     .driver-num { width: 5.5em; }
+    .driver-walls { border: 1px solid currentColor; border-radius: 6px; padding: 0.4em 0.8em; margin: 0.6em 0; }
+    .driver-walls legend { padding: 0 0.3em; }
 </style>
 </head>
 <body>
@@ -256,6 +258,41 @@
           <input type="range" id="dL" class="driver-in" data-k="dL">
           <input type="number" id="dLN" class="driver-in driver-num" data-k="dL" aria-label="Lean (sideways) in °">
         </div>
+        <fieldset class="driver-walls" id="driverWalls">
+          <legend>Walls (the duck is cut off beyond them)</legend>
+          <p class="muted small-text">Stop the duck from poking out at the side, back or top. Enabled walls show as coloured planes while you work in this section.</p>
+          <div class="row driver-row">
+            <input type="checkbox" id="wLOn" class="wall-on" data-w="wL">
+            <label for="wLOn">Left wall</label>
+            <input type="range" id="wL" class="wall-in" data-w="wL" aria-label="Left wall position in cm" aria-describedby="wLOut">
+            <output id="wLOut" for="wL">–</output>
+          </div>
+          <div class="row driver-row">
+            <input type="checkbox" id="wROn" class="wall-on" data-w="wR">
+            <label for="wROn">Right wall</label>
+            <input type="range" id="wR" class="wall-in" data-w="wR" aria-label="Right wall position in cm" aria-describedby="wROut">
+            <output id="wROut" for="wR">–</output>
+          </div>
+          <div class="row driver-row">
+            <input type="checkbox" id="wBOn" class="wall-on" data-w="wB">
+            <label for="wBOn">Rear wall</label>
+            <input type="range" id="wB" class="wall-in" data-w="wB" aria-label="Rear wall position in cm" aria-describedby="wBOut">
+            <output id="wBOut" for="wB">–</output>
+          </div>
+          <div class="row driver-row">
+            <input type="checkbox" id="wFOn" class="wall-on" data-w="wF">
+            <label for="wFOn">Front wall</label>
+            <input type="range" id="wF" class="wall-in" data-w="wF" aria-label="Front wall position in cm" aria-describedby="wFOut">
+            <output id="wFOut" for="wF">–</output>
+          </div>
+          <div class="row driver-row">
+            <input type="checkbox" id="wTOn" class="wall-on" data-w="wT">
+            <label for="wTOn">Roof</label>
+            <input type="range" id="wT" class="wall-in" data-w="wT" aria-label="Roof position in cm" aria-describedby="wTOut">
+            <output id="wTOut" for="wT">–</output>
+          </div>
+          <div class="row"><button type="button" id="wallsAuto" class="small">Auto walls</button></div>
+        </fieldset>
         <p class="muted small-text" id="driverInfo" aria-live="polite"></p>
       </section>
 
@@ -442,15 +479,69 @@
         // Fahrer-Ente (eigener Sitz oder Schätzung); Höhe/Drehung aus den Reglern stecken im Sitz
         if ($('showDriver').checked && window.RubberDuck) { var st = driverSeat(); if (st) TC.addDriver(car, cur.key, { seat: st, template: tpl }); }
         if (typeof gizmoAttach === 'function') gizmoAttach();
+        if (typeof wallPreview === 'function') wallPreview(car);
       }
       // Sitz für Vorschau und Speichern: eigener Sitz (def.seat) oder die Schätzung
       function driverSeat() {
         if (!tpl) return null;
         var st = def.seat && def.seat.s > 0 ? def.seat : TC.seatOf(cur.key, tpl);
-        return st ? { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0, p: st.p || 0, l: st.l || 0 } : null;
+        return st ? { x: st.x, y: st.y, z: st.z, s: st.s, r: st.r || 0, p: st.p || 0, l: st.l || 0, clip: st.clip } : null;
       }
       // Regler je Achse: Einheit cm (Auto-Einheiten / UNIT) bzw. Grad; Bereiche nach Autogröße
       var DRV = { dX: { k: 'x', cm: 1 }, dZ: { k: 'z', cm: 1 }, dY: { k: 'y', cm: 1 }, dS: { k: 's', cm: 1 }, dR: { k: 'r', deg: 180 }, dP: { k: 'p', deg: 30 }, dL: { k: 'l', deg: 30 } };
+      // ── Schnittwände: seat.clip {l, r, b, f, t} in Auto-Koordinaten (cm in den Reglern) ──
+      renderer.localClippingEnabled = true;
+      var WALLS = { wL: { k: 'l', ax: 'z', col: 0x2f9bff }, wR: { k: 'r', ax: 'z', col: 0x3ddc84 }, wB: { k: 'b', ax: 'x', col: 0xff8a1f }, wF: { k: 'f', ax: 'x', col: 0xd94dff }, wT: { k: 't', ax: 'y', col: 0xffd21f } };
+      var wallsShown = false;
+      function wallFill() {
+        var st = driverSeat(), d = tpl ? tpl.userData.dims : null, u = TC.UNIT; if (!d) return;
+        var cl = (def.seat && def.seat.clip) || (st && st.clip) || {}, half = { x: d.L / 2, z: d.W / 2, y: d.H / 2 };
+        Object.keys(WALLS).forEach(function (id) {
+          var w = WALLS[id], on = cl[w.k] != null && isFinite(cl[w.k]), hi = Math.round(half[w.ax] / u * 100);
+          var def0 = st ? (w.ax === 'z' ? st.z : w.ax === 'x' ? st.x : st.y + st.s) : 0;
+          var v = on ? cl[w.k] : def0;
+          $(id + 'On').checked = on; $(id).min = -hi; $(id).max = hi; $(id).step = 0.5; $(id).value = +(v / u * 100).toFixed(1);
+          $(id).disabled = !on; $(id + 'Out').textContent = on ? (+(v / u * 100).toFixed(1)) + ' cm' : 'off';
+        });
+      }
+      function wallSet(id, val, on) {
+        var st = ownSeat(); if (!st) return;
+        var w = WALLS[id]; st.clip = st.clip || {};
+        if (!on) delete st.clip[w.k]; else st.clip[w.k] = +(+val / 100 * TC.UNIT).toFixed(4);
+        if (!Object.keys(st.clip).length) delete st.clip;
+        wallFill(); show();
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('.wall-on'), function (el) {
+        el.addEventListener('change', function () { wallSet(el.dataset.w, $(el.dataset.w).value, el.checked); });
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.wall-in'), function (el) {
+        el.addEventListener('input', function () { wallSet(el.dataset.w, el.value, true); });
+      });
+      $('wallsAuto').addEventListener('click', function () {
+        var st = ownSeat(); if (!st) return;
+        var c = TC.autoWalls(cur.key, tpl, st);
+        if (!c || !Object.keys(c).length) { say('No walls found – set them by hand.'); return; }
+        st.clip = c; wallFill(); show(); say('Walls set from the cabin: ' + Object.keys(c).length + '.');
+      });
+      // Wände nur zeigen, solange im Abschnitt „Driver“ gearbeitet wird (Fokus darin oder Ziehen aktiv)
+      var drvSec = $('h-driver').parentNode;
+      drvSec.addEventListener('focusin', function () { if (!wallsShown) { wallsShown = true; show(); } });
+      drvSec.addEventListener('focusout', function (e) { if (!drvSec.contains(e.relatedTarget) && wallsShown) { wallsShown = false; show(); } });
+      function wallPreview(car) {
+        if (!(wallsShown || gizmoMode) || !tpl) return;
+        var st = driverSeat(), cl = st && st.clip; if (!cl) return;
+        var d = tpl.userData.dims;
+        Object.keys(WALLS).forEach(function (id) {
+          var w = WALLS[id], v = cl[w.k]; if (v == null || !isFinite(v)) return;
+          var g = w.ax === 'z' ? new THREE.PlaneGeometry(d.L, d.H) : w.ax === 'x' ? new THREE.PlaneGeometry(d.W, d.H) : new THREE.PlaneGeometry(d.L, d.W);
+          var m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: w.col, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
+          if (w.ax === 'z') m.position.set(0, 0, v);
+          else if (w.ax === 'x') { m.rotation.y = Math.PI / 2; m.position.set(v, 0, 0); }
+          else { m.rotation.x = -Math.PI / 2; m.position.set(0, v, 0); }
+          m.renderOrder = 5; m.name = 'wallPreview'; m.userData.driver = true;   // nicht wählbar
+          car.add(m);
+        });
+      }
       function driverFill() {
         var st = driverSeat(), u = TC.UNIT, d = tpl ? tpl.userData.dims : null;
         if (!st || !d) { $('driverInfo').textContent = ''; return; }
@@ -463,6 +554,7 @@
           [$(id), $(id + 'N')].forEach(function (el) { el.min = lo; el.max = hi; el.step = step; el.value = val; });
         });
         $('driverInfo').textContent = def.seat ? 'Own seat.' : 'Automatic seat (place it yourself if the duck sits wrong).';
+        wallFill();
       }
       // eigener Sitz aus dem aktuellen (ggf. geschätzten) Sitz anlegen
       function ownSeat() {
@@ -841,7 +933,7 @@
           // Klickpunkt in Auto-Koordinaten (Vorlage), Ente sitzt darauf; Größe bleibt
           var carObj = holder.children[0]; if (!carObj) return;
           var lp = carObj.worldToLocal(hit.point.clone()), st0 = ownSeat(); if (!st0) return;
-          def.seat = { x: +lp.x.toFixed(4), y: +lp.y.toFixed(4), z: +lp.z.toFixed(4), s: st0.s, r: st0.r || 0, p: st0.p || 0, l: st0.l || 0 };
+          def.seat = { x: +lp.x.toFixed(4), y: +lp.y.toFixed(4), z: +lp.z.toFixed(4), s: st0.s, r: st0.r || 0, p: st0.p || 0, l: st0.l || 0, clip: st0.clip };
           setPick('driver'); driverFill(); show(); say('Driver placed. Adjust size, height and turn, then save.'); return;
         }
         if (picking === 'split') {
@@ -988,7 +1080,12 @@
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
-        if (def.seat && def.seat.s > 0) d.seat = { x: def.seat.x, y: def.seat.y, z: def.seat.z, s: def.seat.s, r: def.seat.r || 0, p: def.seat.p || 0, l: def.seat.l || 0 };
+        if (def.seat && def.seat.s > 0) {
+          d.seat = { x: def.seat.x, y: def.seat.y, z: def.seat.z, s: def.seat.s, r: def.seat.r || 0, p: def.seat.p || 0, l: def.seat.l || 0 };
+          var cl = def.seat.clip, cc = {};
+          if (cl) ['l', 'r', 'b', 'f', 't'].forEach(function (k) { if (cl[k] != null && isFinite(cl[k])) cc[k] = +cl[k]; });
+          if (Object.keys(cc).length) d.seat.clip = cc;
+        }
         if (def.cutParts && def.cutParts.length) d.cutParts = def.cutParts.slice(0, 60);
         if (def.rework || (def.issues && def.issues.length) || def.note) {
           d.rework = !!def.rework; d.issues = (def.issues || []).slice(0, 12); if (def.note) d.note = def.note.slice(0, 300);
