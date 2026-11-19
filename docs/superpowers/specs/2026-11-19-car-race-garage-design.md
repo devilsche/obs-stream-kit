@@ -1,6 +1,6 @@
 # Car Race – Garage, Sub-Extras, Kanalpunkte (Konzept)
 
-Stand: 2026-11-19 · Status: Konzept, nicht gebaut (wartet auf „go“)
+Stand: 2026-11-19 · Status: freigegeben („go“), im Bau – Nitro/Anrempeln (Abschnitt 4) folgt als eigener Schritt
 
 ## Wozu
 
@@ -58,12 +58,12 @@ Subs bekommen faire Extras (nichts, was den Sieg kauft). Kanalpunkte erlauben ei
 - Technisch: Befehle gehen an den Server, der sie mit Rennzeit als Ereignis an alle Overlays verteilt; die Simulation
   übernimmt sie deterministisch (gleiche Rennzeit → gleiches Ergebnis in jeder Instanz).
 
-## Offene Entscheidungen (Nutzer)
+## Entscheidungen (Nutzer, 2026-11-19)
 
-- Coin-Raten und Preise oben ok?
-- Sub-Multiplikatoren (1,25/1,5/2) ok, oder nur kosmetisch?
-- Kanalpunkt-Preis (Vorschlag 2.500).
-- Sollen gekaufte Autos auch beim BMW-/Burnout-Befehl nutzbar sein (`!burnout <auto>`), oder nur im Rennen?
+- Coin-Raten und Preise wie oben.
+- Sub-Multiplikatoren 1,25 / 1,5 / 2 plus Stern, Sub-Lackierungen, `!reroll`.
+- Kanalpunkt-Preis 2.500 (wird in Twitch/Streamer.bot eingestellt).
+- Gekaufte Autos gelten nur im Rennen, nicht für `!burnout`.
 
 ## Umsetzung (grob)
 
