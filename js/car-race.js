@@ -548,15 +548,15 @@
     // Schilder: Text, Größe, Gedränge (hinteres kleiner/blasser), Rand-Fade, Ein-/Ausblenden
     function updateLabels(list, dt) {
       var podium = race && race.stage === 'podium';
-      var hpx = podium ? podiumHpx() : clamp(H * 0.055, 13, 30), tanV = Math.tan(FOV * Math.PI / 360);
+      // Rennen: Schilder 30 % kleiner als früher (Nutzerwunsch), Podest wie gehabt
+      var hpx = podium ? podiumHpx() : clamp(H * 0.055, 13, 30) * 0.7, tanV = Math.tan(FOV * Math.PI / 360);
       var placed = [];
       list.forEach(function (it) {
         var r = it.r, L = r.label, up = r.flash > 0;
         // Modellzeile nur, wenn Platz ist: nah genug dran und kein Gedränge (mit Hysterese gegen Flackern)
         var zoomPx = race && race.cam ? Math.exp(race.cam.lp) : PX_MAX;
-        if (podium) r.showModel = true;
-        else if (r.labelK < 0.8 || zoomPx < 8) r.showModel = false;
-        else if (r.labelK > 0.95 && zoomPx > 9.5) r.showModel = true;
+        // Automodell nicht auf den Schildern (steht in Lobby-Karte und Fahrerkarte)
+        r.showModel = false; void zoomPx;
         drawLabel(r, it.place, false, it.dnf ? 'dnf' : up ? 'up' : '', r.showModel);
         tmpV.set(r.holder.position.x, r.holder.position.y + r.height + 0.9, r.holder.position.z).project(cam);
         var px = (tmpV.x * 0.5 + 0.5) * W, py = (1 - (tmpV.y * 0.5 + 0.5)) * H, wpx = hpx * L.boxW / LABEL_H;
