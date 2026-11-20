@@ -100,6 +100,22 @@
     return m ? m[1] + 'assets/' : null;
   })();
   var PHOTO_M = 2, PHOTO_REP = 5;   // Kachel 2 m; Fahrbahn-UV läuft in 10-m-Einheiten (TILE) → 5 Wiederholungen
+  // Foto-Texturensatz (assets/textures/track/<name>_<map>_1k.jpg), seitenweit geteilt; srgb = Karten mit sRGB-Kodierung
+  function photoSet(name, maps, opt, done) {
+    if (!ASSET_BASE || !THREE.TextureLoader) return;
+    var key = 'ph_' + name, ph = TEX[key];
+    if (ph) { if (ph.ready) done(ph); else ph.wait.push(done); return; }
+    ph = TEX[key] = { ready: false, wait: [done], n: 0 };
+    var loader = new THREE.TextureLoader();
+    maps.forEach(function (k) {
+      loader.load(ASSET_BASE + 'textures/track/' + name + '_' + k + '_1k.jpg', function (t) {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = opt.aniso || 1;
+        if ((opt.srgb || []).indexOf(k) >= 0) t.encoding = THREE.sRGBEncoding;
+        t.trackBytes = 1024 * 1024 * 4 * 4 / 3; ph[k] = t;
+        if (++ph.n === maps.length) { ph.ready = true; ph.wait.forEach(function (f) { f(ph); }); ph.wait = []; }
+      }, undefined, function () { ph.failed = true; });   // fehlt die Datei: berechnete Textur bleibt
+    });
+  }
   function photoAsphalt(aniso, done) {
     if (!ASSET_BASE || !THREE.TextureLoader) return;
     if (TEX.photo) { if (TEX.photo.ready) done(TEX.photo); else TEX.photo.wait.push(done); return; }
@@ -545,8 +561,15 @@
     var roMat = new THREE.MeshStandardMaterial({ map: tex(S.grassTex), normalMap: tex(loose.normal), vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.5 });
     tex(loose.map);
     var gScale = kind === 'sand' ? 1 / 2.6 : kind === 'tarmac' ? 1 / TILE : 1 / 1.7;
+    // Foto-Kies (Poly Haven „Gravel“, 2 m) bzw. Küstensand („Coast Sand 03“, 3 m), CC0 – ersetzt nach dem Laden die
+    // berechnete Textur; Kodierung linear, der Shader rechnet sRGB selbst um (wie bei der berechneten Textur)
+    var LOOSE_PHOTO = { gravel: ['gravel', 2], sand: ['coast_sand_03', 3] }[kind] || null, photoL = null;
+    if (LOOSE_PHOTO) photoSet(LOOSE_PHOTO[0], ['diff', 'nor_gl'], { aniso: aniso }, function (ph) {
+      photoL = ph; roMat.normalMap = ph.nor_gl; roMat.needsUpdate = true;
+    });
     roMat.onBeforeCompile = function (sh) {
-      sh.uniforms.tLoose = { value: loose.map }; sh.uniforms.uLooseS = { value: gScale }; sh.uniforms.uLooseN = { value: kind === 'tarmac' ? 0.5 : 1.0 };
+      sh.uniforms.tLoose = { value: photoL ? photoL.diff : loose.map };
+      sh.uniforms.uLooseS = { value: photoL ? 1 / LOOSE_PHOTO[1] : gScale }; sh.uniforms.uLooseN = { value: kind === 'tarmac' ? 0.5 : 1.0 };
       sh.vertexShader = 'attribute vec3 aRun;\nvarying vec3 vRun;\nvarying vec2 vWxz;\n' +
         sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvRun = aRun;\nvWxz = position.xz;');
       sh.fragmentShader = 'uniform sampler2D tLoose;\nuniform float uLooseS;\nuniform float uLooseN;\nvarying vec3 vRun;\nvarying vec2 vWxz;\n' + sh.fragmentShader

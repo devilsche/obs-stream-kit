@@ -48,6 +48,37 @@
   // Katalog { props: [{ uid, kind, slot, theme, size: [x, y, z] (m), sink, bytes, … }], credits } und je Modell eine
   // Vorlage (Teile je Material zusammengefasst). Beides bleibt für die ganze Seite im Speicher – das nächste Rennen
   // nimmt dieselben Vorlagen (dispose() einer Strecke gibt nur die Instanzen frei). Fehlt etwas: prozedurale Deko.
+  // Foto-Rasen (ambientCG „Grass 001“, CC0, 1,4 m, assets/textures/track/grass_lawn_diff_1k.jpg): nur als Helligkeits-
+  // Struktur – die Farbe kommt weiter aus den Ecken-Farben des Themas. Gras-UV läuft in 12-m-Kacheln → das Foto wird
+  // 8 × 8 in eine 1024er-Fläche gelegt (≈ 1,5 m je Foto), auf Grundton gt.base normiert, Streuung nach gt.spread.
+  var grassPhoto = { img: null, wait: [], failed: false, cache: {} };
+  function photoGrass(gt, done) {
+    if (!PROP_BASE || !root.document || grassPhoto.failed) return;
+    var key = gt.base.join(',') + '|' + gt.spread + '|' + (gt.stripes ? 1 : 0);
+    if (grassPhoto.cache[key]) { done(grassPhoto.cache[key]); return; }
+    function make() {
+      var N = 1024, REP = 8, cv = document.createElement('canvas'); cv.width = cv.height = N;
+      var x = cv.getContext('2d'), st = N / REP, i, j;
+      for (i = 0; i < REP; i++) for (j = 0; j < REP; j++) x.drawImage(grassPhoto.img, i * st, j * st, st + 1, st + 1);
+      var im = x.getImageData(0, 0, N, N), d = im.data, sum = 0, n = N * N;
+      for (i = 0; i < n; i++) sum += 0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2];
+      var mean = sum / n || 1, k = Math.min(1.6, (gt.spread || 0.2) / 0.2);
+      for (i = 0; i < n; i++) {
+        var L = (0.2126 * d[i * 4] + 0.7152 * d[i * 4 + 1] + 0.0722 * d[i * 4 + 2]) / mean, f = 1 + (L - 1) * 0.85 * k;
+        d[i * 4] = Math.min(255, gt.base[0] * f); d[i * 4 + 1] = Math.min(255, gt.base[1] * f); d[i * 4 + 2] = Math.min(255, gt.base[2] * f);
+      }
+      x.putImageData(im, 0, 0);
+      if (gt.stripes) { x.fillStyle = 'rgba(0,0,0,0.07)'; x.fillRect(0, 0, N, N / 2); }   // Mähstreifen (Stadion)
+      return (grassPhoto.cache[key] = cv);
+    }
+    if (grassPhoto.img) { done(make()); return; }
+    grassPhoto.wait.push(function () { done(make()); });
+    if (grassPhoto.wait.length > 1) return;
+    var img = new Image();
+    img.onload = function () { grassPhoto.img = img; var w = grassPhoto.wait; grassPhoto.wait = []; w.forEach(function (f) { f(); }); };
+    img.onerror = function () { grassPhoto.failed = true; grassPhoto.wait = []; };   // fehlt die Datei: berechnete Textur bleibt
+    img.src = PROP_BASE + 'assets/textures/track/grass_lawn_diff_1k.jpg';
+  }
   var PROP_BASE = (function () {
     var s = root.document && document.currentScript && document.currentScript.src || '';
     var m = /^(.*\/s\/[^/]+\/)/.exec(s) || /^(.*\/)js\/car-track-scene\.js/.exec(s);
@@ -266,6 +297,7 @@
       noise(x, w, h, gt.base, gt.spread, rnd);
       if (gt.stripes) { x.fillStyle = 'rgba(0,0,0,0.07)'; x.fillRect(0, 0, w, h / 2); }   // Mähstreifen (Stadion)
     }, true));
+    photoGrass(gt, function (cv) { grassTex.image = cv; grassTex.needsUpdate = true; });
     var terrainGeo = own(new THREE.BufferGeometry());
     terrainGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
     terrainGeo.setAttribute('uv', new THREE.BufferAttribute(tUv, 2));
