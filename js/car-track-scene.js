@@ -18,6 +18,7 @@
  *       setMotionBlur(m)       Bewegungsunschärfe der Fahrbahn längs der Strecke in Metern (Car Drive; 0 = aus),
  *       props                  Promise → propStats, sobald alle Kulissen-Modelle geladen/eingesetzt sind,
  *       propStats              { loaded: [key], failed: [key], tris, draws } der eingesetzten Kulissen-Modelle,
+ *       grassAt(x, z, out)     Gras-Anteil 0…1 (Car Drive: Grashalme, js/car-drive-grass.js), out → { y, r, g, b },
  *       dispose()              entfernt alles, gibt frei und setzt Licht/Nebel zurück }
  *   opts.propGate()            optional: false = gerade keine Modelle laden/einsetzen (Car Race: während des Rennens)
  *   Kulissen-Modelle (Sketchfab, data/track-props, scripts/build_track_props.py): nach dem Aufbau nachgeladen, ersetzen
@@ -721,6 +722,43 @@
     });
     if (surfaceRes) surfaceStats = surfaceRes.stats;
 
+    // ---- Gras-Abfrage (Car Drive: Halme aus js/car-drive-grass.js) ----
+    // grassAt(x, z, out) → 0…1 (Anteil Gras): 0 auf Fahrbahn + Curbs, im Kiesbett (Kiesbett-Regel, ±3 Rasterpunkte
+    // wie die weiche Mischung des Auslaufs), im Asphalt-Auslauf, an der Begrenzung, in der Boxengasse, auf belegten
+    // Deko-Plätzen und wo die Bodenfarbe nicht grün ist (Höfe, Beton, Strand, Meer, Fels, Schnee, Waldboden, Ufer).
+    // out (optional) bekommt { y (Höhe der sichtbaren Fläche), r, g, b (Bodenfarbe linear) }.
+    var runoffKind = (theme.surface && theme.surface.runoff) || 'gravel';
+    function grassAt(x, z, out) {
+      var nr = trackNearest(x, z, HALF + 20), e = 1e9, band = false;
+      if (nr.i >= 0) {
+        var p = P[nr.i], sd = (x - p.x) * p.nx + (z - p.z) * p.nz >= 0 ? 1 : -1, Rr = 0;
+        for (var k = -3; k <= 3; k++) Rr = Math.max(Rr, runAt((nr.i + k + n) % n, sd));   // Auslauf kann sprunghaft wechseln
+        Rr += 0.3; e = nr.d - HALF;
+        if (e < 1.9) return 0;
+        if (e < Rr + 1.5) {
+          band = true;
+          if (runoffKind === 'tarmac' && e < Rr + 0.3) return 0;
+          if (e > Rr - 0.4 && e < Rr + 0.7) return 0;   // Leitplanke, Mauer, Reifenstapel
+          if (e < Rr) for (k = -3; k <= 3; k++) if (gravelK[sd][(nr.i + k + n) % n]) return 0;
+        }
+        var pit = ctx.pit;
+        if (pit && sd === pit.sd && e < 16.5) {
+          var sm = ((nr.i * ds - pit.s0) % T.len + T.len) % T.len;
+          if (sm < pit.s1 - pit.s0 + 2) return 0;
+        }
+      }
+      var r = Math.ceil((1 + occR) / OCC), gx = Math.floor(x / OCC), gz = Math.floor(z / OCC);
+      for (var a = -r; a <= r; a++) for (var b = -r; b <= r; b++) {
+        var l = occ.get(hkey(gx + a, gz + b)); if (!l) continue;
+        for (var q = 0; q < l.length; q++) { var o = l[q], dx = o[0] - x, dz = o[1] - z, rr = o[2] * 0.9; if (dx * dx + dz * dz < rr * rr) return 0; }
+      }
+      var y = band ? heightAt(x, z) + 0.015 : groundAt(x, z), c = gc(x, z, y + DROP, e);
+      if (typeof c === 'number') c = lin(c);
+      var gr = c.g > 1e-4 ? (c.g - Math.max(c.r, c.b)) / c.g : 0, w = Math.min(1, Math.max(0, (gr - 0.08) / 0.12));
+      if (out && w > 0) { out.y = y; out.r = c.r; out.g = c.g; out.b = c.b; }
+      return w;
+    }
+
     // ---- Neigung ----
     function grad(x, z) { var e = 0.6; return [(heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e)]; }
     var ZERO = { pitch: 0, roll: 0 };
@@ -771,7 +809,7 @@
     return {
       group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
       heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update,
-      props: propsReady, propStats: propStats, surfaceStats: surfaceStats,
+      props: propsReady, propStats: propStats, surfaceStats: surfaceStats, grassAt: grassAt,
       // Bewegungsunschärfe der Fahrbahn in Metern (Car Drive, Tempogefühl); 0 = aus
       setMotionBlur: function (m) { if (surfaceRes && surfaceRes.setMotionBlur) surfaceRes.setMotionBlur(m); },
       dispose: function () {

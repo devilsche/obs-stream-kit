@@ -616,7 +616,7 @@
   }
 
   // ---- Rennen ----
-  var race = null, trackRes = null;
+  var race = null, trackRes = null, grass = null;
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   function pickOpponents(n, playerKey) {
     var cands = catalog.filter(function (e) {
@@ -672,6 +672,13 @@
     trackRes.applyEnv(scene, renderer, { background: true });
     scene.add(trackRes.group);
     if (FX && FX.setGround) FX.setGround(trackRes.heightAt);
+    // Grashalme nah an der Kamera (js/car-drive-grass.js); Zuschauer „Light“ mit halber Dichte
+    grass = root.CarDriveGrass ? CarDriveGrass.create(THREE, trackRes, { reduce: REDUCE, quality: renderScale < 1 ? 'light' : 'full' }) : null;
+  }
+  function grassFrame(dt) {
+    if (!grass) return;
+    var h = race && race.me && race.me.holder;
+    grass.update(dt, cam, h ? { x: h.position.x, z: h.position.z, r: race.me.len * 0.55 } : null);
   }
   // Geländehöhe (nur Optik – die Fahrphysik bleibt 2D)
   function gh(x, z) { return trackRes ? trackRes.heightAt(x, z) : 0; }
@@ -723,6 +730,7 @@
       if (race.remotes) race.remotes.forEach(disposeCar);
       race = null;
     }
+    if (grass) { grass.dispose(); grass = null; }
     if (trackRes) { trackRes.dispose(); trackRes = null; }
     if (FX && FX.setGround) FX.setGround(null);
     ui.hud.hidden = true; ui.countdown.hidden = true;
@@ -1663,7 +1671,7 @@
     if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('hMsg').classList.remove('show', 'big'); }
     if (race.paused || race.phase === 'results') {
       if (race.phase === 'results' && !race.paused) stepWorld(dt, cruise(race.pc));
-      lookPhase(); fxFrame(dt, null); trackRes.update(race.paused ? 0 : dt);
+      lookPhase(); fxFrame(dt, null); trackRes.update(race.paused ? 0 : dt); grassFrame(race.paused ? 0 : dt);
       renderer.render(scene, cam); return;
     }
     var pc = race.pc;
@@ -1714,6 +1722,7 @@
     lookPhase();
     fxFrame(dt, race.phase === 'countdown' ? null : inp);
     trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
+    grassFrame(dt);
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {
@@ -1783,5 +1792,5 @@
   showPanel(RACE ? 'lobby' : 'menu');
   // Fehlersuche/Prüfskript: aktueller Rennzustand (nur lesen)
   root.CarDrive = { state: function () { return race; },
-    debug: function () { return { sound: !!snd, soundOn: sndOn, volume: sndVol, look: { used: look.used, yaw: look.yaw, dist: look.dist }, fx: FX ? FX.count() : null }; } };
+    debug: function () { return { sound: !!snd, soundOn: sndOn, volume: sndVol, look: { used: look.used, yaw: look.yaw, dist: look.dist }, fx: FX ? FX.count() : null, grass: grass ? grass.stats() : null }; }, grass: function () { return grass; } };
 })(typeof window !== 'undefined' ? window : this);
