@@ -536,7 +536,7 @@ var BUS_DYAW_BEFORE = 0.1238, BUS_JERK_BEFORE = 0.00289;
 
 // ---- 4. Bilanz: Bus gegen 9 Zufallsautos aus der Tabelle (jedes Rennen neu) ----
 var RACES = arg('--races', 1000);
-var busWins = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
+var busWins = 0, busFin = 0, strongWins = 0, dnfs = 0, finishers = 0, wtimes = [], incidents = { spin: 0, crash: 0, dnf: 0 };
 var X = { steerSum: 0, steerN: 0, steerMax: 0, offs: 0, rails: 0, returned: 0, offAtEnd: 0, pushes: 0, oilHits: 0, overtakes: 0, randomOil: 0, oilSpots: 0, maxOil: 0,
   busPush: [], busPushed: [], busLoss: [], busLost: [], busShoveLoss: [], busShovePush: [], draftSteps: 0 };
 var started = Date.now();
@@ -556,6 +556,7 @@ for (var race = 0; race < RACES; race++) {
   var res = sim.result();
   res.forEach(function (e) {
     if (e.place === 1 && e.id === 'bus') busWins++;
+    if (e.id === 'bus' && e.place !== null) busFin++;
     if (e.place === 1 && e.id === strongest) strongWins++;
     if (e.place === null) dnfs++; else finishers++;
   });
@@ -579,7 +580,10 @@ for (var race = 0; race < RACES; race++) {
 var secs = (Date.now() - started) / 1000;
 wtimes.sort(function (a, b) { return a - b; });
 var busPct = 100 * busWins / RACES, strongPct = 100 * strongWins / RACES;
-if (busPct < 0.2) fail('Bus gewinnt nur ' + busPct.toFixed(1) + ' % (Soll ≥ 0,2 %)');
+// Bus (Nutzer 2026-11-20, Variante a): gewinnt nur mit Glück oder wenn die anderen ausfallen – keine Mindest-Siegquote;
+// er muss aber meist regulär ins Ziel kommen (sonst wäre er bei langen Strecken fast immer „DNF“ statt Letzter)
+var busFinPct = 100 * busFin / RACES;
+if (busFinPct < 70) fail('Bus kommt nur in ' + busFinPct.toFixed(1) + ' % der Rennen ins Ziel (Soll ≥ 70 %)');
 if (strongPct > 60 || strongPct < 25) fail('stärkstes Auto gewinnt ' + strongPct.toFixed(1) + ' % (Soll 25–60 %)');
 if (incidents.crash / RACES > 1.2) fail((incidents.crash / RACES).toFixed(2) + ' Crashs je Rennen inkl. Leitplanke (Soll ≤ 1,2)');
 function mean(A) { return A.length ? A.reduce(function (x, y) { return x + y; }, 0) / A.length : 0; }
@@ -726,8 +730,8 @@ function report() {
   if (typeof paceInfo === 'string') console.log(paceInfo);
   if (typeof kartInfo === 'string' && kartInfo) console.log(kartInfo);
   if (typeof RACES !== 'undefined' && wtimes.length) {
-    console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) +
-      ' %, stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +
+    console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) + ' % (im Ziel ' + busFinPct.toFixed(1) + ' %)' +
+      ', stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +
       ' %; Siegerzeit Median ' + wtimes[Math.floor(wtimes.length / 2)].toFixed(1) + ' s (' + wtimes[0].toFixed(1) + '–' +
       wtimes[wtimes.length - 1].toFixed(1) + ' s); W14 gegen Straßensportwagen: ' + (typeof w14Pct === 'number' ? w14Pct.toFixed(1) : '–') +
       ' %, Golf Mk1 gegen Supersportwagen: ' + (typeof golfPct === 'number' ? golfPct.toFixed(2) : '–') + ' %; je Rennen ' + (incidents.spin / RACES).toFixed(2) + ' Dreher, ' +
