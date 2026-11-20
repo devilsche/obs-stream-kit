@@ -14,6 +14,8 @@
  *   s.cheer(), s.fanfare()           Siegerehrung: Jubel (Rauschen schwillt an) + kurze Fanfare
  *   s.silence()                      Dauerklänge aus (Motor, Feuer, Motoren, Quietschen, Rumpeln)
  *
+ *   s.ctx, s.master                  AudioContext und Master-Pegel (vor dem Kompressor) für js/car-engine-audio.js
+ *
  * Zusätzlich für Car Drive (selbst fahren, js/car-drive.js):
  *   s.setVolume(v)                   Gesamtlautstärke 0..1 (0 = stumm)
  *   var m = s.motor(gain)            eigener Motor (je Auto oder fürs Feld): m.set(on, speed m/s, throttle 0..1),
@@ -89,6 +91,7 @@
 
     var api = {
       ctx: ctx,
+      master: master,   // Motorklänge aus Aufnahmen (js/car-engine-audio.js) hängen sich hier an
       resume: function () { if (ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(function () {}); },
       join: function () { var t = now(); tone('sine', 1320, t, 0.005, 0.12, 0.3); tone('sine', 1980, t + 0.04, 0.005, 0.05, 0.25); },
       beep: function () { tone('square', 880, now(), 0.005, 0.07, 0.16); },

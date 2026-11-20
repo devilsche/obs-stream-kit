@@ -113,3 +113,15 @@ def test_ticket_needs_signin_then_filters_garage(conn, root, calls):
     tk = drive_auth.read_ticket(j["ticket"])
     assert tk["id"] == "42" and tk["role"] == "viewer" and tk["garage"] == ["a"] and tk["code"] == "ABC234"
     assert c.get("/drive/ZZZ999/ticket").status_code == 404
+
+
+def test_engine_sounds_without_token(conn, root, calls):
+    d = root / "assets" / "sounds" / "engines" / "i4"
+    os.makedirs(d)
+    (root / "assets" / "sounds" / "engines" / "bank.json").write_text('{"version": 1}')
+    (d / "loop-900-1.mp3").write_bytes(b"ID3x")
+    c = _app(conn, root)
+    assert c.get("/drive/a/assets/sounds/engines/bank.json").get_json() == {"version": 1}
+    assert c.get("/drive/a/assets/sounds/engines/i4/loop-900-1.mp3").status_code == 200
+    assert c.get("/drive/a/assets/sounds/engines/../../../tools/car-drive.html").status_code == 404
+    assert c.get("/drive/a/assets/sounds/engines/i4/none.mp3").status_code == 404

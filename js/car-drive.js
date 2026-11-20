@@ -31,7 +31,8 @@
  * werden nach Fortschritt dahinter sortiert (wie js/car-race.js); Platz nach dem Ziel = Server-Ergebnis, sobald da.
  * Rundenrekorde: Mehrspieler/Chatrennen vom Server (geprüfte Runden, fx_race_lap_record, Meldung „rec“ über den WS),
  * solo nur lokal (localStorage je Auto + Strecke und je Strecke), der Server-Streckenrekord wird nur angezeigt.
- * Effekte: Bremsspuren + Qualm (js/car-drive-fx.js), Klänge (js/car-race-sound.js, nach der ersten Eingabe, M = stumm).
+ * Effekte: Bremsspuren + Qualm (js/car-drive-fx.js), Klänge (js/car-race-sound.js, nach der ersten Eingabe, M = stumm),
+ * Motoren aus echten Aufnahmen (js/car-engine-audio.js, Motorart je Auto aus CarRaceStats engine).
  * Vor dem Start (Countdown): Kamera mit Maus/Touch/rechtem Stick um das eigene Auto drehen, Mausrad/Pinch zoomt.
  */
 (function (root) {
@@ -311,10 +312,18 @@
   }
 
   // ---- Klang (js/car-race-sound.js): startet nach der ersten Eingabe, M = stumm, Lautstärke in localStorage ----
+  // Motoren: echte Aufnahmen je Motorart (js/car-engine-audio.js, Motorart aus CarRaceStats engine); das eigene Auto
+  // voll, die drei nächsten Fremdautos leiser nach Abstand mit Doppler. Ohne Klangbank (Laden fehlgeschlagen):
+  // Rückfall auf den erzeugten Motor von car-race-sound.js
   var snd = null, sndOn = load('sound', true) !== false, sndVol = clamp(+load('volume', 0.6) || 0, 0, 1);
-  var sm = { me: null, field: null, nitro: 0, hitT: 0, lastSlip: 0 };
+  var eng = null, engOk = false, OTHER_N = 3, OTHER_REF = 6, OTHER_MAX = 70;
+  var sm = { me: null, field: null, mev: null, others: [], nitro: 0, hitT: 0, lastSlip: 0, padThr: 0 };
   function soundStart() {
     if (!snd && root.CarRaceSound) snd = root.CarRaceSound.create({ volume: sndOn ? sndVol : 0 });
+    if (snd && !eng && root.CarEngineAudio) {
+      eng = root.CarEngineAudio.create(snd);
+      if (eng) eng.ready.then(function (ok) { engOk = ok; });
+    }
     if (snd) snd.resume();
   }
   ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { doc.addEventListener(ev, soundStart, { passive: true }); });
@@ -348,22 +357,49 @@
     snd.silence();
     if (sm.me) { sm.me.stop(); sm.me = null; }
     if (sm.field) { sm.field.stop(); sm.field = null; }
+    if (sm.mev) { sm.mev.v.stop(); sm.mev = null; }
+    sm.others.forEach(function (o) { o.v.stop(); });
+    sm.others = [];
   }
-  // je Bild: eigener Motor (laut), Feld (leise, mittleres Tempo naher Autos), Quietschen, Rumpeln, Nitro
+  function engineOf(c) { return (c && c.raw && c.raw.engine) || 'i4'; }
+  // je Bild: eigener Motor (laut), nahe Fremdautos (leise, Doppler), Quietschen, Rumpeln, Nitro
   function soundFrame(inp) {
     if (!snd) return;
-    if (!race || race.paused || race.phase === 'results' || !sndOn) { snd.skid(0); snd.rumble(0); snd.scrape(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false); return; }
-    var pc = race.pc, sp = Math.hypot(pc.vx, pc.vz);
-    if (!sm.me) sm.me = snd.motor(1);
-    if (!sm.field) sm.field = snd.motor(0.3);
-    sm.me.set(true, Math.abs(pc.u), inp ? Math.max(inp.throttle || 0, pc.u < -0.5 ? inp.brake || 0 : 0) : 0.3);
-    var n = 0, sum = 0;
-    (race.remotes || []).concat(race.ai || []).forEach(function (c) {
-      if (!c || !c.holder) return;
-      var d = Math.hypot(c.holder.position.x - pc.x, c.holder.position.z - pc.z);
-      if (d < 45 && c.fxSpeed != null) { n++; sum += c.fxSpeed * (1 - d / 45); }
-    });
-    sm.field.set(n > 0, n ? sum / n * 1.4 : 0, 0.5);
+    var dt = sm.lastT ? clamp((performance.now() - sm.lastT) / 1000, 0, 0.1) : 0.016;
+    sm.lastT = performance.now();
+    var off = !race || race.paused || race.phase === 'results' || !sndOn;
+    if (off) {
+      snd.skid(0); snd.rumble(0); snd.scrape(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false);
+      if (sm.mev) sm.mev.v.update(dt, { on: false });
+      sm.others.forEach(function (o) { o.v.update(dt, { on: false }); });
+      return;
+    }
+    var pc = race.pc, sp = Math.hypot(pc.vx, pc.vz), cd = race.phase === 'countdown';
+    // Gas fürs Motorgeräusch: im Countdown aus Tastatur/Gamepad (Gasstöße im Stand), sonst aus der Eingabe
+    var thr = inp ? Math.max(inp.throttle || 0, pc.u < -0.5 ? inp.brake || 0 : 0)
+      : cd && !race.spect ? Math.max((keys.KeyW || keys.ArrowUp) ? 1 : 0, sm.padThr) : race.spect ? 0.5 : 0;
+    if (eng && engOk) {
+      if (sm.me) { sm.me.stop(); sm.me = null; }
+      if (sm.field) { sm.field.stop(); sm.field = null; }
+      if (!sm.mev || sm.mev.car !== race.me) {
+        if (sm.mev) sm.mev.v.stop();
+        sm.mev = { car: race.me, v: eng.voice(engineOf(race.me), { gain: 1, seed: race.me.key }) };
+        if (cd) sm.mev.v.oneShot('start', 0.55);
+      }
+      sm.mev.v.update(dt, { speed: Math.abs(pc.u) / Math.max(1, pc.P.vtop), throttle: thr });
+      otherEngines(dt, cd);
+    } else {
+      if (!sm.me) sm.me = snd.motor(1);
+      if (!sm.field) sm.field = snd.motor(0.3);
+      sm.me.set(true, Math.abs(pc.u), inp ? thr : 0.3);
+      var n = 0, sum = 0;
+      (race.remotes || []).concat(race.ai || []).forEach(function (c) {
+        if (!c || !c.holder) return;
+        var d = Math.hypot(c.holder.position.x - pc.x, c.holder.position.z - pc.z);
+        if (d < 45 && c.fxSpeed != null) { n++; sum += c.fxSpeed * (1 - d / 45); }
+      });
+      sm.field.set(n > 0, n ? sum / n * 1.4 : 0, 0.5);
+    }
     var hard = pc.surface === 'asphalt' || pc.surface === 'curb';
     snd.skid(hard && sp > 3 && !race.spect ? clamp((pc.slip - 0.42) / 0.45, 0, 1) : 0);
     snd.rumble(!hard && sp > 1 ? clamp(sp / 12, 0.2, 1) : 0);
@@ -372,7 +408,38 @@
     sm.nitro = pc.nitroT;
     if (pc.rail > 0) hitSound(pc.rail);
   }
-
+  // Fremdautos: die OTHER_N nächsten (zur Kamera) bekommen eine Stimme; Tempo aus den gezeichneten Lagen (fxSpeed),
+  // Gas aus der Tempoänderung, Doppler aus der Abstandsänderung (Sim-Einheiten → echte m/s über vmax)
+  var camRight = new THREE.Vector3();
+  function otherEngines(dt, cd) {
+    var lx = cam.position.x, lz = cam.position.z, seen = [], list = [];
+    (race.ai || []).concat(race.remotes || []).forEach(function (c) {
+      if (!c || !c.holder || c === race.me || seen.indexOf(c) >= 0) return;
+      seen.push(c);
+      var d = Math.hypot(c.holder.position.x - lx, c.holder.position.z - lz);
+      if (d < OTHER_MAX) list.push({ c: c, d: d });
+    });
+    list.sort(function (a, b) { return a.d - b.d; });
+    list = list.slice(0, OTHER_N);
+    var want = list.map(function (x) { return x.c; });
+    sm.others = sm.others.filter(function (o) { if (want.indexOf(o.car) < 0) { o.v.stop(); return false; } return true; });
+    camRight.setFromMatrixColumn(cam.matrixWorld, 0);
+    list.forEach(function (x) {
+      var c = x.c, o = sm.others.filter(function (q) { return q.car === c; })[0];
+      if (!o) {
+        o = { car: c, v: eng.voice(engineOf(c), { gain: 0.6, seed: c.key, lite: true }), d: x.d, u: c.fxSpeed || 0 };
+        sm.others.push(o);
+      }
+      var u = c.fxSpeed || 0, vtop = Math.max(1, (c.st && c.st.vmax) || 30), mps = ((c.raw && c.raw.vmax) || 250) / 3.6 / vtop;
+      var acc = dt > 0 ? (u - o.u) / dt : 0, radial = dt > 0 ? -(x.d - o.d) / dt * mps : 0;
+      o.u = u; o.d = x.d;
+      o.thr = (o.thr || 0) + ((cd ? 0 : acc > 0.3 ? 0.85 : acc < -1 ? 0 : 0.35) - (o.thr || 0)) * Math.min(1, dt * 6);
+      if (cd && race.cd < 3.5 && Math.random() < dt * 0.6) o.v.blip(0.5 + Math.random() * 0.4);
+      var dx = c.holder.position.x - lx, dz = c.holder.position.z - lz, dl = Math.max(1e-3, Math.hypot(dx, dz));
+      o.v.update(dt, { speed: u / vtop, throttle: o.thr, dist: x.d, ref: OTHER_REF, radial: radial,
+        pan: clamp((dx * camRight.x + dz * camRight.z) / dl, -1, 1) * 0.7 });
+    });
+  }
   // ---- Eingabe ----
   var keys = {}, pressed = {};
   var GAME_KEYS = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1, ShiftLeft: 1, ShiftRight: 1, KeyR: 1, KeyC: 1 };
@@ -1496,6 +1563,7 @@
     root.requestAnimationFrame(frame);
     var dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     var p = readPad();
+    sm.padThr = p ? p.throttle || 0 : 0;
     if (p && p.start && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) setPaused(!race.paused);
     else if (p) padMenu(p);
     if (!race || !trackRes) { idleCam(dt); soundFrame(null); renderer.render(scene, cam); return; }

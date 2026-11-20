@@ -19,6 +19,8 @@ Chatrennen steuerbar (Schritt 2b) – fester Link je Tenant, <kanal> = Twitch-Ka
 Kulissen-Modelle der Strecken-Themen (fx/track_props.py): GET /drive/a/api/fx/track-props/catalog.json und
 GET /drive/a/api/fx/track-props/<uid>.glb (wie die Auto-Modelle ohne Widget-Token).
 
+Motorklänge: GET /drive/a/assets/sounds/engines/<datei> (bank.json + MP3s, js/car-engine-audio.js).
+
 Rundenrekorde (nur lesen, wie …/api/fx/car-race?cmd=records): GET /drive/race/<kanal>/records?track=&car= und
 GET /drive/<code>/records?track=&car= (Tenant des Raums).
 """
@@ -298,6 +300,12 @@ def ticket(code):
 @bp_drive.route("/drive/a/js/<path:filepath>")
 def js_file(filepath):
     return serve_asset(_root(), "js", filepath)
+
+
+@bp_drive.route("/drive/a/assets/sounds/engines/<path:filepath>")
+def engine_sound(filepath):
+    """Motorklänge (scripts/build_engine_sounds.py → assets/sounds/engines/, js/car-engine-audio.js)."""
+    return serve_asset(_root(), os.path.join("assets", "sounds", "engines"), filepath)
 
 
 @bp_drive.route("/drive/a/api/fx/cars/catalog.json")

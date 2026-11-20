@@ -2,8 +2,9 @@
  * plus im Car editor gespeicherte Abweichungen.
  * Läuft im Browser (window.CarRaceStats) und in Node (module.exports). Prüfskript: scripts/check_car_race_sim.js
  *
- *   CarRaceStats.guess(entry) → { on, vmax, acc, hp, kg, grip, brake, drive, len, steer }
+ *   CarRaceStats.guess(entry) → { on, vmax, acc, hp, kg, grip, brake, drive, len, steer, engine }
  *       steer = größter Radeinschlag in Grad (nur Car Drive, Schätzung nach Fahrzeugart),
+ *       engine = Motorklang (js/car-engine-audio.js, ENGINES): echter Motor je Katalog-Schlüssel, sonst nach Name,
  *       entry = Katalog-Eintrag { key, name, brand, len }. Echte Werte: vmax km/h, acc = 0–100 km/h in s,
  *       hp = PS, kg = Leergewicht, grip = Kurvenhaftung in g, brake = Bremsverzögerung in g.
  *       Zuerst die Tabelle je Katalog-Schlüssel (vom Nutzer abgesegnet), sonst die Fahrzeugklasse über
@@ -11,7 +12,7 @@
  *   CarRaceStats.of(key[, entry]) → race-Objekt: guess() überlagert mit ToyCars.vehicle(key).race
  *       (nur gültige Felder; alte 1–10-Felder power/speed/handling/susp/brakes/weight werden verworfen).
  *       Ohne entry wird der Katalog von ToyCars durchsucht.
- *   CarRaceStats.KEYS, CarRaceStats.RANGE (gültige Bereiche je Feld), CarRaceStats.TABLE (Schlüssel → Werte),
+ *   CarRaceStats.ENGINES (gültige Motorklänge), CarRaceStats.KEYS, CarRaceStats.RANGE (gültige Bereiche je Feld), CarRaceStats.TABLE (Schlüssel → Werte),
  *   CarRaceStats.clean(race) → nur gültige Felder
  */
 (function (root) {
@@ -136,7 +137,51 @@
     r.drive = t ? t.drive : /ferrari/i.test((entry && (entry.brand || '') + ' ' + (entry.name || '')) || '') ? 'rwd' : v.drive;
     r.len = inRange('len', len) ? len : 4.5;
     r.steer = steerGuess(entry);
+    r.engine = engineGuess(entry);
     return r;
+  }
+
+  // Motorklang je Auto (js/car-engine-audio.js): i4 Reihenvierer, t4 Turbo-Vierer (auch kleine Turbo-V6), i6 Reihensechser
+  // (auch VR6), f6 Boxer (Porsche 911), v8m Muscle-/Ami-V8, v8f hochdrehende Sport-V8 (Ferrari, AMG, M3 E92, Audi RS),
+  // v10, v12 (auch die Zwölfzylinder-Boxer Testarossa/917), f1 Formel 1/Rennwagen mit V6-Turbo, dsl Lkw/Diesel, ev elektrisch
+  var ENGINES = ['i4', 't4', 'i6', 'f6', 'v8m', 'v8f', 'v10', 'v12', 'f1', 'dsl', 'ev'];
+  var ENGINE = {
+    'amg-w14-s1': 'f1', 'ferrari-296-gt3': 'f1', 'ferrari-296-gt3-verstappen': 'f1',
+    '2025-koenigsegg-gemera': 'v8f', 'porsche-917k-lm-red': 'v12', 'ferrari-laferrari': 'v12',
+    '2022-lamborghini-countach-lp': 'v12', '2022-lamborghini-countach-2': 'v12', '1995-lamborghini-diablo-sv': 'v12',
+    'lamborghini-diablo-sv-1998': 'v12', 'ferrari-gtc4-lusso': 'v12', 'ferrari-550-barchetta-2000-a': 'v12',
+    '2019-ferrari-monza-sp2': 'v12', '1988-ferrari-testarossa': 'v12',
+    'porsche-918-free': 'v8f', 'porsche-918-spyder-2015': 'v8f', '2021-ferrari-sf90-spider': 'v8f',
+    '2023-ferrari-sf90-xx-stradal': 'v8f', 'ferrari-488-pista-widebody': 'v8f', '2026-ferrari-849-testarossa': 'v8f',
+    '2020-ferrari-roma': 'v8f', 'audi-a4-r9-dtm-a': 'v8f', '2010-bmw-m3-e92': 'v8f', 'mersedes-benz-g63-amg': 'v8f',
+    '2020-abt-sportline-audi-rs6': 'v8f', '2020-audi-rs-6-avant': 'v8f', '2020-audi-rs6-avant': 'v8f',
+    '2024-audi-rs6-avant-gt': 'v8f', '2024-audi-rs6-avant-gt-2': 'v8f', 'audi-rs6-gt-avant': 'v8f',
+    '2020-audi-rs5-coup': 't4', 'mercedes-benz-a45-amg-2018': 't4', 'mitsubishi-lancer-evo-ix': 't4',
+    'vw-golf-gti-mk7': 't4', '1973-bmw-2002-turbo': 't4', 'audi-a4-b8': 't4', 'audi-a4-l40-tfsi': 't4',
+    'bmw-m3-competition': 'i6', 'bmw-m2-competition-f87': 'i6', '1988-bmw-m5-e28': 'i6', 'bmw-e39-free': 'i6',
+    '2002-volkswagen-golf-r32-mk4': 'i6', 'bmw-m5-e39-1995': 'v8m',
+    'mercedes-190e-evo-1982-3d-mo': 'i4', '2024-porsche-992-gt3-r': 'f6', '2017-porsche-gt-rsr-991-duke': 'f6',
+    'free-bmw-m3-e30': 'i4', '1990-bmw-m3-sport-evolution': 'i4', 'low-poly-car-bmw-e30-1985-wh': 'i6',
+    'mercedes-benz-500te-w126-est': 'v8m', 'ford-mustang-shelby-gt500': 'v8m', '67-mustang-high-poly': 'v8m',
+    'ford-mustang-1965': 'v8m', '1962-chevrolet-corvette-gran': 'v8m', 'classic-crasher-c170-dominat': 'v8m',
+    'caterpillar-ct680': 'dsl', 'ural-4320-soviet-army-truck': 'dsl', 'krabby-patty-wagon': 'dsl',
+    'trolza-5265-00-megapolis': 'ev'   // Oberleitungsbus: elektrisch
+  };
+  function engineGuess(entry) {
+    var k = entry && entry.key;
+    if (k && ENGINE.hasOwnProperty(k)) return ENGINE[k];
+    var n = ((entry && entry.name) || '') + ' ' + ((entry && entry.brand) || '') + ' ' + (k || '');
+    if (/tesla|taycan|electric|\be-?tron\b|\bev\b|trolza|trolley|\bi3\b|\bleaf\b/i.test(n)) return 'ev';
+    if (/\bw1\d\b|formula|\bf1\b/i.test(n)) return 'f1';
+    if (/\bbus\b|truck|\bural\b|caterpillar|kamaz|scania|\bman\b|\bzil\b|\bmaz\b|diesel|\btdi\b|krabby/i.test(n)) return 'dsl';
+    if (/huracan|hurac\u00e1n|gallardo|\br8\b|urus|\bm5 e6\d\b|carrera gt|viper/i.test(n)) return 'v10';
+    if (/aventador|countach|diablo|murci|\bv12\b|\b(550|575|599|612|812)\b|laferrari|lusso|testarossa|pagani|\bdb\d+\b/i.test(n)) return 'v12';
+    if (/porsche/i.test(n) && /91[18]|cayman|boxster|\b9[69]\d\b|gt3|\bgt2\b|rsr/i.test(n)) return /918/.test(n) ? 'v8f' : 'f6';
+    if (/mustang|shelby|corvette|camaro|charger|challenger|chevrolet|dodge|cadillac|pontiac|hot ?rod|muscle|crasher|hoonicorn/i.test(n)) return 'v8m';
+    if (/ferrari|mclaren|\bamg\b|\brs ?[67]\b|\bm3 e9\d|koenigsegg|maserati|aston/i.test(n)) return 'v8f';
+    if (/\bevo\b|\bwrx\b|\bsti\b|\bgt-?r\b|turbo|\btfsi\b|\btsi\b|\ba45\b|\bgti mk[5-8]\b|\brs ?[345]\b|\btype r\b/i.test(n)) return 't4';
+    if (/bmw|supra|\br32\b|vr6|skyline|\bz4\b/i.test(n)) return 'i6';
+    return 'i4';
   }
   // größter Radeinschlag in Grad (nur Car Drive; die Sim lenkt selbst): Pkw ~38°, Rennwagen weniger, F1 am wenigsten,
   // lange Nutzfahrzeuge mehr (ihr Wendekreis kommt trotzdem aus dem langen Radstand)
@@ -155,6 +200,7 @@
     if (!race || typeof race !== 'object') return o;
     if (typeof race.on === 'boolean') o.on = race.on;
     KEYS.concat(['len', 'steer']).forEach(function (k) { var n = +race[k]; if (race[k] != null && race[k] !== '' && inRange(k, n)) o[k] = n; });
+    if (ENGINES.indexOf(race.engine) >= 0) o.engine = race.engine;
     if (race.drive === 'fwd' || race.drive === 'rwd' || race.drive === 'awd') o.drive = race.drive;
     return o;
   }
@@ -168,7 +214,7 @@
     return r;
   }
 
-  var api = { guess: guess, of: of, clean: clean, KEYS: KEYS, RANGE: RANGE, TABLE: TABLE };
+  var api = { guess: guess, of: of, clean: clean, KEYS: KEYS, RANGE: RANGE, TABLE: TABLE, ENGINES: ENGINES, ENGINE: ENGINE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CarRaceStats = api;
 })(typeof window !== 'undefined' ? window : this);

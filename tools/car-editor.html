@@ -326,6 +326,13 @@
           <span class="muted small-text" id="raceSteerEst"></span>
         </div>
         <p class="muted small-text">Steering lock = largest front-wheel angle, used when you drive the car yourself (Car Drive). Typical cars 35–40°, race cars about 30°, Formula 1 about 24°, buses and trucks up to 45°.</p>
+        <div class="row">
+          <label for="raceEngine">Engine sound</label>
+          <select id="raceEngine" aria-describedby="raceEngineEst"></select>
+          <button type="button" id="raceEnginePlay" class="small" aria-describedby="raceEngineEst">Play</button>
+          <span class="muted small-text" id="raceEngineEst"></span>
+        </div>
+        <p class="muted small-text">Engine sound = recorded engine type for Car Drive and the race overlay (close-ups, fly-bys). Play: start-up, two revs, a run through the gears, idle.</p>
         <div class="row"><button type="button" id="raceReset" class="small">Reset to estimate</button></div>
       </section>
 
@@ -361,6 +368,8 @@
   <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-TransformControls.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-sound.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-engine-audio.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
@@ -1066,8 +1075,8 @@
           var el = document.querySelector('.race-in[data-k="' + k + '"]');
           el.value = r[k]; raceEst(el.id, g[k]);
         });
-        $('raceDrive').value = r.drive; $('raceLen').value = r.len; $('raceSteer').value = r.steer;
-        raceEst('raceDrive', g.drive.toUpperCase()); raceEst('raceLen', g.len); raceEst('raceSteer', g.steer + '°');
+        $('raceDrive').value = r.drive; $('raceLen').value = r.len; $('raceSteer').value = r.steer; $('raceEngine').value = r.engine;
+        raceEst('raceDrive', g.drive.toUpperCase()); raceEst('raceLen', g.len); raceEst('raceSteer', g.steer + '°'); raceEst('raceEngine', engineLabel(g.engine));
         steerRange(r.steer);
       }
       // leere oder ungültige Felder fallen auf die Schätzung zurück, sonst in den gültigen Bereich geklemmt
@@ -1077,7 +1086,8 @@
           var n = el.value === '' ? NaN : +el.value;
           return isFinite(n) ? Math.min(R[k][1], Math.max(R[k][0], n)) : g[k];
         }
-        var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: val($('raceLen'), 'len'), steer: Math.round(val($('raceSteer'), 'steer')) };
+        var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: val($('raceLen'), 'len'), steer: Math.round(val($('raceSteer'), 'steer')),
+          engine: CarRaceStats.ENGINES.indexOf($('raceEngine').value) >= 0 ? $('raceEngine').value : g.engine };
         CarRaceStats.KEYS.forEach(function (k) { r[k] = val(document.querySelector('.race-in[data-k="' + k + '"]'), k); });
         return r;
       }
@@ -1085,7 +1095,7 @@
       function raceChanged() {
         var r = raceRead(), g = CarRaceStats.guess(cur), o = {};
         $('raceLen').value = r.len; steerRange(r.steer);
-        CarRaceStats.KEYS.concat(['drive', 'len', 'steer']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
+        CarRaceStats.KEYS.concat(['drive', 'len', 'steer', 'engine']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
         if (!r.on) o.on = false;
         if (Object.keys(o).length) def.race = o; else delete def.race;
       }
@@ -1094,7 +1104,24 @@
         // beim Verlassen den gültigen Wert (geklemmt bzw. Schätzung) zurückschreiben
         el.addEventListener('change', function () { raceChanged(); el.value = raceRead()[el.dataset.k]; });
       });
-      ['raceOn', 'raceDrive', 'raceLen'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
+      ['raceOn', 'raceDrive', 'raceLen', 'raceEngine'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
+      // Motorklang: Auswahl aus js/car-engine-audio.js, Hörprobe über eine eigene (leise) Klangausgabe
+      var ENG_TYPES = window.CarEngineAudio ? CarEngineAudio.TYPES : CarRaceStats.ENGINES.map(function (id) { return { id: id, label: id }; });
+      function engineLabel(id) { var t = (ENG_TYPES || []).filter(function (x) { return x.id === id; })[0]; return t ? t.label : id; }
+      ENG_TYPES.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.label; $('raceEngine').appendChild(o); });
+      var engSnd = null, engAudio = null;
+      $('raceEnginePlay').addEventListener('click', function () {
+        if (!engSnd && window.CarRaceSound) engSnd = CarRaceSound.create({ volume: 0.7 });
+        if (engSnd && !engAudio && window.CarEngineAudio) engAudio = CarEngineAudio.create(engSnd);
+        if (!engAudio) { say('No Web Audio in this browser.', 'err'); return; }
+        engSnd.resume();
+        var type = $('raceEngine').value;
+        engAudio.ready.then(function (ok) {
+          if (!ok) { say('Engine sounds could not be loaded.', 'err'); return; }
+          engAudio.preview(type, cur && cur.key);
+          say('Playing: ' + engineLabel(type) + '.', 'ok');
+        });
+      });
       $('raceSteer').addEventListener('change', function () { raceChanged(); $('raceSteer').value = raceRead().steer; });
       // Lenkvorschau reicht bis zum Einschlagwinkel des Autos
       function steerRange(deg) {

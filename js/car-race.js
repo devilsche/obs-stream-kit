@@ -124,6 +124,7 @@
     if (STAGE && stageEl) stageEl.classList.toggle('is-stage', true);
     // Klänge (js/car-race-sound.js): in OBS sofort, im Browser-Tab erst nach dem ersten Klick/Tastendruck
     var snd = root.CarRaceSound ? CarRaceSound.create({ enabled: opts.sound !== false, volume: opts.volume }) : null;
+    var engines = snd && root.CarRaceEngines ? CarRaceEngines.create(snd) : null;   // Motorstimmen (js/car-race-engines.js)
     if (snd) ['pointerdown', 'keydown'].forEach(function (ev) { root.addEventListener(ev, function () { snd.resume(); }); });
     var sndSeen = null, sndLit = 0;   // schon bekannte Fahrer (Pling nur für neue), Startampel-Stufe
 
@@ -527,6 +528,7 @@
     }
     function teardown() {
       if (snd) snd.silence();
+      if (engines) engines.stop();
       netStop();
       if (!race) return;
       Object.keys(race.racers).forEach(function (id) { disposeRacer(race.racers[id]); });
@@ -2088,6 +2090,7 @@
       if (ut) camFix = ut;   // Handzoom hat Vorrang vor Automatik und Unfall-Highlight
       updateCamera(pts, dt, camFix);
       cam.updateMatrixWorld();
+      if (engines) engines.frame(dt, race, cam, visible, now);
       inViewport(function () { updateLabels(labels, dt); });
       if (trackRes) trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
       renderScene();

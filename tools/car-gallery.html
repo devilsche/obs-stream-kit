@@ -73,6 +73,12 @@
     <p class="sub" id="track-credits-status" role="status" aria-live="polite">Loading …</p>
     <ul id="track-credits"></ul>
   </section>
+  <section class="credits" aria-labelledby="sound-credits-h">
+    <h2 id="sound-credits-h">Sound credits</h2>
+    <p class="sub">Engine sounds in Car Race and Car Drive, cut from these Freesound recordings (CC0 = public domain, CC BY = attribution).</p>
+    <p class="sub" id="sound-credits-status" role="status" aria-live="polite">Loading …</p>
+    <ul id="sound-credits"></ul>
+  </section>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
@@ -142,6 +148,24 @@
           $('track-credits').appendChild(li);
         });
       }).catch(function () { $('track-credits-status').textContent = 'Could not load the track credits.'; });
+      // Quellen der Motorklänge (Freesound, scripts/build_engine_sounds.py → assets/sounds/engines/bank.json)
+      fetch(TC.base() + 'assets/sounds/engines/bank.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (b) {
+        var src = (b && b.sources) || {}, use = {};
+        Object.keys((b && b.types) || {}).forEach(function (t) {
+          var e = b.types[t];
+          ['loops', 'start', 'rev', 'pass', 'pop', 'turbo'].forEach(function (k) {
+            (e[k] || []).forEach(function (o) { var u = use[o.src] || (use[o.src] = []); if (u.indexOf(e.label) < 0) u.push(e.label); });
+          });
+        });
+        var ids = Object.keys(src).filter(function (id) { return use[id]; }).sort(function (a, b) { return src[a].user.localeCompare(src[b].user); });
+        $('sound-credits-status').textContent = ids.length ? '' : 'No engine sounds yet.';
+        ids.forEach(function (id) {
+          var e = src[id], li = el('li'), a = el('a', null, e.title);
+          a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
+          li.append(a, document.createTextNode(' by ' + e.user + ' · ' + e.lic + ' · ' + use[id].join(', ')));
+          $('sound-credits').appendChild(li);
+        });
+      }).catch(function () { $('sound-credits-status').textContent = 'Could not load the sound credits.'; });
       function apply() {
         var s = $('q').value.trim().toLowerCase(), n = 0;
         tiles.forEach(function (t) { var show = (brand === 'all' || t.e.brand === brand || (brand === 'rework' && t.rework)) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
