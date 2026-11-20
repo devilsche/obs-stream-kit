@@ -18,11 +18,18 @@
  *   Twitch-Anmeldung, Auto aus der Garage oder Zufall, Grafik leicht (.race.glb, 0,75 Auflösung) oder voll.
  *   Im Rennen: keine KI; Fremdautos aus dem Server-Takt (100 ms Puffer, interpoliert), Kontakt schubst nur das eigene
  *   Auto (nach Masse), Countdown/Start/Ergebnis vom Server.
+ *
+ * Chatrennen steuerbar (Schritt 2b, data-mode="race", /drive/race/<kanal>): dieselbe Seite ohne Menü. Wer im Chat
+ * !race getippt hat und mit Twitch angemeldet ist, sitzt sofort im zugeteilten Auto auf seinem Startplatz (Sim-Aufstellung
+ * aus seed), wartet auf den Start (Server-Uhr) und fährt dann selbst; Zustände gehen über /drive-ws/race an die
+ * Overlays. KI-Gegner aus derselben Sim wie im Overlay (andere Piloten als Geister), andere Piloten live, von der KI
+ * übernommene Autos über CarRaceSim.follower. Kontakt schubst nur das eigene Auto. Nicht rechtzeitig verbunden oder
+ * übernommen: Zuschauen (Kamera auf dem eigenen Auto). Ergebnis + Punkte kommen aus dem Chatrennen (state.result).
  */
 (function (root) {
   'use strict';
   var THREE = root.THREE, TC = root.ToyCars, Sim = root.CarRaceSim, Stats = root.CarRaceStats, Phys = root.CarDrivePhys, Net = root.CarDriveNet;
-  var CFG = root.__DRIVE__ || null, VIEWER = !!(CFG && CFG.mode === 'viewer');
+  var CFG = root.__DRIVE__ || null, VIEWER = !!(CFG && CFG.mode === 'viewer'), RACE = !!(CFG && CFG.mode === 'race');
   var doc = root.document;
   function $(id) { return doc.getElementById(id); }
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -50,7 +57,7 @@
 
   // ---- Renderer / Szene ----
   var app = $('app'), canvas = $('view');
-  app.dataset.mode = VIEWER ? 'viewer' : 'solo';
+  app.dataset.mode = VIEWER ? 'viewer' : RACE ? 'race' : 'solo';
   var renderScale = 1;   // Zuschauer „Light“: 0,75
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
   renderer.localClippingEnabled = true;   // Enten-Fahrer an der Karosserie abschneiden
@@ -90,7 +97,7 @@
     form: $('menuForm'), status: $('menuStatus'), menu: $('menu'), loading: $('loading'), loadBar: $('loadBar'),
     loadText: $('loadText'), pause: $('pause'), finish: $('finish'), results: $('results'), finishBest: $('finishBest'),
     hud: $('hud'), countdown: $('countdown'), announce: $('announce'), fs: $('fsBtn'),
-    lobby: $('lobby'), signin: $('signin'), roster: $('roster'), lobbyStatus: $('lobbyStatus'), qual: $('qualSel'),
+    lobby: $('lobby'), signin: $('signin'), roster: $('roster'), lobbyStatus: $('lobbyStatus'), qual: $('qualSel'), qualRace: $('qualRace'),
     finishNote: $('finishNote')
   };
   var catalog = [], byKey = {};
@@ -160,6 +167,7 @@
     ui.status.textContent = catalog.length ? '' : 'The car catalogue is empty.';
     fillList();
     if (VIEWER) viewerInit();
+    if (RACE) rcInit();
   }).catch(function () { ui.status.textContent = 'Could not load the car catalogue.'; });
 
   // ---- Fullscreen ----
@@ -443,7 +451,7 @@
   function teardown() {
     begin.token = null;
     if (race) {
-      race.ai.forEach(disposeCar); disposeCar(race.me);
+      race.ai.forEach(function (c) { if (c) disposeCar(c); }); disposeCar(race.me);
       if (race.remotes) race.remotes.forEach(disposeCar);
       race = null;
     }
@@ -464,10 +472,12 @@
   $('restartBtn').addEventListener('click', function () { if (race) { var s = race.s, o = race.opp; begin(s, o); } });
   $('menuBtn').addEventListener('click', function () { var m = race && race.mp; teardown(); if (m && mp) showLobby(); else showPanel('menu'); });
   $('againBtn').addEventListener('click', function () {
+    if (race && race.chat) { teardown(); showLobby(); if (rc.st) rcLobby(rc.st); return; }
     if (race && race.mp) { teardown(); showLobby(); return; }
     if (race) { var s = race.s, o = race.opp; begin(s, o); }
   });
   $('finishMenuBtn').addEventListener('click', function () {
+    if (race && race.chat) { teardown(); showLobby(); if (rc.st) rcLobby(rc.st); return; }
     if (race && race.mp) { teardown(); mpLeave(); return; }
     teardown(); showPanel('menu');
   });
@@ -481,6 +491,7 @@
     var a = clamp((race.t - race.sim.time) / Sim.DT, 0, 1);   // eine Sim-Stufe zurück, weich dazwischen
     race.ai.forEach(function (c, i) {
       var q = race.sim.cars[i], p = race.prev[i] || q;
+      if (!c || q.ghost) return;   // Chatrennen: Piloten zeichnet rcDraw
       placeCar(c, lerp(p.x, q.x, a), lerp(p.z, q.z, a), p.yaw + (q.yaw - p.yaw) * a, lerp(p.roll, q.roll, a), lerp(p.pitch, q.pitch, a),
         lerp(p.steer, q.steer, a), p.spin + wrapAngle(q.spin - p.spin) * a);
     });
@@ -577,6 +588,7 @@
   function standings() {
     var list = [{ me: true, name: race.me.name, prog: race.pc.prog, fin: race.finishT, dnf: false }];
     if (race.sim) race.sim.cars.forEach(function (q, i) {
+      if (!race.ai[i] || q.ghost) return;
       list.push({ me: false, name: race.ai[i].name, prog: q.s, fin: q.finish, dnf: q.place == null && q.state === 'dnf' && q.wreck });
     });
     if (race.remotes) race.remotes.forEach(function (c) {
@@ -644,7 +656,7 @@
       li.appendChild(pl); li.appendChild(nm); li.appendChild(tm); ui.results.appendChild(li);
     });
     $('againBtn').textContent = race.mp ? 'Back to lobby' : 'Race again';
-    $('finishMenuBtn').textContent = race.mp ? 'Leave room' : 'Back to menu';
+    $('finishMenuBtn').textContent = race.chat ? 'Close' : race.mp ? 'Leave room' : 'Back to menu';
     ui.finishNote.textContent = '';
     if (race.mp) mpFinishNote();
     ui.finishBest.textContent = '';
@@ -858,7 +870,7 @@
     try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ }
   }
   function mpSend() {
-    if (!mp || !mp.net || !race || !race.mp || race.raceId !== mp.raceId) return;
+    if (!mp || !mp.net || !race || !race.mp || race.raceId !== mp.raceId || race.spect) return;
     var pc = race.pc;
     mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steer,
       speed: Math.hypot(pc.vx, pc.vz), prog: pc.prog, t: race.phase === 'countdown' ? 0 : race.t, spin: pc.spin });
@@ -903,7 +915,8 @@
     if (!mp) return;
     var parts = [], mine = mp.results ? mp.results.list.filter(function (r) { return String(r.id) === mp.me; })[0] : null;
     if (mine && mine.status === 'invalid') parts.push('Your race was not counted (' + (mine.reasons.join(', ') || 'implausible') + ').');
-    if (mp.recorded && mp.recorded.race_id === mp.raceId) {
+    if (mp.recorded && mp.recorded.chat) parts.push('Points and coins are added like in every chat race. Next race: type !race in chat.');
+    else if (mp.recorded && mp.recorded.race_id === mp.raceId) {
       if (mp.recorded.counted) {
         var p = mp.recorded.points ? mp.recorded.points[mp.me] : null;
         parts.push('Points and coins saved' + (p != null ? ' – you got ' + p + ' point' + (p === 1 ? '' : 's') : '') + '.');
@@ -970,6 +983,243 @@
       car: s.car, paint: s.paint, light: light, duck: true });
   }
 
+  // ---- Chatrennen steuerbar (/drive/race/<kanal>) ----
+  // Rennen = das Chatrennen (Zustand von Flask, CFG.state, alle 1,5 s); Fahrer-Ticket nur für angemeldete Teilnehmer.
+  var rc = { st: null, raceId: null, ticket: null, busy: false, evKey: '' };
+  var SUB_PAINTS = { gold: { c: 0xd4a017, f: 'shiny' }, purple: { c: 0x5e2a79, f: 'gloss' }, carbon: { c: 0x2b2b30, f: 'carbonGloss' } };
+  function rcInit() {
+    app.dataset.mode = 'race';
+    if (!CFG.user) { $('signinText').textContent = 'Sign in with Twitch to steer your own car in the chat race. Only your Twitch name and ID are used.'; $('signinBtn').href = CFG.login; showPanel('signin'); return; }
+    var who = $('whoamiRace'), out = doc.createElement('a');
+    who.textContent = 'Signed in as ' + CFG.user.name + ' · ';
+    out.href = CFG.logout; out.textContent = 'Sign out'; who.appendChild(out);
+    ui.qualRace.value = load('quality', 'light') === 'full' ? 'full' : 'light';
+    ui.qualRace.addEventListener('change', function () { save('quality', ui.qualRace.value); });
+    $('lobbyTitle').textContent = 'Chat race';
+    showLobby();
+    rcPoll();
+  }
+  function rcPoll() {
+    fetch(CFG.state, { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.json(); })
+      .then(rcState).catch(function () { setLobbyStatus('Could not reach the server – retrying…'); })
+      .then(function () { setTimeout(rcPoll, race && race.chat && race.phase !== 'results' ? 1000 : 1500); });
+  }
+  function rcRacer(st, id) { return (st.racers || []).filter(function (r) { return String(r.user_id) === String(id); })[0] || null; }
+  function rcState(st) {
+    rc.st = st;
+    var me = st.me || {}, ph = st.phase, live = ph === 'lobby' || ph === 'countdown' || ph === 'intro' || ph === 'race';
+    if (st.race_id !== rc.raceId) {           // neues Rennen (oder keins): alles von vorn
+      rc.raceId = st.race_id; rc.ticket = null; rc.evKey = '';
+      if (race && race.chat) teardown();
+      if (mp) mpStop();
+    }
+    if (!(race && race.chat)) rcLobby(st);
+    if (!me.in_race || !live) return;
+    if (!mp && !rc.busy) rcConnect();
+    if (mp && !(race && race.chat) && !rc.busy && ph !== 'lobby' && rc.st.seed != null) rcBegin();
+    if (race && race.chat) rcUpdate(st);
+  }
+  // Warte-Tafel: wer fährt, was zu tun ist
+  function rcLobby(st) {
+    var me = st.me || {}, ph = st.phase;
+    mp = mp || null;
+    ui.roster.textContent = '';
+    $('lobbyCount').textContent = (st.racers || []).length + '/10';
+    (st.racers || []).forEach(function (r) {
+      var li = doc.createElement('li'); if (String(r.user_id) === String(me.id)) li.className = 'me';
+      var nm = doc.createElement('span'); nm.textContent = r.display;
+      if (String(r.user_id) === String(me.id)) { var tg = doc.createElement('span'); tg.className = 'tag'; tg.textContent = 'You'; nm.appendChild(tg); }
+      var car = doc.createElement('span'); car.className = 'car'; car.textContent = byKey[r.car_key] ? displayName(byKey[r.car_key]) : r.car_key || '–';
+      li.appendChild(nm); li.appendChild(car); ui.roster.appendChild(li);
+    });
+    if (!(st.racers || []).length) { var e0 = doc.createElement('li'); e0.className = 'roster-empty'; e0.textContent = 'No race open right now.'; ui.roster.appendChild(e0); }
+    var res = st.result && me.id ? st.result.filter(function (x) { return String(x.user_id) === String(me.id); })[0] : null;
+    if (ph === 'podium' || ph === 'cooldown') setLobbyStatus((res ? (res.place ? 'You finished P' + res.place + '. ' : 'You did not finish. ') : '') + 'Next race: type !race in chat.');
+    else if (!me.in_race) setLobbyStatus(ph === 'intro' || ph === 'race' ? 'A race is running – type !race in chat to join the next one.' : 'Type !race in chat to join – your car shows up here.');
+    else if (ph === 'lobby') setLobbyStatus('You are in! The race starts once 3 drivers have joined. Keep this page open.');
+    else setLobbyStatus('Loading your car…');
+  }
+  function rcConnect() {
+    rc.busy = true;
+    fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      rc.busy = false;
+      if (!j.ok) { setLobbyStatus(j.error || 'Could not join.'); return; }
+      var light = ui.qualRace.value !== 'full';
+      renderScale = light ? 0.75 : 1; resize();
+      mp = { code: 'race', role: 'driver', me: String(j.me.id), room: {}, roster: [], light: light, duck: true, phase: '', raceId: j.race_id,
+        startAt: null, grid: [], fin: {}, results: null, recorded: null, loaded: {}, loading: {}, info: null };
+      var m = mp;
+      mp.net = Net.connect({ url: wsUrl('race'), ticket: j.ticket, onMessage: function (msg) { if (mp === m) rcMsg(msg); },
+        onState: function (on) { if (!on && mp === m && race && race.chat) flash('Connection lost – reconnecting…', 2); } });
+      (rc.st.racers || []).forEach(function (r) { mpLoad(r.car_key); });
+    }).catch(function () { rc.busy = false; });
+  }
+  function rcMsg(m) {
+    if (m.t === 'welcome' || m.t === 'race') { mp.info = m.race; if (race && race.chat) (m.race.taken || []).forEach(rcTakeover); }
+    else if (m.t === 'takeover') rcTakeover(m.ev);
+    else if (m.t === 'lap') {
+      if (m.fin != null) mp.fin[String(m.id)] = m.fin;
+      if (String(m.id) === mp.me && !m.ok && race && race.chat) flash('Lap not counted', 2.5);
+    } else if (m.t === 'error') setLobbyStatus(m.msg);
+    else if (m.t === 'gone') { mpStop(); setLobbyStatus(m.code === 4401 ? 'Sign-in expired – reload the page.' : 'Connection lost – reload the page.'); }
+  }
+  function rcPilots(st) { return Array.isArray(st.pilots) ? st.pilots.map(String) : null; }
+  function rcSimCars(st) {
+    var pil = rcPilots(st) || [];
+    return (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; }).map(function (r) {
+      var e = byKey[r.car_key], raw = Stats.of(r.car_key || '', e || undefined);
+      return { id: String(r.user_id), stats: Sim.stats(raw), ghost: pil.indexOf(String(r.user_id)) >= 0, src: r };
+    });
+  }
+  function rcBuildSim(st) {
+    var cars = rcSimCars(st), T = race.T;
+    race.simCars = cars;
+    race.sim = Sim.create({ seed: st.seed | 0, track: T, laps: st.laps || 3, finishWindow: st.finish_window || 15, cars: cars, events: st.race_events || [] });
+    race.pilotsKey = (rcPilots(st) || ['-']).join('|');
+    race.follow = {};
+    var t = mp.net.serverNow() - st.starts_at;
+    if (t > 0) race.sim.fastForward(Math.min(t, 120));
+    snap();
+  }
+  function rcSet(r) {
+    var sub = SUB_PAINTS[typeof r.paint === 'string' ? r.paint : r.sub_paint] || null;
+    var set = r.car_key ? TC.paintAt(r.car_key, typeof r.paint === 'number' ? r.paint : 0) : { c: null };
+    return sub ? Object.assign({}, set, { c: sub.c, sub: sub }) : set;
+  }
+  // Szene: Strecke, eigenes Auto am Startplatz (Sim-Aufstellung), KI-Autos, andere Piloten
+  function rcBegin() {
+    var st = rc.st, meId = mp.me;
+    rc.busy = true;
+    var keys = (st.racers || []).map(function (r) { return r.car_key; }).filter(Boolean);
+    var wait = Math.max(0.3, (st.starts_at || 0) - mp.net.serverNow() - 2);
+    Promise.race([Promise.all(keys.map(mpLoad)), new Promise(function (res) { setTimeout(res, wait * 1000); })]).then(function () {
+      rc.busy = false;
+      if (rc.st.race_id !== st.race_id || !mp || (race && race.chat)) return;
+      teardown();
+      st = rc.st;
+      var T = Sim.track(Sim.TRACKS[((st.track | 0) % Sim.TRACKS.length + Sim.TRACKS.length) % Sim.TRACKS.length]);
+      trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso });
+      scene.add(trackRes.group);
+      var RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [];
+      var mine = rcRacer(st, meId), mineSrc = mine || { car_key: null, paint: 0 };
+      var me = makeCar(mineSrc.car_key, rcSet(mineSrc), { loaded: !!mp.loaded[mineSrc.car_key], duck: true, outfit: null });
+      race = { s: { car: mineSrc.car_key, paint: 0, track: 0, laps: st.laps || 3 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
+        mp: true, chat: true, raceId: st.race_id, me: me, pc: null, laps: st.laps || 3, phase: 'countdown', paused: false,
+        t: 0, cd: st.starts_at - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mineSrc.car_key + '.' + T.seed, null),
+        prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
+        lapsShown: -1, posShown: '', opp: [], newBest: false, follow: {}, taken: {}, nitroSeen: {} };
+      mp.startAt = st.starts_at; mp.raceId = st.race_id;
+      rcBuildSim(st);
+      // KI-Autos (Index wie in der Sim), andere Fahrer als „remotes“ (live bzw. Nachfahrer), sich selbst weglassen
+      race.simCars.forEach(function (sc, i) {
+        if (sc.id === meId) { race.ai.push(null); race.myIdx = i; return; }
+        var c = makeCar(sc.src.car_key, rcSet(sc.src), { loaded: !!mp.loaded[sc.src.car_key], duck: true, outfit: outfits.length ? outfits[i % outfits.length] : null });
+        c.id = sc.id; c.label = sc.src.display; c.idx = i; c.prog = race.sim.cars[i].s; c.smp = null;
+        race.ai.push(c);
+      });
+      var g0 = race.sim.cars[race.myIdx || 0];
+      race.pc = Phys.create(T, Phys.params(me.st, me.raw), { s: g0.s, d: g0.d });
+      placeCar(me, race.pc.x, race.pc.z, race.pc.yaw, 0, 0, 0, 0);
+      rcRoles(st);
+      ui.hud.hidden = false; showPanel(null);
+      setCam('chase', true);
+      ui.countdown.hidden = false; ui.countdown.textContent = '';
+      say('Race starts soon');
+      canvas.setAttribute('tabindex', '-1');
+      try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ }
+    });
+  }
+  // Rollen nach dem Einfrieren: Piloten (live/Nachfahrer) als „remotes“, KI in race.ai; selbst: fahren oder zuschauen
+  function rcRoles(st) {
+    var pil = rcPilots(st);
+    race.remotes = [];
+    race.ai.forEach(function (c) { if (c && pil && pil.indexOf(c.id) >= 0) race.remotes.push(c); });
+    race.spect = !!(pil && pil.indexOf(mp.me) < 0);
+    if (race.spect && !race.spectSaid) { race.spectSaid = true; flash('You were not connected when the grid closed – the AI drives your car', 4); }
+  }
+  function rcTakeover(ev) {
+    if (!race || !race.chat || !ev || race.taken[ev.id]) return;
+    race.taken[String(ev.id)] = ev;
+    if (String(ev.id) === mp.me) { race.spect = true; flash('Connection lost – the AI took over your car', 4); }
+  }
+  function rcFollower(id, i) {
+    var ev = race.taken[id]; if (!ev) return null;
+    if (!race.follow[id]) {
+      var g0 = race.sim.cars[i], snap0 = ev.grid || ev.prog == null ? { t: ev.t, s: g0.s, d: g0.d, speed: 0 } : ev;
+      race.follow[id] = Sim.follower(race.T, race.simCars[i].stats, snap0, { laps: race.laps });
+    }
+    return race.follow[id];
+  }
+  function rcUpdate(st) {
+    if (st.race_id !== race.raceId) return;
+    if ((rcPilots(st) || ['-']).join('|') !== race.pilotsKey) { rcBuildSim(st); rcRoles(st); }
+    (st.race_events || []).forEach(function (e) {
+      if (e.type === 'takeover') rcTakeover(e);
+      // Nitro aus dem Chat für mich: wirkt hier (einmal je Ereignis)
+      if (e.type === 'nitro' && String(e.id) === mp.me && !race.nitroSeen[e.t] && !race.spect) {
+        race.nitroSeen[e.t] = 1; race.pc.nitroT = Phys.NITRO_T; flash('Nitro from the chat!', 2);
+      }
+    });
+    var key = JSON.stringify(st.race_events || []);
+    if (key !== rc.evKey) { rc.evKey = key; if (race.sim.setEvents(st.race_events || [])) rcBuildSim(st); }
+    if ((st.phase === 'podium' || st.phase === 'cooldown') && Array.isArray(st.result) && !mp.results) {
+      mp.results = { race_id: st.race_id, list: st.result.map(function (x) {
+        return { id: String(x.user_id), name: x.display, place: x.place, time: null, status: x.place ? 'finished' : x.invalid ? 'invalid' : 'dnf', reasons: [] };
+      }) };
+      mp.recorded = { race_id: st.race_id, counted: true, points: null, chat: true };
+      if (race.phase === 'race' || race.phase === 'done' || race.phase === 'countdown') showResults();
+    }
+  }
+  // je Bild: andere Piloten live bzw. als Nachfahrer, eigenes Auto beim Zuschauen aus Sim/Nachfahrer
+  function rcDraw() {
+    if (!race || !race.chat || !race.sim) return;
+    var at = mp.net.serverNow() - Net.DELAY, t = mp.net.serverNow() - mp.startAt;
+    race.remotes.forEach(function (c) {
+      var f = rcFollower(c.id, c.idx), q;
+      if (f) { var fq = f.at(t); q = { x: fq.x, z: fq.z, yaw: fq.yaw, roll: fq.roll, pitch: 0, steer: fq.steer, spin: fq.spin, speed: fq.v, prog: fq.s }; }
+      else q = mp.net.sample(c.id, at);
+      c.smp = q;
+      if (!q) { var g = race.sim.cars[c.idx]; placeCar(c, g.x, g.z, g.yaw, 0, 0, 0, 0); return; }
+      c.prog = q.prog;
+      placeCar(c, q.x, q.z, q.yaw, q.roll, q.pitch, q.steer, q.spin);
+    });
+    if (race.spect) {
+      var pc = race.pc, f2 = rcFollower(mp.me, race.myIdx), q2 = f2 ? f2.at(t) : race.sim.cars[race.myIdx];
+      if (q2 && !q2.ghost) { pc.x = q2.x; pc.z = q2.z; pc.yaw = q2.yaw; pc.prog = q2.s; pc.vx = Math.cos(q2.yaw) * q2.v; pc.vz = -Math.sin(q2.yaw) * q2.v; pc.u = q2.v; pc.steer = q2.steer; pc.spin = q2.spin; }
+    }
+  }
+  // Kontakt: nur das eigene Auto wird geschoben (KI aus der Sim und andere Piloten), nach Masse
+  function rcContacts() {
+    if (race.spect) return;
+    var others = [];
+    race.ai.forEach(function (c, i) {
+      if (!c) return;
+      if (race.remotes.indexOf(c) >= 0) { if (c.smp) others.push({ c: c, q: c.smp }); return; }
+      var q = race.sim.cars[i]; others.push({ c: c, q: { x: q.x, z: q.z, yaw: q.yaw, speed: q.v } });
+    });
+    var pc = race.pc, me = race.me, fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), rM = me.w / 2, oM = Math.max(0, me.len / 2 - rM);
+    var mine = [[pc.x + fx * oM, pc.z + fz * oM], [pc.x - fx * oM, pc.z - fz * oM]];
+    others.forEach(function (o) {
+      var c = o.c, q = o.q;
+      if (Math.abs(q.x - pc.x) > 12 || Math.abs(q.z - pc.z) > 12) return;
+      var gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw), rA = c.w / 2, oA = Math.max(0, c.len / 2 - rA), best = null;
+      var theirs = [[q.x + gx * oA, q.z + gz * oA], [q.x - gx * oA, q.z - gz * oA]];
+      mine.forEach(function (m) { theirs.forEach(function (tt) {
+        var dx = m[0] - tt[0], dz = m[1] - tt[1], d = Math.hypot(dx, dz), pen = rM + rA - d;
+        if (pen > 0 && (!best || pen > best.pen)) best = { pen: pen, nx: d > 1e-4 ? dx / d : -fx, nz: d > 1e-4 ? dz / d : -fz };
+      }); });
+      if (!best) return;
+      var mP = pc.P.mass, mA = c.st.mass, shareP = mA / (mP + mA);
+      pc.x += best.nx * best.pen * shareP; pc.z += best.nz * best.pen * shareP;
+      var vn = (pc.vx - gx * (q.speed || 0)) * best.nx + (pc.vz - gz * (q.speed || 0)) * best.nz;
+      if (vn < 0) {
+        var J = -(1 + 0.25) * vn / (1 / mP + 1 / mA);
+        pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
+        if (-vn > 1.5) race.shake = Math.min(0.5, race.shake + -vn * 0.03);
+      }
+    });
+  }
+
   // ---- Schleife ----
   var lastT = performance.now();
   function frame(now) {
@@ -995,9 +1245,10 @@
       if (race.cd <= 0) { race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0; setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700); }
       placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
       drawAI();
-      if (race.mp) { drawRemotes(); mpSend(); }
+      if (race.chat) { rcDraw(); placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin); mpSend(); }
+      else if (race.mp) { drawRemotes(); mpSend(); }
     } else {
-      var inp = race.phase === 'done' ? cruise(pc) : playerInput(dt, p);
+      var inp = race.spect ? null : race.phase === 'done' ? cruise(pc) : playerInput(dt, p);
       if (race.phase === 'race' && pressed.KeyR) { Phys.reset(pc); flash('Back on track', 1); }
       stepWorld(dt, inp);
     }
@@ -1015,11 +1266,13 @@
       if (Math.abs(srvT - race.t) > 0.15) race.t = srvT;
     }
     if (race.sim) { while (race.sim.time + Sim.DT <= race.t + 1e-9) { snap(); race.sim.step(); } }
+    if (race.chat) rcDraw();
     if (inp) {
       var lapsBefore = pc.laps;
       Phys.step(pc, inp, dt);
-      if (race.sim) contacts();
-      if (race.mp) { drawRemotes(); mpContacts(); }
+      if (race.sim && !race.chat) contacts();
+      if (race.chat) rcContacts();
+      if (race.mp && !race.chat) { drawRemotes(); mpContacts(); }
       if (pc.rail > 2) race.shake = Math.min(0.5, race.shake + pc.rail * 0.04);
       if (race.phase === 'race' && pc.laps > lapsBefore) {
         lapDone(race.t - race.lapStart); race.lapStart = race.t;
@@ -1049,7 +1302,7 @@
   var idleA = 0;
   function idleCam(dt) { idleA += dt * 0.05; cam.position.set(Math.cos(idleA) * 120, 70, Math.sin(idleA) * 120); cam.lookAt(0, 0, 0); }
   root.requestAnimationFrame(frame);
-  showPanel('menu');
+  showPanel(RACE ? 'lobby' : 'menu');
   // Fehlersuche/Prüfskript: aktueller Rennzustand (nur lesen)
   root.CarDrive = { state: function () { return race; } };
 })(typeof window !== 'undefined' ? window : this);

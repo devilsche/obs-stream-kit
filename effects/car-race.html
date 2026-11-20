@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="../widgets/_theme.css">
   <!-- Rangliste (Zeitenturm): Aussehen frei anpassbar, Vorschau tools/car-race-hud-preview.html -->
   <link rel="stylesheet" href="car-race-hud.css">
+  <!-- Material Symbols: Controller-Symbol für selbst gesteuerte Autos (Namensschild + Rangliste) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,1,0">
   <style>
     /* Car Race (js/car-race.js): Chat-Autorennen mit echten 3D-Autos auf einer Spielzeug-Strecke.
        Fenster 16:9, Standard 640×360 (bis 960×540); die Größe ändert nur den Ausschnitt.
@@ -15,6 +17,8 @@
        ?preview=1 – lokale Testlobby ohne Server (im Dashboard „Preview with test racers“, in OBS aus)
        ?finish=<s> (nur Vorschau) – Nachlauf nach dem Sieger (5–40); echte Rennen: Server-Vorgabe 15 s
        ?track=<n> (nur Vorschau) – Strecke aus der Favoritenliste
+       ?pilot=1 (nur Vorschau) – Testfahrer 1 steuert „selbst“ (künstlicher Live-Takt), Knopf „Drop pilot“ = KI übernimmt
+       ?ws=<ws-url> – WS-Dienst für den Live-Takt woanders (lokal ohne nginx, z. B. ws://127.0.0.1:9010)
        ?layout=stage – Rennbühne als Vollbild-Hintergrund (1920×1080), das Spiel als Bild-im-Bild darüber;
        ?pip=x,y,w,h – Lage des Bild-im-Bild in Pixeln (Standard 24,24,640,360)
        ?sound=0 – ohne Klänge (Standard an) · ?volume=0..1 – Lautstärke (Standard 0,5)
@@ -93,6 +97,7 @@
     <button type="button" id="pv-start">Start now</button>
     <button type="button" id="pv-nitro">Nitro</button>
     <button type="button" id="pv-bump">Bump</button>
+    <button type="button" id="pv-drop" hidden>Drop pilot</button>
     <label class="preview-track" for="pv-track">Track</label>
     <select id="pv-track"><option value="">Change every race</option></select>
     <button type="button" id="pv-next">Next track</button>
@@ -118,6 +123,7 @@
   <script src="../js/car-race-sim.js"></script>
   <script src="../js/car-race-stats.js"></script>
   <script src="../js/car-race-sound.js"></script>
+  <script src="../js/car-drive-net.js"></script>
   <script src="../js/car-race.js"></script>
   <script>
     (function () {
@@ -135,6 +141,7 @@
         stage: document.getElementById('stage'),
         base: '../',
         preview: preview,
+        pilot: preview && /^(1|true|yes|on)$/i.test(params.get('pilot') || ''),
         track: params.get('track'),
         layout: params.get('layout') === 'stage' ? 'stage' : null,
         sound: params.get('sound') !== '0',
@@ -159,6 +166,11 @@
         document.getElementById('pv-start').addEventListener('click', function () { race.startNow(); });
         document.getElementById('pv-nitro').addEventListener('click', function () { race.nitro(); });
         document.getElementById('pv-bump').addEventListener('click', function () { race.bump(); });
+        if (/^(1|true|yes|on)$/i.test(params.get('pilot') || '')) {
+          var drop = document.getElementById('pv-drop');
+          drop.hidden = false;
+          drop.addEventListener('click', function () { race.dropPilot(); });
+        }
         var sel = document.getElementById('pv-track');
         CarRaceSim.TRACKS.forEach(function (seed, i) {
           var o = document.createElement('option'); o.value = String(i); o.textContent = CarRaceSim.track(seed).name; sel.appendChild(o);

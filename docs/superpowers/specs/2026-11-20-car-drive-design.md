@@ -50,3 +50,24 @@ Wertung), `fx/drive_auth.py` (Tickets, Zuschauer-Cookie, interne Steuerung), Tok
 Zuschauer-Seite `app/views_drive.py` (`/drive/<code>`), Client `js/car-drive-net.js` + Mehrspieler-Teil in
 `js/car-drive.js`. Offen: Car-Race-Overlay-Modus „live“ (eigenes Teilprojekt, `js/car-race.js`), Zuschauen ohne
 mitzufahren, Wiederaufnahme eines offenen Raums nach Neuladen der Streamer-Seite.
+
+## Schritt 2b – Chatrennen steuerbar (2026-11-20)
+
+Freigegeben, gebaut neben den Räumen mit Code (die bleiben unverändert).
+
+- Es gibt dafür kein eigenes Rennen: das Chatrennen (`!race`, fx/race.py) ist das Mehrspieler-Rennen. Jeder Teilnehmer
+  darf sein Auto auf `stream-overlay.com/drive/race/<kanal>` selbst steuern (Twitch-Anmeldung, nur wer im aktuellen
+  Rennen steht); wer nicht verbunden ist, fährt als KI.
+- Determinismus: Beim Schließen der Startaufstellung (Beginn `intro`) friert Flask die Piloten ein (verbundene Fahrer
+  laut WS-Dienst) → `pilots` im Zustand. Die Sim rechnet Piloten als Geister (Startplatz/Zufallszahlen wie bisher, keine
+  Wechselwirkung) – alle Overlays rechnen dasselbe, ohne Piloten ist die Sim bitgleich zur alten (geprüft, 40 Seeds).
+- KI-Übernahme: 2 s ohne Zustand → `takeover`-Ereignis (race_events + WS), `CarRaceSim.follower` fährt ab dort
+  deterministisch (Ideallinie, Werte des Autos, nur Übernahme-Zustand + Zeit). Kein Zurück.
+- Wertung auf dem Server: das Overlay meldet `places` + `times` (KI/Nachfahrer), Zielzeiten/Gültigkeit der Piloten kommen
+  vom WS-Dienst; Sieger + Zielfrist wie die Sim, ungültig = DNF ohne Punkte; sonst wie bisher (≥ 2 echte, Testfahrer,
+  Coins).
+- Abgleich Flask ↔ WS-Dienst: `GET /internal/sync` bei jedem Abruf des Rennzustands (höchstens alle 0,5 s je Tenant),
+  Raum je Tenant (`fx/drive_race.py`), Verbindungen über `/drive-ws/race` (Fahrer-Ticket bzw. Zuschauer-Ticket fürs Overlay).
+- Webseite: Car Drive im Modus „race“ – keine neue Spiellogik, nur Anbindung (Startplatz aus der Sim, Server-Uhr,
+  Ergebnis aus dem Chatrennen). Overlay: Live-Takt der Piloten, Markierung „wer steuert“ auf Schild + Rangliste.
+- Offen: Nitro für übernommene Autos (abgesagt statt eingerechnet), Bestzeiten der Piloten auf dem Server.

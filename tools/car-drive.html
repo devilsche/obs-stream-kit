@@ -122,7 +122,9 @@
     .app.racing .fs-btn:not(:focus-visible):not(:hover) { opacity: 0.45; }
 
     /* ---- Mehrspieler: Modus (solo/viewer) und Rolle (host) als data-Attribute auf .app ---- */
-    .app[data-mode="viewer"] .solo-only { display: none; }
+    .app:is([data-mode="viewer"], [data-mode="race"]) .solo-only { display: none; }
+    .app:not([data-mode="race"]) .race-only { display: none; }
+    .app[data-mode="race"] .lobby-code { display: none; }
     .app:not([data-mode="viewer"]) .viewer-only { display: none; }
     .app:not([data-role="host"]) .host-only { display: none; }
     a.btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; box-sizing: border-box; padding: 8px 16px; border-radius: var(--cd-radius);
@@ -254,6 +256,14 @@
       <div class="lobby-link host-only">
         <label for="lobbyUrl">Join link for the chat</label>
         <div class="range-row"><input id="lobbyUrl" readonly><button type="button" class="ghost" id="copyBtn"><span class="icon" aria-hidden="true">content_copy</span> Copy</button></div>
+      </div>
+      <div class="field race-only">
+        <p class="whoami" id="whoamiRace"></p>
+        <label for="qualRace">Graphics</label>
+        <select id="qualRace">
+          <option value="light">Light – race models, lower resolution</option>
+          <option value="full">Full quality</option>
+        </select>
       </div>
       <h3 class="lobby-sub">Drivers <span id="lobbyCount"></span></h3>
       <ol id="roster" class="roster"></ol>

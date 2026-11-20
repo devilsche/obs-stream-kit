@@ -15,6 +15,16 @@
  * Qualm, off → Staub, push → Funken + Ruck, dnf → graues Schild). Nach fastForward nur Ereignisse der letzten 1,5 s.
  * Darstellung in Metern (wie die Simulation); ToyCars-Modelle werden auf die Länge aus den Race stats skaliert.
  * Farben je Fahrer (Chatfarbe, Lack) nur im Canvas/WebGL – keine Inline-Styles.
+ *
+ * Chatrennen steuerbar (Car Drive Schritt 2b): state.pilots = Fahrer, die ihr Auto selbst steuern (eingefroren beim
+ * Schließen der Startaufstellung). Die Sim rechnet sie als Geister (ghost, ohne Wechselwirkung – jede Instanz rechnet
+ * dasselbe), gezeigt werden sie aus dem Live-Takt des WS-Dienstes (js/car-drive-net.js, Zuschauer-Ticket über
+ * <base>api/fx/car-race/spectate, 100 ms Puffer). KI-Übernahme (race_events type takeover bzw. WS „takeover“):
+ * ab dann fährt CarRaceSim.follower das Auto. Platzierung/Ende aus allen zusammen (Zielzeiten, Sieger + Zielfrist),
+ * gemeldet werden places (Sim) + times (KI und Nachfahrer); der Server rechnet die Piloten-Zeiten dazu und schickt
+ * das Endergebnis zurück (Podest daraus). Namensschild und Rangliste zeigen, wer steuert: Controller-Symbol
+ * (Material Symbols „sports_esports“) = Mensch, „AI“ = KI. Ohne Piloten ist alles wie vorher.
+ * Vorschau: ?preview=1&pilot=1 – Testfahrer 1 als Pilot mit künstlichem Live-Takt, Knopf „Drop pilot“ = Übernahme.
  */
 (function (root) {
   'use strict';
@@ -535,9 +545,31 @@
     }
     // mode: '' normal · 'up' gerade überholt (Akzentrand, Pfeil nach oben, leuchtet) · 'dnf' ausgegraut
     // withModel: zweite, kleinere Zeile mit dem Automodell unter dem Namensfeld
+    // Wer steuert (r.drv): 'human' = Controller-Symbol (Material Symbols; ohne geladene Schrift „LIVE“), 'ai' = „AI“-Chip
+    var symOk = false;
+    function drvWidth(g, fs, drv) {
+      if (drv === 'human' && symOk) return fs * 0.95;
+      if (!drv) return 0;
+      g.font = font(800, fs * 0.5);
+      return g.measureText(drv === 'human' ? 'LIVE' : 'AI').width + fs * 0.42 + fs * 0.18;
+    }
+    function drawDrv(g, x, cy, fs, drv, dim) {
+      if (drv === 'human' && symOk) {
+        g.font = Math.round(fs * 0.86) + "px 'Material Symbols Outlined'"; g.fillStyle = dim ? TK.dim : TK.accent;
+        g.fillText('sports_esports', x, cy + 1);
+        return;
+      }
+      var t = drv === 'human' ? 'LIVE' : 'AI';
+      g.font = font(800, fs * 0.5);
+      var w = g.measureText(t).width + fs * 0.42, h = fs * 0.66;
+      roundRect(g, x, cy - h / 2, w, h, h * 0.3);
+      if (drv === 'human') { g.fillStyle = dim ? TK.dim : TK.accent; g.fill(); g.fillStyle = TK.surface; }
+      else { g.lineWidth = 3; g.strokeStyle = TK.dim; g.stroke(); g.fillStyle = TK.dim; }
+      g.fillText(t, x + fs * 0.21, cy + 1);
+    }
     function drawLabel(r, place, force, mode, withModel) {
       mode = mode || ''; withModel = !!withModel && !!r.modelName && mode !== 'dnf';
-      var text = place + '\u0000' + r.shown + '\u0000' + mode + (withModel ? '\u0000m' : '') + '\u0000' + r.tier;
+      var text = place + '\u0000' + r.shown + '\u0000' + mode + (withModel ? '\u0000m' : '') + '\u0000' + r.tier + '\u0000' + (r.drv || '') + (symOk ? 's' : '');
       if (!force && text === r.labelText) return;
       r.labelText = text; r.labelPlace = place; r.labelMode = mode; r.label.withModel = withModel;
       var L = r.label, g = L.g;
@@ -549,6 +581,8 @@
       g.font = font(700, fs);
       var sw = r.tier ? fs * 0.95 : 0;   // Platz für den Sub-Stern
       pw += sw;
+      var dw = drvWidth(g, fs, r.drv); pw += dw;   // Platz für die Fahrer-Markierung
+      g.font = font(700, fs);
       var maxName = LABEL_W - 2 * pad - pw - gap - 2 * bw - (mode === 'up' ? 16 : 0);
       while (name.length > 1 && g.measureText(name).width > maxName) name = name.slice(0, -2) + '…';
       var nw = g.measureText(name).width, boxW = Math.min(LABEL_W - 2 * bw, pw + gap + nw + 2 * pad), x0 = (LABEL_W - boxW) / 2, y0 = bw, bh = LABEL_H - 2 * bw;
@@ -564,7 +598,8 @@
         g.fillStyle = TK.accent; g.fill(); tx += aw;
       }
       g.font = font(800, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.accent; g.fillText(place, tx, LABEL_H / 2 + 2);
-      if (r.tier) drawStar(g, x0 + pad + pw - sw / 2 + 4, LABEL_H / 2, fs * 0.36, r.tier);
+      if (r.tier) drawStar(g, x0 + pad + pw - dw - sw / 2 + 4, LABEL_H / 2, fs * 0.36, r.tier);
+      if (r.drv) drawDrv(g, x0 + pad + pw - dw + 2, LABEL_H / 2, fs, r.drv, mode === 'dnf');
       g.font = font(700, fs); g.fillStyle = mode === 'dnf' ? TK.dim : TK.text; g.fillText(name, x0 + pad + pw + gap, LABEL_H / 2 + 2);
       if (withModel) {
         g.font = font(600, 30);
@@ -627,12 +662,15 @@
         finishWindow: preview && finishOpt != null ? finishOpt : (st.finish_window || 15),   // ?finish nur in der Vorschau: echte Rennen nehmen den Server-Wert, damit jede Instanz dasselbe Ergebnis rechnet
         startsAt: st.starts_at, introAt: null, intro: null, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
         sim: null, simKey: '', prev: null, alpha: 1, ended: false, fadeAt: null, endedAt: null, shownAt: srvNow(),
-        cam: null, lastLeader: null, evIdx: 0, oil: []
+        cam: null, lastLeader: null, evIdx: 0, oil: [],
+        pilots: Array.isArray(st.pilots) ? st.pilots.map(String) : null, taken: {}, follow: {}, pilotFin: {}, pilotBad: {},
+        vorder: null, lastT: 0
       };
       buildTrack(T);
     }
     function teardown() {
       if (snd) snd.silence();
+      netStop();
       if (!race) return;
       Object.keys(race.racers).forEach(function (id) { disposeRacer(race.racers[id]); });
       clearOil(); clearPuffs(); clearRankDom();
@@ -640,7 +678,151 @@
       race = null;
     }
     function simCars() {
-      return race.order.map(function (r) { return { id: r.id, stats: r.stats }; });
+      return race.order.map(function (r) { return { id: r.id, stats: r.stats, ghost: isPilot(r.id) }; });
+    }
+    // ---- Chatrennen steuerbar: Piloten, Live-Takt, KI-Übernahme ----
+    function isPilot(id) { return !!(race && race.pilots && race.pilots.indexOf(String(id)) >= 0); }
+    function hasPilots() { return !!(race && race.pilots && race.pilots.length); }
+    function pilotsKey() { return race && race.pilots ? race.pilots.join('|') : '-'; }
+    // wer steuert: vor dem Einfrieren unbekannt (''), dann 'human' bzw. 'ai' (auch nach der Übernahme)
+    function drvOf(r) { return !race || !race.pilots ? '' : isPilot(r.id) && !race.taken[r.id] ? 'human' : 'ai'; }
+    function addTakeover(ev) {
+      if (!race || !ev || ev.id == null) return;
+      var id = String(ev.id);
+      if (race.taken[id] || !isPilot(id)) return;
+      race.taken[id] = ev;
+      race.follow[id] = null;   // Nachfahrer wird beim ersten Bedarf gebaut (Startplatz aus der Sim)
+    }
+    function followerOf(r, i) {
+      var ev = race.taken[r.id];
+      if (!ev) return null;
+      if (!race.follow[r.id]) {
+        var g0 = (race.sim || race.gridSim).cars[i];
+        var snap = ev.grid || ev.prog == null ? { t: ev.t, s: g0.s, d: g0.d, speed: 0 } : ev;
+        race.follow[r.id] = CarRaceSim.follower(race.T, r.stats, snap, { laps: race.laps });
+      }
+      return race.follow[r.id];
+    }
+    // Stand aller Autos zur Rennsekunde t: KI aus der Sim, Piloten live, Übernommene aus dem Nachfahrer.
+    // → { list (Reihenfolge = Platzierung): [{ r, i, kind ai|live|follow, q (Lage, nicht KI), s, v, lap, place, pos,
+    //     finish, done, dnf }], byI, over }. Ohne Piloten genau wie bisher aus sim.standings()/sim.done.
+    function standingsNow(t) {
+      var sim = race.sim, out = { list: [], byI: [], over: false };
+      if (!hasPilots()) {
+        var byId = {}; sim.cars.forEach(function (c, i) { byId[c.id] = i; });
+        out.list = sim.standings().map(function (id) {
+          var i = byId[id], c = sim.cars[i], dnf = c.place == null && (c.state === 'dnf' || sim.done);
+          return { r: race.order[i], i: i, kind: 'ai', c: c, s: c.s, v: c.v, lap: c.lap, place: c.place, pos: c.pos,
+            finish: c.finish, done: c.place != null, dnf: dnf };
+        });
+        out.list.forEach(function (e) { out.byI[e.i] = e; });
+        out.over = sim.done;
+        return out;
+      }
+      var all = race.order.map(function (r, i) {
+        var c = sim.cars[i], e = { r: r, i: i, c: c, hard: false };
+        if (!isPilot(r.id)) { e.kind = 'ai'; e.s = c.s; e.v = c.v; e.finish = c.place != null ? c.finish : null; e.hard = c.place == null && c.state === 'dnf'; }
+        else if (race.taken[r.id]) { var q = followerOf(r, i).at(t); e.kind = 'follow'; e.q = q; e.s = q.s; e.v = q.v; e.finish = q.finish; }
+        else {
+          var sm = liveSample(r, i, t);
+          e.kind = 'live'; e.q = sm; e.s = sm ? sm.prog : c.s; e.v = sm ? sm.speed : 0;
+          e.finish = race.pilotFin[r.id] != null ? race.pilotFin[r.id] : null; e.hard = !!race.pilotBad[r.id];
+        }
+        e.lap = e.s < 0 ? 0 : Math.min(race.laps, Math.floor(e.s / race.T.len) + 1);
+        return e;
+      });
+      var first = Infinity;
+      all.forEach(function (e) { if (e.finish != null && !e.hard) first = Math.min(first, e.finish); });
+      var endT = Math.min(first + race.finishWindow, CarRaceSim.MAX_TIME);
+      all.forEach(function (e) {
+        if (e.hard || (e.finish != null && e.finish > endT + 1e-6)) e.finish = null;
+        e.done = e.finish != null; e.dnf = !e.done && (e.hard || t >= endT);
+      });
+      function cat(e) { return e.done ? 0 : e.dnf ? 2 : 1; }
+      function passes(a, b) {   // gehört a (dahinter) vor b? Fahrende mit 1 m Hysterese wie die Sim
+        var ka = cat(a), kb = cat(b);
+        if (ka !== kb) return ka < kb;
+        if (ka === 0) return a.finish < b.finish;
+        return a.s > b.s + 1;
+      }
+      var prev = race.vorder || all.map(function (e) { return e.i; }), list = prev.map(function (i) { return all[i]; });
+      for (var changed = true; changed;) {
+        changed = false;
+        for (var k = 0; k + 1 < list.length; k++) if (passes(list[k + 1], list[k])) { var tmp = list[k]; list[k] = list[k + 1]; list[k + 1] = tmp; changed = true; }
+      }
+      race.vorder = list.map(function (e) { return e.i; });
+      var pl = 0;
+      list.forEach(function (e, k) { e.pos = k + 1; e.place = e.done ? ++pl : null; out.byI[e.i] = e; });
+      out.list = list;
+      out.over = t >= endT || all.every(function (e) { return e.done || e.dnf; });
+      return out;
+    }
+    // Zuschauer-Verbindung zum WS-Dienst (nur solange ein Rennen mit Piloten läuft; Neuaufbau mit Rückfall-Pause)
+    var net = null, netWant = false, netTry = 0, netTimer = null;
+    function netUrl(path) {
+      var q = null;
+      try { q = new URLSearchParams(root.location.search).get('ws'); } catch (e) { /* alt */ }   // lokal: ?ws=ws://127.0.0.1:9010
+      return (q || ((root.location.protocol === 'https:' ? 'wss://' : 'ws://') + root.location.host)) + path;
+    }
+    function netStart() {
+      if (preview || net || netTimer || !root.CarDriveNet) return;
+      netWant = true;
+      fetch(base + 'api/fx/car-race/spectate', { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (!netWant || net) return;
+          if (!j || !j.ticket) { netRetry(); return; }
+          var me = net = CarDriveNet.connect({ url: netUrl(j.path || '/drive-ws/race'), ticket: j.ticket,
+            onMessage: function (m) { if (net === me) netMsg(m); } });
+        }).catch(netRetry);
+    }
+    function netRetry() {
+      net = null;
+      if (!netWant || netTimer) return;
+      netTry++;
+      netTimer = setTimeout(function () { netTimer = null; netStart(); }, Math.min(60, 5 * netTry) * 1000);
+    }
+    function netStop() {
+      netWant = false;
+      if (netTimer) { clearTimeout(netTimer); netTimer = null; }
+      if (net) { try { net.close(); } catch (e) { /* zu */ } net = null; }
+    }
+    function netRace(info) {
+      if (!race || !info || info.race_id !== race.id) return;
+      (info.taken || []).forEach(addTakeover);
+      Object.keys(info.fin || {}).forEach(function (id) { race.pilotFin[id] = +info.fin[id]; });
+    }
+    function netMsg(m) {
+      if (m.t === 'welcome') { netTry = 0; netRace(m.race); }
+      else if (m.t === 'race') netRace(m.race);
+      else if (m.t === 'takeover') addTakeover(m.ev);
+      else if (m.t === 'lap' && race) {
+        if (m.fin != null) race.pilotFin[String(m.id)] = +m.fin;
+        if (m.ok === false) race.pilotBad[String(m.id)] = true;
+      } else if (m.t === 'gone') netRetry();
+    }
+    // Nitro aus dem Chat für Piloten: wirkt in ihrem Browser; hier nur Schild + Flammen zur Ereigniszeit
+    function pilotNitro(t) {
+      (race.ext || []).forEach(function (e) {
+        if (e.type !== 'nitro' || !isPilot(e.id) || race.taken[e.id] || !(e.t > race.lastT && e.t <= t)) return;
+        var r = race.racers[e.id]; if (!r) return;
+        r.nitroUntil = e.t + 2.2; addTag('NITRO!', r.display, null, TK.accent, race.sim.time);
+        if (snd && visible) snd.nitro();
+      });
+      race.lastT = t;
+    }
+    // Live-Zustand eines Piloten (Rennsekunde t); Vorschau: künstlich aus einem Nachfahrer
+    function liveSample(r, i, t) {
+      if (preview) {
+        if (!race.fake) {
+          var g0 = race.sim.cars[i], st2 = Object.assign({}, r.stats, { grip: r.stats.grip * 0.93 });
+          race.fake = CarRaceSim.follower(race.T, st2, { t: 0.4, s: g0.s, d: g0.d, speed: 0 }, { laps: race.laps });
+        }
+        var q = race.fake.at(Math.max(0, t - 0.1));
+        if (q.finish != null && race.pilotFin[r.id] == null) race.pilotFin[r.id] = q.finish;
+        return { x: q.x, z: q.z, yaw: q.yaw, roll: q.roll, pitch: 0, steer: q.steer, speed: q.v, prog: q.s };
+      }
+      return net && net.sample ? net.sample(r.id) : null;
     }
     // Teilnehmerliste abgleichen (nur vor dem Start); Neuzugänge rollen von hinten auf ihren Platz
     function syncRacers(list) {
@@ -668,7 +850,8 @@
     }
     function startSim() {
       race.sim = CarRaceSim.create({ seed: race.seed, track: race.T, laps: race.laps, finishWindow: race.finishWindow, cars: simCars(), events: race.ext || [] });
-      race.simKey = race.rosterKey + '@' + race.startsAt;
+      race.simKey = race.rosterKey + '@' + race.startsAt + '@' + pilotsKey();
+      race.follow = {}; race.fake = null; race.vorder = null;
       race.stage = 'race'; race.ended = false; race.evIdx = 0; clearOil(); endIntro();
       var t = srvNow() - race.startsAt;
       race.hl = null; race.hlLast = -1e9; race.hlIdx = 0;
@@ -734,6 +917,11 @@
         if (!st.race_id || finished[st.race_id]) return;
         if (race && race.id === st.race_id && race.dropAt != null) { race.dropAt = null; }   // wieder genug Fahrer
         if (!race || race.id !== st.race_id) newRace(st);
+        if (Array.isArray(st.pilots) && pilotsKey() !== st.pilots.map(String).join('|')) {
+          race.pilots = st.pilots.map(String);
+          if (race.sim) { var cam1 = race.cam, tags1 = race.tags; startSim(); race.cam = cam1; race.tags = tags1; }   // spät eingefroren: Geister neu
+        }
+        if (hasPilots()) netStart();
         if (!race.sim) {
           syncRacers(st.racers);
           // countdown: starts_at = Beginn der Vorstellung, Rennstart danach (wie fx/race.py);
@@ -912,6 +1100,7 @@
     // Sim, wird sie aus dem Seed neu aufgebaut und vorgespult – so bleiben alle Instanzen gleich
     function takeRaceEvents(list) {
       if (!race || !Array.isArray(list)) return;
+      list.forEach(function (e) { if (e && e.type === 'takeover') addTakeover(e); });
       var key = JSON.stringify(list);
       if (key === race.extKey) return;
       race.extKey = key; race.ext = list.slice();
@@ -929,11 +1118,25 @@
       race.ended = true; race.stage = 'end'; race.endedAt = srvNow();
       finished[race.id] = true;
       var result = race.sim.result(), id = race.id, places = result.map(function (r) { return r.place; });
+      var body = { race_id: id, places: places };
+      if (hasPilots()) {
+        // Zielzeiten der KI und der Nachfahrer; die Piloten-Zeiten kennt der Server (WS-Dienst)
+        var endT = race.sn ? Math.min(race.startsAt != null ? srvNow() - race.startsAt : 90, CarRaceSim.MAX_TIME) : 90;
+        body.times = race.order.map(function (r, i) {
+          var c = race.sim.cars[i];
+          if (!isPilot(r.id)) return c.place != null ? c.finish : null;
+          var f = race.taken[r.id] ? followerOf(r, i) : null;
+          return f ? f.finishBy(endT) : null;
+        });
+        result = race.order.map(function (r, i) { var e = race.sn.byI[i]; return { id: r.id, place: e && !e.dnf ? e.place : null }; });
+      }
       if (preview) { showPodium(result, null); return; }
       fetch(base + 'api/fx/car-race/result', {
         method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ race_id: id, places: places })
+        body: JSON.stringify(body)
       }).then(function (r) { return r.json(); }).catch(function () { return null; }).then(function (resp) {
+        // Endergebnis vom Server (mit den Zielzeiten der Piloten), sonst das eigene
+        if (resp && Array.isArray(resp.result) && hasPilots()) result = resp.result.map(function (x) { return { id: x.user_id, place: x.place }; });
         if (race && race.id === id) showPodium(result, resp);
       });
     }
@@ -1334,12 +1537,8 @@
       if (race.stage === 'grid') {
         race.order.forEach(function (r) { rows.push({ r: r, place: String(r.grid), dnf: false, fin: false }); });
       } else {
-        var sim = race.sim, ids = sim.standings(), byId = {};
-        sim.cars.forEach(function (c, i) { byId[c.id] = { c: c, r: race.order[i] }; });
-        ids.forEach(function (id) {
-          var o = byId[id]; if (!o) return;
-          var dnf = o.c.place == null && (o.c.state === 'dnf' || sim.done);
-          rows.push({ r: o.r, c: o.c, place: dnf ? 'DNF' : String(o.c.place != null ? o.c.place : o.c.pos), dnf: dnf, fin: o.c.place != null });
+        (race.sn ? race.sn.list : []).forEach(function (e) {
+          rows.push({ r: e.r, c: e, place: e.dnf ? 'DNF' : String(e.place != null ? e.place : e.pos), dnf: e.dnf, fin: e.place != null });
         });
       }
       return rows;
@@ -1359,17 +1558,17 @@
     // ohne Platz) – alles per measureText auf die Spalte gekürzt. Bis 10 Zeilen; reicht der Platz nicht, werden sie flacher.
     function towerHeader(rows) {
       if (race.stage === 'grid') return race.laps + ' LAPS';
-      if (race.stage === 'end' || (race.sim && race.sim.done)) return 'FINAL';
+      if (race.stage === 'end' || (race.sn && race.sn.over)) return 'FINAL';
       var lead = rows[0] && rows[0].c;
       return lead && lead.place != null ? 'FINISH' : 'LAP ' + clamp(lead ? lead.lap : 1, 1, race.laps) + ' / ' + race.laps;
     }
     function towerGap(row, rows) {
       var c = row.c; if (!c) return '';
       if (row.dnf) return 'DNF';
-      var sim = race.sim, L = race.T.len, lead = rows[0] && rows[0].c;
+      var L = race.T.len, lead = rows[0] && rows[0].c;
       if (c.place === 1) return 'WINNER';
       if (c.place != null) {
-        var win = null; sim.cars.forEach(function (o) { if (o.place === 1) win = o; });
+        var win = null; rows.forEach(function (o) { if (o.c && o.c.place === 1) win = o.c; });
         return win && win.finish != null && c.finish != null ? '+' + (c.finish - win.finish).toFixed(1) + 's' : '';
       }
       if (row === rows[0] || !lead) return 'LEADER';
@@ -1397,11 +1596,12 @@
         for (var i = 0; i < 10; i++) { var a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 4 : 9; pts.push((Math.cos(a) * rr).toFixed(2) + ',' + (Math.sin(a) * rr).toFixed(2)); }
         poly.setAttribute('points', pts.join(' ')); st.appendChild(poly); li.appendChild(st);
       }
+      var drv = document.createElement('span'); drv.className = 'race-rank__drv';
       var name = document.createElement('span'); name.className = 'race-rank__name';
       var gap = document.createElement('span'); gap.className = 'race-rank__gap';
-      li.appendChild(name); li.appendChild(gap);
+      li.appendChild(drv); li.appendChild(name); li.appendChild(gap);
       rankEl.appendChild(li);
-      return (rankDom[r.id] = { li: li, pos: pos, name: name, gap: gap });
+      return (rankDom[r.id] = { li: li, pos: pos, drv: drv, name: name, gap: gap });
     }
     function updateRankDom(rows) {
       if (!rankEl) return;
@@ -1421,6 +1621,10 @@
         setAttr(d.li, 'data-leader', gap === 'LEADER' || gap === 'WINNER' ? '' : null);
         setText(d.pos, row.dnf ? '–' : String(row.place));
         setText(d.name, String(r.shown));
+        // wer steuert: Controller-Symbol (Material Symbols) = Mensch, „AI“ = KI (Aussehen in car-race-hud.css)
+        setAttr(d.li, 'data-drv', r.drv || null);
+        setText(d.drv, r.drv === 'human' ? 'sports_esports' : r.drv === 'ai' ? 'AI' : '');
+        setAttr(d.drv, 'aria-label', r.drv === 'human' ? 'steered by the viewer' : r.drv === 'ai' ? 'driven by the AI' : null);
         setText(d.gap, gap);
       });
       if (rankEl.hidden) rankEl.hidden = false;
@@ -1911,6 +2115,7 @@
         } else race.introShot = null;
         if (race.gridSim) race.order.forEach(function (r, i) {
           var c = race.gridSim.cars[i];
+          r.drv = drvOf(r);
           if (!r.disp) r.disp = { s: c.s, d: c.d };
           var dsv = c.s - r.disp.s, ddv = c.d - r.disp.d;
           r.disp.s += clamp(dsv, -dt * Math.min(18, Math.abs(dsv) * 2.2), dt * Math.min(18, Math.abs(dsv) * 2.2));
@@ -1926,10 +2131,26 @@
       } else {
         advanceSim(now - race.startsAt);
         var sim = race.sim, a = race.alpha;
-        var ids = sim.standings(), idx = {};
+        var idx = {};
         sim.cars.forEach(function (c, i) { idx[c.id] = i; });
+        var SN = race.sn = standingsNow(now - race.startsAt);
+        if (hasPilots()) pilotNitro(now - race.startsAt);
         sim.cars.forEach(function (c, i) {
           var p = race.prev[i] || c, r = race.order[i];
+          r.drv = drvOf(r);
+          if (c.ghost) {   // selbst gesteuert (live) bzw. von der KI übernommen (Nachfahrer)
+            var gq = SN.byI[i] && SN.byI[i].q;
+            if (gq) placeCar(r, gq.x, gq.z, gq.yaw, gq.roll || 0, gq.pitch || 0, gq.steer || 0, dt);
+            else placeCar(r, c.x, c.z, c.yaw, 0, 0, 0, dt);
+            if (r.flash > 0) r.flash = Math.max(0, r.flash - dt);
+            duckStep(r, dt);
+            if (r.streak) updateDraft(r, null, dt);
+            if (r.nitroUntil != null && now - race.startsAt < r.nitroUntil && !reduce && Math.random() < dt * 30) {
+              var gb = rearOf(r, true);
+              puff('flame', gb.x, r.height * 0.35, gb.z, { size: 0.45, grow: 0.25, life: 0.3, a: 0.95, grav: 0 });
+            }
+            return;
+          }
           placeCar(r, lerp(p.x, c.x, a), lerp(p.z, c.z, a), lerp(p.yaw, c.yaw, a), lerp(p.roll, c.roll, a), lerp(p.pitch, c.pitch, a), lerp(p.steer, c.steer, a), dt);
           // Stoß-Ruck nach Kontakt/Crash (kurz, bei reduzierter Bewegung aus)
           if (r.jolt > 0) {
@@ -1959,7 +2180,7 @@
         if (snd) {
           var vs = 0, nv = 0, fireMax = 0;
           sim.cars.forEach(function (c) {
-            if (c.state !== 'dnf' && c.place === null) { vs += c.v; nv++; }
+            if (c.state !== 'dnf' && c.place === null && !c.ghost) { vs += c.v; nv++; }
             if (c.wreck && c.burn != null) { var fa = sim.time - c.burn; fireMax = Math.max(fireMax, fa < 0 ? 0 : fa < 10 ? 1 : Math.max(0.25, 1 - (fa - 10) / 2.5)); }
           });
           snd.engine(visible && !sim.done, nv ? vs / nv : 0, race.hl ? highlightWeight(sim) : 0);
@@ -1967,16 +2188,14 @@
         }
         updateOil(sim);
         if (!reduce) streakTex.offset.x = (streakTex.offset.x - dt * 1.6) % 1;
-        if (sim.done && !race.ended) finishRace();
+        if (SN.over && !race.ended) finishRace();
         // Kamera-Ziel: alle, die noch fahren (vorn zuerst, auch neben der Bahn); sind alle durch, das ganze Feld ohne DNF
-        var active = ids.filter(function (id) { var c = sim.cars[idx[id]]; return c.place == null && c.state !== 'dnf' && !sim.done; });
-        if (!active.length) active = ids.filter(function (id) { var c = sim.cars[idx[id]]; return c.state !== 'dnf' && !(sim.done && c.place == null); });
-        if (!active.length) active = ids;
-        active.forEach(function (id) { var r = race.order[idx[id]]; pts.push({ x: r.holder.position.x, z: r.holder.position.z }); });
-        ids.forEach(function (id, o) {
-          var c = sim.cars[idx[id]], r = race.order[idx[id]];
-          var dnf = c.place == null && (c.state === 'dnf' || sim.done);
-          labels.push({ r: r, place: dnf ? 'DNF' : String(c.place != null ? c.place : c.pos), show: true, order: o, dnf: dnf });
+        var active = SN.list.filter(function (e) { return !e.done && !e.dnf && !SN.over; });
+        if (!active.length) active = SN.list.filter(function (e) { return !e.dnf; });
+        if (!active.length) active = SN.list;
+        active.forEach(function (e) { pts.push({ x: e.r.holder.position.x, z: e.r.holder.position.z }); });
+        SN.list.forEach(function (e, o) {
+          labels.push({ r: e.r, place: e.dnf ? 'DNF' : String(e.place != null ? e.place : e.pos), show: true, order: o, dnf: e.dnf });
         });
       }
       inViewport(function () { stepPuffs(dt); });
@@ -2122,7 +2341,21 @@
       apply(pvView());
     }
     // wie fx/race.py: Startaufstellung schließen, Fahrer vorstellen, dann Rennen
-    function pvIntro(at) { pv.phase = 'intro'; pv.intro_at = at; pv.starts_at = at + introSeconds(pv.racers.length); }
+    function pvIntro(at) {
+      pv.phase = 'intro'; pv.intro_at = at; pv.starts_at = at + introSeconds(pv.racers.length);
+      if (opts.pilot) pv.pilots = [pv.racers[0].user_id];   // ?pilot=1: Testfahrer 1 steuert „selbst“ (künstlicher Live-Takt)
+    }
+    // Vorschau: Verbindung des Piloten weg → KI übernimmt an der aktuellen Stelle
+    function previewDrop() {
+      if (!pv || pv.phase !== 'race' || !race || !race.sim || !hasPilots()) return;
+      var id = race.pilots[0], r = race.racers[id], i = race.order.indexOf(r);
+      if (!r || race.taken[id]) return;
+      var t = srvNow() - race.startsAt, q = liveSample(r, i, t);
+      if (!q) return;
+      pv.race_events = (pv.race_events || []).concat([{ t: Math.round(t * 100) / 100, type: 'takeover', id: id,
+        x: q.x, z: q.z, yaw: q.yaw, speed: 0, prog: q.prog, lap: Math.max(0, Math.floor(q.prog / race.T.len)) }]);
+      apply(pvView());
+    }
     // Vorschau: Nitro bzw. Anrempeln für einen zufälligen Testfahrer, 1,5 s in der Zukunft (wie der Server)
     function previewAction(type) {
       if (!pv || pv.phase !== 'race' || !race || !race.sim || race.sim.done) return;
@@ -2151,6 +2384,12 @@
     }
 
     // ---- Start ----
+    // Material Symbols fürs Controller-Symbol auf den Namensschildern (Canvas); ohne Schrift „LIVE“
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load("48px 'Material Symbols Outlined'", 'sports_esports').then(function (l) {
+        symOk = !!(l && l.length) || document.fonts.check("48px 'Material Symbols Outlined'", 'sports_esports');
+      }).catch(function () {});
+    }
     if (document.fonts && document.fonts.load) {
       document.fonts.load('700 40px "DM Sans"').then(function () {
         readTokens();
@@ -2171,7 +2410,7 @@
       teardown(); show(false); previewReset();
     }
     function previewNextTrack() { previewTrack(null); }
-    return { addTestRacer: addTestRacer, startNow: startNow, setTrack: previewTrack, nextTrack: previewNextTrack, nitro: function () { previewAction('nitro'); }, bump: function () { previewAction('bump'); }, _state: function () { return race; }, _cam: function () { return cam; }, _introCardAt: introCardAt };   // _state/_cam: nur für Tests
+    return { addTestRacer: addTestRacer, startNow: startNow, dropPilot: previewDrop, setTrack: previewTrack, nextTrack: previewNextTrack, nitro: function () { previewAction('nitro'); }, bump: function () { previewAction('bump'); }, _state: function () { return race; }, _cam: function () { return cam; }, _introCardAt: introCardAt };   // _state/_cam: nur für Tests
   }
 
   root.CarRace = { start: start };

@@ -13,6 +13,8 @@
          <span class="race-rank__pos">1</span>                        Platz („–“ bei DNF)
          <svg class="race-rank__bar"><rect fill="#chatfarbe"/></svg>  Chatfarbe (Farbe als SVG-Attribut)
          <svg class="race-rank__star">…</svg>                         Sub-Stern (nur bei Subs)
+         <span class="race-rank__drv">sports_esports|AI</span>          wer steuert (Chatrennen steuerbar): Controller-
+                                                                      Symbol (Material Symbols) = Mensch, „AI“ = KI
          <span class="race-rank__name">Name</span>                    Name (gekürzt per CSS-Ellipse)
          <span class="race-rank__gap">+1.2s</span>                    Abstand: „LEADER“, „WINNER“, „+1 LAP“, „DNF“
        </li>
@@ -32,6 +34,7 @@
      data-podium  1/2/3 nur für die ersten drei (Platz-Kasten in Gold/Silber/Bronze)
      data-flash   gesetzt für ~1,4 s nach einem Überholmanöver
      data-leader  gesetzt beim Führenden
+     data-drv     human = selbst gesteuert, ai = KI (fehlt vor dem Schließen der Startaufstellung)
 
    Größen in vh, damit alles mit der Fensterhöhe skaliert (1 vh = 10,8 px bei 1080p, 3,6 px bei 360p).
    Farben und Schrift kommen aus dem Theme des Kanals (--theme-*, widgets/_theme.css, der Server setzt
@@ -150,6 +153,18 @@ html[data-theme="swiss"] .race-rank { --rank-accent: var(--theme-primary, #1a7a3
   text-shadow: 0 0.05vh 0.1vh rgba(0, 0, 0, 0.7);
 }
 .race-rank__row[data-state="done"][data-pos="1"] .race-rank__name { color: var(--rank-accent); }
+
+/* Wer steuert: Controller-Symbol (Mensch, Akzentfarbe) bzw. kleiner „AI“-Chip (gedämpft) */
+.race-rank__drv { flex: 0 0 auto; display: none; }
+.race-rank__row[data-drv] .race-rank__drv { display: inline-flex; align-items: center; justify-content: center; }
+.race-rank__row[data-drv="human"] .race-rank__drv {
+  font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; line-height: 1;
+  font-size: calc(var(--rank-name-size) * 1.35); color: var(--rank-accent); letter-spacing: normal; text-transform: none;
+}
+.race-rank__row[data-drv="ai"] .race-rank__drv {
+  font-size: calc(var(--rank-gap-size) * 0.85); font-weight: 800; color: var(--rank-dim); line-height: 1;
+  padding: 0.05em 0.3em; border: 1px solid var(--rank-dim); border-radius: 0.3em;
+}
 
 /* Abstand rechts */
 .race-rank__gap {
