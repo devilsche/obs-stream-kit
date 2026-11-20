@@ -334,7 +334,7 @@
   // je Bild: eigener Motor (laut), Feld (leise, mittleres Tempo naher Autos), Quietschen, Rumpeln, Nitro
   function soundFrame(inp) {
     if (!snd) return;
-    if (!race || race.paused || race.phase === 'results' || !sndOn) { snd.skid(0); snd.rumble(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false); return; }
+    if (!race || race.paused || race.phase === 'results' || !sndOn) { snd.skid(0); snd.rumble(0); snd.scrape(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false); return; }
     var pc = race.pc, sp = Math.hypot(pc.vx, pc.vz);
     if (!sm.me) sm.me = snd.motor(1);
     if (!sm.field) sm.field = snd.motor(0.3);
@@ -349,6 +349,7 @@
     var hard = pc.surface === 'asphalt' || pc.surface === 'curb';
     snd.skid(hard && sp > 3 && !race.spect ? clamp((pc.slip - 0.42) / 0.45, 0, 1) : 0);
     snd.rumble(!hard && sp > 1 ? clamp(sp / 12, 0.2, 1) : 0);
+    snd.scrape(race.scrape || 0);
     if (pc.nitroT > 0 && sm.nitro <= 0) sfx('nitro');
     sm.nitro = pc.nitroT;
     if (pc.rail > 0) hitSound(pc.rail);
@@ -640,41 +641,67 @@
     });
   }
 
-  // Kontakt Spieler ↔ Gegner: je Auto zwei Kreise (vorn/hinten), Stoß nach Masse
-  function contacts() {
-    var pc = race.pc, me = race.me, T = race.T;
-    var fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), rM = me.w / 2, oM = Math.max(0, me.len / 2 - rM);
-    var mine = [[pc.x + fx * oM, pc.z + fz * oM], [pc.x - fx * oM, pc.z - fz * oM]];
-    race.ai.forEach(function (c, i) {
-      var q = race.sim.cars[i];
-      if (Math.abs(q.x - pc.x) > 12 || Math.abs(q.z - pc.z) > 12) return;
-      var gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw), rA = c.w / 2, oA = Math.max(0, c.len / 2 - rA);
-      var theirs = [[q.x + gx * oA, q.z + gz * oA], [q.x - gx * oA, q.z - gz * oA]];
-      var best = null;
-      mine.forEach(function (m) { theirs.forEach(function (t) {
-        var dx = m[0] - t[0], dz = m[1] - t[1], d = Math.hypot(dx, dz), pen = rM + rA - d;
-        if (pen > 0 && (!best || pen > best.pen)) best = { pen: pen, nx: d > 1e-4 ? dx / d : -fx, nz: d > 1e-4 ? dz / d : -fz };
-      }); });
-      if (!best) return;
-      var mP = pc.P.mass, mA = c.st.mass, shareP = mA / (mP + mA);
-      var wreck = q.state === 'dnf';
-      if (wreck) shareP = 1;
-      pc.x += best.nx * best.pen * shareP; pc.z += best.nz * best.pen * shareP;
-      var vax = gx * q.v, vaz = gz * q.v, vn = (pc.vx - vax) * best.nx + (pc.vz - vaz) * best.nz;
-      if (vn < 0) {
-        var J = -(1 + 0.25) * vn / (1 / mP + (wreck ? 0 : 1 / mA));
-        pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
-        if (!wreck) {
-          // Gegner: Tempo längs, Seitenversatz quer (in Streckenkoordinaten)
-          var dvx = -best.nx * J / mA, dvz = -best.nz * J / mA, a = T.at(q.s);
-          q.v = Math.max(0, q.v + (dvx * gx + dvz * gz));
-          var lat = (dvx * a.nx + dvz * a.nz) * 0.12 + (-best.nx * a.nx - best.nz * a.nz) * best.pen * (1 - shareP);
-          var lim = T.width / 2 + Math.max(0, q.d > 0 ? a.runL : a.runR) - c.w / 2 - 0.2;
-          q.d = clamp(q.d + lat, -lim, lim);
-        }
-        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); hitSound(-vn); }
-      }
+  // ---- Kontakte Auto ↔ Auto ----
+  // Grundfläche als Rechteck (Länge/Breite des Modells bzw. der Sim), Überlappung und Stoß in CarDrivePhys
+  // (stepContacts/collide). Nur das eigene Auto reagiert (andere Clients rechnen dasselbe bei sich), im Solo-Rennen
+  // bekommt die KI zusätzlich den Gegenstoß ab. Wracks (DNF) sind unbeweglich.
+  function poseOf(c, x, z, yaw, v, mass) {
+    var o = { c: c, x: x, z: z, yaw: yaw, len: c.len, w: c.w, vx: Math.cos(yaw) * v, vz: -Math.sin(yaw) * v, mass: mass };
+    var p = c.cPose;   // Lage im vorigen Bild: wird über die Teilschritte mitgezogen (kein Durchtunneln)
+    if (p && Math.hypot(p.x - x, p.z - z) < 8) { o.x0 = p.x; o.z0 = p.z; o.yaw0 = p.yaw; }
+    c.cPose = { x: x, z: z, yaw: yaw };
+    return o;
+  }
+  function contactList() {
+    var out = [];
+    if (race.chat) {
+      // Chatrennen: KI aus der Sim (gemeinsam, nicht anstoßen), andere Piloten/Übernommene aus Live-Takt bzw. Nachfahrer
+      if (race.spect) return out;
+      race.ai.forEach(function (c, i) {
+        if (!c) return;
+        if (race.remotes.indexOf(c) >= 0) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); return; }
+        var q = race.sim.cars[i];
+        out.push(poseOf(c, q.x, q.z, q.yaw, q.v, q.state === 'dnf' ? Infinity : c.st.mass));
+      });
+      return out;
+    }
+    if (race.sim) race.ai.forEach(function (c, i) {
+      if (!c) return;
+      var q = race.sim.cars[i], o = poseOf(c, q.x, q.z, q.yaw, q.v, q.state === 'dnf' ? Infinity : c.st.mass);
+      o.q = q; out.push(o);
     });
+    if (race.mp) race.remotes.forEach(function (c) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); });
+    return out;
+  }
+  // Solo: Gegenstoß auf die KI – Tempo längs, Seitenversatz quer (in Streckenkoordinaten)
+  function nudgeAI(o, h) {
+    if (!isFinite(o.mass) || !o.q) return;
+    var q = o.q, T = race.T, a = T.at(q.s), gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw);
+    var dvx = -h.jx / o.mass, dvz = -h.jz / o.mass;
+    q.v = Math.max(0, q.v + (dvx * gx + dvz * gz));
+    var lim = T.width / 2 + Math.max(0, q.d > 0 ? a.runL : a.runR) - o.c.w / 2 - 0.2;
+    q.d = clamp(q.d + (dvx * a.nx + dvz * a.nz) * 0.12, -lim, lim);
+  }
+  // eigenes Auto fahren + Kontakte; Crash: Kamera-Ruck (reduzierte Bewegung: keiner), Funken/Splitter, Blech-Klang –
+  // stärker je Aufprall und je schwerer der andere; Schrammen: Funkenstrom + Schleifgeräusch statt Abprallen
+  function driveStep(dt, inp) {
+    var pc = race.pc, crash = null, scrape = null;
+    Phys.stepContacts(pc, inp, dt, { len: race.me.len, w: race.me.w }, contactList(), function (o, h) {
+      if (h.impact > 0 && o.q) nudgeAI(o, h);
+      if (h.impact >= Phys.CRASH_V) { if (!crash || h.impact > crash.impact) crash = h; }
+      else if (h.slide > 1.5 && (!scrape || h.slide > scrape.slide)) scrape = h;
+    });
+    race.crashT = Math.max(0, (race.crashT || 0) - dt);
+    if (crash && race.crashT <= 0) {
+      var mP = pc.P.mass, mO = isFinite(crash.o.mass) ? crash.o.mass : mP * 4, heavy = mO / (mO + mP);
+      var lvl = clamp(crash.impact / 18 * (0.55 + 0.9 * heavy), 0.08, 1);
+      race.shake = Math.min(0.7, race.shake + lvl * 0.55);
+      race.crashT = 0.08;
+      if (FX) FX.crash(crash.px, crash.pz, lvl, crash.nx, crash.nz);
+      sfx('crash', lvl);
+    }
+    race.scrape = scrape && !crash ? clamp((scrape.slide - 1.5) / 14, 0.12, 1) : 0;
+    if (race.scrape && FX) FX.scrape(scrape.px, scrape.pz, race.scrape, dt, scrape.tx, scrape.tz);
   }
 
   // ---- Kameras ----
@@ -1120,31 +1147,6 @@
       placeCar(c, q.x, q.z, q.yaw, q.roll, q.pitch, q.steer, q.spin);
     });
   }
-  // Kontakt mit Fremdautos: nur das eigene Auto wird geschoben/gebremst (der andere Client macht dasselbe), nach Masse
-  function mpContacts() {
-    var pc = race.pc, me = race.me;
-    var fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), rM = me.w / 2, oM = Math.max(0, me.len / 2 - rM);
-    var mine = [[pc.x + fx * oM, pc.z + fz * oM], [pc.x - fx * oM, pc.z - fz * oM]];
-    race.remotes.forEach(function (c) {
-      var q = c.smp;
-      if (!q || Math.abs(q.x - pc.x) > 12 || Math.abs(q.z - pc.z) > 12) return;
-      var gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw), rA = c.w / 2, oA = Math.max(0, c.len / 2 - rA);
-      var theirs = [[q.x + gx * oA, q.z + gz * oA], [q.x - gx * oA, q.z - gz * oA]], best = null;
-      mine.forEach(function (m) { theirs.forEach(function (t) {
-        var dx = m[0] - t[0], dz = m[1] - t[1], d = Math.hypot(dx, dz), pen = rM + rA - d;
-        if (pen > 0 && (!best || pen > best.pen)) best = { pen: pen, nx: d > 1e-4 ? dx / d : -fx, nz: d > 1e-4 ? dz / d : -fz };
-      }); });
-      if (!best) return;
-      var mP = pc.P.mass, mA = c.st.mass, shareP = mA / (mP + mA);
-      pc.x += best.nx * best.pen * shareP; pc.z += best.nz * best.pen * shareP;
-      var vn = (pc.vx - gx * q.speed) * best.nx + (pc.vz - gz * q.speed) * best.nz;
-      if (vn < 0) {
-        var J = -(1 + 0.25) * vn / (1 / mP + 1 / mA);
-        pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
-        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); hitSound(-vn); }
-      }
-    });
-  }
   function mpFinishNote() {
     if (!mp) return;
     var parts = [], mine = mp.results ? mp.results.list.filter(function (r) { return String(r.id) === mp.me; })[0] : null;
@@ -1453,38 +1455,6 @@
       if (q2 && !q2.ghost) { pc.x = q2.x; pc.z = q2.z; pc.yaw = q2.yaw; pc.prog = q2.s; pc.vx = Math.cos(q2.yaw) * q2.v; pc.vz = -Math.sin(q2.yaw) * q2.v; pc.u = q2.v; pc.steer = q2.steer; pc.spin = q2.spin; }
     }
   }
-  // Kontakt: nur das eigene Auto wird geschoben (KI aus der Sim und andere Piloten), nach Masse
-  function rcContacts() {
-    if (race.spect) return;
-    var others = [];
-    race.ai.forEach(function (c, i) {
-      if (!c) return;
-      if (race.remotes.indexOf(c) >= 0) { if (c.smp) others.push({ c: c, q: c.smp }); return; }
-      var q = race.sim.cars[i]; others.push({ c: c, q: { x: q.x, z: q.z, yaw: q.yaw, speed: q.v } });
-    });
-    var pc = race.pc, me = race.me, fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), rM = me.w / 2, oM = Math.max(0, me.len / 2 - rM);
-    var mine = [[pc.x + fx * oM, pc.z + fz * oM], [pc.x - fx * oM, pc.z - fz * oM]];
-    others.forEach(function (o) {
-      var c = o.c, q = o.q;
-      if (Math.abs(q.x - pc.x) > 12 || Math.abs(q.z - pc.z) > 12) return;
-      var gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw), rA = c.w / 2, oA = Math.max(0, c.len / 2 - rA), best = null;
-      var theirs = [[q.x + gx * oA, q.z + gz * oA], [q.x - gx * oA, q.z - gz * oA]];
-      mine.forEach(function (m) { theirs.forEach(function (tt) {
-        var dx = m[0] - tt[0], dz = m[1] - tt[1], d = Math.hypot(dx, dz), pen = rM + rA - d;
-        if (pen > 0 && (!best || pen > best.pen)) best = { pen: pen, nx: d > 1e-4 ? dx / d : -fx, nz: d > 1e-4 ? dz / d : -fz };
-      }); });
-      if (!best) return;
-      var mP = pc.P.mass, mA = c.st.mass, shareP = mA / (mP + mA);
-      pc.x += best.nx * best.pen * shareP; pc.z += best.nz * best.pen * shareP;
-      var vn = (pc.vx - gx * (q.speed || 0)) * best.nx + (pc.vz - gz * (q.speed || 0)) * best.nz;
-      if (vn < 0) {
-        var J = -(1 + 0.25) * vn / (1 / mP + 1 / mA);
-        pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
-        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); hitSound(-vn); }
-      }
-    });
-  }
-
   // ---- Schleife ----
   var lastT = performance.now();
   function frame(now) {
@@ -1550,10 +1520,8 @@
     if (race.chat) rcDraw();
     if (inp) {
       var lapsBefore = pc.laps;
-      Phys.step(pc, inp, dt);
-      if (race.sim && !race.chat) contacts();
-      if (race.chat) rcContacts();
-      if (race.mp && !race.chat) { drawRemotes(); mpContacts(); }
+      if (race.mp && !race.chat) drawRemotes();
+      driveStep(dt, inp);
       if (pc.rail > 2) race.shake = Math.min(0.5, race.shake + pc.rail * 0.04);
       if (race.phase === 'race' && pc.laps > lapsBefore) {
         lapDone(race.t - race.lapStart); race.lapStart = race.t;

@@ -3,7 +3,8 @@
  *   node scripts/check_car_drive.js
  * Prüft: Beschleunigen, Kurve mit Lenk-Autopilot (ganze Runde je Strecke), Bremsen, Kies bremst, Leitplanke
  * schiebt zurück, Handbremse dreht das Heck, Nitro einmal je Runde, Rückwärtsgang (S/W wie im Rennspiel, auch aus dem
- * Kies), KI-Gegner fahren (bis 5 Runden).
+ * Kies), KI-Gegner fahren (bis 5 Runden), Kontakte Auto ↔ Auto (Rechteck-Kollision: nie durch einen Bus, Crash
+ * statt Flipper: kaum Rückprall, Tempo weg, außermittiger Treffer hinten dreht, schwer gegen leicht).
  */
 'use strict';
 var path = require('path');
@@ -134,6 +135,112 @@ ok(sim.cars.every(function (q, i) { return q.state !== 'run' || Math.hypot(q.x -
 sim.fastForward(200);
 var fin = sim.cars.filter(function (q) { return q.place != null; }).length, dnf = sim.cars.filter(function (q) { return q.place == null; }).length;
 ok(fin >= 5, '5 Runden: ' + fin + ' im Ziel, ' + dnf + ' ausgeschieden, Sieger nach ' + Math.min.apply(null, sim.cars.map(function (q) { return q.finish || 1e9; })).toFixed(1) + ' s');
+
+// 10) Kontakte Auto ↔ Auto (stepContacts/collide wie js/car-drive.js)
+var TB = Sim.track(1), S0 = 268;   // Speedway: Gerade von ~265 bis ~315 m
+function busAt(s, d, turn) {
+  var a = TB.at(s);
+  return { x: a.x + a.nx * d, z: a.z + a.nz * d, yaw: a.yaw + (turn || 0), len: 12, w: 2.5, vx: 0, vz: 0, mass: 17 };
+}
+function dims(car) { return { len: car.P.len, w: car.P.width }; }
+function setSpeed(car, v) { car.vx = Math.cos(car.yaw) * v; car.vz = -Math.sin(car.yaw) * v; car.u = v; }
+// fährt mit inp gegen others; → größte Überlappung nach jedem Bild, Tempo/Gierrate rund um den ersten Treffer.
+// react: der andere bekommt den Gegenstoß ab (wie die KI im Solo-Rennen bzw. der andere Client bei sich)
+function crashRun(car, inp, others, secs, react) {
+  var r = { maxPen: 0, hit: null, vIn: 0, vOut: null, rMax: 0, sp: [] };
+  for (var t = 0; t < secs; t += DT) {
+    var v0 = Math.hypot(car.vx, car.vz);
+    var out = Phys.stepContacts(car, inp, DT, dims(car), others, react ? function (o, h) { o.vx -= h.jx / o.mass; o.vz -= h.jz / o.mass; } : null);
+    others.forEach(function (o) {
+      var h = Phys.overlap({ x: car.x, z: car.z, yaw: car.yaw, len: car.P.len, w: car.P.width }, o);
+      if (h) r.maxPen = Math.max(r.maxPen, h.pen);
+      if (o.x0 != null) { o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw; o.x += o.vx * DT; o.z += o.vz * DT; }
+    });
+    var big = out.hits.filter(function (h) { return h.impact > 0; })[0];
+    if (big && !r.hit) { r.hit = big; r.vIn = v0; r.tHit = t; }
+    if (r.hit && r.vOut == null && t - r.tHit >= 0.1) r.vOut = Math.hypot(car.vx, car.vz);
+    if (r.hit) r.rMax = Math.max(r.rMax, Math.abs(car.r));
+  }
+  if (r.vOut == null) r.vOut = Math.hypot(car.vx, car.vz);
+  return r;
+}
+// Bus quer über die Strecke (Breitseite), Bus längs (Heck): nie durchfahren, auch bei Tempo, langsam, rückwärts
+[[5, 'quer'], [15, 'quer'], [30, 'quer'], [45, 'quer'], [30, 'längs'], [3, 'längs']].forEach(function (cs) {
+  var v = cs[0], car = carFor('bmw-m3-competition', TB, { s: S0, d: 0 }), bus = busAt(S0 + 25, 0, cs[1] === 'quer' ? Math.PI / 2 : 0);
+  setSpeed(car, v);
+  var r = crashRun(car, { throttle: 1 }, [bus], 2.5);
+  var a = TB.at(S0 + 25), ahead = (car.x - bus.x) * Math.cos(a.yaw) - (car.z - bus.z) * Math.sin(a.yaw);
+  ok(r.hit && r.maxPen < 0.05 && ahead < 0, 'Bus ' + cs[1] + ' mit ' + v + ' m/s + Vollgas: nicht durch (größte Überlappung ' + (r.maxPen * 100).toFixed(1) + ' cm, Auto ' + ahead.toFixed(1) + ' m vor der Busmitte)');
+  if (v >= 15) ok(r.vOut < r.vIn * 0.35, 'Bus ' + cs[1] + ' ' + v + ' m/s: Tempo weg ' + r.vIn.toFixed(1) + ' → ' + r.vOut.toFixed(1) + ' m/s nach 0,1 s');
+});
+// Rückprall gering: frontal in ein Wrack (unbeweglich) und in einen Bus, der den Gegenstoß abbekommt
+(function () {
+  var car = carFor('bmw-m3-competition', TB, { s: S0, d: 0 }), wreck = busAt(S0 + 25, 0, Math.PI / 2), back = 0, hits = 0;
+  wreck.mass = Infinity; setSpeed(car, 20);
+  for (var t = 0; t < 1.5; t += DT) {
+    hits += Phys.stepContacts(car, {}, DT, dims(car), [wreck]).hits.length;
+    back = Math.max(back, -car.u);
+  }
+  ok(hits > 0 && back < 20 * 0.2, 'Rückprall gering: 20 m/s frontal ins Wrack → höchstens ' + back.toFixed(2) + ' m/s zurück');
+  var c2 = carFor('bmw-m3-competition', TB, { s: S0, d: 0 }), bus = busAt(S0 + 25, 0, Math.PI / 2), e = null;
+  setSpeed(c2, 20);
+  for (var t2 = 0; t2 < 1.5 && e == null; t2 += DT) {
+    Phys.stepContacts(c2, {}, DT, dims(c2), [bus], function (o, h) {
+      if (h.impact < 5) return;
+      o.vx -= h.jx / o.mass; o.vz -= h.jz / o.mass;
+      e = ((c2.vx - o.vx) * h.nx + (c2.vz - o.vz) * h.nz) / h.impact;   // Trenntempo / Aufpralltempo
+    });
+  }
+  ok(e != null && e >= 0 && e < 0.2, 'Stoßzahl gegen den Bus ' + (e != null ? e.toFixed(3) : '–') + ' (unelastisch, Bus bekommt den Gegenstoß)');
+})();
+// rückwärts in den Bus (Bus hinter dem Auto), S gehalten
+(function () {
+  var car = carFor('bmw-m3-competition', TB, { s: S0 + 30, d: 0 }), bus = busAt(S0 + 21, 0, Math.PI / 2);
+  var r = crashRun(car, { brake: 1 }, [bus], 5);
+  var a = TB.at(S0 + 21), behind = (car.x - bus.x) * Math.cos(a.yaw) - (car.z - bus.z) * Math.sin(a.yaw);
+  ok(r.hit && r.maxPen < 0.05 && behind > 0, 'rückwärts in den Bus: nicht durch (Überlappung ' + (r.maxPen * 100).toFixed(1) + ' cm, ' + behind.toFixed(1) + ' m hinter der Busmitte)');
+})();
+// schräg mit Gas an der Busseite entlang: schrammt (kein Crash), gleitet ab und behält Tempo
+(function () {
+  var car = carFor('bmw-m3-competition', TB, { s: S0 + 8, d: 0 }), bus = busAt(S0 + 12, 2.2, 0);
+  car.yaw += 0.08; setSpeed(car, 14);
+  var crash = 0, scr = 0;
+  for (var t = 0; t < 2.5; t += DT) {
+    Phys.stepContacts(car, { throttle: 0.6 }, DT, dims(car), [bus], function (o, h) { if (h.scrape && h.impact > 0) scr++; else if (h.impact > 0) crash++; });
+  }
+  ok(scr > 0 && crash === 0 && car.u > 9, 'flacher Seitenkontakt schrammt: ' + scr + '× Schrammen, ' + crash + '× Crash, Tempo danach ' + car.u.toFixed(1) + ' m/s');
+})();
+// außermittiger Treffer hinten: anderes Auto fährt versetzt ins Heck → Gierrate (Dreher)
+(function () {
+  var car = carFor('bmw-m3-competition', TB, { s: S0 + 20, d: 0 }), a = TB.at(S0 + 14);
+  var o = { x: a.x + a.nx * 1.3, z: a.z + a.nz * 1.3, yaw: a.yaw, len: 4.5, w: 1.9, mass: 4.5,
+    vx: Math.cos(a.yaw) * 18, vz: -Math.sin(a.yaw) * 18 };
+  o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw;
+  var yaw0 = car.yaw, r = crashRun(car, {}, [o], 0.6);
+  var c0 = carFor('bmw-m3-competition', TB, { s: S0 + 20, d: 0 }), o2 = Object.assign({}, o, { x: a.x, z: a.z, x0: a.x, z0: a.z });
+  var rc = crashRun(c0, {}, [o2], 0.6);
+  ok(r.hit && r.rMax > 0.8 && r.rMax > rc.rMax * 3, 'Treffer hinten außermittig dreht: Gierrate ' + r.rMax.toFixed(2) + ' rad/s (mittig ' + rc.rMax.toFixed(2) + '), Drehung ' + (car.yaw - yaw0).toFixed(2) + ' rad');
+})();
+// schwer gegen leicht: gleicher Stoß von hinten (4,5er Auto mit 15 m/s), leichtes Auto wird viel stärker geschoben
+(function () {
+  function shove(key) {
+    var car = carFor(key, TB, { s: S0 + 20, d: 0 }), a = TB.at(S0 + 13.5);
+    var o = { x: a.x, z: a.z, yaw: a.yaw, len: 4.5, w: 1.9, mass: 4.5, vx: Math.cos(a.yaw) * 15, vz: -Math.sin(a.yaw) * 15 };
+    o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw;
+    crashRun(car, {}, [o], 0.4, true);
+    return { dv: car.u, m: car.P.mass };
+  }
+  var light = shove('krabby-patty-wagon'), heavy = shove('ural-4320-soviet-army-truck');
+  ok(light.dv > heavy.dv * 2.5, 'leicht (Masse ' + light.m.toFixed(1) + ') geschoben auf ' + light.dv.toFixed(1) + ' m/s, schwer (Masse ' + heavy.m.toFixed(1) + ') nur ' + heavy.dv.toFixed(1) + ' m/s');
+  // umgekehrt: rammt man selbst ein 4,5er Auto mit 20 m/s, verliert der Laster wenig, das leichte Auto viel
+  function ram(key) {
+    var car = carFor(key, TB, { s: S0, d: 0 }), o = busAt(S0 + 10, 0, 0); o.len = 4.5; o.w = 1.9; o.mass = 4.5;
+    o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw;
+    setSpeed(car, 20); var r = crashRun(car, {}, [o], 0.5, true); return r.vOut / r.vIn;
+  }
+  var kl = ram('krabby-patty-wagon'), kh = ram('ural-4320-soviet-army-truck');
+  ok(kh > 0.6 && kl < kh - 0.3, 'Rammen: Laster behält ' + (kh * 100).toFixed(0) + ' % Tempo, leichtes Auto ' + (kl * 100).toFixed(0) + ' %');
+})();
 
 console.log(fails ? fails + ' Prüfung(en) fehlgeschlagen' : 'alles ok');
 process.exit(fails ? 1 : 0);

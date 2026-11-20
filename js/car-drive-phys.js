@@ -12,6 +12,20 @@
  *                                         Bremse im Stand = Rückwärtsgang (bis REV_V), rückwärts bremst das Gas
  *   CarDrivePhys.reset(car)              zurück auf die Mittellinie an der aktuellen Stelle, steht
  *   CarDrivePhys.speedKmh(car)           Tacho: Spielzeug-Tempo auf echte km/h hochgerechnet (vtop ↔ echte vmax)
+ *   CarDrivePhys.overlap(a, b)           Rechteck gegen Rechteck (Trennachsen): a/b = { x, z, yaw, len, w } →
+ *                                         null oder { pen, nx, nz (Normale von b zu a), px, pz (Kontaktpunkt) }
+ *   CarDrivePhys.collide(car, me, o)     Kontakt eigenes Auto ↔ anderes Auto: me = { len, w } (echte Grundfläche des
+ *                                         eigenen Modells), o = { x, z, yaw, len, w, vx, vz, mass } (mass Infinity = Wrack).
+ *                                         Nur das eigene Auto reagiert: ganz aus der Überlappung geschoben, Stoß im
+ *                                         Kontaktpunkt (unelastisch, Reibung, Drehimpuls) → null oder { impact (m/s
+ *                                         Aufprall in Normalenrichtung), slide (m/s längs der Berührung), scrape bool,
+ *                                         jx, jz (Stoß auf das eigene Auto, N·s in Spielzeug-Masse), px, pz, nx, nz, pen,
+ *                                         tx, tz (Richtung, in die das eigene Auto an der Berührung entlanggleitet) }
+ *   CarDrivePhys.stepContacts(car, input, dt, me, others, onHit)
+ *                                        step() in Teilstücken (≤ CHUNK m Relativweg) mit collide() gegen alle others
+ *                                        nach jedem Stück (kein Durchtunneln bei Tempo/niedriger Bildrate); others wie o
+ *                                        oben, optional mit x0, z0, yaw0 = Lage im vorigen Bild (wird mitinterpoliert);
+ *                                        onHit(o, hit) je Berührung → { rail (größter Leitplanken-Aufprall), hits }
  *
  *   car = { x, z, yaw, vx, vz, r (Gierrate, + = links), u (längs), w (quer, + = links), steer (Radwinkel rad),
  *           roll, pitch (wie CarRaceSim: roll > 0 = neigt nach rechts, pitch > 0 = Nase hoch), spin (Raddrehung rad),
@@ -19,6 +33,13 @@
  *           rückwärts fahren zählt zurück), laps (abgeschlossene Runden, nie weniger), surface 'asphalt'|'curb'|'gravel'|'grass',
  *           nitroT (s Rest-Boost), nitroLap (Runde, in der Nitro zuletzt gezündet wurde), rail (Aufprall-Tempo der
  *           letzten Leitplanken-Berührung in diesem Schritt, sonst 0), slip (0..1 Rutschen, für Qualm/Ton) }
+ *
+ * Kontakte (collide): Grundfläche als Rechteck, Überlappung über die vier Kantenrichtungen beider Autos (kleinste
+ * Eindringtiefe = Normale), Kontaktpunkt = Mittel der eingedrungenen Ecken. Stoß wie ein Crash, nicht wie Flipper:
+ * kaum Rückprall (RESTITUTION, bei hartem Aufprall noch weniger), Reibung längs der Berührung (seitliches Schrammen
+ * gleitet ab), Stoß im Kontaktpunkt dreht das Auto (Treffer hinten außermittig = Dreher), Knautschzone kostet je nach
+ * Aufprall und Massenverhältnis zusätzlich Tempo, danach kurz weniger Haftung/Lenkung (car.hitT). Schwere Autos
+ * bewegen sich kaum, leichte werden geschoben. Keine Ausfälle – Arcade.
  *
  * Modell: Einspurmodell (Vorder-/Hinterachse je halbe Masse), Seitenkraft je Achse aus dem Schräglaufwinkel mit
  * Sättigung (über dem Haftmaximum fällt sie auf 80 % – Rutschen), Haftung = st.grip (m/s²); Lastwechsel beim
@@ -48,6 +69,9 @@
     gravel: { grip: 0.5, k: 0.45, c: 2, bump: 1 },
     grass: { grip: 0.62, k: 0.32, c: 1.4, bump: 0.6 }
   };
+  // Kontakte: Rückprall, Reibung längs der Berührung, Trägheitsfaktor (< 1 = dreht leichter, Arcade),
+  // ab CRASH_V m/s Aufprall ist es ein Crash (sonst Schrammen), Knautsch-Tempoverlust je m/s, größte Drehung durch Stoß
+  var RESTITUTION = 0.12, CONTACT_MU = 0.4, INERTIA_K = 0.7, CRASH_V = 2.5, CRUMPLE = 0.014, MAX_DR = 3.2, HIT_T = 0.7;
   var DRIVE = { rwd: [0, 1.4], fwd: [1.4, 0], awd: [0.75, 0.75] };   // Antriebsanteil vorn/hinten (Reibungskreis)
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -124,7 +148,7 @@
       x: a.x + a.nx * d, z: a.z + a.nz * d, yaw: a.yaw, vx: 0, vz: 0, r: 0, u: 0, w: 0, steer: 0,
       roll: 0, pitch: 0, rollV: 0, pitchV: 0, spin: 0, ax: 0, ay: 0,
       s: mod(s, T.len), d: d, hint: -1, prog: s, laps: 0, surface: 'asphalt', bumpPh: 0,
-      nitroT: 0, nitroLap: -1, rail: 0, slip: 0, rails: 0
+      nitroT: 0, nitroLap: -1, rail: 0, slip: 0, rails: 0, hitT: 0
     };
     var pr = project(T, car.x, car.z, -1); car.hint = pr.i; car.s = pr.s; car.d = pr.d;
     return car;
@@ -146,7 +170,10 @@
     // Lenkung: Einschlag nimmt mit dem Tempo ab (sonst bei Tempo nur Rutschen), weich nachgeführt
     var maxSteer = clamp(MAX_STEER * 9 / (9 + Math.max(0, Math.abs(u) - 3)), 0.1, MAX_STEER);
     var want = clamp(inp.steer || 0, -1, 1) * maxSteer;
-    car.steer += clamp(want - car.steer, -3.2 * dt, 3.2 * dt);
+    // nach einem Crash kurz benommen: Lenkung träger, weniger Haftung, Drehung wird nicht kinematisch weggebügelt
+    var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
+    if (car.hitT > 0) car.hitT = Math.max(0, car.hitT - dt);
+    car.steer += clamp(want - car.steer, -3.2 * dt * (1 - 0.7 * stun), 3.2 * dt * (1 - 0.7 * stun));
     var delta = car.steer;
     var thr = clamp(inp.throttle || 0, 0, 1), brk = clamp(inp.brake || 0, 0, 1), hb = !!inp.handbrake;
     var nitro = car.nitroT > 0;
@@ -175,6 +202,7 @@
     Gf = Math.sqrt(Math.max(Gf * Gf * 0.25, Gf * Gf - Math.pow(drv * dr[0], 2)));
     Gr = Math.sqrt(Math.max(Gr * Gr * 0.25, Gr * Gr - Math.pow(drv * dr[1], 2)));
     if (hb) Gr *= 0.32;
+    if (stun > 0) { Gf *= 1 - 0.5 * stun; Gr *= 1 - 0.55 * stun; }
     // Seitenkräfte (je Achse als Beschleunigung ihrer halben Masse)
     var ue = Math.max(Math.abs(u), 4), dirSign = u < -0.5 ? -1 : 1;
     var af = Math.atan2(w + car.r * a, ue) - delta * dirSign, ar = Math.atan2(w - car.r * b, ue);
@@ -187,7 +215,7 @@
     car.r += yawAcc * dt;
     car.r -= car.r * 0.6 * dt;                         // leichte Gierdämpfung (Stabilität)
     // langsam: kinematisch (kein Schräglauf-Modell nahe 0) – Gierrate aus Lenkwinkel, Querrutschen abbauen
-    var k = clamp((Math.abs(u) - 1.5) / 4, 0, 1);
+    var k = Math.max(clamp((Math.abs(u) - 1.5) / 4, 0, 1), stun);
     if (k < 1) {
       var rk = u * Math.tan(delta) / P.wb;
       car.r = car.r * k + rk * (1 - k);
@@ -258,9 +286,111 @@
     var a = car.T.at(car.s);
     car.x = a.x; car.z = a.z; car.yaw = car.yaw + wrapAngle(a.yaw - car.yaw);
     car.vx = car.vz = car.r = car.u = car.w = car.steer = 0;
-    car.roll = car.pitch = car.rollV = car.pitchV = 0; car.ax = car.ay = 0;
+    car.roll = car.pitch = car.rollV = car.pitchV = 0; car.ax = car.ay = 0; car.hitT = 0;
     var pr = project(car.T, car.x, car.z, car.hint); car.d = pr.d; car.hint = pr.i; car.surface = 'asphalt';
     return car;
+  }
+
+  // ---- Kontakte Auto ↔ Auto ----
+  function box(o) {
+    var c = Math.cos(o.yaw), sn = Math.sin(o.yaw);
+    return { x: o.x, z: o.z, fx: c, fz: -sn, lx: -sn, lz: -c, hl: o.len / 2, hw: o.w / 2 };
+  }
+  function radius(b, nx, nz) { return b.hl * Math.abs(b.fx * nx + b.fz * nz) + b.hw * Math.abs(b.lx * nx + b.lz * nz); }
+  function corners(b) {
+    var out = [];
+    [1, -1].forEach(function (sf) { [1, -1].forEach(function (sl) {
+      out.push([b.x + b.fx * b.hl * sf + b.lx * b.hw * sl, b.z + b.fz * b.hl * sf + b.lz * b.hw * sl]);
+    }); });
+    return out;
+  }
+  function inside(b, p, eps) {
+    var dx = p[0] - b.x, dz = p[1] - b.z;
+    return Math.abs(dx * b.fx + dz * b.fz) <= b.hl + eps && Math.abs(dx * b.lx + dz * b.lz) <= b.hw + eps;
+  }
+  function overlap(a0, b0) {
+    var a = box(a0), b = box(b0), dx = a.x - b.x, dz = a.z - b.z, best = null;
+    var axes = [[a.fx, a.fz], [a.lx, a.lz], [b.fx, b.fz], [b.lx, b.lz]];
+    for (var i = 0; i < 4; i++) {
+      var nx = axes[i][0], nz = axes[i][1], dist = dx * nx + dz * nz;
+      var pen = radius(a, nx, nz) + radius(b, nx, nz) - Math.abs(dist);
+      if (pen <= 0) return null;                       // Trennachse gefunden
+      if (!best || pen < best.pen - 1e-9) best = { pen: pen, nx: dist < 0 ? -nx : nx, nz: dist < 0 ? -nz : nz };
+    }
+    // Kontaktpunkt: Mittel der Ecken, die im anderen Rechteck stecken (sonst Mitte der Überlappung auf der Verbindung)
+    var sx = 0, sz = 0, n = 0;
+    corners(a).forEach(function (p) { if (inside(b, p, 0.02)) { sx += p[0]; sz += p[1]; n++; } });
+    corners(b).forEach(function (p) { if (inside(a, p, 0.02)) { sx += p[0]; sz += p[1]; n++; } });
+    if (n) { best.px = sx / n; best.pz = sz / n; }
+    else { var ra = radius(a, best.nx, best.nz) - best.pen / 2; best.px = a.x - best.nx * ra; best.pz = a.z - best.nz * ra; }
+    return best;
+  }
+  function collide(car, me, o) {
+    var P = car.P, len = me && me.len > 0 ? me.len : P.len, w = me && me.w > 0 ? me.w : P.width;
+    var h = overlap({ x: car.x, z: car.z, yaw: car.yaw, len: len, w: w }, o);
+    if (!h) return null;
+    var nx = h.nx, nz = h.nz, tx = -nz, tz = nx;
+    // ganz heraus (der andere bewegt sich hier nicht) – so fährt man nie durch ein Auto, auch langsam/rückwärts nicht
+    car.x += nx * (h.pen + 0.002); car.z += nz * (h.pen + 0.002);
+    var mP = P.mass, mA = o.mass > 0 ? o.mass : P.mass, invA = isFinite(mA) ? 1 / mA : 0;
+    var I = mP * (len * len + w * w) / 12 * INERTIA_K;
+    var rx = h.px - car.x, rz = h.pz - car.z;            // Hebel vom Schwerpunkt zum Kontaktpunkt
+    // Tempo im Kontaktpunkt: v + Gierrate × Hebel (Gierrate + = links: Punkt bewegt sich um (rz, −rx))
+    var rvx = car.vx + car.r * rz - (o.vx || 0), rvz = car.vz - car.r * rx - (o.vz || 0);
+    var vn = rvx * nx + rvz * nz, vt = rvx * tx + rvz * tz;
+    var res = { impact: 0, slide: Math.abs(vt), scrape: false, jx: 0, jz: 0, px: h.px, pz: h.pz, nx: nx, nz: nz, pen: h.pen,
+      tx: vt < 0 ? -tx : tx, tz: vt < 0 ? -tz : tz };
+    if (vn >= 0) return res;                            // trennt sich schon: nur Lage korrigieren
+    var impact = -vn;
+    var cn = rz * nx - rx * nz, ct = rz * tx - rx * tz;
+    var e = RESTITUTION * clamp(1 - impact / 16, 0.25, 1);   // harter Aufprall federt noch weniger
+    var Jn = -(1 + e) * vn / (1 / mP + cn * cn / I + invA);
+    var Jt = clamp(-vt / (1 / mP + ct * ct / I + invA), -CONTACT_MU * Jn, CONTACT_MU * Jn);
+    var jx = nx * Jn + tx * Jt, jz = nz * Jn + tz * Jt;
+    car.vx += jx / mP; car.vz += jz / mP;
+    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR);
+    var scrape = impact < CRASH_V;
+    if (!scrape) {
+      // Knautschzone: zusätzlicher Tempoverlust nach Aufprall und Massenverhältnis (gegen schwere Autos mehr)
+      var heavy = invA ? mA / (mA + mP) : 1, keep = 1 - Math.min(0.35, impact * CRUMPLE * 1.3 * heavy);
+      car.vx *= keep; car.vz *= keep;
+      car.hitT = Math.max(car.hitT || 0, Math.min(HIT_T, 0.12 + impact * 0.035));
+      car.steer *= 0.5;
+    }
+    var fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw), lx = -Math.sin(car.yaw), lz = -Math.cos(car.yaw);
+    car.u = car.vx * fx + car.vz * fz; car.w = car.vx * lx + car.vz * lz;
+    res.impact = impact; res.scrape = scrape; res.jx = jx; res.jz = jz;
+    return res;
+  }
+
+  var CHUNK = 0.3;
+  function stepContacts(car, inp, dt, me, others, onHit) {
+    others = others || [];
+    var vmax = Math.hypot(car.vx, car.vz), i, o;
+    for (i = 0; i < others.length; i++) {
+      o = others[i];
+      var mv = o.x0 != null ? Math.hypot(o.x - o.x0, o.z - o.z0) / Math.max(dt, 1e-3) : Math.hypot(o.vx || 0, o.vz || 0);
+      vmax = Math.max(vmax, Math.hypot(car.vx, car.vz) + mv);
+    }
+    var n = others.length ? clamp(Math.ceil(vmax * Math.min(dt, 0.1) / CHUNK), 1, 12) : 1, rail = 0, hits = [];
+    for (var k = 1; k <= n; k++) {
+      step(car, inp, dt / n);
+      rail = Math.max(rail, car.rail);
+      for (i = 0; i < others.length; i++) {
+        o = others[i];
+        var f = k / n, pose = o;
+        if (o.x0 != null && f < 1) {
+          pose = { x: o.x0 + (o.x - o.x0) * f, z: o.z0 + (o.z - o.z0) * f, yaw: o.yaw0 + wrapAngle(o.yaw - o.yaw0) * f,
+            len: o.len, w: o.w, vx: o.vx, vz: o.vz, mass: o.mass };
+        }
+        var reach = (o.len + (me && me.len > 0 ? me.len : car.P.len)) / 2 + 1;
+        if (Math.abs(pose.x - car.x) > reach || Math.abs(pose.z - car.z) > reach) continue;
+        var h = collide(car, me, pose);
+        if (h) { h.o = o; hits.push(h); if (onHit) onHit(o, h); }
+      }
+    }
+    car.rail = rail;
+    return { rail: rail, hits: hits };
   }
 
   function speedKmh(car) { return Math.abs(car.u) / car.P.vtop * car.P.realVmax; }
@@ -268,6 +398,6 @@
 
   return {
     params: params, trackInfo: trackInfo, project: project, create: create, step: step, reset: reset,
-    speedKmh: speedKmh, nitroReady: nitroReady, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
+    speedKmh: speedKmh, nitroReady: nitroReady, overlap: overlap, collide: collide, stepContacts: stepContacts, CRASH_V: CRASH_V, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
   };
 });

@@ -7,14 +7,19 @@
  *                                    Staub statt Spur.
  *   fx.watch(id, pose, dt, surface)  Fremd-/KI-Autos: Rutschen aus Fahrtrichtung gegen Blickrichtung geschätzt (günstig,
  *                                    aus den gezeichneten Lagen), dann wie drive(); → geschätztes Tempo (m/s)
- *   fx.update(dt, w, h)              Spuren verblassen lassen, Qualm bewegen (Rand-Fade zum Bildrand)
+ *   fx.crash(x, z, level, nx, nz)    Auto-Crash am Kontaktpunkt: Funkenregen + Splitter (Kunststoff/Glas), level 0..1,
+ *                                    (nx, nz) = Stoßnormale (Funken fliegen bevorzugt seitlich davon weg)
+ *   fx.scrape(x, z, level, dt, tx, tz) Schrammen längs eines anderen Autos: Funkenstrom je Bild, level 0..1, (tx, tz) =
+ *                                    Gleitrichtung
+ *   fx.update(dt, w, h)              Spuren verblassen lassen, Qualm/Funken/Splitter bewegen (Rand-Fade zum Bildrand)
  *   fx.clear()                       alles weg (neues Rennen); fx.forget(id) Spur eines Autos abreißen
  *   fx.setGround(fn)                 Geländehöhe fn(x, z) (js/car-track-scene.js heightAt; null = flach): Spuren und
  *                                    Qualm liegen darauf
  *
  * Spuren: ein Ringpuffer aus MAX_SEG Vierecken in EINER Geometrie (Alpha je Ecke, eigener kleiner Shader mit Nebel),
  * verblassen nach MARK_LIFE s. Qualm: Sprite-Pool (höchstens MAXP, bei reduzierter Bewegung kaum), Rand-Fade wie in
- * js/car-race.js – Teilchen ploppen nie hart am Bildrand.
+ * js/car-race.js – Teilchen ploppen nie hart am Bildrand. Funken/Splitter: eigener kleiner Pool (MAXS, bei reduzierter
+ * Bewegung nur eine Handvoll), Schwerkraft, Splitter hüpfen am Boden aus, gleicher Rand-Fade.
  */
 (function (root) {
   'use strict';
@@ -86,7 +91,9 @@
     }
     var TEX = {
       smoke: softTex([[0, 'rgba(236,236,240,0.85)'], [0.5, 'rgba(220,220,226,0.4)'], [1, 'rgba(210,210,216,0)']]),
-      dust: softTex([[0, 'rgba(214,196,156,0.85)'], [0.5, 'rgba(198,178,138,0.38)'], [1, 'rgba(190,170,130,0)']])
+      dust: softTex([[0, 'rgba(214,196,156,0.85)'], [0.5, 'rgba(198,178,138,0.38)'], [1, 'rgba(190,170,130,0)']]),
+      spark: softTex([[0, 'rgba(255,255,236,1)'], [0.25, 'rgba(255,214,120,0.9)'], [0.6, 'rgba(255,140,40,0.35)'], [1, 'rgba(255,100,20,0)']]),
+      shard: softTex([[0, 'rgba(70,72,80,1)'], [0.55, 'rgba(48,50,56,0.9)'], [0.75, 'rgba(40,40,46,0.3)'], [1, 'rgba(30,30,36,0)']])
     };
     var MAXP = reduce ? 10 : 140, puffs = [], pool = { smoke: [], dust: [] }, pv = new THREE.Vector3();
     function puff(kind, x, z, a, vx, vz) {
@@ -100,6 +107,28 @@
       var r = Math.random;
       puffs.push({ s: sp, age: 0, life: (reduce ? 0.9 : 1.1) + r() * 0.8, size0: 0.6 + r() * 0.4, grow: reduce ? 0.8 : 2.2 + r() * 1.2,
         vx: (vx || 0) * 0.25 + (r() - 0.5) * 1.1, vy: 0.5 + r() * 0.7, vz: (vz || 0) * 0.25 + (r() - 0.5) * 1.1, a: a });
+    }
+
+    // ---- Funken + Splitter (Crash/Schrammen) ----
+    var MAXS = reduce ? 8 : 160, bits = [], bitPool = { spark: [], shard: [] };
+    function bit(kind, x, y, z, vx, vy, vz, life, size) {
+      if (bits.length >= MAXS) return;   // voll: verwerfen
+      var sp = bitPool[kind].pop();
+      if (!sp) {
+        sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX[kind], transparent: true, depthWrite: false, opacity: 0,
+          blending: kind === 'spark' ? THREE.AdditiveBlending : THREE.NormalBlending }));
+        sp.userData.kind = kind; scene.add(sp);
+      }
+      sp.visible = true; sp.material.opacity = 0; sp.position.set(x, y, z); sp.scale.setScalar(size);
+      bits.push({ s: sp, age: 0, life: life, vx: vx, vy: vy, vz: vz, size: size, spark: kind === 'spark' });
+    }
+    function sparks(x, z, n, speed, dx, dz, spread) {
+      var y = gy(x, z) + 0.45, r = Math.random;
+      for (var i = 0; i < n; i++) {
+        var a = (r() - 0.5) * spread, c = Math.cos(a), sn = Math.sin(a), v = speed * (0.4 + r() * 0.8);
+        bit('spark', x + (r() - 0.5) * 0.3, y + r() * 0.3, z + (r() - 0.5) * 0.3,
+          (dx * c - dz * sn) * v, 1 + r() * 3, (dx * sn + dz * c) * v, 0.25 + r() * 0.35, 0.16 + r() * 0.14);
+      }
     }
 
     var watched = {};
@@ -143,6 +172,29 @@
         api.drive(id, pose, slip, { speed: sp, surface: surface || 'asphalt', vx: vx, vz: vz, dt: dt });
         return sp;
       },
+      crash: function (x, z, level, nx, nz) {
+        level = clamp(level || 0, 0, 1);
+        if (level <= 0) return;
+        var r = Math.random, tx = -(nz || 0), tz = nx || 1;
+        // Funken nach beiden Seiten längs der Berührung + etwas weg von der Normalen
+        var n = Math.round((reduce ? 3 : 26) * level) + (reduce ? 1 : 4);
+        sparks(x, z, Math.ceil(n / 2), 6 + 8 * level, tx, tz, 1.6);
+        sparks(x, z, Math.floor(n / 2), 6 + 8 * level, -tx, -tz, 1.6);
+        if (level > 0.3) {
+          var m = Math.round((reduce ? 1 : 12) * level), y = gy(x, z) + 0.5;
+          for (var i = 0; i < m; i++) {
+            var a = r() * Math.PI * 2, v = 2 + r() * 4 * level;
+            bit('shard', x, y + r() * 0.3, z, Math.cos(a) * v + (nx || 0) * 2, 2 + r() * 3.5 * level, Math.sin(a) * v + (nz || 0) * 2,
+              1.2 + r() * 1.2, 0.1 + r() * 0.12);
+          }
+          puff('smoke', x, z, 0.25 + 0.2 * level, 0, 0);
+        }
+      },
+      scrape: function (x, z, level, dt, tx, tz) {
+        level = clamp(level || 0, 0, 1);
+        var rate = (reduce ? 3 : 45) * level * (dt || 1 / 60), n = Math.floor(rate) + (Math.random() < rate % 1 ? 1 : 0);
+        if (n > 0) sparks(x, z, n, 3 + 6 * level, -(tx || 0), -(tz || 0), 0.9);
+      },
       forget: function (id) { delete trails[id]; delete watched[id]; },
       update: function (dt, W, H) {
         now += dt;
@@ -168,13 +220,31 @@
           var ef = pv.z > 1 ? 0 : clamp(edge / (Math.min(W, H) * 0.12), 0, 1);
           p.s.material.opacity = p.a * Math.min(1, p.age / 0.15) * (1 - k) * ef;
         }
+        for (var j = bits.length - 1; j >= 0; j--) {
+          var b = bits[j]; b.age += dt;
+          if (b.age >= b.life) { b.s.visible = false; bitPool[b.s.userData.kind].push(b.s); bits.splice(j, 1); continue; }
+          var bp = b.s.position;
+          b.vy -= (b.spark ? 9 : 14) * dt;
+          bp.x += b.vx * dt; bp.y += b.vy * dt; bp.z += b.vz * dt;
+          var floor = gy(bp.x, bp.z) + 0.06;
+          if (bp.y < floor) { bp.y = floor; b.vy = Math.abs(b.vy) * (b.spark ? 0.25 : 0.35); b.vx *= 0.6; b.vz *= 0.6; }
+          if (b.spark) { b.vx *= 1 - dt * 2; b.vz *= 1 - dt * 2; }
+          var kb = b.age / b.life;
+          if (b.spark) b.s.scale.setScalar(b.size * (1 - 0.6 * kb));
+          pv.copy(bp).project(cam);
+          var bx = (pv.x * 0.5 + 0.5) * W, by = (1 - (pv.y * 0.5 + 0.5)) * H, be = Math.min(bx, W - bx, by, H - by);
+          var bf = pv.z > 1 ? 0 : clamp(be / (Math.min(W, H) * 0.12), 0, 1);
+          b.s.material.opacity = (b.spark ? 1 - kb * kb : Math.min(1, (1 - kb) * 3)) * bf;
+        }
       },
       clear: function () {
         born.fill(-1e9); trails = {}; watched = {}; dirty = true;
         puffs.forEach(function (p) { p.s.visible = false; pool[p.s.userData.kind].push(p.s); });
         puffs = [];
+        bits.forEach(function (b) { b.s.visible = false; bitPool[b.s.userData.kind].push(b.s); });
+        bits = [];
       },
-      count: function () { return { puffs: puffs.length, marks: Array.prototype.filter.call(born, function (b) { return now - b < MARK_LIFE; }).length }; }
+      count: function () { return { puffs: puffs.length, bits: bits.length, marks: Array.prototype.filter.call(born, function (b) { return now - b < MARK_LIFE; }).length }; }
     };
     return api;
   }

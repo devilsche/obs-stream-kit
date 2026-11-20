@@ -20,6 +20,9 @@
  *                                    m.stop(); gain = Anteil am Pegel (eigenes Auto 1, andere leiser)
  *   s.skid(level), s.rumble(level)   Dauer-Quietschen (Rutschen/Handbremse) bzw. Kies-/Gras-Rumpeln, 0..1, je Bild
  *   s.jingle(big)                    kurze Tonfolge für eine Runde (big = Rekord)
+ *   s.crash(level)                   Blech-Crash Auto ↔ Auto, 0..1 (dumpfer Schlag + Knirschen + Blechklang, ab 0,6
+ *                                    Splittern), höchstens alle 0,12 s
+ *   s.scrape(level)                  Dauer-Schrammen Blech an Blech, 0..1, je Bild (0 = aus)
  *
  * Alles läuft über einen Master-Pegel und einen Kompressor/Begrenzer – nie laute Spitzen, insgesamt dezent.
  */
@@ -70,7 +73,7 @@
     }
 
     // ---- Dauerklänge ----
-    var eng = null, fireG = null, fireNext = 0, lastWhoosh = -1, motors = [], skidN = null, rumbleG = null;
+    var eng = null, fireG = null, fireNext = 0, lastWhoosh = -1, motors = [], skidN = null, rumbleG = null, scrapeN = null, lastCrash = -1;
     function engineNodes() {
       if (eng) return eng;
       var out = ctx.createGain(); out.gain.value = 0; out.connect(master);
@@ -160,7 +163,7 @@
       silence: function () {
         api.engine(false); if (fireG) fireG.gain.setTargetAtTime(0, now(), 0.2);
         motors.forEach(function (m) { m.set(false); });
-        api.skid(0); api.rumble(0);
+        api.skid(0); api.rumble(0); api.scrape(0);
       },
       setVolume: function (v) {
         vol = Math.max(0, Math.min(1, +v || 0));
@@ -223,6 +226,40 @@
           n.connect(lp); lp.connect(am); am.connect(rumbleG); rumbleG.connect(master); n.start(); lfo.start();
         }
         rumbleG.gain.setTargetAtTime(0.09 * level, now(), 0.08);
+      },
+      crash: function (level) {
+        var t = now();
+        level = Math.max(0, Math.min(1, level || 0));
+        if (level <= 0 || t - lastCrash < 0.12) return;
+        lastCrash = t;
+        var k = 0.35 + 0.65 * level;
+        tone('sine', 95 + 30 * (1 - level), t, 0.004, 0.32 * k, 0.22 + 0.25 * level, 34);   // dumpfer Schlag
+        burst('lowpass', 1400, 0.8, t, 0.003, 0.2 * k, 0.16 + 0.22 * level, 260);           // Knirschen
+        burst('bandpass', 2400, 3, t + 0.012, 0.002, 0.09 * k, 0.1 + 0.12 * level, 900);
+        [430, 690, 1130].forEach(function (f, i) {                                          // Blech schwingt nach
+          tone('triangle', f * (0.92 + 0.16 * Math.random()), t + 0.008 * i, 0.002, 0.035 * k, 0.25 + 0.35 * level, f * 0.86);
+        });
+        if (level > 0.6) {                                                                  // Splittern
+          for (var i = 0; i < 5; i++) burst('highpass', 5200 + i * 600, 1.5, t + 0.04 + i * 0.035 + Math.random() * 0.02, 0.002, 0.04 * level, 0.07);
+        }
+      },
+      scrape: function (level) {
+        level = Math.max(0, Math.min(1, level || 0));
+        if (!scrapeN && level <= 0) return;
+        if (!scrapeN) {
+          var n = noise(true), bp = ctx.createBiquadFilter(), bp2 = ctx.createBiquadFilter(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+          var am = ctx.createGain(), g = ctx.createGain();
+          bp.type = 'bandpass'; bp.frequency.value = 2100; bp.Q.value = 2.5;
+          bp2.type = 'bandpass'; bp2.frequency.value = 3400; bp2.Q.value = 6;
+          lfo.frequency.value = 31; lg.gain.value = 0.45; lfo.connect(lg); am.gain.value = 0.6; lg.connect(am.gain);
+          g.gain.value = 0;
+          n.connect(bp); n.connect(bp2); bp.connect(am); bp2.connect(am); am.connect(g); g.connect(master); n.start(); lfo.start();
+          scrapeN = { g: g, bp: bp, lfo: lfo };
+        }
+        var t = now();
+        scrapeN.g.gain.setTargetAtTime(0.11 * level, t, level > 0 ? 0.03 : 0.1);
+        scrapeN.bp.frequency.setTargetAtTime(1700 + 900 * level, t, 0.08);
+        scrapeN.lfo.frequency.setTargetAtTime(22 + 25 * level, t, 0.1);
       },
       jingle: function (big) {
         var t = now(), notes = big ? [659.25, 783.99, 987.77, 1318.51] : [783.99, 1046.5];
