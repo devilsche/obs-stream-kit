@@ -13,11 +13,18 @@
  *                              optional Hintergrundfarbe (Car Drive; das Overlay bleibt durchsichtig, der Himmel ist
  *                              eine Kuppel in der Gruppe),
  *       update(dt)             Fahnen, Wellen, Leuchtturm (bei reduzierter Bewegung steht alles),
+ *       props                  Promise → propStats, sobald alle Kulissen-Modelle geladen/eingesetzt sind,
+ *       propStats              { loaded: [key], failed: [key], tris, draws } der eingesetzten Kulissen-Modelle,
  *       dispose()              entfernt alles, gibt frei und setzt Licht/Nebel zurück }
+ *   opts.propGate()            optional: false = gerade keine Modelle laden/einsetzen (Car Race: während des Rennens)
+ *   Kulissen-Modelle (Sketchfab, data/track-props, scripts/build_track_props.py): nach dem Aufbau nachgeladen, ersetzen
+ *   je Platz die prozedurale Deko einer Art (ctx.kind(…, { prop })); fehlt der Katalog oder ein Modell, bleibt die
+ *   prozedurale Deko. Vorlagen bleiben für die Seite im Speicher (nächstes Rennen ohne neues Laden).
  *   T = CarRaceSim.track(seed); primary/accent = Farben für Portal/Dächer (CSS-Farbtext oder Zahl);
  *   group noch nicht in der Szene (Aufrufer: scene.add(res.group)).
- *   decor = { objs: [{ o, r }], inst: [{ meshes, spots: [{ x, z, r, hidden }] }] } – was Kamerafahrten (Podest,
- *   Vorstellung) im Weg stehen kann; inst = Instanzen, ausblenden über eine Null-Matrix.
+ *   decor = { objs: [{ o, r }], inst: [{ meshes, spots: [{ x, z, r, hidden }], setHidden(i, bool) }] } – was
+ *   Kamerafahrten (Podest, Vorstellung) im Weg stehen kann; inst = Instanzen, ausblenden über setHidden (setzt die
+ *   prozedurale Instanz und ein eingesetztes Kulissen-Modell auf eine Null-Matrix).
  *   Kiesbett-Regel: außen an Kurven (|curv| > 1/60, ±14 m), wo der Auslauf > 3 m ist – dieselbe Regel nutzt
  *   js/car-drive-phys.js (trackInfo) für die Fahrphysik.
  * Deko steht nie im Auslauf (≥ 14 m neben der Fahrbahn), Ausnahme: Banden/Reifenstapel/Zaun direkt hinter der Leitplanke.
@@ -33,6 +40,102 @@
   var PLAIN = { id: 'plain', flat: true, sky: { top: 0x6fa8dc, horizon: 0xcfe2f3 }, fog: { near: 420, far: 1700 }, sun: { color: 0xffffff, k: 1 },
     hemi: { sky: 0xffffff, ground: 0x5a6070, k: 1 }, fill: 1, exposure: 1, groundTex: { base: [232, 232, 232], spread: 0.22 },
     height: function () { return function () { return 0; }; }, groundColor: function () { return function () { return 0x4a763a; }; } };
+
+  // ---- Kulissen-Modelle (Sketchfab, scripts/build_track_props.py → data/track-props) ----
+  // Katalog { props: [{ uid, kind, slot, theme, size: [x, y, z] (m), sink, bytes, … }], credits } und je Modell eine
+  // Vorlage (Teile je Material zusammengefasst). Beides bleibt für die ganze Seite im Speicher – das nächste Rennen
+  // nimmt dieselben Vorlagen (dispose() einer Strecke gibt nur die Instanzen frei). Fehlt etwas: prozedurale Deko.
+  var PROP_BASE = (function () {
+    var s = root.document && document.currentScript && document.currentScript.src || '';
+    var m = /^(.*\/s\/[^/]+\/)/.exec(s) || /^(.*\/)js\/car-track-scene\.js/.exec(s);
+    return m ? m[1] : null;
+  })();
+  var propCatalog = null, propTpl = {};
+  function loadPropCatalog() {
+    if (propCatalog) return propCatalog;
+    if (!PROP_BASE || !root.fetch || !THREE.GLTFLoader) return (propCatalog = Promise.resolve({ props: [], credits: [] }));
+    return (propCatalog = fetch(PROP_BASE + 'api/fx/track-props/catalog.json', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (c) { return { props: Array.isArray(c && c.props) ? c.props : [], credits: Array.isArray(c && c.credits) ? c.credits : [] }; })
+      .catch(function () { return { props: [], credits: [] }; }));
+  }
+  // Vorlage: alle Netze in Modell-Koordinaten (die Datei ist schon normiert: Meter, Fuß auf y = 0, Mitte x = z = 0),
+  // je Material zu einem Netz zusammengefasst → { parts: [{ geo, mat }], size }
+  function loadPropTpl(e) {
+    if (propTpl[e.uid]) return propTpl[e.uid];
+    return (propTpl[e.uid] = new Promise(function (res, rej) {
+      new THREE.GLTFLoader().load(PROP_BASE + 'api/fx/track-props/' + e.uid + '.glb' + (e.bytes ? '?v=' + e.bytes : ''), function (gl) {
+        try { res(propParts(gl.scene, e)); } catch (err) { rej(err); }
+      }, null, rej);
+    }));
+  }
+  function propParts(sceneObj, e) {
+    var BGU = THREE.BufferGeometryUtils, groups = {}, order = [];
+    sceneObj.updateMatrixWorld(true);
+    sceneObj.traverse(function (o) {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+      var mats = Array.isArray(o.material) ? o.material : [o.material];
+      if (mats.length !== 1) return;   // Mehrfach-Material kommt aus dem GLTFLoader nicht vor
+      var m = mats[0], k = m.uuid;
+      if (!groups[k]) { groups[k] = { mat: m, list: [] }; order.push(k); }
+      groups[k].list.push(o);
+    });
+    // einfarbige Materialien (ohne Textur, undurchsichtig, nicht leuchtend) zu einem Material mit Ecken-Farbe
+    // zusammenlegen – Low-Poly-Modelle haben oft Dutzende davon (je eins ein Zeichenaufruf)
+    var plain = {};
+    order = order.filter(function (k) {
+      var m = groups[k].mat;
+      var flat = m.isMeshStandardMaterial && !m.vertexColors && !m.transparent && !m.map && !m.emissiveMap && !m.alphaMap &&
+        !m.normalMap && !m.aoMap && !m.roughnessMap && !m.metalnessMap && !(m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0.01) && !m.alphaTest;
+      if (!flat) return true;
+      var key = 'plain|' + m.side;
+      if (!plain[key]) {
+        plain[key] = groups[key] = { mat: new THREE.MeshStandardMaterial({ vertexColors: true, side: m.side, roughness: 0, metalness: 0 }), list: [], plain: true, n: 0 };
+        order.push(key);
+      }
+      var pg = plain[key];
+      pg.mat.roughness += m.roughness; pg.mat.metalness += m.metalness; pg.n++;
+      groups[k].list.forEach(function (o) {
+        var gg = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(), n = gg.attributes.position.count, cols = new Float32Array(n * 3);
+        for (var i = 0; i < n; i++) { cols[i * 3] = m.color.r; cols[i * 3 + 1] = m.color.g; cols[i * 3 + 2] = m.color.b; }
+        gg.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+        if (!gg.attributes.normal) gg.computeVertexNormals();
+        pg.list.push({ geometry: gg, matrixWorld: o.matrixWorld, tmp: true });
+      });
+      return false;
+    });
+    Object.keys(plain).forEach(function (k) { var pg = plain[k]; pg.mat.roughness /= pg.n; pg.mat.metalness /= pg.n; });
+    var parts = [], box = new THREE.Box3();
+    order.forEach(function (k) {
+      var gr = groups[k], mixed = gr.list.some(function (o) { return !o.geometry.index; });
+      var names = ['position', 'normal', 'uv', 'color'].filter(function (a) {
+        return gr.list.every(function (o) { var x = o.geometry.attributes[a]; return x && !x.isInterleavedBufferAttribute && x.itemSize === gr.list[0].geometry.attributes[a].itemSize; });
+      });
+      var geos = gr.list.map(function (o) {
+        var src = mixed && o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, gg = new THREE.BufferGeometry();
+        names.forEach(function (a) { gg.setAttribute(a, src.attributes[a].clone()); });
+        if (!mixed && src.index) gg.setIndex(src.index.clone());
+        gg.applyMatrix4(o.matrixWorld);
+        if (src !== o.geometry) src.dispose();
+        if (o.tmp) o.geometry.dispose();
+        return gg;
+      });
+      var merged = geos.length === 1 ? geos[0] : (BGU && BGU.mergeBufferGeometries ? BGU.mergeBufferGeometries(geos, false) : null);
+      if (merged) { if (merged !== geos[0]) geos.forEach(function (x) { x.dispose(); }); merged = [merged]; } else merged = geos;
+      var mat = gr.mat;   // Seite (einseitig/beidseitig) wie in der Datei – Umriss-Hüllen (Toon-Outline) brauchen einseitig
+      if (mat.envMapIntensity != null) mat.envMapIntensity = 0.6;
+      if (!gr.plain && names.indexOf('color') < 0) mat.vertexColors = false;
+      merged.forEach(function (gg) {
+        if (!gg.attributes.normal) gg.computeVertexNormals();
+        gg.computeBoundingBox(); box.union(gg.boundingBox);
+        parts.push({ geo: gg, mat: mat });
+      });
+    });
+    var sz = box.isEmpty() ? new THREE.Vector3(1, 1, 1) : box.getSize(new THREE.Vector3());
+    var tris = 0;
+    parts.forEach(function (p) { tris += (p.geo.index ? p.geo.index.count : p.geo.attributes.position.count) / 3; });
+    return { parts: parts, size: sz, tris: tris, sink: +e.sink || 0 };
+  }
 
   function build(T, opts) {
     opts = opts || {};
@@ -299,14 +402,20 @@
       return (MATS[key] = own(m));
     }
     var kinds = [], bgKits = [], occ = new Map(), occR = 0, OCC = 6;
-    // Art registrieren: parts = [{ geo, mat }] (alle Teile teilen die Plätze), o = { r (Radius bei Größe 1), tint }
+    // Art registrieren: parts = [{ geo, mat }] (alle Teile teilen die Plätze; [] = nur Kulissen-Modell, ohne Ersatz),
+    // o = { r (Radius bei Größe 1), tint, prop }. prop = { slot (Katalog-Feld slot, sonst kind), box: { w, d, h } (Platz
+    // in m, lokal x/z/y – das Modell wird nur verkleinert, nie vergrößert), yaw (Zusatzdrehung), y (Höhe über dem Platz),
+    // front (Vorderkante auf lokal z), tile (kleine Modelle entlang x nebeneinander, bis box.w voll ist),
+    // onProp(spot, { height, scale }) } – Modelle derselben Art wechseln sich je Platz
+    // ab (Reihenfolge des Katalogs, unabhängig davon, welches zuerst geladen ist)
     ctx.kind = function (name, parts, o) {
-      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), spots: [] };
+      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), spots: [], prop: (o && o.prop) || null };
       parts.forEach(function (p) { own(p.geo); });
+      // a.abs: y ist absolut (nicht über dem Gelände) – z. B. auf einer Insel im Meer
       kd.add = function (x, z, a) {
         a = a || {};
         var s = a.s || 1;
-        kd.spots.push({ x: x, z: z, rot: a.rot || 0, s: s, y: a.y || 0, tint: a.tint, r: kd.r * s, hidden: false });
+        kd.spots.push({ x: x, z: z, rot: a.rot || 0, s: s, y: a.y || 0, abs: !!a.abs, tint: a.tint, r: kd.r * s, hidden: false, prop: null });
       };
       kinds.push(kd);
       return kd;
@@ -410,12 +519,16 @@
       [0, Math.PI].forEach(function (r) { var c = new THREE.Mesh(geo, bm); c.rotation.y = r; c.rotation.z = -0.06; grp.add(c); });
       g.add(grp); decor.objs.push({ o: grp, r: 9 });
       anims.push(function (dt) { grp.rotation.y += dt * 0.55; });
+      return grp;
     };
     ctx.bg = function (kit) { if (kit && !kit.empty()) bgKits.push(kit); };
     if (theme.decorate) theme.decorate(ctx);
 
     // Instanzen bauen: je Art und Teil ein InstancedMesh (Matrizen aus den Plätzen, Höhe = Gelände)
     var mtx = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), yAx = new THREE.Vector3(0, 1, 0), white1 = new THREE.Color(1, 1, 1);
+    var ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+    function spotY(s) { return s.abs ? s.y : groundAt(s.x, s.z) + s.y; }
+    function spotMatrix(s, out) { qt.setFromAxisAngle(yAx, s.rot); sc.setScalar(s.s); ps.set(s.x, spotY(s), s.z); return out.compose(ps, qt, sc); }
     kinds.forEach(function (kd) {
       if (!kd.spots.length) return;
       var meshes = kd.parts.map(function (p) {
@@ -423,14 +536,107 @@
         var im = own(new THREE.InstancedMesh(p.geo, mat(p.mat || 'v', tinted ? 'it' : 'i'), kd.spots.length));
         im.frustumCulled = false;   // Instanzen liegen überall – die Kugel der Grundform passt nicht
         kd.spots.forEach(function (s, i) {
-          qt.setFromAxisAngle(yAx, s.rot); sc.setScalar(s.s); ps.set(s.x, groundAt(s.x, s.z) + s.y, s.z);
-          mtx.compose(ps, qt, sc); im.setMatrixAt(i, mtx);
+          im.setMatrixAt(i, spotMatrix(s, mtx));
           if (tinted) im.setColorAt(i, s.tint != null ? lin(s.tint) : white1);
         });
         im.instanceMatrix.needsUpdate = true;
         g.add(im); return im;
       });
-      decor.inst.push({ name: kd.name, meshes: meshes, spots: kd.spots });
+      kd.meshes = meshes; kd.propSets = [];
+      var entry = { name: kd.name, meshes: meshes, spots: kd.spots };
+      // Platz i aus-/einblenden (Kamerafahrten): gilt für die prozedurale Deko und das Kulissen-Modell an diesem Platz
+      entry.setHidden = function (i, hidden) { kd.spots[i].hidden = !!hidden; applySpot(kd, i); };
+      decor.inst.push(entry);
+    });
+    // Platz i neu setzen: Modell geladen → prozedurale Instanz auf null, Modell-Instanzen sichtbar (außer ausgeblendet)
+    function applySpot(kd, i) {
+      var s = kd.spots[i], procOn = !s.hidden && s.prop == null;
+      spotMatrix(s, mtx);
+      // alle Plätze mit Modell → prozedurale Art gar nicht mehr zeichnen (spart den Zeichenaufruf)
+      var anyProc = kd.spots.some(function (x) { return x.prop == null; });
+      kd.meshes.forEach(function (m) { m.setMatrixAt(i, procOn ? mtx : ZERO_M); m.instanceMatrix.needsUpdate = true; m.visible = anyProc; });
+      kd.propSets.forEach(function (ps1) {
+        ps1.slots.forEach(function (sl, j) {
+          if (sl.spot !== i) return;
+          ps1.meshes.forEach(function (m) { m.setMatrixAt(j, s.hidden ? ZERO_M : sl.m); m.instanceMatrix.needsUpdate = true; });
+        });
+      });
+    }
+
+    // ---- Kulissen-Modelle: nach dem Aufbau nachladen (die Strecke steht sofort mit prozeduraler Deko) ----
+    // opts.propGate() → false: gerade nicht laden/tauschen (Car Race: während des Rennens), später nochmal
+    var disposed = false, propStats = { loaded: [], failed: [], tris: 0, draws: 0 };
+    function propsFor(kd, cat) {
+      var slot = kd.prop.slot || kd.name;
+      return cat.props.filter(function (e) { return e && e.uid && (e.slot || e.kind) === slot && (!e.theme || e.theme === theme.id); });
+    }
+    function gateThen(fn) {
+      if (disposed) return;
+      if (opts.propGate && !opts.propGate()) { setTimeout(function () { gateThen(fn); }, 1000); return; }
+      fn();
+    }
+    function swapIn(kd, v, nVar, tpl) {
+      var P0 = kd.prop, box = P0.box || {}, size = tpl.size, yaw = P0.yaw || 0;
+      // nur verkleinern: größte Ausdehnung muss in den reservierten Platz passen
+      var k = Math.min(1, box.w ? box.w / size.x : 1, box.d ? box.d / size.z : 1, box.h ? box.h / size.y : 1);
+      // front: Vorderkante (−z) des Modells auf lokal z = front (Tribüne: erste Reihe wie bei der prozeduralen)
+      var oz = P0.front != null ? P0.front + size.z * k / 2 : 0, oy = (P0.y || 0) - tpl.sink * size.y * k;
+      var n = 1, step = 0;
+      if (P0.tile && box.w) { step = size.x * k * 1.04; n = Math.max(1, Math.min(6, Math.floor(box.w / step))); }
+      var slots = [], m4 = new THREE.Matrix4(), off = new THREE.Matrix4();
+      kd.spots.forEach(function (s, i) {
+        if (i % nVar !== v) return;
+        for (var t = 0; t < n; t++) {
+          var lx = (t - (n - 1) / 2) * step;
+          spotMatrix(s, m4);
+          // lokal: Versatz entlang x (Kacheln), Absenken (Fuß im Wasser/Gelände), Zusatzdrehung, Maßstab
+          off.compose(new THREE.Vector3(lx, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k, k));
+          slots.push({ spot: i, m: new THREE.Matrix4().multiplyMatrices(m4, off) });
+        }
+      });
+      if (!slots.length) return;
+      var meshes = tpl.parts.map(function (p) {
+        var im = own(new THREE.InstancedMesh(p.geo, p.mat, slots.length));
+        im.frustumCulled = false;
+        slots.forEach(function (sl, j) { im.setMatrixAt(j, sl.m); });
+        im.instanceMatrix.needsUpdate = true;
+        g.add(im); return im;
+      });
+      kd.propSets.push({ meshes: meshes, slots: slots });
+      propStats.tris += tpl.tris * slots.length; propStats.draws += meshes.length;
+      var seen = {};
+      slots.forEach(function (sl) {
+        var s = kd.spots[sl.spot];
+        s.prop = v;
+        if (!seen[sl.spot]) { seen[sl.spot] = 1; applySpot(kd, sl.spot); if (P0.onProp) P0.onProp(s, { height: size.y * k * s.s, scale: k }); }
+      });
+    }
+    var propsReady = new Promise(function (resolve) {
+      var users = kinds.filter(function (kd) { return kd.prop && kd.spots.length && kd.meshes; });
+      if (!users.length) { resolve(propStats); return; }
+      // erst nach dem ersten Bild der Strecke anfangen (Laden/Aufbereiten kostet Zeit auf dem Haupt-Thread)
+      setTimeout(function () {
+        gateThen(function () {
+          loadPropCatalog().then(function (cat) {
+            var jobs = [];
+            users.forEach(function (kd) {
+              var list = propsFor(kd, cat);
+              list.forEach(function (e, v) {
+                jobs.push(function () {
+                  return loadPropTpl(e).then(function (tpl) {
+                    return new Promise(function (ok) { gateThen(function () { if (!disposed) { swapIn(kd, v, list.length, tpl); propStats.loaded.push(e.key || e.uid); } ok(); }); });
+                  }, function () { propStats.failed.push(e.key || e.uid); });
+                });
+              });
+            });
+            // nacheinander, mit Luft dazwischen (kein Ruckeln durch mehrere Modelle in einem Bild)
+            (function next() {
+              if (disposed || !jobs.length) { resolve(propStats); return; }
+              jobs.shift()().then(function () { setTimeout(next, 60); });
+            })();
+          });
+        });
+      }, 250);
     });
     // Hintergrund: alles in eine Geometrie (ein Zeichenaufruf)
     if (bgKits.length) {
@@ -499,12 +705,15 @@
     return {
       group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
       heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update,
+      props: propsReady, propStats: propStats,
       dispose: function () {
+        disposed = true;
         restoreEnv();
         if (g.parent) g.parent.remove(g);
         owned.forEach(function (x) { if (x && x.dispose) x.dispose(); }); owned = [];
       }
     };
   }
-  root.CarTrackScene = { build: build };
+  // Quellenangaben der Kulissen-Modelle (CC BY) für Übersichtsseiten: Promise → [{ name, author, license, url, kind, theme }]
+  root.CarTrackScene = { build: build, propCredits: function () { return loadPropCatalog().then(function (c) { return c.credits; }); } };
 })(typeof window !== 'undefined' ? window : this);

@@ -42,6 +42,12 @@
     .swatches { display: flex; gap: 4px; flex-wrap: wrap; }
     .sw { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); }
     .swo { background: conic-gradient(#c33, #3c3, #33c, #c33); }
+    /* Quellen der Strecken-Kulissen (CC BY: Namensnennung), Katalog /api/fx/track-props/catalog.json */
+    .credits { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
+    .credits h2 { font-size: 18px; margin: 0 0 4px; }
+    .credits ul { margin: 8px 0 0; padding-left: 20px; columns: 2 320px; }
+    .credits li { margin: 0 0 4px; break-inside: avoid; }
+    .credits a { color: var(--text); }
   </style>
 </head>
 <body>
@@ -61,6 +67,12 @@
     <p id="status" role="status" aria-live="polite">Loading …</p>
     <ul class="grid" id="cars"></ul>
   </main>
+  <section class="credits" aria-labelledby="track-credits-h">
+    <h2 id="track-credits-h">Track credits</h2>
+    <p class="sub">3D models in the Car Race and Car Drive track themes (landmarks, stands, bridges, buildings).</p>
+    <p class="sub" id="track-credits-status" role="status" aria-live="polite">Loading …</p>
+    <ul id="track-credits"></ul>
+  </section>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
@@ -119,6 +131,17 @@
         apply();
       }).catch(function () { $('status').textContent = 'Could not load the car list.'; });
       $('q').addEventListener('input', apply);
+      // Quellen der Strecken-Kulissen (Sketchfab, scripts/build_track_props.py)
+      fetch(TC.base() + 'api/fx/track-props/catalog.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (c) {
+        var list = (c && Array.isArray(c.credits)) ? c.credits : [];
+        $('track-credits-status').textContent = list.length ? '' : 'No track models yet.';
+        list.forEach(function (e) {
+          var li = el('li'), a = el('a', null, e.name);
+          a.href = e.url; a.target = '_blank'; a.rel = 'noopener';
+          li.append(a, document.createTextNode(' by ' + e.author + ' · ' + e.license + (e.theme ? ' · ' + e.theme : '')));
+          $('track-credits').appendChild(li);
+        });
+      }).catch(function () { $('track-credits-status').textContent = 'Could not load the track credits.'; });
       function apply() {
         var s = $('q').value.trim().toLowerCase(), n = 0;
         tiles.forEach(function (t) { var show = (brand === 'all' || t.e.brand === brand || (brand === 'rework' && t.rework)) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });

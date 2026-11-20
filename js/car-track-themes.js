@@ -143,14 +143,15 @@
       [-12, 0, 12].forEach(function (x) { st.add(box(0.4, 9.5, 0.4), 0x50555f, { x: x, y: 4.75, z: 8.6 }); });
       st.add(box(27, 0.4, 10.5), prim, { y: 9.2, z: 4.2, rx: -0.08 });
       st.add(box(27.2, 0.2, 0.3), acc, { y: 8.75, z: -0.9 });
-      var stand = ctx.kind('stand', [{ geo: st.geo() }], { r: 14 });
+      // Kulissen-Modelle (Tribünen/Sitzreihen): erste Reihe vorn wie die prozedurale, kleine nebeneinander bis 26 m
+      var stand = ctx.kind('stand', [{ geo: st.geo() }], { r: 14, prop: { slot: 'stand', box: { w: 26, d: 11, h: 12 }, front: -1, tile: true } });
       // Flutlichtmast: Gittermast (schlank), Kopf mit Lampenfeld (leuchtend)
       var ms = new Kit();
       ms.add(cyl(0.3, 0.55, 26, 6), 0x9ea4ad, { y: 12 });
       ms.add(box(5, 2.6, 0.5), 0x3a3f47, { y: 25.5, z: -0.2 });
       var lampK = new Kit();
       for (var a = 0; a < 4; a++) for (var b = 0; b < 2; b++) lampK.add(box(1, 0.95, 0.12), 0xfff6d8, { x: -1.8 + a * 1.2, y: 24.9 + b * 1.15, z: -0.5 });
-      var mast = ctx.kind('mast', [{ geo: ms.geo() }, { geo: lampK.geo(), mat: 'glow' }], { r: 3 });
+      var mast = ctx.kind('mast', [{ geo: ms.geo() }, { geo: lampK.geo(), mat: 'glow' }], { r: 3, prop: { slot: 'mast', box: { w: 9, d: 9, h: 30 } } });
       // Werbebande: Rahmen + helle Fläche (Farbe je Instanz), steht hinter der Leitplanke
       var bd = new Kit();
       bd.add(box(6, 1.1, 0.12), 0xffffff, { y: 0.75 });
@@ -204,6 +205,22 @@
         var sm = rnd() * L, sdm = rnd() < 0.5 ? 1 : -1, om = along(sm, sdm, HALF + 22 + rnd() * 14);
         if (!ctx.place(om.x, om.z, 3)) continue;
         mast.add(om.x, om.z, { rot: om.rot }); nm++;
+      }
+      // mobile Lichtmasten (nur als Kulissen-Modell, slot mobileLight) im Fahrerlager neben der Strecke
+      ctx.scatter(ctx.kind('mobileLight', [], { r: 2, prop: { slot: 'mobileLight', box: { w: 5, d: 5, h: 4 } } }), 6, { dmin: 18, dmax: 45, rad: 2.2 });
+      // Strahler auf Pfosten (nur als Kulissen-Modell, slot floodPost)
+      ctx.scatter(ctx.kind('floodPost', [], { r: 1.2, prop: { slot: 'floodPost', box: { w: 3, d: 3, h: 6 } } }), 6, { dmin: 16, dmax: 40, rad: 1.2 });
+      // 7-m-Lampenmasten: Mast prozedural, Kopf prozedural oder Kulissen-Modell (slot floodHead)
+      var pk7 = new Kit(), hk7 = new Kit(), hg7 = new Kit();
+      pk7.add(cyl(0.1, 0.16, 7, 6), 0x8d939b, { y: 3.5 });
+      hk7.add(box(1.2, 0.7, 0.35), 0x3a3f47, { y: 7.35 });
+      hg7.add(box(1.0, 0.5, 0.06), 0xfff6d8, { y: 7.35, z: -0.2 });
+      var pole7 = ctx.kind('floodPole', [{ geo: pk7.geo() }], { r: 1 });
+      var head7 = ctx.kind('floodHead', [{ geo: hk7.geo() }, { geo: hg7.geo(), mat: 'glow' }], { r: 1, prop: { slot: 'floodHead', box: { w: 1.6, d: 1.6, h: 1.6 }, y: 7 } });
+      for (var tf = 0, nf = 0; tf < 200 && nf < 6; tf++) {
+        var of7 = ctx.randomSpot(15, 28);
+        if (!of7 || !ctx.place(of7.x, of7.z, 1)) continue;
+        pole7.add(of7.x, of7.z, { rot: of7.rot }); head7.add(of7.x, of7.z, { rot: of7.rot }); nf++;
       }
       // Werbebanden hinter der Leitplanke auf Geraden (beide Seiten), Farbe abwechselnd
       var adCols = [prim, acc, 0xf4f4f4, 0x2a7de1, 0xe23b3b], ai = 0;
@@ -264,8 +281,22 @@
         br.add(box(0.12, 0.12, 8), 0x6e4c2c, { x: x, y: 1.5 });
         [-3.6, -1.2, 1.2, 3.6].forEach(function (z) { br.add(box(0.14, 1.6, 0.14), 0x6e4c2c, { x: x, y: 0.7, z: z }); });
       });
-      ctx.kind('bridge', [{ geo: br.geo() }], { r: 4.5 }).add(bx, bz, { rot: bdir });
+      // Brücken (Kulissen-Modelle: Spannweite entlang x → quer zum Bach gedreht): die Brücke in der Mitte und weitere
+      // am Bach entlang, wo Platz ist; dazu ein japanischer Brückengarten am anderen Ufer (nur als Modell)
+      var bridge = ctx.kind('bridge', [{ geo: br.geo() }], { r: 8, prop: { slot: 'bridge', box: { w: 16, d: 8, h: 10 }, yaw: Math.PI / 2 } });
+      bridge.add(bx, bz, { rot: bdir });
       ctx.place(bx, bz, 4.5, true);
+      function creekRot(x) { return Math.atan2(-(creekZ(x + 1) - creekZ(x - 1)), 2); }
+      [-80, 80, -160, 160].forEach(function (dx) {
+        var x = bx + dx, z = creekZ(x);
+        if (ctx.place(x, z, 8)) bridge.add(x, z, { rot: creekRot(x) });
+      });
+      var garden = ctx.kind('garden', [], { r: 9, prop: { slot: 'garden', box: { w: 16, d: 16, h: 12 } } });
+      [40, -40, 120, -120].some(function (dx) {
+        var x = bx + dx, z = creekZ(x) - 16;
+        if (!ctx.place(x, z, 9)) return false;
+        garden.add(x, z, { rot: creekRot(x) }); return true;
+      });
       function offCreek(x, z) { return ctx.creekD(x, z) > 4.5; }
       // Nadelbäume: dicht nahe der Strecke, weiter draußen als Waldrand
       var pine = ctx.kind('pine', [{ geo: pineGeo(false) }], { r: 2.2, tint: true });
@@ -337,7 +368,7 @@
       hk.add(prism(8.2, 7.6, 2.8), 0x5b4a44, { y: 4.85 });
       hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: -1.8, y: 2.2, z: 3.03 }); hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: 1.8, y: 2.2, z: 3.03 });
       hk.add(box(0.6, 2, 0.6), 0x77736d, { x: 2.2, y: 5.6, z: -1 });
-      ctx.scatter(ctx.kind('hut', [{ geo: hk.geo() }], { r: 5 }), 4, { dmin: 26, dmax: 110, rad: 5.5, s: [0.9, 1.1] });
+      ctx.scatter(ctx.kind('hut', [{ geo: hk.geo() }], { r: 5, prop: { slot: 'hut', box: { w: 12, d: 12, h: 12 } } }), 4, { dmin: 26, dmax: 110, rad: 5.5, s: [0.9, 1.1] });
     }
   };
 
@@ -397,31 +428,42 @@
       ctx.scatter(umb, 14, { dmin: 22, dmax: 220, rad: 2, pred: function (x, z) { var h = ctx.height(x, z); return h > sea + 0.5 && h < sea + 2.2; }, tint: function () { return ucol[Math.floor(rnd() * ucol.length)]; } });
       // Leuchtturm auf einer Felsklippe an der Küste (rot-weiß, Laterne leuchtet, Lichtkegel dreht sich)
       var lx = ctx.maxX + 18, lz = ctx.shoreZ - 22;
-      var lk = new Kit(), glow = new Kit();
-      lk.add(ico(7), function (x, y) { return mix(0x6d655a, 0x988e7e, y / 8); }, { y: 1.5, sx: 1.3, sy: 0.9, jit: 2.6 });
-      lk.add(ico(4.5), 0x857b6c, { x: -6, y: 0.5, z: 3, jit: 1.8 });
+      var rkK = new Kit(), lk = new Kit(), glow = new Kit();
+      rkK.add(ico(7), function (x, y) { return mix(0x6d655a, 0x988e7e, y / 8); }, { y: 1.5, sx: 1.3, sy: 0.9, jit: 2.6 });
+      rkK.add(ico(4.5), 0x857b6c, { x: -6, y: 0.5, z: 3, jit: 1.8 });
       for (var b = 0; b < 5; b++) lk.add(cyl(2.3 - (b + 1) * 0.22, 2.3 - b * 0.22, 3.4, 12), b % 2 ? 0xd8262b : 0xf4f4f4, { y: 7 + b * 3.4 });
       lk.add(cyl(1.9, 1.9, 0.3, 12), 0x2b2f36, { y: 24.2 });
       lk.add(cone(1.4, 1.6, 12), 0xd8262b, { y: 27.1 });
       glow.add(cyl(1.0, 1.0, 1.7, 10), 0xfff1b0, { y: 25.3 });
-      var lh = ctx.kind('lighthouse', [{ geo: lk.geo() }, { geo: glow.geo(), mat: 'glow' }], { r: 9 });
+      ctx.kind('lighthouseRock', [{ geo: rkK.geo() }], { r: 9 }).add(lx, lz, { y: -1.2 });
+      // Turm: Kulissen-Modell (slot cliff) steht auf dem Fels (Fuß des prozeduralen Turms bei 5,3 m), Lichtkegel wandert
+      // auf ~88 % seiner Höhe mit
+      var beamBase = ctx.ground(lx, lz) - 1.2, beam = null;
+      var lh = ctx.kind('lighthouse', [{ geo: lk.geo() }, { geo: glow.geo(), mat: 'glow' }], { r: 9, prop: { slot: 'cliff', box: { w: 22, d: 22, h: 34 }, y: 5.3,
+        onProp: function (sp, info) { if (beam) beam.position.y = beamBase + 5.3 + info.height * 0.88; } } });
       lh.add(lx, lz, { y: -1.2 });
       ctx.place(lx, lz, 9, true);
-      ctx.beam(lx, ctx.ground(lx, lz) - 1.2 + 25.3, lz);
+      beam = ctx.beam(lx, beamBase + 25.3, lz);
       // Klippe: große Felsen an der Küste beim Leuchtturm
       var rk = ctx.kind('cliffrock', [{ geo: cliffGeo(0x6d655a, 0x9a8f7c) }], { r: 7 });
       for (var k = 0; k < 6; k++) {
         var rx = lx - 14 - k * 11 - rnd() * 4, rz = lz + (rnd() - 0.5) * 10;
         if (ctx.place(rx, rz, 6, true)) rk.add(rx, rz, { rot: rnd() * TAU, s: 0.7 + rnd() * 0.5, y: -1.5 });
       }
-      // Hintergrund: flache Inseln am Horizont
-      var bg = new Kit();
+      // Hintergrund: flache Inseln am Horizont; auf jeder ein Leuchtturm (nur als Kulissen-Modell, slot island) – genau
+      // auf der Inselkuppe: deren Ecke verschiebt Kit.add um hash3 (wie dort berechnet)
+      var bg = new Kit(), isle = ctx.kind('islandLighthouse', [], { r: 20, prop: { slot: 'island', box: { w: 40, d: 40, h: 45 } } });
       for (var is = 0; is < 5; is++) {
         var ix = ctx.cx + (rnd() - 0.5) * 1800, iz = ctx.shoreZ - 650 - rnd() * 450, ir = 60 + rnd() * 110;
         bg.add(new THREE.SphereGeometry(ir, 9, 4, 0, TAU, 0, Math.PI / 2), function (x, y) { return y > ir * 0.25 ? 0x4f6a40 : 0x8a8064; },
           { x: ix, y: sea - 2, z: iz, sy: 0.32, jit: ir * 0.15 });
+        var hy = Math.round(ir * 1000), ij = ir * 0.15;
+        isle.add(ix + (hash3(0, hy, 0) - 0.5) * ij, iz + (hash3(0, 0, hy) - 0.5) * ij,
+          { abs: true, y: sea - 2 + 0.32 * (ir + (hash3(hy, 0, 0) - 0.5) * ij) - 1.5, rot: is * 1.3 });
       }
       ctx.bg(bg);
+      // Felseninsel mit Leuchtturm im Meer zwischen Strand und Horizont (nur als Kulissen-Modell, slot sea)
+      ctx.kind('seaIsland', [], { r: 30, prop: { slot: 'sea', box: { w: 70, d: 70, h: 50 } } }).add(ctx.maxX - 140, ctx.shoreZ - 260, { abs: true, y: sea, rot: 2.2 });
     }
   };
 
@@ -461,13 +503,13 @@
       for (var d = 0; d < 4; d++) hk.add(box(5, 5.5, 0.12), 0x6d747c, { x: -15 + d * 10, y: 2.75, z: 11.03 });
       hk.add(box(42, 1.1, 0.1), 0x9fb6c8, { y: 8.2, z: 11.04 });
       hk.add(box(44.2, 0.5, 0.14), ctx.accent, { y: 9.4, z: 11.05 });
-      var hall = ctx.kind('hall', [{ geo: hk.geo() }], { r: 25 });
+      var hall = ctx.kind('hall', [{ geo: hk.geo() }], { r: 25, prop: { slot: 'hall', box: { w: 46, d: 26, h: 24 } } });
       // Container (Farbe je Instanz), Rippen als dünne Leisten
       var ck = new Kit();
       ck.add(box(6.1, 2.6, 2.45), 0xffffff, { y: 1.3 });
       for (var r = 0; r < 9; r++) ck.add(box(0.12, 2.3, 2.5), 0xd9d9d9, { x: -2.6 + r * 0.65, y: 1.3 });
       ck.add(box(0.1, 2.4, 2.3), 0x9a9a9a, { x: 3.06, y: 1.3 });
-      var cont = ctx.kind('container', [{ geo: ck.geo() }], { r: 3.4, tint: true });
+      var cont = ctx.kind('container', [{ geo: ck.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 } } });
       var ccol = [0xc0392b, 0x2563a8, 0x2e8b57, 0xe67e22, 0x7f8c8d, 0xd4ac0d];
       // Lampenmast mit Ausleger, Leuchte (leuchtend)
       var lk = new Kit(), lg = new Kit();
@@ -476,9 +518,9 @@
       lg.add(box(0.9, 0.18, 0.45), 0xfff3cf, { x: -2.1, y: 9.75 });
       var lamp = ctx.kind('lamp', [{ geo: lk.geo() }, { geo: lg.geo(), mat: 'glow' }], { r: 1.2 });
 
-      // Halle(n) mit Hof davor, Containerstapel, Lampen
+      // Hallen mit Hof davor (bis zu 4: jede Lagerhalle aus den Kulissen-Modellen bekommt einen Platz), Containerstapel, Lampen
       var nh = 0;
-      for (var tr = 0; tr < 300 && nh < 2; tr++) {
+      for (var tr = 0; tr < 300 && nh < 4; tr++) {
         var o = ctx.randomSpot(40, 110);
         if (!o || !ctx.place(o.x, o.z, 25)) continue;
         var rot = Math.round(o.rot / (Math.PI / 2)) * (Math.PI / 2);
@@ -497,6 +539,15 @@
         }
         yards.push({ x: oc.x, z: oc.z, r: rc, w: 5, d: 5 });
         nc++;
+      }
+      // Container-Gruppen (nur als Kulissen-Modell, slot containerPile): ein paar Plätze auf eigenem Hof
+      var pile = ctx.kind('containerPile', [], { r: 10, prop: { slot: 'containerPile', box: { w: 20, d: 13, h: 7 } } });
+      for (var tp = 0, np = 0; tp < 300 && np < 3; tp++) {
+        var op = ctx.randomSpot(24, 90);
+        if (!op || !ctx.place(op.x, op.z, 11)) continue;
+        var rp = Math.round(op.rot / (Math.PI / 2)) * (Math.PI / 2);
+        pile.add(op.x, op.z, { rot: rp }); np++;
+        yards.push({ x: op.x, z: op.z, r: rp, w: 11, d: 8 });
       }
       for (var s2 = 10; s2 < ctx.T.len; s2 += 38) {
         var a = ctx.T.at(s2), sd = (Math.floor(s2 / 38) % 2) ? 1 : -1, off = ctx.HALF + 16.5;

@@ -182,7 +182,9 @@
     function own(x) { trackOwned.push(x); return x; }
     function buildTrack(T) {
       disposeTrack();
-      trackRes = CarTrackScene.build(T, { primary: TK.border, accent: TK.accent, maxAniso: maxAniso, reduceMotion: reduce });
+      // Kulissen-Modelle (Sketchfab) laden nach, aber nie während des Rennens (Laden kostet Haupt-Thread-Zeit)
+      trackRes = CarTrackScene.build(T, { primary: TK.border, accent: TK.accent, maxAniso: maxAniso, reduceMotion: reduce,
+        propGate: function () { return !(race && (race.stage === 'race' || race.stage === 'end')); } });
       trackRes.applyEnv(scene, renderer);
       trackDecor = trackRes.decor; trackNear = trackRes.nearTrack;
       scene.add(trackRes.group);
@@ -1140,26 +1142,21 @@
     }
     // Deko ausblenden, die blocks(x, z, Radius) trifft; Rückgabe zum Wiederherstellen (restoreDecor)
     function hideDecor(blocks) {
-      var undo = { objs: [], inst: [] }, zero = new THREE.Matrix4().makeScale(0, 0, 0);
+      var undo = { objs: [], inst: [] };
       trackDecor.objs.forEach(function (d) { if (d.o.visible && blocks(d.o.position.x, d.o.position.z, d.r)) { d.o.visible = false; undo.objs.push(d.o); } });
+      // setHidden (js/car-track-scene.js) gilt auch für ein nachgeladenes Kulissen-Modell an diesem Platz
       (trackDecor.inst || []).forEach(function (k) {
-        var hit = false;
         k.spots.forEach(function (sp, i) {
           if (sp.hidden || !blocks(sp.x, sp.z, sp.r)) return;
-          undo.inst.push([k, i, k.meshes.map(function (m) { var a = new THREE.Matrix4(); m.getMatrixAt(i, a); m.setMatrixAt(i, zero); return a; })]);
-          sp.hidden = true; hit = true;
+          k.setHidden(i, true); undo.inst.push([k, i]);
         });
-        if (hit) k.meshes.forEach(function (m) { m.instanceMatrix.needsUpdate = true; });
       });
       return undo;
     }
     function restoreDecor(undo) {
       if (!undo) return;
       undo.objs.forEach(function (o) { o.visible = true; });
-      (undo.inst || []).forEach(function (u) {
-        u[0].meshes.forEach(function (m, j) { m.setMatrixAt(u[1], u[2][j]); m.instanceMatrix.needsUpdate = true; });
-        u[0].spots[u[1]].hidden = false;
-      });
+      (undo.inst || []).forEach(function (u) { u[0].setHidden(u[1], false); });
     }
 
     // ---- Fahrervorstellung (Phase intro) ----
