@@ -1,22 +1,45 @@
-/* Strecken-Kulisse aus einer CarRaceSim-Strecke (three r128): Wiese, Asphalt, Randlinien, Curbs, Kiesbett an
- * Kurven-Außenseiten, Leitplanken am Rand des Auslaufs, Start/Ziel mit Portal, Tribüne, Bäume.
- * Herausgelöst aus js/car-race.js (buildTrack, gleiche Regeln/Maße) für Car Drive; car-race.js baut weiter selbst.
+/* Strecken-Kulisse aus einer CarRaceSim-Strecke (three r128) für das Car-Race-Overlay (js/car-race.js) und Car Drive
+ * (js/car-drive.js): Gelände, Asphalt, Randlinien, Curbs, Kiesbett an Kurven-Außenseiten, Leitplanken am Rand des
+ * Auslaufs, Start/Ziel mit Portal, dazu je Strecke ein Thema (js/car-track-themes.js: Stadion, Wald, Alpen, Küste,
+ * Industrie) mit Himmel, Licht, Nebel, Bodenfarbe, Deko und optischem Höhenprofil.
  *
- *   CarTrackScene.build(T, { primary, accent, maxAniso }) → { group, nearTrack(x, z, R), decor, P, gantry, dispose() }
- *       T = CarRaceSim.track(seed); primary/accent = Farben für Portal/Tribünendach (CSS-Farbtext oder Zahl),
- *       group noch nicht in der Szene (Aufrufer: scene.add(res.group)); dispose() entfernt und gibt alles frei.
+ *   CarTrackScene.build(T, { primary, accent, maxAniso, reduceMotion }) → {
+ *       group, theme, P, gantry, decor, nearTrack(x, z, R), trackDist(x, z, R),
+ *       heightAt(x, z)         Höhe der Fahrbahn/des Geländes (nur Optik; Sim und Fahrphysik bleiben 2D),
+ *       groundAt(x, z)         Höhe der Geländefläche, wie sie gezeichnet ist (für Dinge, die neben der Bahn stehen),
+ *       slopeAt(x, z, yaw)     → { pitch, roll } Neigung eines Autos mit Blickrichtung yaw (Drehordnung YXZ wie
+ *                              holder.rotation.set(roll, yaw, pitch)), normalAt(x, z) → Vector3,
+ *       applyEnv(scene, renderer, { background })  Nebel, Licht (die Lichter aus js/car-stage.js), Belichtung,
+ *                              optional Hintergrundfarbe (Car Drive; das Overlay bleibt durchsichtig, der Himmel ist
+ *                              eine Kuppel in der Gruppe),
+ *       update(dt)             Fahnen, Wellen, Leuchtturm (bei reduzierter Bewegung steht alles),
+ *       dispose()              entfernt alles, gibt frei und setzt Licht/Nebel zurück }
+ *   T = CarRaceSim.track(seed); primary/accent = Farben für Portal/Dächer (CSS-Farbtext oder Zahl);
+ *   group noch nicht in der Szene (Aufrufer: scene.add(res.group)).
+ *   decor = { objs: [{ o, r }], inst: [{ meshes, spots: [{ x, z, r, hidden }] }] } – was Kamerafahrten (Podest,
+ *   Vorstellung) im Weg stehen kann; inst = Instanzen, ausblenden über eine Null-Matrix.
  *   Kiesbett-Regel: außen an Kurven (|curv| > 1/60, ±14 m), wo der Auslauf > 3 m ist – dieselbe Regel nutzt
  *   js/car-drive-phys.js (trackInfo) für die Fahrphysik.
+ * Deko steht nie im Auslauf (≥ 14 m neben der Fahrbahn), Ausnahme: Banden/Reifenstapel/Zaun direkt hinter der Leitplanke.
+ * Zeichenaufrufe: je Deko-Art ein InstancedMesh, Hintergrund eine zusammengefasste Geometrie (Ecken-Farben).
  */
 (function (root) {
   'use strict';
   var THREE = root.THREE;
+  var TAU = Math.PI * 2, EXTENT = 1500, DROP = 0.06, SKY_R = 1900;
   function lerp(a, b, t) { return a + (b - a) * t; }
   function col(c, fb) { try { return new THREE.Color(c == null || c === '' ? fb : c); } catch (e) { return new THREE.Color(fb); } }
+  // Rückfall ohne js/car-track-themes.js: flach, Wiese, keine Deko
+  var PLAIN = { id: 'plain', flat: true, sky: { top: 0x6fa8dc, horizon: 0xcfe2f3 }, fog: { near: 420, far: 1700 }, sun: { color: 0xffffff, k: 1 },
+    hemi: { sky: 0xffffff, ground: 0x5a6070, k: 1 }, fill: 1, exposure: 1, groundTex: { base: [232, 232, 232], spread: 0.22 },
+    height: function () { return function () { return 0; }; }, groundColor: function () { return function () { return 0x4a763a; }; } };
+
   function build(T, opts) {
     opts = opts || {};
-    var owned = [], decor = { objs: [], trees: null }, maxAniso = opts.maxAniso || 4;
+    var Themes = root.CarTrackThemes, theme = (Themes && Themes.forTrack(T)) || PLAIN, reduce = !!opts.reduceMotion;
+    var owned = [], decor = { objs: [], inst: [] }, maxAniso = opts.maxAniso || 4, anims = [];
     function own(x) { owned.push(x); return x; }
+    function lin(c) { return Themes ? Themes.lin(c) : new THREE.Color(c).convertSRGBToLinear(); }
     function canvasTex(w, h, draw, repeat) {
       var c = document.createElement('canvas'); c.width = w; c.height = h;
       draw(c.getContext('2d'), w, h);
@@ -39,29 +62,126 @@
     // Mittellinie + Normale je Rasterpunkt
     var P = [];
     for (var i = 0; i < n; i++) { var a = T.at(i * ds); P.push(a); }
-    // Raster für „liegt nah an der Strecke?“ (Bäume, Leitplanken, Tribüne)
-    var CELL = 8, hash = {};
-    P.forEach(function (p, i) { var k = Math.floor(p.x / CELL) + ',' + Math.floor(p.z / CELL); (hash[k] || (hash[k] = [])).push(i); });
+    // Raster für „liegt nah an der Strecke?“ / Abstand zur Mittellinie (Deko, Leitplanken, Bodenfarbe)
+    var CELL = 8, hash = new Map();
+    function hkey(cx, cz) { return (cx + 30000) * 65536 + (cz + 30000); }
+    P.forEach(function (p, i) { var k = hkey(Math.floor(p.x / CELL), Math.floor(p.z / CELL)); var l = hash.get(k); if (!l) hash.set(k, l = []); l.push(i); });
     function nearTrack(x, z, R) {
       var r = Math.ceil(R / CELL), cx = Math.floor(x / CELL), cz = Math.floor(z / CELL), R2 = R * R;
       for (var a = -r; a <= r; a++) for (var b = -r; b <= r; b++) {
-        var l = hash[(cx + a) + ',' + (cz + b)]; if (!l) continue;
+        var l = hash.get(hkey(cx + a, cz + b)); if (!l) continue;
         for (var q = 0; q < l.length; q++) { var p = P[l[q]], dx = p.x - x, dz = p.z - z; if (dx * dx + dz * dz < R2) return true; }
       }
       return false;
     }
+    // nächster Mittellinienpunkt im Umkreis R → { i, d } (d = Infinity, wenn keiner)
+    function trackNearest(x, z, R) {
+      var r = Math.ceil(R / CELL), cx = Math.floor(x / CELL), cz = Math.floor(z / CELL), best = Infinity, bi = -1;
+      for (var a = -r; a <= r; a++) for (var b = -r; b <= r; b++) {
+        var l = hash.get(hkey(cx + a, cz + b)); if (!l) continue;
+        for (var q = 0; q < l.length; q++) { var p = P[l[q]], dx = p.x - x, dz = p.z - z, d2 = dx * dx + dz * dz; if (d2 < best) { best = d2; bi = l[q]; } }
+      }
+      return { i: bi, d: Math.sqrt(best) };
+    }
+    function trackDist(x, z, R) { return trackNearest(x, z, R).d; }
     // Auslauf je Rasterpunkt (links/rechts, m) – dahinter steht die Leitplanke
     var runL = T.runoff ? T.runoff.left : [], runR = T.runoff ? T.runoff.right : [];
     function runAt(i, sd) { var v = (sd > 0 ? runL : runR)[i % n]; return v > 0 ? v : 0; }
-    // Band entlang der Strecke: Seitenversatz a…b (Zahl oder Funktion des Rasterindex), Höhe ya/yb
-    // (Wand: a = b, ya ≠ yb); keep(i) je Abschnitt
-    function strip(a0, b0, ya, yb, mat, vLen, keep) {
-      var pos = [], uv = [], idx = [];
+    var cx = 0, cz = 0, minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    P.forEach(function (p) { cx += p.x / n; cz += p.z / n; minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); });
+    function outside(x, z) { return Math.hypot(Math.max(0, minX - x, x - maxX), Math.max(0, minZ - z, z - maxZ)); }
+
+    // ---- Thema: Höhe (nur Optik) ----
+    var ctx = {
+      T: T, P: P, n: n, ds: ds, HALF: HALF, cx: cx, cz: cz, minX: minX, maxX: maxX, minZ: minZ, maxZ: maxZ,
+      radius: Math.hypot(maxX - minX, maxZ - minZ) / 2, outside: outside, nearTrack: nearTrack, trackDist: trackDist,
+      rng: function (salt) { return CarRaceSim.rng(((T.seed | 0) * 7919 + salt * 104729) | 0); },
+      primary: col(opts.primary, 0x5e2a79).getHex(), accent: col(opts.accent, 0xf2b705).getHex()
+    };
+    ctx.rnd = ctx.rng(1);
+    var H = theme.height(ctx), flat = !!theme.flat;
+    // Fahrbahn quer fast eben: nahe der Strecke zieht die Höhe zum (gewichteten) Höhenverlauf der Mittellinie, nur 20 %
+    // der Querneigung bleiben; ab 16 m neben der Fahrbahn wieder reines Gelände. Gewichte gleiten mit dem Abstand
+    // (keine Stufen, auch wo sich zwei Streckenteile nahe kommen). Autos, Fahrbahn, Gelände nutzen dieselbe Funktion.
+    var KEEP = 0.2, W_IN = HALF + 3, W_OUT = HALF + 16, RK = HALF + 26, HC = new Float64Array(n);
+    if (!flat) for (var hi = 0; hi < n; hi++) HC[hi] = H(P[hi].x, P[hi].z);
+    function heightAt(x, z) {
+      if (flat) return 0;
+      var h = H(x, z);
+      if (outside(x, z) > RK) return h;
+      var r = Math.ceil(RK / CELL), gx = Math.floor(x / CELL), gz = Math.floor(z / CELL), sk = 0, sh = 0, dmin2 = Infinity, RK2 = RK * RK;
+      for (var a = -r; a <= r; a++) for (var b = -r; b <= r; b++) {
+        var l = hash.get(hkey(gx + a, gz + b)); if (!l) continue;
+        for (var q = 0; q < l.length; q++) {
+          var p = P[l[q]], dx = p.x - x, dz = p.z - z, d2 = dx * dx + dz * dz;
+          if (d2 >= RK2) continue;
+          if (d2 < dmin2) dmin2 = d2;
+          var k = 1 - Math.sqrt(d2) / RK; k *= k; k *= k;
+          sk += k; sh += k * HC[l[q]];
+        }
+      }
+      if (!(sk > 0)) return h;
+      var dmin = Math.sqrt(dmin2), t = Math.min(1, Math.max(0, (W_OUT - dmin) / (W_OUT - W_IN))), w = t * t * (3 - 2 * t);
+      return h + w * (1 - KEEP) * (sh / sk - h);
+    }
+    ctx.height = heightAt;
+
+    // ---- Gelände: Raster, nahe der Strecke dicht (4 m), nach außen immer gröber bis ±1500 m ----
+    function axis(lo, hi, c) {
+      var a = [], x, s;
+      for (x = lo; x < hi; x += 4) a.push(x);
+      a.push(hi);
+      var right = [], left = [];
+      for (s = 4, x = hi; x < c + EXTENT; ) { s = Math.min(s * 1.14, 160); x += s; right.push(x); }
+      for (s = 4, x = lo; x > c - EXTENT; ) { s = Math.min(s * 1.14, 160); x -= s; left.push(x); }
+      return left.reverse().concat(a, right);
+    }
+    var XS = axis(minX - 40, maxX + 40, cx), ZS = axis(minZ - 40, maxZ + 40, cz), NX = XS.length, NZ = ZS.length;
+    var TY = new Float32Array(NX * NZ);
+    var tPos = new Float32Array(NX * NZ * 3), tUv = new Float32Array(NX * NZ * 2), tIdx = [];
+    for (var zi = 0; zi < NZ; zi++) for (var xi = 0; xi < NX; xi++) {
+      var vi = zi * NX + xi, X = XS[xi], Z = ZS[zi], Y = heightAt(X, Z) - DROP;
+      TY[vi] = Y; tPos[vi * 3] = X; tPos[vi * 3 + 1] = Y; tPos[vi * 3 + 2] = Z;
+      tUv[vi * 2] = X / 12; tUv[vi * 2 + 1] = Z / 12;
+      if (xi < NX - 1 && zi < NZ - 1) { var A = vi, B = vi + 1, C = vi + NX, D = vi + NX + 1; tIdx.push(A, C, B, B, C, D); }
+    }
+    function findCell(arr, v) { var lo = 0, hi = arr.length - 1; if (v <= arr[0] || v >= arr[hi]) return -1; while (hi - lo > 1) { var m = (lo + hi) >> 1; if (arr[m] <= v) lo = m; else hi = m; } return lo; }
+    // Höhe der gezeichneten Geländefläche (gleiche Dreiecksteilung wie das Raster)
+    function groundAt(x, z) {
+      var i = findCell(XS, x), j = findCell(ZS, z);
+      if (i < 0 || j < 0) return heightAt(x, z) - DROP;
+      var u = (x - XS[i]) / (XS[i + 1] - XS[i]), v = (z - ZS[j]) / (ZS[j + 1] - ZS[j]), k = j * NX + i;
+      var a = TY[k], b = TY[k + 1], c = TY[k + NX], d = TY[k + NX + 1];
+      return u + v <= 1 ? a + u * (b - a) + v * (c - a) : d + (1 - u) * (c - d) + (1 - v) * (b - d);
+    }
+    ctx.ground = groundAt;
+    var gt = theme.groundTex || PLAIN.groundTex;
+    var grassTex = own(canvasTex(128, 128, function (x, w, h) {
+      noise(x, w, h, gt.base, gt.spread, rnd);
+      if (gt.stripes) { x.fillStyle = 'rgba(0,0,0,0.07)'; x.fillRect(0, 0, w, h / 2); }   // Mähstreifen (Stadion)
+    }, true));
+    var terrainGeo = own(new THREE.BufferGeometry());
+    terrainGeo.setAttribute('position', new THREE.BufferAttribute(tPos, 3));
+    terrainGeo.setAttribute('uv', new THREE.BufferAttribute(tUv, 2));
+    terrainGeo.setIndex(tIdx); terrainGeo.computeVertexNormals();
+    var terrain = new THREE.Mesh(terrainGeo, own(new THREE.MeshStandardMaterial({ map: grassTex, vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.6 })));
+    g.add(terrain);
+
+    // Band entlang der Strecke: Seitenversatz a…b (Zahl oder Funktion des Rasterindex), Höhe ya/yb über dem Gelände
+    // (Wand: a = b, ya ≠ yb); keep(i) je Abschnitt; nl = Unterteilung quer (folgt dem Gelände)
+    function strip(a0, b0, ya, yb, mat, vLen, keep, nl) {
+      nl = nl || 1;
+      var pos = [], uv = [], idx = [], row = nl + 1;
       for (var i = 0; i <= n; i++) {
         var p = P[i % n], a = typeof a0 === 'function' ? a0(i % n) : a0, b = typeof b0 === 'function' ? b0(i % n) : b0;
-        pos.push(p.x + p.nx * a, ya, p.z + p.nz * a, p.x + p.nx * b, yb, p.z + p.nz * b);
-        uv.push(0, i * ds / vLen, 1, i * ds / vLen);
-        if (i < n && (!keep || keep(i))) { var o = i * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
+        for (var j = 0; j <= nl; j++) {
+          var f = j / nl, off = lerp(a, b, f), x = p.x + p.nx * off, z = p.z + p.nz * off;
+          pos.push(x, heightAt(x, z) + lerp(ya, yb, f), z);
+          uv.push(f, i * ds / vLen);
+        }
+        if (i < n && (!keep || keep(i))) {
+          for (var q = 0; q < nl; q++) { var o = i * row + q, o2 = o + row; idx.push(o, o + 1, o2, o + 1, o2 + 1, o2); }
+        }
       }
       if (!idx.length) return null;
       var geo = own(new THREE.BufferGeometry());
@@ -70,18 +190,10 @@
       geo.setIndex(idx); geo.computeVertexNormals();
       var m = new THREE.Mesh(geo, mat); g.add(m); return m;
     }
-    var cx = 0, cz = 0, minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-    P.forEach(function (p) { cx += p.x / n; cz += p.z / n; minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); });
-
-    // Wiese (groß genug für den weitesten Zoom), Asphalt, Randlinien, Curbs in Kurven, Leitplanken
-    var GS = 1600;
-    var grassTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [74, 118, 58], 0.22, rnd); }, true));
-    grassTex.repeat.set(GS / 12, GS / 12);
-    var grass = new THREE.Mesh(own(new THREE.PlaneGeometry(GS, GS)), own(new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1, metalness: 0 })));
-    grass.rotation.x = -Math.PI / 2; grass.position.set(cx, 0, cz); g.add(grass);
+    var NL = flat ? 1 : 4;   // Hügel: Asphalt quer unterteilt, damit das Gelände nirgends durchsticht
     var asphaltTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [62, 64, 70], 0.3, rnd); }, true));
     var asphalt = own(new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
-    strip(-HALF, HALF, 0.03, 0.03, asphalt, 9);
+    strip(-HALF, HALF, 0.03, 0.03, asphalt, 9, null, NL);
     var white = own(new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7, side: THREE.DoubleSide }));
     strip(HALF - 0.45, HALF - 0.25, 0.04, 0.04, white, 10);
     strip(-HALF + 0.25, -HALF + 0.45, 0.04, 0.04, white, 10);
@@ -93,94 +205,306 @@
     // Kiesbett im Auslauf an Kurven-Außenseiten (±14 m um die Kurve), wo der Auslauf > 3 m ist; sonst Gras
     var gravelTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [196, 178, 140], 0.45, rnd); }, true));
     var gravel = own(new THREE.MeshStandardMaterial({ map: gravelTex, roughness: 1, metalness: 0, side: THREE.DoubleSide }));
-    var outside = { 1: new Uint8Array(n), '-1': new Uint8Array(n) }, W14 = Math.round(14 / ds);
+    var outsideK = { 1: new Uint8Array(n), '-1': new Uint8Array(n) }, W14 = Math.round(14 / ds);
     for (var ci = 0; ci < n; ci++) {
       if (Math.abs(P[ci].curv) <= 1 / 60) continue;
       var outSd = P[ci].curv > 0 ? -1 : 1;   // Linkskurve → außen = rechts
-      for (var k = -W14; k <= W14; k++) outside[outSd][(ci + k + n) % n] = 1;
+      for (var k = -W14; k <= W14; k++) outsideK[outSd][(ci + k + n) % n] = 1;
     }
     [1, -1].forEach(function (sd) {
       strip(function (i) { return sd * (HALF + 0.9); }, function (i) { return sd * (HALF + Math.max(0.9, runAt(i, sd))); }, 0.035, 0.035, gravel, 5,
-        function (i) { return outside[sd][i] && outside[sd][(i + 1) % n] && runAt(i, sd) > 3 && runAt(i + 1, sd) > 3; });
+        function (i) { return outsideK[sd][i] && outsideK[sd][(i + 1) % n] && runAt(i, sd) > 3 && runAt(i + 1, sd) > 3; }, flat ? 1 : 3);
     });
-    // Leitplanken am Außenrand des Auslaufs (die Sim lässt dort nicht weiter)
-    var rail = own(new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }));
-    [1, -1].forEach(function (sd) {
-      var off = function (i) { return sd * (HALF + runAt(i, sd) + 0.3); };
-      strip(off, off, 0.25, 0.85, rail, 10);
-    });
+    // Leitplanken am Außenrand des Auslaufs (die Sim lässt dort nicht weiter); Industrie: Reifenstapel statt dessen
+    if (theme.rail !== false) {
+      var rail = own(new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }));
+      [1, -1].forEach(function (sd) {
+        var off = function (i) { return sd * (HALF + runAt(i, sd) + 0.3); };
+        strip(off, off, 0.25, 0.85, rail, 10);
+      });
+    }
 
-    // Start/Ziel: Schachbrett über die Fahrbahn + Portal
-    var p0 = P[0];
+    // Start/Ziel: Schachbrett über die Fahrbahn (folgt dem Gelände) + Portal
+    var p0 = P[0], fx0 = Math.cos(p0.yaw), fz0 = -Math.sin(p0.yaw);
     var checkTex = own(canvasTex(160, 32, function (x, w, h) {
       for (var a = 0; a < 10; a++) for (var b = 0; b < 2; b++) { x.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; x.fillRect(a * 16, b * 16, 16, 16); }
     }));
-    var line = new THREE.Mesh(own(new THREE.PlaneGeometry(T.width, 1.6)), own(new THREE.MeshStandardMaterial({ map: checkTex, roughness: 0.7 })));
-    line.rotation.set(-Math.PI / 2, p0.yaw + Math.PI / 2, 0, 'YXZ');   // Breite quer zur Fahrtrichtung
-    line.position.set(p0.x, 0.06, p0.z); g.add(line);
-    // Portal und Tribünendach in den Theme-Farben (Primär + Akzent)
+    (function () {
+      var pos = [], uv = [], idx = [], NQ = 6;
+      for (var b = 0; b <= 1; b++) for (var a = 0; a <= NQ; a++) {
+        var off = lerp(-HALF, HALF, a / NQ), al = (b - 0.5) * 1.6, x = p0.x + p0.nx * off + fx0 * al, z = p0.z + p0.nz * off + fz0 * al;
+        pos.push(x, heightAt(x, z) + 0.06, z); uv.push(a / NQ, b);
+      }
+      for (var q = 0; q < NQ; q++) idx.push(q, q + NQ + 1, q + 1, q + 1, q + NQ + 1, q + NQ + 2);
+      var geo = own(new THREE.BufferGeometry());
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      g.add(new THREE.Mesh(geo, own(new THREE.MeshStandardMaterial({ map: checkTex, roughness: 0.7, side: THREE.DoubleSide }))));
+    })();
+    // Portal und Dächer in den Theme-Farben (Primär + Akzent)
     var purple = own(new THREE.MeshStandardMaterial({ color: col(opts.primary, 0x5e2a79), roughness: 0.5 }));
     var gold = own(new THREE.MeshStandardMaterial({ color: col(opts.accent, 0xf2b705), roughness: 0.4, metalness: 0.3 }));
-    // Portal: Pfosten hinter den Leitplanken (lokal z = −Normale: links = −z)
+    // Portal: Pfosten hinter den Leitplanken (lokal z = −Normale: links = −z), reichen 3 m in den Boden (Hang)
     var gantry = new THREE.Group(), postL = HALF + runAt(0, 1) + 0.8, postR = HALF + runAt(0, -1) + 0.8;
     [-postL, postR].forEach(function (z) {
-      var post = new THREE.Mesh(own(new THREE.BoxGeometry(0.4, 4.6, 0.4)), purple);
-      post.position.set(0, 2.3, z); gantry.add(post);
+      var post = new THREE.Mesh(own(new THREE.BoxGeometry(0.4, 7.6, 0.4)), purple);
+      post.position.set(0, 0.8, z); gantry.add(post);
     });
     var span = postL + postR + 0.4, mid = (postR - postL) / 2;
     var beam = new THREE.Mesh(own(new THREE.BoxGeometry(0.5, 0.9, span)), purple); beam.position.set(0, 4.6, mid); gantry.add(beam);
     var stripe = new THREE.Mesh(own(new THREE.BoxGeometry(0.52, 0.18, span + 0.02)), gold); stripe.position.set(0, 4.6, mid); gantry.add(stripe);
-    gantry.position.set(p0.x, 0, p0.z); gantry.rotation.y = p0.yaw; g.add(gantry);
+    gantry.position.set(p0.x, heightAt(p0.x, p0.z), p0.z); gantry.rotation.y = p0.yaw; g.add(gantry);
     decor.objs.push({ o: gantry, r: HALF + 13 });
 
-    // Tribüne neben der Startgeraden, auf der Seite mit Platz
-    var standMat = own(new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.8 }));
-    var crowdTex = own(canvasTex(128, 32, function (x, w, h) {
-      x.fillStyle = '#6d7280'; x.fillRect(0, 0, w, h);
-      var cols = ['#e04848', '#3a86ff', '#ffbe0b', '#f2f2f2', '#8338ec', '#2ec4b6', '#fb5607'];
-      for (var i = 0; i < 220; i++) { x.fillStyle = cols[Math.floor(rnd() * cols.length)]; x.fillRect(Math.floor(rnd() * w), Math.floor(rnd() * h), 2, 2); }
-    }));
-    var crowdMat = own(new THREE.MeshStandardMaterial({ map: crowdTex, roughness: 0.9 }));
-    var sMid = 28, pS = T.at(sMid);
-    [1, -1].some(function (sd) {
-      // hinter jedem möglichen Auslauf (max. 12 m) – auch dem eines anderen Streckenteils
-      var off = sd * (HALF + 12 + 5), x = pS.x + pS.nx * off, z = pS.z + pS.nz * off;
-      var ok = [-10, 0, 10].every(function (k) { var q = T.at(sMid + k); return !nearTrack(q.x + q.nx * off, q.z + q.nz * off, HALF + 12 + 4); });
-      if (!ok) return false;
-      var st = new THREE.Group();
-      for (var r = 0; r < 4; r++) {
-        var step = new THREE.Mesh(own(new THREE.BoxGeometry(22, 0.8 + r * 0.8, 1.6)), [standMat, standMat, crowdMat, standMat, standMat, standMat]);
-        step.position.set(0, (0.8 + r * 0.8) / 2, -sd * (-2.4 + r * 1.6)); st.add(step);
-      }
-      var roof = new THREE.Mesh(own(new THREE.BoxGeometry(23, 0.3, 7.5)), purple);
-      roof.position.set(0, 5.6, 0); st.add(roof);
-      st.position.set(x, 0, z); st.rotation.y = pS.yaw; g.add(st);
-      decor.objs.push({ o: st, r: 12 });
-      return true;
-    });
+    // ---- Himmel: Kuppel mit Verlauf (Horizont → Zenit), ohne Nebel/Tonemapping, hinter allem ----
+    (function () {
+      var geo = own(new THREE.SphereGeometry(SKY_R, 32, 14)), p = geo.attributes.position, cols = [];
+      var top = lin(theme.sky.top), hz = lin(theme.sky.horizon), c = new THREE.Color();
+      for (var i = 0; i < p.count; i++) { var t = Math.max(0, p.getY(i) / SKY_R); c.copy(hz).lerp(top, Math.pow(t, 0.55)); cols.push(c.r, c.g, c.b); }
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+      var dome = new THREE.Mesh(geo, own(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false })));
+      dome.position.set(cx, 0, cz); dome.renderOrder = -10; dome.frustumCulled = false; g.add(dome);
+    })();
 
-    // Bäume (InstancedMesh): außerhalb der Strecke, nicht zu weit weg
-    var trunkGeo = own(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 6)), crownGeo = own(new THREE.ConeGeometry(1.8, 4.2, 7));
-    var trunkMat = own(new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 1 })), crownMat = own(new THREE.MeshStandardMaterial({ color: 0x2f6b34, roughness: 0.95 }));
-    var spots = [];
-    for (var t = 0; t < 900 && spots.length < 90; t++) {
-      var x = lerp(minX - 60, maxX + 60, rnd()), z = lerp(minZ - 60, maxZ + 60, rnd());
-      if (nearTrack(x, z, HALF + 15) || !nearTrack(x, z, 70)) continue;   // nie im Auslauf
-      if (spots.some(function (s) { return (s[0] - x) * (s[0] - x) + (s[1] - z) * (s[1] - z) < 9; })) continue;
-      spots.push([x, z, 0.7 + rnd() * 0.7]);
+    // ---- Deko (Thema) ----
+    var timeU = { value: 0 }, MATS = {};
+    // variant: '' = normales Mesh, 'i' = Instanzen, 'it' = Instanzen mit Farbe je Instanz – je eigenes Material,
+    // weil three r128 ein Programm mit Instanzfarbe sonst auch für Meshes ohne instanceColor nimmt (Absturz)
+    function mat(name, variant) {
+      variant = variant || '';
+      var key = name + '|' + variant;
+      if (MATS[key]) return MATS[key];
+      var m;
+      if (name === 'glow') m = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+      else if (name === 'water') m = new THREE.MeshStandardMaterial({ color: 0x3f86b0, roughness: 0.2, metalness: 0.1, envMapIntensity: 0.9 });
+      else if (name === 'foam') {
+        var ft = own(canvasTex(64, 64, function (x, w, h) {
+          x.clearRect(0, 0, w, h);
+          for (var i = 0; i < 90; i++) { x.fillStyle = 'rgba(255,255,255,' + (0.3 + rnd() * 0.6).toFixed(2) + ')'; x.fillRect(Math.floor(rnd() * w), Math.floor(rnd() * h), 2 + Math.floor(rnd() * 6), 2); }
+        }, true));
+        m = new THREE.MeshBasicMaterial({ map: ft, transparent: true, opacity: 0.8, depthWrite: false });
+        anims.push(function (dt) { ft.offset.x = (ft.offset.x + dt * 0.02) % 1; ft.offset.y = 0.15 * Math.sin(timeU.value * 0.7); });
+      } else {
+        m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0, flatShading: true, envMapIntensity: 0.5, side: name === 'wave' ? THREE.DoubleSide : THREE.FrontSide });
+        if (name === 'wave') {   // Fahnentuch: Welle wächst vom Mast weg (lokal x), Phase je Instanz
+          m.onBeforeCompile = function (sh) {
+            sh.uniforms.uTime = timeU;
+            sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+              '#include <begin_vertex>\nfloat wph = 0.0;\n#ifdef USE_INSTANCING\nwph = instanceMatrix[3].x * 0.37 + instanceMatrix[3].z * 0.23;\n#endif\n' +
+              'transformed.z += sin(uTime * 5.0 + transformed.x * 2.2 + wph) * 0.13 * max(transformed.x, 0.0);');
+          };
+          m.customProgramCacheKey = function () { return 'track-flag-wave-' + variant; };
+        }
+      }
+      return (MATS[key] = own(m));
     }
-    if (spots.length) {
-      var trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length), crowns = new THREE.InstancedMesh(crownGeo, crownMat, spots.length);
-      var mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
-      spots.forEach(function (s, i) {
-        sc.setScalar(s[2]);
-        ps.set(s[0], 0.8 * s[2], s[1]); mtx.compose(ps, q, sc); trunks.setMatrixAt(i, mtx);
-        ps.set(s[0], (1.6 + 2.1) * s[2], s[1]); mtx.compose(ps, q, sc); crowns.setMatrixAt(i, mtx);
+    var kinds = [], bgKits = [], occ = new Map(), occR = 0, OCC = 6;
+    // Art registrieren: parts = [{ geo, mat }] (alle Teile teilen die Plätze), o = { r (Radius bei Größe 1), tint }
+    ctx.kind = function (name, parts, o) {
+      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), spots: [] };
+      parts.forEach(function (p) { own(p.geo); });
+      kd.add = function (x, z, a) {
+        a = a || {};
+        var s = a.s || 1;
+        kd.spots.push({ x: x, z: z, rot: a.rot || 0, s: s, y: a.y || 0, tint: a.tint, r: kd.r * s, hidden: false });
+      };
+      kinds.push(kd);
+      return kd;
+    };
+    // Platz belegen (kein Überlappen mit anderer Deko; ohne ignoreTrack nur ≥ 14 m neben der Fahrbahn)
+    ctx.place = function (x, z, rad, ignoreTrack) {
+      if (!ignoreTrack) { var need = HALF + 14 + rad; if (trackDist(x, z, need + 0.5) < need) return false; }
+      var r = Math.ceil((rad + occR) / OCC), gx = Math.floor(x / OCC), gz = Math.floor(z / OCC);
+      for (var a = -r; a <= r; a++) for (var b = -r; b <= r; b++) {
+        var l = occ.get(hkey(gx + a, gz + b)); if (!l) continue;
+        for (var q = 0; q < l.length; q++) { var o = l[q], dx = o[0] - x, dz = o[1] - z, rr = o[2] + rad; if (dx * dx + dz * dz < rr * rr) return false; }
+      }
+      var k = hkey(gx, gz), cell = occ.get(k); if (!cell) occ.set(k, cell = []);
+      cell.push([x, z, rad]); occR = Math.max(occR, rad);
+      return true;
+    };
+    // Rechteck (lokal x ±hw, z z0…z1, Drehung rot wie kind.add) frei von Fahrbahn + Auslauf (≥ 13 m neben der Fahrbahn)?
+    ctx.clearRect = function (x, z, rot, hw, z0, z1) {
+      var c = Math.cos(rot), s = Math.sin(rot), need = HALF + 13;
+      for (var u = -hw; u <= hw + 1e-6; u += hw / 4) for (var v = z0; v <= z1 + 1e-6; v += (z1 - z0) / 3) {
+        if (trackDist(x + u * c + v * s, z - u * s + v * c, need + 0.5) < need) return false;
+      }
+      return true;
+    };
+    // zufällig im Band dmin…dmax (m neben der Fahrbahn) streuen; o = { dmin, dmax, rad, s: [min, max], pred, tint() }
+    ctx.scatter = function (kd, count, o) {
+      var R = ctx.rnd, placed = 0, s0 = o.s ? o.s[0] : 1, s1 = o.s ? o.s[1] : 1, ext = HALF + o.dmax;
+      for (var t = 0; t < count * 30 && placed < count; t++) {
+        var x = lerp(minX - ext, maxX + ext, R()), z = lerp(minZ - ext, maxZ + ext, R()), s = lerp(s0, s1, R());
+        var rad = (o.rad || kd.r) * s, dn = Math.max(o.dmin, 14 + rad);
+        // billig zuerst: Abstand zum Strecken-Rechteck ist eine untere Schranke, dann nur kleine Suchradien
+        if (outside(x, z) > ext || nearTrack(x, z, HALF + dn) || !nearTrack(x, z, ext)) continue;
+        if (o.pred && !o.pred(x, z)) continue;
+        if (!ctx.place(x, z, rad)) continue;
+        kd.add(x, z, { rot: R() * TAU, s: s, tint: o.tint ? o.tint() : null });
+        placed++;
+      }
+      return placed;
+    };
+    // Zufallsplatz im Band, Drehung wie der nächste Streckenpunkt
+    ctx.randomSpot = function (dmin, dmax) {
+      var R = ctx.rnd, ext = HALF + dmax;
+      for (var t = 0; t < 60; t++) {
+        var x = lerp(minX - ext, maxX + ext, R()), z = lerp(minZ - ext, maxZ + ext, R()), nr = trackNearest(x, z, ext + 1), d = nr.d - HALF;
+        if (nr.i < 0 || d < dmin || d > dmax) continue;
+        return { x: x, z: z, rot: P[nr.i].yaw };
+      }
+      return null;
+    };
+    // entlang der Leitplanken-Linie (Auslauf + 0,3 m + extra), o = { step, extra, side, every(s), tint(k), rad }
+    ctx.alongRail = function (kd, o) {
+      var k = 0;
+      (o.side ? [o.side] : [1, -1]).forEach(function (sd) {
+        for (var s = 0; s < T.len; s += o.step) {
+          if (o.every && !o.every(s)) continue;
+          var a = T.at(s), off = HALF + (sd > 0 ? a.runL : a.runR) + 0.3 + (o.extra || 0);
+          var x = a.x + a.nx * sd * off, z = a.z + a.nz * sd * off;
+          if (trackDist(x, z, off + 1) < off - 0.3) continue;   // anderer Streckenteil näher
+          if (!ctx.place(x, z, o.rad || 0.45, true)) continue;
+          kd.add(x, z, { rot: a.yaw, tint: o.tint ? o.tint(k++) : null });
+        }
       });
-      g.add(trunks); g.add(crowns);
-      decor.trees = { spots: spots, trunks: trunks, crowns: crowns };
+    };
+    // flaches Band entlang einer Punktliste (Bach, Gischt); y über dem Gelände bzw. absolut
+    ctx.ribbon = function (pts, w, y, matName, absolute) {
+      var pos = [], uv = [], idx = [], L = 0;
+      for (var i = 0; i < pts.length; i++) {
+        var a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+        var nx = -dz / l * w / 2, nz = dx / l * w / 2;
+        if (i) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+        [-1, 1].forEach(function (sd) {
+          var x = pts[i][0] + nx * sd, z = pts[i][1] + nz * sd;
+          pos.push(x, absolute ? y : groundAt(x, z) + y, z); uv.push(L / 6, sd > 0 ? 1 : 0);
+        });
+        if (i) { var o = (i - 1) * 2; idx.push(o, o + 2, o + 1, o + 1, o + 2, o + 3); }
+      }
+      var geo = own(new THREE.BufferGeometry());
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.setIndex(idx); geo.computeVertexNormals();
+      var m = new THREE.Mesh(geo, mat(matName)); m.material.side = THREE.DoubleSide; g.add(m);
+      return m;
+    };
+    // Meer: große Fläche bis zum Horizont (−z), Wellenmuster zieht langsam
+    ctx.sea = function (y, zEdge) {
+      var st = own(canvasTex(128, 128, function (x, w, h) {
+        x.fillStyle = 'rgb(225,232,236)'; x.fillRect(0, 0, w, h);
+        for (var i = 0; i < 260; i++) { x.fillStyle = 'rgba(255,255,255,' + (0.25 + rnd() * 0.5).toFixed(2) + ')'; x.fillRect(Math.floor(rnd() * w), Math.floor(rnd() * h), 4 + Math.floor(rnd() * 10), 1); }
+      }, true));
+      var len = zEdge - (cz - EXTENT - 300), wd = 2 * EXTENT + 600;
+      st.repeat.set(wd / 14, len / 14);
+      var m = new THREE.Mesh(own(new THREE.PlaneGeometry(wd, len)), own(new THREE.MeshStandardMaterial({ map: st, color: 0x2a6e8c, roughness: 0.3, metalness: 0.15, envMapIntensity: 0.9 })));
+      m.rotation.x = -Math.PI / 2; m.position.set(cx, y, zEdge - len / 2); g.add(m);
+      anims.push(function (dt) { st.offset.y = (st.offset.y + dt * 0.035) % 1; st.offset.x = 0.04 * Math.sin(timeU.value * 0.5); });
+      return m;
+    };
+    // Lichtkegel des Leuchtturms (additiv, dreht sich langsam)
+    ctx.beam = function (x, y, z) {
+      var bm = own(new THREE.MeshBasicMaterial({ color: 0xfff2c0, transparent: true, opacity: 0.13, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+      var geo = own(new THREE.ConeGeometry(5, 46, 14, 1, true)); geo.translate(0, -23, 0); geo.rotateZ(Math.PI / 2);   // Spitze an der Laterne, Kegel nach +x
+      var grp = new THREE.Group(); grp.position.set(x, y, z);
+      [0, Math.PI].forEach(function (r) { var c = new THREE.Mesh(geo, bm); c.rotation.y = r; c.rotation.z = -0.06; grp.add(c); });
+      g.add(grp); decor.objs.push({ o: grp, r: 9 });
+      anims.push(function (dt) { grp.rotation.y += dt * 0.55; });
+    };
+    ctx.bg = function (kit) { if (kit && !kit.empty()) bgKits.push(kit); };
+    if (theme.decorate) theme.decorate(ctx);
+
+    // Instanzen bauen: je Art und Teil ein InstancedMesh (Matrizen aus den Plätzen, Höhe = Gelände)
+    var mtx = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), yAx = new THREE.Vector3(0, 1, 0), white1 = new THREE.Color(1, 1, 1);
+    kinds.forEach(function (kd) {
+      if (!kd.spots.length) return;
+      var meshes = kd.parts.map(function (p) {
+        var tinted = kd.tint && !p.notint;
+        var im = own(new THREE.InstancedMesh(p.geo, mat(p.mat || 'v', tinted ? 'it' : 'i'), kd.spots.length));
+        im.frustumCulled = false;   // Instanzen liegen überall – die Kugel der Grundform passt nicht
+        kd.spots.forEach(function (s, i) {
+          qt.setFromAxisAngle(yAx, s.rot); sc.setScalar(s.s); ps.set(s.x, groundAt(s.x, s.z) + s.y, s.z);
+          mtx.compose(ps, qt, sc); im.setMatrixAt(i, mtx);
+          if (tinted) im.setColorAt(i, s.tint != null ? lin(s.tint) : white1);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        g.add(im); return im;
+      });
+      decor.inst.push({ name: kd.name, meshes: meshes, spots: kd.spots });
+    });
+    // Hintergrund: alles in eine Geometrie (ein Zeichenaufruf)
+    if (bgKits.length) {
+      var all = new Themes.Kit();
+      bgKits.forEach(function (k) { Array.prototype.push.apply(all.pos, k.pos); Array.prototype.push.apply(all.col, k.col); });
+      g.add(new THREE.Mesh(own(all.geo()), mat('v')));
     }
-    return { group: g, nearTrack: nearTrack, decor: decor, P: P, gantry: gantry, dispose: function () { if (g.parent) g.parent.remove(g); owned.forEach(function (x) { if (x && x.dispose) x.dispose(); }); owned = []; } };
+    // Bodenfarbe je Ecke (nach der Deko: Höfe/Ufer stehen erst dann fest)
+    (function () {
+      var gc = theme.groundColor(ctx), cols = new Float32Array(NX * NZ * 3);
+      for (var i = 0; i < NX * NZ; i++) {
+        var x = tPos[i * 3], z = tPos[i * 3 + 2], d = outside(x, z) > 32 ? 1e9 : trackDist(x, z, HALF + 32) - HALF;
+        var c = lin(gc(x, z, tPos[i * 3 + 1] + DROP, d));
+        cols[i * 3] = c.r; cols[i * 3 + 1] = c.g; cols[i * 3 + 2] = c.b;
+      }
+      terrainGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+    })();
+
+    // ---- Neigung ----
+    function grad(x, z) { var e = 0.6; return [(heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e)]; }
+    var ZERO = { pitch: 0, roll: 0 };
+    function slopeAt(x, z, yaw) {
+      if (flat) return ZERO;
+      var gr = grad(x, z), c = Math.cos(yaw), s = Math.sin(yaw);
+      return { pitch: Math.atan(gr[0] * c - gr[1] * s), roll: -Math.atan(gr[0] * s + gr[1] * c) };
+    }
+    function normalAt(x, z, out) {
+      out = out || new THREE.Vector3();
+      if (flat) return out.set(0, 1, 0);
+      var gr = grad(x, z); return out.set(-gr[0], 1, -gr[1]).normalize();
+    }
+
+    // ---- Licht/Nebel (die Lichter aus CarStage.setup bleiben, werden nur getönt) ----
+    var envSaved = null;
+    function applyEnv(scene, renderer, o) {
+      restoreEnv();
+      envSaved = { scene: scene, renderer: renderer, fog: scene.fog, bg: scene.background, exp: renderer ? renderer.toneMappingExposure : null, lights: [] };
+      scene.fog = new THREE.Fog(theme.sky.horizon, theme.fog.near, theme.fog.far);
+      if (o && o.background) scene.background = new THREE.Color(theme.sky.horizon);
+      var dirs = 0;
+      scene.children.forEach(function (l) {
+        if (!l.isLight) return;
+        envSaved.lights.push([l, l.color.clone(), l.intensity, l.position.clone(), l.groundColor ? l.groundColor.clone() : null]);
+        if (l.isHemisphereLight) { l.color.set(theme.hemi.sky); l.groundColor.set(theme.hemi.ground); l.intensity *= theme.hemi.k; }
+        else if (l.isDirectionalLight) {
+          if (dirs === 0) { l.color.set(theme.sun.color); l.intensity *= theme.sun.k; if (theme.sun.pos) l.position.fromArray(theme.sun.pos); }
+          else { l.color.set(theme.hemi.sky); l.intensity *= theme.fill; }
+          dirs++;
+        }
+      });
+      if (renderer && envSaved.exp != null) renderer.toneMappingExposure = envSaved.exp * (theme.exposure || 1);
+    }
+    function restoreEnv() {
+      if (!envSaved) return;
+      var e = envSaved; envSaved = null;
+      e.scene.fog = e.fog; e.scene.background = e.bg;
+      if (e.renderer && e.exp != null) e.renderer.toneMappingExposure = e.exp;
+      e.lights.forEach(function (s) { s[0].color.copy(s[1]); s[0].intensity = s[2]; s[0].position.copy(s[3]); if (s[4]) s[0].groundColor.copy(s[4]); });
+    }
+    function update(dt) {
+      if (reduce || !(dt > 0)) return;
+      timeU.value += dt;
+      for (var i = 0; i < anims.length; i++) anims[i](dt);
+    }
+
+    return {
+      group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
+      heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update,
+      dispose: function () {
+        restoreEnv();
+        if (g.parent) g.parent.remove(g);
+        owned.forEach(function (x) { if (x && x.dispose) x.dispose(); }); owned = [];
+      }
+    };
   }
   root.CarTrackScene = { build: build };
 })(typeof window !== 'undefined' ? window : this);

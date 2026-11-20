@@ -277,8 +277,9 @@
     return car;
   }
   function placeCar(c, x, z, yaw, roll, pitch, steer, spin) {
-    c.holder.position.set(x, 0, z);
-    c.holder.rotation.set(roll, yaw, pitch);
+    var sl = trackRes ? trackRes.slopeAt(x, z, yaw) : null;
+    c.holder.position.set(x, gh(x, z), z);
+    c.holder.rotation.set(roll + (sl ? sl.roll : 0), yaw, pitch + (sl ? sl.pitch : 0));
     for (var i = 0; i < c.wheels.length; i++) {
       var w = c.wheels[i];
       if (w.spin) w.spin.rotation[w.spin.userData.ax || 'x'] = w.base - spin * w.sgn;
@@ -538,10 +539,19 @@
     next(0).then(function (go) { if (go) setupRace(s, opp, ok); });
   }
 
+  // Strecken-Kulisse (js/car-track-scene.js): Thema je Strecke mit Himmel, Licht, Nebel und optischer Höhe
+  function buildTrack(T) {
+    trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso, reduceMotion: REDUCE });
+    trackRes.applyEnv(scene, renderer, { background: true });
+    scene.add(trackRes.group);
+    if (FX && FX.setGround) FX.setGround(trackRes.heightAt);
+  }
+  // Geländehöhe (nur Optik – die Fahrphysik bleibt 2D)
+  function gh(x, z) { return trackRes ? trackRes.heightAt(x, z) : 0; }
+  function groundY(x, z) { return trackRes ? trackRes.groundAt(x, z) : 0; }
   function setupRace(s, opp, ok) {
     var seed = Sim.TRACKS[s.track] || 1, T = Sim.track(seed);
-    trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso });
-    scene.add(trackRes.group);
+    buildTrack(T);
     var RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [];
     // Gegner: Startplätze vorn (Sim-Aufstellung), Spieler dahinter
     var ai = opp.map(function (e) {
@@ -586,6 +596,7 @@
       race = null;
     }
     if (trackRes) { trackRes.dispose(); trackRes = null; }
+    if (FX && FX.setGround) FX.setGround(null);
     ui.hud.hidden = true; ui.countdown.hidden = true;
     keys = {}; steerKb = thrKb = brkKb = 0;
     if (FX) FX.clear();
@@ -675,18 +686,19 @@
   }
   function tvSpot(i) {
     var T = race.T, SP = 45, s = i * SP, a = T.at(s);
-    var sd = a.runL >= a.runR ? 1 : -1, off = T.width / 2 + (sd > 0 ? a.runL : a.runR) + 4;
-    return new THREE.Vector3(a.x + a.nx * sd * off, 5.5, a.z + a.nz * sd * off);
+    var sd = a.runL >= a.runR ? 1 : -1, off = T.width / 2 + (sd > 0 ? a.runL : a.runR) + 4, x = a.x + a.nx * sd * off, z = a.z + a.nz * sd * off;
+    return new THREE.Vector3(x, Math.max(gh(x, z), groundY(x, z)) + 5.5, z);
   }
   var tmpV = new THREE.Vector3(), tmpL = new THREE.Vector3();
   function updateCam(dt) {
     var pc = race.pc, me = race.me, fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), mode = race.camMode;
-    var sp = Math.hypot(pc.vx, pc.vz), fov = 62;
+    var sp = Math.hypot(pc.vx, pc.vz), fov = 62, cy = me.holder.position.y;   // cy: Fahrbahnhöhe am Auto
     if (race.phase === 'countdown' && look.used) {
       // Umschauen in der Startaufstellung: Kreisbahn um das eigene Auto
       var ang = pc.yaw + Math.PI + look.yaw, hd = look.dist * Math.cos(look.pitch);
-      tmpV.set(pc.x + Math.cos(ang) * hd, look.dist * Math.sin(look.pitch) + me.height * 0.6, pc.z - Math.sin(ang) * hd);
-      tmpL.set(pc.x, me.height * 0.5, pc.z);
+      tmpV.set(pc.x + Math.cos(ang) * hd, cy + look.dist * Math.sin(look.pitch) + me.height * 0.6, pc.z - Math.sin(ang) * hd);
+      tmpV.y = Math.max(tmpV.y, groundY(tmpV.x, tmpV.z) + 0.6);   // nie ins Gelände
+      tmpL.set(pc.x, cy + me.height * 0.5, pc.z);
       if (!race.camPos) { race.camPos = tmpV.clone(); race.camLook = tmpL.clone(); }
       race.camPos.lerp(tmpV, damp(14, dt)); race.camLook.lerp(tmpL, damp(14, dt));
       cam.position.copy(race.camPos); cam.lookAt(race.camLook);
@@ -698,8 +710,10 @@
       var hx = fx, hz = fz;
       if (sp > 4) { var vx = pc.vx / sp, vz = pc.vz / sp; hx = fx * 0.7 + vx * 0.3; hz = fz * 0.7 + vz * 0.3; var l = Math.hypot(hx, hz) || 1; hx /= l; hz /= l; }
       var back = me.len * 1.15 + 4.2, up = 1.7 + me.height * 0.9;
-      tmpV.set(pc.x - hx * back, up, pc.z - hz * back);
-      tmpL.set(pc.x + fx * 4, me.height * 0.75, pc.z + fz * 4);
+      tmpV.set(pc.x - hx * back, 0, pc.z - hz * back);
+      // Höhe über der Fahrbahn am Auto bzw. – wenn es dahinter ansteigt – über dem Gelände an der Kamera
+      tmpV.y = Math.max(cy + up, gh(tmpV.x, tmpV.z) + up * 0.75, groundY(tmpV.x, tmpV.z) + 0.8);
+      tmpL.set(pc.x + fx * 4, gh(pc.x + fx * 4, pc.z + fz * 4) + me.height * 0.75, pc.z + fz * 4);
       if (!race.camPos) { race.camPos = tmpV.clone(); race.camLook = tmpL.clone(); }
       race.camPos.lerp(tmpV, damp(7, dt)); race.camLook.lerp(tmpL, damp(12, dt));
       fov = 60 + clamp(sp / pc.P.vtop, 0, 1.3) * 10;
@@ -711,9 +725,9 @@
       fov = 68 + clamp(sp / pc.P.vtop, 0, 1.3) * 8;
     } else {
       var SP = 45, n = Math.max(1, Math.floor(race.T.len / SP)), idx = Math.floor(((pc.s + 22) % race.T.len) / SP) % n;
-      if (idx !== race.tvIdx) { race.tvIdx = idx; race.tvPos = tvSpot(idx); race.camLook = new THREE.Vector3(pc.x, 1, pc.z); }
+      if (idx !== race.tvIdx) { race.tvIdx = idx; race.tvPos = tvSpot(idx); race.camLook = new THREE.Vector3(pc.x, cy + 1, pc.z); }
       race.camPos = race.tvPos.clone();
-      tmpL.set(pc.x, me.height * 0.5, pc.z);
+      tmpL.set(pc.x, cy + me.height * 0.5, pc.z);
       race.camLook.lerp(tmpL, damp(10, dt));
       var dist = race.camPos.distanceTo(race.camLook);
       fov = clamp(2 * Math.atan(me.len * 1.6 / Math.max(1, dist)) * 180 / Math.PI, 12, 55);
@@ -723,6 +737,7 @@
       cam.position.x += (Math.random() - 0.5) * race.shake; cam.position.y += (Math.random() - 0.5) * race.shake * 0.6;
     }
     race.shake = Math.max(0, race.shake - dt * 1.5);
+    if (mode !== 'hood') cam.position.y = Math.max(cam.position.y, groundY(cam.position.x, cam.position.z) + 0.5);
     cam.lookAt(race.camLook);
     if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * damp(5, dt); cam.updateProjectionMatrix(); }
   }
@@ -1058,8 +1073,7 @@
   }
   function setupRaceMP() {
     var idx = mp.room.track | 0, seed = Sim.TRACKS[idx] || 1, T = Sim.track(seed);
-    trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso });
-    scene.add(trackRes.group);
+    buildTrack(T);
     var RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [], myGrid = 0, remotes = [];
     mp.grid.forEach(function (g) {
       if (String(g.id) === mp.me) { myGrid = g.grid | 0; return; }
@@ -1321,8 +1335,7 @@
       teardown();
       st = rc.st;
       var tIdx = ((st.track | 0) % Sim.TRACKS.length + Sim.TRACKS.length) % Sim.TRACKS.length, T = Sim.track(Sim.TRACKS[tIdx]);
-      trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso });
-      scene.add(trackRes.group);
+      buildTrack(T);
       race = { s: { car: null, paint: 0, track: tIdx, laps: st.laps || 3 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
         mp: true, chat: true, raceId: st.race_id, me: null, pc: null, laps: st.laps || 3, phase: 'countdown', paused: false,
         t: 0, cd: rcGo(st) - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: null,
@@ -1484,7 +1497,7 @@
     if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('hMsg').classList.remove('show', 'big'); }
     if (race.paused || race.phase === 'results') {
       if (race.phase === 'results' && !race.paused) stepWorld(dt, cruise(race.pc));
-      lookPhase(); fxFrame(dt, null);
+      lookPhase(); fxFrame(dt, null); trackRes.update(race.paused ? 0 : dt);
       renderer.render(scene, cam); return;
     }
     var pc = race.pc;
@@ -1522,6 +1535,7 @@
     updateCam(dt);
     lookPhase();
     fxFrame(dt, race.phase === 'countdown' ? null : inp);
+    trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {

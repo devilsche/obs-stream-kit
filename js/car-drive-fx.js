@@ -9,6 +9,8 @@
  *                                    aus den gezeichneten Lagen), dann wie drive(); → geschätztes Tempo (m/s)
  *   fx.update(dt, w, h)              Spuren verblassen lassen, Qualm bewegen (Rand-Fade zum Bildrand)
  *   fx.clear()                       alles weg (neues Rennen); fx.forget(id) Spur eines Autos abreißen
+ *   fx.setGround(fn)                 Geländehöhe fn(x, z) (js/car-track-scene.js heightAt; null = flach): Spuren und
+ *                                    Qualm liegen darauf
  *
  * Spuren: ein Ringpuffer aus MAX_SEG Vierecken in EINER Geometrie (Alpha je Ecke, eigener kleiner Shader mit Nebel),
  * verblassen nach MARK_LIFE s. Qualm: Sprite-Pool (höchstens MAXP, bei reduzierter Bewegung kaum), Rand-Fade wie in
@@ -47,6 +49,8 @@
     scene.add(marks);
     var head = 0, now = 0, dirty = false, trails = {};
     var Y = 0.045;   // knapp über Asphalt (0,03) und Linien (0,04)
+    var groundFn = null;
+    function gy(x, z) { return groundFn ? groundFn(x, z) : 0; }
 
     function segment(a, b, strength) {
       var k = head; head = (head + 1) % MAX_SEG;
@@ -55,10 +59,10 @@
       // Anfang mit den Kanten des vorigen Stücks verbinden (keine Lücken in Kurven)
       var ax0 = a.ex != null ? a.ex : a.x + nx, az0 = a.ez != null ? a.ez : a.z + nz;
       var ax1 = a.fx != null ? a.fx : a.x - nx, az1 = a.fz != null ? a.fz : a.z - nz;
-      pos[p] = ax0; pos[p + 1] = Y; pos[p + 2] = az0;
-      pos[p + 3] = ax1; pos[p + 4] = Y; pos[p + 5] = az1;
-      pos[p + 6] = b.x + nx; pos[p + 7] = Y; pos[p + 8] = b.z + nz;
-      pos[p + 9] = b.x - nx; pos[p + 10] = Y; pos[p + 11] = b.z - nz;
+      pos[p] = ax0; pos[p + 1] = Y + gy(ax0, az0); pos[p + 2] = az0;
+      pos[p + 3] = ax1; pos[p + 4] = Y + gy(ax1, az1); pos[p + 5] = az1;
+      pos[p + 6] = b.x + nx; pos[p + 7] = Y + gy(b.x + nx, b.z + nz); pos[p + 8] = b.z + nz;
+      pos[p + 9] = b.x - nx; pos[p + 10] = Y + gy(b.x - nx, b.z - nz); pos[p + 11] = b.z - nz;
       b.ex = b.x + nx; b.ez = b.z + nz; b.fx = b.x - nx; b.fz = b.z - nz;
       born[k] = now; strengthOf[k] = clamp(strength, 0.3, 1);
       dirty = true;
@@ -92,7 +96,7 @@
         sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX[kind], transparent: true, depthWrite: false, opacity: 0 }));
         sp.userData.kind = kind; scene.add(sp);
       }
-      sp.visible = true; sp.material.opacity = 0; sp.position.set(x, 0.35, z);
+      sp.visible = true; sp.material.opacity = 0; sp.position.set(x, gy(x, z) + 0.35, z);
       var r = Math.random;
       puffs.push({ s: sp, age: 0, life: (reduce ? 0.9 : 1.1) + r() * 0.8, size0: 0.6 + r() * 0.4, grow: reduce ? 0.8 : 2.2 + r() * 1.2,
         vx: (vx || 0) * 0.25 + (r() - 0.5) * 1.1, vy: 0.5 + r() * 0.7, vz: (vz || 0) * 0.25 + (r() - 0.5) * 1.1, a: a });
@@ -100,6 +104,7 @@
 
     var watched = {};
     var api = {
+      setGround: function (fn) { groundFn = typeof fn === 'function' ? fn : null; },
       drive: function (id, pose, slip, o) {
         o = o || {};
         var sp = o.speed || 0, surf = o.surface || 'asphalt', hard = surf === 'asphalt' || surf === 'curb';

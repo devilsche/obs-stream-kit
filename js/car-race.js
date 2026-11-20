@@ -169,181 +169,34 @@
       if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(8, maxAniso); }
       return t;
     }
-    function noise(g, w, h, base, spread, rnd) {
-      g.fillStyle = 'rgb(' + base.join(',') + ')'; g.fillRect(0, 0, w, h);
-      for (var i = 0; i < w * h / 3; i++) {
-        var k = (rnd() - 0.5) * spread;
-        g.fillStyle = 'rgba(' + (k > 0 ? '255,255,255,' : '0,0,0,') + Math.abs(k).toFixed(3) + ')';
-        g.fillRect(Math.floor(rnd() * w), Math.floor(rnd() * h), 1 + Math.floor(rnd() * 2), 1 + Math.floor(rnd() * 2));
-      }
-    }
     var shadowTex = canvasTex(128, 128, function (g) {
       var gr = g.createRadialGradient(64, 64, 6, 64, 64, 64);
       gr.addColorStop(0, 'rgba(0,0,0,0.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
       g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
     });
 
-    // ---- Strecke ----
-    var trackGroup = null, trackOwned = [], trackNear = null;
-    var trackDecor = { objs: [], trees: null };   // Deko, die dem Podest-Blick im Weg stehen kann   // trackNear(x, z, R): liegt Strecke näher als R?
+    // ---- Strecke (js/car-track-scene.js: Kulisse je Thema, Höhe nur Optik) ----
+    var trackRes = null, trackNear = null;   // trackNear(x, z, R): liegt Strecke näher als R?
+    var trackDecor = { objs: [], inst: [] };   // Deko, die Kamerafahrten (Podest, Vorstellung) im Weg stehen kann
+    var trackOwned = [];   // Podest-Teile (hängen in der Strecken-Gruppe)
     function own(x) { trackOwned.push(x); return x; }
     function buildTrack(T) {
       disposeTrack();
-      var g = trackGroup = new THREE.Group();
-      var raw = T._raw, n = raw.n, ds = raw.ds, HALF = T.width / 2;
-      var rnd = CarRaceSim.rng((T.seed | 0) + 7919);
-      // Mittellinie + Normale je Rasterpunkt
-      var P = [];
-      for (var i = 0; i < n; i++) { var a = T.at(i * ds); P.push(a); }
-      // Raster für „liegt nah an der Strecke?“ (Bäume, Leitplanken, Tribüne)
-      var CELL = 8, hash = {};
-      P.forEach(function (p, i) { var k = Math.floor(p.x / CELL) + ',' + Math.floor(p.z / CELL); (hash[k] || (hash[k] = [])).push(i); });
-      function nearTrack(x, z, R) {
-        var r = Math.ceil(R / CELL), cx = Math.floor(x / CELL), cz = Math.floor(z / CELL), R2 = R * R;
-        for (var a = -r; a <= r; a++) for (var b = -r; b <= r; b++) {
-          var l = hash[(cx + a) + ',' + (cz + b)]; if (!l) continue;
-          for (var q = 0; q < l.length; q++) { var p = P[l[q]], dx = p.x - x, dz = p.z - z; if (dx * dx + dz * dz < R2) return true; }
-        }
-        return false;
-      }
-      // Auslauf je Rasterpunkt (links/rechts, m) – dahinter steht die Leitplanke
-      var runL = T.runoff ? T.runoff.left : [], runR = T.runoff ? T.runoff.right : [];
-      function runAt(i, sd) { var v = (sd > 0 ? runL : runR)[i % n]; return v > 0 ? v : 0; }
-      // Band entlang der Strecke: Seitenversatz a…b (Zahl oder Funktion des Rasterindex), Höhe ya/yb
-      // (Wand: a = b, ya ≠ yb); keep(i) je Abschnitt
-      function strip(a0, b0, ya, yb, mat, vLen, keep) {
-        var pos = [], uv = [], idx = [];
-        for (var i = 0; i <= n; i++) {
-          var p = P[i % n], a = typeof a0 === 'function' ? a0(i % n) : a0, b = typeof b0 === 'function' ? b0(i % n) : b0;
-          pos.push(p.x + p.nx * a, ya, p.z + p.nz * a, p.x + p.nx * b, yb, p.z + p.nz * b);
-          uv.push(0, i * ds / vLen, 1, i * ds / vLen);
-          if (i < n && (!keep || keep(i))) { var o = i * 2; idx.push(o, o + 1, o + 2, o + 1, o + 3, o + 2); }
-        }
-        if (!idx.length) return null;
-        var geo = own(new THREE.BufferGeometry());
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-        geo.setIndex(idx); geo.computeVertexNormals();
-        var m = new THREE.Mesh(geo, mat); g.add(m); return m;
-      }
-      var cx = 0, cz = 0, minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
-      P.forEach(function (p) { cx += p.x / n; cz += p.z / n; minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); });
-
-      // Wiese (groß genug für den weitesten Zoom), Asphalt, Randlinien, Curbs in Kurven, Leitplanken
-      var GS = 1600;
-      var grassTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [74, 118, 58], 0.22, rnd); }, true));
-      grassTex.repeat.set(GS / 12, GS / 12);
-      var grass = new THREE.Mesh(own(new THREE.PlaneGeometry(GS, GS)), own(new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1, metalness: 0 })));
-      grass.rotation.x = -Math.PI / 2; grass.position.set(cx, 0, cz); g.add(grass);
-      var asphaltTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [62, 64, 70], 0.3, rnd); }, true));
-      var asphalt = own(new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
-      strip(-HALF, HALF, 0.03, 0.03, asphalt, 9);
-      var white = own(new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7, side: THREE.DoubleSide }));
-      strip(HALF - 0.45, HALF - 0.25, 0.04, 0.04, white, 10);
-      strip(-HALF + 0.25, -HALF + 0.45, 0.04, 0.04, white, 10);
-      var curbTex = own(canvasTex(8, 64, function (x, w, h) { x.fillStyle = '#d8262b'; x.fillRect(0, 0, w, h / 2); x.fillStyle = '#f4f4f4'; x.fillRect(0, h / 2, w, h / 2); }, true));
-      var curb = own(new THREE.MeshStandardMaterial({ map: curbTex, roughness: 0.6, side: THREE.DoubleSide }));
-      function curvy(i) { return Math.abs(P[i].curv) > 1 / 60 || Math.abs(P[(i + 1) % n].curv) > 1 / 60; }
-      strip(HALF, HALF + 0.9, 0.05, 0.05, curb, 4, curvy);
-      strip(-HALF - 0.9, -HALF, 0.05, 0.05, curb, 4, curvy);
-      // Kiesbett im Auslauf an Kurven-Außenseiten (±14 m um die Kurve), wo der Auslauf > 3 m ist; sonst Gras
-      var gravelTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [196, 178, 140], 0.45, rnd); }, true));
-      var gravel = own(new THREE.MeshStandardMaterial({ map: gravelTex, roughness: 1, metalness: 0, side: THREE.DoubleSide }));
-      var outside = { 1: new Uint8Array(n), '-1': new Uint8Array(n) }, W14 = Math.round(14 / ds);
-      for (var ci = 0; ci < n; ci++) {
-        if (Math.abs(P[ci].curv) <= 1 / 60) continue;
-        var outSd = P[ci].curv > 0 ? -1 : 1;   // Linkskurve → außen = rechts
-        for (var k = -W14; k <= W14; k++) outside[outSd][(ci + k + n) % n] = 1;
-      }
-      [1, -1].forEach(function (sd) {
-        strip(function (i) { return sd * (HALF + 0.9); }, function (i) { return sd * (HALF + Math.max(0.9, runAt(i, sd))); }, 0.035, 0.035, gravel, 5,
-          function (i) { return outside[sd][i] && outside[sd][(i + 1) % n] && runAt(i, sd) > 3 && runAt(i + 1, sd) > 3; });
-      });
-      // Leitplanken am Außenrand des Auslaufs (die Sim lässt dort nicht weiter)
-      var rail = own(new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }));
-      [1, -1].forEach(function (sd) {
-        var off = function (i) { return sd * (HALF + runAt(i, sd) + 0.3); };
-        strip(off, off, 0.25, 0.85, rail, 10);
-      });
-
-      // Start/Ziel: Schachbrett über die Fahrbahn + Portal
-      var p0 = P[0];
-      var checkTex = own(canvasTex(160, 32, function (x, w, h) {
-        for (var a = 0; a < 10; a++) for (var b = 0; b < 2; b++) { x.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; x.fillRect(a * 16, b * 16, 16, 16); }
-      }));
-      var line = new THREE.Mesh(own(new THREE.PlaneGeometry(T.width, 1.6)), own(new THREE.MeshStandardMaterial({ map: checkTex, roughness: 0.7 })));
-      line.rotation.set(-Math.PI / 2, p0.yaw + Math.PI / 2, 0, 'YXZ');   // Breite quer zur Fahrtrichtung
-      line.position.set(p0.x, 0.06, p0.z); g.add(line);
-      // Portal und Tribünendach in den Theme-Farben (Primär + Akzent)
-      var purple = own(new THREE.MeshStandardMaterial({ color: themeColor(TK.border, 0x5e2a79), roughness: 0.5 }));
-      var gold = own(new THREE.MeshStandardMaterial({ color: themeColor(TK.accent, 0xf2b705), roughness: 0.4, metalness: 0.3 }));
-      // Portal: Pfosten hinter den Leitplanken (lokal z = −Normale: links = −z)
-      var gantry = new THREE.Group(), postL = HALF + runAt(0, 1) + 0.8, postR = HALF + runAt(0, -1) + 0.8;
-      [-postL, postR].forEach(function (z) {
-        var post = new THREE.Mesh(own(new THREE.BoxGeometry(0.4, 4.6, 0.4)), purple);
-        post.position.set(0, 2.3, z); gantry.add(post);
-      });
-      var span = postL + postR + 0.4, mid = (postR - postL) / 2;
-      var beam = new THREE.Mesh(own(new THREE.BoxGeometry(0.5, 0.9, span)), purple); beam.position.set(0, 4.6, mid); gantry.add(beam);
-      var stripe = new THREE.Mesh(own(new THREE.BoxGeometry(0.52, 0.18, span + 0.02)), gold); stripe.position.set(0, 4.6, mid); gantry.add(stripe);
-      gantry.position.set(p0.x, 0, p0.z); gantry.rotation.y = p0.yaw; g.add(gantry);
-      trackDecor = { objs: [{ o: gantry, r: HALF + 13 }], trees: null };
-
-      // Tribüne neben der Startgeraden, auf der Seite mit Platz
-      var standMat = own(new THREE.MeshStandardMaterial({ color: 0x8a8f99, roughness: 0.8 }));
-      var crowdTex = own(canvasTex(128, 32, function (x, w, h) {
-        x.fillStyle = '#6d7280'; x.fillRect(0, 0, w, h);
-        var cols = ['#e04848', '#3a86ff', '#ffbe0b', '#f2f2f2', '#8338ec', '#2ec4b6', '#fb5607'];
-        for (var i = 0; i < 220; i++) { x.fillStyle = cols[Math.floor(rnd() * cols.length)]; x.fillRect(Math.floor(rnd() * w), Math.floor(rnd() * h), 2, 2); }
-      }));
-      var crowdMat = own(new THREE.MeshStandardMaterial({ map: crowdTex, roughness: 0.9 }));
-      var sMid = 28, pS = T.at(sMid);
-      [1, -1].some(function (sd) {
-        // hinter jedem möglichen Auslauf (max. 12 m) – auch dem eines anderen Streckenteils
-        var off = sd * (HALF + 12 + 5), x = pS.x + pS.nx * off, z = pS.z + pS.nz * off;
-        var ok = [-10, 0, 10].every(function (k) { var q = T.at(sMid + k); return !nearTrack(q.x + q.nx * off, q.z + q.nz * off, HALF + 12 + 4); });
-        if (!ok) return false;
-        var st = new THREE.Group();
-        for (var r = 0; r < 4; r++) {
-          var step = new THREE.Mesh(own(new THREE.BoxGeometry(22, 0.8 + r * 0.8, 1.6)), [standMat, standMat, crowdMat, standMat, standMat, standMat]);
-          step.position.set(0, (0.8 + r * 0.8) / 2, -sd * (-2.4 + r * 1.6)); st.add(step);
-        }
-        var roof = new THREE.Mesh(own(new THREE.BoxGeometry(23, 0.3, 7.5)), purple);
-        roof.position.set(0, 5.6, 0); st.add(roof);
-        st.position.set(x, 0, z); st.rotation.y = pS.yaw; g.add(st);
-        trackDecor.objs.push({ o: st, r: 12 });
-        return true;
-      });
-
-      // Bäume (InstancedMesh): außerhalb der Strecke, nicht zu weit weg
-      var trunkGeo = own(new THREE.CylinderGeometry(0.25, 0.3, 1.6, 6)), crownGeo = own(new THREE.ConeGeometry(1.8, 4.2, 7));
-      var trunkMat = own(new THREE.MeshStandardMaterial({ color: 0x6b4a2f, roughness: 1 })), crownMat = own(new THREE.MeshStandardMaterial({ color: 0x2f6b34, roughness: 0.95 }));
-      var spots = [];
-      for (var t = 0; t < 900 && spots.length < 90; t++) {
-        var x = lerp(minX - 60, maxX + 60, rnd()), z = lerp(minZ - 60, maxZ + 60, rnd());
-        if (nearTrack(x, z, HALF + 15) || !nearTrack(x, z, 70)) continue;   // nie im Auslauf
-        if (spots.some(function (s) { return (s[0] - x) * (s[0] - x) + (s[1] - z) * (s[1] - z) < 9; })) continue;
-        spots.push([x, z, 0.7 + rnd() * 0.7]);
-      }
-      if (spots.length) {
-        var trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length), crowns = new THREE.InstancedMesh(crownGeo, crownMat, spots.length);
-        var mtx = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
-        spots.forEach(function (s, i) {
-          sc.setScalar(s[2]);
-          ps.set(s[0], 0.8 * s[2], s[1]); mtx.compose(ps, q, sc); trunks.setMatrixAt(i, mtx);
-          ps.set(s[0], (1.6 + 2.1) * s[2], s[1]); mtx.compose(ps, q, sc); crowns.setMatrixAt(i, mtx);
-        });
-        g.add(trunks); g.add(crowns);
-        trackDecor.trees = { spots: spots, trunks: trunks, crowns: crowns };
-      }
-      trackNear = nearTrack;
-      scene.add(g);
+      trackRes = CarTrackScene.build(T, { primary: TK.border, accent: TK.accent, maxAniso: maxAniso, reduceMotion: reduce });
+      trackRes.applyEnv(scene, renderer);
+      trackDecor = trackRes.decor; trackNear = trackRes.nearTrack;
+      scene.add(trackRes.group);
     }
     function disposeTrack() {
-      if (trackGroup) scene.remove(trackGroup);
       trackOwned.forEach(function (x) { if (x && x.dispose) x.dispose(); });
-      trackOwned = []; trackGroup = null;
+      trackOwned = [];
+      if (trackRes) trackRes.dispose();
+      trackRes = null; trackNear = null; trackDecor = { objs: [], inst: [] };
     }
+    // Geländehöhe (Fahrbahn) und Neigung – flach ohne Strecke
+    function gh(x, z) { return trackRes ? trackRes.heightAt(x, z) : 0; }
+    var FLAT = { pitch: 0, roll: 0 };
+    function slope(x, z, yaw) { return trackRes ? trackRes.slopeAt(x, z, yaw) : FLAT; }
 
     // ---- Autos ----
     // Modell laden – eine Stelle; immer die leichte Renn-Version (.race.glb, fällt serverseitig auf das volle Modell zurück)
@@ -520,8 +373,10 @@
         r.wheelAngle = (r.wheelAngle + dist / r.wheelR) % (Math.PI * 2000);
       }
       r.lastX = x; r.lastZ = z;
-      r.holder.position.set(x, 0, z);
-      r.holder.rotation.set(roll, yaw, pitch);
+      // Höhe ist nur Optik: Auto auf die Geländehöhe, zur Steigung geneigt (Sim bleibt 2D)
+      var sl = slope(x, z, yaw);
+      r.holder.position.set(x, gh(x, z), z);
+      r.holder.rotation.set(roll + sl.roll, yaw, pitch + sl.pitch);
       r.steer = ease(r.steer, clamp(steer, -MAX_STEER, MAX_STEER), 0.12, dt, 1.6);
       for (var i = 0; i < r.wheels.length; i++) {
         var w = r.wheels[i];
@@ -1161,9 +1016,12 @@
       var seq = [2, 1, 3].map(function (pl) { return cars.filter(function (c) { return c.place === pl; })[0]; }).filter(Boolean);
       var widths = seq.map(function (c) { return Math.max(5, c.r.len * 0.95 + 1.2); }), total = widths.reduce(function (a, b) { return a + b; }, 0);
       var spot = podiumSpot(total + 2);
-      var g = new THREE.Group(); g.position.set(spot.x, 0, spot.z); trackGroup.add(g);
-      var plinth = new THREE.Mesh(own(new THREE.BoxGeometry(total + 2, 0.25, 6)), own(new THREE.MeshStandardMaterial({ color: themeColor(TK.border, 0x5e2a79), roughness: 0.6 })));
-      plinth.position.y = 0.125; g.add(plinth);
+      // Sockel eben auf der höchsten Geländestelle unter dem Podest, Fundament reicht bis in den Boden (Hang)
+      var base = -Infinity;
+      [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]].forEach(function (k) { base = Math.max(base, trackRes ? trackRes.groundAt(spot.x + k[0] * (total / 2 + 1), spot.z + k[1] * 3) : 0); });
+      var g = new THREE.Group(); g.position.set(spot.x, base, spot.z); trackRes.group.add(g);
+      var plinth = new THREE.Mesh(own(new THREE.BoxGeometry(total + 2, 4.25, 6)), own(new THREE.MeshStandardMaterial({ color: themeColor(TK.border, 0x5e2a79), roughness: 0.6 })));
+      plinth.position.y = 0.25 - 2.125; g.add(plinth);
       var x = -total / 2;
       seq.forEach(function (c, i) {
         var bw = widths[i], h = c.place === 1 ? 1.7 : c.place === 2 ? 1.2 : 0.85, col = PODIUM_COL[c.place];
@@ -1175,7 +1033,7 @@
         })) }));
         var block = new THREE.Mesh(own(new THREE.BoxGeometry(bw - 0.2, h, 4)), [side, side, side, side, front, side]);
         block.position.set(x + bw / 2, 0.25 + h / 2, 0); g.add(block);
-        c.x = spot.x + x + bw / 2; c.z = spot.z; c.top = 0.25 + h;
+        c.x = spot.x + x + bw / 2; c.z = spot.z; c.top = 0.25 + h; c.base = base;
         x += bw;
         // Auto aufs Podest: leicht zur Kamera gedreht, Räder gerade
         seatOnBlock(c);
@@ -1186,7 +1044,7 @@
         if (r.streak) r.streak.meshes.forEach(function (m) { m.visible = false; });
         if (!onPodium[r.id]) { r.holder.visible = false; r.label.sprite.visible = false; }
       });
-      race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts };
+      race.podium = { result: result, response: response, cars: cars, dnf: dnf, t: 0, counted: !!pts, base: base };
       race.podium.cam = podiumCam(race.podium, spot, total);
       race.podium.keys = inView(function () { return podiumShots(race.podium); });
       clearPodiumView(race.podium, total);
@@ -1282,29 +1140,26 @@
     }
     // Deko ausblenden, die blocks(x, z, Radius) trifft; Rückgabe zum Wiederherstellen (restoreDecor)
     function hideDecor(blocks) {
-      var undo = { objs: [], trees: [] };
+      var undo = { objs: [], inst: [] }, zero = new THREE.Matrix4().makeScale(0, 0, 0);
       trackDecor.objs.forEach(function (d) { if (d.o.visible && blocks(d.o.position.x, d.o.position.z, d.r)) { d.o.visible = false; undo.objs.push(d.o); } });
-      var tr = trackDecor.trees;
-      if (tr) {
-        var zero = new THREE.Matrix4().makeScale(0, 0, 0);
-        tr.spots.forEach(function (sp, i) {
-          if (sp.hidden || !blocks(sp[0], sp[1], 2.5)) return;
-          var a = new THREE.Matrix4(), b = new THREE.Matrix4(); tr.trunks.getMatrixAt(i, a); tr.crowns.getMatrixAt(i, b);
-          undo.trees.push([i, a, b]); sp.hidden = true;
-          tr.trunks.setMatrixAt(i, zero); tr.crowns.setMatrixAt(i, zero);
+      (trackDecor.inst || []).forEach(function (k) {
+        var hit = false;
+        k.spots.forEach(function (sp, i) {
+          if (sp.hidden || !blocks(sp.x, sp.z, sp.r)) return;
+          undo.inst.push([k, i, k.meshes.map(function (m) { var a = new THREE.Matrix4(); m.getMatrixAt(i, a); m.setMatrixAt(i, zero); return a; })]);
+          sp.hidden = true; hit = true;
         });
-        if (undo.trees.length) { tr.trunks.instanceMatrix.needsUpdate = true; tr.crowns.instanceMatrix.needsUpdate = true; }
-      }
+        if (hit) k.meshes.forEach(function (m) { m.instanceMatrix.needsUpdate = true; });
+      });
       return undo;
     }
     function restoreDecor(undo) {
       if (!undo) return;
       undo.objs.forEach(function (o) { o.visible = true; });
-      var tr = trackDecor.trees;
-      if (tr && undo.trees.length) {
-        undo.trees.forEach(function (u) { tr.trunks.setMatrixAt(u[0], u[1]); tr.crowns.setMatrixAt(u[0], u[2]); tr.spots[u[0]].hidden = false; });
-        tr.trunks.instanceMatrix.needsUpdate = true; tr.crowns.instanceMatrix.needsUpdate = true;
-      }
+      (undo.inst || []).forEach(function (u) {
+        u[0].meshes.forEach(function (m, j) { m.setMatrixAt(u[1], u[2][j]); m.instanceMatrix.needsUpdate = true; });
+        u[0].spots[u[1]].hidden = false;
+      });
     }
 
     // ---- Fahrervorstellung (Phase intro) ----
@@ -1417,10 +1272,10 @@
         if (w.spin) w.spin.rotation[w.spin.userData.ax || 'x'] = w.base;
         if (w.front) w.pivot.rotation.y = 0;
       });
-      r.holder.position.set(c.x, c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
+      r.holder.position.set(c.x, (c.base || 0) + c.top, c.z); r.holder.rotation.set(0, -0.3, 0);
       r.holder.updateMatrixWorld(true);   // sonst misst lowestPoint mit der alten Lage aus dem Rennen
       var low = lowestPoint(r.body);
-      if (isFinite(low)) r.holder.position.y += c.top - low;
+      if (isFinite(low)) r.holder.position.y += (c.base || 0) + c.top - low;
       r.holder.updateMatrixWorld(true);
     }
     function lowestPoint(obj) {
@@ -1527,8 +1382,19 @@
       var vw = VIEW ? VW.w : W, vh = VIEW ? VW.h : H;
       var px = Math.exp(c.lp), visW = vw / px, tanH = Math.tan(FOV * Math.PI / 360) * (vw / vh);
       var D = visW / (2 * tanH), hor = D * Math.cos(c.tilt);
-      cam.position.set(c.x + hor * Math.sin(c.orb), c.ty + D * Math.sin(c.tilt), c.z + hor * Math.cos(c.orb));
-      cam.lookAt(c.x, c.ty, c.z);
+      // Geländehöhe unter dem Blickpunkt (Podest: Sockelhöhe), weich nachgeführt
+      var gyT = fit.gy != null ? fit.gy : gh(c.x, c.z);
+      c.gy = fit.direct || c.gy == null ? gyT : ease(c.gy, gyT, 0.5, dt);
+      var ly = c.gy + (c.ty || 0), px0 = c.x + hor * Math.sin(c.orb), pz0 = c.z + hor * Math.cos(c.orb);
+      cam.position.set(px0, ly + D * Math.sin(c.tilt), pz0);
+      if (trackRes && !trackRes.theme.flat) {
+        // Hügel zwischen Blickpunkt und Kamera: Kamera so weit anheben, dass die Sichtlinie frei bleibt (≥ 1,2 m)
+        [0.35, 0.6, 0.8, 1].forEach(function (f) {
+          var gy = trackRes.groundAt(lerp(c.x, px0, f), lerp(c.z, pz0, f)) + (f === 1 ? 2 : 1.2);
+          cam.position.y = Math.max(cam.position.y, ly + (gy - ly) / f);
+        });
+      }
+      cam.lookAt(c.x, ly, c.z);
     }
 
     // ---- HUD (2D-Canvas) ----
@@ -1845,12 +1711,13 @@
           blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending }));
         sp.userData.kind = kind; scene.add(sp);
       }
-      sp.visible = true; sp.material.opacity = 0; sp.position.set(x, y, z);
+      var gy = gh(x, z);   // y kommt relativ zum Boden
+      sp.visible = true; sp.material.opacity = 0; sp.position.set(x, y + gy, z);
       var rnd = Math.random;
       puffs.push({ s: sp, age: 0, life: o.life || (spark ? 0.35 + rnd() * 0.2 : 1.2 + rnd() * 0.9),
         size0: o.size || (spark ? 0.25 : 0.7 + rnd() * 0.5), grow: o.grow != null ? o.grow : (spark ? 0 : 1.6 + rnd() * 1.4),
         vel: new THREE.Vector3((rnd() - 0.5) * (spark ? 9 : 1.2), spark ? 1.5 + rnd() * 3 : 0.4 + rnd() * 0.8, (rnd() - 0.5) * (spark ? 9 : 1.2)),
-        a: o.a || (spark ? 1 : 0.5), grav: o.grav != null ? o.grav : spark ? -9 : 0.2, flick: !!o.flick && !reduce, ph: rnd() * 6.3 });
+        a: o.a || (spark ? 1 : 0.5), grav: o.grav != null ? o.grav : spark ? -9 : 0.2, flick: !!o.flick && !reduce, ph: rnd() * 6.3, floor: gy + 0.1 });
       if (o.vel) puffs[puffs.length - 1].vel.copy(o.vel);
     }
     function burst(kind, x, z, n, o) { for (var i = 0; i < (reduce ? Math.min(n, 2) : n); i++) puff(kind, x + (Math.random() - 0.5) * 1.2, (o && o.y) || 0.4, z + (Math.random() - 0.5) * 1.2, o); }
@@ -1860,7 +1727,7 @@
         if (q.age >= q.life) { q.s.visible = false; POOL[q.s.userData.kind].push(q.s); puffs.splice(i, 1); continue; }
         var k = q.age / q.life;
         q.s.position.addScaledVector(q.vel, dt); q.vel.multiplyScalar(1 - dt * 1.2); q.vel.y += dt * q.grav;
-        if (q.s.position.y < 0.1) { q.s.position.y = 0.1; q.vel.y = 0; }
+        if (q.s.position.y < q.floor) { q.s.position.y = q.floor; q.vel.y = 0; }
         q.s.scale.setScalar(q.size0 + q.grow * k);
         // Rand-Fade: Abstand zum Bildrand in Pixeln
         pv3.copy(q.s.position).project(cam);
@@ -1927,6 +1794,7 @@
     }
 
     // Ölflecken aus sim.hazards: ab „from“ weich einblenden, bleiben bis Rennende
+    var UPV = new THREE.Vector3(0, 1, 0);
     function updateOil(sim) {
       var hz = sim.hazards || [];
       for (var i = 0; i < hz.length; i++) {
@@ -1935,8 +1803,11 @@
           var mat = new THREE.MeshStandardMaterial({ map: oilTex, transparent: true, depthWrite: false, opacity: 0, roughness: 0.08, metalness: 0.6, color: 0xffffff });
           m = race.oil[i] = new THREE.Mesh(oilGeo, mat);
           var p = race.T.at(h.s);
-          m.position.set(p.x + p.nx * h.d, 0.065 + i * 0.002, p.z + p.nz * h.d);
-          m.scale.set(h.r, 1, h.r); m.rotation.y = i * 2.1;
+          var ox = p.x + p.nx * h.d, oz = p.z + p.nz * h.d;
+          m.position.set(ox, gh(ox, oz) + 0.065 + i * 0.002, oz);
+          m.scale.set(h.r, 1, h.r);
+          if (trackRes) m.quaternion.setFromUnitVectors(UPV, trackRes.normalAt(ox, oz));
+          m.rotateY(i * 2.1);
           scene.add(m);
         }
         m.material.opacity = 0.92 * clamp((sim.time - h.from) / 0.8, 0, 1);
@@ -1965,7 +1836,8 @@
       var ux = dx / len, uz = dz / len, rot = Math.atan2(-dz, dx);
       S.meshes.forEach(function (m, k) {
         var off = (k ? 1 : -1) * Math.min(r.w, leader.w) * 0.28;
-        m.position.set((a.x + b.x) / 2 - uz * off, 0.55 + k * 0.25, (a.z + b.z) / 2 + ux * off);
+        var sx = (a.x + b.x) / 2 - uz * off, sz = (a.z + b.z) / 2 + ux * off;
+        m.position.set(sx, gh(sx, sz) + 0.55 + k * 0.25, sz);
         m.rotation.y = rot; m.scale.set(len, 1, 0.45);
       });
     }
@@ -2087,11 +1959,12 @@
         // Goldfunken über dem Sieger (kurz, mit Rand-Fade; bei reduzierter Bewegung nicht)
         if (!reduce && pd.t < 4 && Math.random() < dt * 14) {
           var wn = pd.cars[0];
-          puff('spark', wn.x + (Math.random() - 0.5) * wn.r.len, wn.top + wn.r.height + 1.5 + Math.random(), wn.z + (Math.random() - 0.5) * 2, { life: 0.9, size: 0.3 });
+          var spx = wn.x + (Math.random() - 0.5) * wn.r.len, spz = wn.z + (Math.random() - 0.5) * 2;
+          puff('spark', spx, (wn.base || 0) - gh(spx, spz) + wn.top + wn.r.height + 1.5 + Math.random(), spz, { life: 0.9, size: 0.3 });
         }
         // Übergang aus der Rennkamera weich (1,2 s gedämpft), danach direkt den Schlüsselbildern folgen;
         // reduzierte Bewegung: sofort (Schnitt statt Fahrt)
-        camFix = Object.assign({}, shot, { direct: reduce || pd.t > 1.2 });
+        camFix = Object.assign({}, shot, { direct: reduce || pd.t > 1.2, gy: pd.base || 0 });
       } else if (race.stage === 'grid') {
         // Fahrervorstellung: ab introAt bis zum Rennstart (Phase intro)
         var introT = race.introAt != null ? now - race.introAt : -1;
@@ -2154,7 +2027,7 @@
           placeCar(r, lerp(p.x, c.x, a), lerp(p.z, c.z, a), lerp(p.yaw, c.yaw, a), lerp(p.roll, c.roll, a), lerp(p.pitch, c.pitch, a), lerp(p.steer, c.steer, a), dt);
           // Stoß-Ruck nach Kontakt/Crash (kurz, bei reduzierter Bewegung aus)
           if (r.jolt > 0) {
-            if (!reduce) { var j = r.jolt * r.jolt; r.holder.position.y = 0.12 * j; r.holder.rotation.x += 0.07 * j * Math.sin(r.jolt * 25); }
+            if (!reduce) { var j = r.jolt * r.jolt; r.holder.position.y += 0.12 * j; r.holder.rotation.x += 0.07 * j * Math.sin(r.jolt * 25); }
             r.jolt = Math.max(0, r.jolt - dt * 3.5);
           }
           if (r.flash > 0) r.flash = Math.max(0, r.flash - dt);
@@ -2219,6 +2092,7 @@
       updateCamera(pts, dt, camFix);
       cam.updateMatrixWorld();
       inViewport(function () { updateLabels(labels, dt); });
+      if (trackRes) trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
       renderScene();
       var rows = rankingRows();
       drawHudView(function () { drawHud(now, rows); });
@@ -2244,6 +2118,7 @@
     function groundAt(cx, cy) {
       var nx = VIEW ? (cx - VW.x) / VW.w : cx / W, ny = VIEW ? (cy - VW.y) / VW.h : cy / H;
       ray.setFromCamera({ x: nx * 2 - 1, y: -(ny * 2 - 1) }, cam);
+      ground.constant = -(race && race.cam && race.cam.gy || 0);   // Ebene auf Geländehöhe des Blickpunkts
       return ray.ray.intersectPlane(ground, hitV) ? { x: hitV.x, z: hitV.z } : null;
     }
     function zoomAt(factor, cx, cy) {
