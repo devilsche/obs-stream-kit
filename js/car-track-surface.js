@@ -20,7 +20,8 @@
  *   Rand-Deko    Streckenposten, Countdown-Tafeln (Streifen statt Zahlen) vor Bremszonen, Startampel am Portal.
  * Auslauf/Leitplanke bleiben genau dort, wo Sim (js/car-race-sim.js) und Fahrphysik (js/car-drive-phys.js) sie
  * erwarten – hier ist alles nur Optik.
- * Texturen werden einmal je Seite erzeugt (≤ 512², Mipmaps, Anisotropie) und von allen Strecken geteilt.
+ * Texturen werden einmal je Seite erzeugt (Asphalt 1024², sonst ≤ 512²; Mipmaps, Anisotropie bis 16) und von allen
+ * Strecken geteilt.
  */
 (function (root) {
   'use strict';
@@ -91,16 +92,18 @@
   // Asphalt: Grundton, Gesteinskörnung (helle/dunkle Körner), großflächige Flecken; Normalen + Rauheit aus der Höhe
   function asphaltTex(aniso) {
     if (TEX.asphalt) return TEX.asphalt;
-    var N = 512, rnd = xrng(91), H = fbmField(N, rnd, [[4, 0.5], [16, 0.3], [64, 0.25], [128, 0.15]]);
-    var tone = fbmField(N, rnd, [[3, 0.6], [8, 0.4]]), A = new Float32Array(N * N), i;
+    // 1024² und kräftigere Mittel-Strukturen: feine Körner allein mitteln sich in den Mipmaps (Abstand, flacher Blick)
+    // zu flachem Grau – gröbere Körnung, Flecken und Bitumen-Nester bleiben auch aus der Overlay-Totale sichtbar
+    var N = 1024, rnd = xrng(91), H = fbmField(N, rnd, [[4, 0.5], [16, 0.3], [64, 0.25], [128, 0.15], [256, 0.1]]);
+    var tone = fbmField(N, rnd, [[3, 0.6], [8, 0.4]]), mid = fbmField(N, rnd, [[24, 0.5], [48, 0.35], [96, 0.25]]), A = new Float32Array(N * N), i;
     for (i = 0; i < N * N; i++) A[i] = 0;
-    for (i = 0; i < 26000; i++) {   // Körner: Höhe + Farbe (hell = Splitt, dunkel = Bitumen)
-      var r = 0.7 + rnd() * 1.6, light = rnd() < 0.45, k = (light ? 1 : -0.6) * (0.25 + rnd() * 0.75), h = 0.35 + rnd() * 0.4;
+    for (i = 0; i < 95000; i++) {   // Körner: Höhe + Farbe (hell = Splitt, dunkel = Bitumen)
+      var r = 0.8 + rnd() * 2.6, light = rnd() < 0.45, k = (light ? 1 : -0.7) * (0.3 + rnd() * 0.7), h = 0.35 + rnd() * 0.45;
       stamp(N, rnd() * N, rnd() * N, r, function (q, w) { H[q] += h * Math.sqrt(w); A[q] += k * w; });
     }
     var col = new Uint8Array(N * N * 4), rough = new Uint8Array(N * N * 4);
     for (i = 0; i < N * N; i++) {
-      var base = 60 + (tone[i] - 0.5) * 14 + A[i] * 26 + (H[i] - 1) * 8;
+      var base = 62 + (tone[i] - 0.5) * 26 + (mid[i] - 0.5) * 22 + A[i] * 40 + (H[i] - 1) * 10;
       col[i * 4] = clamp(base, 20, 200); col[i * 4 + 1] = clamp(base + 2, 20, 200); col[i * 4 + 2] = clamp(base + 6, 20, 210); col[i * 4 + 3] = 255;
       var ro = 0.86 + (A[i] > 0.2 ? -0.12 : 0.04) - (tone[i] - 0.5) * 0.1;
       rough[i * 4] = rough[i * 4 + 1] = rough[i * 4 + 2] = clamp(ro, 0, 1) * 255; rough[i * 4 + 3] = 255;
@@ -264,7 +267,7 @@
 
   function build(S) {
     var T = S.T, P = S.P, n = S.n, ds = S.ds, HALF = S.HALF, hAt = S.heightAt, theme = S.theme, own = S.own, g = S.g;
-    var cfg = theme.surface || {}, rnd = S.rng(31), aniso = Math.min(8, S.maxAniso || 4), lin = S.lin;
+    var cfg = theme.surface || {}, rnd = S.rng(31), aniso = Math.min(16, S.maxAniso || 4), lin = S.lin;
     var stats = { draws: 0, tris: 0, texBytes: 0 }, texSeen = [];
     var Kit = root.CarTrackThemes && root.CarTrackThemes.Kit;
     function tex(t) { if (texSeen.indexOf(t) < 0) { texSeen.push(t); stats.texBytes += t.trackBytes || 0; own(t); } return t; }
