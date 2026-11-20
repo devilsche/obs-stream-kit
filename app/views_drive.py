@@ -16,6 +16,9 @@ Chatrennen steuerbar (Schritt 2b) – fester Link je Tenant, <kanal> = Twitch-Ka
   GET /drive/race/<kanal>/ticket  Fahrer-Ticket für /drive-ws/race – nur angemeldet und im aktuellen Chatrennen
   GET /drive/login?race=<kanal>   Anmeldung, zurück auf /drive/race/<kanal>
 
+Kulissen-Modelle der Strecken-Themen (fx/track_props.py): GET /drive/a/api/fx/track-props/catalog.json und
+GET /drive/a/api/fx/track-props/<uid>.glb (wie die Auto-Modelle ohne Widget-Token).
+
 Rundenrekorde (nur lesen, wie …/api/fx/car-race?cmd=records): GET /drive/race/<kanal>/records?track=&car= und
 GET /drive/<code>/records?track=&car= (Tenant des Raums).
 """
@@ -30,7 +33,7 @@ import urllib.parse
 from flask import (Blueprint, Response, abort, current_app, jsonify, make_response, redirect, request,
                    send_from_directory, session)
 
-from fx import car_models, drive_auth, race, race_db
+from fx import car_models, drive_auth, race, race_db, track_props
 from webcore.serving import inject_theme, serve_asset
 
 bp_drive = Blueprint("drive", __name__)
@@ -312,6 +315,19 @@ def model(uid, light=False):
     if not os.path.exists(os.path.join(d, name)):
         abort(404)
     return send_from_directory(os.path.abspath(d), name, mimetype="model/gltf-binary", max_age=7 * 86400)
+
+
+@bp_drive.route("/drive/a/api/fx/track-props/catalog.json")
+def track_props_catalog():
+    return _no_store(jsonify(track_props.catalog(_root())))
+
+
+@bp_drive.route("/drive/a/api/fx/track-props/<uid>.glb")
+def track_prop_file(uid):
+    name = track_props.model_name(_root(), uid)
+    if not name:
+        abort(404)
+    return send_from_directory(track_props.folder(_root()), name, mimetype="model/gltf-binary", max_age=7 * 86400)
 
 
 @bp_drive.route("/drive/a/api/fx/cars/custom.js")

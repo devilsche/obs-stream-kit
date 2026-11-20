@@ -21,7 +21,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, abort, request, 
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, race_shop, season_db, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, race_shop, season_db, track_props, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -581,6 +581,24 @@ def car_model_file(token, uid, race=False):
     if not os.path.exists(os.path.join(d, name)):
         abort(404)
     return send_from_directory(os.path.abspath(d), name, mimetype="model/gltf-binary", max_age=7 * 86400)
+
+
+@bp_fx.route("/s/<token>/api/fx/track-props/catalog.json")
+def track_props_catalog(token):
+    """Kulissen-Modelle der Strecken-Themen samt Quellenangaben (data/track-props, scripts/build_track_props.py)."""
+    if g.tenant_id is None:
+        abort(404)
+    return _no_store(jsonify(track_props.catalog(current_app.config.get("_PROJECT_ROOT") or ".")))
+
+
+@bp_fx.route("/s/<token>/api/fx/track-props/<uid>.glb")
+def track_prop_file(token, uid):
+    """Ein Kulissen-Modell; lange cachebar (Aufrufer hängt ?v=<bytes> an)."""
+    root = current_app.config.get("_PROJECT_ROOT") or "."
+    name = track_props.model_name(root, uid) if g.tenant_id is not None else None
+    if not name:
+        abort(404)
+    return send_from_directory(track_props.folder(root), name, mimetype="model/gltf-binary", max_age=7 * 86400)
 
 
 @bp_fx.route("/s/<token>/api/fx/cars/custom.js")
