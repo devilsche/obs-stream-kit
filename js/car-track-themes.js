@@ -90,6 +90,108 @@
   // Prisma (Satteldach): Länge entlang x, Giebel nach oben
   function prism(len, w, h) { var g = new THREE.CylinderGeometry(1, 1, len, 3, 1); g.rotateZ(Math.PI / 2); g.rotateX(Math.PI / 2); g.scale(1, h / 1.5, w / 1.732); g.translate(0, -h / 6, 0); return g; }
 
+
+  // ---- Relief: Bergketten/Hügel/Inseln aus Rauschen (glatt schattiert, Farbe nach Neigung und Höhe) ----
+  // Gitter mit eigenen Normalen (aus den Nachbarpunkten), alle Gitter einer Szene in EINER Geometrie
+  function Relief() { this.pos = []; this.col = []; this.nor = []; this.idx = []; }
+  // R Zeilen × C Spalten; wrap = Spalten ringförmig; pf(r, c) → { p: [x, y, z], k }; cf(p, ny, k) → Farbe (linear)
+  Relief.prototype.grid = function (R, C, wrap, pf, cf) {
+    var V = [], r, c, base = this.pos.length / 3;
+    for (r = 0; r < R; r++) for (c = 0; c < C; c++) V.push(pf(r, c));
+    function at(rr, cc) { return V[rr * C + cc].p; }
+    for (r = 0; r < R; r++) for (c = 0; c < C; c++) {
+      var cl = wrap ? (c - 1 + C) % C : Math.max(c - 1, 0), cr = wrap ? (c + 1) % C : Math.min(c + 1, C - 1);
+      var ru = Math.min(r + 1, R - 1), rd = Math.max(r - 1, 0), A = at(r, cl), B = at(r, cr), U = at(ru, c), D = at(rd, c);
+      var ax = B[0] - A[0], ay = B[1] - A[1], az = B[2] - A[2], bx = U[0] - D[0], by = U[1] - D[1], bz = U[2] - D[2];
+      var nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx, l = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (!(l > 1e-9)) { nx = 0; ny = 1; nz = 0; l = 1; }   // zusammenfallende Nachbarn (Inselgipfel)
+      if (ny < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      var v = V[r * C + c], col = cf(v.p, ny / l, v.k);
+      this.pos.push(v.p[0], v.p[1], v.p[2]); this.nor.push(nx / l, ny / l, nz / l); this.col.push(col.r, col.g, col.b);
+    }
+    var i0 = this.idx.length;
+    for (r = 0; r < R - 1; r++) for (c = 0; c < (wrap ? C : C - 1); c++) {
+      var a = base + r * C + c, b = base + r * C + (c + 1) % C, d = a + C, e = b + C;
+      this.idx.push(a, d, b, b, d, e);
+    }
+    // Wicklung nach oben ausrichten (an einem Viereck in der Mitte geprüft)
+    var P = this.pos, I = this.idx, t = i0 + Math.floor((I.length - i0) / 6) * 3;
+    if (I.length > i0) {
+      var p0 = I[t] * 3, p1 = I[t + 1] * 3, p2 = I[t + 2] * 3;
+      var ux = P[p1] - P[p0], uz = P[p1 + 2] - P[p0 + 2], wx = P[p2] - P[p0], wz = P[p2 + 2] - P[p0 + 2];
+      if (uz * wx - ux * wz < 0) for (var q = i0; q < I.length; q += 3) { var tmp = I[q + 1]; I[q + 1] = I[q + 2]; I[q + 2] = tmp; }
+    }
+    return this;
+  };
+  Relief.prototype.geo = function () {
+    if (!this.idx.length) return null;
+    var g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    g.setIndex(this.idx); g.computeBoundingSphere();
+    return g;
+  };
+  // Grat-Rauschen (ridged multifractal): scharfe Kämme, weiche Täler
+  function ridged(x, z, oct) {
+    var s = 0, a = 0.5, f = 1, w = 1;
+    for (var o = 0; o < (oct || 5); o++) {
+      var v = 1 - Math.abs(vnoise(x * f, z * f) * 2 - 1);
+      v *= v; v *= w; w = clamp(v * 1.7, 0, 1);
+      s += v * a; f *= 2.03; a *= 0.5;
+    }
+    return s;
+  }
+  // Bergketten in Tiefen-Schichten rund um die Strecke. o = { layers: [[r0, r1, Höhe, Dunst]], seed, lambda,
+  //   back (Zusatzhöhe hinten −z), mask(θ) → 0…1, pal: { grass, forest, scree, rock, rock2, snow }, snow (Schneegrenze
+  //   relativ, 0 = keiner), forest (bis zu dieser relativen Höhe Wald), haze (Farbe), seg, rows }
+  function ranges(rl, ctx, o) {
+    var rr = ctx.rng(o.seed || 19), seg = o.seg || 288, rows = o.rows || 14, pal = o.pal, haze = lin(o.haze);
+    o.layers.forEach(function (L, li) {
+      var ox = rr() * 500, oz = rr() * 500, lam = (o.lambda || 260) * (1 + li * 0.35), r0 = L[0], r1 = L[1], hmax = L[2];
+      var snowOff = rr() * 100;
+      rl.grid(rows, seg, true, function (r, c) {
+        var t = r / (rows - 1), th = c / seg * TAU, R = lerp(r0, r1, Math.pow(t, 0.9));
+        var x = ctx.cx + Math.cos(th) * R, z = ctx.cz + Math.sin(th) * R;
+        var mk = o.mask ? o.mask(th) : 1, bk = 1 + (o.back || 0) * Math.max(0, -Math.sin(th));
+        var env = smooth(0, 0.32, t) * (1 - 0.45 * smooth(0.72, 1, t));
+        var big = 0.45 + 0.55 * vnoise((x + ox) / (lam * 3.2), (z + oz) / (lam * 3.2));   // Pässe und Gipfelgruppen
+        var hh = hmax * bk * mk * env * big * (0.2 + ridged((x + ox) / lam, (z + oz) / lam));
+        var base = ctx.height(x, z) - 4;
+        return { p: [x, base + hh, z], k: { rel: hh / Math.max(1, hmax * bk * mk), n: vnoise((x + snowOff) / 60, z / 60), haze: L[3] } };
+      }, function (p, ny, k) {
+        var slope = 1 - ny, c = mix(pal.grass, pal.grass2 || pal.grass, k.n);
+        if (o.forest) c = mix(c, mix(pal.forest, pal.forest2 || pal.forest, k.n), smooth(o.forest + 0.08, o.forest - 0.1, k.rel + (k.n - 0.5) * 0.12) * smooth(0.6, 0.38, slope));
+        c = mix(c, pal.scree, smooth(0.2, 0.4, k.rel) * smooth(0.18, 0.32, slope) * 0.8);
+        c = mix(c, mix(pal.rock, pal.rock2, k.n), smooth(0.34, 0.5, slope));
+        if (o.snow) {
+          var line = o.snow + (k.n - 0.5) * 0.16;
+          c = mix(c, pal.snow, smooth(line - 0.04, line + 0.06, k.rel) * smooth(0.72, 0.55, slope));
+        }
+        return c.clone().lerp(haze, k.haze);
+      });
+    });
+    return rl;
+  }
+  // Insel: unregelmäßiger Umriss, Gipfel in der Mitte (Höhe hpk über y0), Strand – Fels – Grün
+  function island(rl, x0, z0, y0, ir, hpk, seed, pal, hazeC, hz) {
+    var segs = 28, rows = 9, haze = lin(hazeC);
+    rl.grid(rows, segs, true, function (r, c) {
+      var t = r / (rows - 1), th = c / segs * TAU;
+      var edge = ir * (0.8 + 0.4 * vnoise(Math.cos(th) * 1.6 + seed, Math.sin(th) * 1.6 + seed * 1.7));
+      var R = edge * (1 - t), x = x0 + Math.cos(th) * R, z = z0 + Math.sin(th) * R;
+      var prof = Math.pow(t, 1.6) * (3 - 2 * t);
+      var rough = 1 + (1 - t) * t * 1.6 * (ridged(x / 70 + seed, z / 70) - 0.4);
+      return { p: [x, y0 + hpk * clamp(prof * rough, 0, 1.2) - (r === 0 ? 3 : 0), z], k: { rel: t, n: vnoise(x / 40, z / 40) } };
+    }, function (p, ny, k) {
+      var slope = 1 - ny, c = mix(pal.grass, pal.forest, k.n);
+      c = mix(c, mix(pal.rock, pal.rock2, k.n), smooth(0.3, 0.5, slope));
+      c = mix(c, pal.sand, smooth(0.16, 0.05, k.rel));
+      return c.clone().lerp(haze, hz);
+    });
+    return rl;
+  }
+
   // ---- Bausteine, die mehrere Themen nutzen ----
   function pineGeo(dark) {
     var k = new Kit(), g = dark ? [0x234f2a, 0x2a5d31, 0x316a38] : [0x2f6b34, 0x347a3a, 0x3a8540];
@@ -114,6 +216,17 @@
     return k.geo();
   }
 
+  // Reifenstapel: 3 Reifen (Drehkörper mit Flanke, Lauffläche, Loch), Fugen dazwischen; mittlerer Reifen weiß
+  // (Instanzfarbe tönt ihn), Rest fast schwarz. r = Außenradius (m); Fuß auf y = 0
+  function tyreStack(r) {
+    r = r || 0.31;
+    var h = r * 0.62, k = new Kit(), pts = [[r, 0], [r, 0.97 * h], [0.88 * r, h], [r, 1.03 * h], [r, 1.97 * h], [0.88 * r, 2 * h], [r, 2.03 * h], [r, 2.95 * h], [0.5 * r, 3 * h]];
+    var lathe = new THREE.LatheGeometry(pts.map(function (p) { return new THREE.Vector2(p[0], p[1]); }), 7);
+    // mittlerer Reifen hell (Instanzfarbe), Loch oben fast schwarz
+    k.add(lathe, function (x, y, z) { return Math.hypot(x, z) < r * 0.6 ? 0x0c0c0d : y > h * 1.02 && y < h * 1.98 ? 0xffffff : 0x1b1c1f; });
+    return k.geo();
+  }
+
   // ---- Themen ----
   var THEMES = {};
 
@@ -123,6 +236,7 @@
     sky: { top: 0x3d7cc9, horizon: 0xc8dcf0 }, fog: { near: 420, far: 1700 },
     sun: { color: 0xffffff, k: 1.05, pos: [4, 7, 5] }, hemi: { sky: 0xdfeeff, ground: 0x4d6a45, k: 1 }, fill: 1, exposure: 1.0,
     groundTex: { base: [232, 232, 232], spread: 0.12, stripes: true },
+    surface: { curb: [0xd8262b, 0xf4f4f4], runoff: 'gravel', barrier: 'wall' },
     height: function () { return function () { return 0; }; },
     groundColor: function (ctx) {
       return function (x, z, h, d) { var n = fbm(x / 40, z / 40); return mix(0x3f8a3c, 0x4f9a46, n); };
@@ -182,7 +296,9 @@
       [1, -1].some(function (sd) {
         var o = along(-30, sd, HALF + 12 + 4);
         if (!ctx.clearRect(o.x, o.z, o.rot, 24.5, -0.5, 10.5) || !ctx.place(o.x, o.z, 12, true)) return false;
-        pits.add(o.x, o.z, { rot: o.rot }); pitSide = sd; return true;
+        pits.add(o.x, o.z, { rot: o.rot }); pitSide = sd;
+        ctx.pit = { sd: sd, mid: -30, s0: -52, s1: -8 };   // Boxengasse vor dem Gebäude (Markierung: js/car-track-surface.js)
+        return true;
       });
       var L = ctx.T.len, nStand = 0;
       for (var s = 0; s < L && nStand < 6; s += 6) {
@@ -253,6 +369,7 @@
     sky: { top: 0x5b8fc4, horizon: 0xcfe0d6 }, fog: { near: 300, far: 1300 },
     sun: { color: 0xfff1d6, k: 0.9, pos: [5, 7, 3] }, hemi: { sky: 0xd8ecd8, ground: 0x3d5a32, k: 1 }, fill: 0.85, exposure: 1.0,
     groundTex: { base: [232, 232, 232], spread: 0.26 },
+    surface: { curb: [0xd8262b, 0xf4f4f4], runoff: 'gravel', barrier: 'armco', sausage: true },
     height: function (ctx) {
       var w = waveSet(ctx.rng(11), 3, 2.6, 95, 170);
       return function (x, z) { return w(x - ctx.cx, z - ctx.cz); };
@@ -306,6 +423,10 @@
       ctx.scatter(pineD, 520, { dmin: 70, dmax: 270, rad: 2.2, s: [1.0, 1.8], pred: offCreek, tint: green });
       // Felsen
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6 }), 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
+      // Bewaldete Hügelketten im Hintergrund (Wald bis fast oben, Lichtungen, wenig Fels), im Dunst
+      ctx.bgMesh(ranges(new Relief(), ctx, { seed: 11, forest: 0.85, haze: THEMES.forest.sky.horizon, lambda: 200,
+        layers: [[380, 700, 70, 0.08], [620, 1020, 120, 0.25], [920, 1260, 170, 0.4]],
+        pal: { grass: 0x5d7a3e, grass2: 0x6c8645, forest: 0x264a2a, forest2: 0x2f5a31, scree: 0x7c7466, rock: 0x6c6a63, rock2: 0x807d75, snow: 0xf2f5fa } }).geo());
       // Holzzaun an Geraden hinter der Leitplanke (Abschnitte à 4 m)
       var fk = new Kit();
       [-1.9, 0, 1.9].forEach(function (x) { fk.add(box(0.16, 1.3, 0.16), 0x6e4c2c, { x: x, y: 0.45 }); });
@@ -321,6 +442,7 @@
     sky: { top: 0x2f6fc2, horizon: 0xdbe8f5 }, fog: { near: 380, far: 2100 },
     sun: { color: 0xeef4ff, k: 1.15, pos: [3, 8, 4] }, hemi: { sky: 0xe6f0ff, ground: 0x5d6b52, k: 1.05 }, fill: 1, exposure: 1.02,
     groundTex: { base: [232, 232, 232], spread: 0.24 },
+    surface: { curb: [0xd8262b, 0xf4f4f4], runoff: 'gravel', barrier: 'armco', sausage: true },
     height: function (ctx) {
       // schiefe Ebene (weich begrenzt) + Wellen + Anstieg zu den Bergen weit draußen
       var w = waveSet(ctx.rng(13), 3, 1.4, 80, 140), dx = 0.8, dz = -0.6, G = 0.115, R = 110;
@@ -342,19 +464,12 @@
     },
     decorate: function (ctx) {
       var rnd = ctx.rnd;
-      // Bergkette rundum, hinten (−z, Blickrichtung der Totalen) höher; Schnee oben, Fels, grüner Fuß
-      var bg = new Kit();
-      for (var i = 0; i < 30; i++) {
-        var a = i / 30 * TAU + (rnd() - 0.5) * 0.15, back = Math.max(0, -Math.sin(a));
-        var R = 650 + rnd() * 500, x = ctx.cx + Math.cos(a) * R, z = ctx.cz + Math.sin(a) * R;
-        var hgt = 170 + rnd() * 160 + back * 180, rad = Math.min(hgt * (0.7 + rnd() * 0.3), R - 380);   // Fuß ≥ 380 m von der Mitte
-        var sl = 0.55 + rnd() * 0.15;
-        bg.add(new THREE.ConeGeometry(rad, hgt, 9, 4), function (vx, vy) {
-          var t = vy / hgt;
-          return t > sl + (hash3(vx, vy, 3) - 0.5) * 0.1 ? 0xf2f5fa : t > 0.28 ? mix(0x6c6f74, 0x8b8f96, hash3(vx, 1, vy)) : 0x4f6a42;
-        }, { x: x, y: hgt / 2 - 30, z: z, ry: rnd() * TAU, jit: hgt * 0.12 });
-      }
-      ctx.bg(bg);
+      // Bergketten in drei Tiefen-Schichten, hinten (−z, Blickrichtung der Totalen) höher: Grat-Rauschen, Fels nach
+      // Neigung, Schnee nach Höhe mit weicher Grenze, Wald an den unteren Hängen, Dunst zur Ferne hin
+      for (var burn = 0; burn < 180; burn++) rnd();   // Zufallsfolge wie früher (Deko danach bleibt, wo sie war)
+      ctx.bgMesh(ranges(new Relief(), ctx, { seed: 13, back: 0.55, snow: 0.55, forest: 0.3, haze: THEMES.alpine.sky.horizon,
+        layers: [[430, 820, 160, 0.1], [720, 1250, 280, 0.28], [1120, 1760, 420, 0.42]],
+        pal: { grass: 0x5d7c46, grass2: 0x6f8c50, forest: 0x2b472d, forest2: 0x35553a, scree: 0x908b80, rock: 0x6a6761, rock2: 0x817d76, snow: 0xf2f5fa } }).geo());
       // Felswände bergseitig nahe der Strecke
       var cliff = ctx.kind('cliff', [{ geo: cliffGeo(0x6c6a66, 0x9a978f, 0xf4f7fb) }], { r: 8 });
       ctx.scatter(cliff, 16, { dmin: 22, dmax: 75, rad: 8, s: [0.8, 1.35], pred: function (x, z) { return (x - ctx.cx) * 0.8 - (z - ctx.cz) * 0.6 > -10; } });
@@ -379,6 +494,7 @@
     sun: { color: 0xffc9a0, k: 1.0, pos: [6, 3.2, 3] }, hemi: { sky: 0xffd9c2, ground: 0x5b6a4a, k: 0.95 }, fill: 0.8, exposure: 1.02,
     groundTex: { base: [232, 232, 232], spread: 0.22 },
     sea: -3.0,
+    surface: { curb: [0x2a6fd6, 0xf4f4f4], runoff: 'sand', barrier: 'armco', sausage: true },
     height: function (ctx) {
       var w = waveSet(ctx.rng(17), 2, 1.8, 100, 160), zs = ctx.minZ - 64;
       ctx.shoreZ = zs;
@@ -452,16 +568,18 @@
       }
       // Hintergrund: flache Inseln am Horizont; auf jeder ein Leuchtturm (nur als Kulissen-Modell, slot island) – genau
       // auf der Inselkuppe: deren Ecke verschiebt Kit.add um hash3 (wie dort berechnet)
-      var bg = new Kit(), isle = ctx.kind('islandLighthouse', [], { r: 20, prop: { slot: 'island', box: { w: 40, d: 40, h: 45 } } });
+      // Hügel im Hinterland (nur Landseite, +z), Inseln am Horizont aus Rauschen; auf jeder Insel ein Leuchtturm (nur als
+      // Kulissen-Modell, slot island) genau auf dem Gipfel (Mitte der Insel)
+      var rl = new Relief(), cPal = { grass: 0x7b8f48, grass2: 0x95985e, forest: 0x4f6a3c, forest2: 0x5d7843, scree: 0xa3957a, rock: 0x7a6f60, rock2: 0x958a78, snow: 0xffffff, sand: 0xd9c38f };
+      ranges(rl, ctx, { seed: 17, forest: 0.4, haze: THEMES.coast.sky.horizon, lambda: 230, mask: function (th) { return smooth(-0.05, 0.4, Math.sin(th)); },
+        layers: [[460, 860, 65, 0.12], [760, 1320, 115, 0.3]], pal: cPal });
+      var isle = ctx.kind('islandLighthouse', [], { r: 20, prop: { slot: 'island', box: { w: 40, d: 40, h: 45 } } });
       for (var is = 0; is < 5; is++) {
-        var ix = ctx.cx + (rnd() - 0.5) * 1800, iz = ctx.shoreZ - 650 - rnd() * 450, ir = 60 + rnd() * 110;
-        bg.add(new THREE.SphereGeometry(ir, 9, 4, 0, TAU, 0, Math.PI / 2), function (x, y) { return y > ir * 0.25 ? 0x4f6a40 : 0x8a8064; },
-          { x: ix, y: sea - 2, z: iz, sy: 0.32, jit: ir * 0.15 });
-        var hy = Math.round(ir * 1000), ij = ir * 0.15;
-        isle.add(ix + (hash3(0, hy, 0) - 0.5) * ij, iz + (hash3(0, 0, hy) - 0.5) * ij,
-          { abs: true, y: sea - 2 + 0.32 * (ir + (hash3(hy, 0, 0) - 0.5) * ij) - 1.5, rot: is * 1.3 });
+        var ix = ctx.cx + (rnd() - 0.5) * 1800, iz = ctx.shoreZ - 650 - rnd() * 450, ir = 60 + rnd() * 110, hpk = ir * 0.32;
+        island(rl, ix, iz, sea - 2, ir, hpk, is * 7.3 + 1, cPal, THEMES.coast.sky.horizon, 0.25 + (ctx.shoreZ - iz - 650) / 450 * 0.2);
+        isle.add(ix, iz, { abs: true, y: sea - 2 + hpk - 1.5, rot: is * 1.3 });
       }
-      ctx.bg(bg);
+      ctx.bgMesh(rl.geo());
       // Felseninsel mit Leuchtturm im Meer zwischen Strand und Horizont (nur als Kulissen-Modell, slot sea)
       ctx.kind('seaIsland', [], { r: 30, prop: { slot: 'sea', box: { w: 70, d: 70, h: 50 } } }).add(ctx.maxX - 140, ctx.shoreZ - 260, { abs: true, y: sea, rot: 2.2 });
     }
@@ -474,6 +592,7 @@
     sun: { color: 0xf3f6fa, k: 0.95, pos: [4, 7, 5] }, hemi: { sky: 0xe3e8ee, ground: 0x5a5d61, k: 1.05 }, fill: 1, exposure: 1.0,
     groundTex: { base: [232, 232, 232], spread: 0.3 },
     rail: false,
+    surface: { curb: [0x2a6fd6, 0xf2c200], runoff: 'tarmac', barrier: 'tyres', stripes: false },
     height: function () { return function () { return 0; }; },
     groundColor: function (ctx) {
       return function (x, z, h, d) {
@@ -490,10 +609,8 @@
           if (Math.abs(dx * c - dz * s) < y.w && Math.abs(dx * s + dz * c) < y.d) return true; }
         return false;
       };
-      // Reifenstapel statt Leitplanke (mittlerer Reifen in Instanzfarbe)
-      var tk = new Kit();
-      for (var t = 0; t < 3; t++) tk.add(cyl(0.5, 0.5, 0.27, 9), t === 1 ? 0xffffff : 0x1a1a1c, { y: 0.14 + t * 0.29, ry: t * 0.35 });
-      var tyres = ctx.kind('tyres', [{ geo: tk.geo() }], { r: 0.5, tint: true });
+      // Reifenstapel statt Leitplanke (mittlerer Reifen in Instanzfarbe); Gurt davor: js/car-track-surface.js
+      var tyres = ctx.kind('tyres', [{ geo: tyreStack(0.5) }], { r: 0.5, tint: true });
       var tcol = [0x1a1a1c, 0x1a1a1c, 0xf2f2f2, 0xd8262b, 0x1a1a1c, 0xf2b705];
       ctx.alongRail(tyres, { step: 1.05, extra: 0.25, tint: function (k) { return tcol[k % tcol.length]; } });
       // Lagerhalle: Wände, Satteldach, Rolltore, Fensterband
@@ -575,5 +692,5 @@
   var BY_LAYOUT = { Speedway: 'stadium', Twister: 'forest', Hairpin: 'alpine', Coast: 'coast', Kart: 'industrial' };
   function forTrack(T) { return THEMES[BY_LAYOUT[T && T.name] || 'stadium']; }
 
-  root.CarTrackThemes = { forTrack: forTrack, THEMES: THEMES, BY_LAYOUT: BY_LAYOUT, Kit: Kit, lin: lin, mix: mix, smooth: smooth, fbm: fbm };
+  root.CarTrackThemes = { forTrack: forTrack, THEMES: THEMES, BY_LAYOUT: BY_LAYOUT, Kit: Kit, lin: lin, mix: mix, smooth: smooth, fbm: fbm, tyreStack: tyreStack, Relief: Relief, ranges: ranges };
 })(typeof window !== 'undefined' ? window : this);

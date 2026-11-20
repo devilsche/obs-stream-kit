@@ -2,6 +2,8 @@
  * (js/car-drive.js): Gelände, Asphalt, Randlinien, Curbs, Kiesbett an Kurven-Außenseiten, Leitplanken am Rand des
  * Auslaufs, Start/Ziel mit Portal, dazu je Strecke ein Thema (js/car-track-themes.js: Stadion, Wald, Alpen, Küste,
  * Industrie) mit Himmel, Licht, Nebel, Bodenfarbe, Deko und optischem Höhenprofil.
+ * Fahrbahn, Curbs, Auslauf, Begrenzung und Rand-Deko baut js/car-track-surface.js (nach der Deko); fehlt das Modul,
+ * bleibt die einfache Fassung (flache Bänder) hier.
  *
  *   CarTrackScene.build(T, { primary, accent, maxAniso, reduceMotion }) → {
  *       group, theme, P, gantry, decor, nearTrack(x, z, R), trackDist(x, z, R),
@@ -293,46 +295,51 @@
       geo.setIndex(idx); geo.computeVertexNormals();
       var m = new THREE.Mesh(geo, mat); g.add(m); return m;
     }
-    var NL = flat ? 1 : 4;   // Hügel: Asphalt quer unterteilt, damit das Gelände nirgends durchsticht
-    var asphaltTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [62, 64, 70], 0.3, rnd); }, true));
-    var asphalt = own(new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
-    strip(-HALF, HALF, 0.03, 0.03, asphalt, 9, null, NL);
-    var white = own(new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7, side: THREE.DoubleSide }));
-    strip(HALF - 0.45, HALF - 0.25, 0.04, 0.04, white, 10);
-    strip(-HALF + 0.25, -HALF + 0.45, 0.04, 0.04, white, 10);
-    var curbTex = own(canvasTex(8, 64, function (x, w, h) { x.fillStyle = '#d8262b'; x.fillRect(0, 0, w, h / 2); x.fillStyle = '#f4f4f4'; x.fillRect(0, h / 2, w, h / 2); }, true));
-    var curb = own(new THREE.MeshStandardMaterial({ map: curbTex, roughness: 0.6, side: THREE.DoubleSide }));
+    // Fahrbahn + Rand: js/car-track-surface.js (nach der Deko, siehe unten); ohne das Modul die einfache Fassung hier
+    var Surface = root.CarTrackSurface;
     function curvy(i) { return Math.abs(P[i].curv) > 1 / 60 || Math.abs(P[(i + 1) % n].curv) > 1 / 60; }
-    strip(HALF, HALF + 0.9, 0.05, 0.05, curb, 4, curvy);
-    strip(-HALF - 0.9, -HALF, 0.05, 0.05, curb, 4, curvy);
     // Kiesbett im Auslauf an Kurven-Außenseiten (±14 m um die Kurve), wo der Auslauf > 3 m ist; sonst Gras
-    var gravelTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [196, 178, 140], 0.45, rnd); }, true));
-    var gravel = own(new THREE.MeshStandardMaterial({ map: gravelTex, roughness: 1, metalness: 0, side: THREE.DoubleSide }));
     var outsideK = { 1: new Uint8Array(n), '-1': new Uint8Array(n) }, W14 = Math.round(14 / ds);
     for (var ci = 0; ci < n; ci++) {
       if (Math.abs(P[ci].curv) <= 1 / 60) continue;
       var outSd = P[ci].curv > 0 ? -1 : 1;   // Linkskurve → außen = rechts
       for (var k = -W14; k <= W14; k++) outsideK[outSd][(ci + k + n) % n] = 1;
     }
+    var gravelK = { 1: new Uint8Array(n), '-1': new Uint8Array(n) };
     [1, -1].forEach(function (sd) {
-      strip(function (i) { return sd * (HALF + 0.9); }, function (i) { return sd * (HALF + Math.max(0.9, runAt(i, sd))); }, 0.035, 0.035, gravel, 5,
-        function (i) { return outsideK[sd][i] && outsideK[sd][(i + 1) % n] && runAt(i, sd) > 3 && runAt(i + 1, sd) > 3; }, flat ? 1 : 3);
+      for (var i = 0; i < n; i++) gravelK[sd][i] = outsideK[sd][i] && outsideK[sd][(i + 1) % n] && runAt(i, sd) > 3 && runAt(i + 1, sd) > 3 ? 1 : 0;
     });
-    // Leitplanken am Außenrand des Auslaufs (die Sim lässt dort nicht weiter); Industrie: Reifenstapel statt dessen
-    if (theme.rail !== false) {
-      var rail = own(new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }));
-      [1, -1].forEach(function (sd) {
-        var off = function (i) { return sd * (HALF + runAt(i, sd) + 0.3); };
-        strip(off, off, 0.25, 0.85, rail, 10);
-      });
-    }
-
-    // Start/Ziel: Schachbrett über die Fahrbahn (folgt dem Gelände) + Portal
     var p0 = P[0], fx0 = Math.cos(p0.yaw), fz0 = -Math.sin(p0.yaw);
-    var checkTex = own(canvasTex(160, 32, function (x, w, h) {
-      for (var a = 0; a < 10; a++) for (var b = 0; b < 2; b++) { x.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; x.fillRect(a * 16, b * 16, 16, 16); }
-    }));
-    (function () {
+    if (!Surface) (function () {
+      var NL = flat ? 1 : 4;   // Hügel: Asphalt quer unterteilt, damit das Gelände nirgends durchsticht
+      var asphaltTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [62, 64, 70], 0.3, rnd); }, true));
+      var asphalt = own(new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.92, metalness: 0, side: THREE.DoubleSide }));
+      strip(-HALF, HALF, 0.03, 0.03, asphalt, 9, null, NL);
+      var white = own(new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7, side: THREE.DoubleSide }));
+      strip(HALF - 0.45, HALF - 0.25, 0.04, 0.04, white, 10);
+      strip(-HALF + 0.25, -HALF + 0.45, 0.04, 0.04, white, 10);
+      var curbTex = own(canvasTex(8, 64, function (x, w, h) { x.fillStyle = '#d8262b'; x.fillRect(0, 0, w, h / 2); x.fillStyle = '#f4f4f4'; x.fillRect(0, h / 2, w, h / 2); }, true));
+      var curb = own(new THREE.MeshStandardMaterial({ map: curbTex, roughness: 0.6, side: THREE.DoubleSide }));
+      strip(HALF, HALF + 0.9, 0.05, 0.05, curb, 4, curvy);
+      strip(-HALF - 0.9, -HALF, 0.05, 0.05, curb, 4, curvy);
+      var gravelTex = own(canvasTex(128, 128, function (x, w, h) { noise(x, w, h, [196, 178, 140], 0.45, rnd); }, true));
+      var gravel = own(new THREE.MeshStandardMaterial({ map: gravelTex, roughness: 1, metalness: 0, side: THREE.DoubleSide }));
+      [1, -1].forEach(function (sd) {
+        strip(function (i) { return sd * (HALF + 0.9); }, function (i) { return sd * (HALF + Math.max(0.9, runAt(i, sd))); }, 0.035, 0.035, gravel, 5,
+          function (i) { return gravelK[sd][i]; }, flat ? 1 : 3);
+      });
+      // Leitplanken am Außenrand des Auslaufs (die Sim lässt dort nicht weiter); Industrie: Reifenstapel statt dessen
+      if (theme.rail !== false) {
+        var rail = own(new THREE.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.45, metalness: 0.5, side: THREE.DoubleSide }));
+        [1, -1].forEach(function (sd) {
+          var off = function (i) { return sd * (HALF + runAt(i, sd) + 0.3); };
+          strip(off, off, 0.25, 0.85, rail, 10);
+        });
+      }
+      // Start/Ziel: Schachbrett über die Fahrbahn (folgt dem Gelände)
+      var checkTex = own(canvasTex(160, 32, function (x, w, h) {
+        for (var a = 0; a < 10; a++) for (var b = 0; b < 2; b++) { x.fillStyle = (a + b) % 2 ? '#111' : '#f4f4f4'; x.fillRect(a * 16, b * 16, 16, 16); }
+      }));
       var pos = [], uv = [], idx = [], NQ = 6;
       for (var b = 0; b <= 1; b++) for (var a = 0; a <= NQ; a++) {
         var off = lerp(-HALF, HALF, a / NQ), al = (b - 0.5) * 1.6, x = p0.x + p0.nx * off + fx0 * al, z = p0.z + p0.nz * off + fz0 * al;
@@ -522,6 +529,12 @@
       return grp;
     };
     ctx.bg = function (kit) { if (kit && !kit.empty()) bgKits.push(kit); };
+    // Relief (Bergketten, Hügel, Inseln aus CarTrackThemes.Relief): glatt schattiert, Ecken-Farben, ein Zeichenaufruf
+    ctx.bgMesh = function (geo) {
+      if (!geo) return;
+      var m = new THREE.Mesh(own(geo), own(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, envMapIntensity: 0.3 })));
+      m.frustumCulled = false; g.add(m);
+    };
     if (theme.decorate) theme.decorate(ctx);
 
     // Instanzen bauen: je Art und Teil ein InstancedMesh (Matrizen aus den Plätzen, Höhe = Gelände)
@@ -645,8 +658,9 @@
       g.add(new THREE.Mesh(own(all.geo()), mat('v')));
     }
     // Bodenfarbe je Ecke (nach der Deko: Höfe/Ufer stehen erst dann fest)
+    var gc = theme.groundColor(ctx);
     (function () {
-      var gc = theme.groundColor(ctx), cols = new Float32Array(NX * NZ * 3);
+      var cols = new Float32Array(NX * NZ * 3);
       for (var i = 0; i < NX * NZ; i++) {
         var x = tPos[i * 3], z = tPos[i * 3 + 2], d = outside(x, z) > 32 ? 1e9 : trackDist(x, z, HALF + 32) - HALF;
         var c = lin(gc(x, z, tPos[i * 3 + 1] + DROP, d));
@@ -654,6 +668,13 @@
       }
       terrainGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     })();
+    // Fahrbahn, Curbs, Auslauf, Begrenzung, Rand-Deko (js/car-track-surface.js)
+    var surfaceStats = null;
+    if (Surface) surfaceStats = Surface.build({
+      T: T, P: P, n: n, ds: ds, HALF: HALF, g: g, own: own, heightAt: heightAt, trackDist: trackDist, runAt: runAt, gravel: gravelK,
+      curvy: curvy, theme: theme, gc: gc, place: ctx.place, rng: ctx.rng, lin: lin, maxAniso: maxAniso, gantry: gantry, pit: ctx.pit || null,
+      grassTex: grassTex, flat: flat
+    }).stats;
 
     // ---- Neigung ----
     function grad(x, z) { var e = 0.6; return [(heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e)]; }
@@ -705,7 +726,7 @@
     return {
       group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
       heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update,
-      props: propsReady, propStats: propStats,
+      props: propsReady, propStats: propStats, surfaceStats: surfaceStats,
       dispose: function () {
         disposed = true;
         restoreEnv();
