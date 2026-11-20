@@ -1,0 +1,104 @@
+/* Begrüßung vor dem Start (Car Race Overlay effects/car-race.html + Car Drive tools/car-drive.html): „WELCOME TO <Strecke>“ zu Beginn der Vorstellung,
+   „START YOUR ENGINES“ vor der Ampel/dem Countdown. Rennspiel-Klassiker als Vorbild, eigene Gestaltung:
+   schräges Band in Theme-Farben, große kursive Versalien, Akzent-Linie, die von rechts hereinzieht, ein
+   Lichtstreif über der Schrift. Gesteuert nur über Klassen (js/car-race-welcome.js):
+     .race-welcome            unsichtbar
+     .race-welcome.is-on      hereinfahren und stehen
+     .race-welcome.is-out     hinausfahren
+     [data-kind="engines"]    Akzentfarbe statt Primärfarbe als Band
+   Reduzierte Bewegung: steht still, nur ein- und ausblenden. Theme-Tokens mit festen Rückfallwerten. */
+.race-welcome {
+  --rw-primary: var(--theme-primary, #5e2a79);
+  --rw-accent: var(--theme-accent, #f2b705);
+  --rw-text: var(--theme-text, #ffffff);
+  --rw-surface: var(--theme-surface, #1d1128);
+  --rw-font: var(--theme-font-display, 'DM Sans', sans-serif);
+  position: absolute; left: 0; right: 0; top: 34%;
+  display: flex; justify-content: center;
+  pointer-events: none; visibility: hidden; opacity: 0;
+  z-index: 1;
+}
+.race-welcome.is-on, .race-welcome.is-out { visibility: visible; }
+.race-welcome.is-on { opacity: 1; }
+.race-welcome__panel {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start;
+  max-width: 88%; padding: 0.35em 1.4em 0.45em 1.1em; margin: 0;
+  font-family: var(--rw-font); font-style: italic; text-transform: uppercase; line-height: 1;
+  color: var(--rw-text);
+  font-size: clamp(14px, 4.2vmin, 64px);
+}
+/* schräges Band hinter der Schrift: Fläche + Verlauf in die Primärfarbe, Kante in Akzentfarbe */
+.race-welcome__panel::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  transform: skewX(-14deg);
+  background: linear-gradient(100deg, var(--rw-surface) 0%, var(--rw-surface) 35%, var(--rw-primary) 100%);
+  border-left: 0.32em solid var(--rw-accent);
+  box-shadow: 0 0.25em 0.9em rgba(0, 0, 0, 0.45);
+  opacity: 0.94;
+}
+/* Akzent-Linie unter dem Band */
+.race-welcome__panel::after {
+  content: ''; position: absolute; left: 6%; right: -4%; bottom: -0.32em; height: 0.12em;
+  transform: skewX(-14deg); transform-origin: right center;
+  background: linear-gradient(90deg, transparent 0%, var(--rw-accent) 30%, var(--rw-accent) 100%);
+}
+.race-welcome__kicker {
+  font-size: 0.48em; font-weight: 800; letter-spacing: 0.32em; color: var(--rw-accent);
+  margin-bottom: 0.18em;
+}
+.race-welcome__title {
+  position: relative; display: block; overflow: hidden;
+  font-size: 1.15em; font-weight: 900; letter-spacing: 0.04em; white-space: nowrap; text-overflow: ellipsis; max-width: 100%;
+  text-shadow: 0 0.06em 0 rgba(0, 0, 0, 0.5);
+}
+/* Lichtstreif, der einmal über den Titel fährt */
+.race-welcome__title::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 30%;
+  transform: skewX(-20deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+  opacity: 0;
+}
+.race-welcome[data-kind="engines"] .race-welcome__panel::before {
+  background: linear-gradient(100deg, var(--rw-surface) 0%, var(--rw-surface) 30%, var(--rw-accent) 140%);
+  border-left-color: var(--rw-primary);
+}
+.race-welcome[data-kind="engines"] .race-welcome__title { color: var(--rw-accent); }
+
+/* Bewegung */
+.race-welcome.is-on .race-welcome__panel { animation: rw-in 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+.race-welcome.is-on .race-welcome__panel::after { animation: rw-line 0.7s 0.15s cubic-bezier(0.2, 0.9, 0.25, 1) both; }
+.race-welcome.is-on .race-welcome__title::after { animation: rw-glint 0.9s 0.45s ease-in-out both; }
+.race-welcome[data-kind="engines"].is-on .race-welcome__title { animation: rw-throb 0.5s 0.6s ease-in-out 3 alternate; }
+.race-welcome.is-out { animation: rw-fade 0.45s ease-in both; }
+.race-welcome.is-out .race-welcome__panel { animation: rw-out 0.45s cubic-bezier(0.6, 0, 0.8, 0.4) both; }
+@keyframes rw-in {
+  0% { opacity: 0; transform: translateX(28%) skewX(-18deg); }
+  60% { opacity: 1; }
+  100% { opacity: 1; transform: translateX(0) skewX(0); }
+}
+@keyframes rw-out {
+  0% { opacity: 1; transform: translateX(0); }
+  100% { opacity: 0; transform: translateX(-22%) skewX(-12deg); }
+}
+@keyframes rw-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes rw-line {
+  0% { transform: skewX(-14deg) scaleX(0); }
+  100% { transform: skewX(-14deg) scaleX(1); }
+}
+@keyframes rw-glint {
+  0% { left: -40%; opacity: 0; }
+  20% { opacity: 1; }
+  100% { left: 120%; opacity: 0; }
+}
+@keyframes rw-throb {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .race-welcome.is-on .race-welcome__panel,
+  .race-welcome.is-on .race-welcome__panel::after,
+  .race-welcome.is-on .race-welcome__title::after,
+  .race-welcome[data-kind="engines"].is-on .race-welcome__title,
+  .race-welcome.is-out .race-welcome__panel { animation: none; }
+  .race-welcome.is-out { animation: none; opacity: 0; }
+}

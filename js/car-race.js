@@ -516,8 +516,8 @@
       var tr = CarRaceSim.TRACKS[((st.track | 0) % CarRaceSim.TRACKS.length + CarRaceSim.TRACKS.length) % CarRaceSim.TRACKS.length];
       var T = CarRaceSim.track(tr);
       race = {
-        id: st.race_id, seed: st.seed | 0, T: T, laps: st.laps || 3,
-        finishWindow: preview && finishOpt != null ? finishOpt : (st.finish_window || 15),   // ?finish nur in der Vorschau: echte Rennen nehmen den Server-Wert, damit jede Instanz dasselbe Ergebnis rechnet
+        id: st.race_id, seed: st.seed | 0, T: T, laps: st.laps || 2,
+        finishWindow: preview && finishOpt != null ? finishOpt : (st.finish_window || 25),   // ?finish nur in der Vorschau: echte Rennen nehmen den Server-Wert, damit jede Instanz dasselbe Ergebnis rechnet
         startsAt: st.starts_at, introAt: null, intro: null, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
         sim: null, simKey: '', prev: null, alpha: 1, ended: false, fadeAt: null, endedAt: null, shownAt: srvNow(),
         cam: null, lastLeader: null, evIdx: 0, oil: [],
@@ -529,6 +529,7 @@
     function teardown() {
       if (snd) snd.silence();
       if (engines) engines.stop();
+      setWelcome(null);
       netStop();
       if (!race) return;
       Object.keys(race.racers).forEach(function (id) { disposeRacer(race.racers[id]); });
@@ -736,9 +737,9 @@
 
     // ---- Unfall-Highlights: kurz ranzoomen ----
     // Entschieden je Simulationsschritt aus sim.events und dem Sim-Zustand dieses Schritts (für alle Instanzen
-    // gleich, kein Zufall): Ausfall > Crash > Dreher; höchstens eins zur Zeit, mindestens 6 s zwischen zwei Starts;
+    // gleich, kein Zufall): Ausfall > Crash > Dreher; höchstens eins zur Zeit, mindestens 9 s zwischen zwei Starts;
     // keins, wenn der Führende in < 5 s im Ziel ist oder die Zielfrist läuft. Dauer 2,5 s (Sim-Zeit).
-    var HL_PRIO = { dnf: 3, crash: 2, spin: 1 }, HL_LEN = 2.5, HL_GAP = 6;
+    var HL_PRIO = { dnf: 3, crash: 2, spin: 1 }, HL_LEN = 2.5, HL_GAP = 9;   // lange Rennen (2:20): seltener wegschwenken
     function checkHighlight(sim) {
       var ev = sim.events || [];
       for (; race.hlIdx < ev.length; race.hlIdx++) {
@@ -980,7 +981,7 @@
       var body = { race_id: id, places: places };
       if (hasPilots()) {
         // Zielzeiten der KI und der Nachfahrer; die Piloten-Zeiten kennt der Server (WS-Dienst)
-        var endT = race.sn ? Math.min(race.startsAt != null ? srvNow() - race.startsAt : 90, CarRaceSim.MAX_TIME) : 90;
+        var endT = race.sn ? Math.min(race.startsAt != null ? srvNow() - race.startsAt : CarRaceSim.MAX_TIME, CarRaceSim.MAX_TIME) : CarRaceSim.MAX_TIME;
         body.times = race.order.map(function (r, i) {
           var c = race.sim.cars[i];
           if (!isPilot(r.id)) return c.place != null ? c.finish : null;
@@ -1162,11 +1163,12 @@
     }
 
     // ---- Fahrervorstellung (Phase intro) ----
-    // Dauer wie fx/race.py: 2 s + 1,6 s je Fahrer. Kamera fliegt tief von hinten (letzter Startplatz) nach vorn
-    // (Pole), hält je Auto 1,6 s schräg vorn von der Außenseite; die letzten 2 s Totale der Startaufstellung mit
-    // Startampel 3-2-1. Feste Schlüsselbilder (für alle Instanzen gleich); reduzierte Bewegung: stehende
-    // Startaufstellung mit Fahrerliste.
-    var INTRO_BASE = 5.0, INTRO_PER = 2.2, INTRO_TILT = 20 * Math.PI / 180;   // wie fx/race.py
+    // Dauer wie fx/race.py: 8 s + 2,2 s je Fahrer. Überflug über die ganze Strecke hinunter auf die Startaufstellung
+    // („WELCOME TO <Strecke>“), Totale, dann von hinten (letzter Startplatz) nach vorn (Pole) je Startreihe schräg
+    // vorn von der Außenseite; danach Totale mit „START YOUR ENGINES“ (Feld gibt Gas), die letzten 3 s Startampel
+    // 3-2-1. Feste Schlüsselbilder (für alle Instanzen gleich); reduzierte Bewegung: stehende Startaufstellung mit
+    // Fahrerliste, die Begrüßung steht still.
+    var INTRO_BASE = 8.0, INTRO_PER = 2.2, INTRO_TILT = 20 * Math.PI / 180;   // wie fx/race.py
     function introSeconds(n) { return INTRO_BASE + INTRO_PER * n; }
     function gridSlot(i) {
       var c = race.gridSim.cars[i], p = race.T.at(c.s);
@@ -1182,29 +1184,30 @@
     // (gehalten, Namen sichtbar), dann die Fahrer von hinten nach vorn – einzeln, wenn je Fahrer ≥ 1,15 s bleiben,
     // sonst als Startreihe (zwei) bzw. bei sehr wenig Zeit alle zusammen –, die letzte Karte endet vor der Startampel
     // (letzte 2 s). Im Vollbild beginnt die Totale später sichtbar (Einblenden), darum dort länger.
-    // Ablauf: 0–2,5 s reinschwenken (von hoch und weit auf die Startaufstellung), bis 4,5 s Totale halten (alle Autos
-    // und Namen), dann langsam von hinten nach vorn (unter 2,5 s je Fahrer: Startreihen bzw. alle zusammen; jede
-    // Karte ≥ 1,5 s), die letzten 3 s Totale mit Startampel; alles ease-in-out
-    var INTRO_SWING = 2.5, INTRO_WIDE = 4.5, INTRO_LIGHTS = 3.0, INTRO_MIN = 2.5;
+    // Ablauf: 0–3,5 s Überflug (Streckenübersicht hinunter auf die Startaufstellung, „WELCOME TO …“), bis 6 s Totale
+    // halten (alle Autos und Namen), dann langsam von hinten nach vorn (je Startreihe), 2,2 s Totale mit „START YOUR
+    // ENGINES“, die letzten 3 s Totale mit Startampel; alles ease-in-out
+    var INTRO_SWING = 3.5, INTRO_WIDE = 6.0, INTRO_LIGHTS = 3.0, INTRO_ENGINES = 2.2, INTRO_MIN = 2.5;
     function introPlan(n) {
       // Dauer vom Server (starts_at − intro_at), sonst nach Formel; zu kurz: Schwenk/Totale stauchen
       var total = race.startsAt != null && race.introAt != null && race.startsAt > race.introAt ? race.startsAt - race.introAt : introSeconds(n);
-      var wide = Math.min(INTRO_WIDE, total * 0.3), avail = Math.max(0.5, total - wide - INTRO_LIGHTS), groups = [], gs;
+      var wide = Math.min(INTRO_WIDE, total * 0.3), eng = Math.min(INTRO_ENGINES, total * 0.12);
+      var avail = Math.max(0.5, total - wide - INTRO_LIGHTS - eng), groups = [], gs;
       // immer je Startreihe (2 Autos nebeneinander), Restzeit gleichmäßig auf die Reihen verteilt
       gs = 2;
       // Gruppen von hinten nach vorn; Paare = Startreihen (Startplätze 2r+1, 2r+2)
       if (gs === 2) { for (var rr = Math.ceil(n / 2) - 1; rr >= 0; rr--) groups.push([2 * rr, 2 * rr + 1].filter(function (i) { return i < n; })); }
       else if (gs === 1) { for (var i = n - 1; i >= 0; i--) groups.push([i]); }
       else { var all = []; for (var j = n - 1; j >= 0; j--) all.push(j); groups.push(all); }
-      return { total: total, wide: wide, per: avail / groups.length, groups: groups };
+      return { total: total, wide: wide, per: avail / groups.length, groups: groups, engines: Math.max(wide, total - INTRO_LIGHTS - eng) };
     }
     function buildIntro() {
       var n = race.order.length, keys = [], prevOrb = 0, plan = introPlan(n);
       function unwrap(o) { while (o - prevOrb > Math.PI) o -= 2 * Math.PI; while (o - prevOrb < -Math.PI) o += 2 * Math.PI; prevOrb = o; return o; }
       var fit = camFit(race.order.map(function (r, i) { var sl = gridSlot(i); return { x: sl.x, z: sl.z }; })) || { x: 0, z: 0, px: PX_MAX };
       var high = { x: fit.x, z: fit.z, y: 0, px: fit.px, tilt: TILT, orb: 0, wide: 1, focus: -1 };
-      // reinschwenken: von hoch, weit und seitlich versetzt auf die Totale, dann halten
-      var far = Object.assign({}, high, { px: high.px * 0.45, tilt: 72 * Math.PI / 180, orb: -0.7 });
+      // Überflug: von der ganzen Strecke (hoch, seitlich versetzt) hinunter auf die Totale, dann halten
+      var far = trackOverview() || Object.assign({}, high, { px: high.px * 0.45, tilt: 72 * Math.PI / 180, orb: -0.7 });
       keys.push(Object.assign({ t: 0 }, far), Object.assign({ t: Math.min(INTRO_SWING, plan.wide * 0.6) }, high), Object.assign({ t: plan.wide }, high));
       plan.groups.forEach(function (g, k) {
         var t0 = plan.wide + k * plan.per, sl = g.map(gridSlot), rs = g.map(function (i) { return race.order[i]; });
@@ -1221,7 +1224,7 @@
         keys.push(Object.assign({ t: t0 + plan.per * 0.5, orb: orb + 0.03 }, base), Object.assign({ t: t0 + plan.per, orb: orb - 0.03 }, base));
       });
       high.orb = unwrap(0);
-      keys.push(Object.assign({ t: plan.total - INTRO_LIGHTS + 1.0 }, high), Object.assign({ t: plan.total }, high));
+      keys.push(Object.assign({ t: Math.min(plan.engines + 1.0, plan.total) }, high), Object.assign({ t: plan.total }, high));
       // Deko entlang der Fahrt ausblenden (beim Rennstart wieder da)
       var tanH = Math.tan(FOV * Math.PI / 360) * (W / H), segs = [], intro = { keys: keys, at: race.introAt, n: n, plan: plan };
       for (var t = 0; t <= plan.total; t += 0.2) {
@@ -1230,6 +1233,23 @@
       }
       intro.undo = reduce ? null : hideDecor(function (x, z, rad) { return nearSegs(segs, x, z, rad); });
       return intro;
+    }
+    // ganze Strecke im Bild (Überflug-Beginn): Mitte der Strecke, flacher als die Rennkamera, leicht gedreht
+    function trackOverview() {
+      var pts = race.T.pts, minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, tilt = 52 * Math.PI / 180;
+      pts.forEach(function (p) { minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minZ = Math.min(minZ, p[1]); maxZ = Math.max(maxZ, p[1]); });
+      if (!(maxX > minX)) return null;
+      var px = Math.min(W / (maxX - minX + 30), H / ((maxZ - minZ + 30) * Math.sin(tilt)));
+      return { x: (minX + maxX) / 2, z: (minZ + maxZ) / 2, y: 0, px: clamp(px, 0.3, PX_MAX), tilt: tilt, orb: -0.45, wide: 1, focus: -1 };
+    }
+    // Begrüßung je nach Zeit in der Vorstellung (für alle Instanzen gleich): 'welcome' am Anfang des Überflugs,
+    // 'engines' vor der Ampel, sonst null
+    function welcomeAt(introT) {
+      if (!race || !race.intro || !race.intro.plan || introT < 0) return null;
+      var pl = race.intro.plan;
+      if (introT >= 0.3 && introT < Math.max(2.4, Math.min(pl.wide - 0.4, 5.6))) return 'welcome';
+      if (introT >= pl.engines + 0.1 && introT < pl.total - INTRO_LIGHTS + 0.4) return 'engines';
+      return null;
     }
     // Welche Fahrer zeigt die Karte gerade, mit welcher Deckkraft (für alle Instanzen gleich)?
     function introCardAt(introT) {
@@ -1336,6 +1356,28 @@
     }
 
     // ---- Kamera ----
+    // Lange Runde, Feld weit verteilt: die Kamera folgt einer Gruppe. Ist der Führende allein vorn (nächstes Auto
+    // > CAM_GAP m dahinter), zeigt sie den ersten Zweikampf unter den ersten fünf; die Wahl hält CAM_HOLD s (kein
+    // Hin und Her). Im Finale (Führender < CAM_FINAL m vor dem Ziel) und bei reduzierter Bewegung immer die Spitze.
+    // list = Fahrer in Reihenfolge (vorn zuerst, mit .s und .r) → dieselben, gewählte Gruppe zuerst.
+    var CAM_GAP = 30, CAM_HOLD = 8, CAM_FINAL = 350;
+    function camFocus(list, t) {
+      if (reduce || list.length < 3 || list[0].s == null) return list;
+      if (list[0].s > race.laps * race.T.len - CAM_FINAL) { race.camPick = null; return list; }
+      var groups = [], cur = null;
+      list.forEach(function (e, k) {
+        if (!cur || cur.last - e.s > CAM_GAP) { cur = { at: k, items: [] }; groups.push(cur); }
+        cur.items.push(e); cur.last = e.s;
+      });
+      var pick = null, cp = race.camPick;
+      if (cp && t < cp.until) pick = groups.filter(function (g) { return g.items.some(function (e) { return e.r.id === cp.id; }); })[0] || null;
+      if (!pick) {
+        pick = groups[0].items.length > 1 ? groups[0] : groups.filter(function (g) { return g.at < 5 && g.items.length > 1; })[0] || groups[0];
+        race.camPick = { id: pick.items[0].r.id, until: t + CAM_HOLD };
+      }
+      if (pick === groups[0]) return list;
+      return pick.items.concat(list.filter(function (e) { return pick.items.indexOf(e) < 0; }));
+    }
     function camFit(points) { return inView(function () { return camFitRaw(points); }); }
     function camFitRaw(points) {
       // points: [{x, z}] in Reihenfolge (vorn zuerst); Spitzengruppe, solange die Zoom-Grenze hält
@@ -1443,6 +1485,9 @@
     }
     // ---- Rangliste als HTML (Aussehen komplett in effects/car-race-hud.css) ----
     // Nur Attribute und Text werden gesetzt (keine Inline-Styles); die Chatfarbe steht als fill-Attribut im SVG.
+    // Begrüßung vor dem Start (js/car-race-welcome.js + widgets/components/car-race-welcome.css): nur Klassen/Text
+    var welcomeUi = root.CarRaceWelcome && opts.welcome ? CarRaceWelcome.attach(opts.welcome) : null;
+    function setWelcome(kind) { if (welcomeUi) welcomeUi.set(kind, race && race.T ? race.T.name : ''); }
     var SVGNS = 'http://www.w3.org/2000/svg', rankEl = opts.rank || null, rankDom = {}, rankHead = null, rankShown = false;
     if (rankEl) rankEl.setAttribute('data-layout', STAGE ? 'stage' : 'window');
     function setAttr(el, k, v) { if (v == null || v === false) { if (el.hasAttribute(k)) el.removeAttribute(k); } else if (el.getAttribute(k) !== String(v)) el.setAttribute(k, String(v)); }
@@ -1937,6 +1982,7 @@
         return;
       }
       var now = srvNow(), T = race.T;
+      if (race.stage !== 'grid') setWelcome(null);
       // Abbruch/Ende: ausgeblendet → aufräumen
       if (race.dropAt != null && !visible) { if (now - race.dropAt > FADE + 0.2) { teardown(); return; } }
       if (race.fadeAt != null && now >= race.fadeAt) {
@@ -1985,6 +2031,10 @@
               px: Math.exp(lerp(Math.log(q0.px), Math.log(ishot.px), b0)), tilt: lerp(q0.tilt, ishot.tilt, b0), orb: lerp(q0.orb, ishot.orb, b0), direct: true };
           }
         } else race.introShot = null;
+        // „WELCOME TO <Strecke>“ zu Beginn, „START YOUR ENGINES“ vor der Ampel – dann gibt das Feld einmal Gas
+        var wk = inIntro && race.intro ? welcomeAt(introT) : null;
+        setWelcome(wk);
+        if (wk === 'engines' && !race.revved) { race.revved = true; if (engines && engines.rev) engines.rev(INTRO_ENGINES + 0.6); }
         if (race.gridSim) race.order.forEach(function (r, i) {
           var c = race.gridSim.cars[i];
           r.drv = drvOf(r);
@@ -2065,6 +2115,7 @@
         var active = SN.list.filter(function (e) { return !e.done && !e.dnf && !SN.over; });
         if (!active.length) active = SN.list.filter(function (e) { return !e.dnf; });
         if (!active.length) active = SN.list;
+        active = camFocus(active, race.sim.time);
         active.forEach(function (e) { pts.push({ x: e.r.holder.position.x, z: e.r.holder.position.z }); });
         SN.list.forEach(function (e, o) {
           labels.push({ r: e.r, place: e.dnf ? 'DNF' : String(e.place != null ? e.place : e.pos), show: true, order: o, dnf: e.dnf });
@@ -2184,7 +2235,7 @@
       pvResetAt = null;
       var trackIdx = pvTrack != null ? pvTrack : (pvCycle = (pvCycle + 1) % CarRaceSim.TRACKS.length);
       pv = { race_events: [], phase: 'lobby', race_id: 'preview-' + Date.now().toString(36), seed: Math.floor(Math.random() * 2147483647),
-        track: trackIdx, laps: 3, finish_window: 15, starts_at: null, racers: [] };
+        track: trackIdx, laps: 2, finish_window: 25, starts_at: null, racers: [] };
       if (opts.onPreviewTrack) opts.onPreviewTrack(trackIdx, pvTrack == null);
       pvN = 0;
       for (var i = 0; i < 3; i++) addTestRacer();

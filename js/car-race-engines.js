@@ -8,6 +8,8 @@
  *                                               (stage grid/race/end/podium, order[i] mit holder/stats (Sim-Werte)/key/entry,
  *                                               sim.cars[i].v),
  *                                               now = Server-Zeit (Countdown bis race.startsAt)
+ *   E.rev(sec)                                  „START YOUR ENGINES“: das Feld gibt sec Sekunden lang kräftig Gas
+ *                                               (Gasstöße aller Stimmen in der Startaufstellung, je eine Hochdreh-Aufnahme)
  *   E.stop()                                    alle Stimmen aus
  * Zusätzlich: Vorbeifahrt (pass) an der Kamera – vorausberechnet, damit die lauteste Stelle der Aufnahme auf den
  * nächsten Punkt fällt; in der Startaufstellung Gasstöße, die zum Start hin dichter werden.
@@ -21,7 +23,7 @@
     if (!snd || !root.CarEngineAudio) return null;
     var eng = root.CarEngineAudio.create(snd);
     if (!eng) return null;
-    var ok = false, voices = [], lastPass = -1, info = new Map(), fwd = null, right = null;
+    var ok = false, voices = [], lastPass = -1, info = new Map(), fwd = null, right = null, revUntil = -1;
     eng.ready.then(function (b) { ok = b; });
 
     function stats(r) {
@@ -88,7 +90,13 @@
           // Startaufstellung: Leerlauf, Gasstöße (zum Start hin öfter), in der letzten halben Sekunde Drehzahl halten
           thr = left != null && left < 0.6 && left > -0.5 ? 0.45 : 0;
           var rate = left == null ? 0.05 : left < 4 ? 0.9 : left < 10 ? 0.3 : 0.08;
-          if (Math.random() < dt * rate) o.v.blip(0.45 + Math.random() * 0.5);
+          var revving = performance.now() / 1000 < revUntil;
+          if (revving) {
+            // Feld gibt Gas: je Stimme einmal Hochdrehen, dann dichte, kräftige Gasstöße
+            if (!o.revved) { o.revved = true; o.v.oneShot('rev', 0.55); }
+            rate = 2.4; thr = 0.25;
+          }
+          if (Math.random() < dt * rate) o.v.blip(revving ? 0.75 + Math.random() * 0.25 : 0.45 + Math.random() * 0.5);
         } else if (stage === 'podium') {
           thr = 0;
           if (race.podium && race.podium.cars && race.podium.cars[0] && race.podium.cars[0].r === x.r && Math.random() < dt * 0.35) o.v.blip(0.6 + Math.random() * 0.4);
@@ -100,7 +108,11 @@
         o.v.update(dt, { speed: speed, throttle: o.thr, dist: x.d, ref: REF, radial: x.radial, pan: x.pan });
       });
     }
-    return { frame: frame, stop: function () { stopAll(); info = new Map(); }, engine: eng };
+    function rev(sec) {
+      revUntil = performance.now() / 1000 + Math.max(0.5, +sec || 2);
+      voices.forEach(function (o) { o.revved = false; });
+    }
+    return { frame: frame, rev: rev, stop: function () { stopAll(); info = new Map(); revUntil = -1; }, engine: eng };
   }
 
   root.CarRaceEngines = { create: create };
