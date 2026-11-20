@@ -1071,7 +1071,7 @@
   }
 
   function lapDone(lapTime) {
-    if (race.lapAi) { race.lapAi = false; race.lastLap = lapTime; flash('Lap ' + fmt(lapTime) + ' – the AI drove part of it', 2); return; }
+    if (race.lapAi || (race.chat && mp && race.taken[mp.me])) { race.lapAi = !!(race.chat && mp && race.taken[mp.me]); race.lastLap = lapTime; flash('Lap ' + fmt(lapTime) + ' – the AI drove part of it', 2); return; }
     race.lastLap = lapTime;
     if (race.bestLap == null || lapTime < race.bestLap) race.bestLap = lapTime;
     var big = false;
@@ -1841,7 +1841,18 @@
       if (Math.abs(srvT - race.t) > 0.15) race.t = srvT;
     }
     if (race.sim) { while (race.sim.time + Sim.DT <= race.t + 1e-9) { snap(); race.sim.step(); } }
-    if (race.chat) rcDraw();
+    var lapsPre = pc.laps;
+    if (race.chat) rcDraw();   // fährt die KI mein Auto, setzt rcDraw Lage/Runden aus dem Nachfahrer
+    var aiMine = !!(race.chat && mp && race.taken[mp.me] && rcIsPilot());
+    if (!inp && aiMine && race.phase === 'race' && pc.laps > lapsPre) {
+      // Runden/Ziel auch, solange die KI fährt (sonst hängt Car Drive hinter dem Overlay; zählt nicht als Rekord)
+      lapDone(race.t - race.lapStart); race.lapStart = race.t;
+      if (pc.laps >= race.laps) {
+        race.finishT = race.t; race.phase = 'done'; race.doneT = 0;
+        var posA = 1; standings().forEach(function (x, i) { if (x.me) posA = i + 1; });
+        flash('The AI finished your race – P' + posA, 3); say('Finished in position ' + posA);
+      } else say('Lap ' + (pc.laps + 1) + ' of ' + race.laps);
+    }
     if (inp) {
       var lapsBefore = pc.laps;
       if (race.mp && !race.chat) drawRemotes();
