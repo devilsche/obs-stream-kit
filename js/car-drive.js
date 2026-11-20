@@ -411,18 +411,34 @@
     }
     if (p.b && open === 'pause') setPaused(false);
   }
-  // ---- Umschauen vor dem Start: Maus/Touch ziehen dreht die Kamera um das eigene Auto, Mausrad/Pinch zoomt ----
-  // look.yaw = Winkel um das Auto (0 = hinter dem Auto), look.pitch = Höhe, look.dist = Abstand; nur im Countdown.
-  var look = { used: false, yaw: 0, pitch: 0.32, dist: 0, ptrs: {}, pinch: 0 };
-  function lookAllowed() { return !!(race && race.phase === 'countdown' && !race.paused && race.pc); }
-  function lookReset() { look.used = false; look.yaw = 0; look.pitch = 0.32; look.dist = 0; look.ptrs = {}; look.pinch = 0; }
+  // ---- Umschauen: Maus/Touch ziehen dreht die Kamera um das eigene Auto, Mausrad/Pinch zoomt ----
+  // look.yaw = Winkel um das Auto (0 = hinter dem Auto), look.pitch = Höhe, look.dist = Abstand; im Countdown und im
+  // Rennen. Ohne Eingabe pendelt die Kamera nach LOOK_IDLE s sanft zurück hinter das Auto (reduzierte Bewegung: sofort).
+  var LOOK_IDLE = 2.5, LOOK_PITCH = 0.32;
+  var look = { used: false, yaw: 0, pitch: LOOK_PITCH, dist: 0, ptrs: {}, pinch: 0, idle: 0 };
+  function lookAllowed() { return !!(race && (race.phase === 'countdown' || race.phase === 'race' || race.phase === 'done') && !race.paused && race.pc); }
+  function lookReset() { look.used = false; look.yaw = 0; look.pitch = LOOK_PITCH; look.dist = 0; look.ptrs = {}; look.pinch = 0; look.idle = 0; }
   function lookBase() { return race ? race.me.len * 1.15 + 4.2 : 9; }
+  // je Bild: nach der Ruhezeit Winkel, Höhe und Abstand weich zur Verfolgerposition zurück, dann übernimmt die Kamera
+  function lookReturn(dt) {
+    if (!look.used || Object.keys(look.ptrs).length) { look.idle = 0; return; }
+    look.idle += dt;
+    if (look.idle < LOOK_IDLE) return;
+    if (REDUCE) { lookReset(); race.camPos = null; return; }
+    var k = damp(2.2, dt);
+    look.yaw += (0 - look.yaw) * k; look.pitch += (LOOK_PITCH - look.pitch) * k; look.dist += (lookBase() - look.dist) * k;
+    if (Math.abs(look.yaw) < 0.02 && Math.abs(look.pitch - LOOK_PITCH) < 0.02 && Math.abs(look.dist - lookBase()) < 0.1) {
+      var ptrs = look.ptrs; lookReset(); look.ptrs = ptrs;
+    }
+  }
   function lookOrbit(dx, dy) {
+    look.idle = 0;
     if (!look.used) { look.used = true; look.dist = lookBase(); }
     look.yaw = wrapAngle(look.yaw - dx * 0.0065);
     look.pitch = clamp(look.pitch + dy * 0.0045, 0.05, 1.25);
   }
   function lookZoom(f) {
+    look.idle = 0;
     if (!look.used) { look.used = true; look.dist = lookBase(); }
     look.dist = clamp(look.dist * f, Math.max(3, race.me.len * 0.9), 40);
   }
@@ -460,8 +476,8 @@
   }, { passive: false });
   // Countdown an/aus: Hinweis, Cursor; beim Start (GO) übernimmt die Verfolgerkamera weich (reduzierte Bewegung: sofort)
   function lookPhase() {
-    var on = lookAllowed();
-    if ($('hLook').hidden === on) $('hLook').hidden = !on;
+    var on = lookAllowed(), hint = on && race.phase === 'countdown';   // Hinweis nur in der Startaufstellung
+    if ($('hLook').hidden === hint) $('hLook').hidden = !hint;
     if (on) { if (!app.dataset.look) app.dataset.look = '1'; }
     else if (app.dataset.look) { delete app.dataset.look; look.ptrs = {}; }
   }
@@ -720,8 +736,9 @@
   function updateCam(dt) {
     var pc = race.pc, me = race.me, fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), mode = race.camMode;
     var sp = Math.hypot(pc.vx, pc.vz), fov = 62, cy = me.holder.position.y;   // cy: Fahrbahnhöhe am Auto
-    if (race.phase === 'countdown' && look.used) {
-      // Umschauen in der Startaufstellung: Kreisbahn um das eigene Auto
+    lookReturn(dt);
+    if (look.used) {
+      // Umschauen (Startaufstellung und Rennen): Kreisbahn um das eigene Auto, folgt seiner Fahrtrichtung
       var ang = pc.yaw + Math.PI + look.yaw, hd = look.dist * Math.cos(look.pitch);
       tmpV.set(pc.x + Math.cos(ang) * hd, cy + look.dist * Math.sin(look.pitch) + me.height * 0.6, pc.z - Math.sin(ang) * hd);
       tmpV.y = Math.max(tmpV.y, groundY(tmpV.x, tmpV.z) + 0.6);   // nie ins Gelände
@@ -1486,9 +1503,7 @@
       if (race.cd <= 0 && (!race.chat || rc.st.phase === 'intro' || rc.st.phase === 'race')) {
         race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0;
         sfx('go');
-        // Umschauen beendet: Verfolgerkamera holt die Kamera weich zurück (reduzierte Bewegung: sofort)
-        if (look.used && REDUCE) race.camPos = null;
-        lookReset();
+        // Umschauen bleibt beim Start erhalten und pendelt nach der Ruhezeit von selbst zurück
         setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700);
       }
       placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
@@ -1497,6 +1512,7 @@
       else if (race.mp) { drawRemotes(); mpSend(); }
     } else {
       var inp = race.spect ? null : race.phase === 'done' ? cruise(pc) : playerInput(dt, p);
+      if (p && (p.lookX || p.lookY) && lookAllowed()) lookOrbit(p.lookX * dt * 420, p.lookY * dt * 320);
       if (race.phase === 'race' && pressed.KeyR) { Phys.reset(pc); flash('Back on track', 1); }
       stepWorld(dt, inp);
     }
