@@ -10,6 +10,7 @@ Regen und Tools laden beides als Script (/s/<token>/api/fx/cars/custom.js), das
 ToyCars.applyCustom(...) aufruft — nach js/toy-cars.js, vor dem Effekt-Code.
 """
 import json
+import math
 import os
 import re
 import tempfile
@@ -61,6 +62,75 @@ def validate(kind: str, key, d) -> str | None:
     label = d.get("label")
     if label is not None and (not isinstance(label, str) or len(label) > 40):
         return "Label: text up to 40 characters"
+    if "sound" in d:
+        err = _sound_err(d["sound"])
+        if err:
+            return "Sound: " + err
+    return None
+
+
+def _num(v, lo, hi) -> bool:
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and lo <= v <= hi
+
+
+# Motorklang je Auto (Abschnitt „Sound“ im Car editor, Laufzeit js/car-engine-audio.js): Aufnahme src (Freesound-ID,
+# Datei assets/sounds/engines/src/<id>.mp3) mit markierten Abschnitten in s (null = Abschnitt aus) und Kenndaten
+SOUND_SEGS = {"idle": (0.2, 10.0), "start": (0.2, 8.0), "limiter": (0.2, 10.0)}   # [t0, t1], Länge von–bis
+SOUND_SWEEPS = {"sweep": 1, "lift": -1}                                          # {t0, t1, rpm0, rpm1}, Richtung
+SOUND_KEYS = {"src", "idleRpm", "redline", "gears", "shiftRpm", "steps", "limitStyle", "limitHz"} | set(SOUND_SEGS) | set(SOUND_SWEEPS)
+SOUND_MAX_T = 60.0
+
+
+def _sound_err(s) -> str | None:
+    """Fehlertext oder None für def.sound."""
+    if not isinstance(s, dict):
+        return "must be an object"
+    extra = set(s) - SOUND_KEYS
+    if extra:
+        return "unknown field " + sorted(extra)[0]
+    src = s.get("src")
+    if src is not None and not (isinstance(src, int) and not isinstance(src, bool) and 0 < src < 10 ** 9):
+        return "recording id invalid"
+    segs = [k for k in list(SOUND_SEGS) + list(SOUND_SWEEPS) if s.get(k) is not None]
+    if segs and src is None:
+        return "marked sections need a recording"
+    for k, (lo, hi) in SOUND_SEGS.items():
+        v = s.get(k)
+        if v is None:
+            continue
+        if not (isinstance(v, list) and len(v) == 2 and all(_num(x, 0, SOUND_MAX_T) for x in v) and lo <= v[1] - v[0] <= hi):
+            return k + ": start/end in seconds, %g–%g s long" % (lo, hi)
+    for k, sign in SOUND_SWEEPS.items():
+        v = s.get(k)
+        if v is None:
+            continue
+        if not (isinstance(v, dict) and set(v) == {"t0", "t1", "rpm0", "rpm1"}):
+            return k + ": needs t0, t1, rpm0, rpm1"
+        if not (_num(v["t0"], 0, SOUND_MAX_T) and _num(v["t1"], 0, SOUND_MAX_T) and 0.3 <= v["t1"] - v["t0"] <= 20):
+            return k + ": start/end in seconds, 0.3–20 s long"
+        if not (_num(v["rpm0"], 100, 20000) and _num(v["rpm1"], 100, 20000)):
+            return k + ": rpm 100–20000"
+        if (v["rpm1"] - v["rpm0"]) * sign < 0.05 * min(v["rpm0"], v["rpm1"]):
+            return k + (": rpm must rise" if sign > 0 else ": rpm must fall")
+    if "idleRpm" in s and not _num(s["idleRpm"], 200, 6000):
+        return "idle rpm 200–6000"
+    if "redline" in s and not _num(s["redline"], 1000, 20000):
+        return "redline 1000–20000"
+    gears = s.get("gears")
+    if gears is not None and not (isinstance(gears, int) and not isinstance(gears, bool) and 1 <= gears <= 10):
+        return "gears 1–10"
+    if "shiftRpm" in s and not _num(s["shiftRpm"], 500, s["redline"] if _num(s.get("redline"), 1000, 20000) else 20000):
+        return "shift rpm up to the redline"
+    steps = s.get("steps")
+    if steps is not None:
+        if not (isinstance(steps, list) and len(steps) <= 9 and all(_num(x, 1.0, 3.0) for x in steps)):
+            return "gear steps: up to 9 ratios 1.0–3.0"
+        if gears is not None and len(steps) != max(0, gears - 1):
+            return "gear steps: one less than gears"
+    if "limitStyle" in s and s["limitStyle"] not in ("off", "hard", "soft"):
+        return "limiter: off, hard or soft"
+    if "limitHz" in s and not _num(s["limitHz"], 3, 30):
+        return "limiter cuts 3–30 per second"
     return None
 
 

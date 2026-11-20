@@ -83,6 +83,27 @@
     .driver-num { width: 5.5em; }
     .driver-walls { border: 1px solid currentColor; border-radius: 6px; padding: 0.4em 0.8em; margin: 0.6em 0; }
     .driver-walls legend { padding: 0 0.3em; }
+    /* Abschnitt „Sound“ (js/car-sound-editor.js): Wellenform auf dem Canvas, Marker werden dort gezeichnet */
+    .snd-wave { display: block; width: 100%; height: 180px; background: #0e131c; border: 1px solid #4a5570; border-radius: 6px; touch-action: none; margin: 6px 0; }
+    .snd-wave.grab { cursor: ew-resize; }
+    .snd-marks { border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px 8px; margin: 8px 0; min-width: 0; }
+    .snd-marks legend { color: var(--muted); padding: 0 4px; }
+    .snd-sec { border-top: 1px solid var(--line); padding: 4px 0; }
+    .snd-sec:first-child { border-top: 0; }
+    .snd-sec .row > label { min-width: 0; }
+    .snd-sec input[type=number] { width: 76px; }
+    .snd-key { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid #fff; flex: none; }
+    .snd-key.k-idle { background: #4fc3f7; }
+    .snd-key.k-sweep { background: #9be59b; }
+    .snd-key.k-lift { background: #ffab70; }
+    .snd-key.k-start { background: #c39bff; }
+    .snd-key.k-limiter { background: #ff8a80; }
+    .snd-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 4px 8px; }
+    .snd-steps label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+    .snd-steps input { width: 64px; }
+    .sim-read { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; align-items: center; margin: 6px 0; }
+    .sim-read meter { flex: 1; min-width: 120px; height: 18px; }
+    .sim-b[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
 </style>
 </head>
 <body>
@@ -342,6 +363,77 @@
         <div class="row"><button type="button" id="raceReset" class="small">Reset to estimate</button></div>
       </section>
 
+      <section aria-labelledby="h-sound" id="sound">
+        <h2 id="h-sound">Sound</h2>
+        <p class="muted small-text">Engine sound of this car (Car Drive, race overlay). Until you change something here, the automatic sound plays (pieces cut by the sound builder). Mark the right parts of one recording yourself, set the engine values and try them in the gear simulator. The engine type is set under Race stats.</p>
+        <p class="small-text" id="sndMode" aria-live="polite"></p>
+        <p class="muted small-text" id="sndNone" hidden>Electric engines have no recordings to mark and no gears.</p>
+        <div id="sndBody">
+          <div class="row">
+            <label for="sndSrc">Recording</label>
+            <select id="sndSrc" aria-describedby="sndCredit"></select>
+          </div>
+          <p class="muted small-text" id="sndCredit"></p>
+          <div class="row">
+            <button type="button" class="small" id="sndPlayAll">Play recording</button>
+            <button type="button" class="small" id="sndStopAll">Stop</button>
+            <button type="button" class="small" id="sndZoomIn" aria-label="Zoom in on the waveform">Zoom +</button>
+            <button type="button" class="small" id="sndZoomOut" aria-label="Zoom out of the waveform">Zoom −</button>
+          </div>
+          <canvas id="sndWave" class="snd-wave" tabindex="0" role="img" aria-roledescription="waveform editor" aria-label="Waveform of the recording with the measured RPM curve and the marked sections" aria-describedby="sndWaveHelp"></canvas>
+          <div class="row">
+            <label for="sndPan">View</label>
+            <input type="range" id="sndPan" min="0" max="1000" step="1" value="0" aria-describedby="sndViewOut">
+            <output id="sndViewOut" for="sndPan" class="small-text muted"></output>
+          </div>
+          <p class="muted small-text" id="sndWaveHelp">Drag a marker line to move it. Keyboard: focus the waveform, Up/Down picks a marker, Left/Right moves it (Shift = 10×), + and − zoom. Grey = waveform, pink line = measured RPM.</p>
+          <p class="small-text" id="sndLive" aria-live="polite"></p>
+          <fieldset class="snd-marks">
+            <legend>Marked sections</legend>
+            <div id="sndSecs"></div>
+          </fieldset>
+          <fieldset class="snd-marks">
+            <legend>Engine and gears</legend>
+            <div class="row"><label for="sndIdle">Idle (rpm)</label><input type="number" id="sndIdle" class="race-num snd-p" min="200" max="6000" step="10" aria-describedby="sndIdleEst"><span class="muted small-text" id="sndIdleEst"></span></div>
+            <div class="row"><label for="sndRed">Redline (rpm)</label><input type="number" id="sndRed" class="race-num snd-p" min="1000" max="20000" step="50" aria-describedby="sndRedEst"><span class="muted small-text" id="sndRedEst"></span></div>
+            <div class="row"><label for="sndGears">Gears</label><input type="number" id="sndGears" class="race-num snd-p" min="1" max="10" step="1" aria-describedby="sndGearsEst"><span class="muted small-text" id="sndGearsEst"></span></div>
+            <div class="row"><label for="sndShift">Shift at (rpm)</label><input type="number" id="sndShift" class="race-num snd-p" min="500" max="20000" step="50" aria-describedby="sndShiftEst"><span class="muted small-text" id="sndShiftEst"></span></div>
+            <p class="small-text muted">Gear steps = how much the RPM drops when shifting up (ratio of one gear to the next, 1.00–3.00). Usually large in low gears, small in high gears.</p>
+            <div id="sndSteps" class="snd-steps"></div>
+            <div class="row">
+              <label for="sndLimit">Rev limiter</label>
+              <select id="sndLimit" class="snd-p" aria-describedby="sndLimitEst"><option value="hard">Hard cuts</option><option value="soft">Soft (diesel governor)</option><option value="off">Off</option></select>
+              <span class="muted small-text" id="sndLimitEst"></span>
+            </div>
+            <div class="row"><label for="sndLimitHz">Cuts per second</label><input type="number" id="sndLimitHz" class="race-num snd-p" min="3" max="30" step="1" aria-describedby="sndLimitHzEst"><span class="muted small-text" id="sndLimitHzEst"></span></div>
+          </fieldset>
+          <fieldset class="snd-marks">
+            <legend>Gear simulator</legend>
+            <p class="muted small-text" id="simInfo"></p>
+            <div class="row">
+              <button type="button" class="small sim-b" data-act="acc100">Accelerate 0–100</button>
+              <button type="button" class="small sim-b" data-act="vmax">Accelerate to top speed</button>
+              <button type="button" class="small sim-b" data-act="hold">Hold throttle</button>
+              <button type="button" class="small sim-b" data-act="lift">Lift off</button>
+            </div>
+            <div class="row">
+              <button type="button" class="small sim-b" data-act="up">Shift up</button>
+              <button type="button" class="small sim-b" data-act="down">Shift down</button>
+              <button type="button" class="small sim-b" data-act="neutral">Rev in neutral</button>
+              <button type="button" class="small sim-b" data-act="stop">Stop engine</button>
+            </div>
+            <div class="sim-read">
+              <label for="simRpm">RPM</label>
+              <div class="row"><meter id="simRpm" min="0" max="8000" value="0" low="6500" high="7400" optimum="3000"></meter><output id="simRpmOut" for="simRpm">0</output></div>
+              <span class="muted">Gear</span><output id="simGear">–</output>
+              <span class="muted">Speed</span><output id="simKmh">0 km/h</output>
+            </div>
+            <p class="small-text" id="simState" aria-live="polite"></p>
+          </fieldset>
+        </div>
+        <div class="row"><button type="button" id="sndReset" class="small">Reset to automatic</button></div>
+      </section>
+
       <section aria-labelledby="h-steer">
         <h2 id="h-steer">Wheels (preview)</h2>
         <div class="row">
@@ -376,6 +468,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-race-sound.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-engine-audio.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-sound-editor.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
@@ -651,6 +744,7 @@
         $('texOff').checked = !!def.texOff; $('smoothWheels').checked = !!def.smoothWheels; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
         raceFill(); paints(); zones(); driverFill();
+        if (sndEd) sndEd.fill(true);
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
       // Felgen = Farbbereich „Rims“ (id rim). Alte Einstellungen (rimParts, rim, Felge je Set) einmalig umrechnen;
@@ -1109,23 +1203,33 @@
       Array.prototype.forEach.call(document.querySelectorAll('.race-in'), function (el) {
         el.addEventListener('input', raceChanged);
         // beim Verlassen den gültigen Wert (geklemmt bzw. Schätzung) zurückschreiben
-        el.addEventListener('change', function () { raceChanged(); el.value = raceRead()[el.dataset.k]; });
+        el.addEventListener('change', function () { raceChanged(); el.value = raceRead()[el.dataset.k]; if (sndEd) sndEd.fill(); });
       });
       ['raceOn', 'raceDrive', 'raceLen', 'raceEngine'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
+      $('raceEngine').addEventListener('change', function () { if (sndEd) sndEd.fill(); });
       // Motorklang: Auswahl aus js/car-engine-audio.js, Hörprobe über eine eigene (leise) Klangausgabe
       var ENG_TYPES = window.CarEngineAudio ? CarEngineAudio.TYPES : CarRaceStats.ENGINES.map(function (id) { return { id: id, label: id }; });
       function engineLabel(id) { var t = (ENG_TYPES || []).filter(function (x) { return x.id === id; })[0]; return t ? t.label : id; }
       ENG_TYPES.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.label; $('raceEngine').appendChild(o); });
       var engSnd = null, engAudio = null;
-      $('raceEnginePlay').addEventListener('click', function () {
+      function engEnsure() {
         if (!engSnd && window.CarRaceSound) engSnd = CarRaceSound.create({ volume: 0.7 });
         if (engSnd && !engAudio && window.CarEngineAudio) engAudio = CarEngineAudio.create(engSnd);
-        if (!engAudio) { say('No Web Audio in this browser.', 'err'); return; }
+        return engAudio;
+      }
+      // Abschnitt „Sound“ (js/car-sound-editor.js): Aufnahme-Abschnitte, Kenndaten, Gang-Simulator → def.sound
+      var sndEd = window.CarSoundEditor ? CarSoundEditor.create({
+        audio: engEnsure, ctx: function () { return engSnd && engSnd.ctx; }, resume: function () { if (engSnd) engSnd.resume(); },
+        car: function () { return cur; }, def: function () { return def; }, type: function () { return raceRead().engine; },
+        race: function () { return raceRead(); }, say: say
+      }) : null;
+      $('raceEnginePlay').addEventListener('click', function () {
+        if (!engEnsure()) { say('No Web Audio in this browser.', 'err'); return; }
         engSnd.resume();
         var type = $('raceEngine').value;
         engAudio.ready.then(function (ok) {
           if (!ok) { say('Engine sounds could not be loaded.', 'err'); return; }
-          engAudio.preview(type, cur && cur.key);
+          engAudio.preview(type, cur && cur.key, def.sound || null);   // mit dem Entwurf aus „Sound“
           say('Playing: ' + engineLabel(type) + '.', 'ok');
         });
       });
@@ -1137,7 +1241,7 @@
         el.min = String(-m.toFixed(2)); el.max = String(m.toFixed(2));
         if (Math.abs(+el.value) > m) { el.value = String(Math.sign(+el.value) * m); el.dispatchEvent(new Event('input')); }
       }
-      $('raceReset').addEventListener('click', function () { delete def.race; raceFill(); say('Race stats reset to the estimate. Save to keep it.', 'ok'); });
+      $('raceReset').addEventListener('click', function () { delete def.race; raceFill(); if (sndEd) sndEd.fill(); say('Race stats reset to the estimate. Save to keep it.', 'ok'); });
       $('save').addEventListener('click', function () {
         var zids = def.zones.map(function (z) { return z.id; });
         var d = { mix: def.mix !== false, paints: def.paints.map(function (p) {
@@ -1152,6 +1256,7 @@
         if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
         if (def.race) d.race = CarRaceStats.clean(def.race);
+        if (def.sound && window.CarEngineAudio) { var snd = CarEngineAudio.Model.cleanSound(def.sound); if (snd) d.sound = snd; }
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
         if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);

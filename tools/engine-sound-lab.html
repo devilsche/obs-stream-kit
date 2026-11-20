@@ -147,6 +147,11 @@
   <script src="/s/__WIDGET_TOKEN__/js/car-race-sound.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-engine-audio.js"></script>
   <script>
+    // gespeicherte Motorklänge je Auto (Car editor, def.sound) ohne js/toy-cars.js: custom.js ruft ToyCars.applyCustom
+    window.ToyCars = window.ToyCars || { _v: {}, applyCustom: function (c) { this._v = (c && c.vehicles) || {}; }, vehicle: function (k) { return this._v[k] || {}; } };
+  </script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
+  <script>
     (function () {
       'use strict';
       var $ = function (id) { return document.getElementById(id); };
@@ -181,7 +186,7 @@
       function fillRec() {
         var sel = $('rec'), sp = spec(), keep = sel.value;
         sel.textContent = '';
-        var o = document.createElement('option'); o.value = ''; o.textContent = 'Automatic (by car)'; sel.appendChild(o);
+        var o = document.createElement('option'); o.value = ''; o.textContent = 'Automatic (by car, incl. its Car editor sound)'; sel.appendChild(o);
         ((sp && sp.on) || []).forEach(function (s) {
           var src = bank && bank.sources[String(s.src)], p = s.pts || [];
           var op = document.createElement('option'); op.value = String(s.src);
@@ -223,7 +228,7 @@
           if (!ok) return;
           if (v) v.stop();
           var type = $('type').value, car = $('car').value.trim();
-          v = eng.voice(type, { gain: 1, seed: car || type, lite: $('lite').checked, src: $('rec').value || null, mode: $('oldMode').checked ? 'loops' : null });
+          v = eng.voice(type, { gain: 1, seed: car || type, lite: $('lite').checked, src: $('rec').value || null, sound: $('rec').value ? null : undefined, mode: $('oldMode').checked ? 'loops' : null });
           v.oneShot('start', 0.6);
           setLimit(false); sim.speed = 0; sim.seq = null;
           buttons(true);

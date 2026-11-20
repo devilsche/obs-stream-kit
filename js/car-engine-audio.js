@@ -21,11 +21,17 @@
  *                                                    null ohne Web Audio. base = URL von assets/sounds/engines/
  *                                                    (Standard: neben dem Skript, …/js/ → …/assets/sounds/engines/)
  *   E.ready                                           Promise: bank.json geladen (false bei Fehler)
- *   var v = E.voice(type, { gain, seed, lite, src, mode })   Motorstimme; type = Motorart (i4 t4 i6 f6 v6t v8m v8f v8t
+ *   var v = E.voice(type, { gain, seed, lite, src, mode, sound })   Motorstimme; type = Motorart (i4 t4 i6 f6 v6t v8m v8f v8t
  *                                                    v10 v12 f1 dsl ev), seed = Autoschlüssel (welche Aufnahme; bank.cars legt
  *                                                    für einzelne Autos die Aufnahme fest), lite = sparsamer (Fremdautos);
  *                                                    nur Engine sound lab: src = Aufnahme erzwingen (Freesound-ID),
- *                                                    mode 'loops' = alter Weg (nur Drehzahl-Schleifen) zum Vergleich
+ *                                                    mode 'loops' = alter Weg (nur Drehzahl-Schleifen) zum Vergleich;
+ *                                                    sound = Motorklang aus dem Car editor (def.sound, Form: Model.cleanSound;
+ *                                                    null = keiner) – ohne Angabe der gespeicherte des Autos (ToyCars.vehicle(seed).sound,
+ *                                                    /api/fx/cars/custom.js): Kenndaten (Leerlauf, Begrenzer, Gänge, Schaltpunkt,
+ *                                                    Gangsprünge, Begrenzer-Art) und markierte Abschnitte einer Quell-Aufnahme
+ *                                                    (assets/sounds/engines/src/<id>.mp3, scripts/build_engine_sources.py) statt der
+ *                                                    Stücke aus bank.json
  *   v.update(dt, { speed, throttle, dist, ref, radial, pan, on, rpm, load })
  *        speed = Anteil an der Höchstgeschwindigkeit (0..1), throttle 0..1, dist/ref = Abstand zum Hörer und
  *        Bezugsabstand (gleiche Einheit; ohne dist = am Hörer), radial = Annäherung in m/s (Doppler, + = kommt näher),
@@ -33,12 +39,14 @@
  *        rpm / load (optional, Engine sound lab): Drehzahl bzw. Last direkt vorgeben statt Gangmodell
  *   v.oneShot(kind[, gain])                           start | rev | pass | pop | turbo (Aufnahme passend zur Stimme)
  *   v.blip([amount])                                  Gasstoß im Stand (Drehzahl hoch und wieder runter)
- *   v.shift()                                         sofort hochschalten (Engine sound lab)
+ *   v.shift([dir])                                    sofort hoch- (dir −1: zurück-)schalten (Engine sound lab, Gang-Simulator)
+ *   v.manual(on), v.neutral(on)                       nicht selbst schalten / ausgekuppelt (Gang-Simulator im Car editor)
  *   v.rpm(), v.gear(), v.level(), v.info(), v.stop()  info = { rpm, gear, load, mix, on, off, idle, src, limiter, limitHz, steady }
  *                                                    (limiter = true, solange der Begrenzer arbeitet)
  *   E.oneShot(type, kind, { gain, rate, pan, seed })  Einmal-Klang ohne Stimme (z. B. Vorbeifahrt an der TV-Kamera)
  *   E.has(type, kind), E.bank(), E.spec(type)
- *   E.preview(type[, seed])                           Hörprobe für den Car editor: Anlassen, zwei Gasstöße, Hochdrehen, Leerlauf
+ *   E.preview(type[, seed[, sound]])                  Hörprobe für den Car editor: Anlassen, zwei Gasstöße, Hochdrehen, Leerlauf
+ *   E.sources(), E.source(id), E.autoSrc(type, seed), E.playSection(src, kind, w[, dur])   Car editor, Abschnitt „Sound“
  *   E.stopAll()
  *   CarEngineAudio.TYPES                              Liste [{ id, label }] (für Auswahlfelder)
  *   CarEngineAudio.Model                              reine Rechnung (Node-Test scripts/check_engine_audio.js):
@@ -48,7 +56,9 @@
  *        ladder(loops, seed, max), weights(ladder, rpm) → [{ i, g }], rate(rpm, loopRpm),
  *        prepSweep(sw), sweepPos(sw, rpm) → { t, r }, sweepRpm(sw, t), period(rpm, cyl), grainHead(head, pos, P, k),
  *        bestMatch(data, sr, nat, cand, len, delta, step, dec) (WSOLA-Feinsuche), band(sw, rpm, minSpan, dur) → { a, b },
- *        layerMix(spec, rpm, load, hasIdle, hasOff) → { idle, on, off }, hann(n)
+ *        layerMix(spec, rpm, load, hasIdle, hasOff) → { idle, on, off }, hann(n),
+ *        cleanSound(s), soundSpec(spec, s), steps(spec), sweepPts(curve, t0, t1, rpm0, rpm1, pad), loopData(d, a, b, F),
+ *        segGain(d, a, b, dB[, pa, pb])  (Motorklang je Auto aus dem Car editor)
  */
 (function (root) {
   'use strict';
@@ -105,15 +115,27 @@
     tune: function (spec) {
       var k = spec && spec.type, c = spec && spec._tune;
       if (c && c.k === k) return c;
-      c = Object.assign({ k: k }, TUNE_DEF, TUNE[k] || {});
+      c = Object.assign({ k: k }, TUNE_DEF, TUNE[k] || {}, spec && spec.tuneOv || {});   // tuneOv: Car editor (soundSpec)
       if (spec) spec._tune = c;
       return c;
     },
     // Übersetzungen: oberster Gang 1, erster Gang erreicht den Begrenzer bei g1 · vmax; dazwischen geometrisch
+    // Gangsprünge aus dem Car editor (spec.steps = n − 1 Verhältnisse Gang g / Gang g+1) gehen vor
     ratios: function (spec) {
       var n = Math.max(1, spec.gears | 0), q = n > 1 ? Math.pow(1 / spec.g1, 1 / (n - 1)) : 1, r = [];
+      if (spec.steps && spec.steps.length === n - 1) {
+        r[n - 1] = 1;
+        for (var k = n - 2; k >= 0; k--) r[k] = r[k + 1] * spec.steps[k];
+        return r;
+      }
       for (var g = 1; g <= n; g++) r.push(Math.pow(q, n - g));
       return r;
+    },
+    // Gangsprünge der Automatik (geometrisch aus g1) – Vorgabe für den Car editor
+    steps: function (spec) {
+      var n = Math.max(1, spec.gears | 0), q = n > 1 ? Math.pow(1 / spec.g1, 1 / (n - 1)) : 1, out = [];
+      for (var i = 0; i < n - 1; i++) out.push(Math.round(q * 1000) / 1000);
+      return out;
     },
     rpmAt: function (spec, g, speed) {
       var r = spec._r || (spec._r = Model.ratios(spec));
@@ -138,21 +160,23 @@
       if (st.cut > 0) st.cut = Math.max(0, st.cut - dt);
       if (st.blip > 0) st.blip = Math.max(0, st.blip - dt);
       var tn = Model.tune(spec), up = spec.red * (0.6 + (tn.shift - 0.6) * thr), down = spec.red * (0.3 + 0.12 * thr);
-      if (st.force && g < n) { g++; st.shifted = 1; st.cut = 0.14 + 0.1 * thr; st.force = 0; }
-      else if (g < n && Model.rpmAt(spec, g, speed) > up && st.cut <= 0) { g++; st.shifted = 1; st.cut = 0.14 + 0.1 * thr; }
-      else if (g > 1 && Model.rpmAt(spec, g, speed) < down && Model.rpmAt(spec, g - 1, speed) < up * 0.9) {
+      // force = ±1: von Hand schalten (Engine sound lab, Gang-Simulator im Car editor); manual = nie selbst schalten
+      if (st.force > 0 && g < n) { g++; st.shifted = 1; st.cut = 0.14 + 0.1 * thr; st.force = 0; }
+      else if (st.force < 0 && g > 1) { g--; st.shifted = -1; st.force = 0; if (thr < 0.3 && speed > 0.05) st.blip = 0.16; }
+      else if (!st.manual && g < n && Model.rpmAt(spec, g, speed) > up && st.cut <= 0) { g++; st.shifted = 1; st.cut = 0.14 + 0.1 * thr; }
+      else if (!st.manual && g > 1 && Model.rpmAt(spec, g, speed) < down && Model.rpmAt(spec, g - 1, speed) < up * 0.9) {
         g--; st.shifted = -1;
         if (thr < 0.3 && speed > 0.05) st.blip = 0.16;
       }
       st.force = 0;
       st.gear = g;
-      var wheel = Model.rpmAt(spec, g, speed), target, stand = speed < 0.01;
+      var wheel = Model.rpmAt(spec, g, speed), target, stand = speed < 0.01 || !!st.neutral;   // neutral: ausgekuppelt
       // im Stand/ausgekuppelt: Gas = Drehzahl, Vollgas läuft in den Begrenzer (Teilgas bleibt darunter)
       if (stand) target = spec.idle + thr * (1.04 * spec.red - spec.idle);
       else if (g === 1 && wheel < 0.45 * spec.red) target = Math.max(wheel, spec.idle + thr * (0.5 * spec.red - spec.idle));   // Kupplung schleift
       else target = Math.max(wheel, spec.idle);
       if (st.blip > 0) target *= 1.08;
-      target = Math.min(target, spec.red * 1.02);           // nie (weit) über den Begrenzer, auch im Schub
+      target = Math.min(target, spec.red * (tn.off ? 1 : 1.02));   // nie (weit) über den Begrenzer, auch im Schub
       if (Model.limitStep(spec, st, target, thr, dt)) return st;
       // eingekuppelt hängt die Drehzahl fest an den Rädern (kurze Zeitkonstante); im Stand/schleifend träger
       var slip = stand || (g === 1 && wheel < 0.45 * spec.red);
@@ -166,7 +190,7 @@
     // (0..1, 0 = Beginn eines Schnitts), st.limN Zahl der Schnitte. Ohne Last / nach dem Hochschalten sofort aus.
     limitStep: function (spec, st, target, thr, dt) {
       var tn = Model.tune(spec);
-      if (spec.gears <= 1 || !(thr > 0.5) || target < spec.red * 0.995 || (!st.limiter && st.rpm < spec.red * 0.985)) {
+      if (spec.gears <= 1 || tn.off || !(thr > 0.5) || target < spec.red * 0.995 || (!st.limiter && st.rpm < spec.red * 0.985)) {
         st.limiter = 0; st.limPh = 0; return false;
       }
       if (!st.limiter) { st.limiter = 1; st.limPh = 0; st.limN = 0; }
@@ -343,6 +367,104 @@
       if (!hasOff) return { idle: gi, on: rest * (0.55 + 0.45 * load), off: 0 };
       return { idle: gi, on: rest * Math.sqrt(load), off: rest * Math.sqrt(1 - load) };
     },
+    // ---- Car editor: Motorklang je Auto (def.sound, gespeichert über fx/car_models.py, geprüft dort in _sound_err)
+    // { src, idle: [t0, t1], sweep: { t0, t1, rpm0, rpm1 }, lift: { … }, start: [t0, t1], limiter: [t0, t1],
+    //   idleRpm, redline, gears, shiftRpm, steps: [n − 1 Gangsprünge], limitStyle: off|hard|soft, limitHz }
+    // Zeiten in s innerhalb von assets/sounds/engines/src/<src>.mp3; null = Abschnitt aus (statt Vorschlag der Automatik)
+    // cleanSound: nur gültige Felder (wie der Server), sonst null
+    cleanSound: function (s) {
+      if (!s || typeof s !== 'object') return null;
+      function num(v, a, b) { return typeof v === 'number' && isFinite(v) && v >= a && v <= b; }
+      var o = {}, src = s.src;
+      if (typeof src === 'number' && src > 0 && src % 1 === 0) o.src = src;
+      ['idle', 'start', 'limiter'].forEach(function (k) {
+        var v = s[k];
+        if (v === null && o.src) o[k] = null;
+        else if (o.src && Array.isArray(v) && v.length === 2 && num(v[0], 0, 60) && num(v[1], 0, 60) && v[1] - v[0] >= 0.2) o[k] = [v[0], v[1]];
+      });
+      ['sweep', 'lift'].forEach(function (k) {
+        var v = s[k], up = k === 'sweep';
+        if (v === null && o.src) o[k] = null;
+        else if (o.src && v && num(v.t0, 0, 60) && num(v.t1, 0, 60) && v.t1 - v.t0 >= 0.3 && num(v.rpm0, 100, 20000) && num(v.rpm1, 100, 20000) &&
+          (up ? v.rpm1 > v.rpm0 : v.rpm1 < v.rpm0)) o[k] = { t0: v.t0, t1: v.t1, rpm0: v.rpm0, rpm1: v.rpm1 };
+      });
+      if (num(s.idleRpm, 200, 6000)) o.idleRpm = s.idleRpm;
+      if (num(s.redline, 1000, 20000)) o.redline = s.redline;
+      if (typeof s.gears === 'number' && s.gears % 1 === 0 && s.gears >= 1 && s.gears <= 10) o.gears = s.gears;
+      if (num(s.shiftRpm, 500, 20000)) o.shiftRpm = s.shiftRpm;
+      if (Array.isArray(s.steps) && s.steps.length <= 9 && s.steps.every(function (x) { return num(x, 1, 3); })) o.steps = s.steps.slice();
+      if (s.limitStyle === 'off' || s.limitStyle === 'hard' || s.limitStyle === 'soft') o.limitStyle = s.limitStyle;
+      if (num(s.limitHz, 3, 30)) o.limitHz = s.limitHz;
+      return Object.keys(o).length ? o : null;
+    },
+    // Kenndaten der Motorart mit den Abweichungen aus dem Car editor (Kopie; spec bleibt unverändert)
+    soundSpec: function (spec, s) {
+      var o = Object.assign({}, spec);
+      delete o._tune; delete o._r;
+      if (!s) return o;
+      if (s.idleRpm) o.idle = s.idleRpm;
+      if (s.redline) o.red = s.redline;
+      if (s.gears) o.gears = s.gears;
+      if (o.idle >= o.red * 0.8) o.idle = Math.round(o.red * 0.25);
+      if (s.steps && s.steps.length === o.gears - 1) o.steps = s.steps.slice(); else delete o.steps;
+      var tv = {};
+      if (s.shiftRpm) tv.shift = clamp(s.shiftRpm / o.red, 0.6, 1);
+      if (s.limitStyle === 'off') tv.off = true;
+      else if (s.limitStyle === 'soft') tv.soft = true;
+      else if (s.limitStyle === 'hard') tv.soft = false;
+      if (s.limitHz) tv.hz = s.limitHz;
+      o.tuneOv = tv;
+      return o;
+    },
+    // Drehzahlverlauf eines markierten Hoch-/Ablaufs: gemessene Kurve (cur = { t0, dt, rpm: [U/min, 0 = unklar] } aus
+    // src/<id>.json) im Bereich t0…t1, monoton gemacht (Hochlauf laufendes Maximum, Abfall Minimum) und in
+    // log. Drehzahl auf rpm0…rpm1 gestreckt; taugt die Messung nicht (< 4 klare Punkte, Bereich < 15 %), gleichmäßig
+    // (log.) von rpm0 nach rpm1. pad = Vorlauf des Ausschnitts → pts [[t ab Ausschnitt-Anfang, U/min], …]
+    sweepPts: function (cur, t0, t1, rpm0, rpm1, pad) {
+      var up = rpm1 > rpm0, raw = [], i;
+      if (cur && cur.rpm && cur.dt > 0) {
+        for (i = 0; i < cur.rpm.length; i++) {
+          var t = cur.t0 + i * cur.dt;
+          if (t >= t0 && t <= t1 && cur.rpm[i] > 0) raw.push([t, cur.rpm[i]]);
+        }
+      }
+      var pts = [];
+      if (raw.length >= 4) {
+        var m = raw[0][1];
+        raw.forEach(function (p) { m = up ? Math.max(m, p[1]) : Math.min(m, p[1]); p[1] = m; });
+        var a = Math.log(raw[0][1]), b = Math.log(raw[raw.length - 1][1]);
+        if (Math.abs(b - a) >= Math.log(1.15)) {
+          var A = Math.log(rpm0), Bq = Math.log(rpm1);
+          pts.push([t0, rpm0]);
+          raw.forEach(function (p) { if (p[0] > t0 && p[0] < t1) pts.push([p[0], Math.exp(A + (Math.log(p[1]) - a) / (b - a) * (Bq - A))]); });
+          pts.push([t1, rpm1]);
+        }
+      }
+      if (!pts.length) {
+        var n = Math.max(2, Math.round((t1 - t0) / 0.05));
+        for (i = 0; i <= n; i++) pts.push([t0 + (t1 - t0) * i / n, Math.exp(Math.log(rpm0) + (Math.log(rpm1) - Math.log(rpm0)) * i / n)]);
+      }
+      return pts.map(function (p) { return [Math.round((p[0] - t0 + pad) * 1000) / 1000, Math.round(p[1])]; });
+    },
+    // nahtlose Schleife aus d[a…b) (Proben): Länge L − F, Anfang mit dem Überhang überblendet (gleiche Leistung)
+    loopData: function (d, a, b, F) {
+      var L = b - a;
+      F = Math.max(1, Math.min(F, Math.floor(L / 3)));
+      var out = new Float32Array(L - F);
+      for (var i = 0; i < out.length; i++) out[i] = d[a + i];
+      for (i = 0; i < F; i++) { var w = i / F; out[i] = d[a + i] * Math.sqrt(w) + d[a + L - F + i] * Math.sqrt(1 - w); }
+      return out;
+    },
+    // Verstärkung, die d[a…b) auf target dBFS RMS bringt (höchstens ×8, Spitze in d[pa…pb) – Standard a…b – nicht
+    // über −1 dBFS)
+    segGain: function (d, a, b, target, pa, pb) {
+      var e = 0, pk = 0, n = 0, i;
+      for (i = Math.max(0, a); i < Math.min(d.length, b); i++) { e += d[i] * d[i]; n++; }
+      for (i = Math.max(0, pa == null ? a : pa); i < Math.min(d.length, pb == null ? b : pb); i++) pk = Math.max(pk, Math.abs(d[i]));
+      if (!n || e <= 1e-12) return 1;
+      var g = Math.pow(10, target / 20) / Math.sqrt(e / n);
+      return Math.min(8, g, pk > 0 ? 0.89 / pk : 8);
+    },
     hann: function (n) {
       var a = new Float32Array(n);
       for (var i = 0; i < n; i++) a[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (n - 1));
@@ -401,6 +523,91 @@
       return null;
     }
 
+    // ---- Motorklang je Auto aus dem Car editor (def.sound): Quell-Aufnahme src/<id>.mp3 + Drehzahlverlauf src/<id>.json
+    var jsons = {}, customs = {};
+    function getJson(f) {
+      if (!jsons[f]) {
+        jsons[f] = root.fetch(base + f).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+          .catch(function (e) { if (root.console) console.warn('Engine sounds: ' + f + ' – ' + (e && e.message)); return null; });
+      }
+      return jsons[f];
+    }
+    function source(id) {
+      return Promise.all([getJson('src/' + id + '.json'), load('src/' + id + '.mp3')]).then(function (r) { return { info: r[0], buf: r[1] }; });
+    }
+    // gespeichertes def.sound des Autos (ToyCars.applyCustom aus /api/fx/cars/custom.js), Schlüssel = seed
+    function carSound(seed) {
+      var TC = root.ToyCars, d = TC && TC.vehicle && seed ? TC.vehicle(seed) : null;
+      return d && d.sound || null;
+    }
+    // Ausschnitt t0…t1 (s) als eigener Puffer, mal gain, mit kurzen Blenden (fi/fo s)
+    function clipBuf(b, t0, t1, gain, fi, fo) {
+      var sr = b.sampleRate, a = Math.max(0, Math.round(t0 * sr)), e = Math.min(b.length, Math.round(t1 * sr)), n = Math.max(1, e - a);
+      var o = ctx.createBuffer(1, n, sr), d = o.getChannelData(0), s0 = b.getChannelData(0), A = Math.round((fi || 0) * sr), F = Math.round((fo || 0) * sr);
+      for (var i = 0; i < n; i++) {
+        var w = gain;
+        if (A && i < A) w *= i / A;
+        if (F && i > n - F) w *= (n - i) / F;
+        d[i] = s0[a + i] * w;
+      }
+      return o;
+    }
+    // nahtlose Schleife aus t0…t1, auf −20 dBFS RMS
+    function loopBuf(b, t0, t1) {
+      var sr = b.sampleRate, s0 = b.getChannelData(0), a = Math.round(t0 * sr), e = Math.min(b.length, Math.round(t1 * sr));
+      var x = Model.loopData(s0, a, e, Math.round(Math.min(0.25, (t1 - t0) / 3) * sr)), g = Model.segGain(s0, a, e, -20);
+      var o = ctx.createBuffer(1, x.length, sr), d = o.getChannelData(0);
+      for (var i = 0; i < x.length; i++) d[i] = x[i] * g;
+      return o;
+    }
+    // Abschnitte = gespeicherte Markierung, sonst Vorschlag der Automatik (src/<id>.json auto), null = aus
+    function sections(ov, info) {
+      var auto = info && info.auto || {}, seg = {};
+      ['idle', 'sweep', 'lift', 'start', 'limiter'].forEach(function (k) { seg[k] = ov[k] !== undefined ? ov[k] : auto[k] || null; });
+      return seg;
+    }
+    // markierter Hoch-/Ablauf als Sweep wie aus bank.json (Ausschnitt ± 0,15 s, Pegel wie das Bauskript: Hochlauf am
+    // Anfang, Abfall am Ende auf −20 dBFS RMS)
+    function mkSweep(S, w, kind) {
+      var b = S.buf, sr = b.sampleRate, d = b.getChannelData(0), pad = 0.15, a = Math.max(0, w.t0 - pad), q = (w.t1 - w.t0) / 4;
+      var r0 = kind === 'on' ? w.t0 : w.t1 - q, g = Model.segGain(d, Math.round(r0 * sr), Math.round((r0 + q) * sr), -20, Math.round(w.t0 * sr), Math.round(w.t1 * sr));
+      var cb = clipBuf(b, a, Math.min(b.duration, w.t1 + pad), g);
+      return Model.prepSweep({ f: 'src/' + S.id + '.mp3#' + kind, src: S.id, buf: cb, dur: cb.duration, own: true,
+        pts: Model.sweepPts(S.info, w.t0, w.t1, w.rpm0, w.rpm1, w.t0 - a) });
+    }
+    // fertige Puffer je def.sound (geteilt zwischen Stimmen gleicher Einstellung) → { src, seg, sweep, lift, idle, start, limiter }
+    function custom(ov) {
+      var key = JSON.stringify(ov);
+      if (customs[key]) return customs[key];
+      customs[key] = source(ov.src).then(function (S) {
+        if (!S.buf) return null;
+        S.id = ov.src;
+        var seg = sections(ov, S.info), b = S.buf, out = { src: ov.src, seg: seg };
+        function ok(w) { return w && (Array.isArray(w) ? w[1] : w.t1) <= b.duration + 0.05; }
+        if (ok(seg.sweep)) out.sweep = mkSweep(S, seg.sweep, 'on');
+        if (ok(seg.lift)) out.lift = mkSweep(S, seg.lift, 'off');
+        if (ok(seg.idle)) out.idle = loopBuf(b, seg.idle[0], seg.idle[1]);
+        if (ok(seg.limiter)) out.limiter = loopBuf(b, seg.limiter[0], seg.limiter[1]);
+        if (ok(seg.start)) {
+          var sr = b.sampleRate, d0 = b.getChannelData(0);
+          out.start = clipBuf(b, seg.start[0], seg.start[1], Model.segGain(d0, Math.round(seg.start[0] * sr), Math.round(seg.start[1] * sr), -20), 0.003, 0.08);
+        }
+        return out;
+      }).catch(function (e) { if (root.console) console.warn('Engine sounds: own sound – ' + (e && e.message)); return null; });
+      return customs[key];
+    }
+    function playBuf(buf, o) {
+      o = o || {};
+      var src = ctx.createBufferSource(), g = ctx.createGain();
+      src.buffer = buf; src.loop = !!o.loop; src.playbackRate.value = o.rate || 1;
+      g.gain.value = (o.gain == null ? 0.5 : o.gain) * MIX;
+      src.connect(g); g.connect(o.dest || out);
+      src.start(ctx.currentTime);
+      if (o.dur) src.stop(ctx.currentTime + o.dur);
+      src.onended = function () { try { g.disconnect(); } catch (e) { /* schon getrennt */ } };
+      return { stop: function () { try { src.stop(); } catch (e) { /* schon aus */ } } };
+    }
+
     function playShot(type, kind, o) {
       o = o || {};
       return ready.then(function () {
@@ -427,6 +634,10 @@
       var gainK = vo.gain == null ? 1 : vo.gain, seed = vo.seed || type, lite = !!vo.lite;
       var gr = lite ? GR_LITE : GR, hop = lite ? HOP_LITE : HOP;
       var sp = null, st = {}, alive = true, started = false, src0 = null;
+      // Motorklang aus dem Car editor: vo.sound (auch null = keiner), sonst def.sound des Autos (seed = Autoschlüssel);
+      // cu = fertige Puffer der markierten Abschnitte, limS = Begrenzer-Aufnahme (Schleife), limW = ihr Anteil
+      var ov = Model.cleanSound(vo.sound !== undefined ? vo.sound : carSound(seed)), cu = null, limS = null, limW = 0;
+      var cuP = ready.then(function () { return ov && ov.src && vo.mode !== 'loops' ? custom(ov) : null; });
       // Rückfall-Schleifen (ohne Sweep)
       var lad = [], srcs = [], gains = [];
       // Sweep-Ebenen: on (Hochlauf), off (Abfall); je Ebene Haupt-Sweep + ggf. ein höher reichender (ext)
@@ -576,8 +787,14 @@
               idle.g.gain.setTargetAtTime(mixNow.idle, t, 0.03);
               if (idle.s) idle.s.playbackRate.setTargetAtTime(clamp(rpm / idle.rpm, 0.8, 1.5) * dop, t, 0.03);
             }
-            layers.on.g.gain.setTargetAtTime(mixNow.on, t, 0.02);
-            if (layers.off) layers.off.g.gain.setTargetAtTime(mixNow.off, t, 0.02);
+            // eigene Begrenzer-Aufnahme: solange er arbeitet, übernimmt sie (Körner leise darunter)
+            if (limS) {
+              limW += ((st.limiter ? 1 : 0) - limW) * (1 - Math.exp(-dt / 0.04));
+              limS.g.gain.setTargetAtTime(limW * (1 - mixNow.idle), t, 0.03);
+            }
+            var kOn = 1 - 0.85 * limW;
+            layers.on.g.gain.setTargetAtTime(mixNow.on * kOn, t, 0.02);
+            if (layers.off) layers.off.g.gain.setTargetAtTime(mixNow.off * kOn, t, 0.02);
             schedule(rpmG);
           } else {
             var ws = Model.weights(lad, Math.max(rpm, sp.gears <= 1 ? 1 : 0));
@@ -605,7 +822,7 @@
           if (pan) pan.pan.setTargetAtTime(clamp(p.pan || 0, -1, 1), t, 0.05);
           // Begrenzer: Schnitte bis AHEAD voraus planen (Periode ±6 % unregelmäßig); jeder Schnitt endet wieder bei
           // vollem Pegel und Grund-Verzögerung, beim Aussteigen läuft der letzte nur aus
-          if (st.limiter && p.on !== false) {
+          if (st.limiter && p.on !== false && !limS) {
             if (!limOn || limNext < t) limNext = t + 0.005;
             limOn = true;
             while (limNext < t + AHEAD) {
@@ -643,14 +860,18 @@
         // bevorzugt aus derselben Aufnahme wie die Stimme (Anlassen und Fahren klingen nach demselben Auto)
         oneShot: function (kind, g) {
           if (!alive) return;
-          ready.then(function () {
+          cuP.then(function (c) {
             if (!alive) return;
+            if (kind === 'start' && c && c.start) { playBuf(c.start, { gain: (g == null ? 0.5 : g) * gainK * lastAtt, dest: pan || out }); return; }
             var s = src0 != null ? src0 : voiceSrc(spec(type), seed);
             playShot(type, kind, { gain: (g == null ? 0.5 : g) * gainK * lastAtt, dest: pan || out, seed: seed + ':' + kind + ':' + Math.random(), src: kind === 'pop' ? null : s });
           });
         },
         blip: function (a) { blipA = clamp(a == null ? 0.8 : a, 0.2, 1); blipT = 0.45; },
-        shift: function () { st.force = 1; },
+        shift: function (dir) { st.force = dir < 0 ? -1 : 1; },         // dir −1 = zurückschalten
+        manual: function (on) { st.manual = !!on; },                      // nicht selbst schalten (Gang-Simulator)
+        neutral: function (on) { st.neutral = !!on; },                    // ausgekuppelt (Gas = Drehzahl)
+        spec: function () { return sp; },
         rpm: function () { return st.rpm || 0; },
         gear: function () { return st.gear || 1; },
         level: function () { return level; },
@@ -658,7 +879,8 @@
           return { rpm: st.rpm || 0, gear: st.gear || 1, load: loadS, boost: boost, mix: mixNow, src: src0,
             limiter: !!st.limiter, limitHz: st.limiter && sp ? Model.tune(sp).hz : 0, steady: steady,
             on: layers.on ? (layers.on.cur || layers.on.sw).f : null, pieces: layers.on ? layers.on.list.length : 0,
-            off: layers.off ? (layers.off.cur || layers.off.sw).f : null, idle: idle ? idle.f : null, loops: layers.on ? 0 : lad.length };
+            off: layers.off ? (layers.off.cur || layers.off.sw).f : null, idle: idle ? idle.f : null, loops: layers.on ? 0 : lad.length,
+            own: !!cu, limRec: !!limS };
         },
         stop: function () {
           if (!alive) return;
@@ -671,6 +893,7 @@
             if (idle && idle.s) { try { idle.s.stop(); } catch (e) { /* nie gestartet */ } }
             if (turbo) { try { turbo.o.stop(); turbo.n.stop(); } catch (e) { /* schon aus */ } }
             if (noise) { try { noise.s.stop(); } catch (e) { /* schon aus */ } }
+            if (limS) { try { limS.s.stop(); } catch (e) { /* schon aus */ } }
             try { vGain.disconnect(); if (pan) pan.disconnect(); } catch (e) { /* schon getrennt */ }
           }, 700);
           voices = voices.filter(function (x) { return x !== v; });
@@ -690,15 +913,40 @@
         return { sw: all[0], list: all, g: g, next: 0, cur: null };
       }
 
-      ready.then(function () {
+      // eigene Schleife (Leerlauf/Begrenzer-Aufnahme) an Ebene g, Start an zufälliger Stelle
+      function ownLoop(buf, g) {
+        var s = ctx.createBufferSource();
+        s.buffer = buf; s.loop = true; s.connect(g);
+        s.start(ctx.currentTime, (hash(seed) % 1000) / 1000 * buf.duration);
+        return s;
+      }
+      cuP.then(function (c) {
         if (!alive) return;
         sp = spec(type);
         if (!sp) return;
-        sp = Object.assign({}, sp, { type: type });
+        sp = Model.soundSpec(Object.assign({}, sp, { type: type }), ov);   // Kenndaten aus dem Car editor
         st = {};
-        src0 = vo.src != null ? +vo.src : voiceSrc(sp, seed);
+        cu = c && c.sweep && sp.gears > 1 ? c : null;
+        src0 = vo.src != null ? +vo.src : ov && ov.src ? ov.src : voiceSrc(sp, seed);
         var waits = [];
-        if (sp.on && sp.on.length && vo.mode !== 'loops') {
+        if (cu) {
+          // markierte Abschnitte: nur diese Aufnahme – Hochlauf (ggf. Abfall) granular, Leerlauf/Begrenzer als Schleife;
+          // ohne markierten Leerlauf die Leerlauf-Schleife der Bank (unten)
+          var own = function (sw) { var g = ctx.createGain(); g.gain.value = 0; g.connect(mix); var x = Object.assign({}, sw, { head: null }); return { sw: x, list: [x], g: g, next: 0, cur: null }; };
+          layers.on = own(cu.sweep);
+          if (!lite && cu.lift) layers.off = own(cu.lift);
+          if (cu.idle) {
+            idle = { f: 'src/' + cu.src + '.mp3#idle', rpm: sp.idle, g: ctx.createGain() };
+            idle.g.gain.value = 0; idle.g.connect(mix);
+            idle.s = ownLoop(cu.idle, idle.g);
+          }
+          if (cu.limiter && !lite) {
+            limS = { g: ctx.createGain() };
+            limS.g.gain.value = 0; limS.g.connect(mix);
+            limS.s = ownLoop(cu.limiter, limS.g);
+          }
+        }
+        if (!cu && sp.on && sp.on.length && vo.mode !== 'loops') {
           layers.on = makeLayer(sp.on, src0);
           if (!lite) layers.off = makeLayer(sp.off, src0, layers.on.list);
           ['on', 'off'].forEach(function (k) {
@@ -706,7 +954,9 @@
             if (!L) return;
             L.list.forEach(function (x) { waits.push(load(x.f).then(function (b) { x.buf = b; })); });
           });
-          // Leerlauf: Schleife derselben Aufnahme, sonst die tiefste
+        }
+        // Leerlauf: Schleife derselben Aufnahme, sonst die tiefste
+        if (layers.on && !idle) {
           var il = (sp.loops || []).filter(function (l) { return l.rpm <= sp.idle * 1.3; });
           var it = il.filter(function (l) { return l.src === src0; })[0] || il.sort(function (a, b) { return Math.abs(Math.log(a.rpm / sp.idle)) - Math.abs(Math.log(b.rpm / sp.idle)); })[0];
           if (it) {
@@ -720,7 +970,8 @@
               idle.s = s;
             }));
           }
-        } else {
+        }
+        if (!layers.on) {
           lad = Model.ladder(sp.loops, seed, lite ? 4 : 0, src0);
           waits.push(Promise.all(lad.map(function (l) { return load(l.f); })).then(function (bs) {
             if (!alive) return;
@@ -780,10 +1031,12 @@
       bank: function () { return bank; },
       spec: function (type) { return spec(type); },
       // Car editor: Anlassen → Leerlauf → zwei Gasstöße → einmal hochdrehen (stehend, Gang 1 mit Kupplung) → Leerlauf
-      preview: function (type, seed) {
+      preview: function (type, seed, sound) {
         if (api._pv) { api._pv.stop(); clearInterval(api._pvT); }
         snd.resume && snd.resume();
-        var v = voice(type, { gain: 0.9, seed: seed }), t0 = null, shot = false;
+        var vo = { gain: 0.9, seed: seed };
+        if (sound !== undefined) vo.sound = sound;                    // Entwurf aus dem Car editor (null = Automatik)
+        var v = voice(type, vo), t0 = null, shot = false;
         api._pv = v;
         api._pvT = setInterval(function () {
           if (t0 == null) { t0 = ctx.currentTime; }
@@ -799,7 +1052,23 @@
         }, 50);
         return v;
       },
-      stopAll: function () { voices.slice().forEach(function (v) { v.stop(); }); }
+      stopAll: function () { voices.slice().forEach(function (v) { v.stop(); }); },
+      // ---- Car editor (Abschnitt „Sound“)
+      sources: function () { return getJson('src/index.json'); },     // Liste der Quell-Aufnahmen
+      source: function (id) { return source(id); },                    // → { info (src/<id>.json), buf }
+      autoSrc: function (type, seed) { return ready.then(function () { return voiceSrc(spec(type), seed); }); },
+      // markierten Abschnitt hören: kind idle | limiter (Schleife, dur s lang), sweep | lift | start (einmal);
+      // w = [t0, t1] bzw. { t0, t1 } in s → Promise { stop() }
+      playSection: function (src, kind, w, dur) {
+        return source(src).then(function (S) {
+          if (!S.buf || !w) return null;
+          S.id = src;
+          var t0 = Array.isArray(w) ? w[0] : w.t0, t1 = Array.isArray(w) ? w[1] : w.t1, sr = S.buf.sampleRate;
+          if (kind === 'idle' || kind === 'limiter') return playBuf(loopBuf(S.buf, t0, t1), { gain: 0.9, loop: true, dur: dur || 3 });
+          var d = S.buf.getChannelData(0), g = Model.segGain(d, Math.round(t0 * sr), Math.round(t1 * sr), -20);
+          return playBuf(clipBuf(S.buf, t0, t1, g, 0.004, 0.04), { gain: 0.9 });
+        });
+      }
     };
     return api;
   }

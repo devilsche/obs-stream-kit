@@ -1,6 +1,7 @@
 // Prüfskript für die Rechnung von js/car-engine-audio.js (ohne Web Audio): Gangmodell (inkl. Schalten), Schleifen-Leiter,
 // Überblendung, Abspielrate, Sweep-Abbildung Drehzahl ↔ Stelle, Korn-Raster/Lesekopf, Hann, Ebenen-Mix, Begrenzer (Frequenz/Tiefe je
-// Motorart), Höchsttempo-Drehzahl im obersten Gang, Lesestellen bei gleichbleibender Drehzahl (keine kurze Wiederkehr); dazu bank.json (Dateien vorhanden, Schleifenpunkte gültig) und die Motorart je Auto.
+// Motorart), Höchsttempo-Drehzahl im obersten Gang, Lesestellen bei gleichbleibender Drehzahl (keine kurze Wiederkehr), Motorklang je Auto
+// aus dem Car editor (cleanSound, Kenndaten, Gangsprünge, von Hand schalten, markierte Abschnitte); dazu bank.json + src/ (Dateien vorhanden, Schleifenpunkte gültig) und die Motorart je Auto.
 // Aufruf: node scripts/check_engine_audio.js
 'use strict';
 var path = require('path'), fs = require('fs');
@@ -388,6 +389,89 @@ if (fs.existsSync(bankF)) {
       'bank: festes Auto ' + key + ' (' + tp + ') hat Aufnahme ' + src);
   });
 } else console.log('(bank.json fehlt – nur Rechnung geprüft)');
+
+// ---- Motorklang je Auto aus dem Car editor (def.sound)
+var SND = { src: 415275, idle: [1, 3], sweep: { t0: 4, t1: 9.5, rpm0: 1200, rpm1: 7200 }, lift: null, start: [0, 2.5],
+  idleRpm: 850, redline: 7600, gears: 6, shiftRpm: 7000, steps: [1.7, 1.45, 1.3, 1.2, 1.15], limitStyle: 'hard', limitHz: 14 };
+var cs = M.cleanSound(SND);
+function sortJ(o) { return JSON.stringify(o, Object.keys(o).sort()); }
+ok(cs && sortJ(cs) === sortJ(SND) && cs.sweep.rpm1 === 7200, 'cleanSound behält gültige Angaben (inkl. null = Abschnitt aus)');
+ok(M.cleanSound({ idle: [1, 3] }) === null, 'cleanSound: Abschnitt ohne Aufnahme fällt weg');
+cs = M.cleanSound({ src: 1, sweep: { t0: 4, t1: 9, rpm0: 7000, rpm1: 1200 }, lift: { t0: 1, t1: 2, rpm0: 1000, rpm1: 5000 }, gears: 0, limitStyle: 'x', redline: 1e6 });
+ok(cs && !cs.sweep && !cs.lift && !cs.gears && !cs.limitStyle && !cs.redline, 'cleanSound: falsche Richtung/Werte fallen weg');
+var BS = { type: 'i6', idle: 750, red: 7500, gears: 6, g1: 0.28 };
+var ss = M.soundSpec(BS, SND);
+ok(ss.idle === 850 && ss.red === 7600 && ss.gears === 6 && BS.red === 7500, 'soundSpec: Kenndaten überschrieben, Vorlage unverändert');
+near(M.tune(ss).shift, 7000 / 7600, 1e-9, 'soundSpec: Schaltdrehzahl → Anteil am Begrenzer');
+ok(M.tune(ss).hz === 14 && M.tune(ss).soft === false, 'soundSpec: Begrenzer-Takt/-Art');
+r = M.ratios(ss);
+near(r[5], 1, 1e-9, 'Gangsprünge: oberster Gang 1');
+near(r[0], 1.7 * 1.45 * 1.3 * 1.2 * 1.15, 1e-9, 'Gangsprünge: erster Gang = Produkt');
+near(r[3] / r[4], 1.2, 1e-9, 'Gangsprung 4→5');
+var auto = M.steps(BS);
+ok(auto.length === 5 && Math.abs(auto.reduce(function (a, x) { return a * x; }, 1) - 1 / 0.28) < 0.02, 'Automatik-Gangsprünge ergeben 1/g1');
+// Schaltdrehzahl wirkt: Vollgas schaltet knapp unter shiftRpm hoch
+var s2 = {}, prevR = 0, shiftAt = 0;
+for (t = 0; t < 12 && !shiftAt; t += dt) { prevR = s2.rpm || 0; M.gearStep(ss, s2, t / 25, 1, dt); if (s2.shifted > 0) shiftAt = prevR; }
+ok(shiftAt > 6300 && shiftAt <= 7000 * 1.02, 'Vollgas schaltet bei der eingestellten Drehzahl (' + Math.round(shiftAt) + ')');
+// Begrenzer aus: Vollgas im Stand bleibt am Begrenzer, kein Stottern
+var off = M.soundSpec(BS, { limitStyle: 'off' }), s3 = {};
+for (t = 0; t < 2; t += dt) M.gearStep(off, s3, 0, 1, dt);
+ok(!s3.limiter && s3.rpm <= 7500 * 1.001 && s3.rpm > 7300, 'Begrenzer aus: Drehzahl hält oben ohne Schnitte (' + Math.round(s3.rpm) + ')');
+// von Hand schalten: manual hält den Gang (läuft in den Begrenzer), force −1 schaltet zurück
+var s4 = { manual: true }, lim = false;
+for (t = 0; t < 3; t += dt) { M.gearStep(ss, s4, t / 10, 1, dt); if (s4.limiter) lim = true; }
+ok(s4.gear === 1 && lim, 'manual: bleibt im 1. Gang und erreicht den Begrenzer');
+s4.force = 1; M.gearStep(ss, s4, 0.2, 1, dt); ok(s4.gear === 2, 'force +1 schaltet hoch');
+s4.force = -1; M.gearStep(ss, s4, 0.2, 0, dt); ok(s4.gear === 1, 'force −1 schaltet zurück');
+var s5 = { neutral: true, gear: 3, rpm: 800 };
+for (t = 0; t < 1; t += dt) M.gearStep(ss, s5, 0.5, 1, dt);
+ok(s5.rpm > 7000, 'neutral: Gas dreht frei hoch (' + Math.round(s5.rpm) + ')');
+// Drehzahlverlauf eines markierten Hochlaufs: monoton, Endpunkte = rpm0/rpm1, ab Ausschnitt-Anfang (pad)
+var cur = { t0: 0, dt: 0.05, rpm: [] };
+for (i = 0; i < 400; i++) cur.rpm.push(i % 17 === 0 ? 0 : Math.round(1000 + 40 * i + (i % 3) * 30));
+var pts = M.sweepPts(cur, 4, 9.5, 1200, 7200, 0.15);
+ok(pts[0][0] === 0.15 && pts[0][1] === 1200 && pts[pts.length - 1][1] === 7200, 'sweepPts: Endpunkte (' + JSON.stringify(pts[0]) + ')');
+near(pts[pts.length - 1][0], 5.65, 1e-6, 'sweepPts: Ende = Länge + pad');
+var mono = true;
+for (i = 1; i < pts.length; i++) if (pts[i][1] < pts[i - 1][1] || pts[i][0] <= pts[i - 1][0]) mono = false;
+ok(mono, 'sweepPts: monoton steigend, Zeit steigend');
+var lin = M.sweepPts({ t0: 0, dt: 0.05, rpm: [] }, 1, 2, 7000, 1500, 0);
+ok(lin[0][1] === 7000 && lin[lin.length - 1][1] === 1500 && lin.every(function (p, k) { return !k || p[1] <= lin[k - 1][1]; }), 'sweepPts ohne Messung: gleichmäßig fallend');
+var sw = M.prepSweep({ pts: pts });
+near(M.sweepPos(sw, 1200).t, 0.15, 1e-6, 'markierter Hochlauf: Anfangsdrehzahl am Markierungs-Anfang');
+// Schleife: Länge L − F, Naht stetig (Ende geht in den Anfang über)
+var sig = new Float32Array(44100);
+for (i = 0; i < sig.length; i++) sig[i] = Math.sin(i * 0.05) * (0.5 + 0.3 * Math.sin(i * 0.0007));
+var lp = M.loopData(sig, 1000, 21000, 2000);
+ok(lp.length === 18000, 'loopData: Länge L − F');
+ok(Math.abs(lp[lp.length - 1] - lp[0]) < 0.06, 'loopData: Naht stetig (' + (lp[lp.length - 1] - lp[0]).toFixed(3) + ')');
+var gq = M.segGain(sig, 0, 44100, -20);
+var e = 0; for (i = 0; i < sig.length; i++) e += sig[i] * sig[i] * gq * gq;
+near(20 * Math.log10(Math.sqrt(e / sig.length)), -20, 0.01, 'segGain: −20 dBFS RMS');
+// Quell-Aufnahmen für den Editor: index.json, je Aufnahme mp3 + json mit Drehzahlverlauf und gültigen Vorschlägen
+var srcDir = path.join(__dirname, '..', 'assets', 'sounds', 'engines', 'src');
+if (fs.existsSync(path.join(srcDir, 'index.json'))) {
+  var idx = JSON.parse(fs.readFileSync(path.join(srcDir, 'index.json'), 'utf8')).sources, bytes = 0;
+  ok(Object.keys(idx).length >= 10, 'src: mindestens 10 Aufnahmen (' + Object.keys(idx).length + ')');
+  Object.keys(idx).forEach(function (id) {
+    var mp = path.join(srcDir, id + '.mp3'), js = path.join(srcDir, id + '.json');
+    ok(fs.existsSync(mp) && fs.existsSync(js), 'src: Dateien zu ' + id);
+    if (!fs.existsSync(js)) return;
+    bytes += fs.statSync(mp).size;
+    var inf = JSON.parse(fs.readFileSync(js, 'utf8'));
+    ok(inf.dur <= 30.05 && inf.rpm.length > 10 && inf.dt > 0, 'src: ' + id + ' ≤ 30 s mit Drehzahlverlauf');
+    ok(idx[id].types.length && idx[id].lic && idx[id].url, 'src: ' + id + ' mit Motorarten und Lizenz');
+    var a = inf.auto || {}, c2 = M.cleanSound(Object.assign({ src: +id }, a));
+    ['idle', 'sweep', 'lift', 'start'].forEach(function (k) {
+      if (!a[k]) return;
+      ok(c2 && c2[k], 'src: Vorschlag ' + k + ' von ' + id + ' gültig');
+      var t1 = Array.isArray(a[k]) ? a[k][1] : a[k].t1;
+      ok(t1 <= inf.dur + 0.01, 'src: Vorschlag ' + k + ' von ' + id + ' innerhalb der Aufnahme');
+    });
+  });
+  ok(bytes < 8 * 1024 * 1024, 'src: zusammen unter 8 MB (' + (bytes / 1048576).toFixed(1) + ' MB)');
+}
 
 console.log(fails ? fails + ' Fehler' : 'alles ok');
 process.exit(fails ? 1 : 0);
