@@ -15,7 +15,8 @@ steer, speed, prog, rt (Rennzeit), spin} (~20 Hz).
 Server → Client: welcome {id, room, roster, now} · roster {list} · joined {ok, msg} · phase {phase, race_id,
 start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …]}
 (20 Hz) · lap {id, lap, time, ok, fin?} · results {race_id, list} · recorded {race_id, counted, points} ·
-pong {c, s} · closed {msg} · error {msg}.
+rec {id, name, car, track, time, personal, car_rec, track_rec, best_car, best_track} (geprüfte Runde gespeichert,
+fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · pong {c, s} · closed {msg} · error {msg}.
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
 
 Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
@@ -27,7 +28,8 @@ Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, geb
                               → {ok, race_id, connected, takeovers, pilots, snap}
 Client → Server: hello · ping {c} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin} (nur Fahrer, ~20 Hz).
 Server → Client: welcome {id, role, race, now} · race {race} (Rennen/Phase/Piloten/Übernahmen geändert) ·
-S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, fin?} · takeover {ev} · pong {c, s} · error {msg}.
+S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, fin?} · rec {…} (wie oben) · takeover {ev} · pong {c, s} ·
+error {msg}.
 race = {race_id, phase, starts_at, track, track_name, laps, fw, pilots, taken, fin, now} (fx/drive_race.Room.info).
 """
 import asyncio
@@ -69,13 +71,14 @@ class RaceClient:
 
 
 class DriveServer:
-    def __init__(self, secret=None, root=ROOT, record=None, clock=time.time):
+    def __init__(self, secret=None, root=ROOT, record=None, clock=time.time, lap_record=None):
         self.secret = secret
         self.root = root
         self.clock = clock
         self.hub = drive_room.Hub(limits_loader=lambda: drive_room.Limits(drive_auth.load_limits(self.root)))
         self.conns = {}          # code → set(Client)
         self.record = record or _record_db
+        self.lap_record = lap_record or _lap_db
         self.key = drive_auth.internal_key(secret)
         self._done_at = {}
         # Chatrennen: Raum je Tenant
@@ -225,6 +228,10 @@ class DriveServer:
                     if r:
                         for ev in r.state(cl.id, msg, now):
                             self._send_race(tid, ev)
+                            d = r.drivers.get(cl.id)
+                            if ev.get("t") == "lap" and ev.get("ok") and d:
+                                self._lap(tid, r.track, d.car, cl.id, cl.ident.get("display") or cl.id, ev["time"],
+                                          "race", lambda o, t=tid: self._send_race(t, o))
                 elif t == "ping":
                     try:
                         broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))
@@ -321,6 +328,10 @@ class DriveServer:
             cl.last_s = now
             for ev in room.state(uid, msg, now):
                 self._send_room(room.code, ev)
+                d = room.drivers.get(uid)
+                if ev.get("t") == "lap" and ev.get("ok") and d:
+                    self._lap(room.tenant_id, room.track, d.car, uid, d.display, ev["time"], "room",
+                              lambda o, c=room.code: self._send_room(c, o))
         elif t == "ping":
             try:
                 broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))
@@ -334,6 +345,29 @@ class DriveServer:
         elif t == "leave":
             if room.leave(uid, now):
                 self._roster(room)
+
+    # ---- Rundenrekorde ----
+    def _lap(self, tenant, track, car, uid, display, lap_time, source, send):
+        """Geprüfte Runde speichern (im Thread, blockiert den Takt nicht); bei Bestzeit/Rekord „rec“ an alle."""
+        if not car:
+            return
+
+        async def run():
+            try:
+                res = await asyncio.get_running_loop().run_in_executor(
+                    None, self.lap_record, tenant, track, car, str(uid), display, lap_time, source)
+            except Exception:
+                log.exception("drive: lap record failed (%s, %s)", tenant, uid)
+                return
+            if res and (res.get("personal") or res.get("car") or res.get("track")):
+                send({"t": "rec", "id": str(uid), "name": display, "car": car, "track": track, "time": lap_time,
+                      "personal": bool(res.get("personal")), "car_rec": bool(res.get("car")),
+                      "track_rec": bool(res.get("track")), "best_car": res.get("best_car"),
+                      "best_track": res.get("best_track")})
+        try:
+            asyncio.get_running_loop().create_task(run())
+        except RuntimeError:
+            log.warning("drive: no event loop for lap record")
 
     # ---- Takt ----
     async def loop(self):
@@ -397,6 +431,20 @@ def _record_db(tenant_id, race_id, rows):
         raw.close()
     field = len(rows)
     return counted, {r["user_id"]: race_db.points(r["place"], field) for r in rows}
+
+
+def _lap_db(tenant_id, track, car_key, user_id, display, lap_time, source):
+    """Geprüfte Runde in fx_race_lap_record (race_db.lap_submit). → Ergebnis von lap_submit."""
+    import sqlite3
+    from core import db as core_db
+    from core.db_compat import SqliteCompatConn
+    from fx import race_db
+    raw = core_db.connect()
+    conn = raw if isinstance(raw, (sqlite3.Connection, SqliteCompatConn)) else SqliteCompatConn(raw)
+    try:
+        return race_db.lap_submit(conn, tenant_id, track, car_key, user_id, display, lap_time, source)
+    finally:
+        raw.close()
 
 
 async def main(host, port, secret=None, record=None):

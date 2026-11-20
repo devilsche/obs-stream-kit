@@ -15,6 +15,9 @@ Chatrennen steuerbar (Schritt 2b) – fester Link je Tenant, <kanal> = Twitch-Ka
   GET /drive/race/<kanal>/state   Zustand des Chatrennens (wie …/api/fx/car-race/state) + me {in_race, car, pilot}
   GET /drive/race/<kanal>/ticket  Fahrer-Ticket für /drive-ws/race – nur angemeldet und im aktuellen Chatrennen
   GET /drive/login?race=<kanal>   Anmeldung, zurück auf /drive/race/<kanal>
+
+Rundenrekorde (nur lesen, wie …/api/fx/car-race?cmd=records): GET /drive/race/<kanal>/records?track=&car= und
+GET /drive/<code>/records?track=&car= (Tenant des Raums).
 """
 import json
 import os
@@ -98,7 +101,7 @@ def page(code):
     cfg = {"mode": "viewer", "code": code, "room": room,
            "user": {"id": viewer["id"], "name": viewer.get("display") or viewer.get("login")} if viewer else None,
            "login": "/drive/login?code=" + code, "logout": "/drive/logout?code=" + code,
-           "ticket": "/drive/%s/ticket" % code}
+           "ticket": "/drive/%s/ticket" % code, "records": "/drive/%s/records" % code}
     inject = "<script>\nwindow.__DRIVE__ = %s;\n</script>" % json.dumps(cfg).replace("</", "<\\/")
     html = html.replace("</head>", inject + "\n</head>", 1)
     if room:
@@ -151,7 +154,8 @@ def race_page(key):
     cfg = {"mode": "race", "key": key,
            "user": {"id": viewer["id"], "name": viewer.get("display") or viewer.get("login")} if viewer else None,
            "login": "/drive/login?race=" + key, "logout": "/drive/logout?race=" + key,
-           "ticket": "/drive/race/%s/ticket" % key, "state": "/drive/race/%s/state" % key}
+           "ticket": "/drive/race/%s/ticket" % key, "state": "/drive/race/%s/state" % key,
+           "records": "/drive/race/%s/records" % key}
     inject = "<script>\nwindow.__DRIVE__ = %s;\n</script>" % json.dumps(cfg).replace("</", "<\\/")
     html = inject_theme(html.replace("</head>", inject + "\n</head>", 1), _theme(tid))
     return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate"}
@@ -179,6 +183,34 @@ def race_state(key):
     st = race.state(tid, now)
     st["me"] = _me(st, _viewer())
     return _no_store(jsonify(st))
+
+
+def _records(tid):
+    from fx.endpoints import lap_records_json
+    try:
+        out, status = lap_records_json(tid, request.args.get("track") or "", request.args.get("car") or "")
+    except Exception:
+        current_app.logger.exception("car-drive: records failed")
+        out, status = {"ok": False, "error": "records unavailable"}, 500
+    return _no_store(jsonify(out)), status
+
+
+@bp_drive.route("/drive/race/<key>/records")
+def race_records(key):
+    tid = _race_tenant(key)
+    if tid is None:
+        abort(404)
+    return _records(tid)
+
+
+@bp_drive.route("/drive/<code>/records")
+def room_records(code):
+    if not _CODE.match(code):
+        abort(404)
+    info = drive_auth.call("room", code=code.upper())
+    if not info.get("ok"):
+        return _no_store(jsonify({"ok": False, "error": "room not found"})), 404
+    return _records(info["room"]["tenant"])
 
 
 @bp_drive.route("/drive/race/<key>/ticket")

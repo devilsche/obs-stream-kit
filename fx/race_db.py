@@ -11,6 +11,11 @@ Ergebniszeilen gutgeschrieben (record) – doppelte Meldungen schreiben weder
 Zeilen noch Coins; void() bucht die Coins des Rennens wieder ab (nicht unter 0).
 Gekaufte Autos stehen in fx_race_garage; buy() zieht atomar ab.
 
+Rundenrekorde (fx_race_lap_record): geprüfte Runden aus Car Drive (Chatrennen steuerbar und Räume mit Code,
+gemeldet vom WS-Dienst drive_ws.py) – je Tenant, Strecke (0–4), Auto und Fahrer nur die beste Runde.
+lap_submit() trägt ein und meldet, ob es eine neue persönliche Bestzeit, ein Auto- oder Streckenrekord ist;
+lap_records() liefert Streckenrekord + Bestzeit je Auto.
+
 DAO im sqlite-Stil ('?'-Platzhalter) — Tests laufen auf sqlite, Prod über
 core.db_compat.SqliteCompatConn auf Postgres.
 """
@@ -54,6 +59,19 @@ CREATE TABLE IF NOT EXISTS fx_race_garage (
     bought_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_fx_race_garage_car ON fx_race_garage(tenant_id, user_id, car_key);
+CREATE TABLE IF NOT EXISTS fx_race_lap_record (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id INTEGER NOT NULL,
+    track INTEGER NOT NULL,
+    car_key TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    display TEXT NOT NULL DEFAULT '',
+    lap_time REAL NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fx_race_lap_record ON fx_race_lap_record(tenant_id, track, car_key, user_id);
+CREATE INDEX IF NOT EXISTS ix_fx_race_lap_record_best ON fx_race_lap_record(tenant_id, track, lap_time);
 """
 
 # Prod: als postgres-Superuser mit search_path = obs anlegen
@@ -93,6 +111,19 @@ CREATE TABLE IF NOT EXISTS fx_race_garage (
     bought_at TEXT NOT NULL
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ux_fx_race_garage_car ON fx_race_garage(tenant_id, user_id, car_key);
+CREATE TABLE IF NOT EXISTS fx_race_lap_record (
+    id BIGSERIAL PRIMARY KEY,
+    tenant_id INTEGER NOT NULL,
+    track INTEGER NOT NULL,
+    car_key TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    display TEXT NOT NULL DEFAULT '',
+    lap_time DOUBLE PRECISION NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_fx_race_lap_record ON fx_race_lap_record(tenant_id, track, car_key, user_id);
+CREATE INDEX IF NOT EXISTS ix_fx_race_lap_record_best ON fx_race_lap_record(tenant_id, track, lap_time);
 """
 
 
@@ -349,3 +380,74 @@ def car_stats(conn, tenant_id: int) -> list:
         c["races"] += 1
         c["wins"] += 1 if x["place"] == 1 else 0
     return sorted(cars.values(), key=lambda c: (-c["races"], c["car_key"]))
+
+
+# --- Rundenrekorde (Car Drive, nur geprüfte Runden) ---
+
+TRACK_NAMES = ["Speedway", "Twister", "Hairpin", "Coast", "Kart"]   # wie CarRaceSim.TRACKS / fx/drive_room.py
+
+
+def _lap_row(x):
+    return {"user_id": x["user_id"], "display": x["display"], "car_key": x["car_key"],
+            "time": round(float(x["lap_time"]), 3), "at": x["at"]}
+
+
+def lap_best(conn, tenant_id: int, track: int, car_key=None):
+    """Schnellste Runde auf der Strecke (car_key: nur dieses Auto) oder None. Gleichstand: wer zuerst."""
+    sql = ("SELECT user_id, display, car_key, lap_time, at FROM fx_race_lap_record "
+           "WHERE tenant_id = ? AND track = ?")
+    args = [tenant_id, int(track)]
+    if car_key is not None:
+        sql += " AND car_key = ?"
+        args.append(car_key)
+    row = conn.execute(sql + " ORDER BY lap_time, at, id LIMIT 1", args).fetchone()
+    return _lap_row(row) if row else None
+
+
+def lap_records(conn, tenant_id: int, track: int, limit: int = 50) -> dict:
+    """{track: Streckenrekord oder None, cars: [Bestzeit je Auto, schnellste zuerst]} (höchstens limit Autos)."""
+    rows = conn.execute(
+        "SELECT user_id, display, car_key, lap_time, at FROM fx_race_lap_record WHERE tenant_id = ? AND track = ? "
+        "ORDER BY lap_time, at, id", (tenant_id, int(track))).fetchall()
+    cars, seen = [], set()
+    for x in rows:
+        if x["car_key"] in seen:
+            continue
+        seen.add(x["car_key"])
+        cars.append(_lap_row(x))
+        if len(cars) >= limit:
+            break
+    return {"track": cars[0] if cars else None, "cars": cars}
+
+
+def lap_submit(conn, tenant_id: int, track: int, car_key: str, user_id: str, display: str,
+               lap_time: float, source: str = "", at=None) -> dict:
+    """Geprüfte Runde eintragen (nur die beste je Tenant/Strecke/Auto/Fahrer bleibt). → {personal, car, track,
+    best_car, best_track, prev_car, prev_track}: personal/car/track = neue persönliche Bestzeit / Auto- /
+    Streckenrekord (vorher langsamer oder keiner)."""
+    track, lap_time = int(track), round(float(lap_time), 3)
+    if not (0 <= track < len(TRACK_NAMES)) or not car_key or not user_id or not (lap_time > 0):
+        raise ValueError("bad lap")
+    at = at or _now()
+    prev_car = lap_best(conn, tenant_id, track, car_key)
+    prev_track = lap_best(conn, tenant_id, track)
+    mine = conn.execute(
+        "SELECT lap_time FROM fx_race_lap_record WHERE tenant_id = ? AND track = ? AND car_key = ? AND user_id = ?",
+        (tenant_id, track, car_key, user_id)).fetchone()
+    personal = mine is None or lap_time < float(mine["lap_time"])
+    try:
+        conn.execute(
+            "INSERT INTO fx_race_lap_record (tenant_id, track, car_key, user_id, display, lap_time, source, at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (tenant_id, track, car_key, user_id) DO UPDATE SET "
+            "lap_time = excluded.lap_time, display = excluded.display, source = excluded.source, at = excluded.at "
+            "WHERE excluded.lap_time < fx_race_lap_record.lap_time",
+            (tenant_id, track, car_key, user_id, (display or user_id)[:40], lap_time, source[:16], at))
+        conn.commit()
+    except Exception:
+        _rollback(conn)
+        raise
+    return {"personal": personal,
+            "car": prev_car is None or lap_time < prev_car["time"],
+            "track": prev_track is None or lap_time < prev_track["time"],
+            "prev_car": prev_car, "prev_track": prev_track,
+            "best_car": lap_best(conn, tenant_id, track, car_key), "best_track": lap_best(conn, tenant_id, track)}

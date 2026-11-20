@@ -873,6 +873,61 @@ def _race_say_board(rows) -> str:
                                  for i, r in enumerate(rows[:3], 1))
 
 
+def _fmt_lap(t) -> str:
+    m, sec = divmod(float(t), 60)
+    return ("%d:%05.2f" % (m, sec)) if m else ("%.2f s" % sec)
+
+
+def _lap_track(arg):
+    """track-Parameter: 0–4 oder Namensanfang (speedway, twister, hairpin, coast, kart). → Index oder None."""
+    a = (arg or "").strip().lower()
+    if a.isdigit():
+        i = int(a)
+        return i if 0 <= i < len(race_db.TRACK_NAMES) else None
+    for i, n in enumerate(race_db.TRACK_NAMES):
+        if a and n.lower().startswith(a):
+            return i
+    return None
+
+
+def lap_records_json(tenant_id, track_arg, car=None):
+    """Rundenrekorde für Streamer.bot (say) und Car Drive. Ohne track: Streckenrekord je Strecke.
+    → (dict, status). Zeilen {user_id, display, car_key, time, at} + car_name."""
+    catalog = _race_cars()[0]
+
+    def named(row):
+        if row:
+            row = dict(row, car_name=race_shop.car_name(catalog, row["car_key"]))
+        return row
+    car = (car or "")[:120] or None
+    if (track_arg or "").strip() == "":
+        recs = _with_conn(lambda conn: [race_db.lap_best(conn, tenant_id, i) for i in range(len(race_db.TRACK_NAMES))])
+        tracks = [{"track": i, "track_name": n, "record": named(recs[i])} for i, n in enumerate(race_db.TRACK_NAMES)]
+        parts = ["%s %s %s" % (t["track_name"], t["record"]["display"], _fmt_lap(t["record"]["time"]))
+                 for t in tracks if t["record"]]
+        return {"ok": True, "tracks": tracks,
+                "say": ("Lap records: " + ", ".join(parts)) if parts else "No lap records yet."}, 200
+    i = _lap_track(track_arg)
+    if i is None:
+        return {"ok": False, "say": "Unknown track – use " + ", ".join(n.lower() for n in race_db.TRACK_NAMES)}, 400
+    name = race_db.TRACK_NAMES[i]
+
+    def q(conn):
+        return (race_db.lap_records(conn, tenant_id, i, limit=10),
+                race_db.lap_best(conn, tenant_id, i, car) if car else None)
+    recs, mine = _with_conn(q)
+    rec = named(recs["track"])
+    out = {"ok": True, "track": i, "track_name": name, "record": rec, "car": named(mine),
+           "cars": [named(x) for x in recs["cars"]]}
+    if rec:
+        out["say"] = "Track record %s: %s %s (%s)" % (name, rec["display"], _fmt_lap(rec["time"]), rec["car_name"])
+        if car and mine and mine["car_key"] != rec["car_key"]:
+            out["say"] += " · best %s: %s %s" % (out["car"]["car_name"], mine["display"], _fmt_lap(mine["time"]))
+    else:
+        out["say"] = "No lap record on %s yet." % name
+    return out, 200
+
+
 @bp_fx.route("/s/<token>/api/fx/car-race", methods=["GET"])
 def car_race_cmd(token):
     """Chat-/Dashboard-Befehle des Autorennens (GET, damit Streamer.bot sie abrufen kann)."""
@@ -914,6 +969,13 @@ def car_race_cmd(token):
                 log.exception("fx car-race: void failed")
                 out.update({"ok": False, "say": "void failed"})
         return _no_store(jsonify(out))
+    if cmd == "records":
+        try:
+            out, status = lap_records_json(g.tenant_id, _arg("track"), _arg("car"))
+        except Exception:
+            log.exception("fx car-race: records failed")
+            out, status = {"ok": False, "say": "records unavailable"}, 500
+        return _no_store(jsonify(out)), status
     if cmd == "board":
         scope = "all" if request.args.get("scope") == "all" else "month"
         try:
