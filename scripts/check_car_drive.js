@@ -2,7 +2,8 @@
 /* Prüfskript Car Drive: Fahrphysik (js/car-drive-phys.js) und KI-Gegner aus der Sim – schnelle Rauchtests.
  *   node scripts/check_car_drive.js
  * Prüft: Beschleunigen, Kurve mit Lenk-Autopilot (ganze Runde je Strecke), Bremsen, Kies bremst, Leitplanke
- * schiebt zurück, Handbremse dreht das Heck, Nitro einmal je Runde, KI-Gegner fahren (bis 5 Runden).
+ * schiebt zurück, Handbremse dreht das Heck, Nitro einmal je Runde, Rückwärtsgang (S/W wie im Rennspiel, auch aus dem
+ * Kies), KI-Gegner fahren (bis 5 Runden).
  */
 'use strict';
 var path = require('path');
@@ -92,6 +93,36 @@ var c4 = run(carFor('bmw-m3-competition', T1, { s: 5, d: 0 }), { throttle: 1 }, 
 Phys.step(c4, { throttle: 1, nitro: true }, DT); var n1 = c4.nitroT > 0;
 run(c4, { throttle: 1 }, 3); Phys.step(c4, { throttle: 1, nitro: true }, DT);
 ok(n1 && c4.nitroT === 0, 'Nitro zündet einmal, zweites Mal in derselben Runde nicht');
+
+// 8b) Rückwärtsgang wie im Rennspiel (Tastatur-Rampe wie js/car-drive.js): S bremst bis zum Stand, dann rückwärts
+//     bis REV_V (langsamer als vorwärts, Nitro wirkt nicht); W bremst rückwärts bis zum Stand, dann vorwärts
+function ramp(car, want, secs, nitro) {
+  var thr = 0, brk = 0, minU = Infinity, maxU = -Infinity, tStop = null;
+  for (var t = 0; t < secs; t += DT) {
+    thr += Math.max(-8 * DT, Math.min(6 * DT, (want === 'w' ? 1 : 0) - thr));
+    brk += Math.max(-8 * DT, Math.min(8 * DT, (want === 's' ? 1 : 0) - brk));
+    Phys.step(car, { throttle: thr, brake: brk, nitro: !!nitro }, DT);
+    minU = Math.min(minU, car.u); maxU = Math.max(maxU, car.u);
+    if (tStop == null && Math.abs(car.u) < 0.3) tStop = t;
+  }
+  return { minU: minU, maxU: maxU, tStop: tStop };
+}
+['bmw-m3-competition', 'ural-4320-soviet-army-truck'].forEach(function (key) {
+  var r = run(carFor(key, T1, { s: -40, d: 0 }), { throttle: 1 }, 2), u1 = r.u;
+  var b = ramp(r, 's', 7, true);
+  ok(b.tStop != null && b.tStop < 3, key + ': S aus ' + u1.toFixed(1) + ' m/s bremst bis zum Stand (' + (b.tStop != null ? b.tStop.toFixed(2) : '–') + ' s)');
+  ok(r.u < -Phys.REV_V * 0.8 && r.u >= -Phys.REV_V - 0.05, key + ': S weiter gehalten fährt rückwärts bis zur Grenze (' + r.u.toFixed(2) + ' m/s, Grenze ' + Phys.REV_V + ', Nitro gedrückt)');
+  ok(r.nitroT === 0 && -r.u < r.P.vtop * 0.3, key + ': rückwärts deutlich langsamer als vorwärts (vtop ' + r.P.vtop.toFixed(1) + ')');
+  var f = ramp(r, 'w', 4);
+  ok(f.tStop != null && f.tStop < 1.5, key + ': W rückwärts bremst bis zum Stand (' + (f.tStop != null ? f.tStop.toFixed(2) : '–') + ' s)');
+  ok(r.u > 5, key + ': W danach fährt wieder vorwärts (' + r.u.toFixed(1) + ' m/s)');
+});
+// Rückwärts aus dem Kiesbett/Gras (vorher: Rückwärtsgas kleiner als Roll- + Kieswiderstand → steckte fest)
+if (gi >= 0) {
+  var gR = Phys.create(T3, carFor('ural-4320-soviet-army-truck', T3).P, { s: sG, d: dG });
+  var gb = ramp(gR, 's', 3);
+  ok(gR.u < -1.2, 'rückwärts aus dem Kiesbett anfahren (Lkw, jetzt ' + gR.surface + '): ' + gR.u.toFixed(2) + ' m/s nach 3 s');
+}
 
 // 9) KI-Gegner: Sim mit 7 Autos, 5 Runden (maxTime länger als 90 s)
 var keys = Object.keys(Stats.TABLE).slice(0, 7);

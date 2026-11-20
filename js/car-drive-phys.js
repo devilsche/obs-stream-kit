@@ -9,6 +9,7 @@
  *   CarDrivePhys.create(T, P, { s, d }) → Auto auf der Strecke an (s, d), Richtung Fahrtrichtung, steht
  *   CarDrivePhys.step(car, input, dt)    input = { throttle 0..1, brake 0..1, steer −1..1 (+ = links),
  *                                         handbrake bool, nitro bool (zündet einmal je Runde) }
+ *                                         Bremse im Stand = Rückwärtsgang (bis REV_V), rückwärts bremst das Gas
  *   CarDrivePhys.reset(car)              zurück auf die Mittellinie an der aktuellen Stelle, steht
  *   CarDrivePhys.speedKmh(car)           Tacho: Spielzeug-Tempo auf echte km/h hochgerechnet (vtop ↔ echte vmax)
  *
@@ -38,6 +39,9 @@
   var MAX_STEER = 0.42;       // größter Radeinschlag (rad), wie die Sim
   var ALPHA_PEAK = 0.13;      // Schräglaufwinkel mit größter Seitenkraft (rad)
   var NITRO_T = 2.2, NITRO_V = 1.25, NITRO_A = 1.8;
+  // Rückwärtsgang: Endtempo (m/s, Spielzeug-Maßstab, ~1/5 vorwärts) und Antrieb (Anteil von acc, mindestens REV_A_MIN
+  // m/s² – muss Rollwiderstand + Kies/Gras überwinden, sonst kommt man aus dem Auslauf nicht rückwärts heraus)
+  var REV_V = 5, REV_A = 0.85, REV_A_MIN = 3.6;
   var SURF = {
     asphalt: { grip: 1, k: 0, c: 0, bump: 0 },
     curb: { grip: 0.95, k: 0, c: 0.2, bump: 0.35 },
@@ -148,17 +152,20 @@
     var nitro = car.nitroT > 0;
     var vtop = P.vtop * (nitro ? NITRO_V : 1);
     // Längs: Antrieb (wie die Sim: fällt mit (v/vtop)^4), Bremse/Rückwärts, Fahrwiderstand, Untergrund
-    var ax = 0;
+    // Rückwärtsgang wie im Rennspiel: vorwärts bremst S, im Stand fährt S rückwärts (bis REV_V, ohne Nitro),
+    // rückwärts bremst W, im Stand fährt W wieder vorwärts. pedal = das Pedal, das gerade antreibt (Motorbremse nur ohne).
+    var ax = 0, pedal = thr, revA = Math.max(REV_A_MIN, P.acc * REV_A);
     if (u > 0.5 || (u >= -0.5 && brk < 0.05)) {
       var launch = u < 8 ? P.launch : 1;
       ax += thr * P.acc * launch * (nitro ? NITRO_A : 1) * Math.max(0, 1 - Math.pow(Math.max(0, u) / vtop, 4));
       if (u > 0.5) ax -= brk * P.brake;
     } else if (u < -0.5) {
-      // rückwärts: Bremse = Rückwärtsgas (bis 5 m/s), Gas bremst
-      ax -= brk * P.acc * 0.6 * Math.max(0, 1 - Math.pow(-u / 5, 2));
+      // rückwärts: Bremse = Rückwärtsgas (bis REV_V), Gas bremst
+      pedal = brk;
+      ax -= brk * revA * Math.max(0, 1 - Math.pow(-u / REV_V, 3));
       ax += thr * P.brake;
-    } else if (brk >= 0.05) ax -= brk * P.acc * 0.6;   // aus dem Stand rückwärts anfahren
-    var roll = 0.25 + (thr < 0.05 ? 0.9 : 0) + 0.0015 * u * u;   // Rollwiderstand + Motorbremse + Luft
+    } else if (brk >= 0.05) { pedal = brk; ax -= brk * revA; }   // aus dem Stand rückwärts anfahren
+    var roll = 0.25 + (pedal < 0.05 ? 0.9 : 0) + 0.0015 * u * u;   // Rollwiderstand + Motorbremse + Luft
     var resist = roll + S.c + S.k * Math.abs(u) + (hb ? 3.5 : 0);
     if (Math.abs(u) > 0.05) ax -= sign(u) * resist;
     // Haftung je Achse (Lastwechsel, Untergrund, Handbremse, Antrieb am Reibungskreis)
@@ -191,6 +198,7 @@
     var u2 = car.vx * fx + car.vz * fz;
     if (thr < 0.05 && brk < 0.05 && Math.abs(u2) < 0.25 && Math.abs(w) < 0.5) { car.vx *= 0.8; car.vz *= 0.8; }
     else if (u > 0.3 && u2 < 0 && brk >= 0.05) { car.vx -= fx * u2; car.vz -= fz * u2; }   // Bremsen hält bei 0 an
+    else if (u < -0.3 && u2 > 0 && thr >= 0.05) { car.vx -= fx * u2; car.vz -= fz * u2; }  // rückwärts: Gas hält bei 0 an
     car.yaw += car.r * dt;
     car.x += car.vx * dt; car.z += car.vz * dt;
     car.ax = ax; car.ay = ay; car.u = car.vx * fx + car.vz * fz; car.w = car.vx * lx + car.vz * lz;
@@ -260,6 +268,6 @@
 
   return {
     params: params, trackInfo: trackInfo, project: project, create: create, step: step, reset: reset,
-    speedKmh: speedKmh, nitroReady: nitroReady, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T
+    speedKmh: speedKmh, nitroReady: nitroReady, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
   };
 });
