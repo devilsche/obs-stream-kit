@@ -137,6 +137,19 @@ def _finish_follower_import(imp, access_token, info, cfg):
                     % (added, len(names)), code=302)
 
 
+def _finish_drive_signin(drv, info):
+    """Car Drive: Zuschauer-Anmeldung – nur Twitch-ID + Name in ein signiertes Cookie (kein Konto, keine
+    Session in der DB), dann zurück auf /drive/<code>."""
+    import re
+    from fx import drive_auth
+    code = str(drv.get("code") or "").upper()
+    target = "/drive/" + code if re.match(r"^[A-Z2-9]{6}$", code) else "/"
+    resp = make_response(redirect(target, code=302))
+    resp.set_cookie(drive_auth.VIEWER_COOKIE, drive_auth.make_viewer(info), max_age=drive_auth.VIEWER_AGE,
+                    secure=not current_app.config.get("TESTING"), httponly=True, samesite="Lax", path="/drive")
+    return resp
+
+
 @bp_auth.route("/app/oauth/callback")
 def callback():
     state = request.args.get("state")
@@ -155,6 +168,10 @@ def callback():
         info = get_user_info(access_token, cfg["TWITCH_CLIENT_ID"])
     except RuntimeError as e:
         abort(502, description=str(e))
+
+    drv = session.pop("oauth_drive", None)
+    if drv:
+        return _finish_drive_signin(drv, info)
 
     imp = session.pop("oauth_import", None)
     if imp:

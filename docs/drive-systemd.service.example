@@ -1,0 +1,29 @@
+# obs-stream-kit Car Drive Mehrspieler – WebSocket-Dienst (drive_ws.py).
+#
+# Aktivieren auf dem Server:
+#   pip install "websockets>=13"        (für /usr/bin/python3)
+#   cp docs/drive-systemd.service.example /etc/systemd/system/obs-drive.service
+#   systemctl daemon-reload && systemctl enable --now obs-drive.service
+#
+# Bindet NUR 127.0.0.1:9010 — von außen ausschließlich über nginx (/drive-ws/).
+# Braucht dasselbe OBS_KIT_FLASK_SECRET wie Frontend/API (Tickets) und den PG-DSN (Ergebnisse).
+#
+# Logs:  journalctl -u obs-drive.service -f
+
+[Unit]
+Description=obs-stream-kit Car Drive multiplayer (WebSocket, intern)
+After=network-online.target
+
+[Service]
+Type=simple
+User=obskit
+WorkingDirectory=/opt/obs-stream-kit
+EnvironmentFile=/etc/obs-stream-kit.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 /opt/obs-stream-kit/drive_ws.py 9010
+Restart=always
+RestartSec=3
+MemoryMax=1500M
+
+[Install]
+WantedBy=multi-user.target

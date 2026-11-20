@@ -52,6 +52,18 @@ server {
     location ~ ^/s/[^/]+/api/      { proxy_pass http://127.0.0.1:9002; }
     location /api/                 { proxy_pass http://127.0.0.1:9002; }
 
+    # ── Car Drive Mehrspieler: WebSocket-Dienst (intern, :9010) ──────────
+    location /drive-ws/ {
+        proxy_pass http://127.0.0.1:9010;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host       $host;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+    }
+
     # ── Frontend (:9000) ─────────────────────────────────────────────────
     location / { proxy_pass http://127.0.0.1:9000; }
 }

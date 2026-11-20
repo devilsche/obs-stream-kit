@@ -1,0 +1,255 @@
+"""Car Drive Mehrspieler: Raum-Lebenszyklus, Plausibilitätsprüfung, Wertung (fx/drive_room.py), Tickets."""
+import math
+
+import pytest
+
+from fx import drive_auth, drive_room as dr
+
+T0 = 1_000_000.0
+
+
+def ident(uid, role="viewer", garage=None, rnd=None):
+    return {"id": uid, "login": uid, "display": uid.upper(), "role": role, "garage": garage, "rnd": rnd}
+
+
+def room_with(n, track=0, laps=2, limits=None):
+    hub = dr.Hub(limits_loader=lambda: limits or dr.Limits())
+    room, _ = hub.open(7, track, laps, T0)
+    for i in range(n):
+        ok, _ = room.join(ident("u%d" % i, garage=None), "car-a", 0, T0)
+        assert ok
+    return hub, room
+
+
+def drive(room, uid, rt, prog, now, x=None, z=0.0, speed=20.0):
+    msg = {"x": prog if x is None else x, "z": z, "yaw": 0, "prog": prog, "rt": rt, "speed": speed}
+    return room.state(uid, msg, now)
+
+
+def race_clean(room, uid, laps, lap_time=22.0, start=None, steps=60):
+    """Fährt plausibel `laps` Runden: gleichmäßig, Tempo = Strecke / Rundenzeit."""
+    L = room.track_len
+    s0 = dr.grid_pose(room.drivers[uid].grid)[0]
+    total = laps * L - s0 + 0.5
+    T = laps * lap_time
+    evs = []
+    for k in range(1, steps * laps + 1):
+        rt = T * k / (steps * laps)
+        prog = s0 + total * k / (steps * laps)
+        evs += drive(room, uid, rt, prog, room.start_at + rt, speed=total / T)
+    return evs
+
+
+# ---- Lebenszyklus ----
+
+def test_open_gives_code_and_replaces_old_room():
+    hub = dr.Hub()
+    r1, old = hub.open(1, 2, 3, T0)
+    assert old is None and len(r1.code) == 6 and set(r1.code) <= set(dr.CODE_ALPHABET)
+    assert hub.get(r1.code.lower()) is r1 and hub.of_tenant(1) is r1
+    r2, old = hub.open(1, "x", 99, T0)
+    assert old is r1 and hub.get(r1.code) is None and hub.of_tenant(1) is r2
+    assert 0 <= r2.track < 5 and r2.laps == dr.LAPS_MAX
+
+
+def test_close_and_sweep():
+    hub = dr.Hub()
+    r, _ = hub.open(1, 0, 3, T0)
+    assert hub.close(1) is r and hub.get(r.code) is None and hub.close(1) is None
+    r, _ = hub.open(2, 0, 3, T0)
+    assert hub.sweep(T0 + 10) == []
+    assert hub.sweep(T0 + dr.ROOM_TTL + 1) == [r] and hub.of_tenant(2) is None
+
+
+def test_join_limits_and_garage():
+    hub, room = room_with(0)
+    assert room.join(ident("v", garage=["a"], rnd="r"), "b", 0, T0) == (False, "that car is not in your garage")
+    assert room.join(ident("v", garage=["a"], rnd="r"), "r", 0, T0)[0]
+    assert room.join(ident("v", garage=["a"], rnd="r"), "a", 2, T0) == (True, "car changed")
+    assert room.drivers["v"].car == "a" and room.drivers["v"].paint == 2
+    for i in range(dr.MAX_DRIVERS - 1):
+        assert room.join(ident("x%d" % i), "c", 0, T0)[0]
+    assert room.join(ident("late"), "c", 0, T0) == (False, "grid full")
+
+
+def test_start_countdown_race_and_no_join_while_running():
+    hub, room = room_with(2)
+    assert room.tick(T0) == []
+    ok, _ = room.start(T0)
+    assert ok and room.phase == "countdown" and room.start_at == T0 + dr.COUNTDOWN
+    assert [d.grid for d in room.drivers.values()] == [0, 1]
+    assert room.start(T0)[0] is False
+    assert room.join(ident("late"), "c", 0, T0)[0] is False
+    evs = room.tick(T0 + dr.COUNTDOWN)
+    assert room.phase == "race" and evs[0]["phase"] == "race"
+
+
+def test_start_needs_a_driver_and_lobby_leave_removes():
+    hub, room = room_with(1)
+    room.leave("u0", T0)
+    assert "u0" not in room.drivers
+    assert room.start(T0) == (False, "nobody on the grid")
+
+
+# ---- Wertung ----
+
+def test_clean_race_two_finishers_and_rows():
+    hub, room = room_with(2, laps=2)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    e0 = race_clean(room, "u0", 2, lap_time=21.0)
+    e1 = race_clean(room, "u1", 2, lap_time=22.0)
+    assert [e["lap"] for e in e0] == [1, 2] and all(e["ok"] for e in e0) and "fin" in e0[-1]
+    assert all(e["ok"] for e in e1)
+    evs = room.tick(room.start_at + 50)
+    res = next(e for e in evs if e["t"] == "results")
+    assert room.phase == "done"
+    assert [(r["id"], r["place"], r["status"]) for r in res["list"]] == [("u0", 1, "finished"), ("u1", 2, "finished")]
+    rows = room.rows()
+    assert [(r["user_id"], r["place"]) for r in rows] == [("u0", 1), ("u1", 2)]
+    room.recorded = True
+    assert room.rows() is None          # Sperre: nur einmal
+
+
+def test_finish_window_ends_race_with_dnf():
+    hub, room = room_with(2, laps=1)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    race_clean(room, "u0", 1)
+    drive(room, "u1", 1.0, -5.0, room.start_at + 1)
+    first = room.first_finish
+    assert room.tick(first + 1) == []
+    evs = room.tick(first + dr.FINISH_WINDOW)
+    res = next(e for e in evs if e["t"] == "results")
+    assert [(r["id"], r["status"]) for r in res["list"]] == [("u0", "finished"), ("u1", "dnf")]
+    assert [(r["user_id"], r["place"]) for r in room.rows()] == [("u0", 1), ("u1", None)]
+
+
+def test_single_driver_race_is_not_recorded():
+    hub, room = room_with(1, laps=1)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    race_clean(room, "u0", 1)
+    room.tick(room.start_at + 30)
+    assert room.phase == "done" and room.rows() is None
+
+
+def test_restart_from_done_resets_progress():
+    hub, room = room_with(2, laps=1)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    race_clean(room, "u0", 1)
+    race_clean(room, "u1", 1)
+    room.tick(room.start_at + 40)
+    rid = room.race_id
+    ok, _ = room.start(T0 + 100)
+    assert ok and room.race_id != rid and all(d.finish_t is None and d.lap == 0 for d in room.drivers.values())
+
+
+def test_disconnected_driver_in_race_stays_as_dnf_and_race_ends_when_rest_finished():
+    hub, room = room_with(2, laps=1)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    room.leave("u1", room.start_at + 1)
+    assert "u1" in room.drivers and room.drivers["u1"].connected is False
+    race_clean(room, "u0", 1)
+    evs = room.tick(room.start_at + 25)
+    assert any(e["t"] == "results" for e in evs)
+
+
+# ---- Plausibilität ----
+
+def _finish_after(room, uid, cheat):
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    cheat(room)
+    room.tick(room.start_at + 400)
+    return {r["id"]: r for r in room.results["list"]}
+
+
+def test_too_fast_lap_is_invalid():
+    hub, room = room_with(2, laps=1)
+    res = _finish_after(room, "u0", lambda r: (race_clean(r, "u0", 1, lap_time=5.0), race_clean(r, "u1", 1)))
+    assert res["u0"]["status"] == "invalid" and res["u0"]["place"] is None
+    assert res["u1"]["place"] == 1
+    assert room.rows() is None          # nur ein gültiger Fahrer übrig → wird nicht gespeichert
+
+
+def test_teleport_is_flagged():
+    hub, room = room_with(2, laps=1)
+
+    def cheat(r):
+        drive(r, "u0", 1.0, 10.0, r.start_at + 1)
+        drive(r, "u0", 1.05, 200.0, r.start_at + 1.05)        # 190 m in 50 ms
+        race_clean(r, "u1", 1)
+    res = _finish_after(room, "u0", cheat)
+    assert "jump" in room.drivers["u0"].reasons or "progress" in room.drivers["u0"].reasons
+
+
+def test_speed_and_clock_flags():
+    hub, room = room_with(1, laps=1)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    drive(room, "u0", 1.0, 5.0, room.start_at + 1, speed=500)
+    assert "speed" in room.drivers["u0"].reasons
+    drive(room, "u0", 30.0, 6.0, room.start_at + 2)          # Rennzeit läuft der Server-Uhr davon
+    assert "clock" in room.drivers["u0"].reasons
+
+
+def test_jump_start_is_flagged():
+    hub, room = room_with(1, laps=1)
+    room.start(T0)
+    drive(room, "u0", 0.0, -4.0, T0 + 1)                      # Startplatz liegt bei −4 m
+    assert room.drivers["u0"].reasons == []
+    drive(room, "u0", 0.0, 2.0, T0 + 2)
+    assert "jump start" in room.drivers["u0"].reasons
+
+
+def test_reset_back_on_track_is_allowed():
+    hub, room = room_with(1, laps=1)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    drive(room, "u0", 1.0, 10.0, room.start_at + 1, x=10.0, z=12.0)
+    drive(room, "u0", 1.05, 10.0, room.start_at + 1.05, x=10.0, z=0.0)   # R: 12 m seitlich zurück
+    assert room.drivers["u0"].reasons == []
+
+
+def test_limits_per_car():
+    lim = dr.Limits({"cars": {"slow": {"vtop": 10, "lap": [40, 40, 40, 40, 40]}, "bad": "x"}})
+    assert lim.vtop("slow") == 10 and lim.vtop("other") == dr.GLOBAL_VTOP
+    assert lim.min_lap("slow", 0) == 40 * dr.LAP_FACTOR
+    assert lim.min_lap("other", 2) == dr.GLOBAL_LAP[2] * dr.LAP_FACTOR
+    hub, room = room_with(1, laps=1, limits=lim)
+    room.drivers["u0"].car = "slow"
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    drive(room, "u0", 1.0, 5.0, room.start_at + 1, speed=20)
+    assert "speed" in room.drivers["u0"].reasons
+
+
+def test_garbage_state_is_ignored():
+    hub, room = room_with(1)
+    room.start(T0)
+    assert room.state("u0", {"x": "nan", "z": 0, "yaw": 0, "prog": 0, "rt": 0}, T0) == []
+    assert room.state("nobody", {"x": 0, "z": 0, "yaw": 0, "prog": 0, "rt": 0}, T0) == []
+    assert room.drivers["u0"].state is None
+
+
+# ---- Tickets ----
+
+def test_ticket_and_viewer_cookie_roundtrip():
+    tk = drive_auth.make_ticket({"tid": 1, "code": "ABCDEF", "id": "42"}, secret="s1")
+    assert drive_auth.read_ticket(tk, secret="s1")["id"] == "42"
+    assert drive_auth.read_ticket(tk, secret="s2") is None
+    assert drive_auth.read_ticket("junk", secret="s1") is None
+    ck = drive_auth.make_viewer({"id": 9, "login": "abc", "display_name": "Abc"}, secret="s1")
+    assert drive_auth.read_viewer(ck, secret="s1") == {"id": "9", "login": "abc", "display": "Abc"}
+    assert drive_auth.read_viewer(ck, secret="s2") is None
+    assert drive_auth.internal_key("s1") != drive_auth.internal_key("s2")
+
+
+def test_save_limits_filters(tmp_path):
+    n = drive_auth.save_limits(str(tmp_path), {"cars": {"a": {"vtop": 20, "lap": [20, 21]}, "b": {"vtop": "x"},
+                                                        "c": {"vtop": 500}}})
+    assert n == 1
+    assert drive_auth.load_limits(str(tmp_path)) == {"cars": {"a": {"vtop": 20.0, "lap": [20.0, 21.0]}}}

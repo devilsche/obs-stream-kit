@@ -983,3 +983,82 @@ def car_race_result(token):
     field = len(rows)
     gained = {r["user_id"]: race_db.points(r["place"], field) for r in rows}
     return jsonify({"ok": True, "counted": True, "points": points_view(ranks, gained)})
+
+
+# ---- Car Drive Mehrspieler (Räume im WS-Dienst drive_ws.py, fx/drive_room.py) ----
+
+def _drive_host(tenant_id):
+    """Twitch-ID + Anzeigename des Tenant-Owners (der Streamer fährt als normaler Teilnehmer)."""
+    raw = _get_conn()
+    try:
+        with raw.cursor() as cur:
+            cur.execute("SELECT u.twitch_user_id, u.display_name FROM tenants t "
+                        "JOIN users u ON u.id = t.owner_user_id WHERE t.id = %s", (tenant_id,))
+            row = cur.fetchone()
+        if row and row["twitch_user_id"]:
+            return str(row["twitch_user_id"]), row["display_name"] or "Host"
+    except Exception:
+        log.exception("fx car-drive: host lookup failed")
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            raw.close()
+    return "host-%d" % tenant_id, "Host"
+
+
+def _drive_say(out, url=None):
+    room = out.get("room") or {}
+    if url:
+        return "Race me in Car Drive: %s (%s, %d lap%s, max %d drivers)" % (
+            url, room.get("track_name", "?"), room.get("laps", 0), "" if room.get("laps") == 1 else "s",
+            room.get("max", 8))
+    return out.get("msg") or out.get("error") or ""
+
+
+@bp_fx.route("/s/<token>/api/fx/car-drive", methods=["GET", "POST"])
+def car_drive_cmd(token):
+    """Car-Drive-Räume (Streamer.bot per GET, Car-Drive-Seite des Streamers per POST):
+    cmd=open [track=0–4|random, laps=1–5, host=1 → Host-Ticket] · start · close · status.
+    POST-Body {limits: {cars: {key: {vtop, lap}}}} legt die Grenzwerte je Auto ab (fx/drive_auth.save_limits)."""
+    from fx import drive_auth
+    if g.tenant_id is None:
+        abort(404)
+    cmd = (request.args.get("cmd") or "").strip().lower()
+    if cmd == "open":
+        body = (request.get_json(silent=True) or {}) if request.method == "POST" else {}
+        if isinstance(body, dict) and body.get("limits"):
+            try:
+                drive_auth.save_limits(current_app.config.get("_PROJECT_ROOT") or ".", body["limits"])
+            except Exception:
+                log.exception("fx car-drive: limits not saved")
+        track = _arg("track")
+        out = drive_auth.call("open", tenant=g.tenant_id, track=track if track.isdigit() else "random",
+                              laps=_arg("laps") or 3)
+        if not out.get("ok"):
+            return _no_store(jsonify({"ok": False, "say": "Car Drive is offline", "error": out.get("error")})), 503
+        code = out["room"]["code"]
+        url = request.host_url.rstrip("/") + "/drive/" + code
+        res = {"ok": True, "code": code, "url": url, "room": out["room"], "say": _drive_say(out, url)}
+        if _arg("host") == "1":
+            uid, display = _drive_host(g.tenant_id)
+            res["ticket"] = drive_auth.make_ticket({"tid": g.tenant_id, "code": code, "id": uid, "login": "",
+                                                    "display": display, "role": "host", "garage": None, "rnd": None})
+            res["me"] = {"id": uid, "display": display}
+        return _no_store(jsonify(res))
+    if cmd in ("start", "close", "status"):
+        out = drive_auth.call(cmd, tenant=g.tenant_id)
+        if out.get("ok") is None:
+            out["ok"] = False
+        room = out.get("room") or {}
+        if cmd == "status" and out.get("ok"):
+            out["url"] = request.host_url.rstrip("/") + "/drive/" + room.get("code", "")
+            out["say"] = _drive_say(out, out["url"])
+            if _arg("host") == "1":
+                uid, display = _drive_host(g.tenant_id)
+                out["ticket"] = drive_auth.make_ticket({"tid": g.tenant_id, "code": room.get("code"), "id": uid,
+                                                        "login": "", "display": display, "role": "host",
+                                                        "garage": None, "rnd": None})
+                out["me"] = {"id": uid, "display": display}
+        else:
+            out["say"] = _drive_say(out)
+        return _no_store(jsonify(out))
+    return jsonify({"ok": False, "say": "unknown command"}), 400

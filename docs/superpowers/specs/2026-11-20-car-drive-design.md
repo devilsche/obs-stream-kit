@@ -44,3 +44,9 @@ HUD mit Rundenzeit/Bestzeit, 3 Runden, Gegner aus der Sim (bis 7), Positionsanze
 - Kontakt zwischen Spielern: jeder Client schubst sich selbst beim Überlappen (masseabhängig), kein Server-Physikrechnen.
 - Stream: Car-Race-Overlay bekommt einen Modus „live“ (TV-Kamera, Rangliste) für diese Sessions.
 - Wertung: Platzierung → Punkte/Coins wie im Chat-Rennen (nur plausible Ergebnisse).
+
+Stand Bau Schritt 2 (2026-11-20): gebaut – `drive_ws.py` (WS-Dienst, Port 9010), `fx/drive_room.py` (Räume, Prüfung,
+Wertung), `fx/drive_auth.py` (Tickets, Zuschauer-Cookie, interne Steuerung), Token-Route `…/api/fx/car-drive`,
+Zuschauer-Seite `app/views_drive.py` (`/drive/<code>`), Client `js/car-drive-net.js` + Mehrspieler-Teil in
+`js/car-drive.js`. Offen: Car-Race-Overlay-Modus „live“ (eigenes Teilprojekt, `js/car-race.js`), Zuschauen ohne
+mitzufahren, Wiederaufnahme eines offenen Raums nach Neuladen der Streamer-Seite.

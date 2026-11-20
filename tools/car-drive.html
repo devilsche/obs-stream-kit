@@ -121,6 +121,29 @@
     .app.racing .fs-btn { bottom: auto; top: 50%; right: 16px; transform: translateY(-50%); }
     .app.racing .fs-btn:not(:focus-visible):not(:hover) { opacity: 0.45; }
 
+    /* ---- Mehrspieler: Modus (solo/viewer) und Rolle (host) als data-Attribute auf .app ---- */
+    .app[data-mode="viewer"] .solo-only { display: none; }
+    .app:not([data-mode="viewer"]) .viewer-only { display: none; }
+    .app:not([data-role="host"]) .host-only { display: none; }
+    a.btn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; box-sizing: border-box; padding: 8px 16px; border-radius: var(--cd-radius);
+      background: var(--cd-primary); border: 2px solid var(--cd-primary); color: #fff; font-weight: 600; text-decoration: none; }
+    a.btn.primary { background: var(--cd-accent); border-color: var(--cd-accent); color: #1b1300; }
+    a.btn:hover { filter: brightness(1.2); }
+    .whoami { margin: 0; color: var(--cd-dim); font-size: 14px; }
+    .whoami a { color: var(--cd-text); }
+    .lobby-code { margin: 0 0 12px; font-size: 18px; }
+    .lobby-code strong { font-family: var(--cd-mono); font-size: 26px; letter-spacing: 0.12em; color: var(--cd-accent); }
+    .lobby-link { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .lobby-link label { color: var(--cd-dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .lobby-sub { font-family: var(--cd-font); font-size: 16px; margin: 8px 0 6px; }
+    .roster { list-style: none; margin: 0; padding: 0; }
+    .roster li { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+    .roster li .car { color: var(--cd-dim); font-size: 14px; }
+    .roster li.me { background: var(--cd-surface-2); box-shadow: inset 4px 0 0 var(--cd-accent); }
+    .roster li[data-off] { opacity: 0.55; }
+    .roster .tag { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--cd-accent); margin-left: 6px; }
+    .roster-empty { color: var(--cd-dim); padding: 8px 10px; }
+
     @media (max-width: 720px) {
       .grid { grid-template-columns: 1fr; }
       .hud-big { font-size: 28px; }
@@ -175,23 +198,32 @@
           <label for="paintSel">Colour set</label>
           <select id="paintSel"></select>
         </div>
-        <div class="field">
+        <div class="field viewer-only">
+          <label for="qualSel">Graphics</label>
+          <select id="qualSel">
+            <option value="light">Light – race models, lower resolution</option>
+            <option value="full">Full quality</option>
+          </select>
+        </div>
+        <div class="field solo-only">
           <label for="trackSel">Track</label>
           <select id="trackSel"></select>
         </div>
-        <div class="field">
+        <div class="field solo-only">
           <label for="oppRange">Opponents</label>
           <div class="range-row"><input type="range" id="oppRange" min="0" max="7" step="1" value="5"><output id="oppOut" for="oppRange">5</output></div>
         </div>
-        <div class="field">
+        <div class="field solo-only">
           <label for="lapRange">Laps</label>
           <div class="range-row"><input type="range" id="lapRange" min="1" max="5" step="1" value="3"><output id="lapOut" for="lapRange">3</output></div>
         </div>
         <div class="field wide">
           <div class="actions">
-            <label><input type="checkbox" id="duckChk" checked> Rubber duck drivers</label>
+            <label class="solo-only"><input type="checkbox" id="duckChk" checked> Rubber duck drivers</label>
+            <p class="whoami viewer-only" id="whoami"></p>
             <span class="grow"></span>
-            <button type="submit" class="primary" id="startBtn"><span class="icon" aria-hidden="true">sports_score</span> Start race</button>
+            <button type="button" class="solo-only" id="hostBtn"><span class="icon" aria-hidden="true">group_add</span> Host multiplayer</button>
+            <button type="submit" class="primary" id="startBtn"><span class="icon" aria-hidden="true">sports_score</span> <span id="startText">Start race</span></button>
           </div>
           <p id="menuStatus" class="status" role="status" aria-live="polite"></p>
         </div>
@@ -208,6 +240,30 @@
           <dt>Pause</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
         </dl>
       </details>
+    </section>
+
+    <section id="signin" class="panel small" hidden aria-labelledby="signinTitle">
+      <h2 id="signinTitle">Car Drive</h2>
+      <p id="signinText">Sign in with Twitch to race in this room. Only your Twitch name and ID are used, for the results and your garage.</p>
+      <div class="actions"><a class="btn primary" id="signinBtn" href="/"><span class="icon" aria-hidden="true">login</span> Sign in with Twitch</a></div>
+    </section>
+
+    <section id="lobby" class="panel" hidden aria-labelledby="lobbyTitle">
+      <h2 id="lobbyTitle">Multiplayer</h2>
+      <p class="lobby-code">Room <strong id="lobbyCode">–</strong> · <span id="lobbyTrack"></span></p>
+      <div class="lobby-link host-only">
+        <label for="lobbyUrl">Join link for the chat</label>
+        <div class="range-row"><input id="lobbyUrl" readonly><button type="button" class="ghost" id="copyBtn"><span class="icon" aria-hidden="true">content_copy</span> Copy</button></div>
+      </div>
+      <h3 class="lobby-sub">Drivers <span id="lobbyCount"></span></h3>
+      <ol id="roster" class="roster"></ol>
+      <p id="lobbyStatus" class="status" role="status" aria-live="polite"></p>
+      <div class="actions">
+        <button type="button" class="primary host-only" id="mpStartBtn"><span class="icon" aria-hidden="true">sports_score</span> Start race</button>
+        <span class="grow"></span>
+        <button type="button" class="ghost host-only" id="mpCloseBtn">Close room</button>
+        <button type="button" class="ghost viewer-only" id="mpLeaveBtn">Leave room</button>
+      </div>
     </section>
 
     <section id="loading" class="panel small" hidden aria-labelledby="loadTitle">
@@ -230,6 +286,7 @@
       <h2 id="finishTitle">Results</h2>
       <ol id="results" class="results"></ol>
       <p id="finishBest" class="finish-best"></p>
+      <p id="finishNote" class="finish-best" role="status" aria-live="polite"></p>
       <div class="actions">
         <button type="button" class="primary" id="againBtn">Race again</button>
         <button type="button" class="ghost" id="finishMenuBtn">Back to menu</button>
@@ -251,6 +308,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/car-race-sim.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-track-scene.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive-phys.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-drive-net.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive.js"></script>

@@ -9,6 +9,7 @@ from app.views_admin import bp_admin
 from app.views_widgets import bp_widgets
 from app.views_static import bp_static
 from app.views_app import bp_app
+from app.views_drive import bp_drive
 from overlay_app.views_overlays import bp_overlays
 from webcore.metrics import register_metrics
 
@@ -32,6 +33,8 @@ def create_app(testing: bool = False) -> Flask:
     app.register_blueprint(bp_widgets)
     app.register_blueprint(bp_static)
     app.register_blueprint(bp_app)
+    # Car Drive Mehrspieler: öffentliche Zuschauer-Seite /drive/<code>
+    app.register_blueprint(bp_drive)
     # Overlay-Auslieferung (frueher Service 2) ins Frontend integriert:
     # /s/<token>/overlays|assets|js/...  (reines Datei-Serving, kein Template)
     app.register_blueprint(bp_overlays)

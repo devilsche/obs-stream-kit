@@ -10,10 +10,19 @@
  * Kameras: Verfolger (Standard, geglättet), Motorhaube, TV (Streckenkameras, wechseln mit dem Auto).
  * Steuerung: Tastatur + Gamepad-API (Standard-Belegung). Bestzeit je Auto + Strecke in localStorage.
  * Keine Inline-Styles: Zustände über Klassen, data-Attribute und hidden; Farben im WebGL aus Theme-Proben (.tk-*).
+ *
+ * Mehrspieler (Schritt 2): Netz js/car-drive-net.js, Dienst drive_ws.py, Räume fx/drive_room.py.
+ *   Streamer (diese Seite unter /app/tools/car-drive): „Host multiplayer“ öffnet einen Raum (POST /s/<token>/api/fx/car-drive
+ *   ?cmd=open&host=1, Body = Grenzwerte je Auto für die Plausibilitätsprüfung), zeigt Code/Link, startet das Rennen
+ *   (cmd=start) und fährt selbst mit. Zuschauer: dieselbe Seite unter /drive/<code> (window.__DRIVE__, data-mode="viewer"),
+ *   Twitch-Anmeldung, Auto aus der Garage oder Zufall, Grafik leicht (.race.glb, 0,75 Auflösung) oder voll.
+ *   Im Rennen: keine KI; Fremdautos aus dem Server-Takt (100 ms Puffer, interpoliert), Kontakt schubst nur das eigene
+ *   Auto (nach Masse), Countdown/Start/Ergebnis vom Server.
  */
 (function (root) {
   'use strict';
-  var THREE = root.THREE, TC = root.ToyCars, Sim = root.CarRaceSim, Stats = root.CarRaceStats, Phys = root.CarDrivePhys;
+  var THREE = root.THREE, TC = root.ToyCars, Sim = root.CarRaceSim, Stats = root.CarRaceStats, Phys = root.CarDrivePhys, Net = root.CarDriveNet;
+  var CFG = root.__DRIVE__ || null, VIEWER = !!(CFG && CFG.mode === 'viewer');
   var doc = root.document;
   function $(id) { return doc.getElementById(id); }
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
@@ -41,6 +50,8 @@
 
   // ---- Renderer / Szene ----
   var app = $('app'), canvas = $('view');
+  app.dataset.mode = VIEWER ? 'viewer' : 'solo';
+  var renderScale = 1;   // Zuschauer „Light“: 0,75
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
   renderer.localClippingEnabled = true;   // Enten-Fahrer an der Karosserie abschneiden
   var scene = new THREE.Scene();
@@ -53,7 +64,7 @@
   var maxAniso = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 1;
   function resize() {
     var w = Math.max(64, app.clientWidth || root.innerWidth), h = Math.max(36, app.clientHeight || root.innerHeight);
-    renderer.setPixelRatio(Math.min(1.5, root.devicePixelRatio || 1));
+    renderer.setPixelRatio(Math.min(1.5, root.devicePixelRatio || 1) * renderScale);
     renderer.setSize(w, h, false);
     cam.aspect = w / h; cam.updateProjectionMatrix();
   }
@@ -78,7 +89,9 @@
     opp: $('oppRange'), oppOut: $('oppOut'), laps: $('lapRange'), lapOut: $('lapOut'), duck: $('duckChk'),
     form: $('menuForm'), status: $('menuStatus'), menu: $('menu'), loading: $('loading'), loadBar: $('loadBar'),
     loadText: $('loadText'), pause: $('pause'), finish: $('finish'), results: $('results'), finishBest: $('finishBest'),
-    hud: $('hud'), countdown: $('countdown'), announce: $('announce'), fs: $('fsBtn')
+    hud: $('hud'), countdown: $('countdown'), announce: $('announce'), fs: $('fsBtn'),
+    lobby: $('lobby'), signin: $('signin'), roster: $('roster'), lobbyStatus: $('lobbyStatus'), qual: $('qualSel'),
+    finishNote: $('finishNote')
   };
   var catalog = [], byKey = {};
   var pref = load('menu', {}) || {};
@@ -96,12 +109,22 @@
   ui.opp.addEventListener('input', syncOutputs); ui.laps.addEventListener('input', syncOutputs); syncOutputs();
 
   function displayName(e) { return cleanName(TC.vehicle(e.key).name || e.name || e.key); }
+  // Zuschauer: nur Autos aus der eigenen Garage plus ein Zufallsauto (vom Server ausgelost, Ticket)
+  var viewerCars = null;
+  function listPool() {
+    if (!VIEWER) return catalog;
+    if (!viewerCars) return [];
+    var out = [], seen = {};
+    if (viewerCars.rnd && byKey[viewerCars.rnd]) { out.push({ e: byKey[viewerCars.rnd], rnd: true }); seen[viewerCars.rnd] = 1; }
+    (viewerCars.garage || []).forEach(function (k) { if (byKey[k] && !seen[k]) { out.push({ e: byKey[k] }); seen[k] = 1; } });
+    return out;
+  }
   function fillList() {
     var q = ui.search.value.trim().toLowerCase(), cur = ui.list.value || pref.car;
     ui.list.textContent = '';
     var shown = 0;
-    catalog.forEach(function (e) {
-      var label = displayName(e), hay = (label + ' ' + (e.brand || '') + ' ' + e.key).toLowerCase();
+    listPool().forEach(function (x) {
+      var e = x.e || x, label = (x.rnd ? 'Random car: ' : '') + displayName(e), hay = (label + ' ' + (e.brand || '') + ' ' + e.key).toLowerCase();
       if (q && hay.indexOf(q) < 0) return;
       var o = doc.createElement('option'); o.value = e.key; o.textContent = label + (e.brand ? ' (' + e.brand + ')' : '');
       ui.list.appendChild(o); shown++;
@@ -109,7 +132,7 @@
     if (cur && byKey[cur] && ui.list.querySelector('option[value="' + CSS.escape(cur) + '"]')) ui.list.value = cur;
     else if (shown) ui.list.selectedIndex = 0;
     carChanged();
-    if (!shown) ui.info.textContent = 'No car matches “' + ui.search.value + '”.';
+    if (!shown) ui.info.textContent = VIEWER && !viewerCars ? '' : 'No car matches “' + ui.search.value + '”.';
   }
   function carChanged() {
     var key = ui.list.value, e = byKey[key];
@@ -136,6 +159,7 @@
     catalog.forEach(function (e) { byKey[e.key] = e; });
     ui.status.textContent = catalog.length ? '' : 'The car catalogue is empty.';
     fillList();
+    if (VIEWER) viewerInit();
   }).catch(function () { ui.status.textContent = 'Could not load the car catalogue.'; });
 
   // ---- Fullscreen ----
@@ -154,12 +178,12 @@
   });
 
   // ---- Panels ----
-  var PANELS = ['menu', 'loading', 'pause', 'finish'];
+  var PANELS = ['menu', 'loading', 'pause', 'finish', 'lobby', 'signin'];
   function showPanel(name) {
     PANELS.forEach(function (p) { ui[p].hidden = p !== name; });
     app.classList.toggle('racing', !name);
     if (name) {
-      var f = ui[name].querySelector(name === 'menu' ? '#carList' : 'button, select, input');
+      var f = ui[name].querySelector(name === 'menu' ? '#carList' : 'button:not([hidden]), select, input, a.btn');
       if (f) setTimeout(function () { try { f.focus(); } catch (e) { /* */ } }, 0);
     }
   }
@@ -265,8 +289,8 @@
     }
   });
   doc.addEventListener('keyup', function (e) { keys[e.code] = false; });
-  root.addEventListener('blur', function () { keys = {}; if (race && race.phase === 'race' && !race.paused) setPaused(true); });
-  doc.addEventListener('visibilitychange', function () { if (doc.hidden && race && race.phase === 'race' && !race.paused) setPaused(true); });
+  root.addEventListener('blur', function () { keys = {}; if (race && !race.mp && race.phase === 'race' && !race.paused) setPaused(true); });
+  doc.addEventListener('visibilitychange', function () { if (doc.hidden && race && !race.mp && race.phase === 'race' && !race.paused) setPaused(true); });
 
   var pad = { prev: [], active: false };
   function readPad() {
@@ -350,6 +374,7 @@
     e.preventDefault();
     var s = settings();
     if (!byKey[s.car]) { ui.status.textContent = 'Pick a car first.'; ui.list.focus(); return; }
+    if (VIEWER) { viewerJoin(s); return; }
     save('menu', s); pref = s;
     begin(s, null);
   });
@@ -419,6 +444,7 @@
     begin.token = null;
     if (race) {
       race.ai.forEach(disposeCar); disposeCar(race.me);
+      if (race.remotes) race.remotes.forEach(disposeCar);
       race = null;
     }
     if (trackRes) { trackRes.dispose(); trackRes = null; }
@@ -430,13 +456,21 @@
     if (!race) return;
     race.paused = on;
     keys = {};
+    $('restartBtn').hidden = !!race.mp;
+    $('menuBtn').textContent = race.mp ? 'Back to lobby' : 'Back to menu';
     if (on) showPanel('pause'); else { showPanel(null); try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ } }
   }
   $('resumeBtn').addEventListener('click', function () { setPaused(false); });
   $('restartBtn').addEventListener('click', function () { if (race) { var s = race.s, o = race.opp; begin(s, o); } });
-  $('menuBtn').addEventListener('click', function () { teardown(); showPanel('menu'); });
-  $('againBtn').addEventListener('click', function () { if (race) { var s = race.s, o = race.opp; begin(s, o); } });
-  $('finishMenuBtn').addEventListener('click', function () { teardown(); showPanel('menu'); });
+  $('menuBtn').addEventListener('click', function () { var m = race && race.mp; teardown(); if (m && mp) showLobby(); else showPanel('menu'); });
+  $('againBtn').addEventListener('click', function () {
+    if (race && race.mp) { teardown(); showLobby(); return; }
+    if (race) { var s = race.s, o = race.opp; begin(s, o); }
+  });
+  $('finishMenuBtn').addEventListener('click', function () {
+    if (race && race.mp) { teardown(); mpLeave(); return; }
+    teardown(); showPanel('menu');
+  });
 
   // Sim-Zustand für die Interpolation
   function snap() {
@@ -545,6 +579,10 @@
     if (race.sim) race.sim.cars.forEach(function (q, i) {
       list.push({ me: false, name: race.ai[i].name, prog: q.s, fin: q.finish, dnf: q.place == null && q.state === 'dnf' && q.wreck });
     });
+    if (race.remotes) race.remotes.forEach(function (c) {
+      var fin = mp && mp.fin[c.id];
+      list.push({ me: false, name: c.label, prog: c.prog, fin: fin != null ? fin : null, dnf: false });
+    });
     list.sort(function (a, b) {
       if ((a.fin != null) !== (b.fin != null)) return a.fin != null ? -1 : 1;
       if (a.fin != null) return a.fin - b.fin;
@@ -588,16 +626,27 @@
   function showResults() {
     race.phase = 'results';
     var list = standings();
+    if (race.mp && mp && mp.results) {
+      // Mehrspieler: Wertung vom Server (nur plausible Fahrer bekommen einen Platz)
+      list = mp.results.list.map(function (r) {
+        return { me: r.id === mp.me, name: r.name, place: r.place, fin: r.status === 'finished' ? r.time : null,
+          dnf: r.status === 'dnf', invalid: r.status === 'invalid' };
+      });
+    }
     ui.results.textContent = '';
     list.forEach(function (x, i) {
       var li = doc.createElement('li'); if (x.me) li.className = 'me';
-      var pl = doc.createElement('span'); pl.className = 'pl'; pl.textContent = String(i + 1);
+      var pl = doc.createElement('span'); pl.className = 'pl'; pl.textContent = race.mp ? (x.place ? String(x.place) : '–') : String(i + 1);
       var nm = doc.createElement('span'); nm.textContent = x.name;
       if (x.me) { var tg = doc.createElement('span'); tg.className = 'tag'; tg.textContent = 'You'; nm.appendChild(tg); }
       var tm = doc.createElement('span'); tm.className = 'tm';
-      tm.textContent = x.fin != null ? fmt(x.fin) : x.dnf ? 'DNF' : 'running';
+      tm.textContent = x.fin != null ? fmt(x.fin) : x.invalid ? 'Not counted' : x.dnf ? 'DNF' : 'running';
       li.appendChild(pl); li.appendChild(nm); li.appendChild(tm); ui.results.appendChild(li);
     });
+    $('againBtn').textContent = race.mp ? 'Back to lobby' : 'Race again';
+    $('finishMenuBtn').textContent = race.mp ? 'Leave room' : 'Back to menu';
+    ui.finishNote.textContent = '';
+    if (race.mp) mpFinishNote();
     ui.finishBest.textContent = '';
     if (race.bestLap != null) {
       ui.finishBest.appendChild(doc.createTextNode('Your best lap: '));
@@ -616,6 +665,311 @@
     return { steer: clamp(err * 2.5, -1, 1), throttle: pc.u < vmax ? 0.7 : 0, brake: pc.u > vmax + 2 ? 0.6 : 0 };
   }
 
+  // ---- Mehrspieler ----
+  var mp = null;
+  // Streamer: Raum-Befehle über die Token-Route (wie Streamer.bot)
+  function api(cmd, extra, body) {
+    var url = '/s/' + (root.__WIDGET_TOKEN__ || '') + '/api/fx/car-drive?cmd=' + cmd + (extra || '');
+    var init = { credentials: 'same-origin' };
+    if (body) { init.method = 'POST'; init.headers = { 'Content-Type': 'application/json' }; init.body = JSON.stringify(body); }
+    return fetch(url, init).then(function (r) { return r.json().catch(function () { return { ok: false, say: 'HTTP ' + r.status }; }); });
+  }
+  function wsUrl(code) {
+    var q = null;
+    try { q = new URLSearchParams(root.location.search).get('ws'); } catch (e) { /* alt */ }   // lokal ohne nginx: ?ws=ws://127.0.0.1:9010
+    return (q || ((root.location.protocol === 'https:' ? 'wss://' : 'ws://') + root.location.host)) + '/drive-ws/' + code;
+  }
+  // Grenzwerte je Auto für die Plausibilitätsprüfung (gleiche Werte wie die Fahrphysik): Endtempo, Sim-Rundenzeit je Strecke
+  function driveLimits() {
+    var cars = {}, tracks = Sim.TRACKS.map(function (seed) { return Sim.track(seed); });
+    catalog.forEach(function (e) {
+      try {
+        var raw = Stats.of(e.key, e), st = Sim.stats(raw), P = Phys.params(st, raw);
+        cars[e.key] = { vtop: Math.round(P.vtop * 1000) / 1000, lap: tracks.map(function (T) { return Math.round(Sim.lapTime(st, T) * 1000) / 1000; }) };
+      } catch (err) { /* ohne Werte gilt die globale Grenze */ }
+    });
+    return { cars: cars };
+  }
+  function rosterById(id) { return mp ? mp.roster.filter(function (d) { return String(d.id) === String(id); })[0] : null; }
+  function gridPose(gi) { return { s: -(4 + Math.floor(gi / 2) * 7.5), d: gi % 2 === 0 ? 2.3 : -2.3 }; }   // wie fx/drive_room.grid_pose
+  function setLobbyStatus(t) { ui.lobbyStatus.textContent = t || ''; }
+  function showLobby() { showPanel('lobby'); renderRoster(); }
+  function lobbyTrack() {
+    var T = Sim.track(Sim.TRACKS[mp.room.track | 0] || 1), n = mp.room.laps | 0;
+    $('lobbyTrack').textContent = T.name + ' · ' + n + ' lap' + (n === 1 ? '' : 's');
+  }
+  function renderRoster() {
+    if (!mp) return;
+    ui.roster.textContent = '';
+    $('lobbyCount').textContent = mp.roster.length + '/8';
+    if (!mp.roster.length) {
+      var e0 = doc.createElement('li'); e0.className = 'roster-empty'; e0.textContent = 'Nobody on the grid yet.'; ui.roster.appendChild(e0);
+    }
+    mp.roster.forEach(function (d) {
+      var li = doc.createElement('li');
+      if (String(d.id) === mp.me) li.className = 'me';
+      if (!d.connected) li.dataset.off = '1';
+      var nm = doc.createElement('span'); nm.textContent = d.name;
+      [[d.host, 'Host'], [String(d.id) === mp.me, 'You'], [!d.connected, 'offline']].forEach(function (t) {
+        if (!t[0]) return;
+        var tg = doc.createElement('span'); tg.className = 'tag'; tg.textContent = t[1]; nm.appendChild(tg);
+      });
+      var car = doc.createElement('span'); car.className = 'car'; car.textContent = byKey[d.car] ? displayName(byKey[d.car]) : d.car || '–';
+      li.appendChild(nm); li.appendChild(car); ui.roster.appendChild(li);
+    });
+    $('mpStartBtn').disabled = !mp.roster.length || mp.phase === 'countdown' || mp.phase === 'race';
+  }
+  function mpLoad(key) {
+    var e = key && byKey[key];
+    if (!mp || !e) return Promise.resolve();
+    if (mp.loading[key]) return mp.loading[key];
+    var m = mp;
+    return (m.loading[key] = TC.loadModel(e, m.light ? { race: true } : undefined)
+      .then(function (t) { if (TC.mergeForRace) TC.mergeForRace(t); m.loaded[key] = true; })
+      .catch(function () { m.loaded[key] = false; }));
+  }
+  function mpStart(o) {
+    mpStop();
+    mp = { code: o.code, url: o.url || '', role: o.role, me: String(o.me), room: o.room || {}, roster: [], car: o.car,
+      paint: o.paint | 0, light: !!o.light, duck: o.duck !== false, phase: (o.room || {}).phase || 'lobby', raceId: null,
+      startAt: null, grid: [], fin: {}, results: null, recorded: null, loaded: {}, loading: {} };
+    app.dataset.role = o.role;
+    $('lobbyCode').textContent = mp.code;
+    $('lobbyUrl').value = mp.url;
+    lobbyTrack();
+    showLobby();
+    setLobbyStatus('Connecting…');
+    mpLoad(mp.car);
+    var m = mp;
+    mp.net = Net.connect({ url: wsUrl(mp.code), ticket: o.ticket, onMessage: function (msg) { if (mp === m) mpMsg(msg); },
+      onState: function (on) { if (!on && mp === m) setLobbyStatus('Connection lost – reconnecting…'); } });
+  }
+  function mpStop() {
+    if (!mp) return;
+    try { mp.net.close(); } catch (e) { /* zu */ }
+    mp = null;
+    delete app.dataset.role;
+  }
+  function mpLeave(msg) {
+    mpStop();
+    teardown();
+    showPanel('menu');
+    ui.status.textContent = msg || '';
+  }
+  function mpMsg(m) {
+    switch (m.t) {
+      case 'welcome':
+        mp.me = String(m.id); mp.room = m.room || mp.room; mp.phase = mp.room.phase; mp.roster = m.roster || [];
+        lobbyTrack(); renderRoster();
+        mp.net.send({ t: 'join', car: mp.car, paint: mp.paint });
+        setLobbyStatus(mp.role === 'host' ? 'Post the link in the chat, then start the race.' : 'Waiting for the streamer to start the race.');
+        break;
+      case 'joined':
+        if (!m.ok) setLobbyStatus(m.msg);
+        break;
+      case 'roster':
+        mp.roster = m.list || []; renderRoster();
+        mp.roster.forEach(function (d) { mpLoad(d.car); });
+        break;
+      case 'phase': mpPhase(m); break;
+      case 'lap':
+        if (m.fin != null) mp.fin[String(m.id)] = m.fin;
+        if (String(m.id) === mp.me && !m.ok && race && race.mp) flash('Lap not counted', 2.5);
+        break;
+      case 'results':
+        mp.results = m;
+        if (race && race.mp && race.raceId === m.race_id && race.phase === 'race') showResults();
+        if (!race || !race.mp) {
+          var w = (m.list || []).filter(function (r) { return r.place === 1; })[0];
+          setLobbyStatus(w ? 'Last race won by ' + w.name + ' (' + fmt(w.time) + ').' : 'Last race finished without a valid winner.');
+        }
+        break;
+      case 'recorded':
+        mp.recorded = m;
+        if (race && race.mp && race.phase === 'results') mpFinishNote();
+        break;
+      case 'closed': mpLeave(m.msg ? m.msg.charAt(0).toUpperCase() + m.msg.slice(1) + '.' : 'The room was closed.'); break;
+      case 'gone': mpLeave(m.code === 4401 ? 'Sign-in expired – reload the page.' : m.code === 4404 ? 'This room is closed.' : 'Connection lost.'); break;
+      case 'error': setLobbyStatus(m.msg); break;
+    }
+  }
+  function mpPhase(m) {
+    mp.phase = m.phase; mp.room.phase = m.phase;
+    if (m.track != null) mp.room.track = m.track;
+    if (m.laps) mp.room.laps = m.laps;
+    lobbyTrack();
+    if ((m.phase === 'countdown' || m.phase === 'race') && m.race_id) {
+      if (m.race_id !== mp.raceId) { mp.fin = {}; mp.results = null; mp.recorded = null; }
+      mp.raceId = m.race_id; mp.startAt = m.start_at; mp.grid = m.grid || [];
+      var mine = mp.grid.some(function (g) { return String(g.id) === mp.me; });
+      if (!mine) setLobbyStatus('Race running – you will be on the grid next time.');
+      else if (!(race && race.mp && race.raceId === mp.raceId) && !mpBeginRace.pending) mpBeginRace();
+    }
+    renderRoster();
+  }
+  // Countdown: Modelle der Startaufstellung laden (höchstens bis kurz vor dem Start), dann Szene aufbauen
+  function mpBeginRace() {
+    teardown();
+    showPanel('loading');
+    var keys = [mp.car], seen = {}, done = 0;
+    mp.grid.forEach(function (g) { var d = rosterById(g.id); if (d && d.car) keys.push(d.car); });
+    keys = keys.filter(function (k) { if (seen[k]) return false; seen[k] = 1; return true; });
+    ui.loadBar.max = keys.length; ui.loadBar.value = 0;
+    ui.loadText.textContent = 'Loading ' + keys.length + ' car' + (keys.length === 1 ? '' : 's') + '…';
+    var token = {}; begin.token = token; mpBeginRace.pending = true;
+    var all = Promise.all(keys.map(function (k) { return mpLoad(k).then(function () { done++; ui.loadBar.value = done; }); }));
+    var wait = Math.max(0.3, mp.startAt - mp.net.serverNow() - 1.2);
+    Promise.race([all, new Promise(function (res) { setTimeout(res, wait * 1000); })]).then(function () {
+      mpBeginRace.pending = false;
+      if (begin.token !== token || !mp) return;
+      setupRaceMP();
+    });
+  }
+  function setupRaceMP() {
+    var idx = mp.room.track | 0, seed = Sim.TRACKS[idx] || 1, T = Sim.track(seed);
+    trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso });
+    scene.add(trackRes.group);
+    var RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [], myGrid = 0, remotes = [];
+    mp.grid.forEach(function (g) {
+      if (String(g.id) === mp.me) { myGrid = g.grid | 0; return; }
+      var d = rosterById(g.id) || { car: null, paint: 0, name: '?' };
+      var c = makeCar(d.car, d.car ? TC.paintAt(d.car, d.paint | 0) : null, { loaded: !!mp.loaded[d.car], duck: mp.duck,
+        outfit: outfits.length ? outfits[Math.floor(Math.random() * outfits.length)] : null });
+      var p = gridPose(g.grid | 0), a = T.at(p.s);
+      c.id = String(g.id); c.label = d.name || '?'; c.prog = p.s; c.smp = null;
+      placeCar(c, a.x + a.nx * p.d, a.z + a.nz * p.d, a.yaw, 0, 0, 0, 0);
+      remotes.push(c);
+    });
+    var me = makeCar(mp.car, TC.paintAt(mp.car, mp.paint), { loaded: !!mp.loaded[mp.car], duck: mp.duck, outfit: null });
+    var pc = Phys.create(T, Phys.params(me.st, me.raw), gridPose(myGrid));
+    race = {
+      s: { car: mp.car, paint: mp.paint, track: idx, laps: mp.room.laps }, T: T, seed: seed, sim: null, ai: [], remotes: remotes,
+      mp: true, raceId: mp.raceId, me: me, pc: pc, laps: mp.room.laps | 0 || 3, phase: 'countdown', paused: false,
+      t: 0, cd: mp.startAt - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mp.car + '.' + seed, null),
+      prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
+      lapsShown: -1, posShown: '', opp: [], newBest: false
+    };
+    placeCar(me, pc.x, pc.z, pc.yaw, 0, 0, 0, 0);
+    ui.hud.hidden = false; showPanel(null);
+    setCam('chase', true);
+    ui.countdown.hidden = false; ui.countdown.textContent = '';
+    say('Race starts soon');
+    canvas.setAttribute('tabindex', '-1');
+    try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ }
+  }
+  function mpSend() {
+    if (!mp || !mp.net || !race || !race.mp || race.raceId !== mp.raceId) return;
+    var pc = race.pc;
+    mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steer,
+      speed: Math.hypot(pc.vx, pc.vz), prog: pc.prog, t: race.phase === 'countdown' ? 0 : race.t, spin: pc.spin });
+  }
+  function drawRemotes() {
+    if (!race.remotes || !mp || !mp.net) return;
+    var at = mp.net.serverNow() - Net.DELAY;
+    race.remotes.forEach(function (c) {
+      var q = mp.net.sample(c.id, at);
+      c.smp = q;
+      if (!q) return;
+      c.prog = q.prog;
+      placeCar(c, q.x, q.z, q.yaw, q.roll, q.pitch, q.steer, q.spin);
+    });
+  }
+  // Kontakt mit Fremdautos: nur das eigene Auto wird geschoben/gebremst (der andere Client macht dasselbe), nach Masse
+  function mpContacts() {
+    var pc = race.pc, me = race.me;
+    var fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), rM = me.w / 2, oM = Math.max(0, me.len / 2 - rM);
+    var mine = [[pc.x + fx * oM, pc.z + fz * oM], [pc.x - fx * oM, pc.z - fz * oM]];
+    race.remotes.forEach(function (c) {
+      var q = c.smp;
+      if (!q || Math.abs(q.x - pc.x) > 12 || Math.abs(q.z - pc.z) > 12) return;
+      var gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw), rA = c.w / 2, oA = Math.max(0, c.len / 2 - rA);
+      var theirs = [[q.x + gx * oA, q.z + gz * oA], [q.x - gx * oA, q.z - gz * oA]], best = null;
+      mine.forEach(function (m) { theirs.forEach(function (t) {
+        var dx = m[0] - t[0], dz = m[1] - t[1], d = Math.hypot(dx, dz), pen = rM + rA - d;
+        if (pen > 0 && (!best || pen > best.pen)) best = { pen: pen, nx: d > 1e-4 ? dx / d : -fx, nz: d > 1e-4 ? dz / d : -fz };
+      }); });
+      if (!best) return;
+      var mP = pc.P.mass, mA = c.st.mass, shareP = mA / (mP + mA);
+      pc.x += best.nx * best.pen * shareP; pc.z += best.nz * best.pen * shareP;
+      var vn = (pc.vx - gx * q.speed) * best.nx + (pc.vz - gz * q.speed) * best.nz;
+      if (vn < 0) {
+        var J = -(1 + 0.25) * vn / (1 / mP + 1 / mA);
+        pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
+        if (-vn > 1.5) race.shake = Math.min(0.5, race.shake + -vn * 0.03);
+      }
+    });
+  }
+  function mpFinishNote() {
+    if (!mp) return;
+    var parts = [], mine = mp.results ? mp.results.list.filter(function (r) { return String(r.id) === mp.me; })[0] : null;
+    if (mine && mine.status === 'invalid') parts.push('Your race was not counted (' + (mine.reasons.join(', ') || 'implausible') + ').');
+    if (mp.recorded && mp.recorded.race_id === mp.raceId) {
+      if (mp.recorded.counted) {
+        var p = mp.recorded.points ? mp.recorded.points[mp.me] : null;
+        parts.push('Points and coins saved' + (p != null ? ' – you got ' + p + ' point' + (p === 1 ? '' : 's') : '') + '.');
+      } else parts.push('This race does not count for points (it needs at least two valid drivers).');
+    } else if (mp.results) parts.push('Saving the results…');
+    ui.finishNote.textContent = parts.join(' ');
+  }
+  $('hostBtn').addEventListener('click', function () {
+    var s = settings();
+    if (!byKey[s.car]) { ui.status.textContent = 'Pick a car first.'; ui.list.focus(); return; }
+    if (!Net) { ui.status.textContent = 'Network script failed to load – reload the page.'; return; }
+    save('menu', s); pref = s;
+    ui.status.textContent = 'Opening a room…';
+    api('open', '&host=1&track=' + s.track + '&laps=' + s.laps, { limits: driveLimits() }).then(function (r) {
+      if (!r || !r.ok || !r.ticket) { ui.status.textContent = (r && (r.say || r.error)) || 'Could not open a room.'; return; }
+      ui.status.textContent = '';
+      mpStart({ code: r.code, url: r.url, ticket: r.ticket, role: 'host', me: r.me.id, room: r.room, car: s.car, paint: s.paint, light: false, duck: s.duck });
+    }).catch(function () { ui.status.textContent = 'Could not open a room.'; });
+  });
+  $('mpStartBtn').addEventListener('click', function () {
+    setLobbyStatus('Starting…');
+    api('start').then(function (r) { setLobbyStatus(r.ok ? 'Race starts in a few seconds…' : (r.say || r.error || 'Could not start the race.')); })
+      .catch(function () { setLobbyStatus('Could not start the race.'); });
+  });
+  $('mpCloseBtn').addEventListener('click', function () { api('close').catch(function () { /* Raum verfällt ohnehin */ }); mpLeave('Room closed.'); });
+  $('mpLeaveBtn').addEventListener('click', function () { if (mp) mp.net.send({ t: 'leave' }); mpLeave(''); });
+  $('copyBtn').addEventListener('click', function () {
+    var inp = $('lobbyUrl');
+    function done() { setLobbyStatus('Link copied.'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inp.value).then(done, function () { inp.select(); });
+    else { inp.select(); try { doc.execCommand('copy'); done(); } catch (e) { /* markiert */ } }
+  });
+
+  // Zuschauer (/drive/<code>): Anmeldung, Garage + Zufallsauto, Grafikstufe
+  function viewerInit() {
+    if (!CFG.room) {
+      ui.status.textContent = 'This room is closed or does not exist – ask the streamer for a new link.';
+      $('startBtn').disabled = true; return;
+    }
+    if (!CFG.user) { $('signinBtn').href = CFG.login; showPanel('signin'); return; }
+    var who = $('whoami'), out = doc.createElement('a');
+    who.textContent = 'Signed in as ' + CFG.user.name + ' · ';
+    out.href = CFG.logout; out.textContent = 'Sign out'; who.appendChild(out);
+    $('startText').textContent = 'Join race';
+    ui.qual.value = load('quality', 'light') === 'full' ? 'full' : 'light';
+    ui.status.textContent = 'Loading your garage…';
+    fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j.signin) { $('signinBtn').href = CFG.login; showPanel('signin'); return; }
+      if (!j.ok) { ui.status.textContent = j.error || 'This room is not available.'; $('startBtn').disabled = true; return; }
+      viewerCars = { garage: j.garage || [], rnd: j.rnd, ticket: j.ticket, room: j.room, me: j.me };
+      var T = Sim.track(Sim.TRACKS[j.room.track | 0] || 1);
+      ui.status.textContent = T.name + ' · ' + j.room.laps + ' lap' + (j.room.laps === 1 ? '' : 's') + ' · ' + j.room.drivers + '/' + j.room.max + ' drivers' +
+        (viewerCars.garage.length ? '' : ' – no cars in your garage yet, you get a random one (buy cars in the chat with !buy).');
+      fillList();
+    }).catch(function () { ui.status.textContent = 'Could not reach the server.'; });
+  }
+  function viewerJoin(s) {
+    if (!viewerCars || !viewerCars.ticket) return;
+    if (!Net) { ui.status.textContent = 'Network script failed to load – reload the page.'; return; }
+    var light = ui.qual.value !== 'full';
+    save('quality', light ? 'light' : 'full');
+    renderScale = light ? 0.75 : 1; resize();
+    mpStart({ code: CFG.code, ticket: viewerCars.ticket, role: 'viewer', me: viewerCars.me.id, room: viewerCars.room,
+      car: s.car, paint: s.paint, light: light, duck: true });
+  }
+
   // ---- Schleife ----
   var lastT = performance.now();
   function frame(now) {
@@ -631,16 +985,17 @@
     if (pressed.KeyC || (p && p.cam)) setCam(CAM_ORDER[(CAM_ORDER.indexOf(race.camMode) + 1) % CAM_ORDER.length], true);
     if (race.phase === 'countdown') {
       var before = Math.ceil(race.cd);
-      race.cd -= dt;
+      race.cd = race.mp ? mp.startAt - mp.net.serverNow() : race.cd - dt;
       var after = Math.ceil(race.cd);
       if (after !== before || !ui.countdown.textContent) {
         ui.countdown.textContent = after > 0 ? String(after) : 'GO';
         ui.countdown.classList.remove('tick'); void ui.countdown.offsetWidth; ui.countdown.classList.add('tick');
         say(after > 0 ? String(after) : 'Go');
       }
-      if (race.cd <= 0) { race.phase = 'race'; race.t = 0; race.lapStart = 0; setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700); }
+      if (race.cd <= 0) { race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0; setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700); }
       placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
       drawAI();
+      if (race.mp) { drawRemotes(); mpSend(); }
     } else {
       var inp = race.phase === 'done' ? cruise(pc) : playerInput(dt, p);
       if (race.phase === 'race' && pressed.KeyR) { Phys.reset(pc); flash('Back on track', 1); }
@@ -654,11 +1009,17 @@
   function stepWorld(dt, inp) {
     var pc = race.pc;
     race.t += dt;
+    if (race.mp && race.phase !== 'results') {
+      // Rennzeit an der Server-Uhr halten (die Plausibilitätsprüfung vergleicht beide)
+      var srvT = mp.net.serverNow() - mp.startAt;
+      if (Math.abs(srvT - race.t) > 0.15) race.t = srvT;
+    }
     if (race.sim) { while (race.sim.time + Sim.DT <= race.t + 1e-9) { snap(); race.sim.step(); } }
     if (inp) {
       var lapsBefore = pc.laps;
       Phys.step(pc, inp, dt);
       if (race.sim) contacts();
+      if (race.mp) { drawRemotes(); mpContacts(); }
       if (pc.rail > 2) race.shake = Math.min(0.5, race.shake + pc.rail * 0.04);
       if (race.phase === 'race' && pc.laps > lapsBefore) {
         lapDone(race.t - race.lapStart); race.lapStart = race.t;
@@ -671,11 +1032,17 @@
     }
     if (race.phase === 'done') {
       race.doneT += dt;
-      var open = race.sim ? race.sim.cars.some(function (q) { return q.place == null && q.state !== 'dnf'; }) : false;
-      if (!open || race.doneT > 12) showResults();
+      if (race.mp) {
+        // Ergebnis kommt vom Server (alle im Ziel oder Zielfenster abgelaufen); Rückfall, falls es ausbleibt
+        if ((mp && mp.results && mp.results.race_id === mp.raceId) || race.doneT > 60) showResults();
+      } else {
+        var open = race.sim ? race.sim.cars.some(function (q) { return q.place == null && q.state !== 'dnf'; }) : false;
+        if (!open || race.doneT > 12) showResults();
+      }
     }
     placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
     drawAI();
+    if (race.mp) mpSend();
     if (race.phase === 'results') updateCam(dt);
   }
   // Menü: langsamer Kameraflug um den Ursprung (ohne Strecke nur Himmel)
