@@ -11,6 +11,10 @@
  *   - Gas weg (off-load): Abfall-Mitschnitt genauso (fehlt er: Hochlauf dumpfer und leiser), dazu Knallen
  *   - Leerlauf: Schleife, unterhalb ~1,5 × Leerlauf eingeblendet
  *   - Turbo-Pfeifen (synthetisch, nach Ladedruck), Abblasen beim Gaswegnehmen
+ *   - Begrenzer: unter Last am Begrenzer (Stand/ausgekuppelt, Gang gehalten) Kraftstoff-Schnitte 5–20 / s je Motorart –
+ *     Pegel-Einbruch + kurz tiefere Tonhöhe je Schnitt, auf der Audio-Uhr geplant, manche Motorarten knistern dazu
+ *   - gleichbleibende Drehzahl (Höchsttempo, Begrenzer): langes Fenster mit zufälligen Sprüngen und unregelmäßigem
+ *     Korn-Abstand, leichtes Drehzahl-Wackeln und Ansaug-/Auspuffrauschen – keine hörbare Wiederholung
  *   Ohne Sweep (z. B. Elektro): Drehzahl-Schleifen mit Abspielrate und Überblendung (alter Weg, Rückfall).
  *
  *   var E = CarEngineAudio.create(snd[, { base }])   snd = CarRaceSound.create(…) (braucht snd.ctx + snd.master);
@@ -30,14 +34,17 @@
  *   v.oneShot(kind[, gain])                           start | rev | pass | pop | turbo (Aufnahme passend zur Stimme)
  *   v.blip([amount])                                  Gasstoß im Stand (Drehzahl hoch und wieder runter)
  *   v.shift()                                         sofort hochschalten (Engine sound lab)
- *   v.rpm(), v.gear(), v.level(), v.info(), v.stop()  info = { rpm, gear, load, mix, on, off, idle, src }
+ *   v.rpm(), v.gear(), v.level(), v.info(), v.stop()  info = { rpm, gear, load, mix, on, off, idle, src, limiter, limitHz, steady }
+ *                                                    (limiter = true, solange der Begrenzer arbeitet)
  *   E.oneShot(type, kind, { gain, rate, pan, seed })  Einmal-Klang ohne Stimme (z. B. Vorbeifahrt an der TV-Kamera)
  *   E.has(type, kind), E.bank(), E.spec(type)
  *   E.preview(type[, seed])                           Hörprobe für den Car editor: Anlassen, zwei Gasstöße, Hochdrehen, Leerlauf
  *   E.stopAll()
  *   CarEngineAudio.TYPES                              Liste [{ id, label }] (für Auswahlfelder)
  *   CarEngineAudio.Model                              reine Rechnung (Node-Test scripts/check_engine_audio.js):
- *        gearStep(spec, st, speed, throttle, dt) → st { rpm, gear, cut, shifted }, ratios(spec), rpmAt(spec, g, speed),
+ *        gearStep(spec, st, speed, throttle, dt) → st { rpm, gear, cut, shifted, limiter }, ratios(spec), rpmAt(spec, g, speed),
+ *        tune(spec) (Abstimmung je spec.type), limitStep(spec, st, target, thr, dt), limitWave(tune, phase), limitRpm(spec),
+ *        steadyBand(sw, rpm, dur, rateHi), pickHead(state, band, nat, adv, rnd, steady),
  *        ladder(loops, seed, max), weights(ladder, rpm) → [{ i, g }], rate(rpm, loopRpm),
  *        prepSweep(sw), sweepPos(sw, rpm) → { t, r }, sweepRpm(sw, t), period(rpm, cyl), grainHead(head, pos, P, k),
  *        bestMatch(data, sr, nat, cand, len, delta, step, dec) (WSOLA-Feinsuche), band(sw, rpm, minSpan, dur) → { a, b },
@@ -62,6 +69,31 @@
   // Körner: Länge und Abstand (s); Vorlauf der Planung (s) – überbrückt auch verspätete Bilder
   var GR = 0.08, HOP = 0.04, GR_LITE = 0.1, HOP_LITE = 0.05, AHEAD = 0.09;
   var RATE_LO = 0.75, RATE_HI = 1.5;                  // Tonhöhen-Nachzug außerhalb des Sweeps
+  // Abstimmung je Motorart:
+  //   vtop    Drehzahl bei Höchsttempo im obersten Gang (Anteil am Begrenzer) – darunter, damit Vollgas oben nicht im
+  //           Begrenzer hängt
+  //   shift   Hochschalt-Drehzahl bei Vollgas (Anteil am Begrenzer) – vor dem Begrenzer
+  //   hz      Begrenzer: Schnitte je Sekunde (Kraftstoffabschaltung; Renn-Motoren schneller/härter, Diesel weicher Regler)
+  //   depth   Drehzahl-Einbruch je Schnitt (Anteil), duty Anteil des Schnitts an der Periode, dip Pegel im Schnitt
+  //   crackle Wahrscheinlichkeit für Knistern/Knallen, wenn nach dem Schnitt wieder Kraftstoff kommt
+  //   soft    weicher Regler (Diesel): Drehzahl pendelt sinusförmig statt zu stottern
+  //   noise   Ansaug-/Auspuffrauschen unter Last (überdeckt die Körnung bei gleichbleibender Drehzahl)
+  var TUNE_DEF = { vtop: 0.93, shift: 0.95, hz: 14, depth: 0.05, duty: 0.45, dip: 0.45, crackle: 0, soft: false, noise: 0.06 };
+  var TUNE = {
+    i4: { vtop: 0.92, shift: 0.94, hz: 12, depth: 0.05, dip: 0.5 },
+    t4: { vtop: 0.92, shift: 0.92, hz: 13, depth: 0.06, dip: 0.42, crackle: 0.35 },
+    i6: { vtop: 0.93, shift: 0.94, hz: 13, depth: 0.045, dip: 0.48, crackle: 0.2 },
+    f6: { vtop: 0.94, shift: 0.96, hz: 15, depth: 0.05, dip: 0.42 },
+    v6t: { vtop: 0.93, shift: 0.95, hz: 17, depth: 0.06, duty: 0.5, dip: 0.35, crackle: 0.4 },
+    v8m: { vtop: 0.91, shift: 0.92, hz: 10, depth: 0.065, dip: 0.4, crackle: 0.35 },
+    v8f: { vtop: 0.94, shift: 0.96, hz: 16, depth: 0.05, dip: 0.4 },
+    v8t: { vtop: 0.92, shift: 0.93, hz: 12, depth: 0.055, dip: 0.42, crackle: 0.35 },
+    v10: { vtop: 0.94, shift: 0.96, hz: 17, depth: 0.05, duty: 0.5, dip: 0.36, crackle: 0.3, noise: 0.07 },
+    v12: { vtop: 0.94, shift: 0.95, hz: 15, depth: 0.04, dip: 0.45, crackle: 0.25 },
+    f1: { vtop: 0.95, shift: 0.97, hz: 20, depth: 0.04, duty: 0.5, dip: 0.3, noise: 0.07 },
+    dsl: { vtop: 0.9, shift: 0.92, hz: 5, depth: 0.03, duty: 0.5, dip: 0.7, soft: true, noise: 0.05 },
+    ev: { noise: 0 }
+  };
 
   function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
   function hash(s) { s = String(s || ''); var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -69,6 +101,14 @@
 
   // ---------------------------------------------------------------- Rechnung (ohne Web Audio, testbar)
   var Model = {
+    // Abstimmung der Motorart (spec.type, sonst Standardwerte)
+    tune: function (spec) {
+      var k = spec && spec.type, c = spec && spec._tune;
+      if (c && c.k === k) return c;
+      c = Object.assign({ k: k }, TUNE_DEF, TUNE[k] || {});
+      if (spec) spec._tune = c;
+      return c;
+    },
     // Übersetzungen: oberster Gang 1, erster Gang erreicht den Begrenzer bei g1 · vmax; dazwischen geometrisch
     ratios: function (spec) {
       var n = Math.max(1, spec.gears | 0), q = n > 1 ? Math.pow(1 / spec.g1, 1 / (n - 1)) : 1, r = [];
@@ -77,7 +117,7 @@
     },
     rpmAt: function (spec, g, speed) {
       var r = spec._r || (spec._r = Model.ratios(spec));
-      return Math.max(0, speed) * r[clamp(g, 1, r.length) - 1] * spec.red * 0.97;
+      return Math.max(0, speed) * r[clamp(g, 1, r.length) - 1] * spec.red * Model.tune(spec).vtop;
     },
     // ein Schritt Gangmodell: Hochschalten je nach Gas früher/später, Zurückschalten mit Abstand (Hysterese),
     // im Stand bzw. beim Anfahren Kupplung (Drehzahl aus dem Gas), Drehzahl folgt träge. Hochschalten: Drehzahl fällt
@@ -86,7 +126,7 @@
     gearStep: function (spec, st, speed, thr, dt) {
       st = st || {};
       if (st.rpm == null || st.gear == null) { st.rpm = st.rpm == null ? spec.idle : st.rpm; st.gear = 1; }
-      st.cut = st.cut || 0; st.lim = st.lim || 0; st.blip = st.blip || 0;     // auch nach vorgegebener Drehzahl (Lab)
+      st.cut = st.cut || 0; st.blip = st.blip || 0;     // auch nach vorgegebener Drehzahl (Lab)
       st.shifted = 0;
       speed = Math.max(0, speed || 0); thr = clamp(thr || 0, 0, 1);
       if (spec.gears <= 1) {                            // E-Motor: ein Gang, kein Leerlauf
@@ -97,7 +137,7 @@
       var n = spec.gears, g = st.gear || 1;
       if (st.cut > 0) st.cut = Math.max(0, st.cut - dt);
       if (st.blip > 0) st.blip = Math.max(0, st.blip - dt);
-      var up = spec.red * (0.6 + 0.33 * thr), down = spec.red * (0.3 + 0.12 * thr);
+      var tn = Model.tune(spec), up = spec.red * (0.6 + (tn.shift - 0.6) * thr), down = spec.red * (0.3 + 0.12 * thr);
       if (st.force && g < n) { g++; st.shifted = 1; st.cut = 0.14 + 0.1 * thr; st.force = 0; }
       else if (g < n && Model.rpmAt(spec, g, speed) > up && st.cut <= 0) { g++; st.shifted = 1; st.cut = 0.14 + 0.1 * thr; }
       else if (g > 1 && Model.rpmAt(spec, g, speed) < down && Model.rpmAt(spec, g - 1, speed) < up * 0.9) {
@@ -107,23 +147,45 @@
       st.force = 0;
       st.gear = g;
       var wheel = Model.rpmAt(spec, g, speed), target, stand = speed < 0.01;
-      if (stand) target = spec.idle + thr * (0.9 * spec.red - spec.idle);                  // im Stand: Gas = Drehzahl
+      // im Stand/ausgekuppelt: Gas = Drehzahl, Vollgas läuft in den Begrenzer (Teilgas bleibt darunter)
+      if (stand) target = spec.idle + thr * (1.04 * spec.red - spec.idle);
       else if (g === 1 && wheel < 0.45 * spec.red) target = Math.max(wheel, spec.idle + thr * (0.5 * spec.red - spec.idle));   // Kupplung schleift
       else target = Math.max(wheel, spec.idle);
       if (st.blip > 0) target *= 1.08;
       target = Math.min(target, spec.red * 1.02);           // nie (weit) über den Begrenzer, auch im Schub
-      // Begrenzer: kurz abfallen lassen
-      if (target >= spec.red * 0.985 && thr > 0.5) {
-        st.lim = (st.lim || 0) + dt;
-        if (st.lim > 0.09) { st.lim = 0; st.rpm = spec.red * 0.93; }
-        target = Math.min(target, spec.red);
-      }
+      if (Model.limitStep(spec, st, target, thr, dt)) return st;
       // eingekuppelt hängt die Drehzahl fest an den Rädern (kurze Zeitkonstante); im Stand/schleifend träger
       var slip = stand || (g === 1 && wheel < 0.45 * spec.red);
       var tau = target > st.rpm ? (stand ? 0.09 : slip ? 0.14 : 0.05) : (st.cut > 0 ? 0.035 : slip ? 0.12 : 0.06);
       st.rpm += (target - st.rpm) * (1 - Math.exp(-dt / tau));
       return st;
     },
+    // Begrenzer (Kraftstoffabschaltung): will die Drehzahl unter Last (Gas > 50 %) über den Begrenzer und ist sie dort
+    // angekommen, pendelt sie knapp darunter – Schnitt (Drehzahl fällt um depth), Erholung zurück zum Begrenzer,
+    // hz-mal je Sekunde. Setzt st.rpm selbst und gibt true zurück; st.limiter = 1 solange er arbeitet, st.limPh Phase
+    // (0..1, 0 = Beginn eines Schnitts), st.limN Zahl der Schnitte. Ohne Last / nach dem Hochschalten sofort aus.
+    limitStep: function (spec, st, target, thr, dt) {
+      var tn = Model.tune(spec);
+      if (spec.gears <= 1 || !(thr > 0.5) || target < spec.red * 0.995 || (!st.limiter && st.rpm < spec.red * 0.985)) {
+        st.limiter = 0; st.limPh = 0; return false;
+      }
+      if (!st.limiter) { st.limiter = 1; st.limPh = 0; st.limN = 0; }
+      var ph = st.limPh + dt * tn.hz;
+      st.limN = (st.limN || 0) + Math.floor(ph);
+      st.limPh = ph % 1;
+      st.rpm = spec.red * (1 - tn.depth * Model.limitWave(tn, st.limPh));
+      return true;
+    },
+    // Verlauf eines Begrenzer-Schnitts (0 = am Begrenzer, 1 = tiefster Punkt) über die Phase 0..1: schneller Abfall im
+    // Schnitt (duty), dann Erholung; weicher Regler (Diesel) sinusförmig
+    limitWave: function (tn, ph) {
+      ph = ((ph % 1) + 1) % 1;
+      if (tn.soft) return 0.5 - 0.5 * Math.cos(2 * Math.PI * ph);
+      return ph < tn.duty ? Math.sin(Math.PI / 2 * ph / tn.duty) : 1 - smooth((ph - tn.duty) / (1 - tn.duty));
+    },
+    // mittlere Drehzahl im Begrenzer (für die Körner; das Pendeln selbst kommt im Takt der Audio-Uhr dazu)
+    limitRpm: function (spec) { return spec.red * (1 - Model.tune(spec).depth * 0.5); },
+
     // Schleifen-Leiter einer Stimme: Schleifen mit ähnlicher Drehzahl (±10 %) bilden eine Stufe; je Stufe die
     // Aufnahme, die zum Auto passt (seed) – bevorzugt immer dieselbe Quelle, damit die Klangfarbe nicht springt
     ladder: function (loops, seed, max, prefSrc) {
@@ -202,9 +264,9 @@
     // bis das Band ≥ minSpan s lang ist) → { a, b } (a < b)
     // am Rand des Sweeps (Drehzahl darüber/darunter) bzw. bei steilen Stellen wird das Band auf minSpan verlängert
     // (innerhalb 0…dur; die Tonhöhe zieht die Abspielrate nach) – sonst spielte immer dieselbe Stelle („Schleifen“)
-    band: function (sw, rpm, minSpan, dur) {
-      var a = 0, b = 0;
-      for (var tol = 0.04; tol <= 0.121; tol *= 1.5) {
+    band: function (sw, rpm, minSpan, dur, maxTol) {
+      var a = 0, b = 0, mt = maxTol || 0.121;
+      for (var tol = 0.04; tol <= mt; tol *= 1.5) {
         var t1 = Model.sweepPos(sw, rpm * (1 - tol)).t, t2 = Model.sweepPos(sw, rpm * (1 + tol)).t;
         a = Math.min(t1, t2); b = Math.max(t1, t2);
         if (b - a >= minSpan) break;
@@ -217,6 +279,29 @@
         a = Math.max(0, a);
       }
       return { a: a, b: b };
+    },
+    // Fenster bei gleichbleibender Drehzahl: lang (Ziel ≥ 1,2 s; Drehzahl an der Lesestelle bis ±30 % daneben), damit
+    // die Körner nicht immer wieder dieselbe kurze Stelle spielen. Über dem Ende des Sweeps (Höchsttempo, Begrenzer)
+    // bis hinunter, wo der Tonhöhen-Nachzug (rateHi) noch reicht; mindestens 0,35 s wie band
+    steadyBand: function (sw, rpm, dur, rateHi) {
+      Model.prepSweep(sw);
+      var w = Model.band(sw, rpm, 1.2, 0, 0.31);
+      if (w.b - w.a < 1 && rpm > sw.lo) {
+        var t1 = Model.sweepPos(sw, rpm / (rateHi || RATE_HI) * 1.02).t, t2 = Model.sweepPos(sw, rpm * 1.2).t;
+        if (Math.abs(t2 - t1) > w.b - w.a) w = { a: Math.min(t1, t2), b: Math.max(t1, t2) };
+      }
+      if (w.b - w.a < 0.35) w = Model.band(sw, rpm, 0.35, dur);
+      return w;
+    },
+    // Lesestelle des nächsten Korns: läuft die vorige natürlich weiter (nat) und liegt im Fenster, bleibt sie; sonst
+    // Sprung an eine zufällige Stelle (beim Hochdrehen im vorderen Teil des Bands). Bei gleichbleibender Drehzahl
+    // (steady) springt sie nach 2–7 Körnern ohnehin irgendwohin im ganzen Fenster – keine feste Wiederkehr.
+    // g = Zustand je Ebene ({ run }), adv = Vorschub bis zum nächsten Korn (s), rnd = Zufall 0..1 → { head, jump }
+    pickHead: function (g, bd, nat, adv, rnd, steady) {
+      var fits = nat != null && nat >= bd.a && nat <= bd.b - adv;
+      if (fits && (!steady || g.run > 0)) { if (steady) g.run--; return { head: nat, jump: false }; }
+      g.run = steady ? 2 + Math.floor(rnd() * 6) : 0;
+      return { head: bd.a + rnd() * (steady ? 1 : 0.35) * (bd.b - bd.a), jump: true };
     },
     // Korn-Raster: ein Motorzyklus (720° = 120 / U/min s) – auch bei Oktavfehlern der Beschriftung ein Vielfaches der
     // echten Periode; lange Zyklen (Leerlauf) auf ein Vielfaches der Zündperiode ≥ 35 ms gekürzt
@@ -276,7 +361,15 @@
     opts = opts || {};
     if (!snd || !snd.ctx || !snd.master) return null;
     var ctx = snd.ctx, out = snd.master, base = opts.base || BASE;
-    var bank = null, bufs = {}, voices = [], HANN = Model.hann(64);
+    var bank = null, bufs = {}, voices = [], HANN = Model.hann(64), noiseB = null;
+    // weißes Rauschen (2 s, geteilt): Ansaug-/Auspuffrauschen und Knistern am Begrenzer
+    function noiseBuf() {
+      if (noiseB) return noiseB;
+      noiseB = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+      var d = noiseB.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+      return noiseB;
+    }
     var ready = (root.fetch ? root.fetch(base + 'bank.json').then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }) : Promise.reject(new Error('no fetch')))
       .then(function (b) { bank = b; return true; })
       .catch(function (e) { if (root.console) console.warn('Engine sounds: bank.json not loaded – ' + e.message); return false; });
@@ -339,10 +432,16 @@
       // Sweep-Ebenen: on (Hochlauf), off (Abfall); je Ebene Haupt-Sweep + ggf. ein höher reichender (ext)
       var layers = {}, idle = null, mixNow = { idle: 0, on: 0, off: 0 };
       var vGain = ctx.createGain(), lp = ctx.createBiquadFilter(), mix = ctx.createGain(), pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      // Begrenzer: limG = Pegel-Einbruch je Schnitt, dly = Tonhöhe (Verzögerung wächst im Schnitt → kurz tiefer)
+      var limG = ctx.createGain(), dly = ctx.createDelay(0.05), D0 = 0.005;
       vGain.gain.value = 0; lp.type = 'lowpass'; lp.frequency.value = 6000; lp.Q.value = 0.5; mix.gain.value = 1;
-      mix.connect(lp); lp.connect(vGain);
+      limG.gain.value = 1; dly.delayTime.value = D0;
+      mix.connect(limG); limG.connect(dly); dly.connect(lp); lp.connect(vGain);
       if (pan) { vGain.connect(pan); pan.connect(out); } else vGain.connect(out);
       var turbo = null, lastAtt = 1, boost = 0, lastThr = 0, offT = 0, popNext = 0, blipT = 0, blipA = 0, level = 0, loadS = 0, dop = 1;
+      // gleichbleibende Drehzahl erkennen (träge Drehzahl), Drehzahl-Wackeln (±1–2 %, langsamer Zufall), Rauschen,
+      // Begrenzer-Schnitte auf der Audio-Uhr (limNext = Beginn des nächsten Schnitts)
+      var rpmSlow = 0, steady = false, wob = 0, noise = null, limNext = 0, limOn = false;
 
       // Sweep der Ebene für diese Drehzahl: der erste der Liste (bevorzugte Aufnahme zuerst), dessen Bereich passt;
       // sonst der nächstliegende (Schub-Ebene oberhalb ihres Mitschnitts → Hochlauf-Mitschnitt, dumpfer)
@@ -364,26 +463,27 @@
       // ein Korn eines Sweeps zur Zeit when: Zielstelle aus der Drehzahl; Lesekopf auf ganze Motorzyklen gezogen und
       // dann per Wellenform-Vergleich (WSOLA) fein so gesetzt, dass das Korn an das vorige anschließt – überlappende
       // Körner löschen sich so nicht aus (kein Flattern im Korn-Takt)
-      function grain(L, when, rpm) {
+      function grain(L, when, rpm, gap) {
         var sw = pickSweep(L, rpm);
         if (!sw) return;
         if (L.cur !== sw) { if (L.cur) L.cur.head = null; L.cur = sw; }
         var sp0 = Model.sweepPos(sw, rpm), pos = sp0.t, P = Model.period(sp0.r, sp.cyl);
-        var nat = sw.head == null ? null : sw.head + hop * (sw.rate || 1);
+        var adv = gap * (sw.rate || 1), nat = sw.head == null ? null : sw.head + adv;
         // Band um die Drehzahl (±4 %, verbreitert bis ≥ 0,35 s Material): solange der Lesekopf darin liegt, läuft er
         // natürlich vorwärts (kein kurzes Wiederholen derselben Stelle = kein „Schleifen“); verlässt er es, springt er
-        // an eine zufällige Stelle im vorderen Teil des Bands
+        // an eine zufällige Stelle im vorderen Teil des Bands. Bei gleichbleibender Drehzahl (Höchsttempo, Begrenzer)
+        // ein langes Fenster mit zufälligen Sprüngen (Model.steadyBand/pickHead) – sonst hörbare Wiederholung
         var span = gr * RATE_HI, lo = span / 2 + 0.002, hi = sw.buf.duration - span / 2 - 0.002;
-        var bd = Model.band(sw, sp0.r, 0.35, sw.buf.duration), head;
+        var bd = steady ? Model.steadyBand(sw, rpm, sw.buf.duration, RATE_HI) : Model.band(sw, sp0.r, 0.35, sw.buf.duration), head;
         bd.a = clamp(bd.a, lo, hi); bd.b = clamp(bd.b, lo, hi);              // nur Stellen, an denen ein Korn Platz hat
-        if (nat != null && nat >= bd.a && nat <= bd.b - hop * (sw.rate || 1)) head = nat;
-        else head = Model.grainHead(nat == null ? bd.a : nat, bd.a + Math.random() * 0.35 * (bd.b - bd.a), P, 0);
+        var pk = Model.pickHead(L, bd, nat, adv, Math.random, steady);
+        head = pk.jump ? Model.grainHead(nat == null ? pk.head : nat, pk.head, P, 0) : pk.head;
         while (head < lo) head += P;
         while (head > hi) head -= P;
         if (head < lo) head = lo;
-        if (nat != null && nat - hop * (sw.rate || 1) >= 0 && nat < sw.buf.duration) {
+        if (nat != null && nat - adv >= 0 && nat < sw.buf.duration) {
           if (!sw.data) sw.data = sw.buf.getChannelData(0);
-          head = Model.bestMatch(sw.data, sw.buf.sampleRate, nat, head, hop * (sw.rate || 1), Math.min(P / 2, 0.006), lite ? 4 : 2, lite ? 6 : 4);
+          head = Model.bestMatch(sw.data, sw.buf.sampleRate, nat, head, adv, Math.min(P / 2, 0.006), lite ? 4 : 2, lite ? 6 : 4);
           head = clamp(head, lo, hi);
         }
         // Tonhöhe: Drehzahl / Drehzahl an der Lesestelle (im Band höchstens ein paar Prozent, außerhalb des Sweeps
@@ -391,7 +491,7 @@
         var want = rpm / Math.max(1, Model.sweepRpm(sw, head));
         sw.rc = sw.rc == null ? want : sw.rc + (want - sw.rc) * 0.35;
         var rate = clamp(sw.rc, RATE_LO, RATE_HI);
-        sw.head = head; sw.rate = rate * dop;                 // Lesekopf rückt um hop × Abspielrate weiter
+        sw.head = head; sw.rate = rate * dop;                 // Lesekopf rückt um Abstand × Abspielrate weiter
         var s = ctx.createBufferSource(), e = ctx.createGain();
         s.buffer = sw.buf; s.playbackRate.value = rate * dop;
         e.gain.value = 0;
@@ -407,9 +507,35 @@
           if (!L) return;
           var w = mixNow[k];
           if (w < 0.003) { L.next = 0; L.list.forEach(function (x) { x.head = null; }); L.cur = null; return; }
-          if (!L.next || L.next < t) L.next = t + 0.004;
-          while (L.next < until) { grain(L, L.next, rpm); L.next += hop; }
+          if (!L.next || L.next < t) { L.next = t + 0.004; L.gap = hop; }
+          // bei gleichbleibender Drehzahl Körner leicht unregelmäßig setzen (±10 %): kein fester Korn-Takt
+          while (L.next < until) { grain(L, L.next, rpm, L.gap || hop); L.gap = steady ? hop * (0.9 + 0.2 * Math.random()) : hop; L.next += L.gap; }
         });
+      }
+
+      // ein Begrenzer-Schnitt zur Zeit w (Periode per): Pegel bricht ein, Tonhöhe sinkt kurz (Verzögerung wächst) und
+      // kommt in der Erholung zurück; wenn wieder Kraftstoff kommt, manchmal Knistern (unverbranntes Gemisch)
+      function limitCut(w, per, tn) {
+        var c = per * tn.duty, h = tn.depth * 0.7, back = w + c + (per - c) * 0.6;
+        limG.gain.setValueAtTime(1, w);
+        limG.gain.linearRampToValueAtTime(tn.dip, w + c * (tn.soft ? 0.9 : 0.3));
+        limG.gain.setValueAtTime(tn.dip, w + c);
+        limG.gain.linearRampToValueAtTime(1, back);
+        dly.delayTime.setValueAtTime(D0, w);
+        dly.delayTime.linearRampToValueAtTime(D0 + h * c, w + c);
+        dly.delayTime.linearRampToValueAtTime(D0, w + per);
+        if (tn.crackle && Math.random() < tn.crackle) crackle(w + c + Math.random() * 0.01, 0.6 + Math.random() * 0.6);
+      }
+      function crackle(w, a) {
+        var s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(), len = 0.008 + Math.random() * 0.018;
+        s.buffer = noiseBuf();
+        f.type = 'bandpass'; f.frequency.value = 900 + Math.random() * 2600; f.Q.value = 1.4;
+        g.gain.setValueAtTime(0.0001, w);
+        g.gain.linearRampToValueAtTime(a * 0.5 * MIX * gainK * lastAtt, w + 0.001);
+        g.gain.exponentialRampToValueAtTime(0.0001, w + len);
+        s.connect(f); f.connect(g); g.connect(pan || out);
+        s.start(w, Math.random() * 1.9, len + 0.01);
+        s.onended = function () { try { g.disconnect(); } catch (e) { /* schon getrennt */ } };
       }
 
       var v = {
@@ -424,10 +550,22 @@
           if (p.rpm != null) {                                    // Drehzahl vorgegeben (Engine sound lab)
             if (st.rpm == null) st.rpm = sp.idle;
             if (st.cut > 0) st.cut = Math.max(0, st.cut - dt);
-            st.rpm += (clamp(+p.rpm || 0, 0, sp.red * 1.02) - st.rpm) * (1 - Math.exp(-dt / 0.06));
+            var wantR = clamp(+p.rpm || 0, 0, sp.red * 1.02);
+            // Regler ganz oben mit Last → Begrenzer
+            if (!Model.limitStep(sp, st, wantR >= sp.red * 0.99 ? sp.red * 1.02 : wantR, p.load != null ? +p.load : thr, dt)) {
+              st.rpm += (Math.min(wantR, sp.red) - st.rpm) * (1 - Math.exp(-dt / 0.06));
+            }
             st.gear = st.gear || 1; st.shifted = 0;
           } else Model.gearStep(sp, st, p.speed || 0, thr, dt);
-          var t = ctx.currentTime, rpm = st.rpm;
+          var t = ctx.currentTime, tn = Model.tune(sp);
+          // Körner: im Begrenzer die mittlere Drehzahl (das Pendeln liefern limG/dly im Takt der Audio-Uhr)
+          var rpm = st.limiter ? Model.limitRpm(sp) : st.rpm;
+          rpmSlow = rpmSlow ? rpmSlow + (rpm - rpmSlow) * (1 - Math.exp(-dt / 0.35)) : rpm;
+          steady = !!st.limiter || (rpm > sp.idle * 1.6 && Math.abs(rpm - rpmSlow) < rpm * 0.02);
+          // leichtes Wackeln der Drehzahl (langsamer Zufall, ±1–2 % oben) – ein echter Motor hält sie nie ganz still
+          wob += (-wob * dt / 0.25) + (Math.random() - 0.5) * 0.1 * Math.sqrt(dt);
+          wob = clamp(wob, -0.02, 0.02);
+          var rpmG = rpm * (1 + wob * smooth((rpm / sp.red - 0.45) / 0.35));
           dop = p.radial ? clamp(340 / (340 - clamp(p.radial, -120, 120)), 0.75, 1.35) : 1;
           // Last: Gas (nach dem Hochschalten kurz weg, beim Zwischengas kurz da), geglättet
           var load = p.load != null ? clamp(+p.load, 0, 1) : st.cut > 0 ? 0 : st.blip > 0 ? Math.max(thr, 0.6) : thr;
@@ -440,7 +578,7 @@
             }
             layers.on.g.gain.setTargetAtTime(mixNow.on, t, 0.02);
             if (layers.off) layers.off.g.gain.setTargetAtTime(mixNow.off, t, 0.02);
-            schedule(rpm);
+            schedule(rpmG);
           } else {
             var ws = Model.weights(lad, Math.max(rpm, sp.gears <= 1 ? 1 : 0));
             var w = {};
@@ -465,6 +603,23 @@
           level = p.on === false ? 0 : MIX * gainK * att * ev * dyn * shiftDip;
           vGain.gain.setTargetAtTime(level, t, p.on === false ? 0.25 : shiftDip < 1 ? 0.02 : 0.05);
           if (pan) pan.pan.setTargetAtTime(clamp(p.pan || 0, -1, 1), t, 0.05);
+          // Begrenzer: Schnitte bis AHEAD voraus planen (Periode ±6 % unregelmäßig); jeder Schnitt endet wieder bei
+          // vollem Pegel und Grund-Verzögerung, beim Aussteigen läuft der letzte nur aus
+          if (st.limiter && p.on !== false) {
+            if (!limOn || limNext < t) limNext = t + 0.005;
+            limOn = true;
+            while (limNext < t + AHEAD) {
+              var per = (1 / tn.hz) * (1 + (Math.random() - 0.5) * 0.12);
+              limitCut(limNext, per, tn); limNext += per;
+            }
+            if (POPS[type] && tn.crackle && t > popNext && Math.random() < dt * 1.5 * tn.crackle) { v.oneShot('pop', 0.12); popNext = t + 0.25 + Math.random() * 0.4; }
+          } else limOn = false;
+          // Ansaug-/Auspuffrauschen: nach Last und Drehzahl (oben unter Vollgas am meisten), Klangfarbe folgt der Drehzahl
+          if (noise) {
+            var fr = clamp(rpm / sp.red, 0, 1.05);
+            noise.g.gain.setTargetAtTime(tn.noise * Math.pow(loadS, 1.5) * fr * fr, t, 0.06);
+            noise.f.frequency.setTargetAtTime((350 + 2400 * fr) * dop, t, 0.08);
+          }
           // Turbo: Ladedruck folgt Last × Drehzahl träge (Aufladen ~0,6 s, Abfall schnell), Pfeifen 2,5–7 kHz
           if (turbo) {
             var want = clamp((rpm / sp.red - 0.25) * 1.5, 0, 1) * loadS;
@@ -501,6 +656,7 @@
         level: function () { return level; },
         info: function () {
           return { rpm: st.rpm || 0, gear: st.gear || 1, load: loadS, boost: boost, mix: mixNow, src: src0,
+            limiter: !!st.limiter, limitHz: st.limiter && sp ? Model.tune(sp).hz : 0, steady: steady,
             on: layers.on ? (layers.on.cur || layers.on.sw).f : null, pieces: layers.on ? layers.on.list.length : 0,
             off: layers.off ? (layers.off.cur || layers.off.sw).f : null, idle: idle ? idle.f : null, loops: layers.on ? 0 : lad.length };
         },
@@ -514,6 +670,7 @@
             srcs.forEach(function (s) { try { s.stop(); } catch (e) { /* nie gestartet */ } });
             if (idle && idle.s) { try { idle.s.stop(); } catch (e) { /* nie gestartet */ } }
             if (turbo) { try { turbo.o.stop(); turbo.n.stop(); } catch (e) { /* schon aus */ } }
+            if (noise) { try { noise.s.stop(); } catch (e) { /* schon aus */ } }
             try { vGain.disconnect(); if (pan) pan.disconnect(); } catch (e) { /* schon getrennt */ }
           }, 700);
           voices = voices.filter(function (x) { return x !== v; });
@@ -537,7 +694,7 @@
         if (!alive) return;
         sp = spec(type);
         if (!sp) return;
-        sp = Object.assign({}, sp);
+        sp = Object.assign({}, sp, { type: type });
         st = {};
         src0 = vo.src != null ? +vo.src : voiceSrc(sp, seed);
         var waits = [];
@@ -585,6 +742,14 @@
           if (!alive) return;
           if (layers.on && !layers.on.sw.buf) {                 // Sweep nicht geladen → ohne Sweep weiter (stumm)
             if (root.console) console.warn('Engine sounds: sweep for ' + type + ' missing');
+          }
+          if (sp.gears > 1 && Model.tune(sp).noise > 0) {
+            var ns = ctx.createBufferSource(), nf = ctx.createBiquadFilter(), ng0 = ctx.createGain();
+            ns.buffer = noiseBuf(); ns.loop = true;
+            nf.type = 'bandpass'; nf.frequency.value = 800; nf.Q.value = 0.6; ng0.gain.value = 0;
+            ns.connect(nf); nf.connect(ng0); ng0.connect(mix);
+            ns.start(ctx.currentTime, (hash(seed) % 1000) / 500);
+            noise = { s: ns, f: nf, g: ng0 };
           }
           if (sp.boost) {
             var o = ctx.createOscillator(), n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), tg = ctx.createGain();

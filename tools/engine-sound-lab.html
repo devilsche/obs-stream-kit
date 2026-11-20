@@ -113,9 +113,10 @@
         <button type="button" id="liftBtn" disabled>Lift off</button>
         <button type="button" id="shiftBtn" disabled>Shift up</button>
         <button type="button" id="holdBtn" aria-pressed="false" disabled>Hold throttle</button>
+        <button type="button" id="limitBtn" aria-pressed="false" disabled>Hit limiter</button>
         <button type="button" id="idleBtn" disabled>Back to idle</button>
       </div>
-      <p class="hint">Keyboard: buttons with Enter/Space. Rev = throttle blip at standstill. Accelerate = full throttle from standstill to top speed through the gears (switches to Gearbox). Lift off = throttle closed at the current speed (overrun, crackle). Shift up = gear change now (RPM drop + short load cut).</p>
+      <p class="hint">Keyboard: buttons with Enter/Space. Rev = throttle blip at standstill. Accelerate = full throttle from standstill to top speed through the gears (switches to Gearbox). Lift off = throttle closed at the current speed (overrun, crackle). Shift up = gear change now (RPM drop + short load cut). Hold throttle = full throttle through the gears up to top speed (top gear stays below the rev limiter). Hit limiter = full throttle in neutral, the engine bounces off the rev limiter until you press it again or another button. In Manual, RPM slider at the top with throttle above 50 % also hits the limiter.</p>
     </section>
 
     <section class="panel" aria-labelledby="info-h">
@@ -132,6 +133,7 @@
       </div>
       <dl class="readout">
         <dt>RPM / gear</dt><dd id="oRpm">–</dd>
+        <dt>Rev limiter</dt><dd id="oLim">–</dd>
         <dt>Speed</dt><dd id="oSpeed">–</dd>
         <dt>Layers</dt><dd id="oMix">–</dd>
         <dt>Acceleration</dt><dd id="oOn">–</dd>
@@ -152,6 +154,12 @@
       var snd = null, eng = null, bank = null, v = null, raf = 0, lastT = 0;
       // Fahrzustand im Gearbox-Modus: Tempo 0..1, Gas, Abläufe (acc = Beschleunigen, lift = Gas weg)
       var sim = { speed: 0, thr: 0, seq: null, hold: false };
+      // Begrenzer-Ablauf (Vollgas ausgekuppelt) an/aus
+      function setLimit(on) {
+        sim.seq = on ? 'limit' : (sim.seq === 'limit' ? null : sim.seq);
+        $('limitBtn').setAttribute('aria-pressed', on ? 'true' : 'false');
+        if (on) { sim.hold = false; $('holdBtn').setAttribute('aria-pressed', 'false'); sim.speed = 0; setMode('drive'); }
+      }
       function say(t, cls) { $('status').textContent = t; $('status').className = cls || ''; }
       function mode() { var r = document.querySelector('input[name=mode]:checked'); return r ? r.value : 'manual'; }
       function setMode(m) { var r = document.querySelector('input[name=mode][value=' + m + ']'); if (r) r.checked = true; }
@@ -202,11 +210,11 @@
       $('oldMode').addEventListener('change', function () { if (v) restart(); });
       $('lite').addEventListener('change', function () { if (v) restart(); });
       $('vol').addEventListener('input', function () { $('volVal').textContent = $('vol').value + ' %'; if (snd) snd.setVolume(+$('vol').value / 100); });
-      $('rpm').addEventListener('input', function () { setMode('manual'); sim.seq = null; syncRange(); });
-      $('thr').addEventListener('input', function () { $('thrVal').textContent = $('thr').value + ' %'; sim.seq = null; });
+      $('rpm').addEventListener('input', function () { setMode('manual'); setLimit(false); sim.seq = null; syncRange(); });
+      $('thr').addEventListener('input', function () { $('thrVal').textContent = $('thr').value + ' %'; setLimit(false); sim.seq = null; });
 
       function buttons(on) {
-        ['stopBtn', 'revBtn', 'accBtn', 'liftBtn', 'shiftBtn', 'holdBtn', 'idleBtn'].forEach(function (id) { $(id).disabled = !on; });
+        ['stopBtn', 'revBtn', 'accBtn', 'liftBtn', 'shiftBtn', 'holdBtn', 'limitBtn', 'idleBtn'].forEach(function (id) { $(id).disabled = !on; });
         $('startBtn').textContent = on ? 'Restart engine' : 'Start engine';
       }
       function start() {
@@ -217,7 +225,7 @@
           var type = $('type').value, car = $('car').value.trim();
           v = eng.voice(type, { gain: 1, seed: car || type, lite: $('lite').checked, src: $('rec').value || null, mode: $('oldMode').checked ? 'loops' : null });
           v.oneShot('start', 0.6);
-          sim.speed = 0; sim.seq = null;
+          setLimit(false); sim.speed = 0; sim.seq = null;
           buttons(true);
           say('Running: ' + $('type').options[$('type').selectedIndex].textContent + ($('oldMode').checked ? ' – old loop sound' : '') + '.', 'ok');
           if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(tick); }
@@ -232,10 +240,11 @@
       }
       $('startBtn').addEventListener('click', start);
       $('stopBtn').addEventListener('click', stop);
-      $('revBtn').addEventListener('click', function () { if (!v) return; setMode('drive'); sim.seq = null; sim.speed = 0; v.blip(1); });
-      $('accBtn').addEventListener('click', function () { if (!v) return; setMode('drive'); sim.speed = 0; sim.seq = 'acc'; });
+      $('revBtn').addEventListener('click', function () { if (!v) return; setLimit(false); setMode('drive'); sim.seq = null; sim.speed = 0; v.blip(1); });
+      $('accBtn').addEventListener('click', function () { if (!v) return; setLimit(false); setMode('drive'); sim.speed = 0; sim.seq = 'acc'; });
       $('liftBtn').addEventListener('click', function () {
         if (!v) return;
+        setLimit(false);
         if (mode() === 'manual') { $('thr').value = '0'; $('thrVal').textContent = '0 %'; return; }
         sim.seq = 'lift'; if (sim.speed < 0.3) sim.speed = 0.6;
       });
@@ -250,11 +259,13 @@
         v.shift();
       });
       $('holdBtn').addEventListener('click', function () {
+        if (sim.seq === 'limit') setLimit(false);
         sim.hold = !sim.hold; $('holdBtn').setAttribute('aria-pressed', sim.hold ? 'true' : 'false');
         if (sim.hold) { setMode('drive'); sim.seq = null; }
       });
+      $('limitBtn').addEventListener('click', function () { if (!v) return; setLimit(sim.seq !== 'limit'); });
       $('idleBtn').addEventListener('click', function () {
-        sim.seq = null; sim.speed = 0; sim.hold = false; $('holdBtn').setAttribute('aria-pressed', 'false');
+        setLimit(false); sim.seq = null; sim.speed = 0; sim.hold = false; $('holdBtn').setAttribute('aria-pressed', 'false');
         var sp = spec(); if (sp) $('rpm').value = String(sp.gears <= 1 ? 0 : sp.idle);
         $('thr').value = '0'; $('thrVal').textContent = '0 %'; setMode('manual'); syncRange();
       });
@@ -270,15 +281,17 @@
           var thr = sim.hold ? 1 : +$('thr').value / 100;
           if (sim.seq === 'acc') { thr = 1; if (sim.speed >= 0.97) { sim.seq = 'lift'; } }
           if (sim.seq === 'lift') thr = 0;
+          if (sim.seq === 'limit') { thr = 1; sim.speed = 0; }          // ausgekuppelt: Vollgas ohne Vortrieb
           // einfaches Fahrzeug: Vortrieb nimmt mit dem Tempo ab, Rollwiderstand, ohne Gas Schubverzögerung
           var a = thr * 0.16 * (1 - sim.speed * 0.85) - 0.012 - (thr < 0.05 ? 0.05 * sim.speed : 0);
-          sim.speed = Math.max(0, Math.min(1, sim.speed + a * dt));
+          if (sim.seq !== 'limit') sim.speed = Math.max(0, Math.min(1, sim.speed + a * dt));
           if (sim.seq === 'lift' && sim.speed <= 0) sim.seq = null;
           v.update(dt, { speed: sim.speed, throttle: thr });
         }
         var i = v.info();
         $('rpmMeter').value = i.rpm; $('loadMeter').value = i.load;
-        $('oRpm').textContent = Math.round(i.rpm) + ' rpm · gear ' + i.gear;
+        $('oRpm').textContent = Math.round(i.rpm) + ' rpm · gear ' + (mode() === 'drive' && sim.seq === 'limit' ? 'N' : i.gear);
+        $('oLim').textContent = i.limiter ? 'ON – bouncing ' + i.limitHz + ' times per second' : 'off' + (i.steady ? ' (steady RPM)' : '');
         $('oSpeed').textContent = mode() === 'manual' ? '– (manual)' : Math.round(sim.speed * 100) + ' % of top speed';
         $('oMix').textContent = i.loops ? i.loops + ' RPM loops (old sound)' : 'idle ' + i.mix.idle.toFixed(2) + ' · accel ' + i.mix.on.toFixed(2) + ' · overrun ' + i.mix.off.toFixed(2) + (i.boost > 0.05 ? ' · boost ' + i.boost.toFixed(2) : '');
         $('oOn').textContent = (i.on || '–') + (i.pieces > 1 ? ' (one of ' + i.pieces + ' pieces, chosen by RPM)' : '');

@@ -90,6 +90,18 @@ Herstellerangaben, gerundet.
 - **Schalten**: Drehzahlsprung nach Übersetzung + 0,1–0,2 s Last weg; zurückschalten ohne Gas mit Zwischengas.
 - **Turbo** (t4, v8t, dsl): Pfeifen folgt dem Ladedruck (Last × Drehzahl, träge), Abblasen beim Gaswegnehmen.
 - Die alten Drehzahl-Schleifen bleiben als Rückfall (Motorarten ohne Sweep, z. B. ev).
+- **Begrenzer** (Kraftstoffabschaltung): unter Last am Begrenzer pendelt die Drehzahl knapp darunter, 10–20 Schnitte
+  je Sekunde je Motorart (Renn-Motoren schneller/härter, v8m 10 Hz, f1 20 Hz), Diesel als weicher Regler (5 Hz,
+  sinusförmig). Weil das Gangmodell nur je Bild rechnet, kommt das Pendeln auf der Audio-Uhr dazu: je Schnitt
+  Pegel-Einbruch (`dip`) und kurz tiefere Tonhöhe (wachsende Verzögerung), Knistern bei t4/i6/v6t/v8m/v8t/v10/v12.
+  Nur dort, wo er hingehört: Stand/ausgekuppelt, Gang gehalten, Übertempo. Beim Beschleunigen schaltet das
+  Gangmodell vorher hoch (92–97 % je Art), Höchsttempo liegt im obersten Gang bei 90–95 % des Begrenzers.
+- **Gleichbleibende Drehzahl** (Höchsttempo, Begrenzer): das kurze Band (±4 %, ≥ 0,35 s) lief immer wieder durch
+  dieselbe Stelle – hörbar als Wiederholung („schleift“). Jetzt ein langes Fenster (bis ±30 %, Ziel ≥ 1,2 s), Sprung
+  an eine zufällige Stelle nach 2–7 Körnern, Korn-Abstand ±10 %, Drehzahl-Wackeln ±1–2 % und Ansaug-/Auspuffrauschen
+  nach Last × Drehzahl. Grenze: Die obersten Hochlauf-Stücke von f6, v6t, v8t, v12, f1 und dsl haben oben nur
+  0,3–0,4 s Material im Bereich des Tonhöhen-Nachzugs – dort hilft auf Dauer nur eine Aufnahme mit stehender hoher
+  Drehzahl (Begrenzer/Höchsttempo).
 - Neue Motorart **v8t** (Biturbo-V8) für RS6/AMG/M5 – vorher als Ferrari-Flachebenen-V8 (v8f) einsortiert.
 
 ## Auswahl der Aufnahmen (Messung, Stand 2026-11)

@@ -1,5 +1,6 @@
 // Prüfskript für die Rechnung von js/car-engine-audio.js (ohne Web Audio): Gangmodell (inkl. Schalten), Schleifen-Leiter,
-// Überblendung, Abspielrate, Sweep-Abbildung Drehzahl ↔ Stelle, Korn-Raster/Lesekopf, Hann, Ebenen-Mix; dazu bank.json (Dateien vorhanden, Schleifenpunkte gültig) und die Motorart je Auto.
+// Überblendung, Abspielrate, Sweep-Abbildung Drehzahl ↔ Stelle, Korn-Raster/Lesekopf, Hann, Ebenen-Mix, Begrenzer (Frequenz/Tiefe je
+// Motorart), Höchsttempo-Drehzahl im obersten Gang, Lesestellen bei gleichbleibender Drehzahl (keine kurze Wiederkehr); dazu bank.json (Dateien vorhanden, Schleifenpunkte gültig) und die Motorart je Auto.
 // Aufruf: node scripts/check_engine_audio.js
 'use strict';
 var path = require('path'), fs = require('fs');
@@ -15,7 +16,7 @@ ok(r.length === 6, 'sechs Gänge');
 near(r[5], 1, 1e-9, 'oberster Gang 1');
 near(r[0], 1 / 0.28, 1e-9, 'erster Gang 1/g1');
 for (var i = 1; i < r.length; i++) ok(r[i] < r[i - 1], 'Übersetzungen fallen');
-near(M.rpmAt(SPEC, 6, 1), 7000 * 0.97, 1e-6, 'Höchsttempo im letzten Gang knapp unter dem Begrenzer');
+near(M.rpmAt(SPEC, 6, 1), 7000 * M.tune(SPEC).vtop, 1e-6, 'Höchsttempo im letzten Gang unter dem Begrenzer');
 
 // Gangmodell: im Stand Leerlauf, Gas im Stand dreht hoch, Beschleunigen schaltet hoch, Drehzahl bleibt im Band
 var st = {}, t, dt = 1 / 60;
@@ -173,6 +174,160 @@ ok(st.gear >= 5 && maxR2 <= SPEC.red * 1.021, 'Lab-Zustand: schaltet hoch (Gang 
 st = {}; for (t = 0; t < 1; t += dt) M.gearStep(SPEC, st, 0.15, 1, dt);
 var g0 = st.gear; st.force = 1; M.gearStep(SPEC, st, 0.15, 1, dt);
 ok(st.gear === g0 + 1 && st.shifted === 1, 'erzwungenes Hochschalten');
+
+// ---- Begrenzer, Höchsttempo, gleichbleibende Drehzahl – je Motorart (Abstimmung aus TUNE, Daten aus bank.json)
+var bankJ = (function () { try { return require('../assets/sounds/engines/bank.json'); } catch (e) { return null; } })();
+function typeSpec(id) {
+  var b = bankJ && bankJ.types[id];
+  return Object.assign({ idle: 800, red: 7000, gears: 6, g1: 0.28, cyl: 6 }, b ? { idle: b.idle, red: b.red, gears: b.gears, g1: b.g1, cyl: b.cyl } : {}, { type: id });
+}
+// Begrenzer im Stand (ausgekuppelt, Vollgas halten): Frequenz und Tiefe messen (fein abgetastet)
+function limiterRun(spec, secs, h) {
+  var s = {}, mins = 0, lo = 1e9, hi = 0, on = 0, prevD = 0, prevR = null;
+  for (var tt = 0; tt < secs; tt += h) {
+    M.gearStep(spec, s, 0, 1, h);
+    if (tt < 1) continue;
+    if (s.limiter) on++;
+    lo = Math.min(lo, s.rpm); hi = Math.max(hi, s.rpm);
+    if (prevR != null) { var dR = s.rpm - prevR; if (prevD < 0 && dR >= 0) mins++; if (dR !== 0) prevD = dR; }
+    prevR = s.rpm;
+  }
+  return { hz: mins / (secs - 1), lo: lo, hi: hi, on: on * h / (secs - 1) };
+}
+E.TYPES.forEach(function (tp) {
+  var spc = typeSpec(tp.id), tn = M.tune(spc);
+  if (spc.gears <= 1) {
+    var se2 = {}; for (t = 0; t < 2; t += dt) M.gearStep(spc, se2, 1, 1, dt);
+    ok(!se2.limiter, tp.id + ': E-Motor ohne Begrenzer');
+    return;
+  }
+  // Begrenzer: 10–20 Hz (Diesel: weicher Regler 3–8 Hz), Einbruch 2–8 %, nie über dem Begrenzer
+  var lr = limiterRun(spc, 4, 1 / 2000);
+  ok(lr.on > 0.99, tp.id + ': Vollgas im Stand → Begrenzer arbeitet durchgehend (' + lr.on.toFixed(2) + ')');
+  near(lr.hz, tn.hz, tn.hz * 0.06, tp.id + ': Begrenzer-Frequenz');
+  ok(tn.soft ? lr.hz >= 3 && lr.hz <= 8 : lr.hz >= 10 && lr.hz <= 20.5, tp.id + ': Begrenzer-Frequenz im Rahmen (' + lr.hz.toFixed(1) + ' Hz)');
+  var depth = 1 - lr.lo / spc.red;
+  ok(depth >= 0.02 && depth <= 0.08 && lr.hi <= spc.red * 1.0001, tp.id + ': Begrenzer-Einbruch ' + (depth * 100).toFixed(1) + ' %, höchstens Begrenzer');
+  ok(tn.soft || tn.dip <= 0.55, tp.id + ': Begrenzer-Schnitt deutlich hörbar (Pegel ' + tn.dip + ')');
+  // bei 60 Bildern/s genauso (Zustand), Gas weg → sofort aus
+  var s60 = {}; for (t = 0; t < 2; t += dt) M.gearStep(spc, s60, 0, 1, dt);
+  ok(s60.limiter === 1 && s60.limN >= Math.floor(tn.hz * 1.2), tp.id + ': Begrenzer auch bei 60 Bildern/s (' + s60.limN + ' Schnitte)');
+  M.gearStep(spc, s60, 0, 0.2, dt);
+  ok(!s60.limiter, tp.id + ': Gas weg → Begrenzer aus');
+  // Teilgas im Stand bleibt unter dem Begrenzer
+  var sp2 = {}; for (t = 0; t < 2; t += dt) M.gearStep(spc, sp2, 0, 0.8, dt);
+  ok(!sp2.limiter && sp2.rpm < spc.red * 0.9, tp.id + ': Teilgas im Stand ohne Begrenzer (' + Math.round(sp2.rpm) + ')');
+  // Höchsttempo im obersten Gang: 90–95 % des Begrenzers
+  var vr = M.rpmAt(spc, spc.gears, 1) / spc.red;
+  ok(vr >= 0.9 && vr <= 0.95, tp.id + ': Höchsttempo im obersten Gang bei ' + (vr * 100).toFixed(1) + ' % des Begrenzers');
+  ok(tn.shift >= 0.92 && tn.shift <= 0.97, tp.id + ': Schaltpunkt ' + tn.shift);
+  // Vollgas durch alle Gänge bis Höchsttempo: hochschalten vor dem Begrenzer, nie Begrenzer, oben 90–95 %
+  var sa = {}, limSeen = 0, upAt = [], prev = 0;   // Tempo ab 0,5 s über 1 % (vorher Stand = ausgekuppelt)
+  for (t = 0; t < 40; t += dt) {
+    prev = sa.rpm || 0;
+    M.gearStep(spc, sa, Math.min(1, t / 30), 1, dt);
+    if (sa.limiter && t > 0.5) limSeen++;            // im Stand (Anfahren) darf er kurz kommen
+    if (sa.shifted > 0) upAt.push(prev / spc.red);
+  }
+  ok(sa.gear === spc.gears && upAt.length === spc.gears - 1, tp.id + ': Vollgas schaltet bis in den obersten Gang (' + upAt.length + ')');
+  ok(!limSeen, tp.id + ': Vollgas mit Hochschalten nie im Begrenzer (' + limSeen + ' Bilder)');
+  ok(upAt.every(function (x) { return x <= tn.shift + 0.01 && x < 0.985; }), tp.id + ': Hochschalten vor dem Begrenzer (max ' + Math.max.apply(null, upAt).toFixed(3) + ')');
+  var endR = sa.rpm / spc.red;
+  ok(endR >= 0.89 && endR <= 0.95 && !sa.limiter, tp.id + ': Höchsttempo-Drehzahl ' + (endR * 100).toFixed(1) + ' % ohne Begrenzer');
+  // Gang gehalten bei Übertempo (bergab / Windschatten): Begrenzer
+  var so = {}; for (t = 0; t < 3; t += dt) M.gearStep(spc, so, Math.min(1.15, 0.9 + t), 1, dt);
+  ok(so.gear === spc.gears && so.limiter === 1, tp.id + ': über Höchsttempo im obersten Gang → Begrenzer');
+});
+// Schnitt-Verlauf: 0 am Begrenzer, 1 tiefster Punkt, stetig
+[M.tune({ type: 'v10' }), M.tune({ type: 'dsl' })].forEach(function (tn) {
+  near(M.limitWave(tn, 0), 0, 1e-9, 'Schnitt beginnt am Begrenzer');
+  var mx = 0, jump = 0, pv = M.limitWave(tn, 0);
+  for (var ph = 0.001; ph < 1; ph += 0.001) { var wv = M.limitWave(tn, ph); mx = Math.max(mx, wv); jump = Math.max(jump, Math.abs(wv - pv)); pv = wv; }
+  ok(mx > 0.99 && jump < 0.02, 'Schnitt-Verlauf stetig bis 1 (' + mx.toFixed(3) + ', Sprung ' + jump.toFixed(3) + ')');
+  ok(M.limitRpm({ type: tn.k, red: 8000 }) < 8000 && M.limitRpm({ type: tn.k, red: 8000 }) > 8000 * 0.95, 'mittlere Begrenzer-Drehzahl knapp darunter');
+});
+// Lab-Zustand mit vorgegebener Drehzahl (alte Zustände ohne limiter): limitStep greift erst oben
+var sl = { rpm: 3000, gear: 1 };
+ok(!M.limitStep(typeSpec('i4'), sl, 3000, 1, dt) && !sl.limiter, 'limitStep unten aus');
+
+// Gleichbleibende Drehzahl: Lesestellen der Körner ohne kurze Wiederkehr. Je Motorart der Sweep, den die Stimme oben
+// nimmt, bei Höchsttempo-Drehzahl und Begrenzer-Mitte; 30 s Körner im 40-ms-Raster (mit ±10 % Abstand) simulieren.
+function seeded(n) { return function () { n = (n * 1664525 + 1013904223) >>> 0; return n / 4294967296; }; }
+function headSeq(sw, rpm, secs, rnd, steadyMode) {
+  var g = {}, head = null, out = [], win = null, dur = sw.dur || sw.pts[sw.pts.length - 1][0] + 0.15, span = 0.08 * 1.5;
+  var lo = span / 2 + 0.002, hi = dur - span / 2 - 0.002;
+  for (var tt = 0, gap = 0.04; tt < secs; tt += gap) {
+    var bd = steadyMode ? M.steadyBand(sw, rpm, dur, 1.5) : M.band(sw, Math.min(Math.max(rpm, sw.lo), sw.hi), 0.35, dur);
+    bd.a = Math.max(lo, Math.min(hi, bd.a)); bd.b = Math.max(lo, Math.min(hi, bd.b));
+    win = bd;
+    var rate = Math.min(1.5, Math.max(0.75, rpm / M.sweepRpm(sw, head == null ? bd.a : head)));
+    var adv = gap * rate, nat = head == null ? null : head + adv;
+    var pk = M.pickHead(g, bd, nat, adv, rnd, steadyMode);
+    head = pk.head; out.push({ t: tt, h: head });
+    gap = steadyMode ? 0.04 * (0.9 + 0.2 * rnd()) : 0.04;
+  }
+  return { seq: out, win: win };     // win = Fenster, wie die Stimme es nutzt (Korn-Platz an den Rändern abgezogen)
+}
+// Anteil der Körner, deren Lesestelle ein früheres Korn vor Δt (0,15 … 1 s) schon fast genau (±10 ms) hatte – ein
+// kurzer Zyklus zeigt sich als Spitze bei seiner Periode
+function repeatPeak(seq) {
+  var best = 0, at = 0;
+  for (var lag = 0.15; lag <= 1.0001; lag += 0.02) {
+    var hit = 0, n = 0;
+    for (var a = 0; a < seq.length; a++) {
+      for (var b = a + 1; b < seq.length && seq[b].t - seq[a].t <= lag + 0.01; b++) {
+        if (seq[b].t - seq[a].t < lag - 0.01) continue;
+        n++; if (Math.abs(seq[b].h - seq[a].h) < 0.01) hit++;
+        break;
+      }
+    }
+    if (n && hit / n > best) { best = hit / n; at = lag; }
+  }
+  return { frac: best, lag: at };
+}
+if (bankJ) {
+  var oldPeak = 0;
+  E.TYPES.forEach(function (tp) {
+    var b = bankJ.types[tp.id], spc = typeSpec(tp.id);
+    if (!b || !(b.on || []).length || spc.gears <= 1) return;
+    var top = b.on.slice().sort(function (x, y) { return y.pts[y.pts.length - 1][1] - x.pts[x.pts.length - 1][1]; })[0];
+    var sw = M.prepSweep(Object.assign({}, top));
+    [M.rpmAt(spc, spc.gears, 1), M.limitRpm(spc)].forEach(function (rpm, k) {
+      var r1 = headSeq(sw, rpm, 30, seeded(7 + k), true), pk = repeatPeak(r1.seq);
+      var wl = r1.win.b - r1.win.a, hs = r1.seq.map(function (x) { return x.h; });
+      var used = Math.max.apply(null, hs) - Math.min.apply(null, hs);
+      // Zufallstreffer-Grenze: 10 ms von wl s Fenster ≈ 2 · 0,01 / wl (plus Spielraum)
+      ok(pk.frac < Math.max(0.12, 0.06 / Math.max(0.1, wl)), tp.id + (k ? ' Begrenzer' : ' Höchsttempo') + ': keine Wiederkehr der Lesestelle unter 1 s (Spitze ' + (pk.frac * 100).toFixed(0) + ' % bei ' + pk.lag.toFixed(2) + ' s, Fenster ' + wl.toFixed(2) + ' s)');
+      ok(used >= Math.min(1, wl) * 0.75, tp.id + (k ? ' Begrenzer' : ' Höchsttempo') + ': ganzes Fenster genutzt (' + used.toFixed(2) + ' / ' + wl.toFixed(2) + ' s)');
+      if (wl < 1) console.log('  Hinweis: ' + tp.id + (k ? ' Begrenzer' : ' Höchsttempo') + ' – Aufnahme ' + top.f + ' hat oben nur ' + wl.toFixed(2) + ' s Material (zufällig gemischt, Rauschen deckt ab)');
+      var rOld = headSeq(sw, rpm, 30, seeded(7 + k), false);
+      oldPeak = Math.max(oldPeak, repeatPeak(rOld.seq).frac);
+    });
+    // das Fenster für gleichbleibende Drehzahl ist nie kürzer als das Band beim Hochdrehen
+    b.on.forEach(function (o) {
+      var sx = M.prepSweep(Object.assign({}, o));
+      [sx.lo * 1.1, (sx.lo + sx.hi) / 2, sx.hi * 0.95, sx.hi * 1.3].forEach(function (rq) {
+        var ws = M.steadyBand(sx, rq, o.dur, 1.5), wb = M.band(sx, rq, 0.35, o.dur);
+        ok(ws.b - ws.a >= wb.b - wb.a - 1e-9 && ws.a >= 0 && ws.b <= o.dur + 1e-9, tp.id + ': steadyBand ≥ band bei ' + Math.round(rq) + ' (' + o.f + ')');
+      });
+    });
+  });
+  console.log('  Gegenprobe altes Verfahren: Wiederkehr-Spitze ' + (oldPeak * 100).toFixed(0) + ' %');
+  ok(oldPeak > 0.2, 'Gegenprobe: altes Verfahren (kurzes Band) zeigt Wiederkehr (' + (oldPeak * 100).toFixed(0) + ' %)');
+}
+// langsamer Sweep (wie eine Aufnahme bei fast gleicher Drehzahl): Fenster ≥ 1 s, Drehzahl darin höchstens ±31 %
+var SLOW = M.prepSweep({ pts: [[0.1, 3000], [2.1, 4000], [4.1, 5000], [6.1, 6000]] });
+var wS = M.steadyBand(SLOW, 4500, 6.2, 1.5);
+ok(wS.b - wS.a >= 1.2 - 1e-9 && M.sweepRpm(SLOW, wS.a) >= 4500 / 1.31 && M.sweepRpm(SLOW, wS.b) <= 4500 * 1.31, 'steadyBand: langes Fenster (' + wS.a.toFixed(2) + '–' + wS.b.toFixed(2) + ' s)');
+var wT = M.steadyBand(SLOW, 8000, 6.2, 1.5);
+ok(M.sweepRpm(SLOW, wT.a) >= 8000 / 1.5 - 1 && wT.b > 5.9, 'steadyBand über dem Sweep: nur so tief, wie der Tonhöhen-Nachzug reicht (' + wT.a.toFixed(2) + '–' + wT.b.toFixed(2) + ' s)');
+// pickHead: gleichbleibend springt regelmäßig, beim Hochdrehen läuft es natürlich weiter
+var gH = {}, bdH = { a: 0.5, b: 2.5 }, jumps = 0, hh = null, rndH = seeded(3);
+for (i = 0; i < 500; i++) { var pH = M.pickHead(gH, bdH, hh == null ? null : hh + 0.04, 0.04, rndH, true); if (pH.jump) jumps++; hh = pH.head; }
+ok(jumps > 500 / 9 && jumps < 500 / 2.5, 'pickHead: gleichbleibend Sprung alle 2–7 Körner (' + jumps + ' von 500)');
+gH = {}; hh = 0.6; var nj = 0;
+for (i = 0; i < 20; i++) { pH = M.pickHead(gH, bdH, hh + 0.04, 0.04, rndH, false); if (pH.jump) nj++; hh = pH.head; }
+ok(nj === 0, 'pickHead: im Band läuft der Lesekopf natürlich weiter');
 
 // Motorart je Auto
 ok(S.guess({ key: '2015-porsche-911-carrera-s' }).engine === 'f6', '911 → f6');
