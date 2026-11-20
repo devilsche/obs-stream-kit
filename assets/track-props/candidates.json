@@ -221,7 +221,11 @@
   "kind": "grandstand",
   "slot": "stand",
   "len": 26,
-  "faceLow": true
+  "faceLow": true,
+  "slots": [
+   "stand",
+   "upper"
+  ]
  },
  {
   "uid": "6e0e88fa79c84ae082ef06908ca77650",
@@ -234,7 +238,11 @@
   "kind": "grandstand",
   "slot": "stand",
   "len": 8,
-  "faceLow": true
+  "faceLow": true,
+  "slots": [
+   "stand",
+   "upper"
+  ]
  },
  {
   "uid": "10a22c724d1a4083bab2d64cdbac6f01",
@@ -247,7 +255,11 @@
   "kind": "grandstand",
   "slot": "stand",
   "len": 8,
-  "faceLow": true
+  "faceLow": true,
+  "slots": [
+   "stand",
+   "upper"
+  ]
  },
  {
   "uid": "4960023d1ea340bfb07625aaa7f9713b",
@@ -260,7 +272,11 @@
   "kind": "grandstand",
   "slot": "stand",
   "len": 6,
-  "faceLow": true
+  "faceLow": true,
+  "slots": [
+   "stand",
+   "upper"
+  ]
  },
  {
   "uid": "437cb60381414213bcfc52dcd96f4167",
@@ -273,7 +289,82 @@
   "kind": "grandstand",
   "slot": "stand",
   "len": 5,
-  "faceLow": true
+  "faceLow": true,
+  "slots": [
+   "stand",
+   "upper"
+  ]
+ },
+ {
+  "uid": "f47b51bcda6e449495795c66eb7089a9",
+  "key": "stand-prosser",
+  "name": "Race Track/ Stadium Viewing Stand and Seating",
+  "author": "William Prosser",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/race-track-stadium-viewing-stand-and-seating-f47b51bcda6e449495795c66eb7089a9",
+  "theme": "stadium",
+  "kind": "grandstand",
+  "slot": "stand",
+  "slots": [
+   "stand",
+   "upper"
+  ],
+  "len": 26,
+  "faceLow": true,
+  "tris": 4000,
+  "aggressive": true
+ },
+ {
+  "uid": "9745757584ef46b7be11235af84225a9",
+  "key": "stand-tribunes",
+  "name": "Stands/Tribunes",
+  "author": "thenerdpoint60",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/standstribunes-9745757584ef46b7be11235af84225a9",
+  "theme": "stadium",
+  "kind": "grandstand",
+  "slot": "stand",
+  "slots": [
+   "stand",
+   "upper"
+  ],
+  "len": 30,
+  "faceLow": true,
+  "tris": 3000
+ },
+ {
+  "uid": "8b1d8eed69c0405882e50e9099090dc0",
+  "key": "stand-nath",
+  "name": "Stadium Stand",
+  "author": "abhisekh_nath",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/stadium-stand-8b1d8eed69c0405882e50e9099090dc0",
+  "theme": "stadium",
+  "kind": "grandstand",
+  "slot": "upper",
+  "len": 40,
+  "faceLow": true,
+  "keepNode": "LOD2",
+  "tris": 3500,
+  "note": "nur die gröbste Stufe (LOD2); Eck-Tribüne (L-förmig, Ränge steigen nach außen) – nur Oberrang",
+  "aggressive": true
+ },
+ {
+  "uid": "086dda7566f64c6c930354687e2ec274",
+  "key": "pits-redbull",
+  "name": "Red Bull F1 Garage",
+  "author": "paman0744",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/red-bull-f1-garage-086dda7566f64c6c930354687e2ec274",
+  "theme": "stadium",
+  "kind": "pits",
+  "slot": "pits",
+  "len": 22.5,
+  "yaw": 180,
+  "dropNode": "#(6|7|8|12|14|159)$",
+  "dropMat": "^FE_|^Plastic$|^Metal$|^Crome$|^Stick$|SUMSUNG|^material$",
+  "tris": 5000,
+  "note": "Boxengassen-Boden, Boxenmauer (70k Dreiecke), Hintergrundwand, Feuerlöscher und Monitore entfernt; Tor nach −z"
  },
  {
   "uid": "2ac40506a2d74e60be6e9df6657a6367",

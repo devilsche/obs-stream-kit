@@ -45,9 +45,9 @@
     height: function () { return function () { return 0; }; }, groundColor: function () { return function () { return 0x4a763a; }; } };
 
   // ---- Kulissen-Modelle (Sketchfab, scripts/build_track_props.py → data/track-props) ----
-  // Katalog { props: [{ uid, kind, slot, theme, size: [x, y, z] (m), sink, bytes, … }], credits } und je Modell eine
-  // Vorlage (Teile je Material zusammengefasst). Beides bleibt für die ganze Seite im Speicher – das nächste Rennen
-  // nimmt dieselben Vorlagen (dispose() einer Strecke gibt nur die Instanzen frei). Fehlt etwas: prozedurale Deko.
+  // Katalog { props: [{ uid, kind, slot, slots (optional: mehrere Platz-Typen), theme, size: [x, y, z] (m), sink, bytes,
+  // … }], credits } und je Modell eine Vorlage (Teile je Material zusammengefasst). Beides bleibt für die ganze Seite im
+  // Speicher – das nächste Rennen nimmt dieselben Vorlagen (dispose() einer Strecke gibt nur die Instanzen frei). Fehlt etwas: prozedurale Deko.
   // Foto-Rasen (ambientCG „Grass 001“, CC0, 1,4 m, assets/textures/track/grass_lawn_diff_1k.jpg): nur als Helligkeits-
   // Struktur – die Farbe kommt weiter aus den Ecken-Farben des Themas. Gras-UV läuft in 12-m-Kacheln → das Foto wird
   // 8 × 8 in eine 1024er-Fläche gelegt (≈ 1,5 m je Foto), auf Grundton gt.base normiert, Streuung nach gt.spread.
@@ -617,8 +617,12 @@
     // opts.propGate() → false: gerade nicht laden/tauschen (Car Race: während des Rennens), später nochmal
     var disposed = false, propStats = { loaded: [], failed: [], tris: 0, draws: 0 };
     function propsFor(kd, cat) {
+      // Katalog-Eintrag gilt für seinen slot (sonst kind) oder – optional – für alle in slots (ein Modell, mehrere Plätze)
       var slot = kd.prop.slot || kd.name;
-      return cat.props.filter(function (e) { return e && e.uid && (e.slot || e.kind) === slot && (!e.theme || e.theme === theme.id); });
+      return cat.props.filter(function (e) {
+        if (!e || !e.uid || (e.theme && e.theme !== theme.id)) return false;
+        return Array.isArray(e.slots) ? e.slots.indexOf(slot) >= 0 : (e.slot || e.kind) === slot;
+      });
     }
     function gateThen(fn) {
       if (disposed) return;

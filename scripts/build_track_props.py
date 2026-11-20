@@ -10,7 +10,8 @@ Pillow und numpy). Ablauf wie scripts/build_car_rain.py:
      (Meter: `height` = Höhe oder `len` = längste Seite), Fuß auf y = 0, Mitte auf x = z = 0
   5. nach data/track-props/<uid>.glb auf den Server, dazu data/track-props/catalog.json (props + credits)
 Die Modell-Dateien kommen nicht ins Repo (Lizenzen). Auswahl und Maße: assets/track-props/candidates.json
-(Einträge mit "skip" werden nicht gebaut; der Grund steht dabei).
+(Einträge mit "skip" werden nicht gebaut; der Grund steht dabei). Optional "slots": [...] – das Modell gilt für
+mehrere Platz-Typen (z. B. Tribüne und Oberrang), ohne doppelte Datei; wird auch bei ungebauten Einträgen nachgezogen.
 
 Aufruf:  python3 scripts/build_track_props.py [--only <uid> …] [--inspect <uid> …]
   --inspect: nur Original vermessen (Dreiecke, Maße, Knoten-/Materialnamen, Texturgrößen), nichts hochladen;
@@ -248,8 +249,6 @@ def fetch_src(uid):
 def build_one(c):
     uid = c["uid"]
     src = fetch_src(uid)
-    g, _ = bcr.glb_read(src)
-    tris0 = tri_count(g)
     baked = os.path.join(WORK, uid + ".baked.glb")
     if bcr.bake_skins(src, baked):
         src = baked
@@ -258,6 +257,10 @@ def build_one(c):
         f_out.write(f_in.read())
     strip_parts(cut, c)
     src = cut
+    # Budget auf das beziehen, was nach dem Entfernen noch gezeichnet wird (nur Netze, die ein Knoten nutzt)
+    g, _ = bcr.glb_read(src)
+    tris0 = tri_count({"meshes": [g["meshes"][nd["mesh"]] for nd in g.get("nodes", []) if "mesh" in nd],
+                       "accessors": g.get("accessors", [])})
     dst = os.path.join(WORK, uid + ".glb")
     budget = c.get("tris", DEF_TRIS)
     cmd = ["npx", "-y", "gltfpack", "-i", src, "-o", dst, "-noq"]
@@ -269,10 +272,13 @@ def build_one(c):
     bcr.shrink_textures(dst, c.get("tex", DEF_TEX))
     size, yaw = normalize(dst, c)
     g, _ = bcr.glb_read(dst)
-    return dst, {"uid": uid, "key": c["key"], "kind": c["kind"], "slot": c.get("slot") or c["kind"], "sink": c.get("sink", 0),
-                 "theme": c["theme"], "name": c["name"],
-                 "author": c["author"], "license": c["license"], "url": c["url"], "size": size, "yaw": yaw,
-                 "tris": tri_count(g), "draws": draw_calls(g), "bytes": os.path.getsize(dst)}
+    e = {"uid": uid, "key": c["key"], "kind": c["kind"], "slot": c.get("slot") or c["kind"], "sink": c.get("sink", 0),
+         "theme": c["theme"], "name": c["name"],
+         "author": c["author"], "license": c["license"], "url": c["url"], "size": size, "yaw": yaw,
+         "tris": tri_count(g), "draws": draw_calls(g), "bytes": os.path.getsize(dst)}
+    if c.get("slots"):
+        e["slots"] = c["slots"]
+    return dst, e
 
 
 def main(only=None):
@@ -290,7 +296,11 @@ def main(only=None):
             print("skip %-40s %s" % (c["name"][:40], c["skip"]))
             continue
         if uid in old and not (only and uid in only):
-            props.append(old[uid])
+            e = dict(old[uid])   # ungebaut übernehmen; Platz-Typen (slots) aus candidates.json nachziehen
+            e.pop("slots", None)
+            if c.get("slots"):
+                e["slots"] = c["slots"]
+            props.append(e)
             continue
         if only and uid not in only:
             continue

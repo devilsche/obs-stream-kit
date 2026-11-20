@@ -286,7 +286,8 @@
       pt.add(box(48.6, 0.3, 0.2), acc, { y: 4.1, z: -0.12 });
       pt.add(box(6, 3, 5), 0xe8eaee, { x: 14, y: 6.5, z: 5 });
       pt.add(box(6.2, 0.9, 0.1), 0x3a4a5e, { x: 14, y: 6.7, z: 2.45 });
-      var pits = ctx.kind('pits', [{ geo: pt.geo() }], { r: 25 });
+      // Kulissen-Modell (slot pits): eine Box, als Boxenreihe nebeneinander, Tor nach vorn (−z, zur Boxengasse)
+      var pits = ctx.kind('pits', [{ geo: pt.geo() }], { r: 25, prop: { slot: 'pits', box: { w: 48, d: 14, h: 6 }, front: 0, tile: true } });
 
       // Plätze: Boxengebäude an der Startgeraden (Seite mit Platz), Tribünen an Geraden, Fahnen am Start
       var used = {};
@@ -295,7 +296,8 @@
       var pitSide = 0;
       [1, -1].some(function (sd) {
         var o = along(-30, sd, HALF + 12 + 4);
-        if (!ctx.clearRect(o.x, o.z, o.rot, 24.5, -0.5, 10.5) || !ctx.place(o.x, o.z, 12, true)) return false;
+        // Tiefe 14 m: Platz für das Kulissen-Modell (Boxen sind tiefer als das prozedurale Gebäude)
+        if (!ctx.clearRect(o.x, o.z, o.rot, 24.5, -0.5, 14) || !ctx.place(o.x, o.z, 12, true)) return false;
         pits.add(o.x, o.z, { rot: o.rot }); pitSide = sd;
         ctx.pit = { sd: sd, mid: -30, s0: -52, s1: -8 };   // Boxengasse vor dem Gebäude (Markierung: js/car-track-surface.js)
         return true;
@@ -350,16 +352,17 @@
           board.add(x, z, { rot: a2.yaw, tint: adCols[ai++ % adCols.length] });
         }
       });
-      // Hintergrund: Oberrang rund um das Stadion (Schüssel), mit Zuschauerpunkten und Dachkante
-      var bg = new Kit(), R = ctx.radius + 170, N = 56;
+      // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
+      // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
+      var R = ctx.radius + 170, N = 56, w = TAU * R / N * 1.02, up = new Kit();
+      up.add(box(w, 16, 18), function (x, y) { return y > 14 ? 0x5a5f69 : hash3(x * 3, y * 3, 0) > 0.5 ? crowd[Math.floor(hash3(x, y, 1) * crowd.length)] : 0x7c8290; },
+        { y: 6, rx: 0.32 });
+      up.add(box(w, 1.2, 14), prim, { y: 18, z: 6 });
+      var upper = ctx.kind('upper', [{ geo: up.geo() }], { r: w / 2, prop: { slot: 'upper', box: { w: w, d: 20, h: 22 }, front: -9, tile: true } });
       for (var i = 0; i < N; i++) {
-        var a0 = i / N * TAU, am = a0 + Math.PI / N, x0 = ctx.cx + Math.cos(am) * R, z0 = ctx.cz + Math.sin(am) * R * 0.8;
-        var w = TAU * R / N * 1.02;
-        bg.add(box(w, 16, 18), function (x, y) { return y > 14 ? 0x5a5f69 : hash3(x * 3, y * 3, 0) > 0.5 ? crowd[Math.floor(hash3(x, y, 1) * crowd.length)] : 0x7c8290; },
-          { x: x0, y: 6, z: z0, ry: -am - Math.PI / 2, rx: -0.32 });
-        bg.add(box(w, 1.2, 14), prim, { x: x0 + Math.cos(am) * 6, y: 18, z: z0 + Math.sin(am) * 6, ry: -am - Math.PI / 2 });
+        var am = (i + 0.5) / N * TAU;
+        upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: Math.PI / 2 - am });
       }
-      ctx.bg(bg);
     }
   };
 

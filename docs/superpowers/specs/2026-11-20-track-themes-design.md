@@ -42,3 +42,16 @@ Je Thema eigener Himmel, Licht und Bodenfarbe (z. B. warme Abendstimmung an der 
   mit Ecken-Farbe) bleiben für weitere Rennen im Speicher; je Modell und Material ein InstancedMesh. Fehlt eine
   Datei: die prozedurale Deko bleibt. Kamerafahrten blenden Plätze über `setHidden` aus (gilt für beides).
 - Modelle werden in ihren Platz nur verkleinert, nie vergrößert; kleine Tribünen stehen nebeneinander (bis 26 m).
+- Speedway-Ausbau (2026-11-20): Boxengebäude und Oberrang als Plätze mit Modellen statt grauer Klötze.
+  - Boxen (slot `pits`): „Red Bull F1 Garage“ (paman0744, 272k Dreiecke). Außenhülle geschlossen (Betonhülle mit Dach,
+    Seiten- und Rückwand, offen nur zur Boxengasse); entfernt: Boxengassen-Boden, Boxenmauer (70k), Hintergrundwand,
+    Feuerlöscher, Monitore → ~12,8k Dreiecke, 22,5 × 4 × 13,7 m, zwei Boxen nebeneinander, Tor nach −z. Der Platz
+    ist dafür 14 m tief freigehalten (vorher 10,5).
+  - Oberrang (slot `upper`): 56 Plätze im Ring (Ersatz: der bisherige geneigte Rang als Instanz-Art, ein
+    Zeichenaufruf), Front nach innen, kleine Modelle nebeneinander. Katalog-Feld `slots: [...]` (optional) lässt ein
+    Modell für mehrere Platz-Typen gelten: die Tribünen (`stand`, jetzt 7 Typen inkl. „Race Track/ Stadium Viewing
+    Stand“ und „Stands/Tribunes“) gelten auch für `upper`, dazu nur dort die Eck-Tribüne „Stadium Stand“
+    (abhisekh_nath; eigentlich ein L-förmiges Eckstück mit drei LOD-Stufen, nur LOD2 genutzt).
+  - `build_track_props.py`: Dreiecks-Budget bezieht sich jetzt auf das, was nach dem Entfernen von Teilen übrig ist
+    (vorher auf das Original – mit `keepNode`/`dropNode` wurde viel zu stark reduziert).
+  - Speedway gesamt: ~163k Dreiecke, 26 Zeichenaufrufe (vorher 43k / 8), 3,1 MB.
