@@ -89,6 +89,27 @@
   }
 
   var TEX = {};   // Cache für die ganze Seite (dispose() einer Strecke gibt nur den GPU-Speicher frei)
+  // Foto-Asphalt (Poly Haven „Asphalt Track“, CC0, 2 × 2 m, assets/textures/track/): ersetzt nach dem Laden die
+  // berechnete Textur; Pfad neben dem Skript (…/js/ → …/assets/), also /s/<token>/assets/… bzw. /drive/a/assets/…
+  var ASSET_BASE = (function () {
+    var src = root.document && root.document.currentScript && root.document.currentScript.src || '';
+    var m = /^(.*\/)js\/car-track-surface\.js/.exec(src);
+    return m ? m[1] + 'assets/' : null;
+  })();
+  var PHOTO_M = 2, PHOTO_REP = 5;   // Kachel 2 m; Fahrbahn-UV läuft in 10-m-Einheiten (TILE) → 5 Wiederholungen
+  function photoAsphalt(aniso, done) {
+    if (!ASSET_BASE || !THREE.TextureLoader) return;
+    if (TEX.photo) { if (TEX.photo.ready) done(TEX.photo); else TEX.photo.wait.push(done); return; }
+    var ph = TEX.photo = { ready: false, wait: [done], n: 0 }, loader = new THREE.TextureLoader();
+    ['diff', 'nor_gl', 'rough'].forEach(function (k) {
+      loader.load(ASSET_BASE + 'textures/track/asphalt_track_' + k + '_1k.jpg', function (t) {
+        t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(PHOTO_REP, PHOTO_REP); t.anisotropy = aniso || 1;
+        if (k === 'diff') t.encoding = THREE.sRGBEncoding;
+        t.trackBytes = 1024 * 1024 * 4 * 4 / 3; ph[k] = t;
+        if (++ph.n === 3) { ph.ready = true; ph.wait.forEach(function (f) { f(ph); }); ph.wait = []; }
+      }, undefined, function () { ph.failed = true; });   // fehlt die Datei: berechnete Textur bleibt
+    });
+  }
   // Asphalt: Grundton, Gesteinskörnung (helle/dunkle Körner), großflächige Flecken; Normalen + Rauheit aus der Höhe
   function asphaltTex(aniso) {
     if (TEX.asphalt) return TEX.asphalt;
@@ -343,8 +364,14 @@
       }
       road.grid(base0, PR, 3, null, [0, 1, 0]);
     }
-    addMesh(road.geo(), new THREE.MeshStandardMaterial({ map: tex(at.map), normalMap: tex(at.normal), normalScale: new THREE.Vector2(0.55, 0.55),
-      roughnessMap: tex(at.rough), roughness: 1, metalness: 0, vertexColors: true, envMapIntensity: 0.5 }));
+    var roadMat = new THREE.MeshStandardMaterial({ map: tex(at.map), normalMap: tex(at.normal), normalScale: new THREE.Vector2(0.55, 0.55),
+      roughnessMap: tex(at.rough), roughness: 1, metalness: 0, vertexColors: true, envMapIntensity: 0.5 });
+    addMesh(road.geo(), roadMat);
+    // echtes Asphalt-Foto nachladen (geteilt, nicht je Strecke entsorgt); Ideallinie/Bremszonen bleiben als Ecken-Farbe
+    photoAsphalt(aniso, function (ph) {
+      roadMat.map = ph.diff; roadMat.normalMap = ph.nor_gl; roadMat.roughnessMap = ph.rough;
+      roadMat.normalScale.set(0.9, 0.9); roadMat.needsUpdate = true;
+    });
 
     // ---- Aufkleber (ein Zeichenaufruf) ----
     var dec = new Batch(4), Y_DEC = 0.042;

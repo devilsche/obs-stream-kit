@@ -308,6 +308,12 @@ def engine_sound(filepath):
     return serve_asset(_root(), os.path.join("assets", "sounds", "engines"), filepath)
 
 
+@bp_drive.route("/drive/a/assets/textures/<path:filepath>")
+def texture_file(filepath):
+    """Foto-Texturen der Strecken (assets/textures/, CC0 – js/car-track-surface.js)."""
+    return serve_asset(_root(), os.path.join("assets", "textures"), filepath)
+
+
 @bp_drive.route("/drive/a/api/fx/cars/catalog.json")
 def catalog():
     return _no_store(jsonify(_catalog()))
