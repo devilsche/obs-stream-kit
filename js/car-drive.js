@@ -803,12 +803,29 @@
   function snap() {
     race.prev = race.sim.cars.map(function (c) { return { x: c.x, z: c.z, yaw: c.yaw, roll: c.roll, pitch: c.pitch, steer: c.steer, spin: c.spin }; });
   }
+  // Ausgeschiedene Autos (DNF) durchscheinend: eigene Kopien der Materialien (Vorlagen werden geteilt), einmal je Auto
+  function ghostCar(c, on) {
+    if (!c || !c.holder || !!c.ghosted === on) return;
+    c.ghosted = on;
+    c.holder.traverse(function (o) {
+      if (!o.isMesh || !o.material) return;
+      if (on) {
+        if (!o.userData.ghostMat) {
+          var mk = function (m) { var g = m.clone(); g.transparent = true; g.opacity = 0.28 * (m.opacity == null ? 1 : m.opacity); g.depthWrite = false; c.owned.push(g); return g; };
+          o.userData.solidMat = o.material;
+          o.userData.ghostMat = Array.isArray(o.material) ? o.material.map(mk) : mk(o.material);
+        }
+        o.material = o.userData.ghostMat;
+      } else if (o.userData.solidMat) o.material = o.userData.solidMat;
+    });
+  }
   function drawAI() {
     if (!race.sim) return;
     var a = clamp((race.t - race.sim.time) / Sim.DT, 0, 1);   // eine Sim-Stufe zurück, weich dazwischen
     race.ai.forEach(function (c, i) {
       var q = race.sim.cars[i], p = race.prev[i] || q;
       if (!c || q.ghost) return;   // Chatrennen: Piloten zeichnet rcDraw
+      ghostCar(c, q.state === 'dnf');
       placeCar(c, lerp(p.x, q.x, a), lerp(p.z, q.z, a), p.yaw + (q.yaw - p.yaw) * a, lerp(p.roll, q.roll, a), lerp(p.pitch, q.pitch, a),
         lerp(p.steer, q.steer, a), p.spin + wrapAngle(q.spin - p.spin) * a);
     });
@@ -817,7 +834,7 @@
   // ---- Kontakte Auto ↔ Auto ----
   // Grundfläche als Rechteck (Länge/Breite des Modells bzw. der Sim), Überlappung und Stoß in CarDrivePhys
   // (stepContacts/collide). Nur das eigene Auto reagiert (andere Clients rechnen dasselbe bei sich), im Solo-Rennen
-  // bekommt die KI zusätzlich den Gegenstoß ab. Wracks (DNF) sind unbeweglich.
+  // bekommt die KI zusätzlich den Gegenstoß ab. Ausgeschiedene (DNF) sind durchscheinend und kein Hindernis.
   function poseOf(c, x, z, yaw, v, mass) {
     var o = { c: c, x: x, z: z, yaw: yaw, len: c.len, w: c.w, vx: Math.cos(yaw) * v, vz: -Math.sin(yaw) * v, mass: mass };
     var p = c.cPose;   // Lage im vorigen Bild: wird über die Teilschritte mitgezogen (kein Durchtunneln)
@@ -834,13 +851,16 @@
         if (!c) return;
         if (race.remotes.indexOf(c) >= 0) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); return; }
         var q = race.sim.cars[i];
-        out.push(poseOf(c, q.x, q.z, q.yaw, q.v, q.state === 'dnf' ? Infinity : c.st.mass));
+        if (q.state === 'dnf') return;   // ausgeschieden: durchscheinend, man fährt hindurch
+        out.push(poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass));
       });
       return out;
     }
     if (race.sim) race.ai.forEach(function (c, i) {
       if (!c) return;
-      var q = race.sim.cars[i], o = poseOf(c, q.x, q.z, q.yaw, q.v, q.state === 'dnf' ? Infinity : c.st.mass);
+      var q = race.sim.cars[i];
+      if (q.state === 'dnf') return;     // ausgeschieden: durchscheinend, man fährt hindurch
+      var o = poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass);
       o.q = q; out.push(o);
     });
     if (race.mp) race.remotes.forEach(function (c) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); });
