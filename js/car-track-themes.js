@@ -201,6 +201,24 @@
     k.add(cone(1.05, 2.2, 7), g[2], { y: 5.6, ry: 0.8 });
     return k.geo();
   }
+  // Laubbaum (Ersatz für Kulissen-Modelle in Stadion/Kart): Stamm + zwei verbeulte Kronen-Kugeln, ~8 m
+  // (in Kit k, bei x = ox, Größe s)
+  function leafTree(k, ox, s) {
+    k.add(cyl(0.22 * s, 0.34 * s, 3.4 * s, 6), 0x6b4a2f, { x: ox, y: 1.7 * s });
+    k.add(ico(2.6 * s), function (x, y) { return mix(0x3f7a34, 0x5c9446, (y - 3.5 * s) / (4 * s)); }, { x: ox, y: 5.4 * s, sy: 0.85, jit: 0.8 });
+    k.add(ico(1.7 * s), 0x4f8a3e, { x: ox + 1.2 * s, y: 6.9 * s, z: -0.4 * s, jit: 0.5 });
+    return k;
+  }
+  // Laubbäume am Rand und im Hintergrund (Stadion, Kart): einzelne Bäume (slot parkTree) und Dreier-Reihen (slot
+  // treeRow); prozedural Laubbäume, mit Kulissen-Modellen Eichen. Nie im Auslauf (scatter: ≥ 14 m + dmin)
+  function leafTrees(ctx, nTree, nRow, dmin, dmax) {
+    var lt = leafTree(new Kit(), 0, 1), row = new Kit();
+    [-8.5, 0, 8.5].forEach(function (x, i) { leafTree(row, x, [0.9, 1.1, 0.95][i]); });
+    var tree = ctx.kind('parkTree', [{ geo: lt.geo() }], { r: 3.2, prop: { slot: 'parkTree', box: { w: 15, d: 15, h: 12 } } });
+    var rowK = ctx.kind('treeRow', [{ geo: row.geo() }], { r: 13, prop: { slot: 'treeRow', box: { w: 28, d: 12, h: 12 } } });
+    ctx.scatter(tree, nTree, { dmin: dmin, dmax: dmax, rad: 3.5, s: [0.85, 1.2] });
+    ctx.scatter(rowK, nRow, { dmin: dmin + 10, dmax: dmax + 20, rad: 13, s: [0.9, 1.1] });
+  }
   function rockGeo(c1, c2) {
     var k = new Kit();
     k.add(ico(1), function (x, y) { return mix(c1, c2, y * 0.8 + 0.3); }, { y: 0.25, sx: 1.5, sy: 0.85, sz: 1.15, jit: 0.45 });
@@ -352,6 +370,7 @@
           board.add(x, z, { rot: a2.yaw, tint: adCols[ai++ % adCols.length] });
         }
       });
+      leafTrees(ctx, 10, 4, 30, 120);
       // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
       // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
       var R = ctx.radius + 170, N = 56, w = TAU * R / N * 1.02, up = new Kit();
@@ -422,7 +441,10 @@
       var pine = ctx.kind('pine', [{ geo: pineGeo(false) }], { r: 2.2, tint: true });
       var pineD = ctx.kind('pineDark', [{ geo: pineGeo(true) }], { r: 2.2, tint: true });
       function green() { return mix(0xffffff, 0xc9d8b0, rnd()); }
-      ctx.scatter(pine, 260, { dmin: 15, dmax: 80, rad: 1.8, s: [0.8, 1.5], pred: offCreek, tint: green });
+      // nahe Bäume als Kulissen-Modelle (slot forestTree: Nadel-, Birken-, Eichen-Modelle im Wechsel; Ersatz: Nadelbaum)
+      var treeN = ctx.kind('tree', [{ geo: pineGeo(false) }], { r: 2.2, tint: true, prop: { slot: 'forestTree', box: { w: 11, d: 11, h: 15 } } });
+      ctx.scatter(treeN, 70, { dmin: 15, dmax: 50, rad: 2.2, s: [0.8, 1.3], pred: offCreek, tint: green });
+      ctx.scatter(pine, 200, { dmin: 15, dmax: 80, rad: 1.8, s: [0.8, 1.5], pred: offCreek, tint: green });
       ctx.scatter(pineD, 520, { dmin: 70, dmax: 270, rad: 2.2, s: [1.0, 1.8], pred: offCreek, tint: green });
       // Felsen
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6 }), 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
@@ -478,7 +500,10 @@
       ctx.scatter(cliff, 16, { dmin: 22, dmax: 75, rad: 8, s: [0.8, 1.35], pred: function (x, z) { return (x - ctx.cx) * 0.8 - (z - ctx.cz) * 0.6 > -10; } });
       // vereinzelte Nadelbäume, Felsen, Almhütten
       var pine = ctx.kind('pine', [{ geo: pineGeo(true) }], { r: 2, tint: true });
-      ctx.scatter(pine, 220, { dmin: 15, dmax: 240, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
+      // nahe Bäume als Kulissen-Modelle (slot alpineTree: Kiefer, Pappel, Nadelbäume aus dem Wald; Ersatz: Nadelbaum)
+      var treeN = ctx.kind('tree', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', box: { w: 10, d: 10, h: 16 } } });
+      ctx.scatter(treeN, 60, { dmin: 15, dmax: 70, rad: 2, s: [0.8, 1.3], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
+      ctx.scatter(pine, 170, { dmin: 15, dmax: 240, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6 }), 55, { dmin: 15, dmax: 140, rad: 1.6, s: [0.6, 1.8] });
       var hk = new Kit();
       hk.add(box(7, 5, 6), 0x8a5a33, { y: 1.0 });
@@ -536,7 +561,8 @@
         pk.add(box(3.6, 0.08, 0.9), f % 2 ? 0x3f8a3a : 0x4f9e44, { x: tx + Math.cos(fa) * 1.6, y: ty - 0.5, z: Math.sin(fa) * 1.6, ry: -fa, rz: -0.45 });
       }
       [0, 2.1, 4.2].forEach(function (a) { pk.add(ico(0.22), 0x5a3d22, { x: tx + Math.cos(a) * 0.35, y: ty - 0.3, z: Math.sin(a) * 0.35 }); });
-      var palm = ctx.kind('palm', [{ geo: pk.geo() }], { r: 2.2, tint: true });
+      // Kulissen-Modelle (slot palm): Palmen-Modelle im Wechsel, Ersatz: die prozedurale Palme
+      var palm = ctx.kind('palm', [{ geo: pk.geo() }], { r: 2.2, tint: true, prop: { slot: 'palm', box: { w: 10, d: 10, h: 12 } } });
       ctx.scatter(palm, 70, { dmin: 15, dmax: 130, rad: 2.2, s: [0.8, 1.25], pred: land, tint: function () { return mix(0xffffff, 0xd8e6c4, rnd()); } });
       // Strand: bunte Sonnenschirme (Gimmick)
       var uk = new Kit();
@@ -675,6 +701,7 @@
         if (ctx.place(lx, lz, 1.2)) lamp.add(lx, lz, { rot: a.yaw + (sd > 0 ? -Math.PI / 2 : Math.PI / 2) });
       }
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f706b, 0x8d8e88) }], { r: 1.2 }), 18, { dmin: 15, dmax: 100, rad: 1.2, s: [0.4, 0.9] });
+      leafTrees(ctx, 6, 3, 30, 110);
       // Hintergrund: Fabrikhallen (dieselbe Art wie die Hallen am Hof → Kulissen-Modelle statt grauer Klötze),
       // Schornsteine (rot-weiß), Silos
       var bg = new Kit();

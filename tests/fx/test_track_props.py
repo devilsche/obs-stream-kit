@@ -58,3 +58,14 @@ def test_token_needed_and_missing_catalog(tmp_path):
     assert track_props.catalog(str(tmp_path / "nowhere")) == {"props": [], "credits": []}
     (tmp_path / "data" / "track-props" / "catalog.json").write_text("[1, 2]")
     assert track_props.catalog(str(tmp_path)) == {"props": [], "credits": []}
+
+
+def test_pack_part_file_name(tmp_path):
+    _setup(tmp_path)
+    (tmp_path / "data" / "track-props" / (UID + "-b1.glb")).write_bytes(b"glTF")
+    assert track_props.model_name(str(tmp_path), UID + "-b1") == UID + "-b1.glb"
+    assert track_props.model_name(str(tmp_path), UID + "-B1") is None
+    assert track_props.model_name(str(tmp_path), UID + "-../x") is None
+    assert track_props.model_name(str(tmp_path), UID + "-") is None
+    r = _client(tmp_path).get("/drive/a/api/fx/track-props/" + UID + "-b1.glb")
+    assert r.status_code == 200 and r.data == b"glTF"

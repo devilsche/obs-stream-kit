@@ -11,7 +11,9 @@ Pillow und numpy). Ablauf wie scripts/build_car_rain.py:
   5. nach data/track-props/<uid>.glb auf den Server, dazu data/track-props/catalog.json (props + credits)
 Die Modell-Dateien kommen nicht ins Repo (Lizenzen). Auswahl und Maße: assets/track-props/candidates.json
 (Einträge mit "skip" werden nicht gebaut; der Grund steht dabei). Optional "slots": [...] – das Modell gilt für
-mehrere Platz-Typen (z. B. Tribüne und Oberrang), ohne doppelte Datei; wird auch bei ungebauten Einträgen nachgezogen.
+mehrere Platz-Typen (z. B. Tribüne und Oberrang), ohne doppelte Datei; ebenso "themes": [...] für mehrere Themen;
+beides wird auch bei ungebauten Einträgen nachgezogen. Pakete mit mehreren Modellen (z. B. Baum-Packs): je Teil ein
+Eintrag mit derselben uid, eigenem "part" (Datei <uid>-<part>.glb) und keepNode/dropNode für den Teil.
 
 Aufruf:  python3 scripts/build_track_props.py [--only <uid> …] [--inspect <uid> …]
   --inspect: nur Original vermessen (Dreiecke, Maße, Knoten-/Materialnamen, Texturgrößen), nichts hochladen;
@@ -246,13 +248,18 @@ def fetch_src(uid):
     return src
 
 
+def file_id(c):
+    """Datei-/Katalog-id: Sketchfab-uid, bei Paket-Teilen (\"part\") mit Anhang: <uid>-<part>."""
+    return c["uid"] + ("-" + c["part"] if c.get("part") else "")
+
+
 def build_one(c):
-    uid = c["uid"]
+    uid, fid = c["uid"], file_id(c)
     src = fetch_src(uid)
-    baked = os.path.join(WORK, uid + ".baked.glb")
+    baked = os.path.join(WORK, fid + ".baked.glb")
     if bcr.bake_skins(src, baked):
         src = baked
-    cut = os.path.join(WORK, uid + ".cut.glb")
+    cut = os.path.join(WORK, fid + ".cut.glb")
     with open(src, "rb") as f_in, open(cut, "wb") as f_out:
         f_out.write(f_in.read())
     strip_parts(cut, c)
@@ -261,7 +268,7 @@ def build_one(c):
     g, _ = bcr.glb_read(src)
     tris0 = tri_count({"meshes": [g["meshes"][nd["mesh"]] for nd in g.get("nodes", []) if "mesh" in nd],
                        "accessors": g.get("accessors", [])})
-    dst = os.path.join(WORK, uid + ".glb")
+    dst = os.path.join(WORK, fid + ".glb")
     budget = c.get("tris", DEF_TRIS)
     cmd = ["npx", "-y", "gltfpack", "-i", src, "-o", dst, "-noq"]
     if tris0 > budget:
@@ -272,12 +279,13 @@ def build_one(c):
     bcr.shrink_textures(dst, c.get("tex", DEF_TEX))
     size, yaw = normalize(dst, c)
     g, _ = bcr.glb_read(dst)
-    e = {"uid": uid, "key": c["key"], "kind": c["kind"], "slot": c.get("slot") or c["kind"], "sink": c.get("sink", 0),
+    e = {"uid": fid, "key": c["key"], "kind": c["kind"], "slot": c.get("slot") or c["kind"], "sink": c.get("sink", 0),
          "theme": c["theme"], "name": c["name"],
          "author": c["author"], "license": c["license"], "url": c["url"], "size": size, "yaw": yaw,
          "tris": tri_count(g), "draws": draw_calls(g), "bytes": os.path.getsize(dst)}
-    if c.get("slots"):
-        e["slots"] = c["slots"]
+    for f in ("slots", "themes"):
+        if c.get(f):
+            e[f] = c[f]
     return dst, e
 
 
@@ -291,18 +299,20 @@ def main(only=None):
     subprocess.run(bcr.SSH + ["mkdir", "-p", REMOTE + "/data/track-props"], check=True)
     props = []
     for c in cands:
-        uid = c["uid"]
+        uid = file_id(c)
+        want = only and (uid in only or c["uid"] in only)   # --only <uid> baut alle Teile eines Pakets
         if c.get("skip"):
             print("skip %-40s %s" % (c["name"][:40], c["skip"]))
             continue
-        if uid in old and not (only and uid in only):
-            e = dict(old[uid])   # ungebaut übernehmen; Platz-Typen (slots) aus candidates.json nachziehen
-            e.pop("slots", None)
-            if c.get("slots"):
-                e["slots"] = c["slots"]
+        if uid in old and not want:
+            e = dict(old[uid])   # ungebaut übernehmen; Platz-Typen/Themen (slots, themes) aus candidates.json nachziehen
+            for f in ("slots", "themes"):
+                e.pop(f, None)
+                if c.get(f):
+                    e[f] = c[f]
             props.append(e)
             continue
-        if only and uid not in only:
+        if only and not want:
             continue
         try:
             dst, e = build_one(c)
@@ -312,9 +322,14 @@ def main(only=None):
         subprocess.run(bcr.SCP + [dst, "%s:%s/data/track-props/%s.glb" % (HOST, REMOTE, uid)], check=True)
         props.append(e)
         print("%-40s %-10s %6d tris %3d draws %5.2f MB  %s m" % (c["name"][:40], c["kind"], e["tris"], e["draws"], e["bytes"] / 1e6, e["size"]), flush=True)
-    order = {c["uid"]: i for i, c in enumerate(cands)}
+    order = {file_id(c): i for i, c in enumerate(cands)}
     props.sort(key=lambda p: order.get(p["uid"], 999))
-    credits = [{"name": p["name"], "author": p["author"], "license": p["license"], "url": p["url"], "kind": p["kind"], "theme": p["theme"]} for p in props]
+    credits, seen = [], set()   # Paket-Teile: eine Quellenangabe je Sketchfab-Modell
+    for p in props:
+        if p["url"] in seen:
+            continue
+        seen.add(p["url"])
+        credits.append({"name": p["name"], "author": p["author"], "license": p["license"], "url": p["url"], "kind": p["kind"], "theme": p["theme"]})
     path = os.path.join(WORK, "catalog.json")
     json.dump({"props": props, "credits": credits}, open(path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     subprocess.run(bcr.SCP + [path, "%s:%s/data/track-props/catalog.json" % (HOST, REMOTE)], check=True)

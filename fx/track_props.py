@@ -1,7 +1,7 @@
 """Kulissen-Modelle (Sketchfab) für die Strecken-Themen von Car Race und Car Drive.
 
 Aufbereitet von scripts/build_track_props.py, liegen nur auf dem Server (Lizenzen):
-  data/track-props/<uid>.glb       ein Modell, normiert: Meter, Fuß auf y = 0, mittig, Längsseite entlang x
+  data/track-props/<uid>.glb       ein Modell (Teil eines Pakets: <uid>-<part>.glb), normiert: Meter, Fuß auf y = 0, mittig, Längsseite entlang x
   data/track-props/catalog.json    { "props": [{ uid, key, kind, theme, name, author, license, url, size, tris, bytes }],
                                      "credits": [{ name, author, license, url }] }
 Ausgeliefert über /s/<token>/api/fx/track-props/… (fx/endpoints.py) und /drive/a/api/fx/track-props/… (app/views_drive.py);
@@ -11,7 +11,7 @@ import json
 import os
 import re
 
-UID_RE = re.compile(r"^[0-9a-f]{32}$")
+UID_RE = re.compile(r"^[0-9a-f]{32}(-[a-z0-9]{1,16})?$")   # Paket-Teil: <uid>-<part>
 
 
 def folder(root):
