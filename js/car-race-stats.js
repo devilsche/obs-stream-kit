@@ -2,7 +2,8 @@
  * plus im Car editor gespeicherte Abweichungen.
  * Läuft im Browser (window.CarRaceStats) und in Node (module.exports). Prüfskript: scripts/check_car_race_sim.js
  *
- *   CarRaceStats.guess(entry) → { on, vmax, acc, hp, kg, grip, brake, drive, len }
+ *   CarRaceStats.guess(entry) → { on, vmax, acc, hp, kg, grip, brake, drive, len, steer }
+ *       steer = größter Radeinschlag in Grad (nur Car Drive, Schätzung nach Fahrzeugart),
  *       entry = Katalog-Eintrag { key, name, brand, len }. Echte Werte: vmax km/h, acc = 0–100 km/h in s,
  *       hp = PS, kg = Leergewicht, grip = Kurvenhaftung in g, brake = Bremsverzögerung in g.
  *       Zuerst die Tabelle je Katalog-Schlüssel (vom Nutzer abgesegnet), sonst die Fahrzeugklasse über
@@ -17,7 +18,8 @@
   'use strict';
   var KEYS = ['vmax', 'acc', 'hp', 'kg', 'grip', 'brake'];
   var RANGE = {
-    vmax: [30, 420], acc: [1.5, 60], hp: [20, 2000], kg: [300, 40000], grip: [0.2, 5.0], brake: [0.3, 6.0], len: [0.5, 20]
+    vmax: [30, 420], acc: [1.5, 60], hp: [20, 2000], kg: [300, 40000], grip: [0.2, 5.0], brake: [0.3, 6.0], len: [0.5, 20],
+    steer: [10, 60]
   };
 
   // Tabelle je Katalog-Schlüssel: vmax, acc, hp, kg, grip, brake, drive (vom Nutzer abgesegnet, Bremsen vom Controller)
@@ -133,7 +135,18 @@
     // Ferrari-Supercars ohne Tabellenzeile fahren Heckantrieb
     r.drive = t ? t.drive : /ferrari/i.test((entry && (entry.brand || '') + ' ' + (entry.name || '')) || '') ? 'rwd' : v.drive;
     r.len = inRange('len', len) ? len : 4.5;
+    r.steer = steerGuess(entry);
     return r;
+  }
+  // größter Radeinschlag in Grad (nur Car Drive; die Sim lenkt selbst): Pkw ~38°, Rennwagen weniger, F1 am wenigsten,
+  // lange Nutzfahrzeuge mehr (ihr Wendekreis kommt trotzdem aus dem langen Radstand)
+  function steerGuess(entry) {
+    var n = entry ? ((entry.key || '') + ' ' + (entry.name || '')).toLowerCase() : '';
+    if (/w14|\bf1\b|formula/.test(n)) return 24;
+    if (/gt3[ -]?r\b|296-gt3|296 gt3|dtm|917k|\blm\b|r9-dtm/.test(n)) return 30;
+    if (/krabby/.test(n)) return 55;   // Spielzeug-Burgerwagen: extrem wendig, ideal für kurvige Strecken
+    if (/trolza|bus\b|megapolis|ural|truck|ct680|caterpillar|semi/.test(n)) return 45;
+    return 38;
   }
 
   // nur gültige Felder der neuen Form; alte 1–10-Felder (power, speed, handling, susp, brakes, weight) fallen weg
@@ -141,7 +154,7 @@
     var o = {};
     if (!race || typeof race !== 'object') return o;
     if (typeof race.on === 'boolean') o.on = race.on;
-    KEYS.concat(['len']).forEach(function (k) { var n = +race[k]; if (race[k] != null && race[k] !== '' && inRange(k, n)) o[k] = n; });
+    KEYS.concat(['len', 'steer']).forEach(function (k) { var n = +race[k]; if (race[k] != null && race[k] !== '' && inRange(k, n)) o[k] = n; });
     if (race.drive === 'fwd' || race.drive === 'rwd' || race.drive === 'awd') o.drive = race.drive;
     return o;
   }

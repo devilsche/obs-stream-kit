@@ -92,7 +92,8 @@
       acc: st.acc || 5, vtop: (st.vmax || 27) / 1.04, grip: st.grip || 11, brake: st.brake || 8,
       susp: st.susp || 0.5, launch: st.launch || 1, mass: st.mass || 4.5, len: len,
       wb: 0.6 * len, width: clamp(len * 0.42, 1.7, 2.6), drive: DRIVE[raw.drive] ? raw.drive : 'rwd',
-      realVmax: raw.vmax > 0 ? +raw.vmax : 300, wheelR: clamp(0.07 * len, 0.3, 0.55)
+      realVmax: raw.vmax > 0 ? +raw.vmax : 300, wheelR: clamp(0.07 * len, 0.3, 0.55),
+      lock: clamp((raw.steer > 0 ? +raw.steer : 38) * Math.PI / 180, 0.17, 1.05)   // größter Radeinschlag (rad) je Auto
     };
   }
 
@@ -167,8 +168,11 @@
     var u = car.vx * fx + car.vz * fz, w = car.vx * lx + car.vz * lz, sp = Math.hypot(car.vx, car.vz);
     var S = SURF[car.surface] || SURF.asphalt;
     var a = P.wb / 2, b = P.wb / 2;
-    // Lenkung: Einschlag nimmt mit dem Tempo ab (sonst bei Tempo nur Rutschen), weich nachgeführt
-    var maxSteer = clamp(MAX_STEER * 9 / (9 + Math.max(0, Math.abs(u) - 3)), 0.1, MAX_STEER);
+    // Lenkung: im Stand voller Einschlag des Autos (P.lock), mit Tempo nur so viel, wie die Haftung nutzen kann –
+    // kinematischer Winkel für den Grenzradius (wb·G/u²) plus Schräglauf vorn knapp über dem Haftungsmaximum, damit
+    // man die Kurvenhaftung voll ausfahren (und leicht überziehen) kann statt hart zu untersteuern
+    var lock = P.lock || MAX_STEER, Gs = P.grip * S.grip;
+    var maxSteer = clamp(P.wb * Gs / Math.max(1, u * u) + ALPHA_PEAK * 0.9, 0.1, lock);
     var want = clamp(inp.steer || 0, -1, 1) * maxSteer;
     // nach einem Crash kurz benommen: Lenkung träger, weniger Haftung, Drehung wird nicht kinematisch weggebügelt
     var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
@@ -197,7 +201,7 @@
     if (Math.abs(u) > 0.05) ax -= sign(u) * resist;
     // Haftung je Achse (Lastwechsel, Untergrund, Handbremse, Antrieb am Reibungskreis)
     var G = P.grip * S.grip, shift = clamp(-car.ax / G * 0.3, -0.22, 0.22);
-    var Gf = G * 0.96 * (1 + shift), Gr = G * 1.04 * (1 - shift);
+    var Gf = G * 1.04 * (1 + shift), Gr = G * 0.98 * (1 - shift);
     var dr = DRIVE[P.drive], drv = Math.max(0, ax) ;
     Gf = Math.sqrt(Math.max(Gf * Gf * 0.25, Gf * Gf - Math.pow(drv * dr[0], 2)));
     Gr = Math.sqrt(Math.max(Gr * Gr * 0.25, Gr * Gr - Math.pow(drv * dr[1], 2)));

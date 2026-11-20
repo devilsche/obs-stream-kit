@@ -70,9 +70,12 @@ if (gi >= 0) {
 }
 
 // 6) Leitplanke: quer nach außen fahren → zurückgeschoben, Tempo weg
-var T2 = Sim.track(2), c3 = carFor('bmw-m3-competition', T2, { s: 60, d: 0 }), a3 = T2.at(60);
-var side = a3.runL > 0.5 ? 1 : -1;
+// Start kurz vor der Planke (Rand des Auslaufs), Fahrtrichtung schräg darauf zu – ein reines Querrutschen von der
+// Fahrbahnmitte aus bauen die Reifen ab, bevor die Planke erreicht ist
+var T2 = Sim.track(2), a3 = T2.at(60), side = a3.runL > 0.5 ? 1 : -1;
+var c3 = carFor('bmw-m3-competition', T2, { s: 60, d: side * (T2.width / 2 + (side > 0 ? a3.runL : a3.runR) - 2.5) });
 c3.vx = a3.nx * side * 12 + Math.cos(c3.yaw) * 10; c3.vz = a3.nz * side * 12 - Math.sin(c3.yaw) * 10;
+c3.yaw = Math.atan2(-c3.vz, c3.vx);
 var hit = 0, minGap = Infinity, vBefore = 0, vAfter = 0;
 for (var t3 = 0; t3 < 3 && !hit; t3 += DT) {
   vBefore = Math.hypot(c3.vx, c3.vz); Phys.step(c3, {}, DT); hit = c3.rail;
@@ -240,6 +243,26 @@ function crashRun(car, inp, others, secs, react) {
   }
   var kl = ram('krabby-patty-wagon'), kh = ram('ural-4320-soviet-army-truck');
   ok(kh > 0.6 && kl < kh - 0.3, 'Rammen: Laster behält ' + (kh * 100).toFixed(0) + ' % Tempo, leichtes Auto ' + (kl * 100).toFixed(0) + ' %');
+})();
+
+// 14) Lenkung: kein hartes Untersteuern – voller Einschlag nutzt bei Tempo die Kurvenhaftung aus; Einschlag je Auto
+(function () {
+  var T = Sim.track(1);
+  [10, 18, 26].forEach(function (v) {
+    var car = carFor('2020-ferrari-roma', T, { s: -40, d: -3 });
+    var fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw); car.vx = fx * v; car.vz = fz * v;
+    var best = 0;
+    for (var t = 0; t < 1.5; t += DT) {
+      var h0 = Math.atan2(car.vz, car.vx); Phys.step(car, { steer: 1, throttle: 0.3 }, DT);
+      if (car.surface !== 'asphalt') break;
+      var dh = Math.atan2(car.vz, car.vx) - h0; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+      best = Math.max(best, Math.abs(dh / DT) * Math.hypot(car.vx, car.vz));
+    }
+    ok(best >= car.P.grip * (v < 12 ? 0.7 : 0.85), 'voller Einschlag bei ' + v + ' m/s: Querbeschleunigung ' + best.toFixed(1) + ' von ' + car.P.grip.toFixed(1) + ' m/s² Haftung');
+  });
+  var lk = function (k) { var g = Stats.guess({ key: k, name: k, len: 4.5 }); return Phys.params(Sim.stats(g), g).lock * 180 / Math.PI; };
+  ok(lk('krabby-patty-wagon') > lk('2020-ferrari-roma') && lk('2020-ferrari-roma') > lk('amg-w14-s1'),
+     'Einschlag je Auto: Krabby ' + lk('krabby-patty-wagon').toFixed(0) + '° > Roma ' + lk('2020-ferrari-roma').toFixed(0) + '° > W14 ' + lk('amg-w14-s1').toFixed(0) + '°');
 })();
 
 console.log(fails ? fails + ' Prüfung(en) fehlgeschlagen' : 'alles ok');
