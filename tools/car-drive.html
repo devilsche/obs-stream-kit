@@ -128,6 +128,11 @@
     .nitro[data-state="ready"] { color: var(--cd-accent); }
     .nitro[data-state="on"] { color: var(--cd-ok); }
     .hud-cam { left: 20px; bottom: 20px; font-size: 14px; color: var(--cd-dim); }
+    /* Minimap (js/car-drive-minimap.js): rund beim Mitdrehen, eckig bei der ganzen Strecke; über der Kamera-Anzeige */
+    .hud-map { position: absolute; left: 20px; bottom: 72px; width: 200px; height: 200px; display: block; background: var(--cd-hud-bg);
+      border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50%; opacity: 0.92; }
+    .hud-map[data-mode="track"] { border-radius: var(--cd-radius); }
+    .hud-map[hidden] { display: none; }
     .hud-msg { left: 50%; top: 18%; transform: translateX(-50%); font-size: 28px; font-weight: 800; padding: 10px 24px; opacity: 0; transition: opacity 0.3s ease; }
     .hud-msg.show { opacity: 1; }
     .countdown { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-family: var(--cd-font); font-size: 140px; font-weight: 900;
@@ -171,6 +176,7 @@
       .hud-big { font-size: 28px; }
       .hud-speed .hud-big { font-size: 38px; }
       .hud-times { font-size: 14px; }
+      .hud-map { width: 136px; height: 136px; bottom: 64px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .countdown.tick { animation: none; }
@@ -203,6 +209,7 @@
         <div class="nitro" id="hNitro" data-state="ready"><span class="icon" aria-hidden="true">bolt</span><span id="hNitroText">Nitro ready</span></div>
       </div>
       <div class="hud-box hud-cam" id="hCam">Chase camera</div>
+      <canvas class="hud-map" id="hMap" width="200" height="200" aria-hidden="true"></canvas>
       <div class="hud-box hud-look" id="hLook" hidden><span class="icon" aria-hidden="true">360</span> Drag to look around · scroll or pinch to zoom</div>
       <div class="hud-box hud-msg" id="hMsg"></div>
     </div>
@@ -265,6 +272,7 @@
           <dt>Handbrake</dt><dd><kbd>Space</kbd></dd><dd>A</dd>
           <dt>Nitro (once per lap)</dt><dd><kbd>Shift</kbd></dd><dd>B</dd>
           <dt>Camera</dt><dd><kbd>C</kbd></dd><dd>Y</dd>
+          <dt>Minimap: follow car / whole track / off</dt><dd><kbd>N</kbd></dd><dd>Back / View</dd>
           <dt>Back on track</dt><dd><kbd>R</kbd></dd><dd>–</dd>
           <dt>Pause</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
           <dt>Sound on / off</dt><dd><kbd>M</kbd></dd><dd>–</dd>
@@ -318,6 +326,7 @@
         <button type="button" class="primary" id="resumeBtn">Resume</button>
         <button type="button" id="restartBtn">Restart race</button>
         <button type="button" class="ghost" id="menuBtn">Back to menu</button>
+        <button type="button" class="ghost" id="mapBtn"><span class="icon" aria-hidden="true">map</span> <span id="mapText">Minimap: follow car</span> <kbd>N</kbd></button>
       </div>
       <div class="sound-row">
         <button type="button" class="ghost" id="soundBtn" aria-pressed="true"><span class="icon" aria-hidden="true">volume_up</span> <span id="soundText">Sound on</span></button>
@@ -358,6 +367,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/car-drive-net.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive-fx.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive-grass.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-drive-minimap.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-race-sound.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-engine-audio.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-race-welcome.js"></script>

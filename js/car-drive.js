@@ -469,6 +469,7 @@
   var keys = {}, pressed = {};
   var GAME_KEYS = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1, ShiftLeft: 1, ShiftRight: 1, KeyR: 1, KeyC: 1 };
   doc.addEventListener('keydown', function (e) {
+    if (e.code === 'KeyN' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { cycleMap(); return; }
     if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { setSound(!sndOn); return; }
     if (e.code === 'Escape' && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) {
       e.preventDefault(); setPaused(!race.paused); return;
@@ -496,7 +497,7 @@
     ax = Math.abs(ax) < dz ? 0 : (ax - Math.sign(ax) * dz) / (1 - dz);
     var rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
     rx = Math.abs(rx) < 0.18 ? 0 : rx; ry = Math.abs(ry) < 0.18 ? 0 : ry;
-    var r = { throttle: val(7), brake: val(6), steer: -ax, handbrake: cur[0], nitro: cur[1], cam: edge(3), start: edge(9),
+    var r = { throttle: val(7), brake: val(6), steer: -ax, handbrake: cur[0], nitro: cur[1], cam: edge(3), start: edge(9), back: edge(8),
       up: edge(12), down: edge(13), left: edge(14), right: edge(15), a: edge(0), b: edge(1), lookX: rx, lookY: ry };
     pad.prev = cur;
     if (r.throttle > 0.05 || r.brake > 0.05 || ax !== 0 || cur.some(Boolean)) pad.active = true;
@@ -673,7 +674,27 @@
     scene.add(trackRes.group);
     if (FX && FX.setGround) FX.setGround(trackRes.heightAt);
     // Grashalme nah an der Kamera (js/car-drive-grass.js); Zuschauer „Light“ mit halber Dichte
+    if (minimap) minimap.setTrack(T);
     grass = root.CarDriveGrass ? CarDriveGrass.create(THREE, trackRes, { reduce: REDUCE, quality: renderScale < 1 ? 'light' : 'full' }) : null;
+  }
+  // Minimap (js/car-drive-minimap.js): Taste N / Gamepad Back schaltet Mitdrehen → ganze Strecke → aus (gemerkt)
+  var MAP_TEXT = { follow: 'Minimap: follow car', track: 'Minimap: whole track', off: 'Minimap: off' };
+  var minimap = root.CarDriveMinimap ? CarDriveMinimap.create($('hMap'), { reduce: REDUCE }) : null;
+  function setMapMode(m, announce) {
+    if (!minimap) return;
+    minimap.setMode(m); save('map', minimap.mode());
+    $('mapText').textContent = MAP_TEXT[minimap.mode()];
+    if (announce) { flash(MAP_TEXT[minimap.mode()], 1.2); say(MAP_TEXT[minimap.mode()]); }
+  }
+  function cycleMap() { if (minimap) { var M = CarDriveMinimap.MODES; setMapMode(M[(M.indexOf(minimap.mode()) + 1) % M.length], true); } }
+  if (minimap) { setMapMode(load('map', 'follow')); $('mapBtn').addEventListener('click', function () { cycleMap(); }); }
+  else if ($('mapBtn')) $('mapBtn').hidden = true;
+  function mapFrame(now) {
+    if (!minimap || !race || !race.me || !race.me.holder) return;
+    var h = race.me.holder, others = [];
+    (race.ai || []).forEach(function (c) { if (c && c.holder && c.holder.visible) others.push({ x: c.holder.position.x, z: c.holder.position.z, real: false }); });
+    (race.remotes || []).forEach(function (c) { if (c && c.holder && c.holder.visible && c !== race.me) others.push({ x: c.holder.position.x, z: c.holder.position.z, real: true }); });
+    minimap.draw(now, { x: h.position.x, z: h.position.z, yaw: h.rotation.y }, others);
   }
   function grassFrame(dt) {
     if (!grass) return;
@@ -731,6 +752,7 @@
       race = null;
     }
     if (grass) { grass.dispose(); grass = null; }
+    if (minimap) minimap.setTrack(null);
     if (trackRes) { trackRes.dispose(); trackRes = null; }
     if (FX && FX.setGround) FX.setGround(null);
     ui.hud.hidden = true; ui.countdown.hidden = true;
@@ -1665,13 +1687,14 @@
     var dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     var p = readPad();
     sm.padThr = p ? p.throttle || 0 : 0;
+    if (p && p.back && race) cycleMap();
     if (p && p.start && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) setPaused(!race.paused);
     else if (p) padMenu(p);
     if (!race || !trackRes) { idleCam(dt); soundFrame(null); renderer.render(scene, cam); return; }
     if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('hMsg').classList.remove('show', 'big'); }
     if (race.paused || race.phase === 'results') {
       if (race.phase === 'results' && !race.paused) stepWorld(dt, cruise(race.pc));
-      lookPhase(); fxFrame(dt, null); trackRes.update(race.paused ? 0 : dt); grassFrame(race.paused ? 0 : dt);
+      lookPhase(); fxFrame(dt, null); trackRes.update(race.paused ? 0 : dt); grassFrame(race.paused ? 0 : dt); mapFrame(now);
       renderer.render(scene, cam); return;
     }
     var pc = race.pc;
@@ -1723,6 +1746,7 @@
     fxFrame(dt, race.phase === 'countdown' ? null : inp);
     trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
     grassFrame(dt);
+    mapFrame(now);
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {
