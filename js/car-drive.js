@@ -25,6 +25,14 @@
  * Overlays. KI-Gegner aus derselben Sim wie im Overlay (andere Piloten als Geister), andere Piloten live, von der KI
  * übernommene Autos über CarRaceSim.follower. Kontakt schubst nur das eigene Auto. Nicht rechtzeitig verbunden oder
  * übernommen: Zuschauen (Kamera auf dem eigenen Auto). Ergebnis + Punkte kommen aus dem Chatrennen (state.result).
+ * Wer im Countdown dazukommt (oder Auto/Lack tauscht), wird in der Startaufstellung nachgebaut (rcRebuildGrid).
+ *
+ * Wertung: wer im Ziel ist, behält seinen Platz (Zielzeit, sonst Reihenfolge des Zieleinlaufs) – nur Autos ohne Ziel
+ * werden nach Fortschritt dahinter sortiert (wie js/car-race.js); Platz nach dem Ziel = Server-Ergebnis, sobald da.
+ * Rundenrekorde: Mehrspieler/Chatrennen vom Server (geprüfte Runden, fx_race_lap_record, Meldung „rec“ über den WS),
+ * solo nur lokal (localStorage je Auto + Strecke und je Strecke), der Server-Streckenrekord wird nur angezeigt.
+ * Effekte: Bremsspuren + Qualm (js/car-drive-fx.js), Klänge (js/car-race-sound.js, nach der ersten Eingabe, M = stumm).
+ * Vor dem Start (Countdown): Kamera mit Maus/Touch/rechtem Stick um das eigene Auto drehen, Mausrad/Pinch zoomt.
  */
 (function (root) {
   'use strict';
@@ -77,6 +85,7 @@
   }
   resize();
   root.addEventListener('resize', resize);
+  var FX = root.CarDriveFx ? root.CarDriveFx.create(THREE, scene, cam, { reduce: REDUCE }) : null;
 
   function tokenColor(cls, fb) {
     var el = doc.querySelector('.' + cls), c = el && getComputedStyle(el).color;
@@ -197,7 +206,7 @@
   }
   function say(t) { ui.announce.textContent = t; }
   var msgT = 0;
-  function flash(text, secs) { var m = $('hMsg'); m.textContent = text; m.classList.add('show'); msgT = secs || 1.5; }
+  function flash(text, secs, big) { var m = $('hMsg'); m.textContent = text; m.classList.add('show'); m.classList.toggle('big', !!big); msgT = secs || 1.5; }
 
   // ---- Autos ----
   // Räder einsammeln (wie car-race.js setModel): vorn = vorderste Achse oder im Car editor markiert
@@ -282,10 +291,73 @@
     c.owned.forEach(function (x) { if (x && x.dispose) x.dispose(); });   // Modell-Materialien gehören ToyCars (geteilt)
   }
 
+  // ---- Klang (js/car-race-sound.js): startet nach der ersten Eingabe, M = stumm, Lautstärke in localStorage ----
+  var snd = null, sndOn = load('sound', true) !== false, sndVol = clamp(+load('volume', 0.6) || 0, 0, 1);
+  var sm = { me: null, field: null, nitro: 0, hitT: 0, lastSlip: 0 };
+  function soundStart() {
+    if (!snd && root.CarRaceSound) snd = root.CarRaceSound.create({ volume: sndOn ? sndVol : 0 });
+    if (snd) snd.resume();
+  }
+  ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) { doc.addEventListener(ev, soundStart, { passive: true }); });
+  function soundUi() {
+    [$('sndBtn'), $('soundBtn')].forEach(function (b) {
+      b.setAttribute('aria-pressed', sndOn ? 'true' : 'false');
+      b.querySelector('.icon').textContent = sndOn ? 'volume_up' : 'volume_off';
+    });
+    $('sndBtn').querySelector('.sr-only').textContent = sndOn ? 'Sound on – press to mute (M)' : 'Sound off – press to unmute (M)';
+    $('soundText').textContent = sndOn ? 'Sound on' : 'Sound off';
+    $('volRange').value = String(Math.round(sndVol * 100));
+  }
+  function setSound(on) {
+    sndOn = !!on; save('sound', sndOn);
+    soundStart();
+    if (snd) snd.setVolume(sndOn ? sndVol : 0);
+    soundUi();
+  }
+  $('sndBtn').addEventListener('click', function () { setSound(!sndOn); });
+  $('soundBtn').addEventListener('click', function () { setSound(!sndOn); });
+  $('volRange').addEventListener('input', function () {
+    sndVol = clamp((+$('volRange').value || 0) / 100, 0, 1); save('volume', sndVol);
+    if (!sndOn && sndVol > 0) { setSound(true); return; }
+    if (snd) snd.setVolume(sndOn ? sndVol : 0);
+  });
+  soundUi();
+  function sfx(name, arg) { if (snd && sndOn) snd[name](arg); }
+  function hitSound(v) { var t = performance.now(); if (v > 1.5 && t - sm.hitT > 160) { sm.hitT = t; sfx('thud', v > 6); } }
+  function soundStop() {
+    if (!snd) return;
+    snd.silence();
+    if (sm.me) { sm.me.stop(); sm.me = null; }
+    if (sm.field) { sm.field.stop(); sm.field = null; }
+  }
+  // je Bild: eigener Motor (laut), Feld (leise, mittleres Tempo naher Autos), Quietschen, Rumpeln, Nitro
+  function soundFrame(inp) {
+    if (!snd) return;
+    if (!race || race.paused || race.phase === 'results' || !sndOn) { snd.skid(0); snd.rumble(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false); return; }
+    var pc = race.pc, sp = Math.hypot(pc.vx, pc.vz);
+    if (!sm.me) sm.me = snd.motor(1);
+    if (!sm.field) sm.field = snd.motor(0.3);
+    sm.me.set(true, Math.abs(pc.u), inp ? Math.max(inp.throttle || 0, pc.u < -0.5 ? inp.brake || 0 : 0) : 0.3);
+    var n = 0, sum = 0;
+    (race.remotes || []).concat(race.ai || []).forEach(function (c) {
+      if (!c || !c.holder) return;
+      var d = Math.hypot(c.holder.position.x - pc.x, c.holder.position.z - pc.z);
+      if (d < 45 && c.fxSpeed != null) { n++; sum += c.fxSpeed * (1 - d / 45); }
+    });
+    sm.field.set(n > 0, n ? sum / n * 1.4 : 0, 0.5);
+    var hard = pc.surface === 'asphalt' || pc.surface === 'curb';
+    snd.skid(hard && sp > 3 && !race.spect ? clamp((pc.slip - 0.42) / 0.45, 0, 1) : 0);
+    snd.rumble(!hard && sp > 1 ? clamp(sp / 12, 0.2, 1) : 0);
+    if (pc.nitroT > 0 && sm.nitro <= 0) sfx('nitro');
+    sm.nitro = pc.nitroT;
+    if (pc.rail > 0) hitSound(pc.rail);
+  }
+
   // ---- Eingabe ----
   var keys = {}, pressed = {};
   var GAME_KEYS = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1, ShiftLeft: 1, ShiftRight: 1, KeyR: 1, KeyC: 1 };
   doc.addEventListener('keydown', function (e) {
+    if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { setSound(!sndOn); return; }
     if (e.code === 'Escape' && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) {
       e.preventDefault(); setPaused(!race.paused); return;
     }
@@ -310,8 +382,10 @@
     var edge = function (i) { return cur[i] && !pad.prev[i]; };
     var ax = gp.axes[0] || 0, dz = 0.12;
     ax = Math.abs(ax) < dz ? 0 : (ax - Math.sign(ax) * dz) / (1 - dz);
+    var rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
+    rx = Math.abs(rx) < 0.18 ? 0 : rx; ry = Math.abs(ry) < 0.18 ? 0 : ry;
     var r = { throttle: val(7), brake: val(6), steer: -ax, handbrake: cur[0], nitro: cur[1], cam: edge(3), start: edge(9),
-      up: edge(12), down: edge(13), left: edge(14), right: edge(15), a: edge(0), b: edge(1) };
+      up: edge(12), down: edge(13), left: edge(14), right: edge(15), a: edge(0), b: edge(1), lookX: rx, lookY: ry };
     pad.prev = cur;
     if (r.throttle > 0.05 || r.brake > 0.05 || ax !== 0 || cur.some(Boolean)) pad.active = true;
     return r;
@@ -335,6 +409,61 @@
     }
     if (p.b && open === 'pause') setPaused(false);
   }
+  // ---- Umschauen vor dem Start: Maus/Touch ziehen dreht die Kamera um das eigene Auto, Mausrad/Pinch zoomt ----
+  // look.yaw = Winkel um das Auto (0 = hinter dem Auto), look.pitch = Höhe, look.dist = Abstand; nur im Countdown.
+  var look = { used: false, yaw: 0, pitch: 0.32, dist: 0, ptrs: {}, pinch: 0 };
+  function lookAllowed() { return !!(race && race.phase === 'countdown' && !race.paused && race.pc); }
+  function lookReset() { look.used = false; look.yaw = 0; look.pitch = 0.32; look.dist = 0; look.ptrs = {}; look.pinch = 0; }
+  function lookBase() { return race ? race.me.len * 1.15 + 4.2 : 9; }
+  function lookOrbit(dx, dy) {
+    if (!look.used) { look.used = true; look.dist = lookBase(); }
+    look.yaw = wrapAngle(look.yaw - dx * 0.0065);
+    look.pitch = clamp(look.pitch + dy * 0.0045, 0.05, 1.25);
+  }
+  function lookZoom(f) {
+    if (!look.used) { look.used = true; look.dist = lookBase(); }
+    look.dist = clamp(look.dist * f, Math.max(3, race.me.len * 0.9), 40);
+  }
+  canvas.addEventListener('pointerdown', function (e) {
+    if (!lookAllowed()) return;
+    look.ptrs[e.pointerId] = { x: e.clientX, y: e.clientY };
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* */ }
+    app.dataset.look = 'drag';
+  });
+  canvas.addEventListener('pointermove', function (e) {
+    var p0 = look.ptrs[e.pointerId];
+    if (!p0 || !lookAllowed()) return;
+    var ids = Object.keys(look.ptrs);
+    if (ids.length >= 2) {
+      // Pinch: Abstand der beiden Finger
+      p0.x = e.clientX; p0.y = e.clientY;
+      var a = look.ptrs[ids[0]], b = look.ptrs[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (look.pinch > 0 && d > 0) lookZoom(look.pinch / d);
+      look.pinch = d;
+      return;
+    }
+    lookOrbit(e.clientX - p0.x, e.clientY - p0.y);
+    p0.x = e.clientX; p0.y = e.clientY;
+  });
+  function lookUp(e) {
+    delete look.ptrs[e.pointerId]; look.pinch = 0;
+    if (!Object.keys(look.ptrs).length && app.dataset.look === 'drag') app.dataset.look = '1';
+  }
+  canvas.addEventListener('pointerup', lookUp);
+  canvas.addEventListener('pointercancel', lookUp);
+  canvas.addEventListener('wheel', function (e) {
+    if (!lookAllowed()) return;
+    e.preventDefault();
+    lookZoom(Math.exp(clamp(e.deltaY, -200, 200) * 0.0015));
+  }, { passive: false });
+  // Countdown an/aus: Hinweis, Cursor; beim Start (GO) übernimmt die Verfolgerkamera weich (reduzierte Bewegung: sofort)
+  function lookPhase() {
+    var on = lookAllowed();
+    if ($('hLook').hidden === on) $('hLook').hidden = !on;
+    if (on) { if (!app.dataset.look) app.dataset.look = '1'; }
+    else if (app.dataset.look) { delete app.dataset.look; look.ptrs = {}; }
+  }
+
   var steerKb = 0, thrKb = 0, brkKb = 0;
   function playerInput(dt, p) {
     var L = keys.KeyA || keys.ArrowLeft, R = keys.KeyD || keys.ArrowRight;
@@ -437,6 +566,7 @@
       prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
       lapsShown: -1, posShown: '', opp: opp, newBest: false
     };
+    recLoad(race, s.track);
     if (sim) snap();
     ai.forEach(function (c, i) { var q = sim.cars[i]; placeCar(c, q.x, q.z, q.yaw, 0, 0, 0, 0); });
     placeCar(me, pc.x, pc.z, pc.yaw, 0, 0, 0, 0);
@@ -458,6 +588,8 @@
     if (trackRes) { trackRes.dispose(); trackRes = null; }
     ui.hud.hidden = true; ui.countdown.hidden = true;
     keys = {}; steerKb = thrKb = brkKb = 0;
+    if (FX) FX.clear();
+    soundStop(); lookReset();
   }
 
   function setPaused(on) {
@@ -529,7 +661,7 @@
           var lim = T.width / 2 + Math.max(0, q.d > 0 ? a.runL : a.runR) - c.w / 2 - 0.2;
           q.d = clamp(q.d + lat, -lim, lim);
         }
-        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); }
+        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); hitSound(-vn); }
       }
     });
   }
@@ -550,6 +682,17 @@
   function updateCam(dt) {
     var pc = race.pc, me = race.me, fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), mode = race.camMode;
     var sp = Math.hypot(pc.vx, pc.vz), fov = 62;
+    if (race.phase === 'countdown' && look.used) {
+      // Umschauen in der Startaufstellung: Kreisbahn um das eigene Auto
+      var ang = pc.yaw + Math.PI + look.yaw, hd = look.dist * Math.cos(look.pitch);
+      tmpV.set(pc.x + Math.cos(ang) * hd, look.dist * Math.sin(look.pitch) + me.height * 0.6, pc.z - Math.sin(ang) * hd);
+      tmpL.set(pc.x, me.height * 0.5, pc.z);
+      if (!race.camPos) { race.camPos = tmpV.clone(); race.camLook = tmpL.clone(); }
+      race.camPos.lerp(tmpV, damp(14, dt)); race.camLook.lerp(tmpL, damp(14, dt));
+      cam.position.copy(race.camPos); cam.lookAt(race.camLook);
+      if (Math.abs(cam.fov - 60) > 0.05) { cam.fov += (60 - cam.fov) * damp(5, dt); cam.updateProjectionMatrix(); }
+      return;
+    }
     if (mode === 'chase') {
       // hinter dem Auto, Blickrichtung etwas in Fahrtrichtung (Drift sichtbar)
       var hx = fx, hz = fz;
@@ -585,23 +728,39 @@
   }
 
   // ---- Wertung ----
+  // Wertung wie im Overlay (js/car-race.js): Zielankömmlinge nach Zielzeit vorn und dort eingefroren – wer einmal im
+  // Ziel ist (Zielzeit gemeldet oder Fortschritt über der Ziellinie, Zeit kommt evtl. erst später übers Netz), bleibt
+  // im Ziel; Gleichstand/geschätzte Zeiten nach Reihenfolge des Zieleinlaufs. Ohne Ziel nach Fortschritt dahinter.
   function standings() {
-    var list = [{ me: true, name: race.me.name, prog: race.pc.prog, fin: race.finishT, dnf: false }];
+    var list = [{ me: true, key: 'me', name: race.me.name, prog: race.pc.prog, fin: race.finishT, dnf: false }];
     if (race.sim) race.sim.cars.forEach(function (q, i) {
       if (!race.ai[i] || q.ghost) return;
-      list.push({ me: false, name: race.ai[i].name, prog: q.s, fin: q.finish, dnf: q.place == null && q.state === 'dnf' && q.wreck });
+      list.push({ me: false, key: 'ai' + i, name: race.ai[i].name, prog: q.s, fin: q.place != null ? q.finish : null, dnf: q.place == null && q.state === 'dnf' && q.wreck });
     });
     if (race.remotes) race.remotes.forEach(function (c) {
-      var fin = mp && mp.fin[c.id];
-      list.push({ me: false, name: c.label, prog: c.prog, fin: fin != null ? fin : null, dnf: false });
+      var fin = mp && mp.fin[c.id] != null ? mp.fin[c.id] : mp && mp.info && mp.info.fin && mp.info.fin[c.id] != null ? mp.info.fin[c.id] : c.finQ;
+      list.push({ me: false, key: 'r' + c.id, name: c.label, prog: c.prog, fin: fin != null ? fin : null, dnf: false });
+    });
+    var seen = race.finSeen || (race.finSeen = {}), line = race.T.len * race.laps;
+    list.forEach(function (x) {
+      if (x.fin == null && !x.dnf && race.phase !== 'countdown' && x.prog >= line) x.fin = seen[x.key] ? seen[x.key].t : race.t;
+      if (x.fin != null && !seen[x.key]) seen[x.key] = { t: x.fin, n: race.finN = (race.finN || 0) + 1 };
+      if (x.fin == null && seen[x.key]) x.fin = seen[x.key].t;
+      x.order = seen[x.key] ? seen[x.key].n : 0;
     });
     list.sort(function (a, b) {
       if ((a.fin != null) !== (b.fin != null)) return a.fin != null ? -1 : 1;
-      if (a.fin != null) return a.fin - b.fin;
+      if (a.fin != null) return a.fin - b.fin || a.order - b.order;
       if (a.dnf !== b.dnf) return a.dnf ? 1 : -1;
       return b.prog - a.prog;
     });
     return list;
+  }
+  // eigener Endplatz aus dem Server-Ergebnis (sobald da), sonst null
+  function serverPlace() {
+    if (!race || !race.mp || !mp || !mp.results || mp.results.race_id !== race.raceId) return null;
+    var r = mp.results.list.filter(function (x) { return String(x.id) === mp.me; })[0];
+    return r && r.place ? r.place : null;
   }
   function setText(id, t) { var el = $(id); if (el.textContent !== t) el.textContent = t; }
   // große Zahl mit kleinem „/gesamt“ dahinter
@@ -612,6 +771,7 @@
   function updateHud(list) {
     var pc = race.pc, n = list.length, pos = 1;
     list.forEach(function (x, i) { if (x.me) pos = i + 1; });
+    if (race.finishT != null && serverPlace()) pos = serverPlace();
     var posTxt = pos + '/' + n;
     if (race.posShown !== posTxt) { bigNum('hPos', pos, n); race.posShown = posTxt; }
     var lap = Math.min(race.laps, pc.laps + 1);
@@ -621,6 +781,9 @@
     var best = race.bestLap != null && (race.stored == null || race.bestLap < race.stored) ? race.bestLap : race.stored;
     setText('hBest', fmt(best));
     setText('hSpeed', String(Math.round(Phys.speedKmh(pc))));
+    var rev = pc.u < -0.5;
+    if ($('hGear').hidden === rev) $('hGear').hidden = !rev;
+    recHud();
     var nb = $('hNitro'), state = pc.nitroT > 0 ? 'on' : Phys.nitroReady(pc) && pc.prog > 0 ? 'ready' : 'used';
     if (nb.dataset.state !== state) { nb.dataset.state = state; setText('hNitroText', state === 'on' ? 'Nitro!' : state === 'ready' ? 'Nitro ready' : 'Nitro next lap'); }
   }
@@ -628,11 +791,66 @@
   function lapDone(lapTime) {
     race.lastLap = lapTime;
     if (race.bestLap == null || lapTime < race.bestLap) race.bestLap = lapTime;
+    var big = false;
     if (race.stored == null || lapTime < race.stored) {
       race.stored = lapTime; race.newBest = true;
       save('best.' + race.s.car + '.' + race.seed, Math.round(lapTime * 1000) / 1000);
       flash('Best lap ' + fmt(lapTime), 2);
     } else flash('Lap ' + fmt(lapTime), 1.5);
+    if (!race.mp) {
+      // solo (ohne Prüfung): Streckenrekord nur lokal; der Server-Rekord wird nur verglichen, nie geschrieben
+      if (!race.local || lapTime < race.local.t) {
+        race.local = { t: Math.round(lapTime * 1000) / 1000, car: race.s.car, name: race.me.name };
+        save('trackBest.' + race.seed, race.local);
+        flash('New local track record ' + fmt(lapTime), 2.5, true); big = true;
+      }
+      if (race.rec && race.rec.track && lapTime < race.rec.track.time) flash('Faster than the track record – solo laps are not counted', 3);
+    }
+    sfx('jingle', big);
+  }
+
+  // ---- Rundenrekorde (Server: geprüfte Runden; solo nur lesen) ----
+  function recUrl(track, car) {
+    var base = CFG && CFG.records ? CFG.records + '?' : root.__WIDGET_TOKEN__ ? '/s/' + root.__WIDGET_TOKEN__ + '/api/fx/car-race?cmd=records&' : null;
+    return base ? base + 'track=' + track + (car ? '&car=' + encodeURIComponent(car) : '') : null;
+  }
+  function recLoad(r, track) {
+    r.rec = { idx: track, track: null, car: null };
+    r.local = load('trackBest.' + r.seed, null);
+    if (r.local && !(r.local.t > 0)) r.local = null;
+    var url = recUrl(track, r.s.car);
+    if (!url) return;
+    fetch(url, { credentials: 'same-origin', cache: 'no-store' }).then(function (x) { return x.json(); }).then(function (j) {
+      if (race !== r || !j || !j.ok) return;
+      r.rec.track = j.record || null; r.rec.car = j.car || null;
+    }).catch(function () { /* ohne Rekorde */ });
+  }
+  function recName(row) {
+    var e = row && byKey[row.car_key];
+    return row ? row.car_name || (e ? displayName(e) : row.car_key) : '';
+  }
+  function recHud() {
+    var rec = race.rec || {}, solo = !race.mp, carRow = solo ? null : rec.car;
+    setText('hCarRecLbl', solo ? 'Local record' : 'Car record');
+    if (solo) {
+      setText('hCarRec', race.local ? fmt(race.local.t) : '–');
+      setText('hCarRecBy', race.local ? (race.local.name || race.local.car || '') : '');
+    } else {
+      setText('hCarRec', carRow ? fmt(carRow.time) : '–');
+      setText('hCarRecBy', carRow ? carRow.display : '');
+    }
+    setText('hTrackRec', rec.track ? fmt(rec.track.time) : '–');
+    setText('hTrackRecBy', rec.track ? rec.track.display + ' · ' + recName(rec.track) : '');
+  }
+  // WS-Meldung „rec“: geprüfte Runde war Bestzeit/Rekord (eigene → große Einblendung)
+  function recMsg(m) {
+    if (!race || !race.mp || !race.rec || m.track !== race.rec.idx) return;
+    var mine = mp && String(m.id) === mp.me, row = { display: m.name, car_key: m.car, time: m.time };
+    if (m.track_rec) race.rec.track = m.best_track || row;
+    if (m.car === race.s.car && (m.car_rec || !race.rec.car)) race.rec.car = m.best_car || row;
+    if (mine && m.track_rec) { flash('NEW TRACK RECORD ' + fmt(m.time), 3.5, true); sfx('jingle', true); say('New track record'); }
+    else if (mine && m.car_rec) { flash('NEW CAR RECORD ' + fmt(m.time), 3, true); sfx('jingle', true); say('New car record'); }
+    else if (!mine && m.track_rec) flash('Track record by ' + m.name + ' – ' + fmt(m.time), 2.5);
   }
 
   function showResults() {
@@ -641,9 +859,9 @@
     if (race.mp && mp && mp.results) {
       // Mehrspieler: Wertung vom Server (nur plausible Fahrer bekommen einen Platz)
       list = mp.results.list.map(function (r) {
-        return { me: r.id === mp.me, name: r.name, place: r.place, fin: r.status === 'finished' ? r.time : null,
+        return { me: String(r.id) === mp.me, name: r.name, place: r.place, fin: r.status === 'finished' ? r.time : null,
           dnf: r.status === 'dnf', invalid: r.status === 'invalid' };
-      });
+      }).sort(function (a, b) { return (a.place || 1e9) - (b.place || 1e9); });
     }
     ui.results.textContent = '';
     list.forEach(function (x, i) {
@@ -800,6 +1018,7 @@
         mp.recorded = m;
         if (race && race.mp && race.phase === 'results') mpFinishNote();
         break;
+      case 'rec': recMsg(m); break;
       case 'closed': mpLeave(m.msg ? m.msg.charAt(0).toUpperCase() + m.msg.slice(1) + '.' : 'The room was closed.'); break;
       case 'gone': mpLeave(m.code === 4401 ? 'Sign-in expired – reload the page.' : m.code === 4404 ? 'This room is closed.' : 'Connection lost.'); break;
       case 'error': setLobbyStatus(m.msg); break;
@@ -861,6 +1080,7 @@
       prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
       lapsShown: -1, posShown: '', opp: [], newBest: false
     };
+    recLoad(race, idx);
     placeCar(me, pc.x, pc.z, pc.yaw, 0, 0, 0, 0);
     ui.hud.hidden = false; showPanel(null);
     setCam('chase', true);
@@ -907,7 +1127,7 @@
       if (vn < 0) {
         var J = -(1 + 0.25) * vn / (1 / mP + 1 / mA);
         pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
-        if (-vn > 1.5) race.shake = Math.min(0.5, race.shake + -vn * 0.03);
+        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); hitSound(-vn); }
       }
     });
   }
@@ -1059,6 +1279,7 @@
   function rcMsg(m) {
     if (m.t === 'welcome' || m.t === 'race') { mp.info = m.race; if (race && race.chat) (m.race.taken || []).forEach(rcTakeover); }
     else if (m.t === 'takeover') rcTakeover(m.ev);
+    else if (m.t === 'rec') recMsg(m);
     else if (m.t === 'lap') {
       if (m.fin != null) mp.fin[String(m.id)] = m.fin;
       if (String(m.id) === mp.me && !m.ok && race && race.chat) flash('Lap not counted', 2.5);
@@ -1099,36 +1320,61 @@
       if (rc.st.race_id !== st.race_id || !mp || (race && race.chat)) return;
       teardown();
       st = rc.st;
-      var T = Sim.track(Sim.TRACKS[((st.track | 0) % Sim.TRACKS.length + Sim.TRACKS.length) % Sim.TRACKS.length]);
+      var tIdx = ((st.track | 0) % Sim.TRACKS.length + Sim.TRACKS.length) % Sim.TRACKS.length, T = Sim.track(Sim.TRACKS[tIdx]);
       trackRes = CarTrackScene.build(T, { primary: tokenColor('tk-primary', '#5e2a79'), accent: tokenColor('tk-accent', '#f2b705'), maxAniso: maxAniso });
       scene.add(trackRes.group);
-      var RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [];
-      var mine = rcRacer(st, meId), mineSrc = mine || { car_key: null, paint: 0 };
-      var me = makeCar(mineSrc.car_key, rcSet(mineSrc), { loaded: !!mp.loaded[mineSrc.car_key], duck: true, outfit: null });
-      race = { s: { car: mineSrc.car_key, paint: 0, track: 0, laps: st.laps || 3 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
-        mp: true, chat: true, raceId: st.race_id, me: me, pc: null, laps: st.laps || 3, phase: 'countdown', paused: false,
-        t: 0, cd: rcGo(st) - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mineSrc.car_key + '.' + T.seed, null),
+      race = { s: { car: null, paint: 0, track: tIdx, laps: st.laps || 3 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
+        mp: true, chat: true, raceId: st.race_id, me: null, pc: null, laps: st.laps || 3, phase: 'countdown', paused: false,
+        t: 0, cd: rcGo(st) - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: null,
         prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
         lapsShown: -1, posShown: '', opp: [], newBest: false, follow: {}, taken: {}, nitroSeen: {} };
       mp.startAt = rcGo(st); mp.raceId = st.race_id;
-      rcBuildSim(st);
-      // KI-Autos (Index wie in der Sim), andere Fahrer als „remotes“ (live bzw. Nachfahrer), sich selbst weglassen
-      race.simCars.forEach(function (sc, i) {
-        if (sc.id === meId) { race.ai.push(null); race.myIdx = i; return; }
-        var c = makeCar(sc.src.car_key, rcSet(sc.src), { loaded: !!mp.loaded[sc.src.car_key], duck: true, outfit: outfits.length ? outfits[i % outfits.length] : null });
-        c.id = sc.id; c.label = sc.src.display; c.idx = i; c.prog = race.sim.cars[i].s; c.smp = null;
-        race.ai.push(c);
-      });
-      var g0 = race.sim.cars[race.myIdx || 0];
-      race.pc = Phys.create(T, Phys.params(me.st, me.raw), { s: g0.s, d: g0.d });
-      placeCar(me, race.pc.x, race.pc.z, race.pc.yaw, 0, 0, 0, 0);
-      rcRoles(st);
+      rcCars(st);
       ui.hud.hidden = false; showPanel(null);
       setCam('chase', true);
       ui.countdown.hidden = false; ui.countdown.textContent = '';
       say('Race starts soon');
       canvas.setAttribute('tabindex', '-1');
       try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ }
+    });
+  }
+  // Startaufstellung aus dem Rennzustand bauen (beim Start der Szene und neu, wenn sich im Countdown Fahrer, Autos oder
+  // Lacke ändern): Sim neu, KI-Autos (Index wie in der Sim), andere Fahrer, eigenes Auto auf seinem Startplatz.
+  // Kamera, Umschauen und Countdown bleiben; fehlende Modelle werden nachgeladen und dann einmal neu aufgebaut.
+  function rcRosterKey(st) {
+    return (st.racers || []).slice().sort(function (a, b) { return a.grid - b.grid; })
+      .map(function (r) { return [r.user_id, r.car_key, r.paint, r.sub_paint, r.grid].join(':'); }).join('|');
+  }
+  function rcCars(st) {
+    var meId = mp.me, RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [], T = race.T, missing = {};
+    race.ai.forEach(function (c) { if (c) { disposeCar(c); if (FX) FX.forget(c.id); } });
+    if (race.me) disposeCar(race.me);
+    race.ai = []; race.remotes = []; race.myIdx = null;
+    rcBuildSim(st);
+    var mine = rcRacer(st, meId), mineSrc = mine || { car_key: null, paint: 0 };
+    if (mineSrc.car_key && !mp.loaded[mineSrc.car_key]) missing[mineSrc.car_key] = 1;
+    race.me = makeCar(mineSrc.car_key, rcSet(mineSrc), { loaded: !!mp.loaded[mineSrc.car_key], duck: true, outfit: null });
+    if (race.s.car !== mineSrc.car_key) {
+      race.s.car = mineSrc.car_key;
+      race.stored = load('best.' + mineSrc.car_key + '.' + T.seed, null);
+      recLoad(race, race.s.track);
+    }
+    race.simCars.forEach(function (sc, i) {
+      if (sc.id === meId) { race.ai.push(null); race.myIdx = i; return; }
+      if (sc.src.car_key && !mp.loaded[sc.src.car_key]) missing[sc.src.car_key] = 1;
+      var c = makeCar(sc.src.car_key, rcSet(sc.src), { loaded: !!mp.loaded[sc.src.car_key], duck: true, outfit: outfits.length ? outfits[i % outfits.length] : null });
+      c.id = sc.id; c.label = sc.src.display; c.idx = i; c.prog = race.sim.cars[i].s; c.smp = null;
+      race.ai.push(c);
+    });
+    var g0 = race.sim.cars[race.myIdx || 0];
+    race.pc = Phys.create(T, Phys.params(race.me.st, race.me.raw), { s: g0.s, d: g0.d });
+    placeCar(race.me, race.pc.x, race.pc.z, race.pc.yaw, 0, 0, 0, 0);
+    race.ai.forEach(function (c, i) { if (c) { var q = race.sim.cars[i]; placeCar(c, q.x, q.z, q.yaw, 0, 0, 0, 0); } });
+    race.rosterKey = rcRosterKey(st);
+    rcRoles(st);
+    var keys = Object.keys(missing), r = race;
+    if (keys.length) Promise.all(keys.map(mpLoad)).then(function () {
+      if (race === r && r.phase === 'countdown' && mp && keys.some(function (k) { return mp.loaded[k]; })) r.rosterKey = '';
     });
   }
   // Rollen nach dem Einfrieren: Piloten (live/Nachfahrer) als „remotes“, KI in race.ai; selbst: fahren oder zuschauen
@@ -1156,6 +1402,8 @@
     if (st.race_id !== race.raceId) return;
     // Startzeit verschoben (Vorstellung begonnen, „Start now“, neue Fahrer im Countdown): Uhr + Sim nachziehen
     if (rcGo(st) != null && rcGo(st) !== mp.startAt && race.phase === 'countdown') { mp.startAt = rcGo(st); race.cd = mp.startAt - mp.net.serverNow(); rcBuildSim(st); }
+    // neue/abgemeldete Fahrer, Auto- oder Lacktausch im Countdown: Startaufstellung neu bauen
+    if (race.phase === 'countdown' && rcRosterKey(st) !== race.rosterKey) rcCars(st);
     if ((rcPilots(st) || ['-']).join('|') !== race.pilotsKey) { rcBuildSim(st); rcRoles(st); }
     (st.race_events || []).forEach(function (e) {
       if (e.type === 'takeover') rcTakeover(e);
@@ -1180,7 +1428,7 @@
     var at = mp.net.serverNow() - Net.DELAY, t = mp.net.serverNow() - mp.startAt;
     race.remotes.forEach(function (c) {
       var f = rcFollower(c.id, c.idx), q;
-      if (f) { var fq = f.at(t); q = { x: fq.x, z: fq.z, yaw: fq.yaw, roll: fq.roll, pitch: 0, steer: fq.steer, spin: fq.spin, speed: fq.v, prog: fq.s }; }
+      if (f) { var fq = f.at(t); q = { x: fq.x, z: fq.z, yaw: fq.yaw, roll: fq.roll, pitch: 0, steer: fq.steer, spin: fq.spin, speed: fq.v, prog: fq.s }; c.finQ = fq.finish; }
       else q = mp.net.sample(c.id, at);
       c.smp = q;
       if (!q) { var g = race.sim.cars[c.idx]; placeCar(c, g.x, g.z, g.yaw, 0, 0, 0, 0); return; }
@@ -1219,7 +1467,7 @@
       if (vn < 0) {
         var J = -(1 + 0.25) * vn / (1 / mP + 1 / mA);
         pc.vx += best.nx * J / mP; pc.vz += best.nz * J / mP;
-        if (-vn > 1.5) race.shake = Math.min(0.5, race.shake + -vn * 0.03);
+        if (-vn > 1.5) { race.shake = Math.min(0.5, race.shake + -vn * 0.03); hitSound(-vn); }
       }
     });
   }
@@ -1232,9 +1480,13 @@
     var p = readPad();
     if (p && p.start && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) setPaused(!race.paused);
     else if (p) padMenu(p);
-    if (!race || !trackRes) { idleCam(dt); renderer.render(scene, cam); return; }
-    if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('hMsg').classList.remove('show'); }
-    if (race.paused || race.phase === 'results') { if (race.phase === 'results' && !race.paused) stepWorld(dt, cruise(race.pc)); renderer.render(scene, cam); return; }
+    if (!race || !trackRes) { idleCam(dt); soundFrame(null); renderer.render(scene, cam); return; }
+    if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('hMsg').classList.remove('show', 'big'); }
+    if (race.paused || race.phase === 'results') {
+      if (race.phase === 'results' && !race.paused) stepWorld(dt, cruise(race.pc));
+      lookPhase(); fxFrame(dt, null);
+      renderer.render(scene, cam); return;
+    }
     var pc = race.pc;
     if (pressed.KeyC || (p && p.cam)) setCam(CAM_ORDER[(CAM_ORDER.indexOf(race.camMode) + 1) % CAM_ORDER.length], true);
     if (race.phase === 'countdown') {
@@ -1245,8 +1497,17 @@
         ui.countdown.textContent = after > 0 ? String(after) : 'GO';
         ui.countdown.classList.remove('tick'); void ui.countdown.offsetWidth; ui.countdown.classList.add('tick');
         say(after > 0 ? String(after) : 'Go');
+        if (after > 0 && after <= 3 && after !== before) sfx('beep');
       }
-      if (race.cd <= 0 && (!race.chat || rc.st.phase === 'intro' || rc.st.phase === 'race')) { race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0; setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700); }
+      if (p && (p.lookX || p.lookY) && lookAllowed()) lookOrbit(p.lookX * dt * 420, p.lookY * dt * 320);
+      if (race.cd <= 0 && (!race.chat || rc.st.phase === 'intro' || rc.st.phase === 'race')) {
+        race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0;
+        sfx('go');
+        // Umschauen beendet: Verfolgerkamera holt die Kamera weich zurück (reduzierte Bewegung: sofort)
+        if (look.used && REDUCE) race.camPos = null;
+        lookReset();
+        setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700);
+      }
       placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
       drawAI();
       if (race.chat) { rcDraw(); placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin); mpSend(); }
@@ -1259,6 +1520,8 @@
     pressed = {};
     updateHud(standings());
     updateCam(dt);
+    lookPhase();
+    fxFrame(dt, race.phase === 'countdown' ? null : inp);
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {
@@ -1302,11 +1565,32 @@
     if (race.mp) mpSend();
     if (race.phase === 'results') updateCam(dt);
   }
+  // Bremsspuren/Qualm (eigenes Auto aus der Fahrphysik, andere aus ihren gezeichneten Lagen) + Klänge
+  function fxFrame(dt, inp) {
+    if (FX && race && race.pc && !race.paused) {
+      var pc = race.pc;
+      if (race.phase !== 'countdown') {
+        FX.drive('me', { x: pc.x, z: pc.z, yaw: pc.yaw, len: race.me.len, w: race.me.w }, pc.slip,
+          { speed: Math.hypot(pc.vx, pc.vz), surface: pc.surface, vx: pc.vx, vz: pc.vz, dt: dt });
+        var seen = [];
+        (race.ai || []).concat(race.remotes || []).forEach(function (c, i) {
+          if (!c || !c.holder || seen.indexOf(c) >= 0) return;
+          seen.push(c);
+          var q = race.sim && c.idx == null && race.sim.cars[i] ? race.sim.cars[i] : null;
+          c.fxSpeed = FX.watch(c.id || 'ai' + i, { x: c.holder.position.x, z: c.holder.position.z, yaw: c.holder.rotation.y, len: c.len, w: c.w },
+            dt, q && q.off ? 'grass' : 'asphalt');
+        });
+      }
+      FX.update(dt, canvas.clientWidth || root.innerWidth, canvas.clientHeight || root.innerHeight);
+    }
+    soundFrame(inp);
+  }
   // Menü: langsamer Kameraflug um den Ursprung (ohne Strecke nur Himmel)
   var idleA = 0;
   function idleCam(dt) { idleA += dt * 0.05; cam.position.set(Math.cos(idleA) * 120, 70, Math.sin(idleA) * 120); cam.lookAt(0, 0, 0); }
   root.requestAnimationFrame(frame);
   showPanel(RACE ? 'lobby' : 'menu');
   // Fehlersuche/Prüfskript: aktueller Rennzustand (nur lesen)
-  root.CarDrive = { state: function () { return race; } };
+  root.CarDrive = { state: function () { return race; },
+    debug: function () { return { sound: !!snd, soundOn: sndOn, volume: sndVol, look: { used: look.used, yaw: look.yaw, dist: look.dist }, fx: FX ? FX.count() : null }; } };
 })(typeof window !== 'undefined' ? window : this);

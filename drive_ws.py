@@ -447,8 +447,8 @@ def _lap_db(tenant_id, track, car_key, user_id, display, lap_time, source):
         raw.close()
 
 
-async def main(host, port, secret=None, record=None):
-    srv = DriveServer(secret=secret, record=record)
+async def main(host, port, secret=None, record=None, lap_record=None):
+    srv = DriveServer(secret=secret, record=record, lap_record=lap_record)
     async with serve(srv.handler, host, port, process_request=srv.process_request, max_size=8192,
                      ping_interval=20, ping_timeout=20):
         print("obs-drive serving on %s:%d" % (host, port), flush=True)

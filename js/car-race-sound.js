@@ -12,7 +12,14 @@
  *   s.whoosh()                       kurzes Vorbeirauschen (Überholen, höchstens alle 0,4 s)
  *   s.fire(level)                    Knistern der Wrack-Brände, 0 = aus (je Bild aufrufen)
  *   s.cheer(), s.fanfare()           Siegerehrung: Jubel (Rauschen schwillt an) + kurze Fanfare
- *   s.silence()                      Dauerklänge aus (Motor, Feuer)
+ *   s.silence()                      Dauerklänge aus (Motor, Feuer, Motoren, Quietschen, Rumpeln)
+ *
+ * Zusätzlich für Car Drive (selbst fahren, js/car-drive.js):
+ *   s.setVolume(v)                   Gesamtlautstärke 0..1 (0 = stumm)
+ *   var m = s.motor(gain)            eigener Motor (je Auto oder fürs Feld): m.set(on, speed m/s, throttle 0..1),
+ *                                    m.stop(); gain = Anteil am Pegel (eigenes Auto 1, andere leiser)
+ *   s.skid(level), s.rumble(level)   Dauer-Quietschen (Rutschen/Handbremse) bzw. Kies-/Gras-Rumpeln, 0..1, je Bild
+ *   s.jingle(big)                    kurze Tonfolge für eine Runde (big = Rekord)
  *
  * Alles läuft über einen Master-Pegel und einen Kompressor/Begrenzer – nie laute Spitzen, insgesamt dezent.
  */
@@ -63,7 +70,7 @@
     }
 
     // ---- Dauerklänge ----
-    var eng = null, fireG = null, fireNext = 0, lastWhoosh = -1;
+    var eng = null, fireG = null, fireNext = 0, lastWhoosh = -1, motors = [], skidN = null, rumbleG = null;
     function engineNodes() {
       if (eng) return eng;
       var out = ctx.createGain(); out.gain.value = 0; out.connect(master);
@@ -150,7 +157,77 @@
           ch.forEach(function (f) { tone('sawtooth', f, t + k * 0.32, 0.02, 0.03, k === 2 ? 0.9 : 0.28); });
         });
       },
-      silence: function () { api.engine(false); if (fireG) fireG.gain.setTargetAtTime(0, now(), 0.2); }
+      silence: function () {
+        api.engine(false); if (fireG) fireG.gain.setTargetAtTime(0, now(), 0.2);
+        motors.forEach(function (m) { m.set(false); });
+        api.skid(0); api.rumble(0);
+      },
+      setVolume: function (v) {
+        vol = Math.max(0, Math.min(1, +v || 0));
+        master.gain.setTargetAtTime(vol * 0.6, now(), 0.05);
+      },
+      // eigenständiger Motor: zwei Sägezähne (Grundton + Oberton) + gefiltertes Rauschen, Tonhöhe aus Tempo und Gas
+      motor: function (gain) {
+        var k = gain == null ? 1 : gain;
+        var out = ctx.createGain(); out.gain.value = 0; out.connect(master);
+        var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 400; lp.connect(out);
+        var o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), og = ctx.createGain();
+        o1.type = 'sawtooth'; o2.type = 'square'; o1.frequency.value = 50; o2.frequency.value = 100; og.gain.value = 0.3;
+        o1.connect(og); o2.connect(og); og.connect(lp);
+        var n = noise(true), bp = ctx.createBiquadFilter(), ng = ctx.createGain();
+        bp.type = 'bandpass'; bp.frequency.value = 300; bp.Q.value = 0.9; ng.gain.value = 0.35;
+        n.connect(bp); bp.connect(ng); ng.connect(out);
+        o1.start(); o2.start(); n.start(Math.random() * 1.5);
+        var m = {
+          set: function (on, speed, thr) {
+            var t = now(), v = Math.max(0, speed || 0), th = Math.max(0, Math.min(1, thr || 0));
+            // „Gänge“: Drehzahl steigt je Gang an und fällt beim Schalten zurück
+            var g = v % 7 / 7, f = 46 + v * 1.6 + g * 38 + th * 14;
+            out.gain.setTargetAtTime(on ? k * (0.07 + 0.06 * th) : 0, t, on ? 0.15 : 0.2);
+            o1.frequency.setTargetAtTime(f, t, 0.08); o2.frequency.setTargetAtTime(f * 2.01, t, 0.08);
+            bp.frequency.setTargetAtTime(220 + f * 3, t, 0.1); lp.frequency.setTargetAtTime(300 + f * 4 + th * 500, t, 0.1);
+          },
+          stop: function () {
+            m.set(false);
+            setTimeout(function () { try { o1.stop(); o2.stop(); n.stop(); out.disconnect(); } catch (e) { /* schon aus */ } }, 600);
+            motors = motors.filter(function (x) { return x !== m; });
+          }
+        };
+        motors.push(m);
+        return m;
+      },
+      skid: function (level) {
+        level = Math.max(0, Math.min(1, level || 0));
+        if (!skidN && level <= 0) return;
+        if (!skidN) {
+          var o = ctx.createOscillator(), lfo = ctx.createOscillator(), lg = ctx.createGain(), bp = ctx.createBiquadFilter(), g = ctx.createGain();
+          o.type = 'sawtooth'; o.frequency.value = 980; lfo.frequency.value = 19; lg.gain.value = 35;
+          lfo.connect(lg); lg.connect(o.frequency);
+          bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 5; g.gain.value = 0;
+          o.connect(bp); bp.connect(g); g.connect(master); o.start(); lfo.start();
+          skidN = { g: g, o: o };
+        }
+        var t = now();
+        skidN.g.gain.setTargetAtTime(0.035 * level, t, level > 0 ? 0.05 : 0.12);
+        skidN.o.frequency.setTargetAtTime(900 + 220 * level, t, 0.1);
+      },
+      rumble: function (level) {
+        level = Math.max(0, Math.min(1, level || 0));
+        if (!rumbleG && level <= 0) return;
+        if (!rumbleG) {
+          var n = noise(true), lp = ctx.createBiquadFilter(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+          lp.type = 'lowpass'; lp.frequency.value = 520;
+          rumbleG = ctx.createGain(); rumbleG.gain.value = 0;
+          lfo.frequency.value = 13; lg.gain.value = 0.4; lfo.connect(lg);
+          var am = ctx.createGain(); am.gain.value = 0.7; lg.connect(am.gain);
+          n.connect(lp); lp.connect(am); am.connect(rumbleG); rumbleG.connect(master); n.start(); lfo.start();
+        }
+        rumbleG.gain.setTargetAtTime(0.09 * level, now(), 0.08);
+      },
+      jingle: function (big) {
+        var t = now(), notes = big ? [659.25, 783.99, 987.77, 1318.51] : [783.99, 1046.5];
+        notes.forEach(function (f, i) { tone('triangle', f, t + i * 0.11, 0.01, big ? 0.07 : 0.05, big && i === notes.length - 1 ? 0.6 : 0.22); });
+      }
     };
     return api;
   }

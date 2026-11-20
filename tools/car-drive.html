@@ -103,6 +103,23 @@
     .hud-times dt { color: var(--cd-dim); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; align-self: center; }
     .hud-times dd { margin: 0; font-family: var(--cd-mono); text-align: right; }
     .hud-times dd.best { color: var(--cd-accent); }
+    .hud-times dd.rec { color: var(--cd-ok); }
+    .hud-times dd.rec-by { grid-column: 1 / -1; font-family: var(--cd-body); font-size: 12px; color: var(--cd-dim); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: -2px; }
+    .hud-times dd.rec-by:empty { display: none; }
+    .gear { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 4px; background: var(--cd-accent); color: #1b1300; letter-spacing: 0; }
+    .gear[hidden] { display: none; }
+    .hud-look { left: 50%; bottom: 20px; transform: translateX(-50%); font-size: 14px; color: var(--cd-text); display: flex; gap: 6px; align-items: center; }
+    .hud-look[hidden] { display: none; }
+    .hud-msg.big { color: var(--cd-accent); font-size: 34px; letter-spacing: 0.04em; }
+    .app[data-look] #view { cursor: grab; touch-action: none; }
+    .app[data-look="drag"] #view { cursor: grabbing; }
+    .sound-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+    .sound-row label { color: var(--cd-dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .sound-row input { flex: 1; min-width: 120px; }
+    .snd-btn { position: absolute; right: 70px; bottom: 16px; z-index: 12; background: var(--cd-hud-bg); border-color: rgba(255, 255, 255, 0.25); padding: 6px 10px; }
+    .snd-btn[aria-pressed="false"] .icon { color: var(--cd-dim); }
+    .app.racing .snd-btn { bottom: auto; top: calc(50% + 50px); right: 16px; }
+    .app.racing .snd-btn:not(:focus-visible):not(:hover) { opacity: 0.45; }
     .hud-speed { right: 20px; bottom: 20px; text-align: right; min-width: 150px; }
     .hud-speed .hud-big { font-size: 56px; font-variant-numeric: tabular-nums; }
     .nitro { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--cd-dim); }
@@ -173,12 +190,17 @@
         <dt>Time</dt><dd id="hCur">0:00.000</dd>
         <dt>Last</dt><dd id="hLast">–</dd>
         <dt>Best</dt><dd id="hBest" class="best">–</dd>
+        <dt id="hCarRecLbl">Car record</dt><dd id="hCarRec">–</dd>
+        <dd class="rec-by" id="hCarRecBy"></dd>
+        <dt>Track record</dt><dd id="hTrackRec" class="rec">–</dd>
+        <dd class="rec-by" id="hTrackRecBy"></dd>
       </dl>
       <div class="hud-box hud-speed">
-        <span class="hud-lbl">km/h</span><span class="hud-big" id="hSpeed">0</span>
+        <span class="hud-lbl">km/h <span class="gear" id="hGear" hidden>R</span></span><span class="hud-big" id="hSpeed">0</span>
         <div class="nitro" id="hNitro" data-state="ready"><span class="icon" aria-hidden="true">bolt</span><span id="hNitroText">Nitro ready</span></div>
       </div>
       <div class="hud-box hud-cam" id="hCam">Chase camera</div>
+      <div class="hud-box hud-look" id="hLook" hidden><span class="icon" aria-hidden="true">360</span> Drag to look around · scroll or pinch to zoom</div>
       <div class="hud-box hud-msg" id="hMsg"></div>
     </div>
     <div id="countdown" class="countdown" hidden aria-hidden="true"></div>
@@ -241,6 +263,8 @@
           <dt>Camera</dt><dd><kbd>C</kbd></dd><dd>Y</dd>
           <dt>Back on track</dt><dd><kbd>R</kbd></dd><dd>–</dd>
           <dt>Pause</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
+          <dt>Sound on / off</dt><dd><kbd>M</kbd></dd><dd>–</dd>
+          <dt>Look around (before the start)</dt><dd>Drag, scroll</dd><dd>Right stick</dd>
         </dl>
       </details>
     </section>
@@ -291,6 +315,11 @@
         <button type="button" id="restartBtn">Restart race</button>
         <button type="button" class="ghost" id="menuBtn">Back to menu</button>
       </div>
+      <div class="sound-row">
+        <button type="button" class="ghost" id="soundBtn" aria-pressed="true"><span class="icon" aria-hidden="true">volume_up</span> <span id="soundText">Sound on</span></button>
+        <label for="volRange">Volume</label>
+        <input type="range" id="volRange" min="0" max="100" step="5" value="60">
+      </div>
     </section>
 
     <section id="finish" class="panel small" hidden role="dialog" aria-modal="true" aria-labelledby="finishTitle">
@@ -304,6 +333,7 @@
       </div>
     </section>
 
+    <button type="button" class="snd-btn" id="sndBtn" aria-pressed="true"><span class="icon" aria-hidden="true">volume_up</span><span class="sr-only">Sound on – press to mute (M)</span></button>
     <button type="button" class="fs-btn" id="fsBtn" aria-pressed="false"><span class="icon" aria-hidden="true">fullscreen</span><span class="sr-only">Fullscreen</span></button>
   </main>
 
@@ -320,6 +350,8 @@
   <script src="/s/__WIDGET_TOKEN__/js/car-track-scene.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive-phys.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive-net.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-drive-fx.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-sound.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/car-drive.js"></script>

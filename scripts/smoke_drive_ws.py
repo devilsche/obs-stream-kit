@@ -32,6 +32,14 @@ def fake_record(tenant, race_id, rows):
     return True, {r["user_id"]: 1 for r in rows}
 
 
+LAPS = []
+
+
+def fake_lap(tenant, track, car, uid, display, lap_time, source):
+    LAPS.append((uid, lap_time, source))
+    return {"personal": True, "car": len(LAPS) == 1, "track": len(LAPS) == 1, "best_car": None, "best_track": None}
+
+
 def free_port():
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
@@ -43,7 +51,8 @@ def free_port():
 def main():
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
     port = free_port()
-    th = threading.Thread(target=lambda: asyncio.run(drive_ws.main("127.0.0.1", port, secret=SECRET, record=fake_record)),
+    th = threading.Thread(target=lambda: asyncio.run(drive_ws.main("127.0.0.1", port, secret=SECRET, record=fake_record,
+                                                             lap_record=fake_lap)),
                           daemon=True)
     th.start()
     base = "http://127.0.0.1:%d" % port
@@ -69,6 +78,14 @@ def main():
     if rc == 0 and len(SAVED) != 1:
         print("FAIL Ergebnis nicht genau einmal gespeichert")
         rc = 1
+    # Rundenrekorde: geprüfte Runden der ehrlichen Fahrer, nie die des Schummlers (letzter Client)
+    cheat = "u%d" % (n - 1) if n > 2 else None
+    print("     Rekord-Runden: %s" % LAPS)
+    if not LAPS or any(u == cheat for u, _, _ in LAPS) or any(src != "room" for _, _, src in LAPS):
+        print("FAIL Rekord-Runden: nur geprüfte Runden ehrlicher Fahrer erwartet")
+        rc = 1
+    else:
+        print("ok   Rekord-Runden nur von geprüften Runden (%d)" % len(LAPS))
     return rc
 
 

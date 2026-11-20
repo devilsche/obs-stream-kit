@@ -116,11 +116,14 @@ async def run(port):
     ok(rep["pilots"]["a"]["fin"] and not rep["pilots"]["a"]["invalid"] and rep["pilots"]["b"]["taken"],
        "sync meldet Zielzeit A + Übernahme B: %s" % rep["pilots"])
     ok(any(t["id"] == "b" for t in rep["takeovers"]), "Übernahme als Ereignis für race_events")
+    rec = [m for m in isp if m.get("t") == "rec"]
+    ok(rec and rec[0]["id"] == "a" and rec[0]["track_rec"], "Rundenrekord von A an den Overlay gemeldet (%s)" % (rec[:1] or None))
 
 
 def main():
     port = free_port()
-    srv = drive_ws.DriveServer(secret=SECRET)
+    srv = drive_ws.DriveServer(secret=SECRET, lap_record=lambda *a: {"personal": True, "car": True, "track": True,
+                                                                       "best_car": None, "best_track": None})
 
     async def all_():
         from websockets.asyncio.server import serve
