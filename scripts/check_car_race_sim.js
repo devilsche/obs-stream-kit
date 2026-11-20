@@ -450,10 +450,12 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   if (a === ref) fail('Ereignisse ändern das Rennen nicht');
   // Nitro bringt Strecke (wirkt auf Geraden, 3,5 s): der Führende zündet zu mehreren Zeitpunkten, Vergleich 3,5 s
   // später – auf dem Speedway bester Zeitpunkt > 3 m, auf allen Strecken nie schlechter als −0,3 m
+  // (10 s dazu: seit der neuen Ideallinie liegt der Führende bei 12 s gut 1 m weiter vorn, näher an der Bremszone –
+  // 2,93 statt 3,08 m; der Zeitpunkt auf der langen Startgeraden misst die Nitro-Wirkung unabhängig davon)
   var gainBy = {};
   Sim.TRACKS.forEach(function (tr) {
     var ob = function (ev) { var o = { seed: 4242, track: tr, laps: LAPS, finishWindow: FW, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
-    gainBy[tr] = [12, 16, 20, 24, 28, 31].map(function (T0) {
+    gainBy[tr] = [10, 12, 16, 20, 24, 28, 31].map(function (T0) {
       var probe = Sim.create(ob()); probe.fastForward(T0);
       var lid = probe.standings()[0], li = field.map(function (f) { return f.id; }).indexOf(lid);
       var n0 = Sim.create(ob()), n1 = Sim.create(ob([{ t: T0, type: 'nitro', id: lid }]));
@@ -532,6 +534,47 @@ var BUS_DYAW_BEFORE = 0.1238, BUS_JERK_BEFORE = 0.00289;
   if (!(worst <= BUS_DYAW_BEFORE)) fail('Bus: max. |Δyaw| ' + worst.toFixed(4) + ' > vorher ' + BUS_DYAW_BEFORE);
   if (!(jm <= BUS_JERK_BEFORE)) fail('Bus: Gierwinkel ruckelt (' + jm.toFixed(5) + ' > vorher ' + BUS_JERK_BEFORE + ')');
   if (!(inward >= 0.5)) fail('Bus: Hinterachse schneidet enge Kurven nicht innen (' + inward.toFixed(2) + ' m, Soll ≥ 0,5)');
+})();
+
+// ---- 3c. Seitenführung: kein Pendeln vor Kurven ----
+// Wechsel der seitlichen Bewegungsrichtung (Vorzeichen von Δd je Schritt, Bewegungen unter 2 mm/Schritt zählen nicht)
+// je Auto-Minute, fahrende Autos auf der Fahrbahn; volles Feld (Bus + 9) je Strecke über 4 Rennen, dazu der Nachfahrer
+// allein. Vorher (Zielspur jeden Schritt neu zwischen Ideallinie und Überholspur, Linie direkt aus der Krümmung):
+// ~80–160 je Minute, also mehrmals pro Sekunde. Soll ≤ LAT_FLIP_MAX einschließlich echter Überholmanöver.
+var LAT_FLIP_MAX = 25, latInfo = '';
+(function () {
+  var out = [], worstTrack = 0;
+  Sim.TRACKS.forEach(function (tr) {
+    var flips = 0, n = 0, rnd3 = mulberry32(900 + tr);
+    for (var k = 0; k < 4; k++) {
+      var sim = Sim.create({ seed: 7000 + 31 * tr + k, track: tr, laps: LAPS, finishWindow: FW, cars: toSimCars(mixedField(rnd3, 9, BUS_KEY)) });
+      var pd = sim.cars.map(function (c) { return c.d; }), pdd = sim.cars.map(function () { return 0; });
+      while (!sim.done && sim.time < MAX_T) {
+        sim.step();
+        sim.cars.forEach(function (c, i) {
+          var dd = c.d - pd[i]; pd[i] = c.d;
+          if (c.state !== 'run' || c.off || sim.time < 3) { pdd[i] = 0; return; }
+          if (Math.abs(dd) > 0.002) { if (pdd[i] && (dd > 0) !== (pdd[i] > 0)) flips++; pdd[i] = dd; }
+          n++;
+        });
+      }
+    }
+    var perMin = flips / n * 3600;
+    // Nachfahrer (KI übernimmt ein Auto): eigene Seitenführung, gleiche Linie
+    var f = Sim.follower(tr, Sim.stats(AVG), { t: 0, s: 0, d: 3, speed: 0 }, { laps: LAPS }), fd = 3, fdd = 0, ff = 0, fn = 0;
+    for (var t = DT; t < 120; t += DT) {
+      var q = f.at(t), d2 = q.d - fd; fd = q.d;
+      if (Math.abs(d2) > 0.002) { if (fdd && (d2 > 0) !== (fdd > 0)) ff++; fdd = d2; }
+      fn++;
+      if (q.finish !== null) break;
+    }
+    var fPerMin = ff / fn * 3600;
+    worstTrack = Math.max(worstTrack, perMin, fPerMin);
+    out.push(Sim.track(tr).name + ' ' + perMin.toFixed(1) + ' (Nachfahrer ' + fPerMin.toFixed(1) + ')');
+    if (!(perMin <= LAT_FLIP_MAX)) fail('Seitenführung ' + Sim.track(tr).name + ': ' + perMin.toFixed(1) + ' Richtungswechsel je Auto-Minute (Soll ≤ ' + LAT_FLIP_MAX + ')');
+    if (!(fPerMin <= LAT_FLIP_MAX)) fail('Nachfahrer ' + Sim.track(tr).name + ': ' + fPerMin.toFixed(1) + ' Richtungswechsel je Minute (Soll ≤ ' + LAT_FLIP_MAX + ')');
+  });
+  latInfo = 'Seitenführung: Richtungswechsel je Auto-Minute ' + out.join(', ') + ' (Soll ≤ ' + LAT_FLIP_MAX + ')';
 })();
 
 // ---- 4. Bilanz: Bus gegen 9 Zufallsautos aus der Tabelle (jedes Rennen neu) ----
@@ -727,6 +770,7 @@ function report() {
   console.log('Strecken (TRACKS = [' + (Sim && Sim.TRACKS ? Sim.TRACKS.join(', ') : '') + ']):');
   (trackInfo || []).forEach(function (l) { console.log(l); });
   if (busInfo) console.log(busInfo);
+  if (latInfo) console.log(latInfo);
   if (typeof paceInfo === 'string') console.log(paceInfo);
   if (typeof kartInfo === 'string' && kartInfo) console.log(kartInfo);
   if (typeof RACES !== 'undefined' && wtimes.length) {

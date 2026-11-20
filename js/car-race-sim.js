@@ -62,6 +62,10 @@
  *       Schwere gegen Leichte (HEAVY_PUSH): ab 2,5-facher Masse (Bus, Truck gegen Kleinwagen) weicht das schwere
  *       Fahrzeug in Kurven nicht aus und bremst nicht, es schiebt das leichtere zur Seite ('push', kind 'shove');
  *       Leichte schieben Schwere nicht, Wracks bleiben fest.
+ *       Seitenführung der KI (kein Pendeln vor Kurven): Ideallinie je Strecke vorab als glatter Bogen (racingLine: leicht
+ *       außen anfahren, Scheitel innen, Kombinationen in einem Zug, kleine Gegenbewegungen herausgefiltert); Spurwechsel mit
+ *       begrenzter Seitenbeschleunigung LAT_ACC statt sprunghaft; ein Überholmanöver behält seine Seite, bis das Auto vorbei
+ *       ist (Hysterese, höchstens OV_MAX s), statt jeden Schritt zwischen Überholspur und Ideallinie neu zu wählen.
  *       Wracks und stehende Dreher/Crashs sind nie durchfahrbar: die anderen lenken auf der Fahrbahn vorbei,
  *       notfalls durch den Auslauf (höchstens 8 m/s, im Kies 6 m/s), oder stellen sich an; wer länger als 4 s
  *       steht, quetscht sich auf der freien Seite durch den Auslauf. Auffahren auf ein Wrack ist ein Kontakt
@@ -174,6 +178,8 @@
   var OIL_SEE = 0.85;         // Chance, einen Fleck rechtzeitig zu sehen und auszuweichen
   var WRECK_V = 8;            // an einem Wrack vorbei höchstens 8 m/s
   var STUCK_T = 4;            // wer so lange steht, quetscht sich durch den Auslauf
+  var LAT_ACC = 8;            // Seitenbeschleunigung beim Spurwechsel (m/s²): weich statt sprunghaft
+  var OV_MAX = 6;             // ein Überholmanöver hält seine Seite höchstens 6 s (dann neu entscheiden)
   var HYST = 1;               // Positionswechsel erst ab 1 m Vorsprung (kein Flackern)
   // Enge Kurven (Radius < R_AGILE, voll ab R_TIGHT): Fahrzeuggröße, Lenkeinschlag und Drift zählen.
   // Maß = (Radstand − Bezug) + 1,5 · (Breite − Bezug) + (Wendekreis-Radius − Bezug) in m, geteilt durch den
@@ -364,6 +370,36 @@
       for (i = 0; i < n; i++) A[i] = B[i];
     });
     return out;
+  }
+
+  // Ideallinie je Rasterpunkt (Seitenversatz in m, > 0 links), einmal je Strecke: innen = Krümmung, weich verwischt
+  // (σ 14 m: Kurvenkombinationen verschmelzen zu einem Bogen), mit leichtem Ausholen nach außen vor und hinter der
+  // Kurve (− 0,15 · σ² · zweite Ableitung), verstärkt und auf ±2,5 m begrenzt; dann mit 1,3 m Spiel gefiltert (kleine
+  // Gegenbewegungen entfallen, die Linie wechselt die Seite nur, wenn es sich lohnt) und wieder auf ±2,5 m gestreckt –
+  // eine Kurve in einem Zug statt Hin und Her. Gelesen bei s + 10 m (vorausschauend), in create() und follower() gleich.
+  function racingLine(raw) {
+    if (raw.LINE) return raw.LINE;
+    var n = raw.n, I = new Float64Array(n), H = new Float64Array(n), P = new Float64Array(n), i, k, r, PLAY = 1.3;
+    function blur(A, sig) {
+      var B = new Float64Array(n), W = Math.ceil(sig * 3 / raw.ds), wsum = 0, wt = [];
+      for (k = -W; k <= W; k++) { var x = k * raw.ds; wt.push(Math.exp(-x * x / (2 * sig * sig))); wsum += wt[wt.length - 1]; }
+      for (i = 0; i < n; i++) {
+        var s = 0;
+        for (k = -W; k <= W; k++) s += wt[k + W] * A[mod(i + k, n)];
+        B[i] = s / wsum;
+      }
+      return B;
+    }
+    for (i = 0; i < n; i++) I[i] = clamp(raw.CRV[i] * 50, -2.5, 2.5);
+    var SIG = 14, sig2 = SIG * SIG / (raw.ds * raw.ds), G = blur(I, SIG);
+    for (i = 0; i < n; i++) H[i] = clamp(2.5 * (G[i] - 0.15 * sig2 * (G[(i + 1) % n] - 2 * G[i] + G[(i - 1 + n) % n])), -2.5, 2.5);
+    var h = H[0];
+    for (r = 0; r < 2; r++) for (i = 0; i < n; i++) {   // Spiel (2 Umläufe: geschlossene Runde)
+      if (H[i] > h + PLAY) h = H[i] - PLAY; else if (H[i] < h - PLAY) h = H[i] + PLAY;
+      P[i] = h * 2.5 / (2.5 - PLAY);
+    }
+    raw.LINE = blur(P, 4);
+    return raw.LINE;
   }
 
   var trackCache = {};
@@ -597,7 +633,7 @@
         push: form * (0.985 + rnd() * 0.03),        // wie nah am Limit (pro Runde neu)
         pushLap: 0,
         dT: (i % 2 === 0 ? 1 : -1) * 2.3,
-        stuck: 0, detourT: 0, detourJ: -1, detourAge: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
+        stuck: 0, ovJ: -1, ovD: 0, ovAge: 0, ovG: 0, latV: 0, detourT: 0, detourJ: -1, detourAge: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
         dDot: 0, latAng: 0, latCurv: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55),
         // Darstellung (Einspurmodell): Vorder-/Hinterachse in Weltkoordinaten, Richtung Hinter- → Vorderachse
         wb: wheelbase(st.len), fx: 0, fz: 0, rx: 0, rz: 0, hdg: 0,
@@ -648,6 +684,11 @@
     function crvAt(s) {
       var u = mod(s, L) / ds, i0 = Math.floor(u) % n, f = u - Math.floor(u);
       return raw.CRV[i0] + (raw.CRV[(i0 + 1) % n] - raw.CRV[i0]) * f;
+    }
+    var LINE = racingLine(raw);
+    function lineAt(s) {
+      var u = mod(s, L) / ds, i0 = Math.floor(u) % n, f = u - Math.floor(u);
+      return LINE[i0] + (LINE[(i0 + 1) % n] - LINE[i0]) * f;
     }
     function bumpAt(s) {
       var u = mod(s, L) / ds, i0 = Math.floor(u) % n;
@@ -884,8 +925,8 @@
               var slip = slipJ >= 0 && !c.off;
               if (slip && c.state === 'run' && !sim.done) c.draft = cars[slipJ].id;
               var vtop = p.st.vmax / (slip ? 1 : SLIP_BONUS) * nitro;
-              // Ideallinie: vor Kurven nach innen; wer daneben fährt, ist in Kurven langsamer (Überholen kostet)
-              var line = clamp(crvAt(c.s + 10) * 50, -2.5, 2.5) + p.lineOff;
+              // Ideallinie (racingLine): weicher Bogen nach innen; wer daneben fährt, ist in Kurven langsamer (Überholen kostet)
+              var line = lineAt(c.s + 10) + p.lineOff;
               var offLine = 1 - OFF_LINE * Math.max(0, Math.abs(c.d - line) - 0.5);
               // Nitro hebt nur das Tempo auf Geraden (Profil an der Endgeschwindigkeit), nicht die Kurvengrenze
               var prof = profAt(p, c.s), boost = nitro > 1 && prof >= p.st.vmax * 0.97 ? nitro : 1;
@@ -898,6 +939,7 @@
                 var wg = gap(c, cars[j]);
                 if (wg > -minGap(i, j) && wg < 25) { target = Math.min(target, WRECK_V); break; }
               }
+              var freeV = target;                                 // Wunschtempo ohne Vordermann
               if (ahead >= 0) {                                  // nicht auffahren
                 var free = ag - minGap(i, ahead);
                 target = Math.min(target, Math.max(0, cars[ahead].v + Math.max(0, free - 0.5) * 2));
@@ -967,10 +1009,31 @@
                 // zurück: zum nächsten Fahrbahnrand, eingefädelt wird nur in eine freie Lücke (Schritt 2)
                 p.dT = (c.d > 0 ? 1 : -1) * (p.lim - 0.3);
               } else if (p.slowT <= 0) {               // auch im Ziel: Wracks umfahren
-                // Überholen: langsameres Auto dicht vorn → Seite wechseln, wenn dort Platz ist
+                // Überholen: Auto dicht vorn ist langsamer oder hält auf → Seite wechseln, wenn dort Platz ist
                 var wreckAhead = ahead >= 0 && isWreck(ahead);
-                if (ahead >= 0 && ag < minGap(i, ahead) + 4 + Math.max(0, c.v - cars[ahead].v) * 2.5 &&
-                    (cars[ahead].v < c.v * 0.99 || cars[ahead].state !== 'run')) {
+                var wantOv = ahead >= 0 && ag < minGap(i, ahead) + 4 + Math.max(0, c.v - cars[ahead].v) * 2.5 &&
+                    (cars[ahead].v < c.v * 0.99 || cars[ahead].v < freeV * 0.95 || cars[ahead].state !== 'run');
+                // laufendes Manöver halten (Hysterese): die gewählte Seite bleibt, bis das Auto überholt ist, davonzieht,
+                // die Spur dort zugeht oder OV_MAX s um sind – sonst springt das Ziel jeden Schritt zwischen Überholspur
+                // und Ideallinie hin und her (neben dem Auto ist es nicht mehr „vorn“, also zurück, also wieder vorn …)
+                var held = false;
+                if (p.ovJ >= 0) {
+                  var oj = p.ovJ, og = gap(c, cars[oj]);
+                  p.ovAge += DT;
+                  // der Überholte rückt seitlich nach: auf derselben Seite weiter ausweichen, solange Platz ist (nicht die Seite wechseln)
+                  var clr = (P[i].w + P[oj].w) / 2 + 0.3;
+                  if (Math.abs(p.ovD - cars[oj].d) < clr) {
+                    var osd = p.ovD >= cars[oj].d ? 1 : -1;
+                    p.ovD = clamp(cars[oj].d + osd * (clr + 0.4), -p.lim, p.lim);
+                  }
+                  if (og > -(minGap(i, oj) + 1) && og < p.ovG + 5 && p.ovAge < OV_MAX && !(wantOv && ahead !== oj && latOverlap(i, ahead, p.ovD)) &&
+                      Math.abs(p.ovD - cars[oj].d) >= clr && laneFree(i, p.ovD, 0.5)) {
+                    p.dT = p.ovD; held = true;
+                  } else p.ovJ = -1;
+                }
+                if (held) {
+                  // Seite steht
+                } else if (wantOv) {
                   var off = (P[i].w + P[ahead].w) / 2 + 0.8, best = null, bestSc = 0;
                   var cands = [cars[ahead].d + off, cars[ahead].d - off, 0, p.lim * 0.5, -p.lim * 0.5].map(function (x) { return clamp(x, -p.lim, p.lim); });
                   // vor einem Wrack notfalls durch den Auslauf (Grenze: Leitplanke hier und am Wrack)
@@ -980,13 +1043,15 @@
                   });
                   cands.forEach(function (cand) {
                     if (Math.abs(cand - cars[ahead].d) < (P[i].w + P[ahead].w) / 2 + 0.3) return;
-                    if (!laneFree(i, cand, 0.5 + c.v * 0.2)) return;
+                    // frei bis mindestens zum Auto vorn: sonst pendelt die Wahl zwischen zwei Autos nebeneinander
+                    if (!laneFree(i, cand, Math.max(0.5 + c.v * 0.2, ag - minGap(i, ahead) + 1))) return;
                     var sc = Math.abs(cand - c.d) + (Math.abs(cand) > p.lim + 1e-9 ? 4 : 0);   // Fahrbahn bevorzugt
                     if (best === null || sc < bestSc) { best = cand; bestSc = sc; }
                   });
                   if (best !== null) {
                     p.dT = best;
                     if (Math.abs(best) > p.lim + 1e-9) { p.detourT = Math.max(p.detourT, 1); if (p.detourJ !== ahead) p.detourAge = 0; p.detourJ = ahead; }
+                    else if (!isWreck(ahead)) { p.ovJ = ahead; p.ovD = best; p.ovAge = 0; p.ovG = ag; }
                   }
                 } else if (time > 4 && laneFree(i, clamp(line, -p.lim, p.lim), 2)) {
                   p.dT = clamp(line, -p.lim, p.lim);
@@ -1020,8 +1085,22 @@
           c = cars[i]; p = P[i];
           var lo = -p.lim, hi = p.lim, railHi = railLim(i, 1), railLo = -railLim(i, -1), canLeave = freeLat(i);
           if (canLeave) { hi = Math.max(hi, railHi); lo = Math.min(lo, railLo); }
-          var latMax = (p.offTo !== null ? p.offLat : 2 + 0.15 * c.v) * DT;
-          var steerDd = clamp(clamp(p.dT, lo, hi) - c.d, -latMax, latMax);
+          var err = clamp(p.dT, lo, hi) - c.d, steerDd;
+          if (p.offTo !== null || (c.state !== 'run' && c.state !== 'done') || p.detourJ >= 0 ||
+              Math.abs(c.d) > p.lim + 1e-9 || Math.abs(p.dT) > p.lim + 1e-9) {
+            // Abflug (rutscht mit festem Tempo nach außen), Dreher, Crash, Wrack, Umweg/Rückweg durch den Auslauf:
+            // wie bisher direkt, ohne Schwung
+            var lm = p.offTo !== null ? p.offLat : 2 + 0.15 * c.v;
+            steerDd = clamp(err, -lm * DT, lm * DT); p.latV = steerDd / DT;
+          } else {
+            // gelenkt: Seitentempo höchstens 2 + 0,15 · v, aber weich auf- und abgebaut (Seitenbeschleunigung
+            // LAT_ACC, rechtzeitig vor dem Ziel abgebremst) statt sprunghaft – kein Zucken, kein Pendeln
+            var latMax = 2 + 0.15 * c.v, ae = Math.abs(err);
+            var want = (err > 0 ? 1 : -1) * Math.min(latMax, Math.sqrt(2 * LAT_ACC * ae), ae / DT);
+            p.latV += clamp(want - p.latV, -LAT_ACC * DT, LAT_ACC * DT);
+            steerDd = p.latV * DT;
+            if (steerDd * err > 0 && Math.abs(steerDd) > ae) { steerDd = err; p.latV = err / DT; }   // nicht übers Ziel
+          }
           var dd = steerDd + p.pushV * DT;
           // Schub klingt ab (im Kies schneller)
           if (p.pushV !== 0) {
@@ -1038,7 +1117,7 @@
               // deutlich schwerer (Bus gegen Kleinwagen): drängt einfach rein und schubst den anderen weg
               // (selbst bleibt es diesen Schritt stehen – keine Überlappung)
               if (heavy) bl.forEach(function (j2) { contact(i, j2, 1.5 + 0.5 * Math.abs(steerDd) / DT, 'side'); });
-              nd = c.d;
+              nd = c.d; p.latV = 0;
               if (!heavy) {
                 p.pushV = 0;
                 // Wrack, das nicht an den Rand rutschen kann (Auto daneben): an den anderen Rand
@@ -1049,7 +1128,7 @@
           // Leitplanke: wer mit Schwung hineinrutscht, ist raus
           if (nd >= railHi || nd <= railLo) {
             var hard = (p.offTo !== null || Math.abs(p.pushV) > 1.5) && c.v > RAIL_V && c.state === 'run' && !sim.done;
-            nd = clamp(nd, railLo, railHi);
+            nd = clamp(nd, railLo, railHi); p.latV = 0;
             if (hard) railCrash(i);
             else { p.offTo = null; p.pushV = 0; }
           }
@@ -1200,6 +1279,7 @@
     for (pass = 0; pass < 2; pass++) for (k = n - 1; k >= 0; k--) {
       var nx = prof[(k + 1) % n]; prof[k] = Math.min(prof[k], Math.sqrt(nx * nx + 2 * st.brake * ds));
     }
+    var LINE = racingLine(raw);
     function lerpAt(A, s) { var u = mod(s, L) / ds, i0 = Math.floor(u) % n, f = u - Math.floor(u); return A[i0] + (A[(i0 + 1) % n] - A[i0]) * f; }
     function railAt(s, sd) { var u = mod(s, L) / ds, i0 = Math.floor(u) % n, A = sd > 0 ? raw.RUNL : raw.RUNR; return HALF + Math.min(A[i0], A[(i0 + 1) % n]) - w / 2 - 0.1; }
     var t0 = isFinite(+snap.t) ? +snap.t : 0, s0, d0;
@@ -1212,7 +1292,7 @@
     d0 = clamp(d0, -railAt(s0, -1), railAt(s0, 1));
     var c;
     function reset() {
-      c = { s: s0, d: d0, v: Math.max(0, +snap.speed || 0), time: t0, steps: 0, finish: null, lap: 0, yaw: T.at(s0).yaw, lat: 0,
+      c = { s: s0, d: d0, v: Math.max(0, +snap.speed || 0), time: t0, steps: 0, finish: null, lap: 0, yaw: T.at(s0).yaw, lat: 0, latV: 0,
         steer: 0, spin: 0, roll: 0, pitch: 0, x: 0, z: 0, off: false };
       pose();
     }
@@ -1225,7 +1305,7 @@
     }
     function step() {
       var cruise = c.finish !== null;
-      var line = clamp(lerpAt(raw.CRV, c.s + 10) * 50, -2.5, 2.5);
+      var line = lerpAt(LINE, c.s + 10);
       var target = lerpAt(prof, c.s) * (cruise ? 0.75 : 0.97);
       if (c.off) target = Math.min(target, GRAVEL_V);
       var vtop = st.vmax / SLIP_BONUS;
@@ -1236,7 +1316,11 @@
         c.v = Math.min(target, c.v + Math.max(acc, 0.3) * DT);
       } else c.v = Math.max(target, c.v - (c.off ? GRAVEL_DECEL : st.brake * 1.3) * DT);
       var dT = Math.abs(c.d) > lim ? (c.d > 0 ? 1 : -1) * (lim - 0.3) : clamp(line, -lim, lim);
-      var latMax = (2 + 0.15 * c.v) * DT, dd = clamp(dT - c.d, -latMax, latMax);
+      // Seitenbewegung wie in create(): höchstens 2 + 0,15 · v, weich mit LAT_ACC auf- und abgebaut
+      var err = dT - c.d, ae = Math.abs(err), want = (err > 0 ? 1 : -1) * Math.min(2 + 0.15 * c.v, Math.sqrt(2 * LAT_ACC * ae), ae / DT);
+      c.latV += clamp(want - c.latV, -LAT_ACC * DT, LAT_ACC * DT);
+      var dd = c.latV * DT;
+      if (dd * err > 0 && Math.abs(dd) > ae) { dd = err; c.latV = err / DT; }
       c.d += dd;
       c.lat += (clamp(Math.atan2(dd / DT, Math.max(c.v, 4)), -0.5, 0.5) - c.lat) * Math.min(1, DT * 10);
       var sPrev = c.s;
