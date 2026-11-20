@@ -200,6 +200,28 @@ function crashRun(car, inp, others, secs, react) {
   var moved = Math.hypot(me.x - bx, me.z - bz), drove = Math.hypot(o.x - a.x, o.z - a.z);
   ok(moved < drove * 0.35, 'Bus (Masse ' + me.P.mass.toFixed(1) + ') von leichtem Auto (Masse ' + light.P.mass.toFixed(1) + ', 20 m/s, feste Bahn) gerammt: Bus ' + moved.toFixed(1) + ' m verschoben, Rammer fuhr ' + drove.toFixed(1) + ' m');
 })();
+// Seitlich abdrängen (KI auf fester Bahn zieht 1,5 m/s nach innen, fährt gleich schnell daneben): ein Porsche-schweres
+// Auto bewegt einen Lkw kaum, ein gleich schweres drängt langsam und kontrolliert ab (kein Plopp)
+(function () {
+  function shove(meKey, oKey) {
+    var me = carFor(meKey, TB, { s: S0 + 20, d: 0 }), a = TB.at(S0 + 20), oc = carFor(oKey, TB, { s: S0 + 20, d: 0 });
+    var fx = Math.cos(a.yaw), fz = -Math.sin(a.yaw), v = 15, side = (me.P.width + oc.P.width) / 2 - 0.05;
+    setSpeed(me, v);
+    var o = { x: a.x + a.nx * side, z: a.z + a.nz * side, yaw: a.yaw, len: oc.P.len, w: oc.P.width,
+      vx: fx * v - a.nx * 1.5, vz: fz * v - a.nz * 1.5, mass: oc.P.mass };
+    o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw;
+    var d0 = (me.x - a.x) * a.nx + (me.z - a.z) * a.nz, maxStep = 0, prev = d0;
+    for (var t = 0; t < 1.2; t += DT) {
+      Phys.stepContacts(me, { throttle: 0.5 }, DT, dims(me), [o], null);
+      var dd = (me.x - a.x) * a.nx + (me.z - a.z) * a.nz; maxStep = Math.max(maxStep, Math.abs(dd - prev)); prev = dd;
+      o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw; o.x += o.vx * DT; o.z += o.vz * DT;
+    }
+    return { moved: Math.abs(prev - d0), step: maxStep, mMe: me.P.mass, mO: oc.P.mass };
+  }
+  var tr = shove('ural-4320-soviet-army-truck', '1990-mercedes-benz-190e-2-5'), cc = shove('bmw-m3-competition', 'bmw-m3-competition');
+  ok(tr.moved < cc.moved * 0.5, 'seitlich abgedrängt: Lkw (Masse ' + tr.mMe.toFixed(1) + ') von leichtem Auto ' + tr.moved.toFixed(2) + ' m, gleich schwere Autos ' + cc.moved.toFixed(2) + ' m');
+  ok(Math.max(tr.step, cc.step) < 0.08, 'Abdrängen ohne Ruck: größter Versatz je Bild ' + (Math.max(tr.step, cc.step) * 100).toFixed(1) + ' cm');
+})();
 // Bus quer über die Strecke (Breitseite), Bus längs (Heck): nie durchfahren, auch bei Tempo, langsam, rückwärts
 [[5, 'quer'], [15, 'quer'], [30, 'quer'], [45, 'quer'], [30, 'längs'], [3, 'längs']].forEach(function (cs) {
   var v = cs[0], car = carFor('bmw-m3-competition', TB, { s: S0, d: 0 }), bus = busAt(S0 + 25, 0, cs[1] === 'quer' ? Math.PI / 2 : 0);

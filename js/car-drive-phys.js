@@ -352,7 +352,7 @@
     else { var ra = radius(a, best.nx, best.nz) - best.pen / 2; best.px = a.x - best.nx * ra; best.pz = a.z - best.nz * ra; }
     return best;
   }
-  function collide(car, me, o) {
+  function collide(car, me, o, dtSub) {
     var P = car.P, len = me && me.len > 0 ? me.len : P.len, w = me && me.w > 0 ? me.w : P.width;
     var h = overlap({ x: car.x, z: car.z, yaw: car.yaw, len: len, w: w }, o);
     if (!h) return null;
@@ -361,12 +361,19 @@
     // Lage: ganz heraus, wenn ich hineinfahre – so fährt man nie durch ein Auto, auch langsam/rückwärts nicht.
     // Rammt mich dagegen der andere (KI-/Fremdauto auf fester Bahn, das hier nicht ausweicht), schiebt er mich nur
     // nach Massenanteil: ein leichter Wagen verschiebt einen Bus kaum (der Rest bleibt als Überlappung stehen).
+    // Gilt immer, wenn nicht ich hineinfahre (auch seitliches Abdrängen in der Kurve), und weich über ein paar
+    // Teilschritte statt in einem Ruck (kein „Plopp“): Abdrängen wirkt langsam und nach Gewicht.
     var myIn = -(car.vx * nx + car.vz * nz), oIn = (o.vx || 0) * nx + (o.vz || 0) * nz;
-    var share = invA && oIn > 0.5 && oIn > myIn ? Math.max(0.08, mA / (mA + mP)) : 1;
+    var share = invA && oIn > 0.05 && oIn >= myIn ? Math.max(0.08, mA / (mA + mP)) * 0.45 : 1;
     // Steckt ein leichterer Rammer schon tiefer drin: weder schieben noch Stoß – er fährt durch (wie im Overlay, wo die Sim
     // fährt), statt mich Bild für Bild auf sein Tempo mitzunehmen
-    if (share < 0.5 && h.pen > 0.25) return { impact: 0, slide: 0, scrape: false, jx: 0, jz: 0, px: h.px, pz: h.pz, nx: nx, nz: nz, pen: h.pen, tx: tx, tz: tz };
-    car.x += nx * (h.pen * share + 0.002); car.z += nz * (h.pen * share + 0.002);
+    // (auch wenn die Berührungsnormale beim Durchfahren umklappt – sonst ein Sprung um die halbe Breite; 0,45 m liegt
+    // über dem Teilschritt CHUNK, eigenes Hineinfahren erreicht das nie)
+    if (invA && mA < mP * 0.9 && h.pen > 0.45) return { impact: 0, slide: 0, scrape: false, jx: 0, jz: 0, px: h.px, pz: h.pz, nx: nx, nz: nz, pen: h.pen, tx: tx, tz: tz };
+    // leichterer Schieber: keine Lagekorrektur (sie würde mich Bild für Bild mit seinem Tempo mitnehmen), nur der
+    // begrenzte Stoß unten; gleich schwere/schwerere drängen weich nach Massenanteil ab
+    var lightPush = share < 1 && mA < mP * 0.9;
+    if (!lightPush) { car.x += nx * (h.pen * share + 0.002); car.z += nz * (h.pen * share + 0.002); }
     var I = mP * (len * len + w * w) / 12 * INERTIA_K;
     var rx = h.px - car.x, rz = h.pz - car.z;            // Hebel vom Schwerpunkt zum Kontaktpunkt
     // Tempo im Kontaktpunkt: v + Gierrate × Hebel (Gierrate + = links: Punkt bewegt sich um (rz, −rx))
@@ -379,6 +386,10 @@
     var cn = rz * nx - rx * nz, ct = rz * tx - rx * tz;
     var e = RESTITUTION * clamp(1 - impact / 16, 0.25, 1);   // harter Aufprall federt noch weniger
     var Jn = -(1 + e) * vn / (1 / mP + cn * cn / I + invA);
+    // Schiebt mich ein Auto auf fester Bahn (KI/Fremdauto, gibt nicht nach), drückt es höchstens mit dem, was seine
+    // Reifen hergeben (Masse × Haftung) – ein leichter Wagen bewegt einen Lkw kaum, gleich schwere drängen ab;
+    // Aufprall-Stöße (hartes Auffahren) bleiben
+    if (share < 1 && dtSub > 0 && impact < CRASH_V) Jn = Math.min(Jn, mA * (o.grip || P.grip) * dtSub);
     var Jt = clamp(-vt / (1 / mP + ct * ct / I + invA), -CONTACT_MU * Jn, CONTACT_MU * Jn);
     var jx = nx * Jn + tx * Jt, jz = nz * Jn + tz * Jt;
     car.vx += jx / mP; car.vz += jz / mP;
@@ -419,7 +430,7 @@
         }
         var reach = (o.len + (me && me.len > 0 ? me.len : car.P.len)) / 2 + 1;
         if (Math.abs(pose.x - car.x) > reach || Math.abs(pose.z - car.z) > reach) continue;
-        var h = collide(car, me, pose);
+        var h = collide(car, me, pose, dt / n);
         if (h) { h.o = o; hits.push(h); if (onHit) onHit(o, h); }
       }
     }
