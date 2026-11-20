@@ -265,7 +265,7 @@
   // ── Räder ──
   // Innenraum-Gummi (z. B. „INT_Rubber“ beim Lancer Evo IX: Fußmatten, Dichtungen im Motorraum) ist kein Reifen –
   // sonst landen die Vorderräder in der Kabine, stehen ~45° schräg und hängen zu hoch im Radkasten
-  var CALIPER = /calip|brembo|sattel/i;
+  var CALIPER = /cal+ip|brembo|sattel/i;   // auch „Calliper“ (britisch, BMW E30 M3/M2 von Sketchfab)
   var TIRE = /tire|tyre|reifen|rubber|whitewall/i, NOT_TIRE = /trim|seal|strip|window|door|mat\b|pedal|interior|\bint_|_int\b/i;
   var RIM = /\brim|rim\b|rims|felge|hubcap|wheel|alloy|spoke/i, NOT_RIM = /steer|stitch|tire|tyre|lenk|trim|interior|\bint/i;
   var PAINT = /paint|carpaint|lack|main_color|maincolor|body_?colou?r|bodywork|exterior_?colou?r|\bbody\b|^body/i, NOT_PAINT = /under|interior|\bint|chassis|frame|plastic|black|glass/i;
@@ -342,9 +342,17 @@
       var sxx = 0, szz = 0, sxz = 0; pts.forEach(function (p) { var dx = p.x - mx, dz = p.z - mz; sxx += dx * dx; szz += dz * dz; sxz += dx * dz; });
       var ang = 0.5 * Math.atan2(2 * sxz, sxx - szz);           // Richtung der größten Streuung (Radebene)
       var ax = new THREE.Vector3(-Math.sin(ang), 0, Math.cos(ang));   // senkrecht dazu = Achse
-      var R = s.y / 2, hw = 0;
-      pts.forEach(function (p) { hw = Math.max(hw, Math.abs((p.x - c.x) * ax.x + (p.z - c.z) * ax.z)); });
-      out.push({ key: k, center: new THREE.Vector3(mx, c.y, mz), axis: ax, radius: R, half: hw });
+      // Radmitte: Mitte der Ausdehnung in der Radebene (und entlang der Achse), nicht der Mittelwert der Punkte –
+      // Reifen sind ungleich dicht vernetzt (Profil, Schrift auf einer Flanke), der Mittelwert lag beim E30 M3 bis
+      // 7 % des Radius neben der Achse → das Rad eierte beim Drehen
+      var ux = Math.cos(ang), uz = Math.sin(ang), u0 = Infinity, u1 = -Infinity, a0 = Infinity, a1 = -Infinity;
+      pts.forEach(function (p) {
+        var dx = p.x - mx, dz = p.z - mz, pu = dx * ux + dz * uz, pa = dx * ax.x + dz * ax.z;
+        if (pu < u0) u0 = pu; if (pu > u1) u1 = pu; if (pa < a0) a0 = pa; if (pa > a1) a1 = pa;
+      });
+      var cu = (u0 + u1) / 2, ca = (a0 + a1) / 2;
+      var R = s.y / 2, hw = (a1 - a0) / 2;
+      out.push({ key: k, center: new THREE.Vector3(mx + ux * cu + ax.x * ca, c.y, mz + uz * cu + ax.z * ca), axis: ax, radius: R, half: hw });
     });
     if (out.length < 4) return [];
     // vorn = Seite mit dem größeren Radeinschlag bzw. die kürzere Überhang-Seite; Lenkwinkel je Rad

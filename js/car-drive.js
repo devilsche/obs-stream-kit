@@ -276,10 +276,28 @@
     scene.add(holder);
     return car;
   }
+  // Raddrehung fürs Bild: aus der gefahrenen Strecke (vorwärts/rückwärts), höchstens SPIN_STEP je Bild. Echte
+  // Drehzahl wäre bei 50 km/h ~42° je Bild (60 fps) – bei 5–20 Speichen springt das Bild dann vor, zurück oder steht
+  // (Wagenrad-Effekt), die Räder drehen scheinbar „frei“. Gilt für eigenes Auto, KI und Mitspieler gleich (deren
+  // Drehwinkel kommt nur 20× je s bzw. als Winkel 0…2π und ist bei Tempo ohnehin nicht eindeutig).
+  var SPIN_STEP = 0.3;
+  function shownSpin(c, x, z, yaw) {
+    if (c.spinX != null) {
+      var dx = x - c.spinX, dz = z - c.spinZ, d = Math.hypot(dx, dz);
+      if (d < 6) {   // größere Sprünge: neu gesetzt (Start, Zurücksetzen)
+        var along = dx * Math.cos(yaw) - dz * Math.sin(yaw);   // Fahrtrichtung wie car-drive-phys: (cos yaw, −sin yaw)
+        var wr = clamp(0.07 * (c.len || 4.5), 0.3, 0.55);
+        c.spinShown = ((c.spinShown || 0) + clamp(along / wr, -SPIN_STEP, SPIN_STEP)) % (Math.PI * 2000);
+      }
+    }
+    c.spinX = x; c.spinZ = z;
+    return c.spinShown || 0;
+  }
   function placeCar(c, x, z, yaw, roll, pitch, steer, spin) {
     var sl = trackRes ? trackRes.slopeAt(x, z, yaw) : null;
     c.holder.position.set(x, gh(x, z), z);
     c.holder.rotation.set(roll + (sl ? sl.roll : 0), yaw, pitch + (sl ? sl.pitch : 0));
+    spin = shownSpin(c, x, z, yaw);
     for (var i = 0; i < c.wheels.length; i++) {
       var w = c.wheels[i];
       if (w.spin) w.spin.rotation[w.spin.userData.ax || 'x'] = w.base - spin * w.sgn;

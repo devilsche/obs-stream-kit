@@ -233,7 +233,7 @@
     scene.traverse(function (o) {
       if (!o.isMesh || inWheel(o) || !o.geometry.attributes.position) return;
       // Bremse, Fahrwerk, Karosserie, Auspuff, Lampen bleiben stehen (liegen oft auch im Radbereich)
-      if (/calip|brake|bremse|sattel|chassis|body|engine|exhaust|light|lamp|shaft|arm\b|lowerarm|upperarm|axle|susp|shock|spring|strut|knuckle|hub(?!cap)|fender|arch|mud|frame|bumper|skirt|tie_?rod|link|lowr|sway|control|wishbone|damper|brace/i.test([].concat(o.material).map(function (m) { return (m && m.name) || ''; }).join(' ') + ' ' + (o.name || ''))) return;
+      if (/cal+ip|brake|bremse|sattel|chassis|body|engine|exhaust|light|lamp|shaft|arm\b|lowerarm|upperarm|axle|susp|shock|spring|strut|knuckle|hub(?!cap)|fender|arch|mud|frame|bumper|skirt|tie_?rod|link|lowr|sway|control|wishbone|damper|brace/i.test([].concat(o.material).map(function (m) { return (m && m.name) || ''; }).join(' ') + ' ' + (o.name || ''))) return;
       var p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 400)), cnt = W.map(function () { return 0; }), n = 0;
       for (var i = 0; i < p.count; i += step) {
         v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); n++;
@@ -377,8 +377,30 @@
         cur.list.push(p); cur.last = l;
       });
     });
+    // Gruppen, die kein Rad sind (versehentlich gewähltes Einzelteil neben dem Rad, z. B. Schmutzfänger beim
+    // BMW 2002 turbo): nicht rund oder viel kleiner als die Räder – sie drehten sich als eigenes „Rad“ um ihre
+    // eigene Mitte. Ihre Teile kommen zum Rad, in dessen Bereich sie liegen, sonst bleiben sie am Auto.
+    function gbox(g) { var b = new THREE.Box3(); g.list.forEach(function (p) { b.union(p.b); }); return b; }
+    var maxH = 0;
+    groups.forEach(function (g) {
+      var s = gbox(g).getSize(new THREE.Vector3()), dl = lx ? s.x : s.z;
+      g.round = Math.min(dl, s.y) >= Math.max(dl, s.y) * 0.7; g.h = s.y;
+      if (g.round) maxH = Math.max(maxH, s.y);
+    });
+    var real = groups.filter(function (g) { return g.round && g.h >= maxH * 0.5; });
+    if (real.length) groups = groups.filter(function (g) {
+      if (real.indexOf(g) >= 0) return true;
+      g.list.forEach(function (p) {
+        var best = null, bd = Infinity;
+        real.forEach(function (w) { var d = gbox(w).getCenter(new THREE.Vector3()).distanceTo(p.c); if (d < bd) { bd = d; best = w; } });
+        if (best && bd < best.h * 0.6) best.list.push(p);
+        else if (root.console) console.warn('ToyCars: wheel part ignored (not at a wheel): ' + p.o.userData.pkey);
+      });
+      return false;
+    });
     groups.forEach(function (g, i) {
-      // Drehpunkt = Mitte der rollenden Teile (Bremssattel sitzt außermittig), sonst aller Teile
+      // Drehpunkt = Mitte der rollenden Teile (Bremssattel sitzt außermittig), sonst aller Teile; die genaue
+      // Achse (Mitte und Richtung) setzt danach trueAxles()
       var b = new THREE.Box3(), rl = g.list.filter(function (p) { return p.roll; });
       (rl.length ? rl : g.list).forEach(function (p) { b.union(p.b); });
       var c = new THREE.Vector3(); b.getCenter(c);
@@ -389,6 +411,83 @@
       g.list.forEach(function (p) { (p.roll ? spin : pivot).attach(p.o); p.o.userData.wheelPart = true; });
     });
     return groups.length;
+  }
+
+  // Echte Radachse je Rad: Spin dreht um seine lokale x- bzw. z-Achse durch den Drehpunkt. Liegt der Drehpunkt
+  // neben der Radmitte oder steht das Rad im Modell schräg (Sturz: E30 M3/M2 1–1,5°, Knoten „3DWheel Front L“ mit
+  // gekippter Matrix), eiert es beim Drehen. Mitte und Richtung kommen deshalb aus dem Reifen selbst: äußerer Ring
+  // aller Teile des Rads (Reifen; Sattel und Bremse liegen weiter innen). Achse = Richtung, in der der Ring am
+  // schmalsten ist (Lauffläche: Breite·cos + Durchmesser·sin der Schräglage – unabhängig davon, wie dicht der Reifen
+  // vernetzt ist, anders als Mittelwert/Streuung), Mitte = Mitte der Ausdehnung. Zwischen Spin und seine Eltern
+  // kommt eine Gruppe „Axle“ (Lage = echte Achse); Spin und alle Verbraucher (rotation[ax]) bleiben unverändert.
+  function trueAxles(scene) {
+    scene.updateMatrixWorld(true);
+    var v = new THREE.Vector3(), list = []; scene.traverse(function (o) { if (/^Wheel /.test(o.name || '')) list.push(o); });
+    function frame(a) {   // zwei Richtungen in der Radebene
+      var u = Math.abs(a.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+      u.addScaledVector(a, -u.dot(a)).normalize();
+      return [u, new THREE.Vector3().crossVectors(a, u)];
+    }
+    function ext(P, d) { var lo = Infinity, hi = -Infinity; for (var i = 0; i < P.length; i++) { var x = P[i].dot(d); if (x < lo) lo = x; if (x > hi) hi = x; } return [lo, hi]; }
+    // Achse und Mitte aus Punkten (P-Koordinaten); null, wenn der äußere Ring kein Rad ist
+    function fitAxle(pts, e0) {
+      if (pts.length < 30) return null;
+      var a = e0.clone(), c = new THREE.Box3().setFromPoints(pts).getCenter(new THREE.Vector3()), ring = null, R = 0, D = Math.PI / 180;
+      for (var it = 0; it < 2; it++) {
+        var rs = pts.map(function (q) { var d = q.clone().sub(c); return d.addScaledVector(a, -d.dot(a)).length(); });
+        R = Math.max.apply(null, rs);
+        ring = pts.filter(function (q, i) { return rs[i] >= R * 0.85; });
+        if (ring.length < 20) return null;
+        // schmalste Richtung: ±6° in 1°, ±1° in 0,2°, ±0,2° in 0,04° (Suche auf höchstens 1500 Ringpunkten,
+        // Mitte und Prüfung auf allen – sonst fehlen die äußersten Punkte)
+        var sub = ring, st2 = Math.ceil(ring.length / 1500); if (st2 > 1) sub = ring.filter(function (q, i) { return i % st2 === 0; });
+        var F = frame(e0), best = a.clone(), bw = ext(sub, a), bW = bw[1] - bw[0];
+        [[6, 1], [1, 0.2], [0.2, 0.04]].forEach(function (g) {
+          var b0 = best.clone();
+          for (var x = -g[0]; x <= g[0] + 1e-9; x += g[1]) for (var y = -g[0]; y <= g[0] + 1e-9; y += g[1]) {
+            var d = b0.clone().addScaledVector(F[0], Math.tan(x * D)).addScaledVector(F[1], Math.tan(y * D)).normalize();
+            var r = ext(sub, d); if (r[1] - r[0] < bW) { bW = r[1] - r[0]; best = d; }
+          }
+        });
+        a.copy(best);
+        var Fa = frame(a), eu = ext(ring, Fa[0]), ew = ext(ring, Fa[1]), ea = ext(ring, a); bW = ea[1] - ea[0];
+        // nur echte Räder: rund (in der Ebene gleich weit) und quer schmaler als hoch, nahe der bisherigen Achse
+        if (Math.abs((eu[1] - eu[0]) - (ew[1] - ew[0])) > 0.12 * Math.max(eu[1] - eu[0], ew[1] - ew[0]) || bW > 0.9 * (eu[1] - eu[0]) || a.dot(e0) < Math.cos(10 * D)) return null;
+        c.copy(Fa[0]).multiplyScalar((eu[0] + eu[1]) / 2).addScaledVector(Fa[1], (ew[0] + ew[1]) / 2).addScaledVector(a, (ea[0] + ea[1]) / 2);
+      }
+      return { a: a, c: c, R: R };
+    }
+    list.forEach(function (w) {
+      var sp = w.getObjectByName('Spin'); if (!sp || !sp.parent || sp.parent.name === 'Axle') return;
+      var P = sp.parent, inv = new THREE.Matrix4().copy(P.matrixWorld).invert();
+      function points(o) {
+        var pts = [];
+        o.traverse(function (m) {
+          if (!m.isMesh || !m.geometry || !m.geometry.attributes.position) return;
+          var M = new THREE.Matrix4().multiplyMatrices(inv, m.matrixWorld), p = m.geometry.attributes.position;
+          for (var i = 0; i < p.count; i++) pts.push(v.fromBufferAttribute(p, i).applyMatrix4(M).clone());
+        });
+        return pts;
+      }
+      // Spin-Achse in P-Koordinaten (Spin selbst ist ungedreht)
+      var e0 = new THREE.Vector3(sp.userData.ax === 'z' ? 0 : 1, 0, sp.userData.ax === 'z' ? 1 : 0).applyQuaternion(sp.quaternion);
+      // erst nur die rollenden Teile (Reifen dabei), sonst das ganze Rad (z. B. nur Felgenstücke rollen, Reifen lenkt nur)
+      var fit = fitAxle(points(sp), e0) || fitAxle(points(w), e0);
+      if (!fit) return;
+      var a = fit.a, c = fit.c, R = fit.R;
+      // kaum Abweichung (unter 0,1° und 0,2 % des Radius): Aufbau lassen, wie er ist
+      var off = c.clone().sub(sp.position), offR = off.addScaledVector(a, -off.dot(a)).length() / Math.max(1e-9, R);
+      if (a.dot(e0) > Math.cos(0.1 * Math.PI / 180) && offR < 0.002) return;
+      var ax = new THREE.Group(); ax.name = 'Axle';
+      ax.position.copy(c); ax.quaternion.setFromUnitVectors(e0, a).multiply(sp.quaternion);
+      var kids = sp.children.slice();
+      kids.forEach(function (k) { P.attach(k); });   // Weltlage bleibt
+      P.remove(sp); P.add(ax); sp.position.set(0, 0, 0); sp.quaternion.identity(); sp.scale.set(1, 1, 1); ax.add(sp);
+      scene.updateMatrixWorld(true);
+      kids.forEach(function (k) { sp.attach(k); });
+    });
+    scene.updateMatrixWorld(true);
+    return list.length;
   }
 
   function prepare(scene, e) {
@@ -520,6 +619,7 @@
       });
     }
     var ownWheels = own && wheelKeys && (wheelKeys.length || (v.steerParts || []).length) ? buildWheels(scene, wheelKeys, v.steerParts || []) : 0;
+    trueAxles(scene);   // eigene und automatische Räder: Drehachse = echte Radachse (kein Eiern)
     var ud = scene.userData;
     ud.modelRoot = true;   // Car editor „Cut a part“: Schnittebene in den Koordinaten dieses Knotens
     // „Smooth wheel shading“ im Car editor: alle Teile an den Rädern weich schattieren
