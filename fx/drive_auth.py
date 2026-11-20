@@ -1,18 +1,24 @@
-"""Car Drive Mehrspieler: Tickets, Zuschauer-Cookie, interne Schnittstelle zum WebSocket-Dienst.
+"""Car Drive Mehrspieler: Tickets, Zuschauer-Cookie, Kanal-Link, interne Schnittstelle zum WebSocket-Dienst.
 
 - Ticket: signiert (Flask-SECRET_KEY, itsdangerous), sagt dem WS-Dienst, wer sich verbindet:
-  {tid (Tenant), code, id (Twitch-User-ID), login, display, role host|viewer, garage (Liste | None = alle), rnd}.
-  Flask stellt es aus (Streamer: Token-Route, Zuschauer: /drive/<code>/ticket mit Zuschauer-Cookie).
+  Räume mit Code: {tid (Tenant), code, id (Twitch-User-ID), login, display, role host|viewer, garage (Liste | None
+  = alle), rnd}. Flask stellt es aus (Streamer: Token-Route, Zuschauer: /drive/<code>/ticket mit Zuschauer-Cookie).
+  Chatrennen steuerbar (ohne code): {tid, id, login, display, role driver|spectator} – Fahrer über
+  /drive/race/<kanal>/ticket (Zuschauer-Cookie, nur wer im aktuellen Chatrennen steht), Overlays (zuschauen, nie
+  fahren) über die Token-Route …/api/fx/car-race/spectate.
 - Zuschauer-Cookie `obskit_drive`: signiert {id, login, display} aus „Sign in with Twitch“ – getrennt vom
   Streamer-Login (keine Session in der DB, kein Tenant).
+- Kanal-Link des Chatrennens: stream-overlay.com/drive/race/<kanal> – <kanal> = Twitch-Kanal des Tenants
+  (tenant_credentials.twitch_channel), ohne Kanal der Tenant-Slug (key_of_tenant / tenant_of_key).
 - Interne Steuerung: Flask ruft http://127.0.0.1:9010/internal/<cmd>?… mit Header X-Drive-Key (aus dem
   SECRET_KEY abgeleitet); nginx leitet nur /drive-ws/ weiter, /internal ist von außen nicht erreichbar.
-- Grenzwerte je Auto: data/car-rain/drive-limits.json (schreibt Flask, liest der WS-Dienst beim Öffnen).
+- Grenzwerte je Auto: data/car-rain/drive-limits.json (schreibt Flask, liest der WS-Dienst beim Öffnen/je Rennen).
 """
 import hashlib
 import hmac
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -45,7 +51,9 @@ def read_ticket(ticket, secret=None, max_age=TICKET_AGE):
         data = _ser(TICKET_SALT, secret).loads(ticket, max_age=max_age)
     except (BadSignature, TypeError, ValueError):
         return None
-    return data if isinstance(data, dict) and data.get("id") and data.get("code") else None
+    if not isinstance(data, dict) or not data.get("id"):
+        return None
+    return data if data.get("code") or data.get("tid") is not None else None
 
 
 def make_viewer(info, secret=None):
@@ -61,6 +69,34 @@ def read_viewer(cookie, secret=None):
     except (BadSignature, TypeError, ValueError):
         return None
     return data if isinstance(data, dict) and data.get("id") else None
+
+
+KEY_RE = re.compile(r"^[a-z0-9_][a-z0-9_-]{1,39}$")
+
+
+def key_of_tenant(conn, tenant_id):
+    """Link-Schlüssel des Tenants: Twitch-Kanal (klein), sonst Slug; None ohne beides. conn = SqliteCompatConn."""
+    row = conn.execute("SELECT tc.twitch_channel AS ch, t.slug AS slug FROM tenants t "
+                       "LEFT JOIN tenant_credentials tc ON tc.tenant_id = t.id WHERE t.id = ?", (tenant_id,)).fetchone()
+    if not row:
+        return None
+    for k in (row["ch"], row["slug"]):
+        k = (k or "").strip().lower()
+        if KEY_RE.match(k):
+            return k
+    return None
+
+
+def tenant_of_key(conn, key):
+    """Tenant zu einem Link-Schlüssel (Twitch-Kanal, sonst Slug) oder None."""
+    key = (key or "").strip().lower()
+    if not KEY_RE.match(key):
+        return None
+    row = conn.execute("SELECT t.id AS id FROM tenants t JOIN tenant_credentials tc ON tc.tenant_id = t.id "
+                       "WHERE lower(tc.twitch_channel) = ? ORDER BY t.id LIMIT 1", (key,)).fetchone()
+    if not row:
+        row = conn.execute("SELECT id FROM tenants WHERE lower(slug) = ? ORDER BY id LIMIT 1", (key,)).fetchone()
+    return int(row["id"]) if row else None
 
 
 def internal_key(secret=None):

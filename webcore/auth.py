@@ -139,11 +139,13 @@ def _finish_follower_import(imp, access_token, info, cfg):
 
 def _finish_drive_signin(drv, info):
     """Car Drive: Zuschauer-Anmeldung – nur Twitch-ID + Name in ein signiertes Cookie (kein Konto, keine
-    Session in der DB), dann zurück auf /drive/<code>."""
+    Session in der DB), dann zurück auf /drive/<code> bzw. /drive/race/<kanal> (Chatrennen)."""
     import re
     from fx import drive_auth
     code = str(drv.get("code") or "").upper()
-    target = "/drive/" + code if re.match(r"^[A-Z2-9]{6}$", code) else "/"
+    rkey = str(drv.get("race") or "").lower()
+    target = "/drive/" + code if re.match(r"^[A-Z2-9]{6}$", code) else \
+        "/drive/race/" + rkey if drive_auth.KEY_RE.match(rkey) else "/"
     resp = make_response(redirect(target, code=302))
     resp.set_cookie(drive_auth.VIEWER_COOKIE, drive_auth.make_viewer(info), max_age=drive_auth.VIEWER_AGE,
                     secure=not current_app.config.get("TESTING"), httponly=True, samesite="Lax", path="/drive")

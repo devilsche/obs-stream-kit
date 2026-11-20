@@ -760,6 +760,8 @@ def _race_join(now):
         car_key = entry["key"]
     out = race.join(g.tenant_id, uid, login or uid, display, color, now, cars,
                     sub=sub, car_key=car_key, swap=bool(car_key))
+    if out.get("ok"):
+        out["say"] = _with_drive_link(out["say"], g.tenant_id)
     if reward:
         out["refund"] = not out["ok"]
         if not out["ok"]:
@@ -894,12 +896,13 @@ def car_race_cmd(token):
         if r:
             catalog = _race_cars()[0]
             name = race_shop.car_name(catalog, r["car_key"])
-            say = "@%s you're driving the %s (grid %d/%d)" % (display, name, r["grid"], total)
+            say = _with_drive_link("@%s you're driving the %s (grid %d/%d)" % (display, name, r["grid"], total),
+                                   g.tenant_id)
             return _no_store(jsonify({"ok": True, "say": say}))
         if ph in ("podium", "cooldown"):
             say = "@%s you're not in a race – next race opens in %d s" % (display, left)
         else:
-            say = "@%s you're not in a race – type !race to join" % display
+            say = _with_drive_link("@%s you're not in a race – type !race to join" % display, g.tenant_id)
         return _no_store(jsonify({"ok": False, "say": say}))
     if cmd in RACE_ADMIN:
         out = race.admin(g.tenant_id, cmd, now, user_id=_arg("id"))
@@ -926,7 +929,12 @@ def car_race_cmd(token):
 def car_race_state(token):
     if g.tenant_id is None:
         abort(404)
-    return _no_store(jsonify(race.state(g.tenant_id, time.time())))
+    now = time.time()
+    try:
+        drive_sync(g.tenant_id, now)
+    except Exception:
+        log.exception("fx car-race: drive sync failed")
+    return _no_store(jsonify(race.state(g.tenant_id, now)))
 
 
 @bp_fx.route("/s/<token>/api/fx/car-race/result", methods=["POST"])
@@ -935,13 +943,22 @@ def car_race_result(token):
     if g.tenant_id is None:
         abort(404)
     body = request.get_json(silent=True) or {}
-    race_id, places = body.get("race_id"), body.get("places")
+    race_id, places, times = body.get("race_id"), body.get("places"), body.get("times")
     if not isinstance(race_id, str) or not isinstance(places, list):
         return jsonify({"ok": False, "error": "race_id/places missing"}), 400
+    now = time.time()
+    pilot_res = None
     try:
-        rows = race.accept_result(g.tenant_id, race_id, places, time.time())
+        sy = drive_sync(g.tenant_id, now, force=True)
+        pilot_res = (sy or {}).get("pilots")
+    except Exception:
+        log.exception("fx car-race: drive sync failed")
+    try:
+        rows = race.accept_result(g.tenant_id, race_id, places, now,
+                                  times=times if isinstance(times, list) else None, pilot_res=pilot_res)
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+    final = race.state(g.tenant_id, now).get("result")
     def month_ranks(conn):
         board = race_db.board(conn, g.tenant_id, "month", limit=100000)
         return {r["user_id"]: (i, r["points"]) for i, r in enumerate(board, 1)}
@@ -960,7 +977,7 @@ def car_race_result(token):
             pts = _with_conn(stored)
         except Exception:
             pts = {}
-        return jsonify({"ok": True, "counted": False, "points": pts})
+        return jsonify({"ok": True, "counted": False, "points": pts, "result": final})
 
     def save(conn):
         if not race_db.record(conn, g.tenant_id, race_id, rows):
@@ -971,18 +988,103 @@ def car_race_result(token):
     except Exception:
         log.exception("fx car-race: Ergebnis speichern fehlgeschlagen")
         race.release(g.tenant_id, race_id)
-        return jsonify({"ok": True, "counted": False, "points": {}})
+        return jsonify({"ok": True, "counted": False, "points": {}, "result": final})
     if ranks is None:
         race.confirm(g.tenant_id, race_id)
         try:
             pts = _with_conn(stored)
         except Exception:
             pts = {}
-        return jsonify({"ok": True, "counted": False, "points": pts})
+        return jsonify({"ok": True, "counted": False, "points": pts, "result": final})
     race.confirm(g.tenant_id, race_id)
     field = len(rows)
     gained = {r["user_id"]: race_db.points(r["place"], field) for r in rows}
-    return jsonify({"ok": True, "counted": True, "points": points_view(ranks, gained)})
+    return jsonify({"ok": True, "counted": True, "points": points_view(ranks, gained), "result": final})
+
+
+# ---- Car Drive: Chatrennen steuerbar (WS-Dienst drive_ws.py, fx/drive_room.py) ----
+
+DRIVE_SYNC_GAP = 0.5
+_DRIVE_SYNC = {}      # tenant → (Zeit, Antwort des WS-Dienstes)
+_DRIVE_KEY = {}       # tenant → (Zeit, Link-Schlüssel)
+
+
+def drive_sync(tenant_id, now, force=False):
+    """Chatrennen mit dem WS-Dienst abgleichen (höchstens alle 0,5 s je Tenant): Rennen/Phase/Fahrer hin,
+    verbundene Fahrer + KI-Übernahmen + Zielzeiten zurück. Friert beim Schließen der Startaufstellung die Piloten
+    ein. Ist der Dienst weg, übernimmt im Rennen die KI alle Piloten (letzte bekannte Stelle, sonst Startplatz).
+    → letzte Antwort (dict) oder None."""
+    from fx import drive_auth
+    info = race.drive_info(tenant_id, now)
+    if info is None:
+        return None
+    last = _DRIVE_SYNC.get(tenant_id)
+    same = last is not None and last[1].get("race_id") == info["race_id"]
+    if not force and same and now - last[0] < DRIVE_SYNC_GAP:
+        return last[1]
+    out = drive_auth.call("sync", timeout=0.6, tenant=tenant_id, race=json.dumps(info, separators=(",", ":")))
+    if out.get("ok"):
+        out["race_id"] = info["race_id"]
+        if info["pilots"] is None and info["phase"] in ("intro", "race"):
+            if race.set_pilots(tenant_id, info["race_id"], out.get("connected") or [], now) is not None:
+                info = race.drive_info(tenant_id, now) or info
+                again = drive_auth.call("sync", timeout=0.6, tenant=tenant_id,
+                                        race=json.dumps(info, separators=(",", ":")))
+                if again.get("ok"):
+                    again["race_id"] = info["race_id"]
+                    out = again
+        if out.get("takeovers"):
+            race.add_takeovers(tenant_id, info["race_id"], out["takeovers"])
+    else:
+        out = dict(out, race_id=info["race_id"], failed=True)
+        prev = last[1] if same else {}
+        if info["phase"] == "race" and info["pilots"] and info["starts_at"] and now >= info["starts_at"]:
+            t = round(now - info["starts_at"], 2)
+            evs = []
+            for uid in info["pilots"]:
+                pr = (prev.get("pilots") or {}).get(uid) or {}
+                if uid in info["taken"] or pr.get("fin") is not None or pr.get("taken"):
+                    continue
+                sn = (prev.get("snap") or {}).get(uid)
+                evs.append(dict(sn, t=t, id=uid, speed=0) if sn else {"t": t, "id": uid, "grid": 1})
+            if evs:
+                race.add_takeovers(tenant_id, info["race_id"], evs)
+        # letzte gute Antwort behalten (Zielzeiten für die Wertung)
+        for k in ("pilots", "snap"):
+            if prev.get(k):
+                out[k] = prev[k]
+    _DRIVE_SYNC[tenant_id] = (now, out)
+    return out
+
+
+def drive_link(tenant_id):
+    """stream-overlay.com/drive/race/<kanal> des Tenants (Kanal-Login, sonst Slug) oder None (5 min gemerkt)."""
+    from fx import drive_auth
+    hit = _DRIVE_KEY.get(tenant_id)
+    now = time.time()
+    if not hit or now - hit[0] > 300:
+        try:
+            key = _with_conn(lambda conn: drive_auth.key_of_tenant(conn, tenant_id))
+        except Exception:
+            key = None
+        hit = _DRIVE_KEY[tenant_id] = (now, key)
+    return request.host_url.rstrip("/") + "/drive/race/" + hit[1] if hit[1] else None
+
+
+def _with_drive_link(say, tenant_id):
+    url = drive_link(tenant_id)
+    return "%s · steer your own car: %s" % (say, url) if url else say
+
+
+@bp_fx.route("/s/<token>/api/fx/car-race/spectate")
+def car_race_spectate(token):
+    """Zuschauer-Ticket fürs Overlay: Live-Takt der selbst gesteuerten Autos (WS-Dienst), nie selbst fahren."""
+    from fx import drive_auth
+    if g.tenant_id is None:
+        abort(404)
+    tk = drive_auth.make_ticket({"tid": g.tenant_id, "id": "spec-%x" % (int(time.time() * 1000) & 0xffffffff),
+                                 "login": "", "display": "", "role": "spectator"})
+    return _no_store(jsonify({"ok": True, "ticket": tk, "path": "/drive-ws/race"}))
 
 
 # ---- Car Drive Mehrspieler (Räume im WS-Dienst drive_ws.py, fx/drive_room.py) ----

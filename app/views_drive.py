@@ -9,12 +9,19 @@
   GET /drive/logout?code=…      Zuschauer-Cookie löschen
   GET /drive/<code>/ticket      Ticket für den WS-Dienst + Garage des Zuschauers (Autos aus fx_race_garage, die
                                 mitfahren dürfen) + ein Zufallsauto
+
+Chatrennen steuerbar (Schritt 2b) – fester Link je Tenant, <kanal> = Twitch-Kanal (sonst Slug, fx/drive_auth):
+  GET /drive/race/<kanal>         dieselbe Seite im Modus „race“ (window.__DRIVE__.mode = "race")
+  GET /drive/race/<kanal>/state   Zustand des Chatrennens (wie …/api/fx/car-race/state) + me {in_race, car, pilot}
+  GET /drive/race/<kanal>/ticket  Fahrer-Ticket für /drive-ws/race – nur angemeldet und im aktuellen Chatrennen
+  GET /drive/login?race=<kanal>   Anmeldung, zurück auf /drive/race/<kanal>
 """
 import json
 import os
 import random
 import re
 import secrets
+import time
 import urllib.parse
 
 from flask import (Blueprint, Response, abort, current_app, jsonify, make_response, redirect, request,
@@ -99,17 +106,113 @@ def page(code):
     return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate"}
 
 
+def _page_html(root):
+    with open(os.path.join(root, "tools", "car-drive.html"), encoding="utf-8") as f:
+        html = f.read()
+    html = re.sub(r'\s*<script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom\.js"></script>', "", html)
+    html = html.replace("/s/__WIDGET_TOKEN__/api/fx/", "/drive/a/api/fx/").replace("/s/__WIDGET_TOKEN__/js/", "/drive/a/js/")
+
+    def bust(m):
+        full = os.path.normpath(os.path.join(root, "js", m.group(1)))
+        if not full.startswith(os.path.join(root, "js")) or not os.path.exists(full):
+            return m.group(0)
+        return 'src="/drive/a/js/%s?v=%d"' % (m.group(1), int(os.path.getmtime(full)))
+    return _JS_REF.sub(bust, html)
+
+
+def _race_tenant(key):
+    """Tenant zum Kanal-Schlüssel oder None."""
+    if not drive_auth.KEY_RE.match((key or "").lower()):
+        return None
+    try:
+        from fx.endpoints import _with_conn
+        return _with_conn(lambda conn: drive_auth.tenant_of_key(conn, key))
+    except Exception:
+        current_app.logger.exception("car-drive race: tenant lookup failed")
+        return None
+
+
+def _sync(tid, now):
+    try:
+        from fx.endpoints import drive_sync
+        drive_sync(tid, now)
+    except Exception:
+        current_app.logger.exception("car-drive race: sync failed")
+
+
+@bp_drive.route("/drive/race/<key>")
+def race_page(key):
+    key = key.lower()
+    tid = _race_tenant(key)
+    if tid is None:
+        abort(404)
+    viewer = _viewer()
+    html = _page_html(_root())
+    cfg = {"mode": "race", "key": key,
+           "user": {"id": viewer["id"], "name": viewer.get("display") or viewer.get("login")} if viewer else None,
+           "login": "/drive/login?race=" + key, "logout": "/drive/logout?race=" + key,
+           "ticket": "/drive/race/%s/ticket" % key, "state": "/drive/race/%s/state" % key}
+    inject = "<script>\nwindow.__DRIVE__ = %s;\n</script>" % json.dumps(cfg).replace("</", "<\\/")
+    html = inject_theme(html.replace("</head>", inject + "\n</head>", 1), _theme(tid))
+    return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate"}
+
+
+def _me(st, viewer):
+    if not viewer:
+        return None
+    mine = next((r for r in st.get("racers") or [] if str(r.get("user_id")) == str(viewer["id"])), None)
+    pilots = st.get("pilots")
+    taken = {e.get("id") for e in st.get("race_events") or [] if e.get("type") == "takeover"}
+    return {"id": viewer["id"], "name": viewer.get("display") or viewer.get("login"), "in_race": mine is not None,
+            "grid": mine.get("grid") if mine else None,
+            "pilot": None if pilots is None or mine is None else viewer["id"] in pilots,
+            "taken": viewer["id"] in taken}
+
+
+@bp_drive.route("/drive/race/<key>/state")
+def race_state(key):
+    tid = _race_tenant(key)
+    if tid is None:
+        abort(404)
+    now = time.time()
+    _sync(tid, now)
+    st = race.state(tid, now)
+    st["me"] = _me(st, _viewer())
+    return _no_store(jsonify(st))
+
+
+@bp_drive.route("/drive/race/<key>/ticket")
+def race_ticket(key):
+    tid = _race_tenant(key)
+    if tid is None:
+        abort(404)
+    viewer = _viewer()
+    if not viewer:
+        return _no_store(jsonify({"ok": False, "signin": True, "error": "sign in with Twitch first"})), 401
+    now = time.time()
+    _sync(tid, now)
+    st = race.state(tid, now)
+    me = _me(st, viewer)
+    if st["phase"] not in ("lobby", "countdown", "intro", "race") or not me["in_race"]:
+        return _no_store(jsonify({"ok": False, "error": "type !race in chat to join"})), 403
+    tk = drive_auth.make_ticket({"tid": tid, "id": viewer["id"], "login": viewer.get("login") or "",
+                                 "display": viewer.get("display") or viewer.get("login") or viewer["id"],
+                                 "role": "driver"})
+    return _no_store(jsonify({"ok": True, "ticket": tk, "path": "/drive-ws/race", "race_id": st["race_id"], "me": me}))
+
+
 @bp_drive.route("/drive/login")
 def login():
     code = (request.args.get("code") or "").upper()
-    if not _CODE.match(code):
+    rkey = (request.args.get("race") or "").lower()
+    if not _CODE.match(code) and not drive_auth.KEY_RE.match(rkey):
         abort(400)
     cfg = current_app.config
     if not cfg.get("TWITCH_CLIENT_ID"):
         abort(503, description="Twitch sign-in is not configured")
     state = secrets.token_urlsafe(32)
     session["oauth_state"] = state
-    session["oauth_drive"] = {"code": code}
+    session["oauth_drive"] = {"code": code} if _CODE.match(code) else {"race": rkey}
     params = {"client_id": cfg["TWITCH_CLIENT_ID"], "redirect_uri": cfg["TWITCH_REDIRECT_URI"],
               "response_type": "code", "scope": "", "state": state}
     return redirect(cfg["TWITCH_AUTH_URL"] + "?" + urllib.parse.urlencode(params), code=302)
@@ -118,7 +221,9 @@ def login():
 @bp_drive.route("/drive/logout")
 def logout():
     code = (request.args.get("code") or "").upper()
-    resp = make_response(redirect("/drive/" + code if _CODE.match(code) else "/", code=302))
+    rkey = (request.args.get("race") or "").lower()
+    target = "/drive/" + code if _CODE.match(code) else "/drive/race/" + rkey if drive_auth.KEY_RE.match(rkey) else "/"
+    resp = make_response(redirect(target, code=302))
     resp.delete_cookie(drive_auth.VIEWER_COOKIE, path="/drive")
     return resp
 

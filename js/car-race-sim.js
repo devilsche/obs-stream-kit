@@ -91,6 +91,14 @@
  *       sim.standings() → [id…]  aktuelle Reihenfolge
  *       sim.result() → [{ id, place|null }] in Startreihenfolge (null = DNF)
  *       Ende: der erste im Ziel startet die Frist finishWindow; wer danach nicht im Ziel ist, ist DNF.
+ *       Geister: cars[i].ghost = true (Chatrennen: das Auto steuert ein Mensch) – bekommt Startplatz und Zufallszahlen
+ *       wie alle anderen, fährt aber nicht mit: kein Kontakt, kein Windschatten, nicht in standings(), place bleibt null;
+ *       sim.cars[i] behält es (ghost: true, pos 0) am Startplatz. Ohne Geister ist alles exakt wie vorher.
+ *   CarRaceSim.follower(track, stats, snap, { laps }) → f; f.at(t) → { s, d, v, x, z, yaw, steer, spin, roll, pitch,
+ *       lap, finish, off }   KI-Übernahme eines selbst gesteuerten Autos: Ideallinie + Tempoprofil wie in create(),
+ *       ohne andere Autos und ohne Zufall – reine Funktion von snap = { t, prog, x, z, speed } (bzw. { t, s, d, speed })
+ *       und t, für alle Instanzen gleich. f.finishBy(tMax) → Zielzeit oder null.
+ *       CarRaceSim.follow(track, stats, snap, t, opts) = follower(…).at(t) als Kopie.
  *       Spätestens nach 90 s ist Schluss (opts.maxTime ändert das, z. B. Car Drive mit bis zu 5 Runden). Nach sim.done fahren die Autos zur Darstellung locker weiter,
  *       am Ergebnis ändert sich nichts mehr, es kommen keine Ereignisse mehr dazu.
  */
@@ -569,6 +577,17 @@
       pp.hdg = Math.atan2(-(F0[1] - R0[1]), F0[0] - R0[0]);
       cc.x = (F0[0] + R0[0]) / 2; cc.z = (F0[1] + R0[1]) / 2; cc.yaw = cc.yaw + wrapAngle(pp.hdg - cc.yaw);
     });
+    // Geister (Chatrennen: selbst gesteuerte Autos): Startplatz und Zufallszahlen wie alle anderen, danach aus der
+    // Rechnung genommen – kein Kontakt, kein Windschatten, keine Wertung; sim.cars behält sie an ihrem Index
+    var allCars = cars;
+    if (opts.cars.some(function (c) { return c.ghost; })) {
+      cars = []; var P2 = [];
+      opts.cars.forEach(function (c, i) {
+        if (c.ghost) { allCars[i].ghost = true; allCars[i].pos = 0; return; }
+        cars.push(allCars[i]); P2.push(P[i]);
+      });
+      P = P2;
+    }
     var order = cars.map(function (c, i) { return i; });   // aktuelle Reihenfolge (Indizes), mit Hysterese
 
     // Zufalls-Ölfleck (nach den Autos gewürfelt): vor oder in einer Kurve, nie in der Startaufstellung;
@@ -755,7 +774,7 @@
 
     if (opts.events) setExt(opts.events);
     var sim = {
-      DT: DT, track: T, cars: cars, time: 0, done: false, laps: laps, counts: counts,
+      DT: DT, track: T, cars: allCars, time: 0, done: false, laps: laps, counts: counts,
       events: events, hazards: hazards,
       setEvents: function (list) { return setExt(list); },
       step: function () {
@@ -1119,15 +1138,98 @@
         return order.map(function (i) { return cars[i].id; });
       },
       result: function () {
-        return cars.map(function (c) { return { id: c.id, place: c.place }; });
+        return allCars.map(function (c) { return { id: c.id, place: c.place }; });
       }
     };
 
     return sim;
   }
 
+  // ---- Nachfahrer: die KI übernimmt ein selbst gesteuertes Auto (Chatrennen, Verbindung weg) ----
+  // Eigenständig und deterministisch: nur Strecke, Werte des Autos, Übernahme-Zustand und Zeit – keine anderen Autos,
+  // kein Zufall. Ideallinie und Tempoprofil wie in create() (Tagesform 1, kein Pech), feste Schritte DT ab snap.t.
+  // snap = { t, prog (= s), x, z (→ Seitenversatz), speed } oder { t, s, d, speed } (Startplatz aus der Sim).
+  function follower(Tin, st, snap, opts) {
+    var T = typeof Tin === 'object' && Tin ? Tin : track(Tin | 0);
+    var raw = T._raw, n = raw.n, ds = raw.ds, L = T.len, HALF = T.width / 2;
+    opts = opts || {};
+    var laps = opts.laps || 3, w = carWidth(st.len), lim = HALF - w / 2 - 0.1, wb = wheelbase(st.len), wheelR = clamp(0.07 * st.len, 0.3, 0.55);
+    var prof = new Float64Array(n), k, pass;
+    for (k = 0; k < n; k++) {
+      prof[k] = Math.min(st.vmax, Math.sqrt(st.grip / Math.max(Math.abs(raw.CRV[k]), 1e-4))) * (1 - 0.06 * raw.BUMP[k] * (1.1 - st.susp));
+    }
+    for (pass = 0; pass < 2; pass++) for (k = n - 1; k >= 0; k--) {
+      var nx = prof[(k + 1) % n]; prof[k] = Math.min(prof[k], Math.sqrt(nx * nx + 2 * st.brake * ds));
+    }
+    function lerpAt(A, s) { var u = mod(s, L) / ds, i0 = Math.floor(u) % n, f = u - Math.floor(u); return A[i0] + (A[(i0 + 1) % n] - A[i0]) * f; }
+    function railAt(s, sd) { var u = mod(s, L) / ds, i0 = Math.floor(u) % n, A = sd > 0 ? raw.RUNL : raw.RUNR; return HALF + Math.min(A[i0], A[(i0 + 1) % n]) - w / 2 - 0.1; }
+    var t0 = isFinite(+snap.t) ? +snap.t : 0, s0, d0;
+    if (snap.s != null && isFinite(+snap.s)) { s0 = +snap.s; d0 = +snap.d || 0; }
+    else {
+      s0 = +snap.prog || 0;
+      var a0 = T.at(s0);
+      d0 = isFinite(+snap.x) && isFinite(+snap.z) ? (snap.x - a0.x) * a0.nx + (snap.z - a0.z) * a0.nz : 0;
+    }
+    d0 = clamp(d0, -railAt(s0, -1), railAt(s0, 1));
+    var c;
+    function reset() {
+      c = { s: s0, d: d0, v: Math.max(0, +snap.speed || 0), time: t0, steps: 0, finish: null, lap: 0, yaw: T.at(s0).yaw, lat: 0,
+        steer: 0, spin: 0, roll: 0, pitch: 0, x: 0, z: 0, off: false };
+      pose();
+    }
+    function pose() {
+      var a = T.at(c.s);
+      c.x = a.x + a.nx * c.d; c.z = a.z + a.nz * c.d;
+      c.yaw = c.yaw + wrapAngle(a.yaw + c.lat - c.yaw);
+      c.lap = c.s < 0 ? 0 : Math.min(laps, Math.floor(c.s / L) + 1);
+      c.off = Math.abs(c.d) > HALF;
+    }
+    function step() {
+      var cruise = c.finish !== null;
+      var line = clamp(lerpAt(raw.CRV, c.s + 10) * 50, -2.5, 2.5);
+      var target = lerpAt(prof, c.s) * (cruise ? 0.75 : 0.97);
+      if (c.off) target = Math.min(target, GRAVEL_V);
+      var vtop = st.vmax / SLIP_BONUS;
+      if (c.v < target) {
+        var acc = st.acc * (1 - Math.pow(c.v / vtop, DRAG_EXP));
+        if (c.v < 8 && c.s < L) acc *= st.launch;
+        if (c.off) acc *= 0.5;
+        c.v = Math.min(target, c.v + Math.max(acc, 0.3) * DT);
+      } else c.v = Math.max(target, c.v - (c.off ? GRAVEL_DECEL : st.brake * 1.3) * DT);
+      var dT = Math.abs(c.d) > lim ? (c.d > 0 ? 1 : -1) * (lim - 0.3) : clamp(line, -lim, lim);
+      var latMax = (2 + 0.15 * c.v) * DT, dd = clamp(dT - c.d, -latMax, latMax);
+      c.d += dd;
+      c.lat += (clamp(Math.atan2(dd / DT, Math.max(c.v, 4)), -0.5, 0.5) - c.lat) * Math.min(1, DT * 10);
+      var sPrev = c.s;
+      c.s += c.v * DT;
+      c.steps++;
+      c.time = t0 + c.steps * DT;
+      if (c.finish === null && c.s >= laps * L) c.finish = Math.round((c.time - (c.s - laps * L) / Math.max(c.s - sPrev, 1e-6) * DT) * 1000) / 1000;
+      var crv = lerpAt(raw.CRV, c.s + wb / 2);
+      c.steer += (clamp(Math.atan(wb * crv), -MAX_STEER, MAX_STEER) - c.steer) * Math.min(1, DT * 8);
+      c.spin = mod(c.spin + c.v * DT / wheelR, TWO_PI);
+      c.roll += (clamp(c.v * c.v * lerpAt(raw.CRV, c.s) * 0.012 * (1.3 - st.susp), -0.12, 0.12) - c.roll) * Math.min(1, DT * 6);
+      pose();
+    }
+    reset();
+    return {
+      laps: laps,
+      // Zustand zur Zeit t (Rennsekunden); vor snap.t steht das Auto am Übernahme-Punkt
+      at: function (t) {
+        if (t < c.time - 1e-9) reset();
+        var target = Math.floor((t - t0) / DT + 1e-6);
+        var guard = 0;
+        while (c.steps < target && guard++ < 20000) step();
+        return c;
+      },
+      // Zielzeit (Rennsekunden) bis höchstens tMax rechnen, sonst null
+      finishBy: function (tMax) { this.at(tMax); return c.finish !== null && c.finish <= tMax ? c.finish : null; }
+    };
+  }
+  function follow(T, st, snap, t, opts) { var f = follower(T, st, snap, opts); var q = f.at(t); return Object.assign({}, q); }
 
   return {
+    follower: follower, follow: follow,
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
     // fünf kuratierte Strecken, Reihenfolge fest (neue werden hinten angehängt)
     TRACKS: [1, 2, 3, 4, 5],

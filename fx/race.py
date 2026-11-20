@@ -6,6 +6,13 @@ Overlay stellt die Fahrer vor (Phase intro, 2 s + 1,6 s je Fahrer), dann startet
 Zustand per Poll, fährt das Rennen und meldet die Platzierung zurück. Gespeichert
 wird erst das Ergebnis (fx/race_db.py); die Lobby selbst überlebt keinen Neustart.
 
+Chatrennen steuerbar (Car Drive, Schritt 2b): Fahrer können ihr Auto auf stream-overlay.com/drive/<Kanal> selbst
+steuern. Beim Schließen der Startaufstellung (Beginn von intro) friert der Endpoint per set_pilots ein, wer dann mit
+dem WS-Dienst (drive_ws.py) verbunden ist – `pilots` im Zustand. Die Sim rechnet diese Autos als Geister (keine
+Wechselwirkung), die Overlays zeigen sie aus dem Live-Takt. Fällt die Verbindung weg, übernimmt die KI: Ereignis
+`takeover` in race_events (add_takeovers), ab dann fährt js/car-race-sim.js follower() das Auto. Ohne Piloten ist alles
+wie vorher. Zielzeiten der Piloten kommen vom WS-Dienst (accept_result, pilot_res).
+
 Alle Funktionen bekommen `now` (Unix-Sekunden) übergeben, damit Tests die Zeit
 steuern können. Phasen rücken lazy über `now` weiter (_advance).
 """
@@ -52,7 +59,8 @@ def _new_race(now):
     return {"phase": "lobby", "race_id": "%x-%x" % (int(now), seed), "seed": seed,
             "track": rng.getrandbits(31), "rng": rng, "racers": [], "first_at": now,
             "starts_at": None, "ends_at": now + LOBBY_TTL, "podium_until": None,
-            "cool_until": None, "counted": False, "result": None, "events": [], "boosted": set()}
+            "cool_until": None, "counted": False, "result": None, "events": [], "boosted": set(),
+            "pilots": None, "taken": {}}
 
 
 def _get(tenant_id):
@@ -68,6 +76,8 @@ def _intro(t, at):
 
 
 def _go(t, now, starts_at=None):
+    if t.get("pilots") is None:
+        t["pilots"] = []   # niemand rechtzeitig eingefroren (WS-Dienst nicht erreicht): alle fahren als KI
     t["phase"] = "race"
     t["starts_at"] = now if starts_at is None else starts_at
     t["ends_at"] = t["starts_at"] + RACE_MAX
@@ -305,9 +315,69 @@ def _view(t, now):
                       "sub": r.get("sub", 0), "sub_paint": r.get("sub_paint")}
                      for r in t["racers"]]
     out["race_events"] = sorted((dict(e) for e in t.get("events", [])), key=lambda e: e["t"])
+    if t.get("pilots") is not None:
+        out["pilots"] = list(t["pilots"])
     if t["result"] and t["phase"] in ("podium", "cooldown"):
         out["result"] = t["result"]
     return out
+
+
+def drive_info(tenant_id, now):
+    """Für den Abgleich mit dem WS-Dienst: aktuelles Rennen oder None (idle)."""
+    with _LOCK:
+        t = _get(tenant_id)
+        _advance(t, now)
+        if t["phase"] == "idle":
+            return None
+        return {"race_id": t["race_id"], "phase": t["phase"], "starts_at": t["starts_at"], "track": t["track"],
+                "laps": LAPS, "fw": FINISH_WINDOW,
+                "racers": [[r["user_id"], r["car_key"] or "", r["grid"] - 1] for r in t["racers"] if not r.get("test")],
+                "pilots": None if t.get("pilots") is None else list(t["pilots"]),
+                "taken": sorted(t.get("taken", {}))}
+
+
+def set_pilots(tenant_id, race_id, ids, now):
+    """Startaufstellung geschlossen: wer jetzt verbunden ist, steuert selbst (einmalig je Rennen, nur ab intro).
+    → eingefrorene Liste (Startreihenfolge) oder None, wenn nicht (mehr) möglich."""
+    want = {str(i) for i in ids or []}
+    with _LOCK:
+        t = _get(tenant_id)
+        _advance(t, now)
+        if t.get("race_id") != race_id or t["phase"] not in ("intro", "race") or t.get("pilots") is not None:
+            return None
+        t["pilots"] = [r["user_id"] for r in t["racers"] if r["user_id"] in want and not r.get("test")]
+        return list(t["pilots"])
+
+
+_TAKE_KEYS = ("x", "z", "yaw", "speed", "prog")
+
+
+def add_takeovers(tenant_id, race_id, events):
+    """KI übernimmt Piloten (vom WS-Dienst): als race_events {t, type: takeover, id, x, z, yaw, speed, prog, lap}
+    (oder grid: 1 = vom Startplatz). Je Pilot einmal. → Anzahl neuer Übernahmen."""
+    n = 0
+    with _LOCK:
+        t = _get(tenant_id)
+        if t.get("race_id") != race_id or not t.get("pilots"):
+            return 0
+        for e in events or []:
+            uid = str(e.get("id"))
+            if uid not in t["pilots"] or uid in t["taken"]:
+                continue
+            try:
+                ev = {"t": round(float(e["t"]), 2), "type": "takeover", "id": uid}
+                if e.get("grid"):
+                    ev["grid"] = 1
+                else:
+                    for k in _TAKE_KEYS:
+                        ev[k] = round(float(e[k]), 3)
+                    ev["lap"] = int(e.get("lap") or 0)
+            except (KeyError, TypeError, ValueError):
+                continue
+            t["taken"][uid] = ev
+            t["events"].append(ev)
+            n += 1
+    return n
 
 
 def state(tenant_id, now):
@@ -355,9 +425,40 @@ def admin(tenant_id, action, now, user_id=None):
         return {"ok": True, "state": _view(t, now)}
 
 
-def accept_result(tenant_id, race_id, places, now):
+def _merge_pilots(t, racers, places, times, pilot_res):
+    """Platzierung mit Piloten: Zielzeiten der KI/Nachfahrer vom Overlay (times), der Piloten vom WS-Dienst.
+    Sieger + FINISH_WINDOW wie in der Sim, später = DNF; ungültige Piloten (Prüfung) = DNF ohne Wertung.
+    → (places, invalid ids)."""
+    pil, taken, res = set(t["pilots"]), t.get("taken", {}), pilot_res or {}
+    tm, invalid = [], set()
+    for i, r in enumerate(racers):
+        uid = r["user_id"]
+        if uid in pil:
+            pr = res.get(uid) or {}
+            if pr.get("invalid"):
+                invalid.add(uid)
+                tm.append(None)
+                continue
+            v = times[i] if uid in taken else pr.get("fin")
+        else:
+            v = times[i] if places[i] is not None else None
+        tm.append(float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 < v <= RACE_MAX else None)
+    done = [v for v in tm if v is not None]
+    if done:
+        cut = min(done) + FINISH_WINDOW + 1e-6
+        tm = [v if v is not None and v <= cut else None for v in tm]
+    order = sorted((i for i, v in enumerate(tm) if v is not None), key=lambda i: (tm[i], i))
+    out = [None] * len(racers)
+    for k, i in enumerate(order, 1):
+        out[i] = k
+    return out, invalid
+
+
+def accept_result(tenant_id, race_id, places, now, times=None, pilot_res=None):
     """Ergebnis des aktuellen Rennens annehmen (einmalig, innerhalb RESULT_WINDOW nach
     dem Start). places in Startaufstellung: Platz 1..n oder None (DNF).
+    Mit Piloten (pilots) zählen die Zielzeiten: times = Rennsekunden je Startplatz vom Overlay (KI + Nachfahrer),
+    pilot_res = {user_id: {fin, invalid}} vom WS-Dienst; die Plätze werden daraus neu gerechnet.
     → rows für race_db.record, None wenn nicht annehmbar; ValueError bei ungültigen places."""
     with _LOCK:
         t = _get(tenant_id)
@@ -373,16 +474,24 @@ def accept_result(tenant_id, race_id, places, now):
         fin = sorted(p for p in places if p is not None)
         if fin != list(range(1, len(fin) + 1)):
             raise ValueError("places must be 1..k without gaps")
+        invalid = set()
+        if t.get("pilots"):
+            if times is None:
+                times = [None] * len(racers)
+            if not isinstance(times, list) or len(times) != len(racers):
+                raise ValueError("times does not match the number of racers")
+            places, invalid = _merge_pilots(t, racers, places, times, pilot_res)
         # Nur echte Fahrer werden gewertet: Testfahrer bekommen keine Zeilen/Punkte, die echten
         # Zielplätze werden ohne sie neu vergeben (Zielreihenfolge bleibt), DNF bleibt DNF
-        real = [(r, p) for r, p in zip(racers, places) if not r.get("test")]
+        real = [(r, p) for r, p in zip(racers, places) if not r.get("test") and r["user_id"] not in invalid]
         order = {r["user_id"]: i for i, (r, p) in enumerate(sorted(
             ((r, p) for r, p in real if p is not None), key=lambda x: x[1]), 1)}
         rows = [{"user_id": r["user_id"], "login": r["login"], "display": r["display"],
                  "place": order.get(r["user_id"]) if p is not None else None,
                  "car_key": r["car_key"] or "", "sub": r.get("sub", 0)} for r, p in real]
         t["race_end"] = now
-        t["result"] = sorted(({"user_id": r["user_id"], "display": r["display"], "place": p}
+        t["result"] = sorted(({"user_id": r["user_id"], "display": r["display"], "place": p,
+                               **({"invalid": True} if r["user_id"] in invalid else {})}
                               for r, p in zip(racers, places)),
                              key=lambda x: (x["place"] is None, x["place"] or 0))
         t["phase"] = "podium"
@@ -406,6 +515,12 @@ def boost(tenant_id, user_id, kind, query, now, pay):
         me = next((r for r in t["racers"] if r["user_id"] == user_id), None) if t["phase"] == "race" else None
         if me is None or me.get("test") or t["starts_at"] is None or now < t["starts_at"]:
             return {"ok": False, "say": "!%s only works for racers while the race is running" % kind}
+        if user_id in (t.get("pilots") or ()):
+            # selbst gesteuert: Nitro landet im eigenen Browser; Anrempeln gibt es nur für KI-Autos
+            if kind == "bump":
+                return {"ok": False, "say": "!bump is only for AI-driven cars – you're steering yourself"}
+            if user_id in t.get("taken", {}):
+                return {"ok": False, "say": "the AI is driving your car now – !nitro is off"}
         if (kind, user_id) in t["boosted"]:
             return {"ok": False, "say": "you already used %s this race" % kind}
         # Bump hat kein Ziel: die Sim rempelt das nächste Auto direkt voraus (oder daneben) an,

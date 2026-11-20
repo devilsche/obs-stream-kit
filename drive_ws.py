@@ -17,6 +17,18 @@ start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch
 (20 Hz) · lap {id, lap, time, ok, fin?} · results {race_id, list} · recorded {race_id, counted, points} ·
 pong {c, s} · closed {msg} · error {msg}.
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
+
+Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
+(fx/race.py), Seite stream-overlay.com/drive/race/<kanal>. Flask gleicht ihn bei jedem Abruf des Rennzustands ab
+(höchstens alle 0,5 s):
+  ws  /drive-ws/race          Fahrer und Overlays (Zuschauen); erste Nachricht {"t": "hello", "ticket": …}
+                              (Ticket mit tid + role driver|spectator, ohne code)
+  GET /internal/sync?tenant=…&race=<JSON fx/race.drive_info oder leer>
+                              → {ok, race_id, connected, takeovers, pilots, snap}
+Client → Server: hello · ping {c} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin} (nur Fahrer, ~20 Hz).
+Server → Client: welcome {id, role, race, now} · race {race} (Rennen/Phase/Piloten/Übernahmen geändert) ·
+S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, fin?} · takeover {ev} · pong {c, s} · error {msg}.
+race = {race_id, phase, starts_at, track, track_name, laps, fw, pilots, taken, fin, now} (fx/drive_race.Room.info).
 """
 import asyncio
 import json
@@ -29,13 +41,14 @@ import urllib.parse
 from websockets.asyncio.server import broadcast, serve
 from websockets.exceptions import ConnectionClosed
 
-from fx import drive_auth, drive_room
+from fx import drive_auth, drive_race, drive_room
 
 log = logging.getLogger("drive_ws")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TICK = 0.05
 DONE_STREAM = 12.0       # nach dem Ergebnis noch so lange Zustände verteilen (Auslaufen)
 STATE_MIN_GAP = 0.025    # mehr als 40 Zustände/s je Client werden verworfen
+RACE_PATH = "/drive-ws/race"
 
 
 class Client:
@@ -43,6 +56,15 @@ class Client:
         self.ws = ws
         self.ident = ident
         self.code = code
+        self.last_s = 0.0
+
+
+class RaceClient:
+    def __init__(self, ws, ident):
+        self.ws = ws
+        self.ident = ident
+        self.id = str(ident["id"])
+        self.driver = ident.get("role") == "driver"
         self.last_s = 0.0
 
 
@@ -56,6 +78,9 @@ class DriveServer:
         self.record = record or _record_db
         self.key = drive_auth.internal_key(secret)
         self._done_at = {}
+        # Chatrennen: Raum je Tenant
+        self.races = drive_race.Hub(limits_loader=lambda: drive_room.Limits(drive_auth.load_limits(self.root)))
+        self.race_conns = {}     # tenant → set(RaceClient)
 
     # ---- Verteilen ----
     def _send_room(self, code, obj):
@@ -78,6 +103,8 @@ class DriveServer:
     def process_request(self, connection, request):
         parts = urllib.parse.urlsplit(request.path)
         path, q = parts.path, dict(urllib.parse.parse_qsl(parts.query))
+        if path.rstrip("/") == RACE_PATH:
+            return None
         if path.startswith("/drive-ws/"):
             code = path[len("/drive-ws/"):].strip("/").upper()
             if not self.hub.get(code):
@@ -99,6 +126,8 @@ class DriveServer:
             tenant = int(q.get("tenant")) if q.get("tenant") not in (None, "") else None
         except ValueError:
             return {"ok": False, "error": "bad tenant"}, 400
+        if cmd == "sync":
+            return self.race_sync(q, now)
         if cmd == "room":
             room = self.hub.get(q.get("code"))
             if not room:
@@ -130,8 +159,102 @@ class DriveServer:
             return {"ok": True, "msg": "room closed", "room": room.info(now)}, 200
         return {"ok": False, "error": "unknown command"}, 400
 
+    # ---- Chatrennen (fx/drive_race.py) ----
+    def _send_race(self, tid, obj):
+        cl = self.race_conns.get(tid)
+        if cl:
+            broadcast([c.ws for c in cl], json.dumps(obj, separators=(",", ":")))
+
+    def race_connected(self, tid):
+        return {c.id for c in self.race_conns.get(tid, ()) if c.driver}
+
+    def race_sync(self, q, now):
+        try:
+            tenant = int(q.get("tenant"))
+            info = json.loads(q["race"]) if q.get("race") else None
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "bad request"}, 400
+        if info is not None and not isinstance(info, dict):
+            return {"ok": False, "error": "bad race"}, 400
+        room, changed = self.races.sync(tenant, info, now)
+        if changed:
+            self._send_race(tenant, {"t": "race", "race": room.info(now)})
+        return room.report(self.race_connected(tenant)), 200
+
+    async def race_handler(self, ws):
+        try:
+            hello = json.loads(await asyncio.wait_for(ws.recv(), 10))
+        except (asyncio.TimeoutError, ValueError, ConnectionClosed, TypeError):
+            await ws.close(4400, "hello expected")
+            return
+        ident = drive_auth.read_ticket(hello.get("ticket") if isinstance(hello, dict) else None, self.secret)
+        if not ident or ident.get("code") or ident.get("role") not in ("driver", "spectator"):
+            await ws.send(json.dumps({"t": "error", "msg": "sign-in expired – reload the page"}))
+            await ws.close(4401, "bad ticket")
+            return
+        try:
+            tid = int(ident["tid"])
+        except (TypeError, ValueError):
+            await ws.close(4401, "bad ticket")
+            return
+        now = self.clock()
+        room = self.races.get(tid, now)
+        if room.clients >= drive_race.MAX_CLIENTS:
+            await ws.send(json.dumps({"t": "error", "msg": "too many connections"}))
+            await ws.close(4429, "full")
+            return
+        cl = RaceClient(ws, ident)
+        self.race_conns.setdefault(tid, set()).add(cl)
+        room.clients += 1
+        try:
+            await ws.send(json.dumps({"t": "welcome", "id": cl.id, "role": ident["role"], "race": room.info(now),
+                                      "now": now}))
+            async for raw in ws:
+                try:
+                    msg = json.loads(raw)
+                except ValueError:
+                    continue
+                if not isinstance(msg, dict):
+                    continue
+                t, now = msg.get("t"), self.clock()
+                if t == "s" and cl.driver:
+                    if now - cl.last_s < STATE_MIN_GAP:
+                        continue
+                    cl.last_s = now
+                    r = self.races.rooms.get(tid)
+                    if r:
+                        for ev in r.state(cl.id, msg, now):
+                            self._send_race(tid, ev)
+                elif t == "ping":
+                    try:
+                        broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))
+                    except Exception:
+                        pass
+        except ConnectionClosed:
+            pass
+        finally:
+            peers = self.race_conns.get(tid)
+            if peers:
+                peers.discard(cl)
+            r = self.races.rooms.get(tid)
+            if r:
+                r.clients -= 1
+                r.active = self.clock()
+
+    def race_step(self, now):
+        for tid, room in list(self.races.rooms.items()):
+            for ev in room.tick(now):
+                self._send_race(tid, {"t": "takeover", "ev": ev})
+            if room.streaming(now) and self.race_conns.get(tid):
+                d = room.batch(now)
+                if d:
+                    self._send_race(tid, {"t": "S", "now": round(now, 3), "d": d})
+
     # ---- Clients ----
     async def handler(self, ws):
+        if urllib.parse.urlsplit(ws.request.path).path.rstrip("/") == RACE_PATH:
+            await self.race_handler(ws)
+            return
         code = urllib.parse.urlsplit(ws.request.path).path[len("/drive-ws/"):].strip("/").upper()
         room = self.hub.get(code)
         if not room:
@@ -226,8 +349,11 @@ class DriveServer:
                 last_sweep = now
                 for r in self.hub.sweep(now):
                     self.conns.pop(r.code, None)
+                for r in self.races.sweep(now):
+                    self.race_conns.pop(r.tenant_id, None)
 
     def step(self, now):
+        self.race_step(now)
         for room in list(self.hub.rooms.values()):
             for ev in room.tick(now):
                 self._send_room(room.code, ev)
