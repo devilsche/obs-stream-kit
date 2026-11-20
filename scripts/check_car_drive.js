@@ -2,7 +2,7 @@
 /* Prüfskript Car Drive: Fahrphysik (js/car-drive-phys.js) und KI-Gegner aus der Sim – schnelle Rauchtests.
  *   node scripts/check_car_drive.js
  * Prüft: Beschleunigen, Kurve mit Lenk-Autopilot (ganze Runde je Strecke), Bremsen, Kies bremst, Leitplanke
- * schiebt zurück, Handbremse dreht das Heck, Nitro einmal je Runde, Rückwärtsgang (S/W wie im Rennspiel, auch aus dem
+ * schiebt zurück, Handbremse dreht das Heck, Drift je Auto (Handbremse, Heck fängt sich bzw. bleibt quer), Nitro einmal je Runde, Rückwärtsgang (S/W wie im Rennspiel, auch aus dem
  * Kies), KI-Gegner fahren (bis 5 Runden), Kontakte Auto ↔ Auto (Rechteck-Kollision: nie durch einen Bus, Crash
  * statt Flipper: kaum Rückprall, Tempo weg, außermittiger Treffer hinten dreht, schwer gegen leicht).
  */
@@ -92,6 +92,27 @@ function turnWith(hb) { var k = run(carFor('bmw-m3-competition', T1, { s: -60, d
 var yh = turnWith(true), yn = turnWith(false);
 ok(yh > yn, 'Handbremse: Drehung ' + yh.toFixed(2) + ' rad gegen ' + yn.toFixed(2) + ' rad ohne');
 
+// 7b) Drift je Auto (Race stats drift 0–1): gleiches Auto, nur die Driftfreude verschieden – Handbremse dreht das
+//     driftfreudige Auto stärker; nach einem Handbremsen-Kick fängt sich das Auto mit wenig Driftfreude von selbst
+//     (kleinere Gierrate), das driftfreudige bleibt quer (hält den Drift)
+function driftCar(d) {
+  var raw = Stats.guess({ key: 'bmw-m3-competition', len: 4.5 }); raw.drift = d;
+  return Phys.create(T1, Phys.params(Sim.stats(raw), raw), { s: -60, d: 0 });
+}
+function hbTurn(d) { var k = run(driftCar(d), { throttle: 1 }, 2.5), y = k.yaw; run(k, { throttle: 0.3, steer: 0.6, handbrake: true }, 0.7); return k.yaw - y; }
+function slideAfter(d) {
+  var k = run(driftCar(d), { throttle: 1 }, 2.5);
+  run(k, { throttle: 0.3, steer: 0.7, handbrake: true }, 0.35);
+  run(k, { throttle: 0.6, steer: 0 }, 0.6);
+  return { r: Math.abs(k.r), slip: k.slip };
+}
+var hbHi = hbTurn(0.95), hbLo = hbTurn(0.05), slHi = slideAfter(0.95), slLo = slideAfter(0.05);
+ok(hbHi > hbLo, 'Drift: Handbremse dreht driftfreudig ' + hbHi.toFixed(2) + ' rad, wenig Driftfreude ' + hbLo.toFixed(2) + ' rad');
+ok(slLo.r < slHi.r, 'Drift: nach dem Kick Gierrate driftfreudig ' + slHi.r.toFixed(2) + ' rad/s (hält quer), wenig Driftfreude ' + slLo.r.toFixed(2) + ' rad/s (fängt sich)');
+var dg = function (k) { return Stats.guess({ key: k }).drift; };
+ok(dg('1962-chevrolet-corvette-gran') > dg('bmw-m3-competition') && dg('bmw-m3-competition') > dg('volkswagen-golf-gti-1976') && dg('amg-w14-s1') <= 0.15,
+   'Drift-Schätzung: Corvette ' + dg('1962-chevrolet-corvette-gran') + ' > M3 ' + dg('bmw-m3-competition') + ' > Golf Mk1 ' + dg('volkswagen-golf-gti-1976') + ', W14 ' + dg('amg-w14-s1'));
+
 // 8) Nitro einmal je Runde
 var c4 = run(carFor('bmw-m3-competition', T1, { s: 5, d: 0 }), { throttle: 1 }, 0.5);
 Phys.step(c4, { throttle: 1, nitro: true }, DT); var n1 = c4.nitroT > 0;
@@ -128,19 +149,19 @@ if (gi >= 0) {
   ok(gR.u < -1.2, 'rückwärts aus dem Kiesbett anfahren (Lkw, jetzt ' + gR.surface + '): ' + gR.u.toFixed(2) + ' m/s nach 3 s');
 }
 
-// 9) KI-Gegner: Sim mit 7 Autos, 5 Runden (maxTime länger als 90 s)
+// 9) KI-Gegner: Sim mit 7 Autos, 5 Runden auf der langen Coast (maxTime länger als das Chatrennen)
 var keys = Object.keys(Stats.TABLE).slice(0, 7);
 var sim = Sim.create({ seed: 4242, track: 4, laps: 5, finishWindow: 1e6, maxTime: 600,
   cars: keys.map(function (k, i) { return { id: 'ai' + i, stats: Sim.stats(Stats.guess({ key: k, len: 4.5 })) }; }) });
 var x0 = sim.cars.map(function (q) { return [q.x, q.z]; });
 sim.fastForward(30);
 ok(sim.cars.every(function (q, i) { return q.state !== 'run' || Math.hypot(q.x - x0[i][0], q.z - x0[i][1]) > 20; }), 'KI-Gegner fahren (nach 30 s: ' + sim.cars.map(function (q) { return q.s.toFixed(0); }).join(', ') + ' m)');
-sim.fastForward(200);
+sim.fastForward(430);
 var fin = sim.cars.filter(function (q) { return q.place != null; }).length, dnf = sim.cars.filter(function (q) { return q.place == null; }).length;
 ok(fin >= 5, '5 Runden: ' + fin + ' im Ziel, ' + dnf + ' ausgeschieden, Sieger nach ' + Math.min.apply(null, sim.cars.map(function (q) { return q.finish || 1e9; })).toFixed(1) + ' s');
 
 // 10) Kontakte Auto ↔ Auto (stepContacts/collide wie js/car-drive.js)
-var TB = Sim.track(1), S0 = 268;   // Speedway: Gerade von ~265 bis ~315 m
+var TB = Sim.track(1), S0 = 60;   // Speedway: Start-/Zielgerade von ~−45 bis ~260 m
 function busAt(s, d, turn) {
   var a = TB.at(s);
   return { x: a.x + a.nx * d, z: a.z + a.nz * d, yaw: a.yaw + (turn || 0), len: 12, w: 2.5, vx: 0, vz: 0, mass: 17 };

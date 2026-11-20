@@ -45,6 +45,10 @@
  * Sättigung (über dem Haftmaximum fällt sie auf 80 % – Rutschen), Haftung = st.grip (m/s²); Lastwechsel beim
  * Bremsen/Gasgeben verschiebt Haftung nach vorn/hinten; angetriebene Achse verliert Seitenhaftung unter Gas
  * (Reibungskreis: Heckantrieb übersteuert, Frontantrieb untersteuert); Handbremse: Hinterachse rutscht.
+ * Drift (P.drift 0–1 aus den Race stats, Bezug 0,5): hohe Driftfreude = Heck etwas lockerer, die Seitenkraft hinten
+ * fällt über dem Haftmaximum nur sanft ab (Rutschen lässt sich mit Gas halten), die Handbremse dreht williger, beim
+ * Rutschen reicht der Lenkeinschlag weiter fürs Gegenlenken; niedrige Driftfreude = Heck hält etwas mehr (Untersteuern),
+ * fällt über dem Maximum stärker ab, und ein ausbrechendes Heck wird von selbst eingefangen (Gierdämpfung).
  * Kies/Gras: weniger Haftung, Bremswirkung mit dem Tempo (Kies wie die Sim: ~11 m/s² aus vollem Tempo, rollt mit
  * ~6 m/s), Holpern. Leitplanke bei |d| = Breite/2 + Auslauf + 0,3 (wie in der Darstellung): weicher Stoß –
  * zurück auf die Innenseite, Tempo in Normalenrichtung wird umgekehrt gedämpft, längs geht Tempo verloren.
@@ -78,10 +82,10 @@
   function mod(a, n) { var r = a % n; return r < 0 ? r + n : r; }
   function wrapAngle(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
   function sign(x) { return x < 0 ? -1 : 1; }
-  // Seitenkraft-Kurve (normiert): steigt bis x = 1 auf 1, danach Gleitreibung bis 0,8
-  function sat(x) {
+  // Seitenkraft-Kurve (normiert): steigt bis x = 1 auf 1, danach Gleitreibung bis floor (Standard 0,8) mit Abfall k
+  function sat(x, floor, k) {
     var a = Math.abs(x);
-    return a <= 1 ? x * (1.5 - 0.5 * a * a) : sign(x) * Math.max(0.8, 1 - 0.12 * (a - 1));
+    return a <= 1 ? x * (1.5 - 0.5 * a * a) : sign(x) * Math.max(floor == null ? 0.8 : floor, 1 - (k == null ? 0.12 : k) * (a - 1));
   }
 
   function params(st, raw) {
@@ -93,7 +97,8 @@
       susp: st.susp || 0.5, launch: st.launch || 1, mass: st.mass || 4.5, len: len,
       wb: 0.6 * len, width: clamp(len * 0.42, 1.7, 2.6), drive: DRIVE[raw.drive] ? raw.drive : 'rwd',
       realVmax: raw.vmax > 0 ? +raw.vmax : 300, wheelR: clamp(0.07 * len, 0.3, 0.55),
-      lock: clamp((raw.steer > 0 ? +raw.steer : 38) * Math.PI / 180, 0.17, 1.05)   // größter Radeinschlag (rad) je Auto
+      lock: clamp((raw.steer > 0 ? +raw.steer : 38) * Math.PI / 180, 0.17, 1.05),  // größter Radeinschlag (rad) je Auto
+      drift: st.drift != null && isFinite(st.drift) ? clamp(+st.drift, 0, 1) : 0.5     // Driftfreude (Race stats)
     };
   }
 
@@ -172,7 +177,10 @@
     // kinematischer Winkel für den Grenzradius (wb·G/u²) plus Schräglauf vorn knapp über dem Haftungsmaximum, damit
     // man die Kurvenhaftung voll ausfahren (und leicht überziehen) kann statt hart zu untersteuern
     var lock = P.lock || MAX_STEER, Gs = P.grip * S.grip;
-    var maxSteer = clamp(P.wb * Gs / Math.max(1, u * u) + ALPHA_PEAK * 0.9, 0.1, lock);
+    var dr0 = P.drift == null ? 0.5 : P.drift;
+    // Gegenlenken beim Rutschen: je driftfreudiger, desto mehr Einschlag über den Grenzwinkel hinaus
+    var slideX = (inp.steer || 0) * car.r < 0 ? clamp((car.slip - 0.45) / 0.35, 0, 1) * dr0 * 0.25 : 0;
+    var maxSteer = clamp(P.wb * Gs / Math.max(1, u * u) + ALPHA_PEAK * 0.9 + slideX, 0.1, lock);
     var want = clamp(inp.steer || 0, -1, 1) * maxSteer;
     // nach einem Crash kurz benommen: Lenkung träger, weniger Haftung, Drehung wird nicht kinematisch weggebügelt
     var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
@@ -205,12 +213,13 @@
     var dr = DRIVE[P.drive], drv = Math.max(0, ax) ;
     Gf = Math.sqrt(Math.max(Gf * Gf * 0.25, Gf * Gf - Math.pow(drv * dr[0], 2)));
     Gr = Math.sqrt(Math.max(Gr * Gr * 0.25, Gr * Gr - Math.pow(drv * dr[1], 2)));
-    if (hb) Gr *= 0.32;
+    Gr *= 1 + 0.08 * (0.5 - dr0);                       // Driftfreude: Heck lockerer (hoch) bzw. fester (niedrig)
+    if (hb) Gr *= 0.42 - 0.2 * dr0;                     // Handbremse dreht driftfreudige Autos williger
     if (stun > 0) { Gf *= 1 - 0.5 * stun; Gr *= 1 - 0.55 * stun; }
     // Seitenkräfte (je Achse als Beschleunigung ihrer halben Masse)
     var ue = Math.max(Math.abs(u), 4), dirSign = u < -0.5 ? -1 : 1;
     var af = Math.atan2(w + car.r * a, ue) - delta * dirSign, ar = Math.atan2(w - car.r * b, ue);
-    var Ff = -Gf * sat(af / ALPHA_PEAK), Fr = -Gr * sat(ar / ALPHA_PEAK);
+    var Ff = -Gf * sat(af / ALPHA_PEAK), Fr = -Gr * sat(ar / ALPHA_PEAK, 0.72 + 0.2 * dr0, 0.16 - 0.08 * dr0);
     var ay = (Ff * Math.cos(delta) + Fr) / 2;
     var yawAcc = (a * Ff * Math.cos(delta) - b * Fr) / 2 / (a * b);
     car.slip = clamp(Math.max(Math.abs(af), Math.abs(ar)) / (ALPHA_PEAK * 2.5) * Math.min(1, sp / 6) + (hb && sp > 3 ? 0.4 : 0), 0, 1);
@@ -218,6 +227,8 @@
     car.vx += (fx * ax + lx * ay) * dt; car.vz += (fz * ax + lz * ay) * dt;
     car.r += yawAcc * dt;
     car.r -= car.r * 0.6 * dt;                         // leichte Gierdämpfung (Stabilität)
+    // wenig Driftfreude: ausbrechendes Heck (hinten über dem Haftmaximum) wird von selbst eingefangen
+    if (Math.abs(ar) > ALPHA_PEAK && !hb) car.r -= car.r * 1.6 * (0.5 - Math.min(0.5, dr0)) * 2 * dt;
     // langsam: kinematisch (kein Schräglauf-Modell nahe 0) – Gierrate aus Lenkwinkel, Querrutschen abbauen
     var k = Math.max(clamp((Math.abs(u) - 1.5) / 4, 0, 1), stun);
     if (k < 1) {

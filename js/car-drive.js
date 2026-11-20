@@ -112,6 +112,8 @@
   };
   var catalog = [], byKey = {};
   var pref = load('menu', {}) || {};
+  // Begrüßung vor dem Countdown (js/car-race-welcome.js, Aussehen widgets/components/car-race-welcome.css)
+  var welcomeUi = root.CarRaceWelcome && $('welcome') ? CarRaceWelcome.attach($('welcome')) : null;
 
   Sim.TRACKS.forEach(function (seed, i) {
     var T = Sim.track(seed), o = doc.createElement('option');
@@ -120,7 +122,7 @@
   });
   ui.track.value = String(clamp(pref.track | 0, 0, Sim.TRACKS.length - 1));
   ui.opp.value = String(pref.opp != null ? clamp(pref.opp | 0, 0, 7) : 5);
-  ui.laps.value = String(pref.laps != null ? clamp(pref.laps | 0, 1, 5) : 3);
+  ui.laps.value = String(pref.laps != null ? clamp(pref.laps | 0, 1, 5) : 2);   // lange Strecken: 2 Runden ≈ 2:20
   if (pref.duck === false) ui.duck.checked = false;
   function syncOutputs() { ui.oppOut.textContent = ui.opp.value; ui.lapOut.textContent = ui.laps.value; }
   ui.opp.addEventListener('input', syncOutputs); ui.laps.addEventListener('input', syncOutputs); syncOutputs();
@@ -362,6 +364,13 @@
     sm.others = [];
   }
   function engineOf(c) { return (c && c.raw && c.raw.engine) || 'i4'; }
+  // „START YOUR ENGINES“: eigenes Auto dreht einmal hoch, das Feld gibt 1,6 s lang kräftig Gas (otherEngines)
+  function fieldRev() {
+    sm.revUntil = performance.now() / 1000 + 1.6;
+    if (!snd || !sndOn) return;
+    if (sm.mev) { sm.mev.v.oneShot('rev', 0.5); sm.mev.v.blip(0.9); }
+    sm.others.forEach(function (o) { o.v.blip(0.8 + Math.random() * 0.2); });
+  }
   // je Bild: eigener Motor (laut), nahe Fremdautos (leise, Doppler), Quietschen, Rumpeln, Nitro
   function soundFrame(inp) {
     if (!snd) return;
@@ -434,7 +443,8 @@
       var acc = dt > 0 ? (u - o.u) / dt : 0, radial = dt > 0 ? -(x.d - o.d) / dt * mps : 0;
       o.u = u; o.d = x.d;
       o.thr = (o.thr || 0) + ((cd ? 0 : acc > 0.3 ? 0.85 : acc < -1 ? 0 : 0.35) - (o.thr || 0)) * Math.min(1, dt * 6);
-      if (cd && race.cd < 3.5 && Math.random() < dt * 0.6) o.v.blip(0.5 + Math.random() * 0.4);
+      var revving = performance.now() / 1000 < (sm.revUntil || 0);
+      if (cd && (revving ? Math.random() < dt * 2.4 : race.cd < 3.5 && Math.random() < dt * 0.6)) o.v.blip(revving ? 0.75 + Math.random() * 0.25 : 0.5 + Math.random() * 0.4);
       var dx = c.holder.position.x - lx, dz = c.holder.position.z - lz, dl = Math.max(1e-3, Math.hypot(dx, dz));
       o.v.update(dt, { speed: u / vtop, throttle: o.thr, dist: x.d, ref: OTHER_REF, radial: radial,
         pan: clamp((dx * camRight.x + dz * camRight.z) / dl, -1, 1) * 0.7 });
@@ -661,7 +671,7 @@
     });
     var me = makeCar(s.car, TC.paintAt(s.car, s.paint), { loaded: ok[s.car], duck: s.duck, outfit: null });
     var simSeed = (Math.random() * 1e9) | 0;
-    var sim = ai.length ? Sim.create({ seed: simSeed, track: T, laps: s.laps, finishWindow: 1e6, maxTime: s.laps * 60 + 180,
+    var sim = ai.length ? Sim.create({ seed: simSeed, track: T, laps: s.laps, finishWindow: 1e6, maxTime: s.laps * 100 + 120,
       cars: ai.map(function (c, i) { return { id: 'ai' + i, stats: c.st }; }) }) : null;
     // Startplatz des Spielers wie die Sim es täte: Zweierreihen, ungerade Zahl → neben dem letzten Gegner
     var k = ai.length, sP, dP;
@@ -674,7 +684,7 @@
     var P = Phys.params(me.st, me.raw), pc = Phys.create(T, P, { s: sP, d: dP });
     race = {
       s: s, T: T, seed: seed, sim: sim, ai: ai, me: me, pc: pc, laps: s.laps, phase: 'countdown', paused: false,
-      t: 0, cd: 3, lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + s.car + '.' + seed, null),
+      t: 0, cd: 6.4, lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + s.car + '.' + seed, null),
       prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
       lapsShown: -1, posShown: '', opp: opp, newBest: false
     };
@@ -685,13 +695,14 @@
     ui.hud.hidden = false; showPanel(null);
     setCam('chase', true);
     ui.countdown.hidden = false;
-    say('Race starts in 3');
+    say('Get ready');
     canvas.setAttribute('tabindex', '-1');
     try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ }
   }
 
   function teardown() {
     begin.token = null;
+    if (welcomeUi) welcomeUi.set(null);
     if (race) {
       race.ai.forEach(function (c) { if (c) disposeCar(c); }); disposeCar(race.me);
       if (race.remotes) race.remotes.forEach(disposeCar);
@@ -812,8 +823,10 @@
     $('hCam').textContent = CAMS[m] + ' – C / Y to switch';
     if (snapNow) race.camPos = null;
   }
+  // Streckenkameras: Abstand nach Streckenlänge (lange Strecken ~60 m, Kart ~40 m), sonst schneidet es zu oft
+  function tvSpacing(T) { return clamp(T.len / 20, 40, 60); }
   function tvSpot(i) {
-    var T = race.T, SP = 45, s = i * SP, a = T.at(s);
+    var T = race.T, SP = tvSpacing(T), s = i * SP, a = T.at(s);
     var sd = a.runL >= a.runR ? 1 : -1, off = T.width / 2 + (sd > 0 ? a.runL : a.runR) + 4, x = a.x + a.nx * sd * off, z = a.z + a.nz * sd * off;
     return new THREE.Vector3(x, Math.max(gh(x, z), groundY(x, z)) + 5.5, z);
   }
@@ -853,7 +866,7 @@
       race.camPos = tmpV.clone(); race.camLook = tmpL.clone();
       fov = 68 + clamp(sp / pc.P.vtop, 0, 1.3) * 8;
     } else {
-      var SP = 45, n = Math.max(1, Math.floor(race.T.len / SP)), idx = Math.floor(((pc.s + 22) % race.T.len) / SP) % n;
+      var SP = tvSpacing(race.T), n = Math.max(1, Math.floor(race.T.len / SP)), idx = Math.floor(((pc.s + SP / 2) % race.T.len) / SP) % n;
       if (idx !== race.tvIdx) { race.tvIdx = idx; race.tvPos = tvSpot(idx); race.camLook = new THREE.Vector3(pc.x, cy + 1, pc.z); }
       race.camPos = race.tvPos.clone();
       tmpL.set(pc.x, cy + me.height * 0.5, pc.z);
@@ -1218,7 +1231,7 @@
     var pc = Phys.create(T, Phys.params(me.st, me.raw), gridPose(myGrid));
     race = {
       s: { car: mp.car, paint: mp.paint, track: idx, laps: mp.room.laps }, T: T, seed: seed, sim: null, ai: [], remotes: remotes,
-      mp: true, raceId: mp.raceId, me: me, pc: pc, laps: mp.room.laps | 0 || 3, phase: 'countdown', paused: false,
+      mp: true, raceId: mp.raceId, me: me, pc: pc, laps: mp.room.laps | 0 || 2, phase: 'countdown', paused: false,
       t: 0, cd: mp.startAt - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mp.car + '.' + seed, null),
       prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
       lapsShown: -1, posShown: '', opp: [], newBest: false
@@ -1415,7 +1428,7 @@
   function rcBuildSim(st) {
     var cars = rcSimCars(st), T = race.T;
     race.simCars = cars;
-    race.sim = Sim.create({ seed: st.seed | 0, track: T, laps: st.laps || 3, finishWindow: st.finish_window || 15, cars: cars, events: st.race_events || [] });
+    race.sim = Sim.create({ seed: st.seed | 0, track: T, laps: st.laps || 2, finishWindow: st.finish_window || 25, cars: cars, events: st.race_events || [] });
     race.pilotsKey = (rcPilots(st) || ['-']).join('|');
     race.follow = {};
     var t = mp.net.serverNow() - rcGo(st);
@@ -1440,8 +1453,8 @@
       st = rc.st;
       var tIdx = ((st.track | 0) % Sim.TRACKS.length + Sim.TRACKS.length) % Sim.TRACKS.length, T = Sim.track(Sim.TRACKS[tIdx]);
       buildTrack(T);
-      race = { s: { car: null, paint: 0, track: tIdx, laps: st.laps || 3 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
-        mp: true, chat: true, raceId: st.race_id, me: null, pc: null, laps: st.laps || 3, phase: 'countdown', paused: false,
+      race = { s: { car: null, paint: 0, track: tIdx, laps: st.laps || 2 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
+        mp: true, chat: true, raceId: st.race_id, me: null, pc: null, laps: st.laps || 2, phase: 'countdown', paused: false,
         t: 0, cd: rcGo(st) - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: null,
         prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
         lapsShown: -1, posShown: '', opp: [], newBest: false, follow: {}, taken: {}, nitroSeen: {} };
@@ -1579,16 +1592,29 @@
       var before = Math.ceil(race.cd);
       race.cd = race.mp ? mp.startAt - mp.net.serverNow() : race.cd - dt;
       var after = Math.ceil(race.cd);
-      if (after !== before || !ui.countdown.textContent) {
-        ui.countdown.textContent = after > 0 ? String(after) : 'GO';
-        ui.countdown.classList.remove('tick'); void ui.countdown.offsetWidth; ui.countdown.classList.add('tick');
-        say(after > 0 ? String(after) : 'Go');
-        if (after > 0 && after <= 3 && after !== before) sfx('beep');
+      // Begrüßung vor dem Countdown: „WELCOME TO <Strecke>“, dann „START YOUR ENGINES“ (das Feld gibt Gas); in der
+      // Zeit keine Zahlen, danach 3-2-1-GO
+      var wk = root.CarRaceWelcome ? CarRaceWelcome.windowsBefore(race.cd) : null;
+      if (welcomeUi) welcomeUi.set(wk, race.T.name);
+      if (wk !== race.wkShown) {
+        race.wkShown = wk;
+        if (wk) { var wt = CarRaceWelcome.text(wk, race.T.name); say(wt.kicker + ' ' + wt.title); }
+        if (wk === 'engines') fieldRev();
+      }
+      var shown = race.cd > 6.4 ? String(after) : after > 3 ? '' : after > 0 ? String(after) : 'GO';
+      if (shown !== ui.countdown.textContent) {
+        ui.countdown.textContent = shown;
+        if (shown) {
+          ui.countdown.classList.remove('tick'); void ui.countdown.offsetWidth; ui.countdown.classList.add('tick');
+          if (!wk) say(after > 0 ? String(after) : 'Go');
+          if (after > 0 && after <= 3 && after !== before) sfx('beep');
+        }
       }
       if (p && (p.lookX || p.lookY) && lookAllowed()) lookOrbit(p.lookX * dt * 420, p.lookY * dt * 320);
       if (race.cd <= 0 && (!race.chat || rc.st.phase === 'intro' || rc.st.phase === 'race')) {
         race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0;
         sfx('go');
+        if (welcomeUi) welcomeUi.set(null);
         // Umschauen bleibt beim Start erhalten und pendelt nach der Ruhezeit von selbst zurück
         setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700);
       }
