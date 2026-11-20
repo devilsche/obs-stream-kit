@@ -51,6 +51,8 @@ server {
     location = /app/oauth/callback { proxy_pass http://127.0.0.1:9002; }
     location ~ ^/s/[^/]+/api/      { proxy_pass http://127.0.0.1:9002; }
     location /api/                 { proxy_pass http://127.0.0.1:9002; }
+    # Car-Drive-Fahrerseiten: Chatrennen-Zustand liegt im Speicher des API-Dienstes
+    location /drive/               { proxy_pass http://127.0.0.1:9002; }
 
     # ── Car Drive Mehrspieler: WebSocket-Dienst (intern, :9010) ──────────
     location /drive-ws/ {
