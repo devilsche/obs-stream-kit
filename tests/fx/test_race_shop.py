@@ -38,7 +38,8 @@ def test_prices_follow_the_spec():
     assert race_shop.price("2020-audi-rs-6-avant") == 900
     assert race_shop.price("audi-a4-b8") == 400
     assert race_shop.price("bmw-e39-free") == 400
-    assert race_shop.price("free-bmw-m3-e30") == 400
+    assert race_shop.price("1990-bmw-m3-sport-evolution") == 400
+    assert race_shop.price("bmw-m2-competition-f87") == 900
     assert race_shop.price("volkswagen-golf-gti-1976") == 150
     assert race_shop.price("1984-mercedes-190e") == 150
     for k in ("trolza-5265-00-megapolis", "ural-4320-soviet-army-truck", "caterpillar-ct680", "krabby-patty-wagon"):
