@@ -8,7 +8,10 @@
  *            height(ctx) → H(x, z) (nur Optik), groundColor(ctx) → f(x, z, h, d) Bodenfarbe je Ecke,
  *            decorate(ctx) – Deko über ctx.kind()/ctx.bg()/ctx.place() (siehe js/car-track-scene.js) }
  *   CarTrackThemes.Kit – Low-Poly-Baukasten: Teile mit Farbe je Ecke zu EINER Geometrie zusammenfassen
- *     (Material mit vertexColors, flatShading → Spielzeug-Look; je Deko-Art ein InstancedMesh = ein Zeichenaufruf).
+ *     (Material mit vertexColors, flatShading → Spielzeug-Look; je Deko-Art ein InstancedMesh = ein Zeichenaufruf);
+ *     optional mit Atlas-Kachel je Teil (Fassade, Werbung, Graffiti).
+ *   CarTrackThemes.Art – ein Atlas (Canvas zur Laufzeit) für Fassaden, Fantasie-Sponsoren und Graffiti, dazu das
+ *     passende Material (Kachel je Ecke/Instanz) und paint() für einfarbige Kulissen-Modelle (Katalog-Feld paint).
  *
  * Alles deterministisch aus dem Strecken-Seed (CarRaceSim.rng): jede Overlay-Instanz sieht dieselbe Kulisse.
  * Höhe ist nur Optik – Sim und Fahrphysik bleiben 2D.
@@ -50,9 +53,15 @@
   }
 
   // ---- Low-Poly-Baukasten ----
-  function Kit() { this.pos = []; this.col = []; }
+  // chunks: Teile mit Atlas-Kachel (Art) – { at (erste Ecke), n, uv, keep (je Dreieck), tile, vary, mode }
+  function Kit() { this.pos = []; this.col = []; this.chunks = []; }
   // geo wird übernommen (danach freigegeben); color: Farbe oder f(x, y, z) → Farbe (Koordinaten nach o-Transformation);
   // o: { x, y, z, rx, ry, rz, s | sx, sy, sz, jit (Verbeulen in m, je Ecke fest) }
+  // Atlas (Art, Material mat 'atl' bzw. Art.material): o.tile = Kachel-Name (Art.TILES) → Textur auf diesem Teil, Farbe
+  //   multipliziert; o.uv: 'geo' (UV der Grundform auf die Kachel, Standard), 'box' (Projektion nach Flächen-Normale,
+  //   o.m Meter je Wiederholung, Schrift von außen lesbar), 'cyl' (rund um die Teil-Achse, o.reps Wiederholungen, o.m
+  //   Meter je Wiederholung in der Höhe); o.faces(nx, ny, nz) → nur diese Flächen; o.uvK = [ku, kv] Streckung um die
+  //   Mitte (> 1: Motiv kleiner als die Fläche); o.vary: Kachel je Instanz wechseln (Art.material vary, Instanz-Wert iVar)
   Kit.prototype.add = function (geo, color, o) {
     o = o || {};
     var g = geo.index ? geo.toNonIndexed() : geo, s = o.s || 1;
@@ -60,29 +69,425 @@
       new THREE.Quaternion().setFromEuler(new THREE.Euler(o.rx || 0, o.ry || 0, o.rz || 0, 'YXZ')),
       new THREE.Vector3(o.sx || s, o.sy || s, o.sz || s));
     var p = g.attributes.position, v = new THREE.Vector3(), fixed = typeof color === 'function' ? null : lin(color);
+    var at = this.pos.length / 3, lp = o.tile && o.uv === 'cyl' ? [] : null;
     for (var i = 0; i < p.count; i++) {
       v.fromBufferAttribute(p, i);
       if (o.jit) {
         var hx = Math.round(v.x * 1000), hy = Math.round(v.y * 1000), hz = Math.round(v.z * 1000);
         v.x += (hash3(hx, hy, hz) - 0.5) * o.jit; v.y += (hash3(hy, hz, hx) - 0.5) * o.jit; v.z += (hash3(hz, hx, hy) - 0.5) * o.jit;
       }
+      if (lp) lp.push(v.x, v.y, v.z);
       v.applyMatrix4(m);
       this.pos.push(v.x, v.y, v.z);
       var c = fixed || lin(color(v.x, v.y, v.z));
       this.col.push(c.r, c.g, c.b);
     }
+    if (o.tile && Art.TILES[o.tile]) this.chunks.push(artChunk(this.pos, at, p.count, g.attributes.uv, lp, o));
     if (g !== geo) g.dispose();
     geo.dispose();
     return this;
   };
+  // einzelnes Dreieck (Ecken [x, y, z]); optional Atlas: uvs = [[u, v] × 3], tile (Name), mode (siehe Art.material)
+  Kit.prototype.tri = function (A, B, C, color, uvs, tile, mode) {
+    var c = lin(color), at = this.pos.length / 3;
+    for (var k = 0; k < 3; k++) { var q = [A, B, C][k]; this.pos.push(q[0], q[1], q[2]); this.col.push(c.r, c.g, c.b); }
+    if (uvs && Art.TILES[tile]) {
+      this.chunks.push({ at: at, n: 3, uv: [uvs[0][0], uvs[0][1], uvs[1][0], uvs[1][1], uvs[2][0], uvs[2][1]], keep: [1], tile: Art.TILES[tile], vary: false, mode: mode || 0 });
+    }
+    return this;
+  };
+  // anderes Kit anhängen (Hintergrund: alles in eine Geometrie)
+  Kit.prototype.merge = function (k) {
+    var off = this.pos.length / 3;
+    Array.prototype.push.apply(this.pos, k.pos); Array.prototype.push.apply(this.col, k.col);
+    for (var i = 0; i < k.chunks.length; i++) { var c = k.chunks[i], d = {}; for (var f in c) d[f] = c[f]; d.at += off; this.chunks.push(d); }
+    return this;
+  };
+  Kit.prototype.tiled = function () { return this.chunks.length > 0; };
   Kit.prototype.geo = function () {
     var g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
+    if (this.chunks.length) {
+      // Ecken ohne Kachel: aTile = 0 → keine Textur (nur Ecken-Farbe)
+      var nv = this.pos.length / 3, UV = new Float32Array(nv * 2), TL = new Float32Array(nv * 4), ST = new Float32Array(nv * 4);
+      this.chunks.forEach(function (c) {
+        var r = c.tile.r, st = c.tile.step;
+        for (var t = 0; t < c.n; t += 3) {
+          if (!c.keep[t / 3]) continue;
+          for (var k = 0; k < 3; k++) {
+            var j = c.at + t + k;
+            UV[j * 2] = c.uv[(t + k) * 2]; UV[j * 2 + 1] = c.uv[(t + k) * 2 + 1];
+            TL[j * 4] = r[0]; TL[j * 4 + 1] = r[1]; TL[j * 4 + 2] = r[2]; TL[j * 4 + 3] = r[3];
+            ST[j * 4] = c.vary ? st[0] : 0; ST[j * 4 + 1] = c.vary ? st[1] : 0; ST[j * 4 + 2] = c.vary ? st[2] : 1; ST[j * 4 + 3] = c.mode;
+          }
+        }
+      });
+      g.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+      g.setAttribute('aTile', new THREE.BufferAttribute(TL, 4));
+      g.setAttribute('aStep', new THREE.BufferAttribute(ST, 4));
+    }
     g.computeVertexNormals(); g.computeBoundingSphere();
     return g;
   };
   Kit.prototype.empty = function () { return !this.pos.length; };
+  // Atlas-UVs für ein eben eingefügtes Teil (Kit.add): je Dreieck Normale, Filter, UV nach o.uv
+  function artChunk(pos, at, cnt, uvAttr, lp, o) {
+    var mode = o.uv || (uvAttr ? 'geo' : 'box'), M = o.m || 4, ku = o.uvK ? o.uvK[0] : 1, kv = o.uvK ? o.uvK[1] : 1;
+    var U = new Float32Array(cnt * 2), keep = new Uint8Array(Math.ceil(cnt / 3)), reps = o.reps || 4;
+    for (var t = 0; t + 2 < cnt; t += 3) {
+      var a = (at + t) * 3, b = a + 3, c = a + 6;
+      var ux = pos[b] - pos[a], uy = pos[b + 1] - pos[a + 1], uz = pos[b + 2] - pos[a + 2];
+      var vx = pos[c] - pos[a], vy = pos[c + 1] - pos[a + 1], vz = pos[c + 2] - pos[a + 2];
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+      nx /= l; ny /= l; nz /= l;
+      if (o.faces && !o.faces(nx, ny, nz)) continue;
+      keep[t / 3] = 1;
+      var ax = Math.abs(nx), ay = Math.abs(ny), az = Math.abs(nz);
+      for (var k = 0; k < 3; k++) {
+        var j = (at + t + k) * 3, x = pos[j], y = pos[j + 1], z = pos[j + 2], u, v;
+        if (mode === 'geo') { u = (uvAttr.getX(t + k) - 0.5) * ku + 0.5; v = (uvAttr.getY(t + k) - 0.5) * kv + 0.5; }
+        else if (mode === 'cyl') { u = Math.atan2(lp[(t + k) * 3 + 2], lp[(t + k) * 3]) / TAU; v = y / M; }
+        else if (ay >= ax && ay >= az) { u = x / M; v = (ny > 0 ? -z : z) / M; }
+        else if (ax >= az) { u = (nx > 0 ? -z : z) / M; v = y / M; }
+        else { u = (nz > 0 ? x : -x) / M; v = y / M; }
+        U[(t + k) * 2] = u; U[(t + k) * 2 + 1] = v;
+      }
+      if (mode === 'cyl') {   // Naht: Dreieck über ±½ Umlauf → zusammenziehen, dann auf reps Wiederholungen
+        var i0 = t * 2, us = [U[i0], U[i0 + 2], U[i0 + 4]];
+        if (Math.max.apply(null, us) - Math.min.apply(null, us) > 0.5) for (k = 0; k < 3; k++) if (U[i0 + k * 2] < 0) U[i0 + k * 2] += 1;
+        for (k = 0; k < 3; k++) U[i0 + k * 2] *= reps;
+      }
+    }
+    return { at: at, n: cnt, uv: U, keep: keep, tile: Art.TILES[o.tile], vary: !!o.vary, mode: mode === 'geo' ? 1 : 0 };
+  }
+  // ---- Art: ein Atlas für Fassaden, Werbung und Graffiti (Canvas, zur Laufzeit gezeichnet, seitenweit geteilt) ----
+  // 2048 × 1024: links 4 × 4 Fassaden-Kacheln à 256² (kachelbar), rechts oben 8 Werbeflächen à 512 × 128 (frei
+  // erfundene Sponsoren), rechts unten 6 Graffiti à 341 × 256 (durchsichtiger Grund). Ein Material-Typ für alles
+  // (Art.material): je Ecke Kachel (aTile = u0, v0, du, dv) und Modus (aStep.w: 0 = wiederholen, 1 = einmal, Rand
+  // durchsichtig; 2 = waagrecht wiederholen, senkrecht einmal), Farbe = Ecken-Farbe × Textur (wo die Textur durchsichtig ist: nur Ecken-Farbe). vary: Kachel je
+  // Instanz (InstancedBufferAttribute iVar → Spalte/Zeile über aStep.xyz). Keine Kachel (aTile = 0): nur Ecken-Farbe.
+  var AW = 2048, AH = 1024;
+  var Art = { TILES: {}, ADS: 8, TAGS: 6 };
+  (function () {
+    function t(name, x, y, w, h, inset, step) {
+      Art.TILES[name] = { r: [(x + inset) / AW, 1 - (y + h - inset) / AH, (w - 2 * inset) / AW, (h - 2 * inset) / AH], step: step || [0, 0, 1], px: [x, y, w, h] };
+    }
+    ['concrete', 'office', 'corrugated', 'rust', 'brick', 'brickWin', 'roof', 'silo', 'crowd', 'seats', 'door', 'wood', 'grime', 'glassBand', 'panel', 'glass']
+      .forEach(function (n, i) { t(n, (i % 4) * 256, Math.floor(i / 4) * 256, 256, 256, 1); });
+    for (var k = 0; k < Art.ADS; k++) t('ad' + k, 1024 + (k % 2) * 512, Math.floor(k / 2) * 128, 512, 128, 0, [512 / AW, -128 / AH, 2]);
+    for (k = 0; k < Art.TAGS; k++) t('tag' + k, 1024 + (k % 3) * 341, 512 + Math.floor(k / 3) * 256, 341, 256, 0, [341 / AW, -256 / AH, 3]);
+    Art.TILES.ad = Art.TILES.ad0; Art.TILES.tag = Art.TILES.tag0;
+  })();
+  // fester Zufall fürs Zeichnen (unabhängig von der Strecke)
+  function xr(seed) { var s = seed >>> 0 || 1; return function () { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
+  // Fantasie-Sponsoren (keine echten Marken): Name, Grund, Schrift, Logo
+  var SPONSORS = [
+    ['PURPLE PEAK', '#5e2a79', '#f2b705', 'peak'], ['GOLDEN LAP', '#f2b705', '#3b1650', 'flag'],
+    ['HYPERNOODLE', '#121417', '#7cf26a', 'bolt'], ['TURBO TACO', '#ff7a1a', '#fff3c4', 'taco'],
+    ['ZEPHYR FUEL', '#1f5fae', '#ffffff', 'drop'], ['PIXEL PISTON', '#f4f4f2', '#1d2230', 'pixel'],
+    ['COMET COLA', '#c8102e', '#ffffff', 'comet'], ['GRIPWORX', '#0f4c4a', '#e9fbf5', 'tread']
+  ];
+  var TAG_WORDS = ['VROOM', 'BOOST', 'GG', 'KART', 'NITRO', 'WOW'];
+  var TAG_COLS = [['#ff3fa4', '#ffd23f'], ['#3fd0ff', '#7b5cff'], ['#f2b705', '#ff5e3a'], ['#7cf26a', '#1fb8a6'], ['#b06cff', '#ff8adf'], ['#ffef5a', '#ff7a1a']];
+  function drawAtlas(g) {
+    var R = xr(4711);
+    function clip(x, y, w, h, fn) { g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip(); fn(); g.restore(); }
+    function speck(x, y, w, h, n, a) {
+      for (var i = 0; i < n; i++) { var k = R() - 0.5; g.fillStyle = (k > 0 ? 'rgba(255,255,255,' : 'rgba(0,0,0,') + (Math.abs(k) * a).toFixed(3) + ')'; g.fillRect(x + R() * w, y + R() * h, 1 + R() * 2, 1 + R() * 2); }
+    }
+    function streaks(x, y, w, h, n, a) {
+      for (var i = 0; i < n; i++) {
+        var sx = x + R() * w, sw = 2 + R() * 8, sh = h * (0.2 + R() * 0.6), gr = g.createLinearGradient(0, y, 0, y + sh);
+        gr.addColorStop(0, 'rgba(40,36,30,' + (a * (0.5 + R())).toFixed(3) + ')'); gr.addColorStop(1, 'rgba(40,36,30,0)');
+        g.fillStyle = gr; g.fillRect(sx, y, sw, sh);
+      }
+    }
+    function F(name, fn) { var p = Art.TILES[name].px; clip(p[0], p[1], p[2], p[3], function () { fn(p[0], p[1], p[2], p[3]); }); }
+    function panes(x, y, w, h, lit) {   // Glas mit Spiegelung, Rahmen
+      var gr = g.createLinearGradient(x, y, x + w * 0.6, y + h);
+      gr.addColorStop(0, '#5f86a8'); gr.addColorStop(0.5, '#2e4c68'); gr.addColorStop(1, '#6f97b8');
+      g.fillStyle = lit ? '#f1d59a' : gr; g.fillRect(x, y, w, h);
+      g.fillStyle = 'rgba(255,255,255,0.18)'; g.beginPath(); g.moveTo(x + w * 0.15, y + h); g.lineTo(x + w * 0.55, y); g.lineTo(x + w * 0.75, y); g.lineTo(x + w * 0.35, y + h); g.fill();
+      g.strokeStyle = '#22272e'; g.lineWidth = 3; g.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    }
+    function ribs(x, y, w, h, base, light, dark, step) {
+      g.fillStyle = base; g.fillRect(x, y, w, h);
+      for (var i = 0; i < w; i += step) {
+        var gr = g.createLinearGradient(x + i, 0, x + i + step, 0);
+        gr.addColorStop(0, light); gr.addColorStop(0.45, base); gr.addColorStop(0.55, dark); gr.addColorStop(1, base);
+        g.fillStyle = gr; g.fillRect(x + i, y, step, h);
+      }
+    }
+    function bricks(x, y, w, h) {
+      g.fillStyle = '#b3a897'; g.fillRect(x, y, w, h);
+      for (var r = 0; r < h / 16; r++) for (var c = -1; c < w / 32 + 1; c++) {
+        var bx = x + c * 32 + (r % 2) * 16, l = 0.8 + R() * 0.35;
+        g.fillStyle = 'rgb(' + Math.round(150 * l) + ',' + Math.round(72 * l) + ',' + Math.round(52 * l) + ')'; g.fillRect(bx + 1, y + r * 16 + 1, 30, 13);
+      }
+    }
+    // Fassaden
+    F('concrete', function (x, y, w, h) {
+      g.fillStyle = '#bdbab2'; g.fillRect(x, y, w, h); speck(x, y, w, h, 2600, 0.22);
+      for (var i = 0; i < 2; i++) for (var j = 0; j < 2; j++) {
+        g.fillStyle = 'rgba(0,0,0,' + (0.03 + R() * 0.05).toFixed(3) + ')'; g.fillRect(x + i * 128, y + j * 128, 128, 128);
+        for (var a = 0; a < 3; a++) for (var b = 0; b < 3; b++) { g.fillStyle = 'rgba(60,58,54,0.5)'; g.beginPath(); g.arc(x + i * 128 + 24 + a * 40, y + j * 128 + 24 + b * 40, 2.2, 0, TAU); g.fill(); }
+      }
+      g.fillStyle = '#6f6c66'; g.fillRect(x, y, w, 2); g.fillRect(x, y + 127, w, 2); g.fillRect(x, y, 2, h); g.fillRect(x + 127, y, 2, h);
+      streaks(x, y, w, h, 7, 0.12);
+    });
+    F('office', function (x, y, w, h) {
+      g.fillStyle = '#cfccc4'; g.fillRect(x, y, w, h); speck(x, y, w, h, 1200, 0.15);
+      for (var r = 0; r < 4; r++) for (var c = 0; c < 4; c++) panes(x + c * 64 + 8, y + r * 64 + 12, 48, 40, R() < 0.12);
+      for (r = 0; r < 4; r++) { g.fillStyle = 'rgba(0,0,0,0.15)'; g.fillRect(x, y + r * 64 + 54, w, 3); }
+    });
+    F('corrugated', function (x, y, w, h) { ribs(x, y, w, h, '#a9b2ba', '#d3dbe2', '#7e8890', 16); speck(x, y, w, h, 900, 0.12); var gr = g.createLinearGradient(0, y + h * 0.7, 0, y + h); gr.addColorStop(0, 'rgba(70,60,45,0)'); gr.addColorStop(1, 'rgba(70,60,45,0.25)'); g.fillStyle = gr; g.fillRect(x, y, w, h); });
+    F('rust', function (x, y, w, h) {
+      ribs(x, y, w, h, '#7a6656', '#9c8574', '#4f4036', 16);
+      for (var i = 0; i < 40; i++) { g.fillStyle = 'rgba(' + (140 + R() * 50 | 0) + ',' + (70 + R() * 30 | 0) + ',30,' + (0.15 + R() * 0.25).toFixed(2) + ')'; g.beginPath(); g.arc(x + R() * w, y + R() * h, 4 + R() * 16, 0, TAU); g.fill(); }
+      streaks(x, y, w, h, 10, 0.18);
+    });
+    F('brick', function (x, y, w, h) { bricks(x, y, w, h); speck(x, y, w, h, 1500, 0.2); streaks(x, y, w, h, 5, 0.1); });
+    F('brickWin', function (x, y, w, h) {
+      bricks(x, y, w, h); speck(x, y, w, h, 1000, 0.18);
+      [24, 140].forEach(function (wx) {
+        g.fillStyle = '#7e7466'; g.fillRect(x + wx - 4, y + 36, 100, 8);
+        g.fillStyle = '#2b3138'; g.fillRect(x + wx, y + 44, 92, 150);
+        for (var r = 0; r < 5; r++) for (var c = 0; c < 4; c++) panes(x + wx + 3 + c * 22, y + 47 + r * 29, 21, 28, R() < 0.06);
+      });
+    });
+    F('roof', function (x, y, w, h) {
+      g.fillStyle = '#4c525a'; g.fillRect(x, y, w, h); speck(x, y, w, h, 1800, 0.18);
+      for (var i = 0; i < w; i += 32) { g.fillStyle = '#6a7179'; g.fillRect(x + i, y, 3, h); g.fillStyle = '#353a40'; g.fillRect(x + i + 3, y, 2, h); }
+    });
+    F('silo', function (x, y, w, h) {
+      ribs(x, y, w, h, '#c4c9ce', '#dde2e6', '#a3a9af', 32);
+      for (var r = 0; r < h; r += 64) { g.fillStyle = '#8c939a'; g.fillRect(x, y + r, w, 5); for (var c = 4; c < w; c += 16) { g.fillStyle = '#6f767d'; g.fillRect(x + c, y + r + 9, 3, 3); } }
+      streaks(x, y, w, h, 8, 0.2);
+      for (var i = 0; i < 6; i++) { g.fillStyle = 'rgba(150,80,30,0.25)'; g.fillRect(x + R() * w, y + R() * h, 3, 20 + R() * 40); }
+    });
+    var shirts = ['#e04848', '#3a86ff', '#ffbe0b', '#f2f2f2', '#8338ec', '#2ec4b6', '#fb5607', '#222831', '#5e2a79', '#f2b705'];
+    var skins = ['#f1c7a5', '#d9a07a', '#a8714e', '#7a4a2e', '#f5d6bd'];
+    F('crowd', function (x, y, w, h) {
+      for (var r = 0; r < 4; r++) {
+        var ry = y + r * 64;
+        g.fillStyle = r % 2 ? '#4b2163' : '#5e2a79'; g.fillRect(x, ry, w, 64);
+        g.fillStyle = '#2b1238'; g.fillRect(x, ry + 56, w, 8);
+        for (var c = 0; c < 8; c++) {
+          var cx = x + c * 32 + 16 + (R() - 0.5) * 6;
+          if (R() < 0.22) { g.fillStyle = r % 2 ? '#6a3389' : '#7a3d9c'; g.fillRect(cx - 11, ry + 26, 22, 30); continue; }
+          g.fillStyle = shirts[Math.floor(R() * shirts.length)]; g.fillRect(cx - 12, ry + 30, 24, 26);
+          g.fillStyle = skins[Math.floor(R() * skins.length)]; g.beginPath(); g.arc(cx, ry + 20, 8.5, 0, TAU); g.fill();
+          if (R() < 0.3) { g.fillStyle = shirts[Math.floor(R() * shirts.length)]; g.fillRect(cx - 9, ry + 9, 18, 6); }   // Mütze
+          if (R() < 0.15) { g.fillStyle = '#f2b705'; g.fillRect(cx + 10, ry + 4, 4, 22); }   // Fähnchen
+        }
+      }
+      speck(x, y, w, h, 800, 0.12);
+    });
+    F('seats', function (x, y, w, h) {
+      for (var r = 0; r < 4; r++) for (var c = 0; c < 8; c++) {
+        var ry = y + r * 64; g.fillStyle = '#3d4249'; g.fillRect(x + c * 32, ry, 32, 64);
+        g.fillStyle = (c + r) % 5 === 0 ? '#f2b705' : '#5e2a79'; g.fillRect(x + c * 32 + 3, ry + 14, 26, 34);
+        g.fillStyle = 'rgba(255,255,255,0.15)'; g.fillRect(x + c * 32 + 3, ry + 14, 26, 5);
+      }
+    });
+    F('door', function (x, y, w, h) {
+      g.fillStyle = '#9aa1a8'; g.fillRect(x, y, w, h);
+      for (var i = 0; i < h; i += 10) { g.fillStyle = '#b8bec4'; g.fillRect(x, y + i, w, 4); g.fillStyle = '#7b828a'; g.fillRect(x, y + i + 8, w, 2); }
+      g.fillStyle = '#f2b705'; for (i = 0; i < w; i += 32) { g.fillRect(x + i, y + h - 14, 16, 14); }
+      streaks(x, y, w, h, 5, 0.1);
+    });
+    F('wood', function (x, y, w, h) {
+      for (var i = 0; i < w; i += 32) {
+        var l = 0.85 + R() * 0.3; g.fillStyle = 'rgb(' + Math.round(130 * l) + ',' + Math.round(92 * l) + ',' + Math.round(60 * l) + ')'; g.fillRect(x + i, y, 32, h);
+        g.fillStyle = 'rgba(40,25,15,0.5)'; g.fillRect(x + i, y, 2, h);
+        for (var k = 0; k < 6; k++) { g.fillStyle = 'rgba(60,40,20,0.25)'; g.fillRect(x + i + 4 + R() * 24, y, 1, h); }
+      }
+    });
+    F('grime', function (x, y, w, h) {
+      g.fillStyle = '#8e8b84'; g.fillRect(x, y, w, h); speck(x, y, w, h, 3000, 0.3); streaks(x, y, w, h, 14, 0.25);
+      g.fillStyle = '#5d5a55'; g.fillRect(x, y + 126, w, 3); g.fillRect(x + 84, y, 3, h); g.fillRect(x + 170, y, 3, h);
+    });
+    F('glassBand', function (x, y, w, h) { g.fillStyle = '#2b3138'; g.fillRect(x, y, w, h); for (var c = 0; c < 8; c++) panes(x + c * 32 + 2, y + 8, 28, h - 16, R() < 0.08); });
+    F('panel', function (x, y, w, h) {
+      g.fillStyle = '#dfe2e6'; g.fillRect(x, y, w, h); speck(x, y, w, h, 900, 0.1);
+      for (var r = 0; r < h; r += 64) { g.fillStyle = '#9ea4ab'; g.fillRect(x, y + r, w, 2); g.fillStyle = '#f4f6f8'; g.fillRect(x, y + r + 2, w, 2); }
+      g.fillStyle = '#b8bdc3'; g.fillRect(x + 127, y, 2, h);
+      streaks(x, y, w, h, 4, 0.06);
+    });
+    F('glass', function (x, y, w, h) { for (var r = 0; r < 2; r++) for (var c = 0; c < 2; c++) panes(x + c * 128, y + r * 128, 128, 128, false); });
+    // Werbung (Rand 4 px durchsichtig: einmalig gemappt bleibt die Fläche drumherum in der Ecken-Farbe)
+    function logo(kind, cx, cy, s, c1, c2) {
+      g.save(); g.translate(cx, cy); g.fillStyle = c1; g.strokeStyle = c1; g.lineWidth = s * 0.12; g.lineJoin = 'round';
+      g.beginPath();
+      if (kind === 'peak') { g.moveTo(-s, s * 0.7); g.lineTo(-s * 0.2, -s * 0.8); g.lineTo(s * 0.2, -s * 0.1); g.lineTo(s * 0.5, -s * 0.5); g.lineTo(s, s * 0.7); g.fill(); }
+      else if (kind === 'flag') { for (var i = 0; i < 4; i++) for (var j = 0; j < 3; j++) if ((i + j) % 2 === 0) g.rect(-s + i * s * 0.5, -s * 0.75 + j * s * 0.5, s * 0.5, s * 0.5); g.fill(); g.fillRect(-s - s * 0.12, -s * 0.75, s * 0.1, s * 1.8); }
+      else if (kind === 'bolt') { g.moveTo(s * 0.2, -s); g.lineTo(-s * 0.6, s * 0.15); g.lineTo(-s * 0.05, s * 0.15); g.lineTo(-s * 0.3, s); g.lineTo(s * 0.6, -s * 0.2); g.lineTo(s * 0.05, -s * 0.2); g.closePath(); g.fill(); }
+      else if (kind === 'taco') { g.arc(0, s * 0.3, s, Math.PI, 0); g.fill(); g.fillStyle = c2; g.beginPath(); g.arc(-s * 0.4, -s * 0.15, s * 0.18, 0, TAU); g.arc(s * 0.3, -s * 0.3, s * 0.15, 0, TAU); g.fill(); }
+      else if (kind === 'drop') { g.moveTo(0, -s); g.quadraticCurveTo(s * 0.9, s * 0.1, 0, s * 0.9); g.quadraticCurveTo(-s * 0.9, s * 0.1, 0, -s); g.fill(); }
+      else if (kind === 'pixel') { ['#e04848', '#3a86ff', '#f2b705', '#2ec4b6'].forEach(function (c, i) { g.fillStyle = c; g.fillRect(-s + (i % 2) * s, -s + Math.floor(i / 2) * s, s * 0.9, s * 0.9); }); }
+      else if (kind === 'comet') { g.arc(s * 0.4, -s * 0.2, s * 0.45, 0, TAU); g.fill(); g.lineWidth = s * 0.16; [0.5, 0, -0.5].forEach(function (o) { g.beginPath(); g.moveTo(-s, s * (0.5 + o * 0.6)); g.lineTo(s * 0.1, s * o * 0.3); g.stroke(); }); }
+      else if (kind === 'tread') { g.arc(0, 0, s, 0, TAU); g.fill(); g.fillStyle = c2; for (var k = 0; k < 8; k++) { g.save(); g.rotate(k * TAU / 8); g.fillRect(-s * 0.1, -s * 0.95, s * 0.2, s * 0.35); g.restore(); } g.beginPath(); g.arc(0, 0, s * 0.35, 0, TAU); g.fill(); }
+      g.restore();
+    }
+    var FONT = '"DM Sans", "Arial Black", Arial, sans-serif';
+    SPONSORS.forEach(function (sp, k) {
+      var p = Art.TILES['ad' + k].px, x = p[0] + 4, y = p[1] + 4, w = p[2] - 8, h = p[3] - 8;
+      g.fillStyle = sp[1]; g.fillRect(x, y, w, h);
+      var gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, 'rgba(255,255,255,0.14)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.16)');
+      g.fillStyle = gr; g.fillRect(x, y, w, h);
+      logo(sp[3], x + 62, y + h / 2, 34, sp[2], sp[1]);
+      g.fillStyle = sp[2]; g.textBaseline = 'middle'; g.textAlign = 'left';
+      var fs = 64; g.font = '800 ' + fs + 'px ' + FONT;
+      var tw = g.measureText(sp[0]).width, maxW = w - 140;
+      if (tw > maxW) { fs = Math.floor(fs * maxW / tw); g.font = '800 ' + fs + 'px ' + FONT; tw = g.measureText(sp[0]).width; }
+      g.fillText(sp[0], x + 120 + (maxW - tw) / 2, y + h / 2 + 3);
+    });
+    // Graffiti: Wurf-Fläche (Blase) hinter dicken, umrandeten Buchstaben, Glanzpunkte, Tropfen
+    TAG_WORDS.forEach(function (word, k) {
+      var p = Art.TILES['tag' + k].px, cx = p[0] + p[2] / 2, cy = p[1] + p[3] / 2, cs = TAG_COLS[k];
+      clip(p[0] + 4, p[1] + 4, p[2] - 8, p[3] - 8, function () {
+        g.save(); g.translate(cx, cy); g.rotate((R() - 0.5) * 0.16);
+        var fs = word.length <= 2 ? 150 : 96; g.font = '900 ' + fs + 'px Impact, "Arial Black", ' + FONT;
+        var tw = g.measureText(word).width, k2 = Math.min(1, (p[2] - 50) / tw); g.scale(k2, 1);
+        if (k % 2 === 0) {   // Blase
+          g.fillStyle = 'rgba(20,20,26,0.9)'; g.beginPath();
+          for (var a = 0; a <= 24; a++) { var an = a / 24 * TAU, rr = 1 + (R() - 0.5) * 0.12; g.lineTo(Math.cos(an) * (tw / 2 + 26) * rr, Math.sin(an) * (fs * 0.62) * rr); }
+          g.fill();
+        }
+        g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round';
+        g.strokeStyle = '#141418'; g.lineWidth = 18; g.strokeText(word, 4, 6);
+        g.lineWidth = 14; g.strokeStyle = '#ffffff'; g.strokeText(word, 0, 0);
+        var gr = g.createLinearGradient(0, -fs / 2, 0, fs / 2); gr.addColorStop(0, cs[0]); gr.addColorStop(1, cs[1]);
+        g.fillStyle = gr; g.fillText(word, 0, 0);
+        g.fillStyle = 'rgba(255,255,255,0.75)';   // Glanz
+        for (var s = 0; s < 4; s++) { g.beginPath(); g.arc((R() - 0.5) * tw * 0.8, -fs * 0.22 + (R() - 0.5) * 8, 3 + R() * 3, 0, TAU); g.fill(); }
+        g.fillStyle = cs[1];   // Tropfen
+        for (s = 0; s < 5; s++) { var dx = (R() - 0.5) * tw * 0.8, dl = 10 + R() * 30; g.fillRect(dx, fs * 0.3, 4, dl); g.beginPath(); g.arc(dx + 2, fs * 0.3 + dl, 3.5, 0, TAU); g.fill(); }
+        g.restore();
+        g.strokeStyle = cs[0]; g.lineWidth = 4;   // Sternchen
+        for (s = 0; s < 3; s++) { var sx = p[0] + 20 + R() * (p[2] - 40), sy = p[1] + 18 + R() * 30, sl = 6 + R() * 6; g.beginPath(); g.moveTo(sx - sl, sy); g.lineTo(sx + sl, sy); g.moveTo(sx, sy - sl); g.lineTo(sx, sy + sl); g.stroke(); }
+      });
+    });
+  }
+  var atlasTex;
+  Art.atlas = function () {
+    if (atlasTex !== undefined) return atlasTex;
+    atlasTex = null;
+    if (!root.document) return null;
+    try {
+      var cv = document.createElement('canvas'); cv.width = AW; cv.height = AH;
+      drawAtlas(cv.getContext('2d'));
+      atlasTex = new THREE.CanvasTexture(cv);
+      atlasTex.encoding = THREE.sRGBEncoding; atlasTex.anisotropy = 4;
+      atlasTex.wrapS = atlasTex.wrapT = THREE.ClampToEdgeWrapping;
+      atlasTex.trackBytes = AW * AH * 4 * 4 / 3;
+    } catch (e) { atlasTex = null; }
+    return atlasTex;
+  };
+  // Material mit Atlas: o = { side, roughness, metalness, flat, env, vary (Instanz-Kachel iVar), cut (Ausstanzen nach Alpha),
+  //   inst (für Instanzen – eigenes Material, wie mat() in js/car-track-scene.js) }
+  // seitenweit geteilt je Kombination (nicht freigeben)
+  var artMats = {};
+  var ART_FRAG = [
+    '#ifdef USE_MAP',
+    'if (vTile.z > 0.0) {',
+    '  vec2 af = vec2(vAMode > 0.5 && vAMode < 1.5 ? clamp(vAtl.x, 0.0, 1.0) : fract(vAtl.x), vAMode > 0.5 ? clamp(vAtl.y, 0.0, 1.0) : fract(vAtl.y));',
+    '  vec2 tuv = vTile.xy + af * vTile.zw;',
+    '  #if __VERSION__ >= 300',
+    // Mip-Stufe aus der ungebrochenen UV (keine Nähte am Kachelrand), höchstens ~32 Texel je Pixel (bleibt in der Kachel)
+    '  vec2 gx = dFdx(vAtl) * vTile.zw, gy = dFdy(vAtl) * vTile.zw; float gm = max(length(gx), length(gy));',
+    '  if (gm > 0.0156) { gx *= 0.0156 / gm; gy *= 0.0156 / gm; }',
+    '  vec4 tx = textureGrad(map, tuv, gx, gy);',
+    '  #else',
+    '  vec4 tx = texture2D(map, tuv);',
+    '  #endif',
+    '  tx = mapTexelToLinear(tx);',
+    '  diffuseColor.rgb *= mix(vec3(1.0), tx.rgb, tx.a);',
+    '  #ifdef ART_CUT',
+    '  diffuseColor.a *= tx.a;',
+    '  #endif',
+    '}',
+    '#ifdef ART_CUT',
+    'else { diffuseColor.a = 0.0; }',
+    '#endif',
+    '#endif'
+  ].join('\n');
+  Art.material = function (o) {
+    o = o || {};
+    var side = o.side == null ? THREE.FrontSide : o.side;
+    var key = [side, o.roughness, o.metalness, !!o.flat, o.env, !!o.vary, !!o.cut, !!o.inst].join('|');
+    if (artMats[key]) return artMats[key];
+    var m = new THREE.MeshStandardMaterial({ vertexColors: true, map: Art.atlas(), roughness: o.roughness == null ? 0.85 : o.roughness, metalness: o.metalness || 0,
+      flatShading: !!o.flat, envMapIntensity: o.env == null ? 0.5 : o.env, side: side, alphaTest: o.cut ? 0.5 : 0 });
+    m.onBeforeCompile = function (sh) {
+      sh.vertexShader = 'attribute vec4 aTile;\nattribute vec4 aStep;\nvarying vec4 vTile;\nvarying vec2 vAtl;\nvarying float vAMode;\n' +
+        (o.vary ? 'attribute float iVar;\n' : '') +
+        sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvTile = aTile; vAtl = uv; vAMode = aStep.w;\n' +
+          (o.vary ? 'vTile.xy += vec2(mod(iVar, aStep.z) * aStep.x, floor(iVar / aStep.z + 0.001) * aStep.y);\n' : ''));
+      sh.fragmentShader = (o.cut ? '#define ART_CUT\n' : '') + 'varying vec4 vTile;\nvarying vec2 vAtl;\nvarying float vAMode;\n' +
+        sh.fragmentShader.replace('#include <map_fragment>', ART_FRAG);
+    };
+    m.customProgramCacheKey = function () { return 'track-art-' + (o.vary ? 'v' : '') + (o.cut ? 'c' : ''); };
+    return (artMats[key] = m);
+  };
+  // Kachel je Instanz: Werte für iVar (Index in der Reihe der Kachel, z. B. ad0 … ad7)
+  Art.setVary = function (geo, vals) { geo.setAttribute('iVar', new THREE.InstancedBufferAttribute(new Float32Array(vals), 1)); };
+
+  // Einfarbige Kulissen-Modelle bemalen (Katalog-Feld paint): je Dreieck nach Normale (Modell-Koordinaten: Fuß y = 0,
+  // Tribünen-Front −z) eine Kachel mit Box-Projektion; geo nicht indiziert, Farbe je Ecke (wird angelegt).
+  // style: seats (Tribünen: Sitzflächen/Front Publikum, Rückseite Werbung, Seiten Beton), warehouse (Wände Wellblech,
+  // Dach), pits (helle, graue Teile: Wände Paneele, Dach). → true, wenn etwas bemalt wurde
+  Art.paint = function (geo, style, base, size, seed) {
+    var p = geo.attributes.position, n = p.count, cnt = 0;
+    if (!geo.attributes.color) {
+      var cc = new Float32Array(n * 3);
+      for (var i = 0; i < n; i++) { cc[i * 3] = base.r; cc[i * 3 + 1] = base.g; cc[i * 3 + 2] = base.b; }
+      geo.setAttribute('color', new THREE.BufferAttribute(cc, 3));
+    }
+    var C = geo.attributes.color, UV = new Float32Array(n * 2), TL = new Float32Array(n * 4), ST = new Float32Array(n * 4);
+    var ad = Art.TILES['ad' + (Math.abs(seed | 0) % Art.ADS)], H = size ? size.y : 5;
+    var bandH = Math.min(2.4, Math.max(0.9, H * 0.3)), bandY = H * 0.55 - bandH / 2;
+    for (var t = 0; t + 2 < n; t += 3) {
+      var ax = p.getX(t), ay = p.getY(t), az = p.getZ(t);
+      var ux = p.getX(t + 1) - ax, uy = p.getY(t + 1) - ay, uz = p.getZ(t + 1) - az, vx = p.getX(t + 2) - ax, vy = p.getY(t + 2) - ay, vz = p.getZ(t + 2) - az;
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, l = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (!(l > 1e-12)) continue;
+      nx /= l; ny /= l; nz /= l;
+      var r0 = C.getX(t), g0 = C.getY(t), b0 = C.getZ(t), lum = (r0 + g0 + b0) / 3, sat = Math.max(r0, g0, b0) - Math.min(r0, g0, b0);
+      var tile = null, M = 4, col = 1, mode = 0, band = false;
+      if (style === 'seats') {
+        if (ny > 0.55 || nz < -0.55) { tile = 'crowd'; M = 2.4; }
+        else if (nz > 0.55) { tile = 'ad'; band = true; col = 0.86; }
+        else if (ny > -0.5) { tile = 'concrete'; col = 0.95; }
+      } else if (style === 'warehouse') {
+        if (ny > 0.5) { tile = 'roof'; M = 4; } else if (ny > -0.5) { tile = 'corrugated'; M = 3; }
+      } else if (style === 'pits') {
+        if (sat < 0.12 && lum > 0.35) { if (ny > 0.5) { tile = 'roof'; M = 4; } else if (ny > -0.5) { tile = 'panel'; M = 4; } }
+      }
+      if (!tile) continue;
+      cnt++;
+      var T = tile === 'ad' ? ad : Art.TILES[tile], aax = Math.abs(nx), aay = Math.abs(ny), aaz = Math.abs(nz);
+      for (var k = 0; k < 3; k++) {
+        var j = t + k, x = p.getX(j), y = p.getY(j), z = p.getZ(j), u, v;
+        if (aay >= aax && aay >= aaz) { u = x / M; v = (ny > 0 ? -z : z) / M; }
+        else if (aax >= aaz) { u = (nx > 0 ? -z : z) / M; v = y / M; }
+        else { u = (nz > 0 ? x : -x) / M; v = y / M; }
+        if (band) { u = (nz > 0 ? x : -x) / (bandH * 4); v = (y - bandY) / bandH; mode = 2; }
+        UV[j * 2] = u; UV[j * 2 + 1] = v;
+        TL[j * 4] = T.r[0]; TL[j * 4 + 1] = T.r[1]; TL[j * 4 + 2] = T.r[2]; TL[j * 4 + 3] = T.r[3];
+        ST[j * 4 + 2] = 1; ST[j * 4 + 3] = mode;
+        C.setXYZ(j, col, col, col);
+      }
+    }
+    if (!cnt) return false;
+    geo.setAttribute('uv', new THREE.BufferAttribute(UV, 2));
+    geo.setAttribute('aTile', new THREE.BufferAttribute(TL, 4));
+    geo.setAttribute('aStep', new THREE.BufferAttribute(ST, 4));
+    C.needsUpdate = true;
+    return true;
+  };
+
   function box(w, h, d) { return new THREE.BoxGeometry(w, h, d); }
   function cyl(rt, rb, h, seg) { return new THREE.CylinderGeometry(rt, rb, h, seg || 6, 1); }
   function cone(r, h, seg) { return new THREE.ConeGeometry(r, h, seg || 7, 1); }
@@ -284,13 +689,12 @@
       var lampK = new Kit();
       for (var a = 0; a < 4; a++) for (var b = 0; b < 2; b++) lampK.add(box(1, 0.95, 0.12), 0xfff6d8, { x: -1.8 + a * 1.2, y: 24.9 + b * 1.15, z: -0.5 });
       var mast = ctx.kind('mast', [{ geo: ms.geo() }, { geo: lampK.geo(), mat: 'glow' }], { r: 3, prop: { slot: 'mast', box: { w: 9, d: 9, h: 30 } } });
-      // Werbebande: Rahmen + helle Fläche (Farbe je Instanz), steht hinter der Leitplanke
+      // Werbebande: Rahmen + Fläche mit wechselnden Fantasie-Sponsoren (Atlas, Kachel je Instanz), hinter der Leitplanke
       var bd = new Kit();
-      bd.add(box(6, 1.1, 0.12), 0xffffff, { y: 0.75 });
+      bd.add(box(6, 1.1, 0.12), 0xffffff, { y: 0.75, tile: 'ad', vary: true, faces: function (nx, ny, nz) { return Math.abs(nz) > 0.5; } });
       bd.add(box(6.1, 0.12, 0.16), 0x22252b, { y: 1.33 });
       bd.add(box(0.1, 1.5, 0.1), 0x22252b, { x: -2.9, y: 0.55 }); bd.add(box(0.1, 1.5, 0.1), 0x22252b, { x: 2.9, y: 0.55 });
-      bd.add(box(3.4, 0.26, 0.14), 0x1b1d22, { x: -0.8, y: 0.8 });
-      var board = ctx.kind('board', [{ geo: bd.geo() }], { r: 3, tint: true });
+      var board = ctx.kind('board', [{ geo: bd.geo(), mat: 'atl' }], { r: 3, vary: true });
       // Fahne: Mast + Tuch (weht im Wind, außer bei reduzierter Bewegung)
       var fp = new Kit(), fc = new Kit();
       fp.add(cyl(0.06, 0.09, 9, 5), 0xd8dde4, { y: 4.3 });
@@ -298,14 +702,14 @@
       var flag = ctx.kind('flag', [{ geo: fp.geo(), notint: true }, { geo: fc.geo(), mat: 'wave' }], { r: 1.5, tint: true });
       // Boxengasse: flaches Boxengebäude mit Garagentoren und Dachstreifen
       var pt = new Kit();
-      pt.add(box(48, 5, 10), 0xd6d9de, { y: 2.0, z: 5 });
-      for (var gi = 0; gi < 10; gi++) pt.add(box(3.4, 3.2, 0.1), 0x2b2f36, { x: -21 + gi * 4.67, y: 1.6, z: -0.03 });
+      pt.add(box(48, 5, 10), 0xffffff, { y: 2.0, z: 5, tile: 'panel', uv: 'box', m: 4, faces: function (nx, ny, nz) { return Math.abs(ny) < 0.5; } });
+      for (var gi = 0; gi < 10; gi++) pt.add(box(3.4, 3.2, 0.1), 0xd8dce0, { x: -21 + gi * 4.67, y: 1.6, z: -0.03, tile: 'door', faces: function (nx, ny, nz) { return nz < -0.5; } });
       pt.add(box(48.4, 0.5, 10.4), prim, { y: 4.75, z: 5 });
       pt.add(box(48.6, 0.3, 0.2), acc, { y: 4.1, z: -0.12 });
       pt.add(box(6, 3, 5), 0xe8eaee, { x: 14, y: 6.5, z: 5 });
       pt.add(box(6.2, 0.9, 0.1), 0x3a4a5e, { x: 14, y: 6.7, z: 2.45 });
       // Kulissen-Modell (slot pits): eine Box, als Boxenreihe nebeneinander, Tor nach vorn (−z, zur Boxengasse)
-      var pits = ctx.kind('pits', [{ geo: pt.geo() }], { r: 25, prop: { slot: 'pits', box: { w: 48, d: 14, h: 6 }, front: 0, tile: true } });
+      var pits = ctx.kind('pits', [{ geo: pt.geo(), mat: 'atl' }], { r: 25, prop: { slot: 'pits', box: { w: 48, d: 14, h: 6 }, front: 0, tile: true } });
 
       // Plätze: Boxengebäude an der Startgeraden (Seite mit Platz), Tribünen an Geraden, Fahnen am Start
       var used = {};
@@ -358,8 +762,10 @@
         if (!of7 || !ctx.place(of7.x, of7.z, 1)) continue;
         pole7.add(of7.x, of7.z, { rot: of7.rot }); head7.add(of7.x, of7.z, { rot: of7.rot }); nf++;
       }
-      // Werbebanden hinter der Leitplanke auf Geraden (beide Seiten), Farbe abwechselnd
-      var adCols = [prim, acc, 0xf4f4f4, 0x2a7de1, 0xe23b3b], ai = 0;
+      // Werbebanden hinter der Leitplanke auf Geraden (beide Seiten): derselbe Sponsor 2–4 Banden lang, dann ein anderer
+      // (eigener Zufall – die Deko danach bleibt, wo sie war)
+      var adR = ctx.rng(77), adK = Math.floor(adR() * 8), adRun = 0;
+      function nextAd() { if (adRun-- <= 0) { adK = (adK + 1 + Math.floor(adR() * 6)) % 8; adRun = 1 + Math.floor(adR() * 3); } return adK; }
       [1, -1].forEach(function (sd) {
         for (var s2 = 0; s2 < L; s2 += 7) {
           if (!straightAt(s2, 4)) continue;
@@ -367,7 +773,7 @@
           var x = a2.x + a2.nx * sd * off, z = a2.z + a2.nz * sd * off;
           if (ctx.trackDist(x, z, off + 2) < off - 0.5) continue;   // anderer Streckenteil zu nah
           if (!ctx.place(x, z, 2.6, true)) continue;
-          board.add(x, z, { rot: a2.yaw, tint: adCols[ai++ % adCols.length] });
+          board.add(x, z, { rot: a2.yaw, v: nextAd() });
         }
       });
       leafTrees(ctx, 10, 4, 30, 120);
@@ -644,18 +1050,32 @@
       ctx.alongRail(tyres, { step: 1.05, extra: 0.25, tint: function (k) { return tcol[k % tcol.length]; } });
       // Lagerhalle: Wände, Satteldach, Rolltore, Fensterband
       var hk = new Kit();
-      hk.add(box(44, 11, 22), 0xb9bec4, { y: 4.5 });
-      hk.add(prism(44.6, 23, 4), 0x5d646d, { y: 11.3 });
-      for (var d = 0; d < 4; d++) hk.add(box(5, 5.5, 0.12), 0x6d747c, { x: -15 + d * 10, y: 2.75, z: 11.03 });
-      hk.add(box(42, 1.1, 0.1), 0x9fb6c8, { y: 8.2, z: 11.04 });
+      hk.add(box(44, 11, 22), 0xffffff, { y: 4.5, tile: 'corrugated', uv: 'box', m: 3, faces: function (nx, ny, nz) { return Math.abs(ny) < 0.5; } });
+      hk.add(prism(44.6, 23, 4), 0xffffff, { y: 11.3, tile: 'roof', uv: 'box', m: 4 });
+      for (var d = 0; d < 4; d++) hk.add(box(5, 5.5, 0.12), 0xffffff, { x: -15 + d * 10, y: 2.75, z: 11.03, tile: 'door', faces: function (nx, ny, nz) { return nz > 0.5; } });
+      hk.add(box(42, 1.1, 0.1), 0xffffff, { y: 8.2, z: 11.04, tile: 'glassBand', uvK: [1, 1], faces: function (nx, ny, nz) { return nz > 0.5; } });
       hk.add(box(44.2, 0.5, 0.14), ctx.accent, { y: 9.4, z: 11.05 });
-      var hall = ctx.kind('hall', [{ geo: hk.geo() }], { r: 25, prop: { slot: 'hall', box: { w: 46, d: 26, h: 24 } } });
+      var hall = ctx.kind('hall', [{ geo: hk.geo(), mat: 'atl' }], { r: 25, prop: { slot: 'hall', box: { w: 46, d: 26, h: 24 } } });
       // Container (Farbe je Instanz), Rippen als dünne Leisten
       var ck = new Kit();
       ck.add(box(6.1, 2.6, 2.45), 0xffffff, { y: 1.3 });
       for (var r = 0; r < 9; r++) ck.add(box(0.12, 2.3, 2.5), 0xd9d9d9, { x: -2.6 + r * 0.65, y: 1.3 });
       ck.add(box(0.1, 2.4, 2.3), 0x9a9a9a, { x: 3.06, y: 1.3 });
-      var cont = ctx.kind('container', [{ geo: ck.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 } } });
+      // Graffiti auf Containern: Aufkleber-Fläche (ausgestanzt nach Alpha, Motiv je Instanz) an der Außenseite eines
+      // äußeren unteren Containers; sitzt ein Kulissen-Modell dort, rückt sie auf dessen Seitenwand (onProp: faceZ)
+      var tagK = new Kit();
+      tagK.add(new THREE.PlaneGeometry(2.3, 1.6), 0xffffff, { y: 1.15, tile: 'tag', vary: true });
+      var tag = ctx.kind('tag', [{ geo: tagK.geo(), mat: 'atlcut' }], { r: 1.2, vary: true });
+      function tagTo(s, d) {
+        var tg = tag.spots[s.tagI];
+        tg.x = s.x + s.tagSide * d * Math.sin(s.rot); tg.z = s.z + s.tagSide * d * Math.cos(s.rot);
+      }
+      var cont = ctx.kind('container', [{ geo: ck.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 },
+        onProp: function (s, info) {
+          if (s.tagI == null || !info.faceZ) return;
+          tagTo(s, (s.tagSide > 0 ? info.faceZ[1] : -info.faceZ[0]) + 0.03); tag.refresh(s.tagI);
+        } } });
+      var tagR = ctx.rng(78);
       var ccol = [0xc0392b, 0x2563a8, 0x2e8b57, 0xe67e22, 0x7f8c8d, 0xd4ac0d];
       // Lampenmast mit Ausleger, Leuchte (leuchtend)
       var lk = new Kit(), lg = new Kit();
@@ -682,6 +1102,13 @@
         for (var q = 0; q < cols; q++) {
           var oz = (q - (cols - 1) / 2) * 2.55, lv = rnd() < 0.45 ? 2 : 1;
           for (var l = 0; l < lv; l++) cont.add(oc.x + oz * sn, oc.z + oz * cs, { rot: rc, y: l * 2.6, tint: ccol[Math.floor(rnd() * ccol.length)] });
+          var side = q === 0 && q === cols - 1 ? (tagR() < 0.5 ? -1 : 1) : q === 0 ? -1 : q === cols - 1 ? 1 : 0;
+          if (side && tagR() < 0.5) {
+            var cs0 = cont.spots[cont.spots.length - lv];
+            cs0.tagI = tag.spots.length; cs0.tagSide = side;
+            tag.add(cs0.x, cs0.z, { rot: rc + (side < 0 ? Math.PI : 0), v: Math.floor(tagR() * Art.TAGS) });
+            tagTo(cs0, 1.28);
+          }
         }
         yards.push({ x: oc.x, z: oc.z, r: rc, w: 5, d: 5 });
         nc++;
@@ -711,17 +1138,29 @@
         if (kind < 0.55) hall.add(bx, bz, { rot: aa, s: Math.max(0.8, Math.min(1.8, w / 44)) });
         else if (kind < 0.8) {
           var ch = 45 + rnd() * 40;
-          bg.add(cyl(1.8, 2.6, ch, 8), function (x, y) { return Math.floor(y / 7) % 2 ? 0xd8262b : 0xeeeeee; }, { x: bx, y: ch / 2, z: bz });
+          bg.add(cyl(1.8, 2.6, ch, 8), function (x, y) { return Math.floor(y / 7) % 2 ? 0xd8262b : 0xeeeeee; }, { x: bx, y: ch / 2, z: bz,
+            tile: 'grime', uv: 'cyl', reps: 2, m: 5, faces: function (nx, ny, nz) { return Math.abs(ny) < 0.5; } });
         } else {
-          for (var si = 0; si < 3; si++) bg.add(cyl(5, 5, 22, 10), 0xa9b0b8, { x: bx + si * 11, y: 11, z: bz });
+          for (var si = 0; si < 3; si++) bg.add(cyl(5, 5, 22, 10), 0xffffff, { x: bx + si * 11, y: 11, z: bz, tile: 'silo', uv: 'cyl', reps: 5, m: 6, faces: function (nx, ny, nz) { return Math.abs(ny) < 0.5; } });
         }
       }
       ctx.bg(bg);
+      // Graffiti-Mauern: freistehende Betonwände auf den Höfen neben der Strecke, längs zur Fahrbahn, Motiv je Instanz
+      // (beide Seiten); am Ende, damit die Deko davor bleibt, wo sie war
+      var tw = new Kit();
+      tw.add(box(5, 0.4, 0.6), 0x8e8b84, { y: 0.1 });
+      tw.add(box(4.8, 2.6, 0.24), 0xd2cfc8, { y: 1.55, tile: 'tag', vary: true, uvK: [1.3, 1.05], faces: function (nx, ny, nz) { return Math.abs(nz) > 0.5; } });
+      var tagWall = ctx.kind('tagWall', [{ geo: tw.geo(), mat: 'atl' }], { r: 2.6, vary: true });
+      for (var tt = 0, nt = 0; tt < 300 && nt < 8; tt++) {
+        var ot = ctx.randomSpot(16, 70);
+        if (!ot || !ctx.place(ot.x, ot.z, 2.7)) continue;
+        tagWall.add(ot.x, ot.z, { rot: ot.rot, v: (nt + Math.floor(tagR() * 2)) % Art.TAGS }); nt++;
+      }
     }
   };
 
   var BY_LAYOUT = { Speedway: 'stadium', Twister: 'forest', Hairpin: 'alpine', Coast: 'coast', Kart: 'industrial' };
   function forTrack(T) { return THEMES[BY_LAYOUT[T && T.name] || 'stadium']; }
 
-  root.CarTrackThemes = { forTrack: forTrack, THEMES: THEMES, BY_LAYOUT: BY_LAYOUT, Kit: Kit, lin: lin, mix: mix, smooth: smooth, fbm: fbm, tyreStack: tyreStack, Relief: Relief, ranges: ranges };
+  root.CarTrackThemes = { forTrack: forTrack, THEMES: THEMES, BY_LAYOUT: BY_LAYOUT, Kit: Kit, Art: Art, lin: lin, mix: mix, smooth: smooth, fbm: fbm, tyreStack: tyreStack, Relief: Relief, ranges: ranges };
 })(typeof window !== 'undefined' ? window : this);

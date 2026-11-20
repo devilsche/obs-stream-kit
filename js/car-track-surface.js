@@ -311,8 +311,8 @@
     var stats = { draws: 0, tris: 0, texBytes: 0 }, texSeen = [];
     var Kit = root.CarTrackThemes && root.CarTrackThemes.Kit;
     function tex(t) { if (texSeen.indexOf(t) < 0) { texSeen.push(t); stats.texBytes += t.trackBytes || 0; own(t); } return t; }
-    function addMesh(geo, mat, ro) {
-      var m = new THREE.Mesh(own(geo), own(mat)); m.userData.surface = true; if (ro) m.renderOrder = ro;
+    function addMesh(geo, mat, ro, shared) {
+      var m = new THREE.Mesh(own(geo), shared ? mat : own(mat)); m.userData.surface = true; if (ro) m.renderOrder = ro;
       g.add(m); stats.draws++; stats.tris += (geo.index ? geo.index.count : geo.attributes.position.count) / 3;
       return m;
     }
@@ -618,13 +618,23 @@
     }
     // Profil entlang eines Abschnitts der Begrenzung extrudieren (flach schattiert, in Kit): prof = [[e, y]…],
     // colFn(Segment, i) → Farbe
-    function tri(kit, A, B, C, c) { var k3 = lin(c); [A, B, C].forEach(function (v) { kit.pos.push(v[0], v[1], v[2]); kit.col.push(k3.r, k3.g, k3.b); }); }
-    function extrude(kit, sd, i0, i1, prof, colFn, extra) {
+    // uvs/tile/mode: Atlas-Kachel (CarTrackThemes.Art, Kit.tri)
+    function tri(kit, A, B, C, c, uvs, tile, mode) {
+      if (kit.tri) { kit.tri(A, B, C, c, uvs, tile, mode); return; }
+      var k3 = lin(c); [A, B, C].forEach(function (v) { kit.pos.push(v[0], v[1], v[2]); kit.col.push(k3.r, k3.g, k3.b); });
+    }
+    // uvFn(j, q) → { tile, u0, u1 } (optional): Fläche j zwischen Ring q − 1 und q mit Atlas-Kachel, v 0…1 über die Fläche
+    function extrude(kit, sd, i0, i1, prof, colFn, extra, uvFn) {
       var prev = null;
       for (var q = i0; q <= i1; q++) {
         var b = bAt(q, sd, extra), ring = prof.map(function (pp) { return [b.x + b.ox * pp[0], b.y + pp[1], b.z + b.oz * pp[0]]; });
         if (prev) for (var j = 0; j < prof.length - 1; j++) {
-          var cc = colFn(j, q);
+          var cc = colFn(j, q), ad = uvFn ? uvFn(j, q) : null;
+          if (ad) {
+            tri(kit, prev[j], ring[j], prev[j + 1], cc, [[ad.u0, 0], [ad.u1, 0], [ad.u0, 1]], ad.tile, 1);
+            tri(kit, prev[j + 1], ring[j], ring[j + 1], cc, [[ad.u0, 1], [ad.u1, 0], [ad.u1, 1]], ad.tile, 1);
+            continue;
+          }
           tri(kit, prev[j], ring[j], prev[j + 1], cc); tri(kit, prev[j + 1], ring[j], ring[j + 1], cc);
         }
         prev = ring;
@@ -638,6 +648,25 @@
       }
       if (cur) { if (out.length && out[0][0] === 0 && cur[1] === n) out[0] = [cur[0], n + out[0][1]]; else out.push(cur); }
       return out;
+    }
+    // Werbeflächen auf der Mauer-Front (Stadion): Felder à 3 Rasterpunkte, derselbe Sponsor 2–5 Felder lang, ab und zu
+    // ein leeres Feld; Schrift von der Strecke aus lesbar (u läuft je Seite passend zur Blickrichtung)
+    var Art = root.CarTrackThemes && root.CarTrackThemes.Art, AD_SEG = 3;
+    function adOnWall(sd) {
+      if (!Art || !Art.atlas()) return function () { return null; };
+      var ar = S.rng(sd > 0 ? 83 : 89), np = Math.ceil(n / AD_SEG), seq = [], k = Math.floor(ar() * Art.ADS), run = 0;
+      for (var pi = 0; pi < np; pi++) {
+        if (run-- <= 0) { k = (k + 1 + Math.floor(ar() * (Art.ADS - 1))) % Art.ADS; run = 1 + Math.floor(ar() * 4); if (ar() < 0.15) { seq.push(-1); continue; } }
+        seq.push(k);
+      }
+      var p0 = P[0], ox = p0.nx * sd, oz = p0.nz * sd, flip = (-oz * Math.cos(p0.yaw) + ox * -Math.sin(p0.yaw)) < 0;
+      return function (j, q) {
+        if (j !== 1) return null;
+        var qq = wrap(q - 1), pk = seq[Math.floor(qq / AD_SEG)];
+        if (pk == null || pk < 0) return null;
+        var f0 = (qq % AD_SEG) / AD_SEG, f1 = f0 + 1 / AD_SEG;
+        return flip ? { tile: 'ad' + pk, u0: 1 - f0, u1: 1 - f1 } : { tile: 'ad' + pk, u0: f0, u1: f1 };
+      };
     }
     var tyreStack = root.CarTrackThemes && root.CarTrackThemes.tyreStack, tyreSpots = [], fenceSecs = [];
     var belt = [[0, 0.06], [0, 0.82], [0.03, 0.84], [0.03, 0.06]];
@@ -666,10 +695,11 @@
         });
         mainSec.forEach(function (sec) {
           if (barrier === 'wall') {
-            // Betonmauer: Fuß verschmutzt, Front in Feldern leicht unterschiedlich, Krone hell
+            // Betonmauer: Fuß verschmutzt, Front mit Werbeflächen (Fantasie-Sponsoren, 3 m je Feld, Atlas), Krone hell
+            var wallAd = adOnWall(sd);
             extrude(hw, sd, sec[0], sec[1], [[0, -0.4], [0, 0.16], [0, 0.86], [0.06, 1.0], [0.28, 1.0], [0.34, 0.86], [0.34, -0.4]], function (j, q) {
-              if (j === 0) return 0x8c8c86; if (j === 1) return Math.floor(q / 4) % 2 ? 0xd7d7d1 : 0xcfcfc8; if (j === 2 || j === 3) return 0xe4e4df; return 0xb4b4ae;
-            });
+              if (j === 0) return 0x8c8c86; if (j === 1) return wallAd(1, q) ? 0xffffff : Math.floor(q / 4) % 2 ? 0xd7d7d1 : 0xcfcfc8; if (j === 2 || j === 3) return 0xe4e4df; return 0xb4b4ae;
+            }, 0, wallAd);
             // Fangzaun: Pfosten alle 3 m (Metall), Geflecht als eigenes Band (unten)
             for (var q2 = sec[0]; q2 < sec[1]; q2 += 3) {
               var b = bAt(q2, sd, 0.2);
@@ -801,7 +831,10 @@
         }
       });
     }
-    if (hw && !hw.empty()) addMesh(hw.geo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, envMapIntensity: 0.5, side: THREE.DoubleSide }));
+    if (hw && !hw.empty()) {
+      if (Art && hw.tiled && hw.tiled()) addMesh(hw.geo(), Art.material({ side: THREE.DoubleSide, roughness: 0.8, env: 0.5 }), 0, true);
+      else addMesh(hw.geo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, envMapIntensity: 0.5, side: THREE.DoubleSide }));
+    }
     if (metal && !metal.empty()) addMesh(metal.geo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.65, envMapIntensity: 1.0, side: THREE.DoubleSide }));
 
     // ---- Startampel am Portal (lokal: x = Fahrtrichtung, z quer, Balken bei y 4,6) – Lampen aus ----

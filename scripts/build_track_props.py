@@ -11,8 +11,9 @@ Pillow und numpy). Ablauf wie scripts/build_car_rain.py:
   5. nach data/track-props/<uid>.glb auf den Server, dazu data/track-props/catalog.json (props + credits)
 Die Modell-Dateien kommen nicht ins Repo (Lizenzen). Auswahl und Maße: assets/track-props/candidates.json
 (Einträge mit "skip" werden nicht gebaut; der Grund steht dabei). Optional "slots": [...] – das Modell gilt für
-mehrere Platz-Typen (z. B. Tribüne und Oberrang), ohne doppelte Datei; ebenso "themes": [...] für mehrere Themen;
-beides wird auch bei ungebauten Einträgen nachgezogen. Pakete mit mehreren Modellen (z. B. Baum-Packs): je Teil ein
+mehrere Platz-Typen (z. B. Tribüne und Oberrang), ohne doppelte Datei; ebenso "themes": [...] für mehrere Themen und
+"paint" (seats/warehouse/pits: einfarbige Teile bekommen im Browser Atlas-Kacheln, js/car-track-themes.js Art.paint);
+alles wird auch bei ungebauten Einträgen nachgezogen. Pakete mit mehreren Modellen (z. B. Baum-Packs): je Teil ein
 Eintrag mit derselben uid, eigenem "part" (Datei <uid>-<part>.glb) und keepNode/dropNode für den Teil.
 
 Aufruf:  python3 scripts/build_track_props.py [--only <uid> …] [--inspect <uid> …]
@@ -290,7 +291,7 @@ def build_one(c):
          "theme": c["theme"], "name": c["name"],
          "author": c["author"], "license": c["license"], "url": c["url"], "size": size, "yaw": yaw,
          "tris": tri_count(g), "draws": draw_calls(g), "bytes": os.path.getsize(dst)}
-    for f in ("slots", "themes"):
+    for f in ("slots", "themes", "paint"):
         if c.get(f):
             e[f] = c[f]
     return dst, e
@@ -312,8 +313,8 @@ def main(only=None):
             print("skip %-40s %s" % (c["name"][:40], c["skip"]))
             continue
         if uid in old and not want:
-            e = dict(old[uid])   # ungebaut übernehmen; Platz-Typen/Themen (slots, themes) aus candidates.json nachziehen
-            for f in ("slots", "themes"):
+            e = dict(old[uid])   # ungebaut übernehmen; Platz-Typen/Themen/Bemalung (slots, themes, paint) aus candidates.json nachziehen
+            for f in ("slots", "themes", "paint"):
                 e.pop(f, None)
                 if c.get(f):
                     e[f] = c[f]

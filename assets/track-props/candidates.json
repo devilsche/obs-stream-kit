@@ -91,7 +91,7 @@
  },
  {
   "uid": "daa7fd3ff88945298d00045ca40a4c03",
-  "key": "warehouse-nicholas",
+  "key": "warehouse-nicholas", "tris": 5000, "paint": "warehouse",
   "name": "Warehouse FBX Model Free",
   "author": "Nicholas-3D",
   "license": "CC Attribution",
@@ -212,7 +212,7 @@
  },
  {
   "uid": "6bbe4c85d2a4489dbe5918831be5d886",
-  "key": "stand-arena",
+  "key": "stand-arena", "tris": 2000,
   "name": "Low poly stadium/sports arena seats",
   "author": "anDDDres",
   "license": "CC Attribution",
@@ -246,7 +246,7 @@
  },
  {
   "uid": "10a22c724d1a4083bab2d64cdbac6f01",
-  "key": "stand-sports",
+  "key": "stand-sports", "paint": "seats",
   "name": "Sports Bleachers",
   "author": "justice2free",
   "license": "CC Attribution",
@@ -311,12 +311,12 @@
   ],
   "len": 26,
   "faceLow": true,
-  "tris": 4000,
+  "tris": 2000,
   "aggressive": true
  },
  {
   "uid": "9745757584ef46b7be11235af84225a9",
-  "key": "stand-tribunes",
+  "key": "stand-tribunes", "paint": "seats",
   "name": "Stands/Tribunes",
   "author": "thenerdpoint60",
   "license": "CC Attribution",
@@ -330,11 +330,11 @@
   ],
   "len": 30,
   "faceLow": true,
-  "tris": 3000
+  "tris": 1800
  },
  {
   "uid": "8b1d8eed69c0405882e50e9099090dc0",
-  "key": "stand-nath",
+  "key": "stand-nath", "paint": "seats",
   "name": "Stadium Stand",
   "author": "abhisekh_nath",
   "license": "CC Attribution",
@@ -345,13 +345,13 @@
   "len": 40,
   "faceLow": true,
   "keepNode": "LOD2",
-  "tris": 3500,
+  "tris": 1800,
   "note": "nur die gröbste Stufe (LOD2); Eck-Tribüne (L-förmig, Ränge steigen nach außen) – nur Oberrang",
   "aggressive": true
  },
  {
   "uid": "086dda7566f64c6c930354687e2ec274",
-  "key": "pits-redbull",
+  "key": "pits-redbull", "paint": "pits",
   "name": "Red Bull F1 Garage",
   "author": "paman0744",
   "license": "CC Attribution",
@@ -469,7 +469,7 @@
   "kind": "floodlight",
   "slot": "mast",
   "height": 26,
-  "tris": 12000,
+  "tris": 2400,
   "dropNode": "Plane__0",
   "note": "Bodenplatte (10 km) entfernt",
   "aggressive": true

@@ -33,6 +33,8 @@
  *   js/car-drive-phys.js (trackInfo) für die Fahrphysik.
  * Deko steht nie im Auslauf (≥ 14 m neben der Fahrbahn), Ausnahme: Banden/Reifenstapel/Zaun direkt hinter der Leitplanke.
  * Zeichenaufrufe: je Deko-Art ein InstancedMesh, Hintergrund eine zusammengefasste Geometrie (Ecken-Farben).
+ * Fassaden, Werbung, Graffiti: ein Atlas (CarTrackThemes.Art, mat 'atl'/'atlcut') – Kachel je Ecke bzw. je Instanz,
+ * keine zusätzlichen Materialien je Haus; einfarbige Kulissen-Modelle mit Katalog-Feld paint werden beim Laden bemalt.
  */
 (function (root) {
   'use strict';
@@ -118,7 +120,8 @@
     });
     // einfarbige Materialien (ohne Textur, undurchsichtig, nicht leuchtend) zu einem Material mit Ecken-Farbe
     // zusammenlegen – Low-Poly-Modelle haben oft Dutzende davon (je eins ein Zeichenaufruf)
-    var plain = {};
+    // (neue Gruppen erst nach dem Filtern anhängen – filter besucht während des Laufs angehängte Einträge nicht)
+    var plain = {}, plainKeys = [];
     order = order.filter(function (k) {
       var m = groups[k].mat;
       var flat = m.isMeshStandardMaterial && !m.vertexColors && !m.transparent && !m.map && !m.emissiveMap && !m.alphaMap &&
@@ -127,7 +130,7 @@
       var key = 'plain|' + m.side;
       if (!plain[key]) {
         plain[key] = groups[key] = { mat: new THREE.MeshStandardMaterial({ vertexColors: true, side: m.side, roughness: 0, metalness: 0 }), list: [], plain: true, n: 0 };
-        order.push(key);
+        plainKeys.push(key);
       }
       var pg = plain[key];
       pg.mat.roughness += m.roughness; pg.mat.metalness += m.metalness; pg.n++;
@@ -140,6 +143,7 @@
       });
       return false;
     });
+    order = order.concat(plainKeys);
     Object.keys(plain).forEach(function (k) { var pg = plain[k]; pg.mat.roughness /= pg.n; pg.mat.metalness /= pg.n; });
     var parts = [], box = new THREE.Box3();
     order.forEach(function (k) {
@@ -168,9 +172,42 @@
       });
     });
     var sz = box.isEmpty() ? new THREE.Vector3(1, 1, 1) : box.getSize(new THREE.Vector3());
+    var Art = root.CarTrackThemes && root.CarTrackThemes.Art;
+    // einfarbige Modelle bemalen (Katalog-Feld paint, CarTrackThemes.Art.paint): Teile ohne Textur bekommen Atlas-Kacheln
+    // nach Flächen-Richtung (Publikum, Werbung, Beton, Wellblech, Dach …) – gleiche Zahl Zeichenaufrufe
+    if (e.paint && Art) parts.forEach(function (pt) {
+      var m = pt.mat;
+      if (m.map || m.transparent || m.alphaTest || (m.emissive && m.emissive.r + m.emissive.g + m.emissive.b > 0.01)) return;
+      var geo = pt.geo.index ? pt.geo.toNonIndexed() : pt.geo, base = m.color || new THREE.Color(1, 1, 1), ca = geo.attributes.color;
+      if (ca && (base.r !== 1 || base.g !== 1 || base.b !== 1)) for (var i = 0; i < ca.count; i++) ca.setXYZ(i, ca.getX(i) * base.r, ca.getY(i) * base.g, ca.getZ(i) * base.b);
+      var seed = 0;
+      for (var c = 0; c < e.uid.length; c++) seed = (seed * 31 + e.uid.charCodeAt(c)) | 0;
+      if (!Art.paint(geo, e.paint, base, sz, seed)) { if (geo !== pt.geo) geo.dispose(); return; }
+      if (geo !== pt.geo) pt.geo.dispose();
+      pt.geo = geo;
+      pt.mat = Art.material({ side: m.side, roughness: m.roughness, metalness: m.metalness, env: 0.6 });
+    });
+    // Container: Lage der Seitenwände (±z, Mitte der Längsseite) – dort sitzen Graffiti (Thema Industrie, onProp)
+    var faceZ = null;
+    if (e.kind === 'container') {
+      var zn = Infinity, zp = -Infinity, va = new THREE.Vector3(), vb = new THREE.Vector3(), vc = new THREE.Vector3(), nn = new THREE.Vector3(), e1 = new THREE.Vector3();
+      parts.forEach(function (pt) {
+        var pa = pt.geo.attributes.position, ix = pt.geo.index, nt = (ix ? ix.count : pa.count) / 3;
+        for (var q = 0; q < nt; q++) {
+          var a = ix ? ix.getX(q * 3) : q * 3, b = ix ? ix.getX(q * 3 + 1) : q * 3 + 1, c2 = ix ? ix.getX(q * 3 + 2) : q * 3 + 2;
+          va.fromBufferAttribute(pa, a); vb.fromBufferAttribute(pa, b); vc.fromBufferAttribute(pa, c2);
+          nn.subVectors(vc, vb).cross(e1.subVectors(va, vb)).normalize();
+          var mx = (va.x + vb.x + vc.x) / 3, my = (va.y + vb.y + vc.y) / 3;
+          if (Math.abs(mx) > 0.35 * sz.x || my < 0.25 * sz.y || my > 0.75 * sz.y) continue;
+          if (nn.z > 0.8) zp = Math.max(zp, va.z, vb.z, vc.z);
+          else if (nn.z < -0.8) zn = Math.min(zn, va.z, vb.z, vc.z);
+        }
+      });
+      if (isFinite(zn) && isFinite(zp)) faceZ = [zn, zp];
+    }
     var tris = 0;
     parts.forEach(function (p) { tris += (p.geo.index ? p.geo.index.count : p.geo.attributes.position.count) / 3; });
-    return { parts: parts, size: sz, tris: tris, sink: +e.sink || 0 };
+    return { parts: parts, size: sz, tris: tris, sink: +e.sink || 0, faceZ: faceZ };
   }
 
   function build(T, opts) {
@@ -419,7 +456,11 @@
       variant = variant || '';
       var key = name + '|' + variant;
       if (MATS[key]) return MATS[key];
-      var m;
+      var m, Art = Themes && Themes.Art;
+      // Atlas (Fassaden, Werbung, Graffiti – CarTrackThemes.Art): seitenweit geteilt, nicht freigeben; 'atlcut' stanzt aus
+      if ((name === 'atl' || name === 'atlcut') && Art) {
+        return (MATS[key] = Art.material({ flat: true, vary: variant === 'iv', cut: name === 'atlcut', inst: variant !== '', side: name === 'atlcut' ? THREE.DoubleSide : THREE.FrontSide }));
+      }
       if (name === 'glow') m = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
       else if (name === 'water') m = new THREE.MeshStandardMaterial({ color: 0x3f86b0, roughness: 0.2, metalness: 0.1, envMapIntensity: 0.9 });
       else if (name === 'foam') {
@@ -448,17 +489,20 @@
     // o = { r (Radius bei Größe 1), tint, prop }. prop = { slot (Katalog-Feld slot, sonst kind), box: { w, d, h } (Platz
     // in m, lokal x/z/y – das Modell wird nur verkleinert, nie vergrößert), yaw (Zusatzdrehung), y (Höhe über dem Platz),
     // front (Vorderkante auf lokal z), tile (kleine Modelle entlang x nebeneinander, bis box.w voll ist),
-    // onProp(spot, { height, scale }) } – Modelle derselben Art wechseln sich je Platz
-    // ab (Reihenfolge des Katalogs, unabhängig davon, welches zuerst geladen ist)
+    // onProp(spot, { height, scale, faceZ }) } – Modelle derselben Art wechseln sich je Platz
+    // ab (Reihenfolge des Katalogs, unabhängig davon, welches zuerst geladen ist). o.vary: Atlas-Kachel je Platz
+    // (kd.add(…, { v }) → iVar, Material mat 'atl'/'atlcut' mit Kit-Teilen o.vary). kd.refresh(i): Platz i neu setzen,
+    // nachdem x/z/y/rot geändert wurden (nach dem Aufbau, z. B. in onProp)
     ctx.kind = function (name, parts, o) {
-      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), spots: [], prop: (o && o.prop) || null };
+      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), vary: !!(o && o.vary), spots: [], prop: (o && o.prop) || null };
       parts.forEach(function (p) { own(p.geo); });
       // a.abs: y ist absolut (nicht über dem Gelände) – z. B. auf einer Insel im Meer
       kd.add = function (x, z, a) {
         a = a || {};
         var s = a.s || 1;
-        kd.spots.push({ x: x, z: z, rot: a.rot || 0, s: s, y: a.y || 0, abs: !!a.abs, tint: a.tint, r: kd.r * s, hidden: false, prop: null });
+        kd.spots.push({ x: x, z: z, rot: a.rot || 0, s: s, y: a.y || 0, abs: !!a.abs, tint: a.tint, v: a.v || 0, r: kd.r * s, hidden: false, prop: null });
       };
+      kd.refresh = function (i) { if (kd.meshes) applySpot(kd, i); };
       kinds.push(kd);
       return kd;
     };
@@ -584,8 +628,9 @@
     kinds.forEach(function (kd) {
       if (!kd.spots.length) return;
       var meshes = kd.parts.map(function (p) {
-        var tinted = kd.tint && !p.notint;
-        var im = own(new THREE.InstancedMesh(p.geo, mat(p.mat || 'v', tinted ? 'it' : 'i'), kd.spots.length));
+        var tinted = kd.tint && !p.notint, vary = kd.vary && p.geo.attributes.aStep;
+        if (vary) Themes.Art.setVary(p.geo, kd.spots.map(function (s) { return s.v; }));
+        var im = own(new THREE.InstancedMesh(p.geo, mat(p.mat || 'v', vary ? 'iv' : tinted ? 'it' : 'i'), kd.spots.length));
         im.frustumCulled = false;   // Instanzen liegen überall – die Kugel der Grundform passt nicht
         kd.spots.forEach(function (s, i) {
           im.setMatrixAt(i, spotMatrix(s, mtx));
@@ -666,7 +711,10 @@
       slots.forEach(function (sl) {
         var s = kd.spots[sl.spot];
         s.prop = v;
-        if (!seen[sl.spot]) { seen[sl.spot] = 1; applySpot(kd, sl.spot); if (P0.onProp) P0.onProp(s, { height: size.y * k * s.s, scale: k }); }
+        if (!seen[sl.spot]) {
+          seen[sl.spot] = 1; applySpot(kd, sl.spot);
+          if (P0.onProp) P0.onProp(s, { height: size.y * k * s.s, scale: k, faceZ: tpl.faceZ ? [tpl.faceZ[0] * k * s.s, tpl.faceZ[1] * k * s.s] : null });
+        }
       });
     }
     var propsReady = new Promise(function (resolve) {
@@ -699,8 +747,8 @@
     // Hintergrund: alles in eine Geometrie (ein Zeichenaufruf)
     if (bgKits.length) {
       var all = new Themes.Kit();
-      bgKits.forEach(function (k) { Array.prototype.push.apply(all.pos, k.pos); Array.prototype.push.apply(all.col, k.col); });
-      g.add(new THREE.Mesh(own(all.geo()), mat('v')));
+      bgKits.forEach(function (k) { all.merge(k); });
+      g.add(new THREE.Mesh(own(all.geo()), mat(all.tiled() ? 'atl' : 'v')));
     }
     // Bodenfarbe je Ecke (nach der Deko: Höfe/Ufer stehen erst dann fest)
     var gc = theme.groundColor(ctx);
