@@ -1012,7 +1012,7 @@
     var me = st.me || {}, ph = st.phase, live = ph === 'lobby' || ph === 'countdown' || ph === 'intro' || ph === 'race';
     if (st.race_id !== rc.raceId) {           // neues Rennen (oder keins): alles von vorn
       rc.raceId = st.race_id; rc.ticket = null; rc.evKey = '';
-      if (race && race.chat) teardown();
+      if (race && race.chat) { teardown(); showPanel('lobby'); }   // abgebrochen/vorbei: zurück zur Warte-Tafel statt leerer Szene
       if (mp) mpStop();
     }
     if (!(race && race.chat)) rcLobby(st);
