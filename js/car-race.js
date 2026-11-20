@@ -2078,8 +2078,8 @@
       var pts = [], labels = [], camFix = null;
       if (race.stage === 'podium') {
         var pd = race.podium;
-        // Siegerente hüpft auf dem Podest (bei reduzierter Bewegung nicht)
-        if (pd.cars) pd.cars.forEach(function (c, k) { duckStep(c.r, dt, k === 0 && !reduce ? Math.abs(Math.sin(pd.t * 5)) * 0.25 : 0); });
+        // Enten bleiben auf dem Podest ruhig sitzen (kein Hüpfen im Auto)
+        if (pd.cars) pd.cars.forEach(function (c) { duckStep(c.r, dt, 0); });
         pd.t += dt;
         var shot = pd.shot = podiumShotAt(pd, pd.t);
         // Schilder: in der Totale alle, in Nahaufnahmen nur das Auto im Bild (sonst angeschnitten)
