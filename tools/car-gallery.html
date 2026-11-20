@@ -91,7 +91,7 @@
           if (Array.isArray(v.paints) && v.paints.length) {
             var sw = el('div', 'swatches'); sw.setAttribute('aria-label', 'Paints');
             v.paints.forEach(function (p) {
-              var d = el('span', 'sw'); d.title = p.c == null ? 'Original colour' : hex(p.c);
+              var d = el('span', 'sw'); d.title = (p.n ? p.n + ': ' : '') + (p.c == null ? 'Original colour' : hex(p.c));
               if (p.c == null) d.classList.add('swo'); else { d.classList.add('swc' + ncss); css += '.swc' + ncss + '{background:' + hex(p.c) + '}'; ncss++; }
               sw.appendChild(d);
             });

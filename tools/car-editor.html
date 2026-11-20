@@ -67,6 +67,7 @@
     .zone { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin: 6px 0; }
     .zone.on { box-shadow: inset 0 0 0 2px var(--accent); }
     .zone input[type=text] { flex: 1; min-width: 0; }
+    #setName { flex: 1; min-width: 0; }
     .zone select { flex: 0 1 auto; }
     #status { min-height: 20px; margin: 8px 0 0; }
     #status.ok { color: var(--ok); }
@@ -676,25 +677,34 @@
           var pick = el('button', 'set-pick'); pick.type = 'button'; pick.setAttribute('aria-pressed', String(i === shown));
           var nz = p.z ? Object.keys(p.z).length : 0;
           var desc = (p.c == null ? 'Original' : hex(p.c)) + (nz ? ', ' + nz + ' zone colour' + (nz > 1 ? 's' : '') : '');
-          pick.setAttribute('aria-label', 'Show set ' + n + ': ' + desc + ', weight ' + (p.w || 1));
+          var nm = setName(p, i);
+          pick.setAttribute('aria-label', 'Show ' + nm + ': ' + desc + ', weight ' + (p.w || 1));
           var zsw = def.zones.filter(function (z) { return p.z && p.z[z.id] != null; }).map(function (z) { return swatch(p.z[z.id], 'rim'); });
           pick.append.apply(pick, [swatch(p.c == null ? 'orig' : p.c)].concat(zsw).concat([
-            el('span', null, 'Set ' + n), el('span', 'muted', '· weight ' + (p.w || 1) + (nz ? ' · ' + nz + ' zone' + (nz > 1 ? 's' : '') : ''))]));
+            el('span', null, nm), el('span', 'muted', '· weight ' + (p.w || 1) + (nz ? ' · ' + nz + ' zone' + (nz > 1 ? 's' : '') : ''))]));
           pick.addEventListener('click', function () { shown = i; paints(); show(); });
-          var ed = el('button', 'small', 'Edit'); ed.type = 'button'; ed.setAttribute('aria-label', 'Edit set ' + n);
+          var ed = el('button', 'small', 'Edit'); ed.type = 'button'; ed.setAttribute('aria-label', 'Edit ' + nm);
           ed.addEventListener('click', function () { editSet(i); });
-          var rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove set ' + n);
+          var rm = el('button', 'danger small', 'Remove'); rm.type = 'button'; rm.setAttribute('aria-label', 'Remove ' + nm);
           rm.addEventListener('click', function () { def.paints.splice(i, 1); shown = 0; if ($('setDlg').open) $('setDlg').close(); paints(); show(); });
           row.append(pick, ed, rm); box.appendChild(row);
         });
       }
+      // Name eines Farbsets (Feld n), sonst „Set n“
+      function setName(p, i) { return p && typeof p.n === 'string' && p.n.trim() ? p.n.trim() : 'Set ' + (i + 1); }
       var setOpener = null;
       function editSet(i) {
         var p = def.paints[i]; if (!p) return;
         shown = i; paints(); show();
-        $('setTitle').textContent = 'Colour set ' + (i + 1);
+        $('setTitle').textContent = 'Colour set: ' + setName(p, i);
         var b = $('setBody'); b.textContent = '';
         function changed() { shown = i; paints(); show(); }
+        // Name
+        var r0 = el('div', 'row'), nl = el('label', null, 'Name'), ni = el('input');
+        ni.type = 'text'; ni.id = 'setName'; nl.htmlFor = 'setName'; ni.maxLength = 30; ni.autocomplete = 'off';
+        ni.value = p.n || ''; ni.placeholder = 'Set ' + (i + 1);
+        ni.addEventListener('input', function () { var v = ni.value.trim(); if (v) p.n = v; else delete p.n; $('setTitle').textContent = 'Colour set: ' + setName(p, i); paints(); });
+        r0.append(nl, ni);
         // Lack
         var r1 = el('div', 'row'), oc = el('input'), ol = el('label', null, 'Original paint'), pc = el('input'), pl = el('label', null, 'Paint');
         oc.type = 'checkbox'; oc.id = 'setOrig'; ol.htmlFor = 'setOrig'; oc.checked = p.c == null;
@@ -708,7 +718,7 @@
         w.type = 'number'; w.min = 1; w.max = 20; w.value = p.w || 1; w.id = 'setW'; wl.htmlFor = 'setW';
         w.addEventListener('change', function () { p.w = Math.max(1, Math.min(20, parseInt(w.value, 10) || 1)); w.value = p.w; changed(); });
         r3.append(wl, w, el('span', 'muted small-text', 'higher = more often'));
-        b.append(r1, r3);
+        b.append(r0, r1, r3);
         // Bereichsfarben
         var zb = el('div', 'zones-in-set');
         zb.appendChild(el('h3', 'sub3', 'Zones in this set'));
