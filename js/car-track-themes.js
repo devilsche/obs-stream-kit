@@ -672,12 +672,13 @@
         if (ctx.place(lx, lz, 1.2)) lamp.add(lx, lz, { rot: a.yaw + (sd > 0 ? -Math.PI / 2 : Math.PI / 2) });
       }
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f706b, 0x8d8e88) }], { r: 1.2 }), 18, { dmin: 15, dmax: 100, rad: 1.2, s: [0.4, 0.9] });
-      // Hintergrund: Fabrikhallen, Schornsteine (rot-weiß), Silos
+      // Hintergrund: Fabrikhallen (dieselbe Art wie die Hallen am Hof → Kulissen-Modelle statt grauer Klötze),
+      // Schornsteine (rot-weiß), Silos
       var bg = new Kit();
       for (var i = 0; i < 40; i++) {
         var aa = rnd() * TAU, R = ctx.radius + 230 + rnd() * 420, bx = ctx.cx + Math.cos(aa) * R, bz = ctx.cz + Math.sin(aa) * R;
         var w = 30 + rnd() * 60, h = 12 + rnd() * 26, kind = rnd();
-        if (kind < 0.55) bg.add(box(w, h, w * 0.6), mix(0x7a8088, 0x9aa0a8, rnd()), { x: bx, y: h / 2 - 1, z: bz, ry: aa });
+        if (kind < 0.55) hall.add(bx, bz, { rot: aa, s: Math.max(0.8, Math.min(1.8, w / 44)) });
         else if (kind < 0.8) {
           var ch = 45 + rnd() * 40;
           bg.add(cyl(1.8, 2.6, ch, 8), function (x, y) { return Math.floor(y / 7) % 2 ? 0xd8262b : 0xeeeeee; }, { x: bx, y: ch / 2, z: bz });
