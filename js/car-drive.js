@@ -34,6 +34,13 @@
  * Effekte: Bremsspuren + Qualm (js/car-drive-fx.js), Klänge (js/car-race-sound.js, nach der ersten Eingabe, M = stumm),
  * Motoren aus echten Aufnahmen (js/car-engine-audio.js, Motorart je Auto aus CarRaceStats engine).
  * Vor dem Start (Countdown): Kamera mit Maus/Touch/rechtem Stick um das eigene Auto drehen, Mausrad/Pinch zoomt.
+ * Tempogefühl (nur Optik/Klang, Fahrphysik und Zeiten unverändert), alles nach Tempo / vtop des eigenen Autos:
+ * Verfolger tiefer und näher bei Tempo, bleibt beim Beschleunigen zurück, rückt beim Bremsen heran, Sichtfeld bis
+ * +20° (Haube +16°, Nitro etwas mehr), leichtes Neigen in Kurven, hochfrequentes Rütteln nach Untergrund (Asphalt
+ * kaum, Randstein/Kies deutlich); Fahrtwind-Streifen + Vignette am Bildrand ab ~60 % vtop, verwischter Asphalt,
+ * verwischte Felgen (js/car-drive-fx.js speed), Leitpfosten/Chevrons an der Strecke (js/car-track-surface.js),
+ * Fahrtwind + Abrollgeräusch (car-race-sound.js wind/tyres). Reduzierte Bewegung: kein Rütteln/Neigen/Streifen,
+ * Sichtfeld- und Kamera-Änderungen deutlich schwächer.
  */
 (function (root) {
   'use strict';
@@ -45,6 +52,7 @@
   function lerp(a, b, t) { return a + (b - a) * t; }
   function wrapAngle(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
   function damp(k, dt) { return 1 - Math.exp(-k * dt); }
+  function smooth(e0, e1, x) { var t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
   function cleanName(n) {
     return String(n || '').replace(/\|\s*www\.\S+/gi, '').replace(/\[\s*free\s*\]/gi, '').replace(/\bfree\b/gi, '')
       .replace(/\s{2,}/g, ' ').replace(/^[\s|\-–·]+|[\s|\-–·]+$/g, '');
@@ -87,6 +95,8 @@
   resize();
   root.addEventListener('resize', resize);
   var FX = root.CarDriveFx ? root.CarDriveFx.create(THREE, scene, cam, { reduce: REDUCE }) : null;
+  // Tempogefühl: Fahrtwind-Streifen + Vignette, verwischte Felgen (js/car-drive-fx.js), siehe speedFrame
+  var SPD = root.CarDriveFx && root.CarDriveFx.speed ? root.CarDriveFx.speed(THREE, scene, { reduce: REDUCE }) : null;
 
   function tokenColor(cls, fb) {
     var el = doc.querySelector('.' + cls), c = el && getComputedStyle(el).color;
@@ -267,6 +277,7 @@
       holder.add(model);
       if (opts.duck) car.duck = addDuck(model, key, opts.outfit);
       car.wheels = collectWheels(holder, model, st.len, car.height);
+      car.rimBlur = SPD ? SPD.wheels(holder, car.wheels) : null;
     } else {
       // Ersatz-Kiste (Modell nicht geladen)
       var mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(set && set.c != null ? set.c : 0x9146ff), roughness: 0.4, metalness: 0.1 });
@@ -309,6 +320,7 @@
     if (c.duck && TC.updateDriverClip) TC.updateDriverClip(c.duck);
   }
   function disposeCar(c) {
+    if (c.rimBlur) { c.rimBlur.dispose(); c.rimBlur = null; }
     scene.remove(c.holder);
     c.owned.forEach(function (x) { if (x && x.dispose) x.dispose(); });   // Modell-Materialien gehören ToyCars (geteilt)
   }
@@ -378,7 +390,7 @@
     sm.lastT = performance.now();
     var off = !race || race.paused || race.phase === 'results' || !sndOn;
     if (off) {
-      snd.skid(0); snd.rumble(0); snd.scrape(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false);
+      snd.skid(0); snd.rumble(0); snd.scrape(0); snd.wind(0); snd.tyres(0); if (sm.me) sm.me.set(false); if (sm.field) sm.field.set(false);
       if (sm.mev) sm.mev.v.update(dt, { on: false });
       sm.others.forEach(function (o) { o.v.update(dt, { on: false }); });
       return;
@@ -413,6 +425,9 @@
     snd.skid(hard && sp > 3 && !race.spect ? clamp((pc.slip - 0.42) / 0.45, 0, 1) : 0);
     snd.rumble(!hard && sp > 1 ? clamp(sp / 12, 0.2, 1) : 0);
     snd.scrape(race.scrape || 0);
+    // Fahrtwind + Abrollen (Tempogefühl), nach Tempoverhältnis; im Countdown still
+    var rr = cd ? 0 : clamp(sp / Math.max(1, pc.P.vtop), 0, 1.3);
+    snd.wind(rr); snd.tyres(hard ? rr : 0);
     if (pc.nitroT > 0 && sm.nitro <= 0) sfx('nitro');
     sm.nitro = pc.nitroT;
     if (pc.rail > 0) hitSound(pc.rail);
@@ -713,6 +728,7 @@
     ui.hud.hidden = true; ui.countdown.hidden = true;
     keys = {}; steerKb = thrKb = brkKb = 0;
     if (FX) FX.clear();
+    if (SPD) SPD.set(0, 0, 0);
     soundStop(); lookReset();
   }
 
@@ -831,9 +847,26 @@
     return new THREE.Vector3(x, Math.max(gh(x, z), groundY(x, z)) + 5.5, z);
   }
   var tmpV = new THREE.Vector3(), tmpL = new THREE.Vector3();
+  // Tempogefühl (nur Optik – Fahrphysik und Zeiten bleiben): alles am Tempoverhältnis r = Tempo / vtop des eigenen
+  // Autos, damit es je Auto gleich wirkt. Geglättet: r, Längsbeschleunigung (je s, relativ zu vtop), Gierrate.
+  // Rütteln je Untergrund (Winkel in rad bei voller Fahrt; Randstein/Kies deutlich, Asphalt kaum)
+  var SHAKE_SURF = { asphalt: 1, curb: 4.5, grass: 3, gravel: 5.5 }, SHAKE_A = 0.0011;
+  function speedState(dt, pc, sp) {
+    var vt = Math.max(1, pc.P.vtop), rRaw = clamp(sp / vt, 0, 1.3), dtt = Math.max(dt, 1e-3);
+    var so = race.sos || (race.sos = { r: rRaw, sp: sp, acc: 0, yaw: pc.yaw, yr: 0, roll: 0, t: 0 });
+    if (dt > 0) {
+      so.r += (rRaw - so.r) * damp(4, dt);
+      so.acc += (clamp((sp - so.sp) / dtt / vt, -1.5, 1.5) - so.acc) * damp(3, dt);
+      so.yr += (clamp(wrapAngle(pc.yaw - so.yaw) / dtt, -3, 3) - so.yr) * damp(5, dt);
+      so.t += dt;
+    }
+    so.sp = sp; so.yaw = pc.yaw;
+    return so;
+  }
   function updateCam(dt) {
     var pc = race.pc, me = race.me, fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), mode = race.camMode;
     var sp = Math.hypot(pc.vx, pc.vz), fov = 62, cy = me.holder.position.y;   // cy: Fahrbahnhöhe am Auto
+    var so = speedState(dt, pc, sp), r = Math.min(1, so.r), mot = REDUCE ? 0.4 : 1, nitro = pc.nitroT > 0 && !REDUCE ? 1 : 0;
     lookReturn(dt);
     if (look.used) {
       // Umschauen (Startaufstellung und Rennen): Kreisbahn um das eigene Auto, folgt seiner Fahrtrichtung
@@ -851,20 +884,23 @@
       // hinter dem Auto, Blickrichtung etwas in Fahrtrichtung (Drift sichtbar)
       var hx = fx, hz = fz;
       if (sp > 4) { var vx = pc.vx / sp, vz = pc.vz / sp; hx = fx * 0.7 + vx * 0.3; hz = fz * 0.7 + vz * 0.3; var l = Math.hypot(hx, hz) || 1; hx /= l; hz /= l; }
-      var back = me.len * 1.15 + 4.2, up = 1.7 + me.height * 0.9;
+      // bei Tempo tiefer und etwas näher; beim Beschleunigen bleibt die Kamera zurück, beim Bremsen rückt sie heran
+      var back = (me.len * 1.15 + 4.2) * (1 - 0.14 * r * mot) + clamp(so.acc * 2.2, -0.7, 1.0) * mot, up = (1.7 + me.height * 0.9) * (1 - 0.2 * r * mot);
       tmpV.set(pc.x - hx * back, 0, pc.z - hz * back);
       // Höhe über der Fahrbahn am Auto bzw. – wenn es dahinter ansteigt – über dem Gelände an der Kamera
       tmpV.y = Math.max(cy + up, gh(tmpV.x, tmpV.z) + up * 0.75, groundY(tmpV.x, tmpV.z) + 0.8);
-      tmpL.set(pc.x + fx * 4, gh(pc.x + fx * 4, pc.z + fz * 4) + me.height * 0.75, pc.z + fz * 4);
+      var ahead = 4 + 3 * r;
+      tmpL.set(pc.x + fx * ahead, gh(pc.x + fx * ahead, pc.z + fz * ahead) + me.height * 0.75, pc.z + fz * ahead);
       if (!race.camPos) { race.camPos = tmpV.clone(); race.camLook = tmpL.clone(); }
       race.camPos.lerp(tmpV, damp(7, dt)); race.camLook.lerp(tmpL, damp(12, dt));
-      fov = 60 + clamp(sp / pc.P.vtop, 0, 1.3) * 10;
+      // Sichtfeld weitet sich mit dem Tempo (oben stärker), Nitro legt etwas drauf
+      fov = 60 + 20 * mot * Math.pow(Math.min(so.r, 1.15), 1.4) + 4 * nitro;
     } else if (mode === 'hood') {
       me.holder.updateMatrixWorld(true);
       tmpV.set(me.len * 0.08, me.height * 1.02 + 0.12, 0); me.holder.localToWorld(tmpV);
       tmpL.set(me.len * 0.08 + 30, me.height * 0.8, 0); me.holder.localToWorld(tmpL);
       race.camPos = tmpV.clone(); race.camLook = tmpL.clone();
-      fov = 68 + clamp(sp / pc.P.vtop, 0, 1.3) * 8;
+      fov = 68 + 16 * mot * Math.pow(Math.min(so.r, 1.15), 1.3) + 3 * nitro;
     } else {
       var SP = tvSpacing(race.T), n = Math.max(1, Math.floor(race.T.len / SP)), idx = Math.floor(((pc.s + SP / 2) % race.T.len) / SP) % n;
       if (idx !== race.tvIdx) { race.tvIdx = idx; race.tvPos = tvSpot(idx); race.camLook = new THREE.Vector3(pc.x, cy + 1, pc.z); }
@@ -881,7 +917,51 @@
     race.shake = Math.max(0, race.shake - dt * 1.5);
     if (mode !== 'hood') cam.position.y = Math.max(cam.position.y, groundY(cam.position.x, cam.position.z) + 0.5);
     cam.lookAt(race.camLook);
+    if (mode !== 'tv') camFeel(dt, so, pc, sp, mode);
     if (Math.abs(cam.fov - fov) > 0.05) { cam.fov += (fov - cam.fov) * damp(5, dt); cam.updateProjectionMatrix(); }
+  }
+  // Rütteln (hochfrequent, nach Tempo und Untergrund; Motorhaube etwas stärker) und leichtes Neigen in Kurven (aus
+  // Gierrate × Tempo, wie Seitenkraft nach außen). Bei reduzierter Bewegung beides aus.
+  function camFeel(dt, so, pc, sp, mode) {
+    var rollT = 0;
+    if (!REDUCE) {
+      var k = SHAKE_SURF[pc.surface] || 1, rr = Math.min(so.r, 1.2);
+      var amp = SHAKE_A * k * Math.pow(rr, 1.5) * (mode === 'hood' ? 1.4 : 1);
+      if (pc.surface !== 'asphalt') amp = Math.max(amp, SHAKE_A * k * 0.35 * Math.min(1, sp / 6));   // neben der Bahn rumpelt es auch langsam
+      if (amp > 1e-5) {
+        var t = so.t, rn = Math.random() - 0.5;
+        cam.rotateX(amp * (Math.sin(t * 61) * 0.4 + Math.sin(t * 97.3 + 1.7) * 0.3 + rn * 0.6));
+        cam.rotateY(amp * 0.6 * (Math.sin(t * 73.1 + 0.4) * 0.5 + Math.sin(t * 41.7 + 2.2) * 0.3 + (Math.random() - 0.5) * 0.5));
+      }
+      rollT = clamp(-so.yr * Math.min(so.r, 1) * 0.035, -0.045, 0.045);
+    }
+    so.roll += (rollT - so.roll) * damp(4, dt);
+    if (Math.abs(so.roll) > 1e-4) cam.rotateZ(so.roll);
+  }
+  // je Bild: Fahrtwind-Streifen/Vignette (nur Verfolger-/Haubenkamera ohne Umschauen), verwischter Asphalt,
+  // verwischte Felgen am eigenen Auto und an nahen Fremdautos
+  var RIM_NEAR = 40, RIM_N = 3;
+  function speedFrame(dt) {
+    var W = canvas.clientWidth || root.innerWidth, H = canvas.clientHeight || root.innerHeight;
+    var live = race && race.pc && !race.paused && race.phase !== 'results' && race.phase !== 'countdown';
+    var so = live ? race.sos : null, onboard = live && so && !look.used && (race.camMode === 'chase' || race.camMode === 'hood');
+    var r = so ? so.r : 0;
+    if (SPD) SPD.set(onboard ? smooth(0.6, 1.0, r) * (race.camMode === 'hood' ? 1.15 : 1) : 0, onboard ? 0.32 * smooth(0.45, 1.05, r) : 0, dt, W, H);
+    if (trackRes && trackRes.setMotionBlur) trackRes.setMotionBlur(onboard && !REDUCE ? 0.3 * smooth(0.3, 1.0, r) : 0);
+    if (!race) return;
+    if (race.paused) dt = 0;
+    if (race.me && race.me.rimBlur) race.me.rimBlur.set(race.pc ? smooth(0.12, 0.45, Math.hypot(race.pc.vx, race.pc.vz) / Math.max(1, race.pc.P.vtop)) : 0, dt);
+    // Fremdautos: nur die RIM_N nächsten innerhalb RIM_NEAR (je Auto 4 Zeichenaufrufe, solange sichtbar)
+    var list = [];
+    (race.ai || []).concat(race.remotes || []).forEach(function (c) {
+      if (!c || !c.rimBlur || c === race.me || list.some(function (x) { return x.c === c; })) return;
+      list.push({ c: c, d: Math.hypot(c.holder.position.x - cam.position.x, c.holder.position.z - cam.position.z) });
+    });
+    list.sort(function (a, b) { return a.d - b.d; });
+    list.forEach(function (x, i) {
+      var c = x.c, vt = Math.max(1, (c.st && c.st.vmax) || 30);
+      c.rimBlur.set(i < RIM_N && x.d < RIM_NEAR ? smooth(0.12, 0.45, (c.fxSpeed || 0) / vt) : 0, dt);
+    });
   }
 
   // ---- Wertung ----
@@ -1693,6 +1773,7 @@
       }
       FX.update(dt, canvas.clientWidth || root.innerWidth, canvas.clientHeight || root.innerHeight);
     }
+    speedFrame(dt);
     soundFrame(inp);
   }
   // Menü: langsamer Kameraflug um den Ursprung (ohne Strecke nur Himmel)

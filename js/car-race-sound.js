@@ -25,6 +25,10 @@
  *   s.crash(level)                   Blech-Crash Auto ↔ Auto, 0..1 (dumpfer Schlag + Knirschen + Blechklang, ab 0,6
  *                                    Splittern), höchstens alle 0,12 s
  *   s.scrape(level)                  Dauer-Schrammen Blech an Blech, 0..1, je Bild (0 = aus)
+ *   s.wind(level)                    Fahrtwind (Rauschen, Band steigt mit dem Tempo, Pegel überproportional), level =
+ *                                    Tempo / Höchsttempo 0..1,3, je Bild (0 = aus)
+ *   s.tyres(level)                   Abrollgeräusch der Reifen auf Asphalt (tiefes Rauschen mit leichtem Pulsieren),
+ *                                    level wie wind, je Bild (0 = aus; neben der Bahn übernimmt rumble)
  *
  * Alles läuft über einen Master-Pegel und einen Kompressor/Begrenzer – nie laute Spitzen, insgesamt dezent.
  */
@@ -76,6 +80,7 @@
 
     // ---- Dauerklänge ----
     var eng = null, fireG = null, fireNext = 0, lastWhoosh = -1, motors = [], skidN = null, rumbleG = null, scrapeN = null, lastCrash = -1;
+    var windN = null, tyreN = null;
     function engineNodes() {
       if (eng) return eng;
       var out = ctx.createGain(); out.gain.value = 0; out.connect(master);
@@ -166,7 +171,7 @@
       silence: function () {
         api.engine(false); if (fireG) fireG.gain.setTargetAtTime(0, now(), 0.2);
         motors.forEach(function (m) { m.set(false); });
-        api.skid(0); api.rumble(0); api.scrape(0);
+        api.skid(0); api.rumble(0); api.scrape(0); api.wind(0); api.tyres(0);
       },
       setVolume: function (v) {
         vol = Math.max(0, Math.min(1, +v || 0));
@@ -263,6 +268,46 @@
         scrapeN.g.gain.setTargetAtTime(0.11 * level, t, level > 0 ? 0.03 : 0.1);
         scrapeN.bp.frequency.setTargetAtTime(1700 + 900 * level, t, 0.08);
         scrapeN.lfo.frequency.setTargetAtTime(22 + 25 * level, t, 0.1);
+      },
+      wind: function (level) {
+        level = Math.max(0, Math.min(1.3, level || 0));
+        if (!windN && level <= 0) return;
+        if (!windN) {
+          // zwei Bänder (tiefes Brausen + helles Zischen), langsam schwankend wie Böen
+          var n = noise(true), lo = ctx.createBiquadFilter(), hi = ctx.createBiquadFilter(), gl = ctx.createGain(), gh = ctx.createGain();
+          var lfo = ctx.createOscillator(), lg = ctx.createGain(), am = ctx.createGain(), g = ctx.createGain();
+          lo.type = 'bandpass'; lo.frequency.value = 420; lo.Q.value = 0.6;
+          hi.type = 'bandpass'; hi.frequency.value = 2400; hi.Q.value = 0.9;
+          gl.gain.value = 1; gh.gain.value = 0.25;
+          lfo.frequency.value = 0.37; lg.gain.value = 0.18; lfo.connect(lg); am.gain.value = 0.85; lg.connect(am.gain);
+          g.gain.value = 0;
+          n.connect(lo); n.connect(hi); lo.connect(gl); hi.connect(gh); gl.connect(am); gh.connect(am); am.connect(g); g.connect(master);
+          n.start(0, 0.7); lfo.start();
+          windN = { g: g, lo: lo, hi: hi, gh: gh };
+        }
+        var t = now(), k = Math.min(1, level);
+        windN.g.gain.setTargetAtTime(0.075 * Math.pow(k, 2.2) * (level > 1 ? 1 + (level - 1) * 0.8 : 1), t, 0.12);
+        windN.lo.frequency.setTargetAtTime(300 + 700 * k, t, 0.15);
+        windN.hi.frequency.setTargetAtTime(1600 + 2600 * k, t, 0.15);
+        windN.gh.gain.setTargetAtTime(0.12 + 0.5 * k * k, t, 0.15);
+      },
+      tyres: function (level) {
+        level = Math.max(0, Math.min(1.3, level || 0));
+        if (!tyreN && level <= 0) return;
+        if (!tyreN) {
+          var n = noise(true), lp = ctx.createBiquadFilter(), bp = ctx.createBiquadFilter(), lfo = ctx.createOscillator(), lg = ctx.createGain();
+          var am = ctx.createGain(), g = ctx.createGain();
+          lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.7;
+          bp.type = 'peaking'; bp.frequency.value = 160; bp.Q.value = 1.2; bp.gain.value = 6;
+          lfo.frequency.value = 9; lg.gain.value = 0.12; lfo.connect(lg); am.gain.value = 0.9; lg.connect(am.gain);
+          g.gain.value = 0;
+          n.connect(lp); lp.connect(bp); bp.connect(am); am.connect(g); g.connect(master); n.start(0, 1.3); lfo.start();
+          tyreN = { g: g, lp: lp, lfo: lfo };
+        }
+        var t = now(), k = Math.min(1, level);
+        tyreN.g.gain.setTargetAtTime(0.045 * Math.pow(k, 1.2), t, 0.1);
+        tyreN.lp.frequency.setTargetAtTime(220 + 520 * k, t, 0.12);
+        tyreN.lfo.frequency.setTargetAtTime(5 + 16 * k, t, 0.2);
       },
       jingle: function (big) {
         var t = now(), notes = big ? [659.25, 783.99, 987.77, 1318.51] : [783.99, 1046.5];

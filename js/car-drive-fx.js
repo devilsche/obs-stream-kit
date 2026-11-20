@@ -16,6 +16,14 @@
  *   fx.setGround(fn)                 Geländehöhe fn(x, z) (js/car-track-scene.js heightAt; null = flach): Spuren und
  *                                    Qualm liegen darauf
  *
+ *
+ *   var sp = CarDriveFx.speed(THREE, scene, { reduce })   Tempogefühl (Car Drive):
+ *   sp.set(k, vig, dt, w, h)         Fahrtwind-Streifen am Bildrand (k 0..1, bei reduzierter Bewegung aus) und
+ *                                    Tempo-Vignette (vig 0..1) – EIN Bildschirm-Viereck, ein Zeichenaufruf, nur sichtbar
+ *                                    wenn k/vig > 0; Streifen blenden zum Bildrand weich aus
+ *   var wb = sp.wheels(holder, wheels)  verwischte Felgen (Scheibe außen je Rad, am Rad-Pivot); wb.set(level, dt),
+ *                                    wb.dispose(); unsichtbar (kein Zeichenaufruf) bei level < 0,02
+ *
  * Spuren: ein Ringpuffer aus MAX_SEG Vierecken in EINER Geometrie (Alpha je Ecke, eigener kleiner Shader mit Nebel),
  * verblassen nach MARK_LIFE s. Qualm: Sprite-Pool (höchstens MAXP, bei reduzierter Bewegung kaum), Rand-Fade wie in
  * js/car-race.js – Teilchen ploppen nie hart am Bildrand. Funken/Splitter: eigener kleiner Pool (MAXS, bei reduzierter
@@ -249,5 +257,107 @@
     return api;
   }
 
-  root.CarDriveFx = { create: create };
+  // ---- Tempogefühl: Fahrtwind-Streifen + Tempo-Vignette (Bildschirm) und verwischte Felgen ----
+  function smooth(e0, e1, x) { var t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
+  var SPEED_VS = 'varying vec2 vP;\nvoid main() { vP = position.xy; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+  // Streifen: Strahlen aus der Bildmitte, je Winkel-Spur zufällig an/aus, Striche laufen nach außen; Breite in
+  // Pixeln (nicht im Winkel), nur im äußeren Ring, weich zum Bildrand ausgeblendet. Vignette: dunkler Rand.
+  var SPEED_FS = [
+    'uniform float uK; uniform float uVig; uniform float uT; uniform vec2 uRes;',
+    'varying vec2 vP;',
+    'float h1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }',
+    'void main() {',
+    '  vec2 px = vP * 0.5 * uRes; float rp = length(px), rmax = length(0.5 * uRes), r = rp / rmax;',
+    '  float s = 0.0;',
+    '  if (uK > 0.0 && r > 0.38) {',
+    '    float N = 140.0, a = (atan(px.y, px.x) / 6.2831853 + 0.5) * N, cell = floor(a), h = h1(cell), h2 = h1(cell + 71.3);',
+    '    float dpx = abs(fract(a) - 0.5) * 6.2831853 / N * rp;',
+    '    float thin = smoothstep(1.4 + 1.6 * r, 0.3, dpx);',
+    '    float ph = fract(r * (1.3 + h2) - uT * (1.1 + 1.6 * h2) + h);',
+    '    float seg = smoothstep(0.0, 0.05, ph) * smoothstep(0.38, 0.1, ph);',
+    '    vec2 e = 0.5 * uRes - abs(px); float edge = clamp(min(e.x, e.y) / (0.06 * uRes.y), 0.0, 1.0);',
+    '    s = thin * seg * step(1.0 - 0.45 * uK, h) * smoothstep(0.38, 0.85, r) * edge * uK * 0.42;',
+    '  }',
+    '  float v = smoothstep(0.5, 1.08, r) * uVig;',
+    '  float al = max(s, v);',
+    '  if (al < 0.003) discard;',
+    '  gl_FragColor = vec4(vec3(0.94, 0.96, 1.0) * (s / al), al);',
+    '}'].join('\n');
+  function makeRimTex() {
+    var c = root.document.createElement('canvas'); c.width = c.height = 128;
+    var g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    // Nabe dunkel, Speichenbereich als verwischter Metallschleier, Felgenhorn hell, außen weich (Reifen bleibt scharf)
+    gr.addColorStop(0, 'rgba(40,42,46,0.95)'); gr.addColorStop(0.16, 'rgba(70,72,78,0.92)');
+    gr.addColorStop(0.24, 'rgba(150,154,162,0.72)'); gr.addColorStop(0.7, 'rgba(176,180,188,0.66)');
+    gr.addColorStop(0.86, 'rgba(206,210,216,0.8)'); gr.addColorStop(0.93, 'rgba(120,122,128,0.55)'); gr.addColorStop(1, 'rgba(60,60,64,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    // leichte Wischbögen, damit die Drehung lesbar bleibt
+    g.lineCap = 'round';
+    for (var i = 0; i < 9; i++) {
+      var r0 = 20 + i * 4.6, a0 = i * 2.1;
+      g.strokeStyle = 'rgba(235,238,244,' + (0.12 + (i % 3) * 0.05) + ')'; g.lineWidth = 2;
+      g.beginPath(); g.arc(64, 64, r0, a0, a0 + 1.6); g.stroke();
+    }
+    return c;
+  }
+  function speed(THREE, scene, opts) {
+    opts = opts || {};
+    var reduce = !!opts.reduce;
+    var U = { uK: { value: 0 }, uVig: { value: 0 }, uT: { value: 0 }, uRes: { value: new THREE.Vector2(1920, 1080) } };
+    var quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+      uniforms: U, vertexShader: SPEED_VS, fragmentShader: SPEED_FS, transparent: true, depthTest: false, depthWrite: false
+    }));
+    quad.frustumCulled = false; quad.renderOrder = 999; quad.visible = false;
+    scene.add(quad);
+    var rimTex = null, discGeo = null;
+    return {
+      // k = Streifen 0..1 (bei reduzierter Bewegung immer aus), vig = Vignette 0..1, W/H = Bildgröße in Pixeln
+      set: function (k, vig, dt, W, H) {
+        k = reduce ? 0 : clamp(k || 0, 0, 1); vig = clamp(vig || 0, 0, 1);
+        U.uK.value = k; U.uVig.value = vig; U.uT.value = (U.uT.value + (dt || 0)) % 1000;
+        U.uRes.value.set(W || 1920, H || 1080);
+        quad.visible = k > 0.005 || vig > 0.005;
+      },
+      // verwischte Felgen je Auto: Scheibe außen auf jedem Rad (am Rad-Pivot, lenkt mit); holder steht beim Aufruf
+      // noch im Ursprung (wie nach collectWheels). → { set(level 0..1, dt), dispose() } oder null
+      wheels: function (holder, wheels) {
+        if (!wheels || !wheels.length) return null;
+        if (!rimTex) { rimTex = new THREE.CanvasTexture(makeRimTex()); discGeo = new THREE.CircleGeometry(1, 28); }
+        var mat = new THREE.MeshBasicMaterial({ map: rimTex, color: 0xb8bcc4, transparent: true, depthWrite: false, opacity: 0,
+          polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+        holder.updateMatrixWorld(true);
+        var discs = [], box = new THREE.Box3(), c = new THREE.Vector3(), sz = new THREE.Vector3();
+        wheels.forEach(function (w) {
+          box.setFromObject(w.pivot); if (box.isEmpty()) return;
+          box.getCenter(c); box.getSize(sz);
+          var R = Math.max(sz.x, sz.y) / 2, side = c.z >= 0 ? 1 : -1;
+          var d = new THREE.Mesh(discGeo, mat);
+          d.scale.setScalar(R * 0.74);
+          d.position.set(c.x, c.y, c.z + side * (sz.z / 2 + 0.006));
+          if (side < 0) d.rotation.y = Math.PI;
+          d.visible = false; d.renderOrder = 2;
+          holder.add(d); d.updateMatrixWorld(true); w.pivot.attach(d);
+          discs.push(d);
+        });
+        if (!discs.length) { mat.dispose(); return null; }
+        var shown = 0;
+        return {
+          set: function (level, dt) {
+            level = clamp(level || 0, 0, 1);
+            if (level < 0.02 && shown < 0.02) return;
+            shown = level;
+            mat.opacity = level * 0.88;
+            for (var i = 0; i < discs.length; i++) {
+              discs[i].visible = level >= 0.02;
+              if (!reduce) discs[i].rotateZ(-(dt || 0) * (14 + 10 * level) * (i % 2 ? 1.07 : 1));
+            }
+          },
+          dispose: function () { discs.forEach(function (d) { if (d.parent) d.parent.remove(d); }); mat.dispose(); }
+        };
+      },
+      dispose: function () { scene.remove(quad); quad.geometry.dispose(); quad.material.dispose(); }
+    };
+  }
+
+  root.CarDriveFx = { create: create, speed: speed, smooth: smooth };
 })(typeof window !== 'undefined' ? window : this);
