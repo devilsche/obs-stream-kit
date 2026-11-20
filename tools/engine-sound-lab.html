@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Engine sound lab</title>
+  <style>
+    /* Engine sound lab: Motorklänge (js/car-engine-audio.js, Klangbank assets/sounds/engines/) zum Abhören –
+       Motorart/Auto/Aufnahme wählen, Drehzahl + Gas von Hand oder Abläufe (Gasstoß, Beschleunigen, Gas weg, Schalten);
+       Vergleich mit dem alten Weg (nur Drehzahl-Schleifen). Hintergrund: docs/engine-sound-research.md */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --ok: #9be59b; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 3; }
+    header, main { max-width: 980px; margin: 0 auto; padding: 18px 16px 4px; }
+    h1 { font-size: 22px; margin: 0; }
+    h2 { font-size: 16px; margin: 0 0 8px; }
+    .lead, .hint { color: var(--muted); margin: 4px 0 0; }
+    .hint { font-size: 13px; }
+    .lead a { color: var(--text); }
+    .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+    fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+    legend { font-weight: 700; padding: 0; margin: 0 0 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    label { color: var(--muted); font-size: 14px; }
+    select, input[type=text] { background: var(--bg); color: var(--text); border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 10px; font: inherit; min-height: 34px; }
+    input[type=range] { width: 100%; min-height: 28px; accent-color: var(--accent); }
+    .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .check { display: flex; gap: 8px; align-items: center; color: var(--text); min-height: 28px; }
+    .check input { width: 20px; height: 20px; accent-color: var(--accent); }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer; min-height: 36px; min-width: 44px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.primary { background: var(--accent); color: #1a1200; border-color: var(--accent); font-weight: 700; }
+    button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    .val { font: 13px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
+    meter { width: 100%; height: 14px; }
+    dl.readout { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; font-size: 14px; }
+    dl.readout dt { color: var(--muted); }
+    dl.readout dd { margin: 0; font: 13px/1.5 ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+    #status { min-height: 1.4em; }
+    #status.err { color: #ffb4a8; }
+    #status.ok { color: var(--ok); }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to the controls</a>
+  <header>
+    <h1>Engine sound lab</h1>
+    <p class="lead">Listen to the engine sounds of Car Race and Car Drive. Pick an engine type or a car, then drive the engine by hand (RPM and throttle) or with the buttons. Compare with the old sound (fixed RPM loops) to judge by ear. Sources: <a href="car-gallery">Sound credits</a>.</p>
+  </header>
+  <main id="main">
+    <section class="panel" aria-labelledby="pick-h">
+      <h2 id="pick-h">Engine</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="car">Car (optional – sets type and recording like in the race)</label>
+          <input type="text" id="car" list="carList" autocomplete="off" aria-describedby="carHint">
+          <datalist id="carList"></datalist>
+          <span class="hint" id="carHint">Catalogue key, e.g. 2020-abt-sportline-audi-rs6</span>
+        </div>
+        <div class="field">
+          <label for="type">Engine type</label>
+          <select id="type"></select>
+        </div>
+        <div class="field">
+          <label for="rec">Recording (acceleration sweep)</label>
+          <select id="rec"></select>
+        </div>
+        <div class="field">
+          <label for="vol">Volume <span class="val" id="volVal">60 %</span></label>
+          <input type="range" id="vol" min="0" max="100" step="1" value="60">
+        </div>
+      </div>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="oldMode"> Old sound (RPM loops only) for comparison</label>
+        <label class="check"><input type="checkbox" id="lite"> Background car (lighter voice as in the race field)</label>
+      </div>
+      <div class="row">
+        <button type="button" class="primary" id="startBtn">Start engine</button>
+        <button type="button" id="stopBtn" disabled>Stop</button>
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section class="panel" aria-labelledby="drive-h">
+      <h2 id="drive-h">Drive</h2>
+      <fieldset>
+        <legend>Control</legend>
+        <div class="row" role="radiogroup" aria-label="Control mode">
+          <label class="check"><input type="radio" name="mode" value="manual" checked> Manual (RPM + throttle sliders)</label>
+          <label class="check"><input type="radio" name="mode" value="drive"> Gearbox (speed + throttle, shifts by itself)</label>
+        </div>
+      </fieldset>
+      <div class="grid">
+        <div class="field">
+          <label for="rpm">RPM <span class="val" id="rpmVal"></span></label>
+          <input type="range" id="rpm" min="0" max="9000" step="10" value="900">
+        </div>
+        <div class="field">
+          <label for="thr">Throttle (load) <span class="val" id="thrVal">0 %</span></label>
+          <input type="range" id="thr" min="0" max="100" step="1" value="0">
+        </div>
+      </div>
+      <div class="row">
+        <button type="button" id="revBtn" disabled>Rev</button>
+        <button type="button" id="accBtn" disabled>Accelerate 0–100</button>
+        <button type="button" id="liftBtn" disabled>Lift off</button>
+        <button type="button" id="shiftBtn" disabled>Shift up</button>
+        <button type="button" id="holdBtn" aria-pressed="false" disabled>Hold throttle</button>
+        <button type="button" id="idleBtn" disabled>Back to idle</button>
+      </div>
+      <p class="hint">Keyboard: buttons with Enter/Space. Rev = throttle blip at standstill. Accelerate = full throttle from standstill to top speed through the gears (switches to Gearbox). Lift off = throttle closed at the current speed (overrun, crackle). Shift up = gear change now (RPM drop + short load cut).</p>
+    </section>
+
+    <section class="panel" aria-labelledby="info-h">
+      <h2 id="info-h">What is playing</h2>
+      <div class="grid">
+        <div class="field">
+          <label for="rpmMeter">RPM</label>
+          <meter id="rpmMeter" min="0" max="9000" value="0"></meter>
+        </div>
+        <div class="field">
+          <label for="loadMeter">Load</label>
+          <meter id="loadMeter" min="0" max="1" value="0"></meter>
+        </div>
+      </div>
+      <dl class="readout">
+        <dt>RPM / gear</dt><dd id="oRpm">–</dd>
+        <dt>Speed</dt><dd id="oSpeed">–</dd>
+        <dt>Layers</dt><dd id="oMix">–</dd>
+        <dt>Acceleration</dt><dd id="oOn">–</dd>
+        <dt>Overrun</dt><dd id="oOff">–</dd>
+        <dt>Idle loop</dt><dd id="oIdle">–</dd>
+        <dt>Recording</dt><dd id="oSrc">–</dd>
+      </dl>
+    </section>
+  </main>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-sound.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-engine-audio.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var $ = function (id) { return document.getElementById(id); };
+      var CEA = window.CarEngineAudio, CS = window.CarRaceStats;
+      var snd = null, eng = null, bank = null, v = null, raf = 0, lastT = 0;
+      // Fahrzustand im Gearbox-Modus: Tempo 0..1, Gas, Abläufe (acc = Beschleunigen, lift = Gas weg)
+      var sim = { speed: 0, thr: 0, seq: null, hold: false };
+      function say(t, cls) { $('status').textContent = t; $('status').className = cls || ''; }
+      function mode() { var r = document.querySelector('input[name=mode]:checked'); return r ? r.value : 'manual'; }
+      function setMode(m) { var r = document.querySelector('input[name=mode][value=' + m + ']'); if (r) r.checked = true; }
+      function spec() { return eng && eng.spec($('type').value); }
+
+      CEA.TYPES.forEach(function (t) { var o = document.createElement('option'); o.value = t.id; o.textContent = t.label + ' (' + t.id + ')'; $('type').appendChild(o); });
+      Object.keys((CS && CS.TABLE) || {}).sort().forEach(function (k) { var o = document.createElement('option'); o.value = k; $('carList').appendChild(o); });
+
+      function ensure() {
+        if (!snd && window.CarRaceSound) snd = CarRaceSound.create({ volume: +$('vol').value / 100 });
+        if (snd && !eng) {
+          eng = CEA.create(snd);
+          if (eng) eng.ready.then(function (ok) { bank = ok ? eng.bank() : null; if (!ok) say('Engine sounds could not be loaded.', 'err'); fillRec(); syncRange(); });
+        }
+        if (snd) snd.resume();
+        return !!eng;
+      }
+      // Aufnahmen der Motorart (Hochläufe) zur Auswahl
+      function fillRec() {
+        var sel = $('rec'), sp = spec(), keep = sel.value;
+        sel.textContent = '';
+        var o = document.createElement('option'); o.value = ''; o.textContent = 'Automatic (by car)'; sel.appendChild(o);
+        ((sp && sp.on) || []).forEach(function (s) {
+          var src = bank && bank.sources[String(s.src)], p = s.pts || [];
+          var op = document.createElement('option'); op.value = String(s.src);
+          op.textContent = (src ? src.title + ' – ' + src.user : s.src) + ' (' + (p.length ? p[0][1] + '–' + p[p.length - 1][1] + ' rpm' : '') + ')';
+          sel.appendChild(op);
+        });
+        if (Array.prototype.some.call(sel.options, function (x) { return x.value === keep; })) sel.value = keep;
+      }
+      function syncRange() {
+        var sp = spec();
+        if (!sp) return;
+        $('rpm').min = String(sp.gears <= 1 ? 0 : Math.round(sp.idle * 0.9));
+        $('rpm').max = String(sp.red);
+        $('rpmMeter').max = sp.red;
+        if (+$('rpm').value < +$('rpm').min || +$('rpm').value > sp.red) $('rpm').value = String(sp.gears <= 1 ? 0 : sp.idle);
+        $('rpmVal').textContent = $('rpm').value + ' rpm (idle ' + sp.idle + ', redline ' + sp.red + ')';
+      }
+
+      $('car').addEventListener('change', function () {
+        var k = $('car').value.trim();
+        if (k && CS) { var e = CS.guess({ key: k }).engine; if (e) $('type').value = e; }
+        fillRec(); syncRange(); if (v) restart();
+      });
+      $('type').addEventListener('change', function () { fillRec(); syncRange(); if (v) restart(); });
+      $('rec').addEventListener('change', function () { if (v) restart(); });
+      $('oldMode').addEventListener('change', function () { if (v) restart(); });
+      $('lite').addEventListener('change', function () { if (v) restart(); });
+      $('vol').addEventListener('input', function () { $('volVal').textContent = $('vol').value + ' %'; if (snd) snd.setVolume(+$('vol').value / 100); });
+      $('rpm').addEventListener('input', function () { setMode('manual'); sim.seq = null; syncRange(); });
+      $('thr').addEventListener('input', function () { $('thrVal').textContent = $('thr').value + ' %'; sim.seq = null; });
+
+      function buttons(on) {
+        ['stopBtn', 'revBtn', 'accBtn', 'liftBtn', 'shiftBtn', 'holdBtn', 'idleBtn'].forEach(function (id) { $(id).disabled = !on; });
+        $('startBtn').textContent = on ? 'Restart engine' : 'Start engine';
+      }
+      function start() {
+        if (!ensure()) { say('No Web Audio in this browser.', 'err'); return; }
+        eng.ready.then(function (ok) {
+          if (!ok) return;
+          if (v) v.stop();
+          var type = $('type').value, car = $('car').value.trim();
+          v = eng.voice(type, { gain: 1, seed: car || type, lite: $('lite').checked, src: $('rec').value || null, mode: $('oldMode').checked ? 'loops' : null });
+          v.oneShot('start', 0.6);
+          sim.speed = 0; sim.seq = null;
+          buttons(true);
+          say('Running: ' + $('type').options[$('type').selectedIndex].textContent + ($('oldMode').checked ? ' – old loop sound' : '') + '.', 'ok');
+          if (!raf) { lastT = performance.now(); raf = requestAnimationFrame(tick); }
+        });
+      }
+      function restart() { start(); }
+      function stop() {
+        if (v) v.stop();
+        v = null; buttons(false);
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0; say('Stopped.');
+      }
+      $('startBtn').addEventListener('click', start);
+      $('stopBtn').addEventListener('click', stop);
+      $('revBtn').addEventListener('click', function () { if (!v) return; setMode('drive'); sim.seq = null; sim.speed = 0; v.blip(1); });
+      $('accBtn').addEventListener('click', function () { if (!v) return; setMode('drive'); sim.speed = 0; sim.seq = 'acc'; });
+      $('liftBtn').addEventListener('click', function () {
+        if (!v) return;
+        if (mode() === 'manual') { $('thr').value = '0'; $('thrVal').textContent = '0 %'; return; }
+        sim.seq = 'lift'; if (sim.speed < 0.3) sim.speed = 0.6;
+      });
+      $('shiftBtn').addEventListener('click', function () {
+        if (!v) return;
+        if (mode() === 'manual') {                       // von Hand: Drehzahl fällt um einen typischen Gangsprung
+          var sp = spec(); if (!sp) return;
+          var r = CEA.Model.ratios(sp), q = r.length > 1 ? r[0] / r[1] : 1;
+          $('rpm').value = String(Math.max(+$('rpm').min, Math.round(+$('rpm').value / q))); syncRange();
+          return;
+        }
+        v.shift();
+      });
+      $('holdBtn').addEventListener('click', function () {
+        sim.hold = !sim.hold; $('holdBtn').setAttribute('aria-pressed', sim.hold ? 'true' : 'false');
+        if (sim.hold) { setMode('drive'); sim.seq = null; }
+      });
+      $('idleBtn').addEventListener('click', function () {
+        sim.seq = null; sim.speed = 0; sim.hold = false; $('holdBtn').setAttribute('aria-pressed', 'false');
+        var sp = spec(); if (sp) $('rpm').value = String(sp.gears <= 1 ? 0 : sp.idle);
+        $('thr').value = '0'; $('thrVal').textContent = '0 %'; setMode('manual'); syncRange();
+      });
+
+      function tick(now) {
+        raf = requestAnimationFrame(tick);
+        var dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+        if (!v) return;
+        if (mode() === 'manual') {
+          var thrM = +$('thr').value / 100;
+          v.update(dt, { rpm: +$('rpm').value, load: thrM, throttle: thrM, speed: 0.3 });
+        } else {
+          var thr = sim.hold ? 1 : +$('thr').value / 100;
+          if (sim.seq === 'acc') { thr = 1; if (sim.speed >= 0.97) { sim.seq = 'lift'; } }
+          if (sim.seq === 'lift') thr = 0;
+          // einfaches Fahrzeug: Vortrieb nimmt mit dem Tempo ab, Rollwiderstand, ohne Gas Schubverzögerung
+          var a = thr * 0.16 * (1 - sim.speed * 0.85) - 0.012 - (thr < 0.05 ? 0.05 * sim.speed : 0);
+          sim.speed = Math.max(0, Math.min(1, sim.speed + a * dt));
+          if (sim.seq === 'lift' && sim.speed <= 0) sim.seq = null;
+          v.update(dt, { speed: sim.speed, throttle: thr });
+        }
+        var i = v.info();
+        $('rpmMeter').value = i.rpm; $('loadMeter').value = i.load;
+        $('oRpm').textContent = Math.round(i.rpm) + ' rpm · gear ' + i.gear;
+        $('oSpeed').textContent = mode() === 'manual' ? '– (manual)' : Math.round(sim.speed * 100) + ' % of top speed';
+        $('oMix').textContent = i.loops ? i.loops + ' RPM loops (old sound)' : 'idle ' + i.mix.idle.toFixed(2) + ' · accel ' + i.mix.on.toFixed(2) + ' · overrun ' + i.mix.off.toFixed(2) + (i.boost > 0.05 ? ' · boost ' + i.boost.toFixed(2) : '');
+        $('oOn').textContent = (i.on || '–') + (i.pieces > 1 ? ' (one of ' + i.pieces + ' pieces, chosen by RPM)' : '');
+        $('oOff').textContent = i.off || (i.on ? '– (acceleration sweep, duller)' : '–');
+        $('oIdle').textContent = i.idle || '–';
+        var src = bank && i.src != null && bank.sources[String(i.src)];
+        $('oSrc').textContent = src ? src.title + ' – ' + src.user + ' (' + src.lic + ')' : '–';
+      }
+    })();
+  </script>
+</body>
+</html>

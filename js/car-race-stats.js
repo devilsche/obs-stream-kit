@@ -145,21 +145,23 @@
   }
 
   // Motorklang je Auto (js/car-engine-audio.js): i4 Reihenvierer, t4 Turbo-Vierer (auch kleine Turbo-V6), i6 Reihensechser
-  // (auch VR6), f6 Boxer (Porsche 911), v8m Muscle-/Ami-V8, v8f hochdrehende Sport-V8 (Ferrari, AMG, M3 E92, Audi RS),
+  // (auch VR6), f6 Boxer (Porsche 911), v8m Muscle-/Ami-V8, v8f hochdrehende Flachebenen-/Sauger-V8 (Ferrari, M3 E92),
+  // v8t Biturbo-V8 mit Kreuzebene (Audi RS6, AMG, BMW M5 – tiefer, vom Turbo gedämpft; docs/engine-sound-research.md),
+  // v6t Biturbo-V6 (Ferrari 296 GT3, Audi RS5 – kein F1-Hybrid),
   // v10, v12 (auch die Zwölfzylinder-Boxer Testarossa/917), f1 Formel 1/Rennwagen mit V6-Turbo, dsl Lkw/Diesel, ev elektrisch
-  var ENGINES = ['i4', 't4', 'i6', 'f6', 'v8m', 'v8f', 'v10', 'v12', 'f1', 'dsl', 'ev'];
+  var ENGINES = ['i4', 't4', 'i6', 'f6', 'v6t', 'v8m', 'v8f', 'v8t', 'v10', 'v12', 'f1', 'dsl', 'ev'];
   var ENGINE = {
-    'amg-w14-s1': 'f1', 'ferrari-296-gt3': 'f1', 'ferrari-296-gt3-verstappen': 'f1',
+    'amg-w14-s1': 'f1', 'ferrari-296-gt3': 'v6t', 'ferrari-296-gt3-verstappen': 'v6t',
     '2025-koenigsegg-gemera': 'v8f', 'porsche-917k-lm-red': 'v12', 'ferrari-laferrari': 'v12',
     '2022-lamborghini-countach-lp': 'v12', '2022-lamborghini-countach-2': 'v12', '1995-lamborghini-diablo-sv': 'v12',
     'lamborghini-diablo-sv-1998': 'v12', 'ferrari-gtc4-lusso': 'v12', 'ferrari-550-barchetta-2000-a': 'v12',
     '2019-ferrari-monza-sp2': 'v12', '1988-ferrari-testarossa': 'v12',
     'porsche-918-free': 'v8f', 'porsche-918-spyder-2015': 'v8f', '2021-ferrari-sf90-spider': 'v8f',
     '2023-ferrari-sf90-xx-stradal': 'v8f', 'ferrari-488-pista-widebody': 'v8f', '2026-ferrari-849-testarossa': 'v8f',
-    '2020-ferrari-roma': 'v8f', 'audi-a4-r9-dtm-a': 'v8f', '2010-bmw-m3-e92': 'v8f', 'mersedes-benz-g63-amg': 'v8f',
-    '2020-abt-sportline-audi-rs6': 'v8f', '2020-audi-rs-6-avant': 'v8f', '2020-audi-rs6-avant': 'v8f',
-    '2024-audi-rs6-avant-gt': 'v8f', '2024-audi-rs6-avant-gt-2': 'v8f', 'audi-rs6-gt-avant': 'v8f',
-    '2020-audi-rs5-coup': 't4', 'mercedes-benz-a45-amg-2018': 't4', 'mitsubishi-lancer-evo-ix': 't4',
+    '2020-ferrari-roma': 'v8f', 'audi-a4-r9-dtm-a': 'v8f', '2010-bmw-m3-e92': 'v8f', 'mersedes-benz-g63-amg': 'v8t',
+    '2020-abt-sportline-audi-rs6': 'v8t', '2020-audi-rs-6-avant': 'v8t', '2020-audi-rs6-avant': 'v8t',
+    '2024-audi-rs6-avant-gt': 'v8t', '2024-audi-rs6-avant-gt-2': 'v8t', 'audi-rs6-gt-avant': 'v8t',
+    '2020-audi-rs5-coup': 'v6t', 'mercedes-benz-a45-amg-2018': 't4', 'mitsubishi-lancer-evo-ix': 't4',
     'vw-golf-gti-mk7': 't4', '1973-bmw-2002-turbo': 't4', 'audi-a4-b8': 't4', 'audi-a4-l40-tfsi': 't4',
     'bmw-m3-competition': 'i6', 'bmw-m2-competition-f87': 'i6', '1988-bmw-m5-e28': 'i6', 'bmw-e39-free': 'i6',
     '2002-volkswagen-golf-r32-mk4': 'i6', 'bmw-m5-e39-1995': 'v8m',
@@ -181,7 +183,8 @@
     if (/aventador|countach|diablo|murci|\bv12\b|\b(550|575|599|612|812)\b|laferrari|lusso|testarossa|pagani|\bdb\d+\b/i.test(n)) return 'v12';
     if (/porsche/i.test(n) && /91[18]|cayman|boxster|\b9[69]\d\b|gt3|\bgt2\b|rsr/i.test(n)) return /918/.test(n) ? 'v8f' : 'f6';
     if (/mustang|shelby|corvette|camaro|charger|challenger|chevrolet|dodge|cadillac|pontiac|hot ?rod|muscle|crasher|hoonicorn/i.test(n)) return 'v8m';
-    if (/ferrari|mclaren|\bamg\b|\brs ?[67]\b|\bm3 e9\d|koenigsegg|maserati|aston/i.test(n)) return 'v8f';
+    if (/\bamg\b|\brs ?[67]\b|\bm[58]\b|bentley|cayenne turbo|panamera/i.test(n)) return 'v8t';
+    if (/ferrari|mclaren|\bm3 e9\d|koenigsegg|maserati|aston/i.test(n)) return 'v8f';
     if (/\bevo\b|\bwrx\b|\bsti\b|\bgt-?r\b|turbo|\btfsi\b|\btsi\b|\ba45\b|\bgti mk[5-8]\b|\brs ?[345]\b|\btype r\b/i.test(n)) return 't4';
     if (/bmw|supra|\br32\b|vr6|skyline|\bz4\b/i.test(n)) return 'i6';
     return 'i4';
