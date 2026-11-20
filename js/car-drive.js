@@ -699,7 +699,7 @@
     var P = Phys.params(me.st, me.raw), pc = Phys.create(T, P, { s: sP, d: dP });
     race = {
       s: s, T: T, seed: seed, sim: sim, ai: ai, me: me, pc: pc, laps: s.laps, phase: 'countdown', paused: false,
-      t: 0, cd: 6.4, lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + s.car + '.' + seed, null),
+      t: 0, cd: 6.4, lapStart: 0, lastLap: null, bestLap: null, stored: load('best2.' + s.car + '.' + seed, null),
       prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
       lapsShown: -1, posShown: '', opp: opp, newBest: false
     };
@@ -1031,14 +1031,14 @@
     var big = false;
     if (race.stored == null || lapTime < race.stored) {
       race.stored = lapTime; race.newBest = true;
-      save('best.' + race.s.car + '.' + race.seed, Math.round(lapTime * 1000) / 1000);
+      save('best2.' + race.s.car + '.' + race.seed, Math.round(lapTime * 1000) / 1000);
       flash('Best lap ' + fmt(lapTime), 2);
     } else flash('Lap ' + fmt(lapTime), 1.5);
     if (!race.mp) {
       // solo (ohne Prüfung): Streckenrekord nur lokal; der Server-Rekord wird nur verglichen, nie geschrieben
       if (!race.local || lapTime < race.local.t) {
         race.local = { t: Math.round(lapTime * 1000) / 1000, car: race.s.car, name: race.me.name };
-        save('trackBest.' + race.seed, race.local);
+        save('trackBest2.' + race.seed, race.local);
         flash('New local track record ' + fmt(lapTime), 2.5, true); big = true;
       }
       if (race.rec && race.rec.track && lapTime < race.rec.track.time) flash('Faster than the track record – solo laps are not counted', 3);
@@ -1053,7 +1053,7 @@
   }
   function recLoad(r, track) {
     r.rec = { idx: track, track: null, car: null };
-    r.local = load('trackBest.' + r.seed, null);
+    r.local = load('trackBest2.' + r.seed, null);
     if (r.local && !(r.local.t > 0)) r.local = null;
     var url = recUrl(track, r.s.car);
     if (!url) return;
@@ -1312,7 +1312,7 @@
     race = {
       s: { car: mp.car, paint: mp.paint, track: idx, laps: mp.room.laps }, T: T, seed: seed, sim: null, ai: [], remotes: remotes,
       mp: true, raceId: mp.raceId, me: me, pc: pc, laps: mp.room.laps | 0 || 2, phase: 'countdown', paused: false,
-      t: 0, cd: mp.startAt - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mp.car + '.' + seed, null),
+      t: 0, cd: mp.startAt - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best2.' + mp.car + '.' + seed, null),
       prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
       lapsShown: -1, posShown: '', opp: [], newBest: false
     };
@@ -1566,7 +1566,7 @@
     race.me = makeCar(mineSrc.car_key, rcSet(mineSrc), { loaded: !!mp.loaded[mineSrc.car_key], duck: true, outfit: null });
     if (race.s.car !== mineSrc.car_key) {
       race.s.car = mineSrc.car_key;
-      race.stored = load('best.' + mineSrc.car_key + '.' + T.seed, null);
+      race.stored = load('best2.' + mineSrc.car_key + '.' + T.seed, null);
       recLoad(race, race.s.track);
     }
     race.simCars.forEach(function (sc, i) {
