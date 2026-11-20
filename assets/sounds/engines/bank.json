@@ -1,0 +1,2155 @@
+{
+ "version": 1,
+ "types": {
+  "i4": {
+   "label": "Inline-4",
+   "cyl": 4,
+   "idle": 850,
+   "red": 6800,
+   "gears": 5,
+   "g1": 0.3,
+   "loops": [
+    {
+     "f": "i4/loop-850-487553.mp3",
+     "rpm": 850,
+     "ls": 0.12,
+     "le": 0.7426,
+     "src": 487553
+    },
+    {
+     "f": "i4/loop-1325-268623.mp3",
+     "rpm": 1325,
+     "ls": 0.12,
+     "le": 1.1423,
+     "src": 268623
+    },
+    {
+     "f": "i4/loop-1653-760690.mp3",
+     "rpm": 1653,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 760690
+    },
+    {
+     "f": "i4/loop-1653-268623.mp3",
+     "rpm": 1653,
+     "ls": 0.12,
+     "le": 0.817,
+     "src": 268623
+    },
+    {
+     "f": "i4/loop-1653-692112.mp3",
+     "rpm": 1653,
+     "ls": 0.12,
+     "le": 0.6726,
+     "src": 692112
+    },
+    {
+     "f": "i4/loop-2064-268623.mp3",
+     "rpm": 2064,
+     "ls": 0.12,
+     "le": 0.6538,
+     "src": 268623
+    },
+    {
+     "f": "i4/loop-2576-268623.mp3",
+     "rpm": 2576,
+     "ls": 0.12,
+     "le": 1.0075,
+     "src": 268623
+    },
+    {
+     "f": "i4/loop-3216-692112.mp3",
+     "rpm": 3216,
+     "ls": 0.12,
+     "le": 0.9566,
+     "src": 692112
+    },
+    {
+     "f": "i4/loop-4015-692112.mp3",
+     "rpm": 4015,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 692112
+    },
+    {
+     "f": "i4/loop-6256-692112.mp3",
+     "rpm": 6256,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 692112
+    }
+   ],
+   "start": [
+    {
+     "f": "i4/start-487553-0.mp3",
+     "src": 487553,
+     "dur": 3.2
+    },
+    {
+     "f": "i4/start-760690-1.mp3",
+     "src": 760690,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "i4/rev-424738-0.mp3",
+     "src": 424738,
+     "dur": 1.79
+    },
+    {
+     "f": "i4/rev-33192-1.mp3",
+     "src": 33192,
+     "dur": 2.3
+    },
+    {
+     "f": "i4/rev-760690-2.mp3",
+     "src": 760690,
+     "dur": 2.41
+    },
+    {
+     "f": "i4/rev-487553-3.mp3",
+     "src": 487553,
+     "dur": 2.6
+    },
+    {
+     "f": "i4/rev-692112-4.mp3",
+     "src": 692112,
+     "dur": 2.35
+    },
+    {
+     "f": "i4/rev-215960-5.mp3",
+     "src": 215960,
+     "dur": 2.41
+    },
+    {
+     "f": "i4/rev-268623-6.mp3",
+     "src": 268623,
+     "dur": 2.32
+    }
+   ],
+   "pass": [
+    {
+     "f": "i4/pass-425868-0.mp3",
+     "src": 425868,
+     "dur": 3.0,
+     "peak": 1.2
+    }
+   ],
+   "pop": [],
+   "turbo": []
+  },
+  "t4": {
+   "label": "Turbo inline-4",
+   "cyl": 4,
+   "idle": 900,
+   "red": 7200,
+   "gears": 6,
+   "g1": 0.27,
+   "boost": true,
+   "loops": [
+    {
+     "f": "t4/loop-900-496171.mp3",
+     "rpm": 900,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 496171
+    },
+    {
+     "f": "t4/loop-900-625702.mp3",
+     "rpm": 900,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 625702
+    },
+    {
+     "f": "t4/loop-900-369797.mp3",
+     "rpm": 900,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 369797
+    },
+    {
+     "f": "t4/loop-1123-496171.mp3",
+     "rpm": 1123,
+     "ls": 0.12,
+     "le": 0.9679,
+     "src": 496171
+    },
+    {
+     "f": "t4/loop-1123-273334.mp3",
+     "rpm": 1123,
+     "ls": 0.12,
+     "le": 1.0045,
+     "src": 273334
+    },
+    {
+     "f": "t4/loop-1123-369797.mp3",
+     "rpm": 1123,
+     "ls": 0.12,
+     "le": 0.9135,
+     "src": 369797
+    },
+    {
+     "f": "t4/loop-1402-369797.mp3",
+     "rpm": 1402,
+     "ls": 0.12,
+     "le": 0.9319,
+     "src": 369797
+    },
+    {
+     "f": "t4/loop-1402-273334.mp3",
+     "rpm": 1402,
+     "ls": 0.12,
+     "le": 0.6651,
+     "src": 273334
+    },
+    {
+     "f": "t4/loop-1751-496171.mp3",
+     "rpm": 1751,
+     "ls": 0.12,
+     "le": 0.8657,
+     "src": 496171
+    },
+    {
+     "f": "t4/loop-3405-496171.mp3",
+     "rpm": 3405,
+     "ls": 0.12,
+     "le": 0.853,
+     "src": 496171
+    },
+    {
+     "f": "t4/loop-5306-496171.mp3",
+     "rpm": 5306,
+     "ls": 0.12,
+     "le": 1.1973,
+     "src": 496171
+    },
+    {
+     "f": "t4/loop-6624-496171.mp3",
+     "rpm": 6624,
+     "ls": 0.12,
+     "le": 0.705,
+     "src": 496171
+    }
+   ],
+   "start": [
+    {
+     "f": "t4/start-369797-0.mp3",
+     "src": 369797,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "t4/rev-797835-0.mp3",
+     "src": 797835,
+     "dur": 1.07
+    },
+    {
+     "f": "t4/rev-496171-1.mp3",
+     "src": 496171,
+     "dur": 1.56
+    },
+    {
+     "f": "t4/rev-369797-2.mp3",
+     "src": 369797,
+     "dur": 1.74
+    },
+    {
+     "f": "t4/rev-625702-3.mp3",
+     "src": 625702,
+     "dur": 1.93
+    },
+    {
+     "f": "t4/rev-273334-4.mp3",
+     "src": 273334,
+     "dur": 2.74
+    },
+    {
+     "f": "t4/rev-797835-5.mp3",
+     "src": 797835,
+     "dur": 1.67
+    },
+    {
+     "f": "t4/rev-496171-6.mp3",
+     "src": 496171,
+     "dur": 3.13
+    }
+   ],
+   "pass": [],
+   "pop": [
+    {
+     "f": "t4/pop-369797-0.mp3",
+     "src": 369797,
+     "dur": 0.32
+    },
+    {
+     "f": "t4/pop-797835-1.mp3",
+     "src": 797835,
+     "dur": 0.32
+    },
+    {
+     "f": "t4/pop-369797-2.mp3",
+     "src": 369797,
+     "dur": 0.32
+    },
+    {
+     "f": "t4/pop-797835-3.mp3",
+     "src": 797835,
+     "dur": 0.32
+    },
+    {
+     "f": "t4/pop-797835-4.mp3",
+     "src": 797835,
+     "dur": 0.32
+    },
+    {
+     "f": "t4/pop-797835-5.mp3",
+     "src": 797835,
+     "dur": 0.32
+    }
+   ],
+   "turbo": [
+    {
+     "f": "t4/turbo-659544-0.mp3",
+     "src": 659544,
+     "dur": 4.5
+    }
+   ]
+  },
+  "i6": {
+   "label": "Inline-6",
+   "cyl": 6,
+   "idle": 750,
+   "red": 7500,
+   "gears": 6,
+   "g1": 0.28,
+   "loops": [
+    {
+     "f": "i6/loop-750-173005.mp3",
+     "rpm": 750,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 173005
+    },
+    {
+     "f": "i6/loop-750-415276.mp3",
+     "rpm": 750,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 415276
+    },
+    {
+     "f": "i6/loop-750-478597.mp3",
+     "rpm": 750,
+     "ls": 0.12,
+     "le": 1.4507,
+     "src": 478597
+    },
+    {
+     "f": "i6/loop-960-415276.mp3",
+     "rpm": 960,
+     "ls": 0.12,
+     "le": 1.3736,
+     "src": 415276
+    },
+    {
+     "f": "i6/loop-960-478597.mp3",
+     "rpm": 960,
+     "ls": 0.12,
+     "le": 1.4863,
+     "src": 478597
+    },
+    {
+     "f": "i6/loop-1228-415276.mp3",
+     "rpm": 1228,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 415276
+    },
+    {
+     "f": "i6/loop-1228-128612.mp3",
+     "rpm": 1228,
+     "ls": 0.12,
+     "le": 0.8315,
+     "src": 128612
+    },
+    {
+     "f": "i6/loop-1228-466715.mp3",
+     "rpm": 1228,
+     "ls": 0.12,
+     "le": 0.7801,
+     "src": 466715
+    },
+    {
+     "f": "i6/loop-1572-415276.mp3",
+     "rpm": 1572,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 415276
+    },
+    {
+     "f": "i6/loop-1572-466715.mp3",
+     "rpm": 1572,
+     "ls": 0.12,
+     "le": 0.9027,
+     "src": 466715
+    },
+    {
+     "f": "i6/loop-1572-128612.mp3",
+     "rpm": 1572,
+     "ls": 0.12,
+     "le": 0.6871,
+     "src": 128612
+    },
+    {
+     "f": "i6/loop-2011-478597.mp3",
+     "rpm": 2011,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 478597
+    },
+    {
+     "f": "i6/loop-2011-185151.mp3",
+     "rpm": 2011,
+     "ls": 0.12,
+     "le": 0.9165,
+     "src": 185151
+    },
+    {
+     "f": "i6/loop-2573-415276.mp3",
+     "rpm": 2573,
+     "ls": 0.12,
+     "le": 1.1793,
+     "src": 415276
+    },
+    {
+     "f": "i6/loop-2573-185151.mp3",
+     "rpm": 2573,
+     "ls": 0.12,
+     "le": 0.9615,
+     "src": 185151
+    },
+    {
+     "f": "i6/loop-3293-173005.mp3",
+     "rpm": 3293,
+     "ls": 0.12,
+     "le": 0.6526,
+     "src": 173005
+    },
+    {
+     "f": "i6/loop-3893-585710.mp3",
+     "rpm": 3893,
+     "ls": 0.12,
+     "le": 0.9092,
+     "src": 585710,
+     "from": "f6"
+    },
+    {
+     "f": "i6/loop-6343-585710.mp3",
+     "rpm": 6343,
+     "ls": 0.12,
+     "le": 0.8461,
+     "src": 585710,
+     "from": "f6"
+    }
+   ],
+   "start": [
+    {
+     "f": "i6/start-21741-0.mp3",
+     "src": 21741,
+     "dur": 3.2
+    },
+    {
+     "f": "i6/start-401558-1.mp3",
+     "src": 401558,
+     "dur": 2.31
+    },
+    {
+     "f": "i6/start-478597-2.mp3",
+     "src": 478597,
+     "dur": 3.2
+    },
+    {
+     "f": "i6/start-57939-3.mp3",
+     "src": 57939,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "i6/rev-185151-0.mp3",
+     "src": 185151,
+     "dur": 2.09
+    },
+    {
+     "f": "i6/rev-21741-1.mp3",
+     "src": 21741,
+     "dur": 1.37
+    },
+    {
+     "f": "i6/rev-466715-2.mp3",
+     "src": 466715,
+     "dur": 1.44
+    },
+    {
+     "f": "i6/rev-415276-3.mp3",
+     "src": 415276,
+     "dur": 2.21
+    },
+    {
+     "f": "i6/rev-343369-4.mp3",
+     "src": 343369,
+     "dur": 1.53
+    },
+    {
+     "f": "i6/rev-173005-5.mp3",
+     "src": 173005,
+     "dur": 2.6
+    },
+    {
+     "f": "i6/rev-57939-6.mp3",
+     "src": 57939,
+     "dur": 2.35
+    }
+   ],
+   "pass": [],
+   "pop": [
+    {
+     "f": "i6/pop-478597-0.mp3",
+     "src": 478597,
+     "dur": 0.32
+    }
+   ],
+   "turbo": []
+  },
+  "f6": {
+   "label": "Flat-6",
+   "cyl": 6,
+   "idle": 900,
+   "red": 8800,
+   "gears": 7,
+   "g1": 0.24,
+   "loops": [
+    {
+     "f": "f6/loop-900-457560.mp3",
+     "rpm": 900,
+     "ls": 0.12,
+     "le": 0.6298,
+     "src": 457560
+    },
+    {
+     "f": "f6/loop-900-55727.mp3",
+     "rpm": 900,
+     "ls": 0.12,
+     "le": 0.8,
+     "src": 55727
+    },
+    {
+     "f": "f6/loop-1149-90404.mp3",
+     "rpm": 1149,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 90404
+    },
+    {
+     "f": "f6/loop-1149-55727.mp3",
+     "rpm": 1149,
+     "ls": 0.12,
+     "le": 1.3239,
+     "src": 55727
+    },
+    {
+     "f": "f6/loop-1466-55727.mp3",
+     "rpm": 1466,
+     "ls": 0.12,
+     "le": 0.6392,
+     "src": 55727
+    },
+    {
+     "f": "f6/loop-1872-55727.mp3",
+     "rpm": 1872,
+     "ls": 0.12,
+     "le": 0.8607,
+     "src": 55727
+    },
+    {
+     "f": "f6/loop-1872-585710.mp3",
+     "rpm": 1872,
+     "ls": 0.12,
+     "le": 0.6615,
+     "src": 585710
+    },
+    {
+     "f": "f6/loop-2389-90404.mp3",
+     "rpm": 2389,
+     "ls": 0.12,
+     "le": 0.8115,
+     "src": 90404
+    },
+    {
+     "f": "f6/loop-3893-585710.mp3",
+     "rpm": 3893,
+     "ls": 0.12,
+     "le": 0.9092,
+     "src": 585710
+    },
+    {
+     "f": "f6/loop-6343-585710.mp3",
+     "rpm": 6343,
+     "ls": 0.12,
+     "le": 0.8461,
+     "src": 585710
+    }
+   ],
+   "start": [],
+   "rev": [
+    {
+     "f": "f6/rev-457560-0.mp3",
+     "src": 457560,
+     "dur": 2.14
+    },
+    {
+     "f": "f6/rev-90404-1.mp3",
+     "src": 90404,
+     "dur": 0.98
+    },
+    {
+     "f": "f6/rev-772802-2.mp3",
+     "src": 772802,
+     "dur": 2.37
+    },
+    {
+     "f": "f6/rev-577941-3.mp3",
+     "src": 577941,
+     "dur": 2.83
+    },
+    {
+     "f": "f6/rev-55727-4.mp3",
+     "src": 55727,
+     "dur": 1.95
+    },
+    {
+     "f": "f6/rev-585710-5.mp3",
+     "src": 585710,
+     "dur": 2.46
+    },
+    {
+     "f": "f6/rev-457560-6.mp3",
+     "src": 457560,
+     "dur": 2.35
+    }
+   ],
+   "pass": [],
+   "pop": [],
+   "turbo": []
+  },
+  "v8m": {
+   "label": "Muscle V8",
+   "cyl": 8,
+   "idle": 700,
+   "red": 6500,
+   "gears": 6,
+   "g1": 0.3,
+   "loops": [
+    {
+     "f": "v8m/loop-700-205509.mp3",
+     "rpm": 700,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 205509
+    },
+    {
+     "f": "v8m/loop-700-213977.mp3",
+     "rpm": 700,
+     "ls": 0.12,
+     "le": 1.0589,
+     "src": 213977
+    },
+    {
+     "f": "v8m/loop-888-432508.mp3",
+     "rpm": 888,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 432508
+    },
+    {
+     "f": "v8m/loop-888-205509.mp3",
+     "rpm": 888,
+     "ls": 0.12,
+     "le": 1.2855,
+     "src": 205509
+    },
+    {
+     "f": "v8m/loop-888-651534.mp3",
+     "rpm": 888,
+     "ls": 0.12,
+     "le": 1.4136,
+     "src": 651534
+    },
+    {
+     "f": "v8m/loop-1431-205509.mp3",
+     "rpm": 1431,
+     "ls": 0.12,
+     "le": 0.7546,
+     "src": 205509
+    },
+    {
+     "f": "v8m/loop-1816-133831.mp3",
+     "rpm": 1816,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 133831
+    },
+    {
+     "f": "v8m/loop-2533-465453.mp3",
+     "rpm": 2533,
+     "ls": 0.12,
+     "le": 0.7665,
+     "src": 465453,
+     "from": "v8f"
+    },
+    {
+     "f": "v8m/loop-4032-465453.mp3",
+     "rpm": 4032,
+     "ls": 0.12,
+     "le": 1.3178,
+     "src": 465453,
+     "from": "v8f"
+    },
+    {
+     "f": "v8m/loop-5001-112076.mp3",
+     "rpm": 5001,
+     "ls": 0.12,
+     "le": 0.6642,
+     "src": 112076,
+     "from": "v10"
+    }
+   ],
+   "start": [
+    {
+     "f": "v8m/start-455925-0.mp3",
+     "src": 455925,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "v8m/rev-455926-0.mp3",
+     "src": 455926,
+     "dur": 2.02
+    },
+    {
+     "f": "v8m/rev-205509-1.mp3",
+     "src": 205509,
+     "dur": 2.3
+    },
+    {
+     "f": "v8m/rev-133831-2.mp3",
+     "src": 133831,
+     "dur": 2.14
+    },
+    {
+     "f": "v8m/rev-144454-3.mp3",
+     "src": 144454,
+     "dur": 1.74
+    },
+    {
+     "f": "v8m/rev-432508-4.mp3",
+     "src": 432508,
+     "dur": 1.72
+    },
+    {
+     "f": "v8m/rev-213977-5.mp3",
+     "src": 213977,
+     "dur": 2.37
+    },
+    {
+     "f": "v8m/rev-651534-6.mp3",
+     "src": 651534,
+     "dur": 1.18
+    }
+   ],
+   "pass": [
+    {
+     "f": "v8m/pass-213977-0.mp3",
+     "src": 213977,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "v8m/pass-213977-1.mp3",
+     "src": 213977,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "v8m/pass-213977-2.mp3",
+     "src": 213977,
+     "dur": 3.0,
+     "peak": 1.2
+    }
+   ],
+   "pop": [
+    {
+     "f": "v8m/pop-455926-0.mp3",
+     "src": 455926,
+     "dur": 0.32
+    },
+    {
+     "f": "v8m/pop-432508-1.mp3",
+     "src": 432508,
+     "dur": 0.32
+    }
+   ],
+   "turbo": []
+  },
+  "v8f": {
+   "label": "Exotic V8",
+   "cyl": 8,
+   "idle": 1000,
+   "red": 8800,
+   "gears": 7,
+   "g1": 0.24,
+   "loops": [
+    {
+     "f": "v8f/loop-1000-241083.mp3",
+     "rpm": 1000,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 241083
+    },
+    {
+     "f": "v8f/loop-1000-659560.mp3",
+     "rpm": 1000,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 659560
+    },
+    {
+     "f": "v8f/loop-1000-465453.mp3",
+     "rpm": 1000,
+     "ls": 0.12,
+     "le": 0.9151,
+     "src": 465453
+    },
+    {
+     "f": "v8f/loop-1262-585215.mp3",
+     "rpm": 1262,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 585215
+    },
+    {
+     "f": "v8f/loop-1262-465453.mp3",
+     "rpm": 1262,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 465453
+    },
+    {
+     "f": "v8f/loop-1592-241083.mp3",
+     "rpm": 1592,
+     "ls": 0.12,
+     "le": 0.7322,
+     "src": 241083
+    },
+    {
+     "f": "v8f/loop-2008-465453.mp3",
+     "rpm": 2008,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 465453
+    },
+    {
+     "f": "v8f/loop-2533-465453.mp3",
+     "rpm": 2533,
+     "ls": 0.12,
+     "le": 0.7665,
+     "src": 465453
+    },
+    {
+     "f": "v8f/loop-4032-465453.mp3",
+     "rpm": 4032,
+     "ls": 0.12,
+     "le": 1.3178,
+     "src": 465453
+    },
+    {
+     "f": "v8f/loop-5001-112076.mp3",
+     "rpm": 5001,
+     "ls": 0.12,
+     "le": 0.6642,
+     "src": 112076,
+     "from": "v10"
+    },
+    {
+     "f": "v8f/loop-6423-181187.mp3",
+     "rpm": 6423,
+     "ls": 0.12,
+     "le": 1.3954,
+     "src": 181187,
+     "from": "f1"
+    },
+    {
+     "f": "v8f/loop-7521-181187.mp3",
+     "rpm": 7521,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 181187,
+     "from": "f1"
+    }
+   ],
+   "start": [
+    {
+     "f": "v8f/start-659560-0.mp3",
+     "src": 659560,
+     "dur": 3.2
+    },
+    {
+     "f": "v8f/start-547057-1.mp3",
+     "src": 547057,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "v8f/rev-505321-0.mp3",
+     "src": 505321,
+     "dur": 1.39
+    },
+    {
+     "f": "v8f/rev-43484-1.mp3",
+     "src": 43484,
+     "dur": 2.51
+    },
+    {
+     "f": "v8f/rev-241083-2.mp3",
+     "src": 241083,
+     "dur": 2.62
+    },
+    {
+     "f": "v8f/rev-547057-3.mp3",
+     "src": 547057,
+     "dur": 2.39
+    },
+    {
+     "f": "v8f/rev-465453-4.mp3",
+     "src": 465453,
+     "dur": 2.51
+    },
+    {
+     "f": "v8f/rev-14830-5.mp3",
+     "src": 14830,
+     "dur": 2.41
+    },
+    {
+     "f": "v8f/rev-659560-6.mp3",
+     "src": 659560,
+     "dur": 2.41
+    }
+   ],
+   "pass": [],
+   "pop": [],
+   "turbo": []
+  },
+  "v10": {
+   "label": "V10",
+   "cyl": 10,
+   "idle": 1000,
+   "red": 8700,
+   "gears": 7,
+   "g1": 0.24,
+   "loops": [
+    {
+     "f": "v10/loop-1000-564375.mp3",
+     "rpm": 1000,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 564375
+    },
+    {
+     "f": "v10/loop-1000-649889.mp3",
+     "rpm": 1000,
+     "ls": 0.12,
+     "le": 1.3583,
+     "src": 649889
+    },
+    {
+     "f": "v10/loop-1260-478756.mp3",
+     "rpm": 1260,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 478756
+    },
+    {
+     "f": "v10/loop-2000-649889.mp3",
+     "rpm": 2000,
+     "ls": 0.12,
+     "le": 0.7329,
+     "src": 649889
+    },
+    {
+     "f": "v10/loop-2520-649889.mp3",
+     "rpm": 2520,
+     "ls": 0.12,
+     "le": 0.8528,
+     "src": 649889
+    },
+    {
+     "f": "v10/loop-4001-112076.mp3",
+     "rpm": 4001,
+     "ls": 0.12,
+     "le": 0.6642,
+     "src": 112076
+    },
+    {
+     "f": "v10/loop-5138-181187.mp3",
+     "rpm": 5138,
+     "ls": 0.12,
+     "le": 1.3954,
+     "src": 181187,
+     "from": "f1"
+    },
+    {
+     "f": "v10/loop-6017-181187.mp3",
+     "rpm": 6017,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 181187,
+     "from": "f1"
+    },
+    {
+     "f": "v10/loop-7046-14833.mp3",
+     "rpm": 7046,
+     "ls": 0.12,
+     "le": 0.7955,
+     "src": 14833,
+     "from": "f1"
+    }
+   ],
+   "start": [],
+   "rev": [
+    {
+     "f": "v10/rev-457560-0.mp3",
+     "src": 457560,
+     "dur": 2.14
+    },
+    {
+     "f": "v10/rev-112076-1.mp3",
+     "src": 112076,
+     "dur": 2.11
+    },
+    {
+     "f": "v10/rev-649961-2.mp3",
+     "src": 649961,
+     "dur": 1.51
+    },
+    {
+     "f": "v10/rev-641824-3.mp3",
+     "src": 641824,
+     "dur": 2.14
+    },
+    {
+     "f": "v10/rev-564375-4.mp3",
+     "src": 564375,
+     "dur": 2.44
+    },
+    {
+     "f": "v10/rev-478756-5.mp3",
+     "src": 478756,
+     "dur": 2.53
+    },
+    {
+     "f": "v10/rev-649889-6.mp3",
+     "src": 649889,
+     "dur": 2.23
+    }
+   ],
+   "pass": [
+    {
+     "f": "v10/pass-377148-0.mp3",
+     "src": 377148,
+     "dur": 3.0,
+     "peak": 1.2
+    }
+   ],
+   "pop": [
+    {
+     "f": "v10/pop-564375-0.mp3",
+     "src": 564375,
+     "dur": 0.32
+    },
+    {
+     "f": "v10/pop-641824-1.mp3",
+     "src": 641824,
+     "dur": 0.32
+    },
+    {
+     "f": "v10/pop-641824-2.mp3",
+     "src": 641824,
+     "dur": 0.32
+    }
+   ],
+   "turbo": []
+  },
+  "v12": {
+   "label": "V12",
+   "cyl": 12,
+   "idle": 950,
+   "red": 8800,
+   "gears": 7,
+   "g1": 0.24,
+   "loops": [
+    {
+     "f": "v12/loop-950-112075.mp3",
+     "rpm": 950,
+     "ls": 0.12,
+     "le": 1.3283,
+     "src": 112075
+    },
+    {
+     "f": "v12/loop-950-564373.mp3",
+     "rpm": 950,
+     "ls": 0.12,
+     "le": 0.761,
+     "src": 564373
+    },
+    {
+     "f": "v12/loop-1205-564373.mp3",
+     "rpm": 1205,
+     "ls": 0.12,
+     "le": 1.1441,
+     "src": 564373
+    },
+    {
+     "f": "v12/loop-1205-112075.mp3",
+     "rpm": 1205,
+     "ls": 0.12,
+     "le": 0.7601,
+     "src": 112075
+    },
+    {
+     "f": "v12/loop-1529-112075.mp3",
+     "rpm": 1529,
+     "ls": 0.12,
+     "le": 1.1116,
+     "src": 112075
+    },
+    {
+     "f": "v12/loop-1940-112075.mp3",
+     "rpm": 1940,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 112075
+    },
+    {
+     "f": "v12/loop-3334-112076.mp3",
+     "rpm": 3334,
+     "ls": 0.12,
+     "le": 0.6642,
+     "src": 112076,
+     "from": "v10"
+    },
+    {
+     "f": "v12/loop-4282-181187.mp3",
+     "rpm": 4282,
+     "ls": 0.12,
+     "le": 1.3954,
+     "src": 181187,
+     "from": "f1"
+    },
+    {
+     "f": "v12/loop-5014-181187.mp3",
+     "rpm": 5014,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 181187,
+     "from": "f1"
+    },
+    {
+     "f": "v12/loop-5871-14833.mp3",
+     "rpm": 5871,
+     "ls": 0.12,
+     "le": 0.7955,
+     "src": 14833,
+     "from": "f1"
+    }
+   ],
+   "start": [
+    {
+     "f": "v12/start-564373-0.mp3",
+     "src": 564373,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "v12/rev-112075-0.mp3",
+     "src": 112075,
+     "dur": 2.21
+    },
+    {
+     "f": "v12/rev-564373-1.mp3",
+     "src": 564373,
+     "dur": 1.88
+    },
+    {
+     "f": "v12/rev-484191-2.mp3",
+     "src": 484191,
+     "dur": 1.79
+    },
+    {
+     "f": "v12/rev-112076-3.mp3",
+     "src": 112076,
+     "dur": 2.11
+    },
+    {
+     "f": "v12/rev-112075-4.mp3",
+     "src": 112075,
+     "dur": 1.67
+    },
+    {
+     "f": "v12/rev-112076-5.mp3",
+     "src": 112076,
+     "dur": 1.02
+    },
+    {
+     "f": "v12/rev-112075-6.mp3",
+     "src": 112075,
+     "dur": 2.35
+    }
+   ],
+   "pass": [],
+   "pop": [
+    {
+     "f": "v12/pop-408896-0.mp3",
+     "src": 408896,
+     "dur": 0.32
+    },
+    {
+     "f": "v12/pop-408896-1.mp3",
+     "src": 408896,
+     "dur": 0.32
+    }
+   ],
+   "turbo": []
+  },
+  "f1": {
+   "label": "Formula 1",
+   "cyl": 8,
+   "idle": 4000,
+   "red": 18000,
+   "gears": 8,
+   "g1": 0.22,
+   "loops": [
+    {
+     "f": "f1/loop-4000-400130.mp3",
+     "rpm": 4000,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 400130
+    },
+    {
+     "f": "f1/loop-4000-131239.mp3",
+     "rpm": 4000,
+     "ls": 0.12,
+     "le": 1.0521,
+     "src": 131239
+    },
+    {
+     "f": "f1/loop-4000-478546.mp3",
+     "rpm": 4000,
+     "ls": 0.12,
+     "le": 0.8411,
+     "src": 478546
+    },
+    {
+     "f": "f1/loop-4684-400130.mp3",
+     "rpm": 4684,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 400130
+    },
+    {
+     "f": "f1/loop-4684-77667.mp3",
+     "rpm": 4684,
+     "ls": 0.12,
+     "le": 1.184,
+     "src": 77667
+    },
+    {
+     "f": "f1/loop-5485-77667.mp3",
+     "rpm": 5485,
+     "ls": 0.12,
+     "le": 0.9467,
+     "src": 77667
+    },
+    {
+     "f": "f1/loop-6423-181187.mp3",
+     "rpm": 6423,
+     "ls": 0.12,
+     "le": 1.3954,
+     "src": 181187
+    },
+    {
+     "f": "f1/loop-6423-77667.mp3",
+     "rpm": 6423,
+     "ls": 0.12,
+     "le": 0.9848,
+     "src": 77667
+    },
+    {
+     "f": "f1/loop-7521-77667.mp3",
+     "rpm": 7521,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 77667
+    },
+    {
+     "f": "f1/loop-7521-44771.mp3",
+     "rpm": 7521,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 44771
+    },
+    {
+     "f": "f1/loop-7521-181187.mp3",
+     "rpm": 7521,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 181187
+    },
+    {
+     "f": "f1/loop-8807-77667.mp3",
+     "rpm": 8807,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 77667
+    },
+    {
+     "f": "f1/loop-8807-181187.mp3",
+     "rpm": 8807,
+     "ls": 0.12,
+     "le": 1.0421,
+     "src": 181187
+    },
+    {
+     "f": "f1/loop-8807-14833.mp3",
+     "rpm": 8807,
+     "ls": 0.12,
+     "le": 0.7955,
+     "src": 14833
+    },
+    {
+     "f": "f1/loop-10313-14833.mp3",
+     "rpm": 10313,
+     "ls": 0.12,
+     "le": 1.375,
+     "src": 14833
+    }
+   ],
+   "start": [
+    {
+     "f": "f1/start-181187-0.mp3",
+     "src": 181187,
+     "dur": 3.2
+    },
+    {
+     "f": "f1/start-44771-1.mp3",
+     "src": 44771,
+     "dur": 3.2
+    }
+   ],
+   "rev": [
+    {
+     "f": "f1/rev-77667-0.mp3",
+     "src": 77667,
+     "dur": 0.98
+    },
+    {
+     "f": "f1/rev-131239-1.mp3",
+     "src": 131239,
+     "dur": 1.97
+    },
+    {
+     "f": "f1/rev-478546-2.mp3",
+     "src": 478546,
+     "dur": 1.37
+    },
+    {
+     "f": "f1/rev-44771-3.mp3",
+     "src": 44771,
+     "dur": 0.84
+    },
+    {
+     "f": "f1/rev-181187-4.mp3",
+     "src": 181187,
+     "dur": 3.0
+    },
+    {
+     "f": "f1/rev-14833-5.mp3",
+     "src": 14833,
+     "dur": 1.37
+    },
+    {
+     "f": "f1/rev-77667-6.mp3",
+     "src": 77667,
+     "dur": 1.86
+    }
+   ],
+   "pass": [
+    {
+     "f": "f1/pass-44289-0.mp3",
+     "src": 44289,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "f1/pass-14833-1.mp3",
+     "src": 14833,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "f1/pass-200810-2.mp3",
+     "src": 200810,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "f1/pass-478546-3.mp3",
+     "src": 478546,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "f1/pass-131239-4.mp3",
+     "src": 131239,
+     "dur": 3.0,
+     "peak": 1.2
+    }
+   ],
+   "pop": [],
+   "turbo": []
+  },
+  "dsl": {
+   "label": "Diesel truck / bus",
+   "cyl": 6,
+   "idle": 600,
+   "red": 2600,
+   "gears": 6,
+   "g1": 0.18,
+   "loops": [
+    {
+     "f": "dsl/loop-600-186935.mp3",
+     "rpm": 600,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 186935
+    },
+    {
+     "f": "dsl/loop-600-828756.mp3",
+     "rpm": 600,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 828756
+    },
+    {
+     "f": "dsl/loop-600-181900.mp3",
+     "rpm": 600,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 181900
+    },
+    {
+     "f": "dsl/loop-700-828756.mp3",
+     "rpm": 700,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 828756
+    },
+    {
+     "f": "dsl/loop-700-435656.mp3",
+     "rpm": 700,
+     "ls": 0.12,
+     "le": 0.7408,
+     "src": 435656
+    },
+    {
+     "f": "dsl/loop-816-128160.mp3",
+     "rpm": 816,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 128160
+    },
+    {
+     "f": "dsl/loop-951-828756.mp3",
+     "rpm": 951,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 828756
+    },
+    {
+     "f": "dsl/loop-951-49988.mp3",
+     "rpm": 951,
+     "ls": 0.12,
+     "le": 1.3458,
+     "src": 49988
+    },
+    {
+     "f": "dsl/loop-1109-828756.mp3",
+     "rpm": 1109,
+     "ls": 0.12,
+     "le": 1.52,
+     "src": 828756
+    },
+    {
+     "f": "dsl/loop-1294-828756.mp3",
+     "rpm": 1294,
+     "ls": 0.12,
+     "le": 1.3769,
+     "src": 828756
+    }
+   ],
+   "start": [],
+   "rev": [
+    {
+     "f": "dsl/rev-435656-0.mp3",
+     "src": 435656,
+     "dur": 1.14
+    },
+    {
+     "f": "dsl/rev-828756-1.mp3",
+     "src": 828756,
+     "dur": 2.28
+    },
+    {
+     "f": "dsl/rev-49988-2.mp3",
+     "src": 49988,
+     "dur": 2.41
+    },
+    {
+     "f": "dsl/rev-435656-3.mp3",
+     "src": 435656,
+     "dur": 2.37
+    },
+    {
+     "f": "dsl/rev-828756-4.mp3",
+     "src": 828756,
+     "dur": 1.25
+    },
+    {
+     "f": "dsl/rev-49988-5.mp3",
+     "src": 49988,
+     "dur": 1.44
+    },
+    {
+     "f": "dsl/rev-435656-6.mp3",
+     "src": 435656,
+     "dur": 2.25
+    }
+   ],
+   "pass": [],
+   "pop": [],
+   "turbo": []
+  },
+  "ev": {
+   "label": "Electric",
+   "cyl": 2,
+   "idle": 0,
+   "red": 16000,
+   "gears": 1,
+   "g1": 1.0,
+   "loops": [
+    {
+     "f": "ev/loop-1280-324119.mp3",
+     "rpm": 1280,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 324119
+    },
+    {
+     "f": "ev/loop-1434-324119.mp3",
+     "rpm": 1434,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 324119
+    },
+    {
+     "f": "ev/loop-1628-324119.mp3",
+     "rpm": 1628,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 324119
+    },
+    {
+     "f": "ev/loop-2250-761685.mp3",
+     "rpm": 2250,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 761685
+    },
+    {
+     "f": "ev/loop-2305-807728.mp3",
+     "rpm": 2305,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 807728
+    },
+    {
+     "f": "ev/loop-2622-761685.mp3",
+     "rpm": 2622,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 761685
+    },
+    {
+     "f": "ev/loop-2630-807728.mp3",
+     "rpm": 2630,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 807728
+    },
+    {
+     "f": "ev/loop-3525-635454.mp3",
+     "rpm": 3525,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 635454
+    },
+    {
+     "f": "ev/loop-3996-635454.mp3",
+     "rpm": 3996,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 635454
+    },
+    {
+     "f": "ev/loop-4714-635454.mp3",
+     "rpm": 4714,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 635454
+    },
+    {
+     "f": "ev/loop-5116-635454.mp3",
+     "rpm": 5116,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 635454
+    },
+    {
+     "f": "ev/loop-5417-170421.mp3",
+     "rpm": 5417,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 170421
+    },
+    {
+     "f": "ev/loop-6056-170421.mp3",
+     "rpm": 6056,
+     "ls": 0.12,
+     "le": 0.912,
+     "src": 170421
+    }
+   ],
+   "start": [
+    {
+     "f": "ev/start-324119-0.mp3",
+     "src": 324119,
+     "dur": 3.2
+    }
+   ],
+   "rev": [],
+   "pass": [
+    {
+     "f": "ev/pass-635454-0.mp3",
+     "src": 635454,
+     "dur": 3.0,
+     "peak": 1.2
+    },
+    {
+     "f": "ev/pass-635454-1.mp3",
+     "src": 635454,
+     "dur": 3.0,
+     "peak": 0.05
+    },
+    {
+     "f": "ev/pass-635454-2.mp3",
+     "src": 635454,
+     "dur": 3.0,
+     "peak": 1.2
+    }
+   ],
+   "pop": [],
+   "turbo": []
+  }
+ },
+ "sources": {
+  "268623": {
+   "user": "EverydaySounds",
+   "title": "VW Golf GTI Pull Away (Zoom H2n M&S).wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/EverydaySounds/sounds/268623/"
+  },
+  "487553": {
+   "user": "thepodcastdoctor",
+   "title": "Honda Engine Start and Rev.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/thepodcastdoctor/sounds/487553/"
+  },
+  "692112": {
+   "user": "MPooman",
+   "title": "[ MPooman ] Honda Civic Engine Sounds (SE542) (High Quality)",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/MPooman/sounds/692112/"
+  },
+  "33192": {
+   "user": "Heigh-hoo",
+   "title": "racing honda.aif",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Heigh-hoo/sounds/33192/"
+  },
+  "215960": {
+   "user": "jess_pfohl",
+   "title": "4civic engine.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/jess_pfohl/sounds/215960/"
+  },
+  "424738": {
+   "user": "Joaofmms",
+   "title": "Old 2001 Honda Civic Engine",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Joaofmms/sounds/424738/"
+  },
+  "760690": {
+   "user": "imaniv",
+   "title": "Altima startup 1",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/imaniv/sounds/760690/"
+  },
+  "425868": {
+   "user": "Soundholder",
+   "title": "Volkswagen Golf V 1.6 FSI exterior passby fast speed stereo ORTF 8040.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/Soundholder/sounds/425868/"
+  },
+  "496171": {
+   "user": "editboy23",
+   "title": "Import car revs on Chassis Dyno with Turbo.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/editboy23/sounds/496171/"
+  },
+  "273334": {
+   "user": "ulose2piranha",
+   "title": "WRX - Exhaust sounds",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/ulose2piranha/sounds/273334/"
+  },
+  "659544": {
+   "user": "EwanPenman11",
+   "title": "Turbo Spooling and Blow Off.WAV",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/EwanPenman11/sounds/659544/"
+  },
+  "369797": {
+   "user": "t33kno",
+   "title": "subaru impreza start up-idle-launch limiter.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/t33kno/sounds/369797/"
+  },
+  "625702": {
+   "user": "MilanKovanda",
+   "title": "Subaru Impreza STI idling",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/MilanKovanda/sounds/625702/"
+  },
+  "797835": {
+   "user": "modusmogulus",
+   "title": "Car Antilag (No cleanup, 32float)",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/modusmogulus/sounds/797835/"
+  },
+  "21741": {
+   "user": "Erdie",
+   "title": "car-start.mp3",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/Erdie/sounds/21741/"
+  },
+  "401558": {
+   "user": "GiocoSound",
+   "title": "SFX_Car_Engine_Outside_Start.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/GiocoSound/sounds/401558/"
+  },
+  "478597": {
+   "user": "Kinoton",
+   "title": "Car, BMW M6, Start, Idle, Accelerate",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Kinoton/sounds/478597/"
+  },
+  "57939": {
+   "user": "joanfelipsound",
+   "title": "engine start BMW 320 VG91.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/joanfelipsound/sounds/57939/"
+  },
+  "173005": {
+   "user": "ninebilly",
+   "title": "BMW 320 1988..wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/ninebilly/sounds/173005/"
+  },
+  "128612": {
+   "user": "Heigh-hoo",
+   "title": "bmwz4.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Heigh-hoo/sounds/128612/"
+  },
+  "466715": {
+   "user": "dudebrobrodude",
+   "title": "Inline Six.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/dudebrobrodude/sounds/466715/"
+  },
+  "185151": {
+   "user": "Ears68",
+   "title": "6-cyl-VintageRaceCar-toStartLine-burnout-StartClimb-051.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Ears68/sounds/185151/"
+  },
+  "415276": {
+   "user": "ikbenraar",
+   "title": "BMWM3_01.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/ikbenraar/sounds/415276/"
+  },
+  "343369": {
+   "user": "ccdff2",
+   "title": "M3 accelerate",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/ccdff2/sounds/343369/"
+  },
+  "457560": {
+   "user": "florianreichelt",
+   "title": "Acceleration of a Sports Car Engine like Ferrari or Lamborghini or Porsche",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/florianreichelt/sounds/457560/"
+  },
+  "90404": {
+   "user": "mmplisskin",
+   "title": "Porsche.MP3",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/mmplisskin/sounds/90404/"
+  },
+  "585710": {
+   "user": "kevp888",
+   "title": "R4_00225_FR_SportsCar.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/kevp888/sounds/585710/"
+  },
+  "577941": {
+   "user": "kevp888",
+   "title": "VOC_210625-1847_FR_SportsCar.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/kevp888/sounds/577941/"
+  },
+  "55727": {
+   "user": "mharo",
+   "title": "porsche_911.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/mharo/sounds/55727/"
+  },
+  "772802": {
+   "user": "jerry.berumen",
+   "title": "vehicle car porsche 911 revving engine motor boxer",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/jerry.berumen/sounds/772802/"
+  },
+  "133831": {
+   "user": "Gx3Gary",
+   "title": "CarRumble1.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Gx3Gary/sounds/133831/"
+  },
+  "205509": {
+   "user": "VacekH",
+   "title": "mustang 8.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/VacekH/sounds/205509/"
+  },
+  "455926": {
+   "user": "noiseloop",
+   "title": "Acceleration sounds of Ford V8 5 Liter engine",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/noiseloop/sounds/455926/"
+  },
+  "455925": {
+   "user": "noiseloop",
+   "title": "Starting of Ford V8 5 Liter engine",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/noiseloop/sounds/455925/"
+  },
+  "432508": {
+   "user": "holderall",
+   "title": "Open header V8 cars idling and revving",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/holderall/sounds/432508/"
+  },
+  "213977": {
+   "user": "Ears68",
+   "title": "V-8HotRodApproachRevUpsDrivePast-cut-DR087.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Ears68/sounds/213977/"
+  },
+  "144454": {
+   "user": "Ears68",
+   "title": "Hot-Rod-V-8-BigSpchg-RoughIdle-RevUps-IdleDR025-30sec.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/Ears68/sounds/144454/"
+  },
+  "651534": {
+   "user": "overmedium",
+   "title": "v8 engine rev.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/overmedium/sounds/651534/"
+  },
+  "14830": {
+   "user": "Heigh-hoo",
+   "title": "MSchFerr.aif",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Heigh-hoo/sounds/14830/"
+  },
+  "585215": {
+   "user": "myeclecticself",
+   "title": "Car Engine: Maserati GranTurismo Switch to Sport Mode and Launch",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/myeclecticself/sounds/585215/"
+  },
+  "43484": {
+   "user": "enginemusic",
+   "title": "ferrari355underhood4.mp3",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/enginemusic/sounds/43484/"
+  },
+  "241083": {
+   "user": "PritzProductions",
+   "title": "Ferrari 360 Spider - engine sound",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/PritzProductions/sounds/241083/"
+  },
+  "505321": {
+   "user": "marcelweiss",
+   "title": "S63 AMG V8 Engine Revs",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/marcelweiss/sounds/505321/"
+  },
+  "659560": {
+   "user": "EwanPenman11",
+   "title": "Ferrari start up and drive off.WAV",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/EwanPenman11/sounds/659560/"
+  },
+  "547057": {
+   "user": "lmartins",
+   "title": "Aston Martin V8 Vantage start-up.m4a",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/lmartins/sounds/547057/"
+  },
+  "465453": {
+   "user": "lmartins",
+   "title": "Maserati GranTurismo S",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/lmartins/sounds/465453/"
+  },
+  "377148": {
+   "user": "Mr_KeybOred",
+   "title": "Distant Loud Sports Car Vroom",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Mr_KeybOred/sounds/377148/"
+  },
+  "112076": {
+   "user": "cheesepuff",
+   "title": "lambo rev.mp3",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/cheesepuff/sounds/112076/"
+  },
+  "478756": {
+   "user": "richwise",
+   "title": "Supercar rev",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/richwise/sounds/478756/"
+  },
+  "564375": {
+   "user": "JaimeLopes",
+   "title": "Lamborghini Sounds",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/JaimeLopes/sounds/564375/"
+  },
+  "641824": {
+   "user": "TheStolenBattenberg",
+   "title": "lamborghini",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/TheStolenBattenberg/sounds/641824/"
+  },
+  "649961": {
+   "user": "kevp888",
+   "title": "VOC_220909-2079_FR_SportsCar.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/kevp888/sounds/649961/"
+  },
+  "649889": {
+   "user": "kevp888",
+   "title": "VOC_220909-2078_FR_SportsCar.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/kevp888/sounds/649889/"
+  },
+  "408896": {
+   "user": "oldazatloukal",
+   "title": "Engine sound",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/oldazatloukal/sounds/408896/"
+  },
+  "112075": {
+   "user": "cheesepuff",
+   "title": "Lambo idle and rev.mp3",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/cheesepuff/sounds/112075/"
+  },
+  "484191": {
+   "user": "Janosch-JR",
+   "title": "V12 Engine - Short Rev",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Janosch-JR/sounds/484191/"
+  },
+  "564373": {
+   "user": "JaimeLopes",
+   "title": "Lambo Start Up Sound",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/JaimeLopes/sounds/564373/"
+  },
+  "44289": {
+   "user": "rfhache",
+   "title": "F1 BR 07 2P MSBraking1turn.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/rfhache/sounds/44289/"
+  },
+  "14833": {
+   "user": "Heigh-hoo",
+   "title": "backstraight.aif",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Heigh-hoo/sounds/14833/"
+  },
+  "200810": {
+   "user": "WebbFilmsUK",
+   "title": "F1 Single Car Pass.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/WebbFilmsUK/sounds/200810/"
+  },
+  "478546": {
+   "user": "LordFluffeh",
+   "title": "Formula 1 racing",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/LordFluffeh/sounds/478546/"
+  },
+  "181187": {
+   "user": "Ears68",
+   "title": "F-1raceCar-IdleAndRaceStartDemo.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Ears68/sounds/181187/"
+  },
+  "44771": {
+   "user": "rfhache",
+   "title": "F1 BR 06 Engine Starts.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/rfhache/sounds/44771/"
+  },
+  "131239": {
+   "user": "Heigh-hoo",
+   "title": "finish2011.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Heigh-hoo/sounds/131239/"
+  },
+  "400130": {
+   "user": "monkeyman535",
+   "title": "Formula F1 Racing.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/monkeyman535/sounds/400130/"
+  },
+  "77667": {
+   "user": "LG",
+   "title": "BCR F1 Car 07.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/LG/sounds/77667/"
+  },
+  "128160": {
+   "user": "ibirdfilm",
+   "title": "Diesel Truck Idling Front.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/ibirdfilm/sounds/128160/"
+  },
+  "49988": {
+   "user": "BoilingSand",
+   "title": "080316 Dodge truck revving in driveway.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/BoilingSand/sounds/49988/"
+  },
+  "186935": {
+   "user": "ReadeOnly",
+   "title": "engine_idle_loop.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/ReadeOnly/sounds/186935/"
+  },
+  "181900": {
+   "user": "yurkobb",
+   "title": "Bus engine looped",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/yurkobb/sounds/181900/"
+  },
+  "435656": {
+   "user": "YellowJacketStudios",
+   "title": "FORD LTL 9000_engine start and idle.wav",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/YellowJacketStudios/sounds/435656/"
+  },
+  "828756": {
+   "user": "chungus43A",
+   "title": "Mississauga Transit Orion V bus engine",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/chungus43A/sounds/828756/"
+  },
+  "761685": {
+   "user": "justVova",
+   "title": "Acceleration of an electric car",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/justVova/sounds/761685/"
+  },
+  "807728": {
+   "user": "Sam-Mortley",
+   "title": "electric car",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Sam-Mortley/sounds/807728/"
+  },
+  "635454": {
+   "user": "kevp888",
+   "title": "VOC_220519-2006-2_FR_ElectricVehicle.wav",
+   "lic": "CC BY",
+   "url": "https://freesound.org/people/kevp888/sounds/635454/"
+  },
+  "170421": {
+   "user": "Eelke",
+   "title": "nissan-leaf",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/Eelke/sounds/170421/"
+  },
+  "324119": {
+   "user": "evsecrets",
+   "title": "Electric car start-up and drive away",
+   "lic": "CC0",
+   "url": "https://freesound.org/people/evsecrets/sounds/324119/"
+  }
+ }
+}
