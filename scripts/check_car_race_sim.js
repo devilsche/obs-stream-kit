@@ -692,7 +692,7 @@ if (G.krabby.len !== 1) fail('Krabby: Katalog-len 1 m muss bleiben');
 TKEYS.forEach(function (k) { validRace(Stats.guess({ key: k }), 'Tabelle ' + k); });
 var mk1 = Stats.guess({ key: GOLF_KEY, name: 'whatever', brand: 'VW' });
 if (!(mk1.vmax === 182 && mk1.hp === 110 && mk1.drive === 'fwd')) fail('Tabelle schlägt Klasse nicht: Golf Mk1 ' + JSON.stringify(mk1));
-if (Stats.guess({ key: 'ferrari-296-gt3' }).grip !== 1.6) fail('Tabelle: Ferrari 296 GT3 grip 1,6 erwartet');
+if (Stats.guess({ key: 'ferrari-296-gt3-verstappen' }).grip !== 1.6) fail('Tabelle: Ferrari 296 GT3 (Verstappen) grip 1,6 erwartet');
 // clean(): alte 1–10-Felder verworfen, Bereiche geprüft
 var cl = Stats.clean({ on: false, power: 7, speed: 9, weight: 3, vmax: 250, acc: 0.5, kg: '1200', grip: 9, drive: 'awd', len: 0.6 });
 if (JSON.stringify(cl) !== JSON.stringify({ on: false, vmax: 250, kg: 1200, len: 0.6, drive: 'awd' })) fail('clean() falsch: ' + JSON.stringify(cl));
