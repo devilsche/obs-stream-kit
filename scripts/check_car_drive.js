@@ -320,6 +320,21 @@ function crashRun(car, inp, others, secs, react) {
   });
 })();
 
+// 13c) Kein automatisches Gegenlenken: Heck bricht aus (Gierrate-Kick), ohne Lenkeingabe bleiben die Räder gerade,
+// mit Lenkung nach links schlagen sie nie nach rechts ein (Gegenlenken macht der Spieler)
+(function () {
+  var T = Sim.track(1), worst0 = 0, wrong = 0;
+  [0, 1].forEach(function (st) {
+    var car = carFor('bmw-m3-competition', T, { s: -40, d: 0 }); setSpeed(car, 20); car.r = 1.6;
+    for (var t = 0; t < 1; t += DT) {
+      Phys.step(car, { steer: st, throttle: 0.5 }, DT);
+      if (st === 0) worst0 = Math.max(worst0, Math.abs(car.steer));
+      else if (car.steer < -1e-3) wrong = Math.min(wrong, car.steer);
+    }
+  });
+  ok(worst0 < 1e-3 && wrong === 0, 'kein automatisches Gegenlenken: ohne Eingabe Radwinkel ' + worst0.toFixed(3) + ' rad, mit Eingabe links nie rechts (' + wrong.toFixed(3) + ')');
+})();
+
 // 14) Lenkung: kein hartes Untersteuern – voller Einschlag nutzt bei Tempo die Kurvenhaftung aus; Einschlag je Auto
 (function () {
   var T = Sim.track(1);

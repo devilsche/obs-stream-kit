@@ -48,7 +48,7 @@
  * Drift (P.drift 0–1 aus den Race stats, Bezug 0,5): hohe Driftfreude = Heck etwas lockerer, die Seitenkraft hinten
  * fällt über dem Haftmaximum nur sanft ab (Rutschen lässt sich mit Gas halten), die Handbremse dreht williger, beim
  * Rutschen reicht der Lenkeinschlag weiter fürs Gegenlenken; niedrige Driftfreude = Heck hält etwas mehr (Untersteuern),
- * fällt über dem Maximum stärker ab, und ein ausbrechendes Heck wird von selbst eingefangen (Gierdämpfung).
+ * fällt über dem Maximum stärker ab (kein automatisches Einfangen – der Spieler lenkt selbst gegen).
  * Kies/Gras: weniger Haftung, Bremswirkung mit dem Tempo (Kies wie die Sim: ~11 m/s² aus vollem Tempo, rollt mit
  * ~6 m/s), Holpern. Leitplanke bei |d| = Breite/2 + Auslauf + 0,3 (wie in der Darstellung): weicher Stoß –
  * zurück auf die Innenseite, Tempo in Normalenrichtung wird umgekehrt gedämpft, längs geht Tempo verloren.
@@ -190,7 +190,9 @@
     if (Math.abs(u) > 2) {
       var dirS = u < -0.5 ? -1 : 1, aim = Math.atan2(w + car.r * (P.wb / 2), Math.max(Math.abs(u), 4)) * dirS;
       var band = ALPHA_PEAK * 1.15 + Math.max(0, 7 - Math.abs(u)) * 0.12 + slideX;
-      want = clamp(want, aim - band, aim + band);
+      // nur begrenzen, nie selbst gegenlenken: höchstens bis zur Mitte zurück, Gegenlenken macht der Spieler
+      if (want > 0) want = Math.min(want, Math.max(0, aim + band));
+      else if (want < 0) want = Math.max(want, Math.min(0, aim - band));
     }
     // nach einem Crash kurz benommen: Lenkung träger, weniger Haftung, Drehung wird nicht kinematisch weggebügelt
     var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
@@ -239,8 +241,8 @@
     // leichte Gierdämpfung (Stabilität); bei langem Radstand schwächer – dort ist das Giermoment der Reifen kleiner,
     // eine feste Dämpfung fräße Bussen/Lkw die halbe Lenkwirkung
     car.r -= car.r * 0.6 * Math.min(1, 2.8 / P.wb) * dt;
-    // wenig Driftfreude: ausbrechendes Heck (hinten über dem Haftmaximum) wird von selbst eingefangen
-    if (Math.abs(ar) > ALPHA_PEAK && !hb) car.r -= car.r * 1.6 * (0.5 - Math.min(0.5, dr0)) * 2 * dt;
+    // (kein automatisches Einfangen eines ausbrechenden Hecks mehr – Gegenlenken macht der Spieler; wenig Driftfreude
+    // wirkt über mehr Haftung hinten und einen sanfteren Abfall der Seitenkraft)
     // langsam: kinematisch (kein Schräglauf-Modell nahe 0) – Gierrate aus Lenkwinkel, Querrutschen abbauen
     var k = Math.max(clamp((Math.abs(u) - 1.5) / 4, 0, 1), stun);
     if (k < 1) {
