@@ -325,7 +325,13 @@
           <input type="number" id="raceSteer" class="race-num" min="10" max="60" step="1" value="38" aria-describedby="raceSteerEst">
           <span class="muted small-text" id="raceSteerEst"></span>
         </div>
-        <p class="muted small-text">Steering lock = largest front-wheel angle, used when you drive the car yourself (Car Drive). Typical cars 35–40°, race cars about 30°, Formula 1 about 24°, buses and trucks up to 45°.</p>
+        <p class="muted small-text">Steering lock = largest front-wheel angle, used when you drive the car yourself (Car Drive) and for the turning circle in tight hairpins of the chat race (Kart). Typical cars 35–40°, race cars about 30°, Formula 1 about 24°, buses and trucks up to 45°.</p>
+        <div class="row">
+          <label for="raceDrift">Drift (0–1)</label>
+          <input type="number" id="raceDrift" class="race-num" min="0" max="1" step="0.05" value="0.5" aria-describedby="raceDriftEst">
+          <span class="muted small-text" id="raceDriftEst"></span>
+        </div>
+        <p class="muted small-text">Drift = how willingly the car slides. High (powerful rear-wheel drive, muscle cars): the rear steps out gently and a slide can be held with throttle and countersteer, the handbrake turns it in more easily; in the chat race a bit faster through hairpins, with slightly more risk of going off. Low (front-wheel drive, race cars with downforce, trucks): grippy and safe, a stepping-out rear catches itself.</p>
         <div class="row">
           <label for="raceEngine">Engine sound</label>
           <select id="raceEngine" aria-describedby="raceEngineEst"></select>
@@ -1075,8 +1081,8 @@
           var el = document.querySelector('.race-in[data-k="' + k + '"]');
           el.value = r[k]; raceEst(el.id, g[k]);
         });
-        $('raceDrive').value = r.drive; $('raceLen').value = r.len; $('raceSteer').value = r.steer; $('raceEngine').value = r.engine;
-        raceEst('raceDrive', g.drive.toUpperCase()); raceEst('raceLen', g.len); raceEst('raceSteer', g.steer + '°'); raceEst('raceEngine', engineLabel(g.engine));
+        $('raceDrive').value = r.drive; $('raceLen').value = r.len; $('raceSteer').value = r.steer; $('raceDrift').value = r.drift; $('raceEngine').value = r.engine;
+        raceEst('raceDrive', g.drive.toUpperCase()); raceEst('raceLen', g.len); raceEst('raceSteer', g.steer + '°'); raceEst('raceDrift', g.drift); raceEst('raceEngine', engineLabel(g.engine));
         steerRange(r.steer);
       }
       // leere oder ungültige Felder fallen auf die Schätzung zurück, sonst in den gültigen Bereich geklemmt
@@ -1087,6 +1093,7 @@
           return isFinite(n) ? Math.min(R[k][1], Math.max(R[k][0], n)) : g[k];
         }
         var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: val($('raceLen'), 'len'), steer: Math.round(val($('raceSteer'), 'steer')),
+          drift: Math.round(val($('raceDrift'), 'drift') * 20) / 20,
           engine: CarRaceStats.ENGINES.indexOf($('raceEngine').value) >= 0 ? $('raceEngine').value : g.engine };
         CarRaceStats.KEYS.forEach(function (k) { r[k] = val(document.querySelector('.race-in[data-k="' + k + '"]'), k); });
         return r;
@@ -1095,7 +1102,7 @@
       function raceChanged() {
         var r = raceRead(), g = CarRaceStats.guess(cur), o = {};
         $('raceLen').value = r.len; steerRange(r.steer);
-        CarRaceStats.KEYS.concat(['drive', 'len', 'steer', 'engine']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
+        CarRaceStats.KEYS.concat(['drive', 'len', 'steer', 'drift', 'engine']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
         if (!r.on) o.on = false;
         if (Object.keys(o).length) def.race = o; else delete def.race;
       }
@@ -1123,6 +1130,7 @@
         });
       });
       $('raceSteer').addEventListener('change', function () { raceChanged(); $('raceSteer').value = raceRead().steer; });
+      $('raceDrift').addEventListener('change', function () { raceChanged(); $('raceDrift').value = raceRead().drift; });
       // Lenkvorschau reicht bis zum Einschlagwinkel des Autos
       function steerRange(deg) {
         var m = (+deg || 38) * Math.PI / 180, el = $('steer');

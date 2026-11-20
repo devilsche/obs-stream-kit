@@ -31,7 +31,9 @@ var DT = 1 / 60;
 var OVERLAP_TOL = 0.1;   // Wrack-Überlappung: höchstens 10 cm (längs und quer)
 var busInfo = '';
 var overlapChecked = {}; // Rennen, in denen mindestens ein Wrack stand (Überlappung geprüft)
-var MAX_T = 95;
+var MAX_T = 205;
+// Chatrennen-Format (fx/race.py LAPS / FINISH_WINDOW): 2 Runden auf den langen Strecken, Ziel-Frist 25 s
+var LAPS = 2, FW = 25;
 // Seltene Fälle (festgefahren > 8 s) in Bilanz/Probe: höchstens RARE_MAX je 1000 Rennen (Controller-Entscheidung);
 // überall sonst sind sie ein Fehler
 var RARE_MAX = 3, rareCases = [];
@@ -215,11 +217,14 @@ function winnerTime(sim) {
 function checkTrack(seed) {
   var probs = [];
   var t = Sim.track(seed);
-  if (!(t.len >= 280 && t.len <= 500)) probs.push('Länge ' + t.len.toFixed(1) + ' m nicht in 280–500');
-  if (t.width !== 10) probs.push('Breite ' + t.width + ' statt 10');
+  // lange Strecken 1000–1400 m, Breite 10 m; Kart kurz (380–500 m), schmal (8 m) und eng (Radien ab 8 m)
+  var kart = t.character === 'kart', LEN_R = kart ? [380, 500] : [1000, 1400], WANT_W = kart ? 8 : 10, MIN_R = kart ? 8 : 12;
+  if (!(t.len >= LEN_R[0] && t.len <= LEN_R[1])) probs.push('Länge ' + t.len.toFixed(1) + ' m nicht in ' + LEN_R.join('–'));
+  if (t.width !== WANT_W) probs.push('Breite ' + t.width + ' statt ' + WANT_W);
   var half = t.width / 2, minR = Infinity;
   for (var s = 0; s < t.len; s += 0.5) minR = Math.min(minR, t.radiusAt(s));
-  if (!(minR >= 12)) probs.push('kleinster Radius ' + minR.toFixed(1) + ' m < 12');
+  if (!(minR >= MIN_R - 0.1)) probs.push('kleinster Radius ' + minR.toFixed(1) + ' m < ' + MIN_R);
+  if (kart && !(minR <= 10)) probs.push('Kart ohne enge Kehre (kleinster Radius ' + minR.toFixed(1) + ' m, Soll ≤ 10)');
   // Kurven unabhängig von t.corners nachzählen: zusammenhängende Abschnitte mit |curv| > 1/60
   var step = 0.5, n = Math.round(t.len / step), kinds = [], turn = 0;
   for (var i = 0; i < n; i++) {
@@ -254,7 +259,7 @@ function checkTrack(seed) {
     minRun = Math.min(minRun, a.runL, a.runR); maxRun = Math.max(maxRun, a.runL, a.runR);
     P.push(a);
   }
-  if (minRun < 2) probs.push('Auslauf nur ' + minRun.toFixed(1) + ' m (Soll ≥ 2)');
+  if (minRun < 1.95) probs.push('Auslauf nur ' + minRun.toFixed(1) + ' m (Soll ≥ 2)');
   if (maxRun > 12 + 1e-9) probs.push('Auslauf ' + maxRun.toFixed(1) + ' m (Soll ≤ 12)');
   var overlap = 0, minD = Infinity;
   for (i = 0; i < nc && overlap < 1; i++) {
@@ -272,13 +277,14 @@ function checkTrack(seed) {
     }
   }
   if (overlap) probs.push('Fahrbahn/Auslauf überschneidet sich');
-  // Durchschnittsfeld, 3 Runden: Sieger im Ziel nach 45–75 s
+  // Durchschnittsfeld, 2 Runden: Sieger im Ziel nach 120–155 s (≈ 2:20), Kart 60–90 s
   var times = [];
   for (var k = 0; k < 3; k++) {
-    var sim = run({ seed: 1000 + k * 77, track: seed, laps: 3, finishWindow: 15, cars: avgField(10) }, 'Strecke ' + seed, true);
+    var sim = run({ seed: 1000 + k * 77, track: seed, laps: LAPS, finishWindow: FW, cars: avgField(10) }, 'Strecke ' + seed, true);
     times.push(winnerTime(sim));
   }
-  times.forEach(function (wt) { if (!(wt >= 45 && wt <= 75)) probs.push('Siegerzeit ' + wt.toFixed(1) + ' s nicht in 45–75'); });
+  var WT = kart ? [60, 90] : [120, 155];
+  times.forEach(function (wt) { if (!(wt >= WT[0] && wt <= WT[1])) probs.push('Siegerzeit ' + wt.toFixed(1) + ' s nicht in ' + WT.join('–')); });
   return { probs: probs, len: t.len, minR: minR, minD: minD, times: times, corners: corners, counter: counter, tight: tight,
     straight: straight, minRun: minRun, name: t.name, character: t.character };
 }
@@ -302,7 +308,7 @@ if (!Array.isArray(Sim.TRACKS) || Sim.TRACKS.length !== 5) fail('CarRaceSim.TRAC
 (function () {   // neue Ausgaben vorhanden?
   var t = Sim.track(Sim.TRACKS ? Sim.TRACKS[0] : 1);
   if (typeof t.runoffAt !== 'function' || !t.runoff || !Array.isArray(t.corners)) fail('track() liefert kein runoffAt/runoff/corners');
-  var sm = Sim.create({ seed: 1, track: t.seed, laps: 3, finishWindow: 15, cars: avgField(3) });
+  var sm = Sim.create({ seed: 1, track: t.seed, laps: LAPS, finishWindow: FW, cars: avgField(3) });
   if (!Array.isArray(sm.events) || !Array.isArray(sm.hazards)) fail('sim.events / sim.hazards fehlen');
   if (!('draft' in sm.cars[0]) || !('off' in sm.cars[0])) fail('cars[i].draft / cars[i].off fehlen');
   if (!(Sim.stats({}).mass > 0)) fail('stats().mass fehlt');
@@ -330,7 +336,8 @@ var def = Sim.stats({}), ref = Sim.stats(AVG);
   if (!(Sim.lapTime(w, t) < Sim.lapTime(ref, t) && Sim.lapTime(ref, t) < Sim.lapTime(b, t))) fail('lapTime: nicht W14 < Bezug < Bus');
 })();
 // Rundenpace (Nutzer-Kompromiss Task 9: „ein Bus fährt eben nicht so schnell wie ein Lambo“, aber mit kleiner
-// Außenseiter-Chance), Mittel über alle Strecken: Bus 8–13 % langsamer als Countach und Diablo, Ural/CT680 im Bereich
+// Außenseiter-Chance), Mittel über alle Strecken: Bus 8–16 % langsamer als Countach und Diablo (lange Strecken: mehr
+// Gerade, und die Kart-Kehren kosten den 12-m-Bus zusätzlich – vorher 8–13 %), Ural/CT680 im Bereich
 // des Busses, Golf GTI Mk1 3–6 % langsamer als das Mittel der Supersportwagen, W14 ≥ 8 % schneller
 function paceOf(key) {
   var st = Sim.stats(carRaw(key));
@@ -342,7 +349,7 @@ var PACE = {}, superAvg = SUPER.reduce(function (a, k) { return a + paceOf(k); }
 });
 PACE.golf = paceOf(GOLF_KEY) / superAvg; PACE.w14 = paceOf(W14_KEY) / superAvg;
 ['2022-lamborghini-countach-lp', '1995-lamborghini-diablo-sv'].forEach(function (k) {
-  if (!(PACE[k] >= 1.08 && PACE[k] <= 1.13)) fail('Bus/' + k + ' = ' + PACE[k].toFixed(3) + ' (Soll 8–13 % langsamer)');
+  if (!(PACE[k] >= 1.08 && PACE[k] <= 1.16)) fail('Bus/' + k + ' = ' + PACE[k].toFixed(3) + ' (Soll 8–16 % langsamer)');
 });
 ['ural-4320-soviet-army-truck', 'caterpillar-ct680'].forEach(function (k) {
   if (!(PACE[k] > 0.9 && PACE[k] < 1.1)) fail(k + ': Rundenpace nicht im Bereich des Busses (Bus/' + k + ' = ' + PACE[k].toFixed(3) + ')');
@@ -387,7 +394,7 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
 
 (function () {
   var field = mixedField(mulberry32(7), 7, BUS_KEY);
-  var opts = function () { return { seed: 123456, track: Sim.TRACKS[0], laps: 3, finishWindow: 15, cars: toSimCars(field) }; };
+  var opts = function () { return { seed: 123456, track: Sim.TRACKS[0], laps: LAPS, finishWindow: FW, cars: toSimCars(field) }; };
   var a = run(opts(), 'Determinismus A', true), b = run(opts(), 'Determinismus B', false);
   var ra = JSON.stringify(a.result()), rb = JSON.stringify(b.result());
   if (JSON.stringify(a.events) !== JSON.stringify(b.events)) fail('gleicher Seed ergibt unterschiedliche Ereignisse');
@@ -423,7 +430,7 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
 // ---- 3a. Zuschauer-Aktionen (Nitro, Anrempeln) ----
 (function () {
   var field = mixedField(mulberry32(11), 6);
-  var base = function (ev) { var o = { seed: 4242, track: Sim.TRACKS[1], laps: 3, finishWindow: 15, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
+  var base = function (ev) { var o = { seed: 4242, track: Sim.TRACKS[1], laps: LAPS, finishWindow: FW, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
   function full(sim) { while (!sim.done && sim.time < MAX_T) sim.step(); return JSON.stringify([sim.result(), sim.events, sim.cars, sim.hazards]); }
   // ohne Ereignisse: genau wie vorher (auch mit leerer Liste und setEvents([]) mitten im Rennen)
   var ref = full(Sim.create(base()));
@@ -445,7 +452,7 @@ function toSimCars(field) { return field.map(function (c) { return { id: c.id, s
   // später – auf dem Speedway bester Zeitpunkt > 3 m, auf allen Strecken nie schlechter als −0,3 m
   var gainBy = {};
   Sim.TRACKS.forEach(function (tr) {
-    var ob = function (ev) { var o = { seed: 4242, track: tr, laps: 3, finishWindow: 15, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
+    var ob = function (ev) { var o = { seed: 4242, track: tr, laps: LAPS, finishWindow: FW, cars: toSimCars(field) }; if (ev) o.events = ev; return o; };
     gainBy[tr] = [12, 16, 20, 24, 28, 31].map(function (T0) {
       var probe = Sim.create(ob()); probe.fastForward(T0);
       var lid = probe.standings()[0], li = field.map(function (f) { return f.id; }).indexOf(lid);
@@ -495,7 +502,7 @@ var BUS_DYAW_BEFORE = 0.1238, BUS_JERK_BEFORE = 0.00289;
   for (var k = 0; k < 10; k++) {
     var cars = [{ id: 'bus', stats: Sim.stats(BUS) }];
     for (var i = 1; i < 6; i++) cars.push({ id: 'c' + i, stats: Sim.stats(AVG) });
-    var sim = Sim.create({ seed: 500 + k, track: hair, laps: 3, finishWindow: 15, cars: cars }), T = sim.track;
+    var sim = Sim.create({ seed: 500 + k, track: hair, laps: LAPS, finishWindow: FW, cars: cars }), T = sim.track;
     var wb = Sim.wheelbase(BUS.len), prev = null, prevD = null;
     while (!sim.done) {
       sim.step();
@@ -544,7 +551,7 @@ for (var race = 0; race < RACES; race++) {
     if (lt < best) { best = lt; strongest = c.id; }
   });
   var seed = ((race + (BSEED - 2026) * 100003) * 2654435761) >>> 1;
-  var sim = run({ seed: seed, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15, cars: toSimCars(field) },
+  var sim = run({ seed: seed, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: LAPS, finishWindow: FW, cars: toSimCars(field) },
     'Bilanz-Rennen ' + race, race < 200);
   var res = sim.result();
   res.forEach(function (e) {
@@ -599,7 +606,7 @@ else {
 var PROBE = Math.max(100, Math.round(RACES / 5)), w14Wins = 0, prnd = mulberry32(BSEED + 1);
 for (race = 0; race < PROBE; race++) {
   var pf = mixedField(prnd, 9, W14_KEY, ROAD);
-  var ps = run({ seed: race * 7919 + 1, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15, cars: toSimCars(pf) }, 'Probe ' + race, false);
+  var ps = run({ seed: race * 7919 + 1, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: LAPS, finishWindow: FW, cars: toSimCars(pf) }, 'Probe ' + race, false);
   ps.result().forEach(function (e) { if (e.id === W14_KEY && e.place === 1) w14Wins++; });
 }
 var w14Pct = 100 * w14Wins / PROBE;
@@ -607,13 +614,55 @@ if (w14Pct < 45 || w14Pct > 85) fail('W14 gegen 9 Straßensportwagen gewinnt ' +
 // Golf-Probe ohne Prüfungen je Schritt (nur Ergebnis), dafür viele Rennen: Außenseiter-Chance ist klein
 var GPROBE = RACES, golfWins = 0;
 for (race = 0; race < GPROBE; race++) {
-  var gs = Sim.create({ seed: race * 104729 + 3, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: 3, finishWindow: 15,
+  var gs = Sim.create({ seed: race * 104729 + 3, track: Sim.TRACKS[race % Sim.TRACKS.length], laps: LAPS, finishWindow: FW,
     cars: toSimCars(mixedField(prnd, 9, GOLF_KEY, SUPER)) });
   while (!gs.done && gs.time < MAX_T) gs.step();
   gs.result().forEach(function (e) { if (e.id === GOLF_KEY && e.place === 1) golfWins++; });
 }
 var golfPct = 100 * golfWins / GPROBE;
 if (golfPct < 0.2) fail('Golf GTI Mk1 gegen 9 Supersportwagen gewinnt ' + golfPct.toFixed(2) + ' % (Soll ≥ 0,2 %)');
+
+// ---- 6. Kart: Größe zählt (enge Kehren, 8 m breit) ----
+// Lange Supersportwagen (echte Längen) gegen wendige Kleine (Golf Mk1, Golf GTI 1992, Krabby Patty mit 55° Einschlag):
+// auf dem Kart schrumpft der Rundenzeit-Vorsprung der Großen deutlich (≥ 2 Prozentpunkte gegenüber den langen
+// Strecken), und im Rennen (Feld 5 Große + 4 Kleine) landen die Kleinen auf dem Kart im Mittel ≥ 0,4 Plätze weiter vorn
+var KART_BIG = { '2022-lamborghini-countach-lp': 4.9, 'ferrari-gtc4-lusso': 4.9, '2025-koenigsegg-gemera': 5.0,
+  '2020-abt-sportline-audi-rs6': 5.0, 'ferrari-laferrari': 4.7 };
+var KART_SMALL = { 'volkswagen-golf-gti-1976': 3.8, '1992-volkswagen-golf-gti': 4.0, 'krabby-patty-wagon': 4, '1999-volkswagen-gol-2000-gti': 3.9 };
+function kRaw(key, len) { var r = Stats.guess({ key: key }); r.len = len; return r; }
+var kartInfo = '';
+(function () {
+  var kartT = Sim.TRACKS.filter(function (sd) { return Sim.track(sd).character === 'kart'; })[0];
+  var longT = Sim.TRACKS.filter(function (sd) { return sd !== kartT; });
+  function grpPace(G, tracks) {
+    var ks = Object.keys(G);
+    return ks.reduce(function (a, k) {
+      var st = Sim.stats(kRaw(k, G[k]));
+      return a + tracks.reduce(function (b, sd) { return b + Sim.lapTime(st, Sim.track(sd)); }, 0) / tracks.length;
+    }, 0) / ks.length;
+  }
+  var lead = function (tracks) { return grpPace(KART_SMALL, tracks) / grpPace(KART_BIG, tracks) - 1; };
+  var leadLong = lead(longT), leadKart = lead([kartT]);
+  if (!(leadLong - leadKart >= 0.02)) fail('Kart: Vorsprung der großen Supersportwagen schrumpft nur von ' + (100 * leadLong).toFixed(1) + ' auf ' + (100 * leadKart).toFixed(1) + ' % (Soll ≥ 2 Prozentpunkte)');
+  var KR = Math.max(60, Math.round(RACES / 8)), krnd = mulberry32(BSEED + 7), place = {};
+  [kartT, longT[0]].forEach(function (tr) {
+    var sum = 0, cnt = 0;
+    for (var r = 0; r < KR; r++) {
+      var f = Object.keys(KART_BIG).map(function (k) { return { id: 'B' + k, raw: kRaw(k, KART_BIG[k]) }; })
+        .concat(Object.keys(KART_SMALL).map(function (k) { return { id: 'S' + k, raw: kRaw(k, KART_SMALL[k]) }; }));
+      for (var i = f.length - 1; i > 0; i--) { var j = Math.floor(krnd() * (i + 1)), tmp = f[i]; f[i] = f[j]; f[j] = tmp; }
+      var ks = Sim.create({ seed: r * 7717 + 11, track: tr, laps: LAPS, finishWindow: FW, cars: toSimCars(f) });
+      while (!ks.done && ks.time < MAX_T) ks.step();
+      ks.result().forEach(function (e) { if (e.id[0] === 'S') { sum += e.place === null ? f.length : e.place; cnt++; } });
+    }
+    place[tr] = sum / cnt;
+  });
+  var gain = place[longT[0]] - place[kartT];
+  kartInfo = 'Kart: Rundenvorsprung große Supersportwagen vor wendigen Kleinen ' + (100 * leadLong).toFixed(1) + ' % (lange Strecken) → ' +
+    (100 * leadKart).toFixed(1) + ' % (Kart); Kleine im Rennen im Mittel Platz ' + place[longT[0]].toFixed(2) + ' (' + Sim.track(longT[0]).name +
+    ') → ' + place[kartT].toFixed(2) + ' (Kart), ' + KR + ' Rennen je Strecke';
+  if (!(gain >= 0.4)) fail('Kart: wendige Kleine gewinnen im Rennen nur ' + gain.toFixed(2) + ' Plätze (Soll ≥ 0,4)');
+})();
 
 /* Race-stats-Schätzung (js/car-race-stats.js): Tabelle, Klassen und gültige Bereiche */
 function validRace(g, label) {
@@ -675,6 +724,7 @@ function report() {
   (trackInfo || []).forEach(function (l) { console.log(l); });
   if (busInfo) console.log(busInfo);
   if (typeof paceInfo === 'string') console.log(paceInfo);
+  if (typeof kartInfo === 'string' && kartInfo) console.log(kartInfo);
   if (typeof RACES !== 'undefined' && wtimes.length) {
     console.log('Bilanz ' + RACES + ' Rennen (' + secs.toFixed(1) + ' s): Bus gewinnt ' + busPct.toFixed(1) +
       ' %, stärkstes Auto ' + strongPct.toFixed(1) + ' %; DNF-Anteil ' + (100 * dnfs / (dnfs + finishers)).toFixed(1) +

@@ -8,7 +8,8 @@
  *   CarRaceSim.track(seed) → { pts, len, width, at(s), radiusAt(s), runoffAt(s), runoff, corners,
  *                              longestStraight, turnDir, name, character }
  *       seed wählt das Layout LAYOUTS[(seed − 1) mod 5]; aus dem Seed kommen nur die Wellen.
- *       Polygon mit Eckradien: Geraden + Kreisbögen, Links- UND Rechtskurven, Radien ≥ 13 m, Runde ~295–315 m.
+ *       Polygon mit Eckradien: Geraden + Kreisbögen, Links- UND Rechtskurven. Lange Strecken: Runde ~1,1–1,3 km,
+ *       Radien ≥ 13 m, Breite 10 m; Kart: ~450 m, 8 m breit, Kehren ab R 8 m (track.width je Strecke).
  *       pts = Mittellinie im 1-m-Raster [[x, z]…]; at(s) → { x, z, yaw, curv, nx, nz, bump, runL, runR }
  *       (s in Metern ab Start/Ziel, beliebig auch negativ/über len hinaus; yaw so, dass three.js
  *       rotation.y = yaw die Front +x in Fahrtrichtung dreht; curv > 0 = Linkskurve;
@@ -19,9 +20,9 @@
  *       anderen Streckenteil, innen in Kurven kleiner.
  *       corners = [{ s0, len, dir (+1 links / −1 rechts), minR, counter (gegen die Hauptdrehrichtung) }],
  *       Kurve = zusammenhängender Abschnitt mit |curv| > 1/60; longestStraight (m); turnDir = Hauptdrehrichtung.
- *   CarRaceSim.stats(raw[, real]) → { acc, vmax, grip, brake, susp, launch, len, mass }
+ *   CarRaceSim.stats(raw[, real]) → { acc, vmax, grip, brake, susp, launch, len, lock, drift, mass }
  *       raw = echte Werte aus CarRaceStats { vmax km/h, acc 0–100 km/h in s, hp PS, kg, grip g, brake g,
- *       drive 'fwd'|'rwd'|'awd', len m }; fehlende Werte = Bezugsauto CarRaceSim.REF (300 km/h, 3,5 s, 0,4 PS/kg,
+ *       drive 'fwd'|'rwd'|'awd', len m, steer (Radeinschlag °, → lock rad), drift 0–1 }; fehlende Werte = Bezugsauto CarRaceSim.REF (300 km/h, 3,5 s, 0,4 PS/kg,
  *       1,1 g, 1,3 g, 1500 kg). Jede Größe wirkt als Verhältnis zum Bezugsauto, gestaucht mit dem Realismus-Faktor
  *       real (Standard CarRaceSim.REAL = 0,5; 0 = alle gleich, 1 = volle Verhältnisse; Formel bei REAL unten).
  *       Kurvenhaftung und Bremsen wirken stark, vmax wenig, Beschleunigung aus 0–100-Zeit und Leistungsgewicht.
@@ -29,6 +30,8 @@
  *       vmax ist die absolute Grenze (mit Windschatten); frei fährt das Auto vmax / 1,04.
  *       mass = Masse für Kontakte aus kg (Bus 12 t ≈ 17, Bezugsauto 4,5, Golf 800 kg ≈ 3).
  *   CarRaceSim.lapTime(stats, track) → berechnete Rundenzeit (s) eines Autos allein (ohne Zufall): Rundenpace.
+ *   CarRaceSim.agility(stats, R) → Faktor aufs Kurventempo in engen Kurven (R < 17 m, voll ab 8 m): Radstand, Breite,
+ *       Wendekreis (Länge, Einschlag) und Drift – lange/breite Autos verlieren in Kart-Kehren, wendige gewinnen.
  *   CarRaceSim.create({ seed, track, laps, finishWindow, cars: [{ id, stats }] }) → sim
  *       track = Strecken-Seed (oder fertiges track()-Objekt). cars in Startreihenfolge (Index 0 = Pole).
  *       sim.step()            ein fester Schritt DT = 1/60 s
@@ -99,7 +102,7 @@
  *       ohne andere Autos und ohne Zufall – reine Funktion von snap = { t, prog, x, z, speed } (bzw. { t, s, d, speed })
  *       und t, für alle Instanzen gleich. f.finishBy(tMax) → Zielzeit oder null.
  *       CarRaceSim.follow(track, stats, snap, t, opts) = follower(…).at(t) als Kopie.
- *       Spätestens nach 90 s ist Schluss (opts.maxTime ändert das, z. B. Car Drive mit bis zu 5 Runden). Nach sim.done fahren die Autos zur Darstellung locker weiter,
+ *       Spätestens nach MAX_TIME = 200 s ist Schluss (opts.maxTime ändert das, z. B. Car Drive mit bis zu 5 Runden). Nach sim.done fahren die Autos zur Darstellung locker weiter,
  *       am Ergebnis ändert sich nichts mehr, es kommen keine Ereignisse mehr dazu.
  */
 (function (root, factory) {
@@ -112,7 +115,7 @@
   var DT = 1 / 60;
   var MAX_STEER = 0.42;   // größter Lenkeinschlag der Vorderräder (rad, ca. 24°)
   var YAW_SMOOTH = 25;    // leichte Glättung des Gierwinkels (1/s) gegen Mikro-Zittern
-  var MAX_TIME = 90;          // Rennen endet spätestens nach 90 s
+  var MAX_TIME = 200;         // Rennen endet spätestens nach 200 s (2 Runden auf den langen Strecken ≈ 2:20)
   var WIDTH = 10;             // Streckenbreite (m)
   var SLIP_RANGE = 25;        // Windschatten bis 25 m Abstand
   var SLIP_BONUS = 1.04;      // +4 % Endgeschwindigkeit im Windschatten
@@ -172,6 +175,13 @@
   var WRECK_V = 8;            // an einem Wrack vorbei höchstens 8 m/s
   var STUCK_T = 4;            // wer so lange steht, quetscht sich durch den Auslauf
   var HYST = 1;               // Positionswechsel erst ab 1 m Vorsprung (kein Flackern)
+  // Enge Kurven (Radius < R_AGILE, voll ab R_TIGHT): Fahrzeuggröße, Lenkeinschlag und Drift zählen.
+  // Maß = (Radstand − Bezug) + 1,5 · (Breite − Bezug) + (Wendekreis-Radius − Bezug) in m, geteilt durch den
+  // Kurvenradius, begrenzt auf AG_LO…AG_HI; Kurventempo × (1 − K_SIZE · Maß) – lange/breite Supersportwagen verlieren
+  // in Kart-Kehren, wendige Kleinwagen (Krabby Patty 55°) gewinnen. Drift (0–1, Bezug 0,5): ± K_DRIFT/2 in Kehren,
+  // dafür etwas mehr Abfluggefahr (RISK_DRIFT).
+  var R_AGILE = 17, R_TIGHT = 8, K_SIZE = 0.45, AG_LO = -0.15, AG_HI = 0.4, K_DRIFT = 0.05, RISK_DRIFT = 0.6;
+  var LOCK_REF = 38 * Math.PI / 180;
   var TWO_PI = Math.PI * 2;
 
   // ---- Zufall ----
@@ -192,21 +202,32 @@
   // ---- Strecke ----
   // Drei kuratierte Layouts: Polygon [x, z, R] – an jeder Ecke ein Kreisbogen mit Radius R (m),
   // dazwischen Geraden. Ecken gegen die Hauptdrehrichtung ergeben Gegenkurven/Schikanen.
+  // Lange Strecken (Konzept 2026-11-20): ~1,1–1,3 km je Runde, Chatrennen 2 Runden ≈ 2:20; Kart bleibt kurz
+  // (~450 m), schmal (8 m) und eng (Kehren R 8–10 m) – dort zählen Größe und Wendekreis (agility()).
   var LAYOUTS = [
-    { name: 'Speedway', character: 'fast', pts: [          // lange Geraden, Senke mit zwei Gegenkurven
-      [0, 0, 22], [110, 0, 24], [110, 56, 15], [82, 56, 15], [70, 38, 15], [46, 38, 15], [34, 56, 15], [0, 56, 16]
+    { name: 'Speedway', character: 'fast', pts: [          // 310-m-Startgerade, schneller Rechtsbogen, Schikane,
+      [0, 0, 30], [340, 0, 35], [390, 50, 25], [390, 120, 15], [350, 130, 15], [325, 95, 13], [290, 95, 13],   // Gegengerade
+      [270, 130, 15], [290, 175, 20], [200, 185, 24], [160, 150, 15], [115, 150, 15], [95, 180, 18],         // mit Senke
+      [-10, 185, 25], [-50, 130, 14], [-15, 95, 14], [-50, 60, 22]                                           // (zwei Gegenkurven), S zurück
     ] },
-    { name: 'Twister', character: 'twisty', pts: [         // neun Kurven, S-Kurven links und rechts
-      [0, 0, 15], [85, 0, 16], [100, 25, 13], [75, 41, 13], [94, 71, 13], [43, 74, 15], [30, 52, 13], [4, 58, 13], [-5, 28, 14]
+    { name: 'Twister', character: 'twisty', pts: [         // zwanzig Kurven: Esses links/rechts im Wechsel, kurze Geraden
+      [0, 0, 15], [140, 0, 16], [170, 35, 13], [145, 62, 13], [170, 98, 13], [235, 98, 18], [268, 62, 14], [320, 62, 16],
+      [350, 100, 13], [320, 152, 15], [255, 152, 13], [225, 192, 15], [135, 197, 16], [105, 162, 13], [62, 178, 13],
+      [22, 140, 14], [-22, 152, 15], [-35, 92, 14], [8, 62, 13], [-18, 30, 14]
     ] },
-    { name: 'Hairpin', character: 'hairpin', pts: [        // lange Gerade in eine 180°-Haarnadel, danach Schikane
-      [0, 0, 18], [102, 0, 13], [102, 27, 13], [70, 27, 15], [54, 48, 15], [28, 38, 15], [10, 62, 15], [-20, 36, 16]
+    { name: 'Hairpin', character: 'hairpin', pts: [        // 300-m-Gerade in eine 180°-Haarnadel, Serpentinen mit zwei
+      [0, 0, 18], [330, 0, 13], [330, 34, 13], [235, 34, 15], [205, 72, 14], [300, 78, 13], [300, 112, 13],   // weiteren
+      [185, 112, 16], [155, 155, 14], [105, 155, 14], [85, 122, 14], [45, 122, 14], [25, 162, 16],            // Kehren,
+      [-30, 162, 18], [-45, 60, 18]                                                                           // Schikane
     ] },
-    { name: 'Coast', character: 'sweeping', pts: [         // weite, schnelle Bögen, eine Schikane oben, Gegenbogen
-      [0, 0, 22], [96, 0, 34], [132, 28, 30], [132, 64, 14], [106, 68, 14], [95, 80, 14], [54, 80, 22], [34, 65, 18], [0, 63, 22], [-12, 34, 22]
+    { name: 'Coast', character: 'sweeping', pts: [         // weite, schnelle Bögen; Kap-Kehre am Leuchtturm, Schikane,
+      [0, 0, 30], [260, 0, 60], [400, 50, 40], [455, 140, 14], [420, 162, 14], [372, 108, 22], [330, 150, 16],  // Gegenbögen
+      [352, 188, 14], [310, 210, 16], [200, 212, 40], [120, 178, 30], [60, 210, 22], [-20, 200, 35], [-62, 125, 30],
+      [-28, 72, 20], [-62, 30, 25]
     ] },
-    { name: 'Kart', character: 'kart', pts: [              // kurze Gerade, dann eng links/rechts im Wechsel
-      [0, 0, 15], [84, 0, 15], [100, 26, 13], [78, 46, 13], [96, 70, 13], [62, 82, 17], [40, 62, 14], [10, 76, 17], [-12, 46, 20]
+    { name: 'Kart', character: 'kart', width: 8, pts: [    // kurz, 8 m schmal: kurze Gerade, dann Kehren R 8–10 m
+      [0, 0, 12], [85, 0, 9], [92, 28, 8], [56, 30, 8], [48, 54, 9], [88, 60, 10], [96, 90, 9], [64, 98, 8],      // im Wechsel
+      [38, 76, 9], [10, 96, 10], [-20, 76, 9], [2, 50, 8], [-22, 24, 10]
     ] }
   ];
   var CORNER_K = 1 / 60;      // Kurve = zusammenhängender Abschnitt mit |curv| > 1/60
@@ -362,7 +383,8 @@
       }
     }
     raw.BUMP = BUMP;
-    var run = runoffs(raw, WIDTH / 2);
+    var W = lay.width || WIDTH;   // Kart schmaler: Fahrzeuggröße zählt
+    var run = runoffs(raw, W / 2);
     raw.RUNL = run.left; raw.RUNR = run.right;
     var pts = [];
     for (i = 0; i < n; i++) pts.push([raw.X[i], raw.Z[i]]);
@@ -387,7 +409,7 @@
       else corners.push({ s0: sc.s0, len: sc.len, dir: sc.kind, minR: sc.minR, counter: sc.kind !== dir });
     });
     var t = {
-      seed: seed, name: lay.name, character: lay.character, pts: pts, len: L, width: WIDTH,
+      seed: seed, name: lay.name, character: lay.character, pts: pts, len: L, width: W,
       at: at, radiusAt: radiusAt, runoffAt: runoffAt,
       runoff: { left: Array.prototype.slice.call(run.left), right: Array.prototype.slice.call(run.right), max: RUNOFF_MAX },
       corners: corners, longestStraight: straight, turnDir: dir, _raw: raw
@@ -404,6 +426,8 @@
       hp = num(raw.hp, 20, 2000, REF.pw * REF.kg), kg = num(raw.kg, 300, 40000, REF.kg),
       grip = num(raw.grip, 0.2, 5, REF.grip), brake = num(raw.brake, 0.3, 6, REF.brake);
     var len = Number(raw.len); if (!(len > 0)) len = 4.5;
+    var lock = Number(raw.steer) > 0 ? clamp(Number(raw.steer), 10, 60) * Math.PI / 180 : LOCK_REF;
+    var drift = raw.drift != null && raw.drift !== '' && isFinite(Number(raw.drift)) ? clamp(Number(raw.drift), 0, 1) : 0.5;
     // Beschleunigung: geometrisches Mittel aus 0–100-Zeit und Leistungsgewicht (PS je kg)
     var accR = Math.sqrt(REF.acc / acc) * Math.sqrt(hp / kg / REF.pw);
     function f(ratio, w) {
@@ -417,7 +441,7 @@
       brake: BRAKE_BASE * f(brake / REF.brake, W_BRAKE),
       susp: clamp(0.2 + 0.3 * grip, 0.3, 0.9),       // Federung (Wellen, Wanken) aus der Haftung: Bus weich, Rennwagen straff
       launch: LAUNCH[raw.drive] || 1,
-      len: len,
+      len: len, lock: lock, drift: drift,
       mass: MASS_BASE * Math.pow(kg / REF.kg, R * W_MASS)        // Masse für Kontakte (Bus 12 t ≈ 17, Golf 800 kg ≈ 3)
     };
   }
@@ -427,7 +451,7 @@
   function lapTime(st, T) {
     T = typeof T === 'object' && T ? T : track(T | 0);
     var raw = T._raw, n = raw.n, ds = raw.ds, prof = new Float64Array(n), k, pass, vtop = st.vmax / SLIP_BONUS;
-    for (k = 0; k < n; k++) prof[k] = Math.min(vtop, Math.sqrt(st.grip / Math.max(Math.abs(raw.CRV[k]), 1e-4)));
+    for (k = 0; k < n; k++) prof[k] = Math.min(vtop, cornerV(st, raw.CRV[k]));
     for (pass = 0; pass < 2; pass++) for (k = n - 1; k >= 0; k--) {
       var nx = prof[(k + 1) % n]; prof[k] = Math.min(prof[k], Math.sqrt(nx * nx + 2 * st.brake * ds));
     }
@@ -447,6 +471,22 @@
   function carWidth(len) { return clamp(len * 0.42, 1.7, 2.6); }
   // Radstand (m): Abstand Vorder- zu Hinterachse, 0,6 × Länge (Bus 12 m → 7,2 m)
   function wheelbase(len) { return 0.6 * len; }
+  // Faktor aufs Kurventempo in engen Kurven (Radius R): Größe/Wendekreis/Drift, siehe R_AGILE oben; 1 bei R ≥ R_AGILE
+  var REF_WB = wheelbase(4.5), REF_W = carWidth(4.5), REF_TURN = REF_WB / Math.tan(LOCK_REF);
+  function tightness(R) { return clamp((R_AGILE - R) / (R_AGILE - R_TIGHT), 0, 1); }
+  function agility(st, R) {
+    var k = tightness(R);
+    if (!(k > 0)) return 1;
+    var len = st.len > 0 ? st.len : 4.5, wb = wheelbase(len);
+    var size = (wb - REF_WB) + 1.5 * (carWidth(len) - REF_W) + 0.5 * (wb / Math.tan(st.lock || LOCK_REF) - REF_TURN);
+    var f = -K_SIZE * clamp(size / R, AG_LO, AG_HI) + K_DRIFT * ((st.drift == null ? 0.5 : st.drift) - 0.5);
+    return 1 + k * f;
+  }
+  // Kurvengrenze (m/s) eines Autos an Krümmung crv: √(Haftung · R) × Wendigkeit
+  function cornerV(st, crv) {
+    var R = 1 / Math.max(Math.abs(crv), 1e-4);
+    return Math.sqrt(st.grip * R) * agility(st, R);
+  }
 
   // ---- Rennen ----
   function create(opts) {
@@ -538,8 +578,7 @@
       // dann rückwärts Bremszonen einrechnen
       var prof = new Float64Array(n), k;
       for (k = 0; k < n; k++) {
-        var R = 1 / Math.max(Math.abs(raw.CRV[k]), 1e-4);
-        prof[k] = Math.min(st.vmax, Math.sqrt(st.grip * R)) * (1 - 0.06 * raw.BUMP[k] * (1.1 - st.susp));
+        prof[k] = Math.min(st.vmax, cornerV(st, raw.CRV[k])) * (1 - 0.06 * raw.BUMP[k] * (1.1 - st.susp));
       }
       for (var pass = 0; pass < 2; pass++) {
         for (k = n - 1; k >= 0; k--) {
@@ -893,8 +932,8 @@
               var R = Math.min(R_RISK, 1 / Math.max(Math.abs(crvAt(c.s)), 1e-4));
               if (!cruise && c.state === 'run' && c.v > 4 && p.offTo === null && !c.off) {
                 var gripNow = p.st.grip * (p.oilT > 0 ? OIL_GRIP : 1);
-                var ratio = c.v / Math.sqrt(G_REF * R), own = c.v / Math.sqrt(gripNow * R);
-                var rate = RISK * Math.pow(ratio, RISK_EXP) * Math.exp((own - 1) * 12);
+                var ratio = c.v / Math.sqrt(G_REF * R), own = c.v / (Math.sqrt(gripNow * R) * agility(p.st, R));
+                var rate = RISK * Math.pow(ratio, RISK_EXP) * Math.exp((own - 1) * 12) * (1 + RISK_DRIFT * ((p.st.drift == null ? 0.5 : p.st.drift) - 0.5) * tightness(R));
                 if (rnd() < rate * DT) {
                   var u = rnd();
                   startEvent(i, c, p, u < EV_SLIDE ? 'slide' : u < EV_OFF ? 'off' : u < EV_SPIN ? 'spin' : 'crash');
@@ -1156,7 +1195,7 @@
     var laps = opts.laps || 3, w = carWidth(st.len), lim = HALF - w / 2 - 0.1, wb = wheelbase(st.len), wheelR = clamp(0.07 * st.len, 0.3, 0.55);
     var prof = new Float64Array(n), k, pass;
     for (k = 0; k < n; k++) {
-      prof[k] = Math.min(st.vmax, Math.sqrt(st.grip / Math.max(Math.abs(raw.CRV[k]), 1e-4))) * (1 - 0.06 * raw.BUMP[k] * (1.1 - st.susp));
+      prof[k] = Math.min(st.vmax, cornerV(st, raw.CRV[k])) * (1 - 0.06 * raw.BUMP[k] * (1.1 - st.susp));
     }
     for (pass = 0; pass < 2; pass++) for (k = n - 1; k >= 0; k--) {
       var nx = prof[(k + 1) % n]; prof[k] = Math.min(prof[k], Math.sqrt(nx * nx + 2 * st.brake * ds));
@@ -1233,6 +1272,6 @@
     DT: DT, WIDTH: WIDTH, MAX_TIME: MAX_TIME,
     // fünf kuratierte Strecken, Reihenfolge fest (neue werden hinten angehängt)
     TRACKS: [1, 2, 3, 4, 5],
-    HEAVY_PUSH: HEAVY_PUSH, REAL: REAL, REF: REF, lapTime: lapTime, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
+    HEAVY_PUSH: HEAVY_PUSH, REAL: REAL, REF: REF, lapTime: lapTime, agility: agility, LAYOUTS: LAYOUTS, carWidth: carWidth, wheelbase: wheelbase, rng: rng, track: track, stats: stats, create: create
   };
 });

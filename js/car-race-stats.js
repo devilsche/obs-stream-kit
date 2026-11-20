@@ -2,8 +2,11 @@
  * plus im Car editor gespeicherte Abweichungen.
  * Läuft im Browser (window.CarRaceStats) und in Node (module.exports). Prüfskript: scripts/check_car_race_sim.js
  *
- *   CarRaceStats.guess(entry) → { on, vmax, acc, hp, kg, grip, brake, drive, len, steer, engine }
- *       steer = größter Radeinschlag in Grad (nur Car Drive, Schätzung nach Fahrzeugart),
+ *   CarRaceStats.guess(entry) → { on, vmax, acc, hp, kg, grip, brake, drive, len, steer, drift, engine }
+ *       steer = größter Radeinschlag in Grad (Car Drive; im Chatrennen der Wendekreis in engen Kehren),
+ *       drift = Driftfreude 0–1 (Schätzung aus Antrieb, Leistungsgewicht, Radstand und Klasse: Heckantrieb mit viel
+ *       Leistung hoch, Frontantrieb/Rennwagen mit Abtrieb/Nutzfahrzeuge niedrig; Car Drive: Heck lässt sich kontrolliert
+ *       quer halten, Handbremse dreht williger; Chatrennen: etwas schneller durch Kehren, etwas mehr Abfluggefahr),
  *       engine = Motorklang (js/car-engine-audio.js, ENGINES): echter Motor je Katalog-Schlüssel, sonst nach Name,
  *       entry = Katalog-Eintrag { key, name, brand, len }. Echte Werte: vmax km/h, acc = 0–100 km/h in s,
  *       hp = PS, kg = Leergewicht, grip = Kurvenhaftung in g, brake = Bremsverzögerung in g.
@@ -20,7 +23,7 @@
   var KEYS = ['vmax', 'acc', 'hp', 'kg', 'grip', 'brake'];
   var RANGE = {
     vmax: [30, 420], acc: [1.5, 60], hp: [20, 2000], kg: [300, 40000], grip: [0.2, 5.0], brake: [0.3, 6.0], len: [0.5, 20],
-    steer: [10, 60]
+    steer: [10, 60], drift: [0, 1]
   };
 
   // Tabelle je Katalog-Schlüssel: vmax, acc, hp, kg, grip, brake, drive (vom Nutzer abgesegnet, Bremsen vom Controller)
@@ -136,6 +139,7 @@
     r.drive = t ? t.drive : /ferrari/i.test((entry && (entry.brand || '') + ' ' + (entry.name || '')) || '') ? 'rwd' : v.drive;
     r.len = inRange('len', len) ? len : 4.5;
     r.steer = steerGuess(entry);
+    r.drift = driftGuess(entry, r, c.id);
     r.engine = engineGuess(entry);
     return r;
   }
@@ -193,12 +197,29 @@
     return 38;
   }
 
+  // Driftfreude 0–1 (auf 0,05 gerundet): Grundwert je Antrieb (Heck 0,6, Allrad 0,4, Front 0,2), viel Leistung je kg
+  // bricht das Heck leichter aus (±0,25), kurzer Radstand dreht williger ein (±0,1); Rennwagen mit viel Haftung
+  // (Abtrieb) −0,25; Formel 1, Busse und Lkw fest niedrig, Spaß-Autos (Hoonicorn …) fest hoch
+  function driftGuess(entry, r, klassId) {
+    var n = entry ? ((entry.key || '') + ' ' + (entry.name || '')).toLowerCase() : '';
+    if (/w14|\bf1\b|formula/.test(n)) return 0.1;
+    if (/trolza|\bbus\b|megapolis|ural|truck|ct680|caterpillar|semi/.test(n) || klassId === 'bus' || klassId === 'truck') return 0.1;
+    if (/hoonicorn|crasher/.test(n)) return 0.95;
+    if (/krabby/.test(n)) return 0.7;
+    function cl(x, a, b) { return x < a ? a : x > b ? b : x; }
+    var d = { rwd: 0.6, awd: 0.4, fwd: 0.2 }[r.drive] || 0.4;
+    d += 0.25 * cl((r.hp / r.kg - 0.3) / 0.4, -1, 1);
+    d += 0.1 * cl((4.6 - r.len) / 1.2, -1, 1);
+    if (r.grip >= 1.4) d -= 0.25;
+    return Math.round(cl(d, 0.05, 0.95) * 20) / 20;
+  }
+
   // nur gültige Felder der neuen Form; alte 1–10-Felder (power, speed, handling, susp, brakes, weight) fallen weg
   function clean(race) {
     var o = {};
     if (!race || typeof race !== 'object') return o;
     if (typeof race.on === 'boolean') o.on = race.on;
-    KEYS.concat(['len', 'steer']).forEach(function (k) { var n = +race[k]; if (race[k] != null && race[k] !== '' && inRange(k, n)) o[k] = n; });
+    KEYS.concat(['len', 'steer', 'drift']).forEach(function (k) { var n = +race[k]; if (race[k] != null && race[k] !== '' && inRange(k, n)) o[k] = n; });
     if (ENGINES.indexOf(race.engine) >= 0) o.engine = race.engine;
     if (race.drive === 'fwd' || race.drive === 'rwd' || race.drive === 'awd') o.drive = race.drive;
     return o;

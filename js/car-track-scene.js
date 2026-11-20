@@ -448,7 +448,11 @@
       return true;
     };
     // zufällig im Band dmin…dmax (m neben der Fahrbahn) streuen; o = { dmin, dmax, rad, s: [min, max], pred, tint() }
+    // Anzahl je Thema gilt für eine ~320-m-Runde; lange Strecken bekommen mehr (√ der Länge, höchstens doppelt so
+    // viele), damit die Kulisse nicht ausdünnt, ohne dass die Dreiecke mit der Länge voll mitwachsen
+    var SCATTER_K = Math.max(1, Math.min(2, Math.sqrt(T.len / 320)));
     ctx.scatter = function (kd, count, o) {
+      count = Math.round(count * SCATTER_K);
       var R = ctx.rnd, placed = 0, s0 = o.s ? o.s[0] : 1, s1 = o.s ? o.s[1] : 1, ext = HALF + o.dmax;
       for (var t = 0; t < count * 30 && placed < count; t++) {
         var x = lerp(minX - ext, maxX + ext, R()), z = lerp(minZ - ext, maxZ + ext, R()), s = lerp(s0, s1, R());
