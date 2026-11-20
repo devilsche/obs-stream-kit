@@ -71,3 +71,36 @@ Je Thema eigener Himmel, Licht und Bodenfarbe (z. B. warme Abendstimmung an der 
     Netz (nicht trennbar) → eigener Platz-Typ Baumreihe.
   - Gemessen (Seed 1–5): Speedway 216k / 31 Zeichenaufrufe, Twister 270k / 43, Hairpin 275k / 19, Coast 165k / 75,
     Kart 245k / 67; 2,1–8,5 MB je Thema.
+
+## Fassaden, Werbung, Graffiti (2026-11-20)
+
+Ziel: keine grauen, leeren Flächen mehr an Bauten der Kulisse.
+
+- Inventur (vorher grau/einfarbig): Werbebanden (Farbfläche je Instanz), Stadion-Betonmauer, Industrie-Hintergrund
+  (Silos grau, Schornsteine nur Streifen), prozedurale Ersatz-Halle und Ersatz-Boxen (graue Klötze), Container (nur
+  Farbe), Modelle ohne Textur: „Stands/Tribunes“ (weiß), „Sports Bleachers“ (dunkelgrau), „Stadium Stand“ (grau),
+  „Warehouse FBX Model Free“ (Blech dunkelgrau, ohne UV), „Red Bull F1 Garage“ (Hülle weiß/grau).
+- Fehler gefunden: `propParts` verlor die zusammengefassten einfarbigen Materialien (Gruppe wurde während
+  `order.filter` angehängt und vom Filter nie besucht). Modelle nur aus einfarbigen Materialien waren unsichtbar
+  (Stands/Tribunes, Sports Bleachers, Stadium Light), bei Boxen und Lagerhalle fehlte die Hülle. Behoben; damit die
+  Kulissen im Budget bleiben, sechs Modelle mit kleinerem Dreiecks-Budget neu aufbereitet (Stadium Light 2,4k statt
+  12k, Tribünen 1,8–2k, Warehouse 5k).
+- Ein Atlas `CarTrackThemes.Art` (Canvas 2048 × 1024, zur Laufzeit gezeichnet, seitenweit geteilt, ~11 MB GPU mit
+  Mipmaps, 0 Byte Download): 16 Fassaden-Kacheln (Beton, Büro-Fenster, Wellblech hell/rostig, Ziegel, Ziegel mit
+  Fenstern, Dach, Silo, Publikum, Sitze, Rolltor, Holz, Beton verschmutzt, Fensterband, Paneele, Glas), 8 Werbeflächen
+  mit frei erfundenen Sponsoren (Purple Peak, Golden Lap, Hypernoodle, Turbo Taco, Zephyr Fuel, Pixel Piston, Comet
+  Cola, Gripworx – keine echten Marken), 6 Graffiti.
+- Ein Material-Typ (`Art.material`): Kachel je Ecke (`aTile`, `aStep`: wiederholen/einmal), Farbe = Ecken-Farbe ×
+  Textur, wo die Textur durchsichtig ist nur Ecken-Farbe; Kachel je Instanz über `iVar` (Banden, Graffiti). Mip-Stufe aus
+  der ungebrochenen UV (`textureGrad`, gedeckelt), keine Nähte am Kachelrand. Kit-Teile tragen die Kachel (`Kit.add`
+  `tile`/`uv: geo|box|cyl`/`faces`/`vary`), der Hintergrund bleibt eine Geometrie, jede Deko-Art ein InstancedMesh.
+- Einsatz: Werbebanden (Sponsor je Bande, 2–4 gleiche hintereinander), Stadion-Mauer-Front (3-m-Felder, Schrift von der
+  Strecke aus lesbar), Ersatz-Boxen/-Halle, Industrie-Silos/-Schornsteine, Kart: Graffiti-Mauern (8, längs zur Strecke)
+  und Graffiti an der Außenseite äußerer unterer Container (sitzt ein Modell dort: auf dessen gemessener Seitenwand,
+  `onProp` mit `faceZ`). Einfarbige Modelle über Katalog-Feld `paint` (`seats`, `warehouse`, `pits`, in
+  `candidates.json`, vom Build-Skript durchgereicht): Teile ohne Textur bekommen Kacheln nach Flächen-Richtung
+  (Box-Projektion) – Tribünen Publikum, Rückseite Werbeband, Seiten Beton; Halle Wellblech + Dach; Boxen helle Teile
+  Paneele + Dach.
+- Gemessen (Kulissen-Modelle, Seed 1–5): Speedway 297k / 39, Twister 278k / 44, Hairpin 275k / 19, Coast 173k / 76,
+  Kart 282k / 68. Ganze Szene (Gelände, Fahrbahn, Deko, Modelle): Speedway 50 → 58 und Kart 84 → 87 Zeichenaufrufe
+  (Graffiti-Aufkleber, Graffiti-Mauern und durch den Fix wieder sichtbare Modellteile), sonst +0/+1.
