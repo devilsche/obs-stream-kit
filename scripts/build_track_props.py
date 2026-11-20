@@ -237,6 +237,13 @@ def normalize(path, c):
     g.setdefault("nodes", []).append({"name": "TrackPropRoot", "matrix": [float(v) for v in M.T.reshape(-1)], "children": list(sc["nodes"])})
     sc["nodes"] = [len(g["nodes"]) - 1]
     g.pop("animations", None)   # Kulisse steht still
+    if c.get("cutout", c.get("kind") in ("tree", "palm")):
+        # Blätter: halbtransparent (BLEND) → Ausstanzen (MASK, alphaTest) – BLEND wird bei Hunderten Instanzen nicht
+        # sortiert (Blätter verschwinden/flackern), MASK schreibt Tiefe und braucht keine Sortierung
+        for m in g.get("materials", []):
+            if m.get("alphaMode") == "BLEND":
+                m["alphaMode"] = "MASK"
+                m.setdefault("alphaCutoff", 0.5)
     bcr.glb_write(path, g, binc)
     return [round(float(v * s), 2) for v in ext], yaw
 

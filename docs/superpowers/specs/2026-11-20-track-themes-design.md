@@ -58,7 +58,8 @@ Je Thema eigener Himmel, Licht und Bodenfarbe (z. B. warme Abendstimmung an der 
 - Bäume (2026-11-20): 12 Sketchfab-Modelle (CC BY), Pakete in einzelne Bäume zerlegt – je Teil ein Eintrag mit
   derselben uid, `part` und `keepNode` (Datei `<uid>-<part>.glb`, Route erlaubt das Anhängsel; eine Quellenangabe je
   Modell). 26 Einträge, je ~0,1–3,3k Dreiecke (gltfpack, bei dichten Modellen `aggressive`), Texturen 256 px, Blätter
-  behalten ihr Alpha (GLTFLoader: MASK → alphaTest). Optionales Katalog-Feld `themes` wie `slots`.
+  behalten ihr Alpha; halbtransparente Blätter (BLEND) werden beim Aufbereiten zu MASK (alphaTest 0,5) –
+  BLEND wird bei Hunderten Instanzen nicht sortiert (Flackern), MASK schreibt Tiefe (`cutout`, Standard für tree/palm). Optionales Katalog-Feld `themes` wie `slots`.
   - Wald (slot `forestTree`): 70 nahe Bäume (×Streckenlänge, 15–50 m) als eigene Art, Ersatz Nadelbaum; Modelle:
     Conifer, Comicstyle Fir, 4 Birken, 3 Eichen (klein/mittel/groß), 4 Detail-Bäume aus dem Low Poly Forest Tree Pack
     (dessen Atlas-Hintergrundbäume und Steine weggelassen). Ferne Bäume bleiben prozedural (Budget).
