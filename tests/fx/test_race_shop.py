@@ -27,7 +27,7 @@ def test_prices_follow_the_spec():
     assert race_shop.PRICES == {"small": 150, "sedan": 400, "sport": 900, "super": 2000, "race": 3500,
                                 "f1": 6000, "fun": 250}
     assert race_shop.price("amg-w14-s1") == 6000
-    assert race_shop.price("ferrari-296-gt3") == 3500
+    assert race_shop.price("ferrari-296-gt3-verstappen") == 3500
     assert race_shop.price("2024-porsche-992-gt3-r") == 3500
     assert race_shop.price("audi-a4-r9-dtm-a") == 3500
     assert race_shop.price("porsche-917k-lm-red") == 3500

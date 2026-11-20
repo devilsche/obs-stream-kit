@@ -32,7 +32,7 @@ LABELS = {"small": "Small/Classic", "sedan": "Sedan", "sport": "Sports car", "su
 
 _KEYS = {
     "f1": ["amg-w14-s1"],
-    "race": ["porsche-917k-lm-red", "ferrari-296-gt3", "ferrari-296-gt3-verstappen", "2024-porsche-992-gt3-r",
+    "race": ["porsche-917k-lm-red", "ferrari-296-gt3-verstappen", "2024-porsche-992-gt3-r",
              "audi-a4-r9-dtm-a", "2017-porsche-gt-rsr-991-duke"],
     "super": ["2025-koenigsegg-gemera", "ferrari-laferrari", "2022-lamborghini-countach-lp", "porsche-918-free",
               "2021-ferrari-sf90-spider", "ferrari-488-pista-widebody", "2026-ferrari-849-testarossa",
