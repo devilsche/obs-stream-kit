@@ -196,7 +196,8 @@
     if (/w14|\bf1\b|formula/.test(n)) return 24;
     if (/gt3[ -]?r\b|296-gt3|296 gt3|dtm|917k|\blm\b|r9-dtm/.test(n)) return 30;
     if (/krabby/.test(n)) return 55;   // Spielzeug-Burgerwagen: extrem wendig, ideal für kurvige Strecken
-    if (/trolza|bus\b|megapolis|ural|truck|ct680|caterpillar|semi/.test(n)) return 45;
+    if (/trolza|bus\b|megapolis/.test(n)) return 56;    // Stadtbus: sehr großer Einschlag (enger Wendekreis trotz Länge)
+    if (/ural|truck|ct680|caterpillar|semi/.test(n)) return 48;
     return 38;
   }
 

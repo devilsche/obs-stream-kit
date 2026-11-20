@@ -95,7 +95,9 @@
     return {
       acc: st.acc || 5, vtop: (st.vmax || 27) / 1.04, grip: st.grip || 11, brake: st.brake || 8,
       susp: st.susp || 0.5, launch: st.launch || 1, mass: st.mass || 4.5, len: len,
-      wb: 0.6 * len, width: clamp(len * 0.42, 1.7, 2.6), drive: DRIVE[raw.drive] ? raw.drive : 'rwd',
+      wb: 0.6 * len,
+      // schwere Fahrzeuge (Bus/Lkw) quietschen/qualmen erst bei deutlich mehr Schräglauf (große, weiche Reifen)
+      slipK: (st.mass || 4.5) > 10 ? 1.5 : 1, width: clamp(len * 0.42, 1.7, 2.6), drive: DRIVE[raw.drive] ? raw.drive : 'rwd',
       realVmax: raw.vmax > 0 ? +raw.vmax : 300, wheelR: clamp(0.07 * len, 0.3, 0.55),
       lock: clamp((raw.steer > 0 ? +raw.steer : 38) * Math.PI / 180, 0.17, 1.05),  // größter Radeinschlag (rad) je Auto
       drift: st.drift != null && isFinite(st.drift) ? clamp(+st.drift, 0, 1) : 0.5     // Driftfreude (Race stats)
@@ -182,6 +184,14 @@
     var slideX = (inp.steer || 0) * car.r < 0 ? clamp((car.slip - 0.45) / 0.35, 0, 1) * dr0 * 0.25 : 0;
     var maxSteer = clamp(P.wb * Gs / Math.max(1, u * u) + ALPHA_PEAK * 0.9 + slideX, 0.1, lock);
     var want = clamp(inp.steer || 0, -1, 1) * maxSteer;
+    // Lenkhilfe gegen Untersteuern: die Vorderräder nie weiter als bis zum Haftungsmaximum über die Fahrtrichtung der
+    // Vorderachse hinaus einschlagen (mehr Einschlag würde nur rutschen – lange Busse/Lkw schoben sonst geradeaus);
+    // bei Schritttempo bleibt der volle Einschlag (kinematisch), dazwischen weich
+    if (Math.abs(u) > 2) {
+      var dirS = u < -0.5 ? -1 : 1, aim = Math.atan2(w + car.r * (P.wb / 2), Math.max(Math.abs(u), 4)) * dirS;
+      var band = ALPHA_PEAK * 1.15 + Math.max(0, 7 - Math.abs(u)) * 0.12 + slideX;
+      want = clamp(want, aim - band, aim + band);
+    }
     // nach einem Crash kurz benommen: Lenkung träger, weniger Haftung, Drehung wird nicht kinematisch weggebügelt
     var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
     if (car.hitT > 0) car.hitT = Math.max(0, car.hitT - dt);
@@ -222,11 +232,13 @@
     var Ff = -Gf * sat(af / ALPHA_PEAK), Fr = -Gr * sat(ar / ALPHA_PEAK, 0.72 + 0.2 * dr0, 0.16 - 0.08 * dr0);
     var ay = (Ff * Math.cos(delta) + Fr) / 2;
     var yawAcc = (a * Ff * Math.cos(delta) - b * Fr) / 2 / (a * b);
-    car.slip = clamp(Math.max(Math.abs(af), Math.abs(ar)) / (ALPHA_PEAK * 2.5) * Math.min(1, sp / 6) + (hb && sp > 3 ? 0.4 : 0), 0, 1);
+    car.slip = clamp(Math.max(Math.abs(af), Math.abs(ar)) / (ALPHA_PEAK * 2.5 * P.slipK) * Math.min(1, sp / 6) + (hb && sp > 3 ? 0.4 : 0), 0, 1);
     // integrieren
     car.vx += (fx * ax + lx * ay) * dt; car.vz += (fz * ax + lz * ay) * dt;
     car.r += yawAcc * dt;
-    car.r -= car.r * 0.6 * dt;                         // leichte Gierdämpfung (Stabilität)
+    // leichte Gierdämpfung (Stabilität); bei langem Radstand schwächer – dort ist das Giermoment der Reifen kleiner,
+    // eine feste Dämpfung fräße Bussen/Lkw die halbe Lenkwirkung
+    car.r -= car.r * 0.6 * Math.min(1, 2.8 / P.wb) * dt;
     // wenig Driftfreude: ausbrechendes Heck (hinten über dem Haftmaximum) wird von selbst eingefangen
     if (Math.abs(ar) > ALPHA_PEAK && !hb) car.r -= car.r * 1.6 * (0.5 - Math.min(0.5, dr0)) * 2 * dt;
     // langsam: kinematisch (kein Schräglauf-Modell nahe 0) – Gierrate aus Lenkwinkel, Querrutschen abbauen
@@ -345,9 +357,16 @@
     var h = overlap({ x: car.x, z: car.z, yaw: car.yaw, len: len, w: w }, o);
     if (!h) return null;
     var nx = h.nx, nz = h.nz, tx = -nz, tz = nx;
-    // ganz heraus (der andere bewegt sich hier nicht) – so fährt man nie durch ein Auto, auch langsam/rückwärts nicht
-    car.x += nx * (h.pen + 0.002); car.z += nz * (h.pen + 0.002);
     var mP = P.mass, mA = o.mass > 0 ? o.mass : P.mass, invA = isFinite(mA) ? 1 / mA : 0;
+    // Lage: ganz heraus, wenn ich hineinfahre – so fährt man nie durch ein Auto, auch langsam/rückwärts nicht.
+    // Rammt mich dagegen der andere (KI-/Fremdauto auf fester Bahn, das hier nicht ausweicht), schiebt er mich nur
+    // nach Massenanteil: ein leichter Wagen verschiebt einen Bus kaum (der Rest bleibt als Überlappung stehen).
+    var myIn = -(car.vx * nx + car.vz * nz), oIn = (o.vx || 0) * nx + (o.vz || 0) * nz;
+    var share = invA && oIn > 0.5 && oIn > myIn ? Math.max(0.08, mA / (mA + mP)) : 1;
+    // Steckt ein leichterer Rammer schon tiefer drin: weder schieben noch Stoß – er fährt durch (wie im Overlay, wo die Sim
+    // fährt), statt mich Bild für Bild auf sein Tempo mitzunehmen
+    if (share < 0.5 && h.pen > 0.25) return { impact: 0, slide: 0, scrape: false, jx: 0, jz: 0, px: h.px, pz: h.pz, nx: nx, nz: nz, pen: h.pen, tx: tx, tz: tz };
+    car.x += nx * (h.pen * share + 0.002); car.z += nz * (h.pen * share + 0.002);
     var I = mP * (len * len + w * w) / 12 * INERTIA_K;
     var rx = h.px - car.x, rz = h.pz - car.z;            // Hebel vom Schwerpunkt zum Kontaktpunkt
     // Tempo im Kontaktpunkt: v + Gierrate × Hebel (Gierrate + = links: Punkt bewegt sich um (rz, −rx))

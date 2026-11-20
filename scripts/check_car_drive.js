@@ -188,6 +188,18 @@ function crashRun(car, inp, others, secs, react) {
   if (r.vOut == null) r.vOut = Math.hypot(car.vx, car.vz);
   return r;
 }
+// Ich im Bus (steht), ein leichtes KI-/Fremdauto auf fester Bahn rammt mich von hinten (weicht nicht aus, wie im
+// Chatrennen): es verschiebt den Bus nur nach Massenanteil, nicht um seine ganze Fahrt
+(function () {
+  var me = carFor('trolza-5265-00-megapolis', TB, { s: S0 + 20, d: 0 }), a = TB.at(S0), fx = Math.cos(a.yaw), fz = -Math.sin(a.yaw);
+  var light = carFor('1990-mercedes-benz-190e-2-5', TB, { s: S0, d: 0 });
+  var o = { x: a.x, z: a.z, yaw: a.yaw, len: light.P.len, w: light.P.width, vx: fx * 20, vz: fz * 20, mass: light.P.mass,
+    x0: a.x, z0: a.z, yaw0: a.yaw };
+  var bx = me.x, bz = me.z;
+  crashRun(me, { brake: 1 }, [o], 2);
+  var moved = Math.hypot(me.x - bx, me.z - bz), drove = Math.hypot(o.x - a.x, o.z - a.z);
+  ok(moved < drove * 0.35, 'Bus (Masse ' + me.P.mass.toFixed(1) + ') von leichtem Auto (Masse ' + light.P.mass.toFixed(1) + ', 20 m/s, feste Bahn) gerammt: Bus ' + moved.toFixed(1) + ' m verschoben, Rammer fuhr ' + drove.toFixed(1) + ' m');
+})();
 // Bus quer über die Strecke (Breitseite), Bus längs (Heck): nie durchfahren, auch bei Tempo, langsam, rückwärts
 [[5, 'quer'], [15, 'quer'], [30, 'quer'], [45, 'quer'], [30, 'längs'], [3, 'längs']].forEach(function (cs) {
   var v = cs[0], car = carFor('bmw-m3-competition', TB, { s: S0, d: 0 }), bus = busAt(S0 + 25, 0, cs[1] === 'quer' ? Math.PI / 2 : 0);
@@ -264,6 +276,26 @@ function crashRun(car, inp, others, secs, react) {
   }
   var kl = ram('krabby-patty-wagon'), kh = ram('ural-4320-soviet-army-truck');
   ok(kh > 0.6 && kl < kh - 0.3, 'Rammen: Laster behält ' + (kh * 100).toFixed(0) + ' % Tempo, leichtes Auto ' + (kl * 100).toFixed(0) + ' %');
+})();
+
+// 13b) Bus/Lkw (lang, schwer, langsam): kein Untersteuern – voller Einschlag nutzt die Haftung (Lenkhilfe: Vorderräder
+// nie über das Haftungsmaximum hinaus), mit echter Länge
+(function () {
+  var T = Sim.track(1);
+  [['trolza-5265-00-megapolis', 12], ['caterpillar-ct680', 7.5]].forEach(function (kc) {
+    [8, 14].forEach(function (v) {
+      var raw = Stats.guess({ key: kc[0], len: kc[1] }), car = Phys.create(T, Phys.params(Sim.stats(raw), raw), { s: -40, d: -3 });
+      var fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw); car.vx = fx * v; car.vz = fz * v;
+      var best = 0;
+      for (var t = 0; t < 2; t += DT) {
+        var h0 = Math.atan2(car.vz, car.vx); Phys.step(car, { steer: 1, throttle: 0.3 }, DT);
+        if (car.surface !== 'asphalt') break;
+        var dh = Math.atan2(car.vz, car.vx) - h0; while (dh > Math.PI) dh -= 2 * Math.PI; while (dh < -Math.PI) dh += 2 * Math.PI;
+        best = Math.max(best, Math.abs(dh / DT) * Math.hypot(car.vx, car.vz));
+      }
+      ok(best >= car.P.grip * 0.7, kc[0].split('-')[0] + ' voller Einschlag bei ' + v + ' m/s: Querbeschleunigung ' + best.toFixed(1) + ' von ' + car.P.grip.toFixed(1) + ' m/s² Haftung');
+    });
+  });
 })();
 
 // 14) Lenkung: kein hartes Untersteuern – voller Einschlag nutzt bei Tempo die Kurvenhaftung aus; Einschlag je Auto
