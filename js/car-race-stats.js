@@ -15,6 +15,8 @@
  *   CarRaceStats.of(key[, entry]) → race-Objekt: guess() überlagert mit ToyCars.vehicle(key).race
  *       (nur gültige Felder; alte 1–10-Felder power/speed/handling/susp/brakes/weight werden verworfen).
  *       Ohne entry wird der Katalog von ToyCars durchsucht.
+ *   rclass = Fahrzeugklasse für Klassen-Rekorde (RCLASSES: everyday, sports, super, race, suv, heavy, fun; Schätzung aus
+ *       Klasse, Name, PS, Endtempo, Gewicht; im Car editor änderbar), CarRaceStats.rclassName(id) → englischer Name.
  *   CarRaceStats.ENGINES (gültige Motorklänge), CarRaceStats.KEYS, CarRaceStats.RANGE (gültige Bereiche je Feld), CarRaceStats.TABLE (Schlüssel → Werte),
  *   CarRaceStats.clean(race) → nur gültige Felder
  */
@@ -141,6 +143,7 @@
     r.steer = steerGuess(entry);
     r.drift = driftGuess(entry, r, c.id);
     r.engine = engineGuess(entry);
+    r.rclass = rclassGuess(entry, r, c.id);
     return r;
   }
 
@@ -219,12 +222,33 @@
   }
 
   // nur gültige Felder der neuen Form; alte 1–10-Felder (power, speed, handling, susp, brakes, weight) fallen weg
+  // Fahrzeugklassen für die Rundenrekorde (Klassen-Rekord je Strecke): Schätzung aus Klasse, Name und Werten,
+  // im Car editor änderbar (race.rclass)
+  var RCLASSES = [
+    { id: 'everyday', name: 'Everyday cars' }, { id: 'sports', name: 'Sports cars' }, { id: 'super', name: 'Supercars' },
+    { id: 'race', name: 'Race cars' }, { id: 'suv', name: 'SUVs & pickups' }, { id: 'heavy', name: 'Buses & trucks' },
+    { id: 'fun', name: 'Fun cars' }
+  ];
+  function rclassGuess(entry, r, klassId) {
+    var n = entry ? ((entry.key || '') + ' ' + (entry.name || '') + ' ' + (entry.brand || '')).toLowerCase() : '';
+    if (klassId === 'fun' || /krabby|hoonicorn|crasher/.test(n)) return 'fun';
+    if (klassId === 'bus' || klassId === 'truck' || r.kg >= 5000) return 'heavy';
+    // Rennwagen: GT3 R/RSR/296 GT3 (Straßen-GT3 und „Touring“ sind Sportwagen), Formel, Le Mans, DTM, Rallye, NASCAR
+    if (/w14|\bf1\b|formula|gt3[ -]?r\b|296-gt3|\brsr\b|\bdtm\b|917k|\blm\b|lmp|gt4|\brally|\bwrc\b|nascar|touring car|race ?car/.test(n)) return 'race';
+    if (klassId === 'suv' || /\bsuv\b|g63|g-class|g-klasse|\bx[5-7]\b|range rover|cayenne|\burus\b|pick-?up|raptor|hilux|f-150|jeep|wrangler|defender|land cruiser|bronco/.test(n)) return 'suv';
+    if (r.hp >= 600 || r.vmax >= 320) return 'super';
+    if (r.hp >= 300 || r.vmax >= 250) return 'sports';
+    return 'everyday';
+  }
+  function rclassName(id) { var c = RCLASSES.filter(function (x) { return x.id === id; })[0]; return c ? c.name : id; }
+
   function clean(race) {
     var o = {};
     if (!race || typeof race !== 'object') return o;
     if (typeof race.on === 'boolean') o.on = race.on;
     KEYS.concat(['len', 'steer', 'drift']).forEach(function (k) { var n = +race[k]; if (race[k] != null && race[k] !== '' && inRange(k, n)) o[k] = n; });
     if (ENGINES.indexOf(race.engine) >= 0) o.engine = race.engine;
+    if (RCLASSES.some(function (c) { return c.id === race.rclass; })) o.rclass = race.rclass;
     if (race.drive === 'fwd' || race.drive === 'rwd' || race.drive === 'awd') o.drive = race.drive;
     return o;
   }
@@ -238,7 +262,7 @@
     return r;
   }
 
-  var api = { guess: guess, of: of, clean: clean, KEYS: KEYS, RANGE: RANGE, TABLE: TABLE, ENGINES: ENGINES, ENGINE: ENGINE };
+  var api = { guess: guess, of: of, clean: clean, RCLASSES: RCLASSES, rclassName: rclassName, KEYS: KEYS, RANGE: RANGE, TABLE: TABLE, ENGINES: ENGINES, ENGINE: ENGINE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CarRaceStats = api;
 })(typeof window !== 'undefined' ? window : this);

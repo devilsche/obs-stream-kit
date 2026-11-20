@@ -198,7 +198,9 @@ def race_state(key):
 def _records(tid):
     from fx.endpoints import lap_records_json
     try:
-        out, status = lap_records_json(tid, request.args.get("track") or "", request.args.get("car") or "")
+        v = _viewer() or {}
+        out, status = lap_records_json(tid, request.args.get("track") or "", request.args.get("car") or "",
+                                       v.get("id"), v.get("display") or v.get("login"))
     except Exception:
         current_app.logger.exception("car-drive: records failed")
         out, status = {"ok": False, "error": "records unavailable"}, 500

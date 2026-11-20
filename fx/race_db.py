@@ -420,6 +420,20 @@ def lap_records(conn, tenant_id: int, track: int, limit: int = 50) -> dict:
     return {"track": cars[0] if cars else None, "cars": cars}
 
 
+def lap_personal(conn, tenant_id: int, user_id: str) -> list:
+    """Eigene Bestzeit je Strecke (über alle Autos), Strecken aufsteigend → [{track, user_id, display, car_key, time, at}]."""
+    rows = conn.execute(
+        "SELECT track, user_id, display, car_key, lap_time, at FROM fx_race_lap_record WHERE tenant_id = ? AND user_id = ? "
+        "ORDER BY track, lap_time, at, id", (tenant_id, str(user_id))).fetchall()
+    out, seen = [], set()
+    for x in rows:
+        if x["track"] in seen:
+            continue
+        seen.add(x["track"])
+        out.append(dict(_lap_row(x), track=int(x["track"])))
+    return out
+
+
 def lap_submit(conn, tenant_id: int, track: int, car_key: str, user_id: str, display: str,
                lap_time: float, source: str = "", at=None) -> dict:
     """Geprüfte Runde eintragen (nur die beste je Tenant/Strecke/Auto/Fahrer bleibt). → {personal, car, track,

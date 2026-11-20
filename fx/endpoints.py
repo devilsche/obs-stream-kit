@@ -908,8 +908,10 @@ def _lap_track(arg):
     return None
 
 
-def lap_records_json(tenant_id, track_arg, car=None):
-    """Rundenrekorde für Streamer.bot (say) und Car Drive. Ohne track: Streckenrekord je Strecke.
+def lap_records_json(tenant_id, track_arg, car=None, user_id=None, user_name=None):
+    """Rundenrekorde für Streamer.bot (say) und Car Drive. Ohne track: Streckenrekord je Strecke; track=me (mit
+    user_id): eigene Bestzeit je Strecke. Mit user_id zusätzlich mine (eigene Bestzeit dieser Strecke, jedes Auto) und
+    mine_all (je Strecke). cars = Bestzeit je Auto (bis 200, für Klassen-Rekorde im Client).
     → (dict, status). Zeilen {user_id, display, car_key, time, at} + car_name."""
     catalog = _race_cars()[0]
 
@@ -918,6 +920,19 @@ def lap_records_json(tenant_id, track_arg, car=None):
             row = dict(row, car_name=race_shop.car_name(catalog, row["car_key"]))
         return row
     car = (car or "")[:120] or None
+    user_id = (str(user_id) if user_id else "")[:64] or None
+
+    def personal():
+        rows = _with_conn(lambda conn: race_db.lap_personal(conn, tenant_id, user_id)) if user_id else []
+        return [dict(named(x), track_name=race_db.TRACK_NAMES[x["track"]]) for x in rows
+                if 0 <= x["track"] < len(race_db.TRACK_NAMES)]
+    if (track_arg or "").strip().lower() in ("me", "my", "mine"):
+        mine = personal()
+        who = "@%s" % ((user_name or user_id or "you").lstrip("@")[:25])
+        say = ("%s best laps: " % who + ", ".join("%s %s (%s)" % (x["track_name"], _fmt_lap(x["time"]), x["car_name"])
+                                                 for x in mine)) if mine \
+            else "%s no lap times yet – drive in the chat race or a room" % who
+        return {"ok": True, "mine": mine, "say": say}, 200
     if (track_arg or "").strip() == "":
         recs = _with_conn(lambda conn: [race_db.lap_best(conn, tenant_id, i) for i in range(len(race_db.TRACK_NAMES))])
         tracks = [{"track": i, "track_name": n, "record": named(recs[i])} for i, n in enumerate(race_db.TRACK_NAMES)]
@@ -931,12 +946,15 @@ def lap_records_json(tenant_id, track_arg, car=None):
     name = race_db.TRACK_NAMES[i]
 
     def q(conn):
-        return (race_db.lap_records(conn, tenant_id, i, limit=10),
+        return (race_db.lap_records(conn, tenant_id, i, limit=200),
                 race_db.lap_best(conn, tenant_id, i, car) if car else None)
     recs, mine = _with_conn(q)
     rec = named(recs["track"])
     out = {"ok": True, "track": i, "track_name": name, "record": rec, "car": named(mine),
            "cars": [named(x) for x in recs["cars"]]}
+    if user_id:
+        out["mine_all"] = personal()
+        out["mine"] = next((x for x in out["mine_all"] if x["track"] == i), None)
     if rec:
         out["say"] = "Track record %s: %s %s (%s)" % (name, rec["display"], _fmt_lap(rec["time"]), rec["car_name"])
         if car and mine and mine["car_key"] != rec["car_key"]:
@@ -989,7 +1007,8 @@ def car_race_cmd(token):
         return _no_store(jsonify(out))
     if cmd == "records":
         try:
-            out, status = lap_records_json(g.tenant_id, _arg("track"), _arg("car"))
+            out, status = lap_records_json(g.tenant_id, _arg("track"), _arg("car"), _arg("id"),
+                                           _arg("user").lstrip("@") or None)
         except Exception:
             log.exception("fx car-race: records failed")
             out, status = {"ok": False, "say": "records unavailable"}, 500

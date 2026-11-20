@@ -352,7 +352,13 @@
           <input type="number" id="raceDrift" class="race-num" min="0" max="1" step="0.05" value="0.5" aria-describedby="raceDriftEst">
           <span class="muted small-text" id="raceDriftEst"></span>
         </div>
-        <p class="muted small-text">Drift = how willingly the car slides. High (powerful rear-wheel drive, muscle cars): the rear steps out gently and a slide can be held with throttle and countersteer, the handbrake turns it in more easily; in the chat race a bit faster through hairpins, with slightly more risk of going off. Low (front-wheel drive, race cars with downforce, trucks): grippy and safe, a stepping-out rear catches itself.</p>
+        <p class="muted small-text">Drift = how willingly the car slides. High (powerful rear-wheel drive, muscle cars): the rear steps out gently and a slide can be held with throttle and countersteer, the handbrake turns it in more easily; in the chat race a bit faster through hairpins, with slightly more risk of going off. Low (front-wheel drive, race cars with downforce, trucks): grippy and safe, the rear holds more grip – catching a slide is up to the driver.</p>
+        <div class="row">
+          <label for="raceClass">Record class</label>
+          <select id="raceClass" aria-describedby="raceClassEst"></select>
+          <span class="muted small-text" id="raceClassEst"></span>
+        </div>
+        <p class="muted small-text">Record class = the class this car's laps count in for the class records per track (Car Drive, <code>!records</code>).</p>
         <div class="row">
           <label for="raceEngine">Engine sound</label>
           <select id="raceEngine" aria-describedby="raceEngineEst"></select>
@@ -1175,7 +1181,8 @@
           var el = document.querySelector('.race-in[data-k="' + k + '"]');
           el.value = r[k]; raceEst(el.id, g[k]);
         });
-        $('raceDrive').value = r.drive; $('raceLen').value = r.len; $('raceSteer').value = r.steer; $('raceDrift').value = r.drift; $('raceEngine').value = r.engine;
+        $('raceDrive').value = r.drive; $('raceLen').value = r.len; $('raceSteer').value = r.steer; $('raceDrift').value = r.drift; $('raceEngine').value = r.engine; $('raceClass').value = r.rclass;
+        raceEst('raceClass', CarRaceStats.rclassName(g.rclass));
         raceEst('raceDrive', g.drive.toUpperCase()); raceEst('raceLen', g.len); raceEst('raceSteer', g.steer + '°'); raceEst('raceDrift', g.drift); raceEst('raceEngine', engineLabel(g.engine));
         steerRange(r.steer);
       }
@@ -1188,7 +1195,8 @@
         }
         var r = { on: $('raceOn').checked, drive: $('raceDrive').value, len: val($('raceLen'), 'len'), steer: Math.round(val($('raceSteer'), 'steer')),
           drift: Math.round(val($('raceDrift'), 'drift') * 20) / 20,
-          engine: CarRaceStats.ENGINES.indexOf($('raceEngine').value) >= 0 ? $('raceEngine').value : g.engine };
+          engine: CarRaceStats.ENGINES.indexOf($('raceEngine').value) >= 0 ? $('raceEngine').value : g.engine,
+          rclass: CarRaceStats.RCLASSES.some(function (c) { return c.id === $('raceClass').value; }) ? $('raceClass').value : g.rclass };
         CarRaceStats.KEYS.forEach(function (k) { r[k] = val(document.querySelector('.race-in[data-k="' + k + '"]'), k); });
         return r;
       }
@@ -1196,7 +1204,7 @@
       function raceChanged() {
         var r = raceRead(), g = CarRaceStats.guess(cur), o = {};
         $('raceLen').value = r.len; steerRange(r.steer);
-        CarRaceStats.KEYS.concat(['drive', 'len', 'steer', 'drift', 'engine']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
+        CarRaceStats.KEYS.concat(['drive', 'len', 'steer', 'drift', 'engine', 'rclass']).forEach(function (k) { if (r[k] !== g[k]) o[k] = r[k]; });
         if (!r.on) o.on = false;
         if (Object.keys(o).length) def.race = o; else delete def.race;
       }
@@ -1205,7 +1213,8 @@
         // beim Verlassen den gültigen Wert (geklemmt bzw. Schätzung) zurückschreiben
         el.addEventListener('change', function () { raceChanged(); el.value = raceRead()[el.dataset.k]; if (sndEd) sndEd.fill(); });
       });
-      ['raceOn', 'raceDrive', 'raceLen', 'raceEngine'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
+      CarRaceStats.RCLASSES.forEach(function (c) { var o = document.createElement('option'); o.value = c.id; o.textContent = c.name; $('raceClass').appendChild(o); });
+      ['raceOn', 'raceDrive', 'raceLen', 'raceEngine', 'raceClass'].forEach(function (id) { $(id).addEventListener('change', raceChanged); });
       $('raceEngine').addEventListener('change', function () { if (sndEd) sndEd.fill(); });
       // Motorklang: Auswahl aus js/car-engine-audio.js, Hörprobe über eine eigene (leise) Klangausgabe
       var ENG_TYPES = window.CarEngineAudio ? CarEngineAudio.TYPES : CarRaceStats.ENGINES.map(function (id) { return { id: id, label: id }; });

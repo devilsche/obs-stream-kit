@@ -59,6 +59,16 @@ def test_records_are_per_tenant_and_track(conn):
         race_db.lap_submit(conn, 1, 0, "car-a", "u1", "Uno", 0)
 
 
+def test_personal_best_per_track_any_car(conn):
+    race_db.lap_submit(conn, 1, 0, "car-a", "u1", "Uno", 30.0)
+    race_db.lap_submit(conn, 1, 0, "car-b", "u1", "Uno", 28.5)     # gleiche Strecke, anderes Auto: schneller
+    race_db.lap_submit(conn, 1, 2, "car-a", "u1", "Uno", 40.0)
+    race_db.lap_submit(conn, 1, 0, "car-a", "u2", "Dos", 20.0)     # anderer Fahrer zählt nicht
+    mine = race_db.lap_personal(conn, 1, "u1")
+    assert [(x["track"], x["car_key"], x["time"]) for x in mine] == [(0, "car-b", 28.5), (2, "car-a", 40.0)]
+    assert race_db.lap_personal(conn, 2, "u1") == []
+
+
 # ---- Endpoints ----
 
 @pytest.fixture
@@ -103,6 +113,23 @@ def test_viewer_records_routes(conn, client, monkeypatch):
     monkeypatch.setattr(drive_auth, "call", lambda cmd, timeout=3.0, **p: {"ok": True, "room": {"tenant": 1, "code": "ABC234"}})
     assert client.get("/drive/ABC234/records?track=2&car=car-a").get_json()["car"]["display"] == "Uno"
     assert client.get("/drive/race/nobody-here/records").status_code == 404
+
+
+def test_records_include_personal_for_viewer_and_chat(conn, client, monkeypatch):
+    race_db.lap_submit(conn, 1, 3, "car-a", "u1", "Uno", 21.344)
+    race_db.lap_submit(conn, 1, 1, "car-b", "u1", "Uno", 25.0)
+    race_db.lap_submit(conn, 1, 3, "car-b", "u2", "Dos", 20.5)
+    # Chat: !records me → eigene Bestzeiten je Strecke
+    r = client.get("/s/tok/api/fx/car-race?cmd=records&track=me&id=u1&user=Uno").get_json()
+    assert r["ok"] and r["say"] == "@Uno best laps: Twister 25.00 s (Beta), Coast 21.34 s (Alpha GT)"
+    assert [x["track_name"] for x in r["mine"]] == ["Twister", "Coast"]
+    r = client.get("/s/tok/api/fx/car-race?cmd=records&track=me&id=u9&user=Nemo").get_json()
+    assert r["say"] == "@Nemo no lap times yet – drive in the chat race or a room"
+    # Car Drive (angemeldet): eigene Bestzeit der Strecke dabei
+    monkeypatch.setattr("app.views_drive._viewer", lambda: {"id": "u1", "login": "uno", "display": "Uno"})
+    r = client.get("/drive/race/luckychan/records?track=3").get_json()
+    assert r["mine"]["time"] == 21.344 and r["mine"]["car_name"] == "Alpha GT"
+    assert [x["track"] for x in r["mine_all"]] == [1, 3]
 
 
 # ---- WS-Dienst: geprüfte Runde → lap_record, „rec“ an den Raum ----

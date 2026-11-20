@@ -1106,6 +1106,7 @@
     fetch(url, { credentials: 'same-origin', cache: 'no-store' }).then(function (x) { return x.json(); }).then(function (j) {
       if (race !== r || !j || !j.ok) return;
       r.rec.track = j.record || null; r.rec.car = j.car || null;
+      r.rec.cars = Array.isArray(j.cars) ? j.cars : []; r.rec.mine = j.mine || null; r.rec.signed = 'mine_all' in j;
     }).catch(function () { /* ohne Rekorde */ });
   }
   function recName(row) {
@@ -1122,6 +1123,18 @@
       setText('hCarRec', carRow ? fmt(carRow.time) : '–');
       setText('hCarRecBy', carRow ? carRow.display : '');
     }
+    // Klassen-Rekord: schnellste Bestzeit je Auto unter den Autos derselben Klasse (Car editor „Record class“)
+    var myCls = race.me && race.me.raw ? race.me.raw.rclass : null, clsRow = null;
+    if (myCls && root.CarRaceStats) (rec.cars || []).forEach(function (x) {
+      if (!clsRow && CarRaceStats.of(x.car_key).rclass === myCls) clsRow = x;
+    });
+    setText('hClassRecLbl', myCls && root.CarRaceStats ? CarRaceStats.rclassName(myCls) : 'Class record');
+    setText('hClassRec', clsRow ? fmt(clsRow.time) : '–');
+    setText('hClassRecBy', clsRow ? clsRow.display + ' · ' + recName(clsRow) : '');
+    // eigene Bestzeit dieser Strecke (jedes Auto; nur angemeldet, Chatrennen/Räume)
+    var showMine = !solo && !!rec.signed;
+    ['hMineLbl', 'hMine', 'hMineBy'].forEach(function (id) { $(id).hidden = !showMine; });
+    if (showMine) { setText('hMine', rec.mine ? fmt(rec.mine.time) : '–'); setText('hMineBy', rec.mine ? recName(rec.mine) : ''); }
     setText('hTrackRec', rec.track ? fmt(rec.track.time) : '–');
     setText('hTrackRecBy', rec.track ? rec.track.display + ' · ' + recName(rec.track) : '');
   }
@@ -1131,6 +1144,10 @@
     var mine = mp && String(m.id) === mp.me, row = { display: m.name, car_key: m.car, time: m.time };
     if (m.track_rec) race.rec.track = m.best_track || row;
     if (m.car === race.s.car && (m.car_rec || !race.rec.car)) race.rec.car = m.best_car || row;
+    // Bestzeit je Auto (Klassen-Rekord) und eigene Bestzeit nachziehen, Liste bleibt nach Zeit sortiert
+    var cars = (race.rec.cars || []).filter(function (x) { return x.car_key !== m.car; }), old = (race.rec.cars || []).filter(function (x) { return x.car_key === m.car; })[0];
+    cars.push(old && old.time <= m.time ? old : row); cars.sort(function (a, b) { return a.time - b.time; }); race.rec.cars = cars;
+    if (mine && race.rec.signed && (!race.rec.mine || m.time < race.rec.mine.time)) race.rec.mine = row;
     if (mine && m.track_rec) { flash('NEW TRACK RECORD ' + fmt(m.time), 3.5, true); sfx('jingle', true); say('New track record'); }
     else if (mine && m.car_rec) { flash('NEW CAR RECORD ' + fmt(m.time), 3, true); sfx('jingle', true); say('New car record'); }
     else if (!mine && m.track_rec) flash('Track record by ' + m.name + ' – ' + fmt(m.time), 2.5);
