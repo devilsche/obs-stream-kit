@@ -36,7 +36,7 @@ from fx.drive_room import (CLOCK_AHEAD, JUMP_MAX, LAP_FACTOR, NITRO_V, PROG_SLAC
 
 MAX_CLIENTS = 60           # Verbindungen je Tenant (Piloten + Overlays)
 ROOM_TTL = 1800.0          # Raum ohne Verbindungen verfällt nach 30 min
-RACE_MAX = 90.0            # wie fx/race.RACE_MAX
+RACE_MAX = 200.0           # wie fx/race.RACE_MAX
 TAKEOVER_GAP = 2.0         # so lange ohne Zustand → KI übernimmt
 STREAM_LEAD = 120.0        # Zustände schon in der Startaufstellung verteilen (Countdown/Vorstellung)
 STREAM_TAIL = 15.0         # und nach Rennende noch so lange (Auslaufen)
@@ -87,7 +87,7 @@ class Room:
         self.phase = "idle"
         self.starts_at = None
         self.track = 0
-        self.laps = 3
+        self.laps = 2
         self.fw = 15.0
         self.drivers = {}           # id → Driver (Startreihenfolge)
         self.pilots = None          # eingefroren ab intro (Liste) – vorher None
@@ -120,7 +120,7 @@ class Room:
             self.track = int(info.get("track") or 0) % len(TRACK_LEN)
         except (TypeError, ValueError):
             self.track = 0
-        self.laps = max(1, min(int(_num(info.get("laps")) or 3), 5))
+        self.laps = max(1, min(int(_num(info.get("laps")) or 2), 5))
         self.fw = _num(info.get("fw")) or 15.0
         keep = {}
         for row in info.get("racers") or []:

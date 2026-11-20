@@ -2,7 +2,8 @@
 
 Zuschauer melden sich per !race (Streamer.bot → Endpoint) an. Ab dem 3. Fahrer
 läuft ein Countdown; danach (oder sofort beim 10.) schließt die Startaufstellung, das
-Overlay stellt die Fahrer vor (Phase intro, 2 s + 1,6 s je Fahrer), dann startet das Rennen. Das Overlay holt den
+Overlay stellt die Fahrer vor (Phase intro, 8 s + 2,2 s je Fahrer: „WELCOME TO <Strecke>“, Fahrer, „START YOUR
+ENGINES“, Ampel), dann startet das Rennen (2 Runden auf den langen Strecken, ≈ 2:20). Das Overlay holt den
 Zustand per Poll, fährt das Rennen und meldet die Platzierung zurück. Gespeichert
 wird erst das Ergebnis (fx/race_db.py); die Lobby selbst überlebt keinen Neustart.
 
@@ -24,18 +25,18 @@ from fx import race_shop
 MIN = 3
 MAX = 10
 COUNTDOWN = 60
-RACE_MAX = 90
+RACE_MAX = 200      # wie CarRaceSim.MAX_TIME (2 Runden ≈ 2:20 + Ziel-Frist, langsamstes Feld)
 PODIUM = 16
 LOBBY_TTL = 300
 COOLDOWN = 120
-RESULT_WINDOW = 120
-LAPS = 3
+RESULT_WINDOW = 260  # Ergebnis bis 260 s nach dem Start (RACE_MAX + Puffer fürs Melden)
+LAPS = 2             # lange Strecken (~1,1–1,3 km, Kart ~450 m)
 NITRO_COST = 50
 BUMP_COST = 100
 EVENT_LEAD = 1.5   # Ereignisse gelten 1,5 s nach Eingang, damit alle Overlays sie vor Eintritt haben
-FINISH_WINDOW = 15
-INTRO_BASE = 5.0   # Vorstellung der Fahrer vor dem Start: 5 s + 2,2 s je Fahrer (Overlay: reinschwenken,
-INTRO_PER = 2.2    # Totale halten, langsam von hinten nach vorn, Ampel) – 10 Fahrer ≈ 27 s
+FINISH_WINDOW = 25   # Ziel-Frist nach dem Sieger (s)
+INTRO_BASE = 8.0   # Vorstellung der Fahrer vor dem Start: 8 s + 2,2 s je Fahrer (Overlay: Überflug mit „WELCOME TO
+INTRO_PER = 2.2    # <Strecke>“, Totale, langsam von hinten nach vorn, „START YOUR ENGINES“, Ampel) – 10 Fahrer = 30 s
 
 
 def intro_seconds(n):

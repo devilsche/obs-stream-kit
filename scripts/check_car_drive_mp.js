@@ -89,4 +89,4 @@ function check() {
   console.log(fails ? fails + ' Fehler' : 'alles ok');
   process.exit(fails ? 1 : 0);
 }
-setTimeout(function () { ok(false, 'Zeitüberschreitung (kein Ergebnis nach 90 s)'); process.exit(1); }, 90000);
+setTimeout(function () { ok(false, 'Zeitüberschreitung (kein Ergebnis nach 150 s)'); process.exit(1); }, 150000);

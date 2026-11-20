@@ -1214,7 +1214,7 @@ def car_drive_cmd(token):
                 log.exception("fx car-drive: limits not saved")
         track = _arg("track")
         out = drive_auth.call("open", tenant=g.tenant_id, track=track if track.isdigit() else "random",
-                              laps=_arg("laps") or 3)
+                              laps=_arg("laps") or 2)
         if not out.get("ok"):
             return _no_store(jsonify({"ok": False, "say": "Car Drive is offline", "error": out.get("error")})), 503
         code = out["room"]["code"]

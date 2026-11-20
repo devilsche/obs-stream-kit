@@ -59,7 +59,8 @@ def main():
     key = drive_auth.internal_key(SECRET)
     for _ in range(50):
         try:
-            req = urllib.request.Request(base + "/internal/open?tenant=1&track=0&laps=1", headers={"X-Drive-Key": key})
+            # Kart: kurze Runde (die langen Strecken brauchen ~70 s je Runde)
+            req = urllib.request.Request(base + "/internal/open?tenant=1&track=4&laps=1", headers={"X-Drive-Key": key})
             room = json.loads(urllib.request.urlopen(req, timeout=1).read())["room"]
             break
         except OSError:

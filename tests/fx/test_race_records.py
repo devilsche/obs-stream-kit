@@ -129,8 +129,8 @@ def test_server_records_verified_laps_and_sends_rec(monkeypatch):
         cl = drive_ws.Client(FakeWs(), {"id": "u1"}, room.code)
         L, s0 = room.track_len, dr.grid_pose(0)[0]
         t0 = room.start_at
-        # zwei Runden à 22 s, gleichmäßig
-        total, T, steps = 2 * L - s0 + 0.5, 44.0, 120
+        # zwei Runden à 70 s, gleichmäßig
+        total, T, steps = 2 * L - s0 + 0.5, 140.0, 240
         for k in range(1, steps + 1):
             rt = T * k / steps
             srv.clock = lambda v=t0 + rt: v

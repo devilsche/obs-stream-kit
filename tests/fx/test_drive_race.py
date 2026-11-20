@@ -90,8 +90,8 @@ def test_result_merge_pilot_times_window_and_invalid(cars):
     race.set_pilots(TID, rid, ["b", "c"], T)
     race.add_takeovers(TID, rid, [{"t": 9, "id": "c", "grid": 1}])
     now = st["starts_at"] + 70
-    # a = KI 50 s, b = Pilot 48 s (schnellster), c = übernommen (Nachfahrer 70 s > 48 + 15 → DNF), d = KI 60 s
-    rows = race.accept_result(TID, rid, [1, None, None, 2], now, times=[50.0, None, 70.0, 60.0],
+    # a = KI 50 s, b = Pilot 48 s (schnellster), c = übernommen (Nachfahrer 80 s > 48 + 25 → DNF), d = KI 60 s
+    rows = race.accept_result(TID, rid, [1, None, None, 2], now, times=[50.0, None, 80.0, 60.0],
                               pilot_res={"b": {"fin": 48.0, "invalid": False}, "c": {"fin": None}})
     got = {r["user_id"]: r["place"] for r in rows}
     assert got == {"b": 1, "a": 2, "d": 3, "c": None}
@@ -170,14 +170,14 @@ def test_pilot_finish_and_takeover_after_gap():
     L = room.track_len
     evs = []
     for k in range(1, 61):
-        rt = 30.0 * k / 60
-        evs += send(room, "a", rt, -3.0 + (L + 3.5) * k / 60, start + rt, speed=(L + 3.5) / 30)
-    assert evs and evs[-1]["fin"] == 30.0
+        rt = 60.0 * k / 60
+        evs += send(room, "a", rt, -3.0 + (L + 3.5) * k / 60, start + rt, speed=(L + 3.5) / 60)
+    assert evs and evs[-1]["fin"] == 60.0
     assert room.tick(start + 1) == []
     out = room.tick(start + 2.5)                   # b nie verbunden → vom Startplatz
     assert out == [{"t": 2.5, "type": "takeover", "id": "b", "grid": 1}]
     rep = room.report(set())
-    assert rep["pilots"]["a"]["fin"] == 30.0 and rep["pilots"]["b"]["taken"] and rep["takeovers"][0]["id"] == "b"
+    assert rep["pilots"]["a"]["fin"] == 60.0 and rep["pilots"]["b"]["taken"] and rep["takeovers"][0]["id"] == "b"
     assert not room.may_drive("b", start + 3)
 
 

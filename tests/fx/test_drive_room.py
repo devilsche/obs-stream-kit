@@ -26,7 +26,7 @@ def drive(room, uid, rt, prog, now, x=None, z=0.0, speed=20.0):
     return room.state(uid, msg, now)
 
 
-def race_clean(room, uid, laps, lap_time=22.0, start=None, steps=60):
+def race_clean(room, uid, laps, lap_time=70.0, start=None, steps=60):
     """Fährt plausibel `laps` Runden: gleichmäßig, Tempo = Strecke / Rundenzeit."""
     L = room.track_len
     s0 = dr.grid_pose(room.drivers[uid].grid)[0]
@@ -97,11 +97,11 @@ def test_clean_race_two_finishers_and_rows():
     hub, room = room_with(2, laps=2)
     room.start(T0)
     room.tick(T0 + dr.COUNTDOWN)
-    e0 = race_clean(room, "u0", 2, lap_time=21.0)
-    e1 = race_clean(room, "u1", 2, lap_time=22.0)
+    e0 = race_clean(room, "u0", 2, lap_time=68.0)
+    e1 = race_clean(room, "u1", 2, lap_time=70.0)
     assert [e["lap"] for e in e0] == [1, 2] and all(e["ok"] for e in e0) and "fin" in e0[-1]
     assert all(e["ok"] for e in e1)
-    evs = room.tick(room.start_at + 50)
+    evs = room.tick(room.start_at + 160)
     res = next(e for e in evs if e["t"] == "results")
     assert room.phase == "done"
     assert [(r["id"], r["place"], r["status"]) for r in res["list"]] == [("u0", 1, "finished"), ("u1", 2, "finished")]
@@ -130,7 +130,7 @@ def test_single_driver_race_is_not_recorded():
     room.start(T0)
     room.tick(T0 + dr.COUNTDOWN)
     race_clean(room, "u0", 1)
-    room.tick(room.start_at + 30)
+    room.tick(room.start_at + 90)
     assert room.phase == "done" and room.rows() is None
 
 
@@ -140,9 +140,9 @@ def test_restart_from_done_resets_progress():
     room.tick(T0 + dr.COUNTDOWN)
     race_clean(room, "u0", 1)
     race_clean(room, "u1", 1)
-    room.tick(room.start_at + 40)
+    room.tick(room.start_at + 90)
     rid = room.race_id
-    ok, _ = room.start(T0 + 100)
+    ok, _ = room.start(T0 + 200)
     assert ok and room.race_id != rid and all(d.finish_t is None and d.lap == 0 for d in room.drivers.values())
 
 
@@ -153,7 +153,7 @@ def test_disconnected_driver_in_race_stays_as_dnf_and_race_ends_when_rest_finish
     room.leave("u1", room.start_at + 1)
     assert "u1" in room.drivers and room.drivers["u1"].connected is False
     race_clean(room, "u0", 1)
-    evs = room.tick(room.start_at + 25)
+    evs = room.tick(room.start_at + 90)
     assert any(e["t"] == "results" for e in evs)
 
 
@@ -215,9 +215,11 @@ def test_reset_back_on_track_is_allowed():
 
 
 def test_limits_per_car():
-    lim = dr.Limits({"cars": {"slow": {"vtop": 10, "lap": [40, 40, 40, 40, 40]}, "bad": "x"}})
+    lim = dr.Limits({"cars": {"slow": {"vtop": 10, "lap": [70, 70, 70, 70, 40]}, "old": {"vtop": 20, "lap": [20]}, "bad": "x"}})
     assert lim.vtop("slow") == 10 and lim.vtop("other") == dr.GLOBAL_VTOP
-    assert lim.min_lap("slow", 0) == 40 * dr.LAP_FACTOR
+    assert lim.min_lap("slow", 0) == 70 * dr.LAP_FACTOR
+    # veraltete Werte (alte, kurze Strecken) fallen nie unter die globale Untergrenze
+    assert lim.min_lap("old", 0) == dr.GLOBAL_LAP[0] * dr.LAP_FACTOR
     assert lim.min_lap("other", 2) == dr.GLOBAL_LAP[2] * dr.LAP_FACTOR
     hub, room = room_with(1, laps=1, limits=lim)
     room.drivers["u0"].car = "slow"

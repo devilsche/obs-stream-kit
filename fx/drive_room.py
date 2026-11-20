@@ -35,14 +35,16 @@ COUNTDOWN = 8.0
 FINISH_WINDOW = 30.0
 ROOM_TTL = 1800.0          # Raum ohne Verbindungen verfällt nach 30 min
 LAPS_MIN, LAPS_MAX = 1, 5
+LAPS_DEFAULT = 2          # lange Strecken: 2 Runden ≈ 2:20
 
 # Streckenlängen (m) für CarRaceSim.TRACKS = [1..5] (Speedway, Twister, Hairpin, Coast, Kart)
-TRACK_LEN = [312.96, 299.35, 293.70, 370.96, 323.91]
+TRACK_LEN = [1209.02, 1084.46, 1148.26, 1332.53, 450.10]
 TRACK_NAMES = ["Speedway", "Twister", "Hairpin", "Coast", "Kart"]
-# schnellstes denkbares Auto (vmax 420, 0–100 1,5 s, 2000 PS, 300 kg, 5 g): Endtempo der Fahrphysik (m/s)
-# und Sim-Rundenzeit je Strecke (s)
+# schnellstes denkbares Auto (vmax 420, 0–100 1,5 s, 2000 PS, 300 kg, 5 g, 0,5 m lang, 60° Einschlag, Drift 1):
+# Endtempo der Fahrphysik (m/s) und Sim-Rundenzeit je Strecke (s) – absolute Untergrenze, auch für veraltete
+# drive-limits.json (alte, kurze Strecken)
 GLOBAL_VTOP = 27.68
-GLOBAL_LAP = [16.87, 17.82, 16.70, 18.48, 18.57]
+GLOBAL_LAP = [56.37, 57.19, 55.68, 57.63, 28.31]
 NITRO_V = 1.25
 SPEED_MARGIN = 1.15
 SPEED_SLACK = 2.0
@@ -59,7 +61,7 @@ def grid_pose(i):
 
 
 def race_max(laps):
-    return laps * 90.0 + 60.0
+    return laps * 150.0 + 60.0   # lange Strecken: Runde ~60–75 s (KI), Menschen langsamer
 
 
 def _num(v):
@@ -96,7 +98,8 @@ class Limits:
         t = None
         if c and track < len(c["lap"]):
             t = c["lap"][track]
-        return (t or GLOBAL_LAP[track]) * LAP_FACTOR
+        # nie unter der globalen Untergrenze (veraltete Werte der alten, kurzen Strecken zählen nicht)
+        return max(t or 0.0, GLOBAL_LAP[track]) * LAP_FACTOR
 
 
 class Driver:
@@ -383,7 +386,7 @@ class Hub:
         try:
             laps = int(laps)
         except (TypeError, ValueError):
-            laps = 3
+            laps = LAPS_DEFAULT
         laps = max(LAPS_MIN, min(laps, LAPS_MAX))
         old = self.close(tenant_id)
         room = Room(self._code(), tenant_id, track, laps, self._limits(), now)

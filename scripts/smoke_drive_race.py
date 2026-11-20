@@ -75,7 +75,7 @@ async def run(port):
         except OSError:
             await asyncio.sleep(0.1)
     start = time.time() + 3
-    info = {"race_id": "smoke-1", "phase": "intro", "starts_at": start, "track": 0, "laps": 1, "fw": 15,
+    info = {"race_id": "smoke-1", "phase": "intro", "starts_at": start, "track": 4, "laps": 1, "fw": 25,
             "racers": [["a", "car-a", 0], ["b", "car-b", 1], ["c", "car-c", 2]], "pilots": None, "taken": []}
     ia, ib, isp = [], [], []
     wa = await client(port, "a", "driver", ia)
@@ -88,10 +88,10 @@ async def run(port):
     await asyncio.to_thread(sync, base, key, info)
     await asyncio.sleep(0.2)
     ok(any(m.get("t") == "race" and m["race"]["pilots"] == ["a", "b"] for m in isp), "Overlay kennt die Piloten")
-    L = drive_race.TRACK_LEN[0]
+    L = drive_race.TRACK_LEN[4]   # Kart: kurze Runde (die langen Strecken brauchen ~70 s)
     s0 = -3.0
     t0 = time.time()
-    lap_t = 22.0
+    lap_t = 24.0
     while True:
         now = time.time()
         rt = now - start
