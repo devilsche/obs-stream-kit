@@ -91,7 +91,7 @@
  *       sim.standings() → [id…]  aktuelle Reihenfolge
  *       sim.result() → [{ id, place|null }] in Startreihenfolge (null = DNF)
  *       Ende: der erste im Ziel startet die Frist finishWindow; wer danach nicht im Ziel ist, ist DNF.
- *       Spätestens nach 90 s ist Schluss. Nach sim.done fahren die Autos zur Darstellung locker weiter,
+ *       Spätestens nach 90 s ist Schluss (opts.maxTime ändert das, z. B. Car Drive mit bis zu 5 Runden). Nach sim.done fahren die Autos zur Darstellung locker weiter,
  *       am Ergebnis ändert sich nichts mehr, es kommen keine Ereignisse mehr dazu.
  */
 (function (root, factory) {
@@ -445,6 +445,7 @@
     var T = typeof opts.track === 'object' && opts.track ? opts.track : track(opts.track | 0);
     var raw = T._raw, n = raw.n, ds = raw.ds, L = T.len, HALF = T.width / 2;
     var laps = opts.laps || 3, finishWindow = opts.finishWindow == null ? 15 : opts.finishWindow;
+    var maxTime = opts.maxTime > 0 ? +opts.maxTime : MAX_TIME;   // Car Drive: längere Rennen (bis 5 Runden)
     // Weltposition (x, z) eines Punkts mit Streckenkoordinaten s / d
     function worldAt(s, d) { var a = T.at(s); return [a.x + a.nx * d, a.z + a.nz * d]; }
     var rnd = rng(opts.seed | 0);
@@ -1081,7 +1082,7 @@
         if (!sim.done) {
           var open = 0;
           for (i = 0; i < cars.length; i++) if (cars[i].place === null && !P[i].parked) open++;
-          if (open === 0 || time >= deadline - 1e-9 || time >= MAX_TIME - 1e-9) {
+          if (open === 0 || time >= deadline - 1e-9 || time >= maxTime - 1e-9) {
             sim.done = true;
             for (i = 0; i < cars.length; i++) {
               if (cars[i].place === null && !P[i].parked) emit('dnf', i, null, { reason: 'time' });

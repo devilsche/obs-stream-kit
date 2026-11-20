@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Car Drive</title>
+  <link rel="stylesheet" href="/widgets-static/_theme.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0,0">
+  <style>
+    /* Car Drive: das Rennen selbst fahren (Admin-Tool, Vollbild). Logik in js/car-drive.js, Fahrphysik js/car-drive-phys.js,
+       Strecke js/car-track-scene.js, Gegner aus js/car-race-sim.js. Farben aus den Theme-Tokens (--theme-*), mit
+       festen Rückfällen (keine verschachtelten var()-Rückfälle). */
+    :root {
+      --cd-page: #0d0912;
+      --cd-surface: var(--theme-surface, #1d1128);
+      --cd-surface-2: var(--theme-surface-2, #2a1838);
+      --cd-text: var(--theme-text, #ffffff);
+      --cd-dim: var(--theme-text-dim, #c9bdd6);
+      --cd-accent: var(--theme-accent, #f2b705);
+      --cd-primary: var(--theme-primary, #5e2a79);
+      --cd-border: var(--theme-border, #5e2a79);
+      --cd-ok: var(--theme-ok, #6fdc8c);
+      --cd-radius: var(--theme-radius, 8px);
+      --cd-font: var(--theme-font-display, 'DM Sans', system-ui, sans-serif);
+      --cd-body: var(--theme-font-body, 'DM Sans', system-ui, sans-serif);
+      --cd-mono: var(--theme-font-mono, ui-monospace, 'DejaVu Sans Mono', monospace);
+      --cd-hud-bg: rgba(13, 9, 18, 0.72);
+      --cd-focus: #f2b705;
+    }
+    html, body { margin: 0; height: 100%; background: var(--cd-page); color: var(--cd-text); font: 15px/1.45 var(--cd-body); overflow: hidden; }
+    .skip { position: absolute; left: -9999px; top: 8px; z-index: 50; }
+    .skip:focus { left: 12px; background: var(--cd-accent); color: #1b1300; padding: 8px 12px; border-radius: 6px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .icon { font-family: 'Material Symbols Outlined'; font-size: 22px; line-height: 1; vertical-align: middle; font-weight: normal; font-style: normal; }
+    .tk { position: absolute; width: 0; height: 0; overflow: hidden; }
+    .tk-accent { color: var(--cd-accent); }
+    .tk-primary { color: var(--cd-primary); }
+
+    .app { position: fixed; inset: 0; background: var(--cd-page); }
+    #view { display: block; width: 100%; height: 100%; }
+
+    button, input, select { font: inherit; color: inherit; }
+    button { background: var(--cd-primary); color: #fff; border: 2px solid var(--cd-primary); border-radius: var(--cd-radius); padding: 8px 16px; min-height: 40px; min-width: 40px; cursor: pointer; font-weight: 600; }
+    button:hover { filter: brightness(1.2); }
+    button.primary { background: var(--cd-accent); border-color: var(--cd-accent); color: #1b1300; }
+    button.ghost { background: transparent; border-color: var(--cd-dim); color: var(--cd-text); }
+    :is(button, input, select, a, summary):focus-visible { outline: 3px solid var(--cd-focus); outline-offset: 3px; }
+    input, select { background: #0e0a14; border: 1px solid #6a5a80; border-radius: 6px; padding: 6px 8px; min-height: 36px; box-sizing: border-box; }
+    input[type=range] { accent-color: var(--cd-accent); padding: 0; min-height: 28px; }
+
+    /* ---- Menü, Laden, Pause, Ziel: Tafeln über dem Bild ---- */
+    .panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(760px, calc(100% - 32px)); max-height: calc(100% - 32px);
+      overflow-y: auto; box-sizing: border-box; background: var(--cd-surface); border: 2px solid var(--cd-border); border-radius: calc(var(--cd-radius) + 4px);
+      padding: 20px 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55); z-index: 10; }
+    .panel[hidden] { display: none; }
+    .panel h1, .panel h2 { font-family: var(--cd-font); margin: 0 0 12px; }
+    .panel h1 { font-size: 28px; }
+    .panel h1 .accent { color: var(--cd-accent); }
+    .panel h2 { font-size: 22px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field > label, .field > .lbl { color: var(--cd-dim); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+    .field.wide { grid-column: 1 / -1; }
+    #carList { min-height: 220px; width: 100%; }
+    .range-row { display: flex; gap: 12px; align-items: center; }
+    .range-row input { flex: 1; }
+    .range-row output { min-width: 2ch; font-weight: 700; font-size: 18px; color: var(--cd-accent); text-align: right; }
+    .car-info { margin: 0; color: var(--cd-dim); font-size: 13px; min-height: 1.4em; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; align-items: center; }
+    .actions .grow { flex: 1; }
+    .status { color: var(--cd-dim); margin: 8px 0 0; min-height: 1.4em; }
+    details { margin-top: 14px; color: var(--cd-dim); }
+    summary { cursor: pointer; color: var(--cd-text); font-weight: 600; min-height: 28px; }
+    .keys { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 14px; margin: 10px 0 0; font-size: 14px; }
+    .keys dt { color: var(--cd-text); font-weight: 600; }
+    .keys dd { margin: 0; }
+    kbd { font-family: var(--cd-mono); background: var(--cd-surface-2); border: 1px solid #6a5a80; border-radius: 4px; padding: 0 5px; font-size: 13px; }
+    progress { width: 100%; height: 14px; accent-color: var(--cd-accent); }
+    .stack { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+    .stack button { width: 100%; }
+    .panel.small { width: min(420px, calc(100% - 32px)); }
+
+    /* Ergebnis */
+    .results { list-style: none; margin: 0; padding: 0; counter-reset: none; }
+    .results li { display: grid; grid-template-columns: 3ch 1fr auto; gap: 12px; padding: 8px 10px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); align-items: baseline; }
+    .results li .pl { font-family: var(--cd-font); font-weight: 800; color: var(--cd-dim); }
+    .results li .tm { font-family: var(--cd-mono); }
+    .results li.me { background: var(--cd-surface-2); box-shadow: inset 4px 0 0 var(--cd-accent); }
+    .results li.me .pl { color: var(--cd-accent); }
+    .results .tag { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--cd-accent); margin-left: 6px; }
+    .finish-best { color: var(--cd-dim); margin: 12px 0 0; }
+    .finish-best strong { color: var(--cd-accent); }
+
+    /* ---- HUD ---- */
+    .hud { position: absolute; inset: 0; pointer-events: none; font-family: var(--cd-font); z-index: 5; }
+    .hud[hidden] { display: none; }
+    .hud-box { position: absolute; background: var(--cd-hud-bg); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: var(--cd-radius); padding: 10px 14px; }
+    .hud-pos { left: 20px; top: 20px; display: flex; gap: 22px; align-items: baseline; }
+    .hud-big { font-size: 40px; font-weight: 800; line-height: 1; }
+    .hud-big small { font-size: 20px; color: var(--cd-dim); font-weight: 600; }
+    .hud-lbl { display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--cd-dim); margin-bottom: 4px; }
+    .hud-times { right: 20px; top: 20px; display: grid; grid-template-columns: auto auto; gap: 2px 14px; font-size: 18px; }
+    .hud-times dt { color: var(--cd-dim); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; align-self: center; }
+    .hud-times dd { margin: 0; font-family: var(--cd-mono); text-align: right; }
+    .hud-times dd.best { color: var(--cd-accent); }
+    .hud-speed { right: 20px; bottom: 20px; text-align: right; min-width: 150px; }
+    .hud-speed .hud-big { font-size: 56px; font-variant-numeric: tabular-nums; }
+    .nitro { display: inline-flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; font-weight: 700; color: var(--cd-dim); }
+    .nitro[data-state="ready"] { color: var(--cd-accent); }
+    .nitro[data-state="on"] { color: var(--cd-ok); }
+    .hud-cam { left: 20px; bottom: 20px; font-size: 14px; color: var(--cd-dim); }
+    .hud-msg { left: 50%; top: 18%; transform: translateX(-50%); font-size: 28px; font-weight: 800; padding: 10px 24px; opacity: 0; transition: opacity 0.3s ease; }
+    .hud-msg.show { opacity: 1; }
+    .countdown { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-family: var(--cd-font); font-size: 140px; font-weight: 900;
+      color: var(--cd-accent); text-shadow: 0 6px 30px rgba(0, 0, 0, 0.7); pointer-events: none; z-index: 6; }
+    .countdown[hidden] { display: none; }
+    .countdown.tick { animation: cd-pop 0.9s ease-out; }
+    @keyframes cd-pop { from { transform: translate(-50%, -50%) scale(1.5); opacity: 0; } 30% { opacity: 1; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
+
+    .fs-btn { position: absolute; right: 16px; bottom: 16px; z-index: 12; background: var(--cd-hud-bg); border-color: rgba(255, 255, 255, 0.25); padding: 6px 10px; }
+    .app.racing .fs-btn { bottom: auto; top: 50%; right: 16px; transform: translateY(-50%); }
+    .app.racing .fs-btn:not(:focus-visible):not(:hover) { opacity: 0.45; }
+
+    @media (max-width: 720px) {
+      .grid { grid-template-columns: 1fr; }
+      .hud-big { font-size: 28px; }
+      .hud-speed .hud-big { font-size: 38px; }
+      .hud-times { font-size: 14px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .countdown.tick { animation: none; }
+      .hud-msg { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#carSearch">Skip to car selection</a>
+  <span class="tk tk-accent" aria-hidden="true"></span><span class="tk tk-primary" aria-hidden="true"></span>
+  <main id="app" class="app">
+    <canvas id="view" aria-label="Race view" role="img"></canvas>
+
+    <div id="hud" class="hud" hidden>
+      <div class="hud-box hud-pos">
+        <div><span class="hud-lbl">Position</span><span class="hud-big" id="hPos">–</span></div>
+        <div><span class="hud-lbl">Lap</span><span class="hud-big" id="hLap">–</span></div>
+      </div>
+      <dl class="hud-box hud-times">
+        <dt>Time</dt><dd id="hCur">0:00.000</dd>
+        <dt>Last</dt><dd id="hLast">–</dd>
+        <dt>Best</dt><dd id="hBest" class="best">–</dd>
+      </dl>
+      <div class="hud-box hud-speed">
+        <span class="hud-lbl">km/h</span><span class="hud-big" id="hSpeed">0</span>
+        <div class="nitro" id="hNitro" data-state="ready"><span class="icon" aria-hidden="true">bolt</span><span id="hNitroText">Nitro ready</span></div>
+      </div>
+      <div class="hud-box hud-cam" id="hCam">Chase camera</div>
+      <div class="hud-box hud-msg" id="hMsg"></div>
+    </div>
+    <div id="countdown" class="countdown" hidden aria-hidden="true"></div>
+    <p id="announce" class="sr-only" role="status" aria-live="polite"></p>
+
+    <section id="menu" class="panel" aria-labelledby="menuTitle">
+      <h1 id="menuTitle">Car <span class="accent">Drive</span></h1>
+      <form id="menuForm" class="grid" novalidate>
+        <div class="field wide">
+          <label for="carSearch">Search cars</label>
+          <input type="search" id="carSearch" autocomplete="off" aria-controls="carList">
+        </div>
+        <div class="field wide">
+          <label for="carList">Car</label>
+          <select id="carList" size="8" aria-describedby="carInfo"></select>
+          <p id="carInfo" class="car-info"></p>
+        </div>
+        <div class="field">
+          <label for="paintSel">Colour set</label>
+          <select id="paintSel"></select>
+        </div>
+        <div class="field">
+          <label for="trackSel">Track</label>
+          <select id="trackSel"></select>
+        </div>
+        <div class="field">
+          <label for="oppRange">Opponents</label>
+          <div class="range-row"><input type="range" id="oppRange" min="0" max="7" step="1" value="5"><output id="oppOut" for="oppRange">5</output></div>
+        </div>
+        <div class="field">
+          <label for="lapRange">Laps</label>
+          <div class="range-row"><input type="range" id="lapRange" min="1" max="5" step="1" value="3"><output id="lapOut" for="lapRange">3</output></div>
+        </div>
+        <div class="field wide">
+          <div class="actions">
+            <label><input type="checkbox" id="duckChk" checked> Rubber duck drivers</label>
+            <span class="grow"></span>
+            <button type="submit" class="primary" id="startBtn"><span class="icon" aria-hidden="true">sports_score</span> Start race</button>
+          </div>
+          <p id="menuStatus" class="status" role="status" aria-live="polite"></p>
+        </div>
+      </form>
+      <details>
+        <summary>Controls</summary>
+        <dl class="keys">
+          <dt>Throttle / brake</dt><dd><kbd>W</kbd> <kbd>S</kbd> or arrow keys</dd><dd>RT / LT</dd>
+          <dt>Steer</dt><dd><kbd>A</kbd> <kbd>D</kbd> or arrow keys</dd><dd>Left stick</dd>
+          <dt>Handbrake</dt><dd><kbd>Space</kbd></dd><dd>A</dd>
+          <dt>Nitro (once per lap)</dt><dd><kbd>Shift</kbd></dd><dd>B</dd>
+          <dt>Camera</dt><dd><kbd>C</kbd></dd><dd>Y</dd>
+          <dt>Back on track</dt><dd><kbd>R</kbd></dd><dd>–</dd>
+          <dt>Pause</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
+        </dl>
+      </details>
+    </section>
+
+    <section id="loading" class="panel small" hidden aria-labelledby="loadTitle">
+      <h2 id="loadTitle">Loading cars</h2>
+      <label for="loadBar" class="sr-only">Loading progress</label>
+      <progress id="loadBar" max="1" value="0"></progress>
+      <p id="loadText" class="status" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="pause" class="panel small" hidden role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
+      <h2 id="pauseTitle">Paused</h2>
+      <div class="stack">
+        <button type="button" class="primary" id="resumeBtn">Resume</button>
+        <button type="button" id="restartBtn">Restart race</button>
+        <button type="button" class="ghost" id="menuBtn">Back to menu</button>
+      </div>
+    </section>
+
+    <section id="finish" class="panel small" hidden role="dialog" aria-modal="true" aria-labelledby="finishTitle">
+      <h2 id="finishTitle">Results</h2>
+      <ol id="results" class="results"></ol>
+      <p id="finishBest" class="finish-best"></p>
+      <div class="actions">
+        <button type="button" class="primary" id="againBtn">Race again</button>
+        <button type="button" class="ghost" id="finishMenuBtn">Back to menu</button>
+      </div>
+    </section>
+
+    <button type="button" class="fs-btn" id="fsBtn" aria-pressed="false"><span class="icon" aria-hidden="true">fullscreen</span><span class="sr-only">Fullscreen</span></button>
+  </main>
+
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-RoomEnvironment.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/rubber-duck.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-stats.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-race-sim.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-track-scene.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-drive-phys.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/api/fx/ducks/custom.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/car-drive.js"></script>
+</body>
+</html>
