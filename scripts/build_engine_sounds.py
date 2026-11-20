@@ -66,13 +66,14 @@ TYPES = {
     "v10": dict(label="V10", cyl=10, idle=1000, red=8700, gears=7, g1=0.24),
     "v12": dict(label="V12", cyl=12, idle=950, red=8800, gears=7, g1=0.24),
     "f1": dict(label="Formula 1", cyl=8, idle=4000, red=15000, gears=8, g1=0.22),   # Begrenzer wie die V6-Hybride
-    "dsl": dict(label="Diesel truck / bus", cyl=6, idle=600, red=2600, gears=6, g1=0.18, turbo=0.06),
+    "dsl": dict(label="Diesel truck / bus", cyl=6, idle=600, red=2600, gears=6, g1=0.18, turbo=0.035),   # leise, tief (Laufzeit)
     "ev": dict(label="Electric", cyl=2, idle=0, red=16000, gears=1, g1=1.0),
 }
 
 # (typ, Freesound-ID, Autor, Titel, Lizenz, Dauer s, Vorschau-Pfad, Hinweise)
 # Hinweise: loops=False (keine Schleifen, z. B. Vorbeifahrt/fern), start/pass/turbo/pop=True (Einmal-Klang-Art erzwingen),
-#           revs=False (keine Gasstöße suchen), sweeps=False (keine Hochläufe/Abfälle), oct=Faktor für die
+#           revs=False (keine Gasstöße suchen), sweeps=False (keine Hochläufe/Abfälle), on=False (nur keine Hochläufe –
+#           435656: Nutzer „on-435656-1 ist schlecht“), oct=Faktor für die
 #           Drehzahl-Beschriftung (sonst automatisch: Kreuzebenen-V8 u. a. werden oft auf der halben Zündfrequenz
 #           erkannt → Leerlauf deutlich unter dem der Motorart → × 2)
 SOURCES = [
@@ -148,7 +149,7 @@ SOURCES = [
     ("dsl", 128160, "ibirdfilm", "Diesel Truck Idling Front.wav", "CC0", 34.4, "128/128160_1372389-lq.mp3", {"revs": False}),
     ("dsl", 49988, "BoilingSand", "080316 Dodge truck revving in driveway.wav", "CC BY", 34.7, "49/49988_571325-lq.mp3", {}),
     ("dsl", 186935, "ReadeOnly", "engine_idle_loop.wav", "CC0", 6.1, "186/186935_545448-lq.mp3", {"revs": False, "sweeps": False}),
-    ("dsl", 435656, "YellowJacketStudios", "FORD LTL 9000_engine start and idle.wav", "CC0", 56.6, "435/435656_2347916-lq.mp3", {"start": True}),
+    ("dsl", 435656, "YellowJacketStudios", "FORD LTL 9000_engine start and idle.wav", "CC0", 56.6, "435/435656_2347916-lq.mp3", {"start": True, "on": False}),
     ("dsl", 828756, "chungus43A", "Mississauga Transit Orion V bus engine", "CC0", 48.0, "828/828756_12024110-lq.mp3", {}),
     ("ev", 761685, "justVova", "Acceleration of an electric car", "CC0", 5.2, "761/761685_13088347-lq.mp3", {"revs": False}),
     ("ev", 807728, "Sam-Mortley", "electric car", "CC0", 19.5, "807/807728_16596600-lq.mp3", {"revs": False}),
@@ -180,6 +181,13 @@ CARS = {
     "bmw-m2-competition-f87": 415276,
 }
 MAX_SWEEPS = {"on": 6, "off": 4}
+# Eigenen Hochlauf oben strecken statt fremde Aufnahme leihen: die Laufzeit spielt das oberste eigene Stück bis
+# EXT_OWN × dessen Höchstdrehzahl (Tonhöhe hoch, Klangfarbe ausgeglichen; TUNE.ext in js/car-engine-audio.js – beide
+# Werte gleich halten). Geliehen wird nur noch, wenn auch das nicht bis 95 % des Begrenzers reicht.
+# f6: die Porsche-Aufnahmen enden bei 5200 U/min, auf Freesound gibt es (Stand 2026-11, CC0/CC BY) keinen Boxer-
+# Hochlauf darüber → strecken bis 1,75 × statt (wie bisher) ab 5200 U/min den Maserati-V8 (465453) zu leihen
+EXT_OWN = {"f6": 1.75}
+EXT_DEF = 1.35
 
 
 # ---------------------------------------------------------------- Laden / Dekodieren
@@ -695,6 +703,8 @@ def build(only, report, cache):
             found["loops"] = find_loops(an, tp, x, oct_)
         if rpm is not None and hint.get("sweeps", True):
             for sw in find_sweeps(an, tp, rpm, good):
+                if sw["kind"] == "up" and hint.get("on") is False:
+                    continue
                 y, pts = sweep_clip(x, an, rpm, sw)
                 sw.update(y=y, pts=pts)
                 found["on" if sw["kind"] == "up" else "off"].append(sw)
@@ -737,6 +747,8 @@ def build(only, report, cache):
                     bank["types"][tp] = v
             for k, v in old.get("sources", {}).items():
                 bank["sources"].setdefault(k, v)
+            for k, v in old.get("cars", {}).items():          # feste Aufnahmen der nicht neu gebauten Motorarten
+                bank["cars"].setdefault(k, v)
     used = set()
     for tp, spec in TYPES.items():
         if only and tp not in only:
@@ -774,11 +786,12 @@ def build(only, report, cache):
                 for o in [o for o in lst if o["src"] == src][:2]:
                     if o not in pick:
                         pick.append(o)
-            # reicht immer noch keiner bis 75 %: Hochlauf einer verwandten Motorart leihen (gleiche Zündfrequenz,
-            # Drehzahl × deren Zylinder / eigene Zylinder), wie bei den Schleifen
+            # reicht immer noch keiner bis 75 % – auch nicht gestreckt (EXT_OWN): Hochlauf einer verwandten Motorart
+            # leihen (gleiche Zündfrequenz, Drehzahl × deren Zylinder / eigene Zylinder), wie bei den Schleifen
             top = max([max(o["r0"], o["r1"]) for o in pick] or [0])
+            ext = EXT_OWN.get(tp, EXT_DEF)
             for _ in range(2):
-                if kind != "on" or top >= spec["red"] * 0.75:
+                if kind != "on" or top >= spec["red"] * 0.75 or top * ext >= spec["red"] * 0.95:
                     break
                 c = []
                 for sib in SIBLINGS.get(tp, []):
@@ -901,6 +914,7 @@ def build(only, report, cache):
             len(entry["rev"]), len(entry["pass"]), len(entry["pop"]), len(entry["turbo"])))
     if not only:
         bank["sources"] = {k: v for k, v in bank["sources"].items() if int(k) in used}
+    bank["types"] = {tp: bank["types"][tp] for tp in TYPES if tp in bank["types"]}   # feste Reihenfolge (auch mit --only)
     with open(os.path.join(OUT, "bank.json"), "w", encoding="utf-8") as f:
         json.dump(bank, f, ensure_ascii=False, indent=1)
     write_credits(bank)

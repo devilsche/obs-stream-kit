@@ -23,7 +23,7 @@ Engine sounds for Car Race / Car Drive are cut from these Freesound recordings
 | [VOC_220909-2078_FR_SportsCar.wav](https://freesound.org/people/kevp888/sounds/649889/) | kevp888 | CC BY | Exotic V8 (flat-plane), Muscle V8, V10, V12 |
 | [VOC_220519-2006-2_FR_ElectricVehicle.wav](https://freesound.org/people/kevp888/sounds/635454/) | kevp888 | CC BY | Electric |
 | [BCR F1 Car 07.wav](https://freesound.org/people/LG/sounds/77667/) | LG | CC BY | Formula 1 |
-| [Maserati GranTurismo S](https://freesound.org/people/lmartins/sounds/465453/) | lmartins | CC BY | Exotic V8 (flat-plane), Flat-6, Muscle V8, Twin-turbo V8 |
+| [Maserati GranTurismo S](https://freesound.org/people/lmartins/sounds/465453/) | lmartins | CC BY | Exotic V8 (flat-plane), Muscle V8, Twin-turbo V8 |
 | [Aston Martin V8 Vantage start-up.m4a](https://freesound.org/people/lmartins/sounds/547057/) | lmartins | CC BY | Twin-turbo V8 |
 | [Subaru Impreza STI idling](https://freesound.org/people/MilanKovanda/sounds/625702/) | MilanKovanda | CC BY | Turbo inline-4 |
 | [Formula F1 Racing.wav](https://freesound.org/people/monkeyman535/sounds/400130/) | monkeyman535 | CC BY | Formula 1 |

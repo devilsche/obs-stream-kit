@@ -353,7 +353,8 @@ if (fs.existsSync(bankF)) {
     if (t.id !== 'ev') ok((b.on || []).length >= 1, 'bank: ' + t.id + ' hat mindestens einen Hochlauf (Sweep)');
     if (t.id !== 'ev') {
       var topOn = Math.max.apply(null, (b.on || []).map(function (o) { return o.pts[o.pts.length - 1][1]; }).concat([0]));
-      ok(topOn * 1.5 >= b.red * 0.85, 'bank: ' + t.id + ' Hochläufe reichen (mit ≤ 1,5 × Nachzug) bis 85 % des Begrenzers (' + topOn + ' / ' + b.red + ')');
+      var xt = Math.max(1.5, M.tune({ type: t.id }).ext);
+      ok(topOn * xt >= b.red * 0.85, 'bank: ' + t.id + ' Hochläufe reichen (mit ≤ ' + xt + ' × Nachzug) bis 85 % des Begrenzers (' + topOn + ' / ' + b.red + ')');
     }
     ['on', 'off'].forEach(function (k) {
       (b[k] || []).forEach(function (o) {
@@ -471,6 +472,81 @@ if (fs.existsSync(path.join(srcDir, 'index.json'))) {
     });
   });
   ok(bytes < 8 * 1024 * 1024, 'src: zusammen unter 8 MB (' + (bytes / 1048576).toFixed(1) + ' MB)');
+}
+
+// ---- Übergabe zwischen Aufnahmen (alle Motorarten): eigene Stücke vor geliehenen, oberstes eigenes gestreckt bis
+// TUNE.ext, Wechsel über ±15 % Drehzahl überblendet, Pegel/Helligkeit an der Übergabe angeglichen
+function pc(lo, hi, src, from) { var o = M.prepSweep({ src: src, pts: [[0.15, lo], [1.15, Math.sqrt(lo * hi)], [2.15, hi]], dur: 2.3 }); if (from) o.from = from; return o; }
+var HL = [pc(1400, 5200, 1), pc(1100, 2800, 2), pc(1600, 6400, 3, 'v8f')];
+ok(M.sweepSel(HL, 2000, 1.35) === 0, 'sweepSel: erstes eigenes Stück, das die Drehzahl enthält');
+ok(M.sweepSel(HL, 6000, 1.35) === 0, 'sweepSel: über dem eigenen Stück erst strecken (bis 1,35 ×), nicht leihen');
+ok(M.sweepSel(HL, 7300, 1.35) === 2, 'sweepSel: geliehenes Stück erst jenseits der Streckung');
+ok(M.sweepSel(HL, 7300, 1.75) === 0, 'sweepSel: mit ext 1,75 bleibt es beim eigenen');
+ok(M.sweepSel(HL, 2000, 1.35, function (x) { return x.src !== 1; }) === 1, 'sweepSel: ohne Puffer das nächste eigene');
+// Überblendung: Gewichte gleiche Leistung, breiter Übergang, keine Sprünge
+var XW = 1.15, both = [], prevW = null, jumpW = 0;
+for (var rq = 3000; rq <= 12000; rq *= 1.005) {
+  var mx = M.sweepMix(HL, rq, 1.35, XW), e2 = mx.reduce(function (a, m) { return a + m.g * m.g; }, 0);
+  if (Math.abs(e2 - 1) > 1e-9) ok(false, 'sweepMix: Summe der Quadrate 1 bei ' + Math.round(rq));
+  var w = {}; mx.forEach(function (m) { w[m.i] = m.g; });
+  if (mx.length === 2 && Math.min(mx[0].g, mx[1].g) > 0.15) both.push(rq);
+  if (prevW) [0, 1, 2].forEach(function (i) { jumpW = Math.max(jumpW, Math.abs((w[i] || 0) - (prevW[i] || 0))); });
+  prevW = w;
+}
+ok(both.length && both[both.length - 1] / both[0] >= 1.2, 'sweepMix: Wechsel der Aufnahme über ≥ 20 % Drehzahl verteilt (' + (both.length ? (both[both.length - 1] / both[0]).toFixed(2) : 0) + ' ×)');
+ok(jumpW < 0.3, 'sweepMix: Gewichte ändern sich je 0,5 % Drehzahl um < 0,3 (' + jumpW.toFixed(2) + ')');
+ok(M.sweepMix(HL, 2000, 1.35, XW).length === 1, 'sweepMix: mitten in einem Stück nur dieses');
+// Pegel-/Helligkeitsangleich: Rauschen gefiltert (dumpf, laut) gegen hell und leise → nach dem Angleich ±2 dB
+function synth(n, amp, bright, seed) {
+  var r = seeded(seed), d = new Float32Array(n), y = 0;
+  for (var i = 0; i < n; i++) { var x = r() * 2 - 1; y = bright ? x : y + 0.1 * (x - y); d[i] = amp * y; }
+  return d;
+}
+var SR = 8000, dA = synth(SR * 2.3, 0.8, false, 3), dB = synth(SR * 2.3, 0.08, true, 5);
+var mp = M.matchPiece(pc(1400, 5200, 1), dA, pc(4000, 8000, 2), dB, SR);
+for (var i2 = 0; i2 < dB.length; i2++) dB[i2] *= mp.gain;
+var mp2 = M.matchPiece(pc(1400, 5200, 1), dA, pc(4000, 8000, 2), dB, SR);
+ok(Math.abs(mp.lA - mp.lB) > 5 && Math.abs(mp2.lA - mp2.lB) <= 2, 'matchPiece: Pegel an der Übergabe vorher ' + (mp.lB - mp.lA).toFixed(1) + ' dB, danach ±2 dB (' + (mp2.lB - mp2.lA).toFixed(1) + ')');
+ok(mp.shelf < -3, 'matchPiece: helleres Stück wird abgesenkt (' + mp.shelf.toFixed(1) + ' dB)');
+ok(mp.h > 4000 && mp.h < 5200, 'matchPiece: Übergabe in der Überlappung (' + mp.h + ')');
+ok(M.stretchShelf(1) === 0 && M.stretchShelf(1.69) < -4 && M.stretchShelf(9) >= -12, 'stretchShelf: Streckung wird dunkler ausgeglichen');
+
+if (bankJ) {
+  // f6 (Nutzer: „ab 5200 kommt eine andere mp3“): nur Boxer-/Porsche-Aufnahmen, Leerlauf → Begrenzer ohne Leihgabe
+  var f6 = bankJ.types.f6, ext6 = M.tune({ type: 'f6' }).ext, L6 = f6.on.map(function (o) { return M.prepSweep(Object.assign({}, o)); });
+  ok(f6.on.every(function (o) { return !o.from && /porsche|boxer/i.test(bankJ.sources[o.src].title); }), 'f6: alle Hochläufe aus eigenen Porsche-Aufnahmen');
+  var lo6 = Math.min.apply(null, L6.map(function (o) { return o.lo; })), hi6 = Math.max.apply(null, L6.map(function (o) { return o.hi; }));
+  ok(lo6 <= f6.idle * 1.6, 'f6: Hochläufe beginnen am Leerlauf (' + lo6 + ')');
+  ok(hi6 * ext6 >= f6.red, 'f6: oberstes Stück gestreckt bis zum Begrenzer (' + hi6 + ' × ' + ext6 + ' ≥ ' + f6.red + ')');
+  var miss = 0;
+  for (var r6 = f6.idle; r6 <= f6.red * 1.02; r6 *= 1.01) {
+    var s6 = M.sweepSel(L6, r6, ext6), q6 = s6 >= 0 ? L6[s6] : null;
+    if (!q6 || (r6 > q6.hi && r6 > q6.hi * ext6) || r6 / q6.hi > Math.max(1.5, ext6)) miss++;
+  }
+  ok(!miss, 'f6: jede Drehzahl Leerlauf…Begrenzer aus eigenem Stück im Streck-Bereich (' + miss + ' Lücken)');
+  // dsl (Nutzer: „on-435656-1 ist schlecht“, Lader passt nicht zum Lkw)
+  var ds = bankJ.types.dsl, tbd = M.tune({ type: 'dsl' }).tb;
+  ok(!ds.on.some(function (o) { return o.src === 435656; }), 'dsl: Hochlauf 435656 nicht mehr in der Bank');
+  ok(ds.on.every(function (o) { return !o.from; }), 'dsl: keine geliehenen Hochläufe');
+  ok(tbd.tone === 0 && tbd.hi <= 1500 && tbd.hiss && ds.boost <= 0.04, 'dsl: Lader tief und leise, kein Pfeifton/Abblasventil');
+  ok(M.tune({ type: 't4' }).tb.tone === 1 && M.tune({ type: 't4' }).tb.lo === 2500, 'Benziner-Turbo unverändert (Pfeifen 2,5–7 kHz)');
+  // echte Stücke (ffmpeg dekodiert): nach dem Angleich an jeder Übergabe ±2 dB
+  var cp = require('child_process'), hasFF = !cp.spawnSync('ffmpeg', ['-version']).error;
+  if (hasFF) {
+    var dec = function (f) {
+      var r = cp.spawnSync('ffmpeg', ['-v', 'quiet', '-i', path.join(__dirname, '..', 'assets', 'sounds', 'engines', f), '-ac', '1', '-ar', '22050', '-f', 'f32le', '-'], { maxBuffer: 1 << 26 });
+      var b = r.stdout; return new Float32Array(b.buffer, b.byteOffset, b.length >> 2).slice();
+    };
+    ['f6', 'dsl', 'v8m', 'v12'].forEach(function (tp) {
+      var ps = bankJ.types[tp].on.map(function (o) { return M.prepSweep(Object.assign({}, o, { d: dec(o.f) })); });
+      for (var a = 1; a < ps.length; a++) {
+        var m = M.matchPiece(ps[0], ps[0].d, ps[a], ps[a].d, 22050);
+        if (!m) continue;
+        var after = m.lB + 20 * Math.log10(m.gain);
+        ok(Math.abs(after - m.lA) <= 2, tp + ': Pegel an der Übergabe ' + ps[0].f + ' → ' + ps[a].f + ' bei ' + m.h + ' U/min ±2 dB (' + (m.lB - m.lA).toFixed(1) + ' dB → ' + (after - m.lA).toFixed(1) + ' dB)');
+      }
+    });
+  } else console.log('  (ffmpeg fehlt – Pegel der echten Stücke nicht geprüft)');
 }
 
 console.log(fails ? fails + ' Fehler' : 'alles ok');

@@ -103,6 +103,17 @@ Herstellerangaben, gerundet.
   0,3–0,4 s Material im Bereich des Tonhöhen-Nachzugs – dort hilft auf Dauer nur eine Aufnahme mit stehender hoher
   Drehzahl (Begrenzer/Höchsttempo).
 - Neue Motorart **v8t** (Biturbo-V8) für RS6/AMG/M5 – vorher als Ferrari-Flachebenen-V8 (v8f) einsortiert.
+- **Übergabe zwischen Aufnahmen** (alle Motorarten, `Model.sweepSel`/`sweepMix`/`matchPiece`): eigene Stücke vor
+  geliehenen; über dem obersten eigenen Stück wird dieses gestreckt (Tonhöhe bis `TUNE.ext` × seine Höchstdrehzahl,
+  Standard 1,35, f6 1,75; je Oktave Streckung 9 dB Kuhschwanz-Absenkung ab 1,2 kHz gegen den „Mickey Mouse“-Klang),
+  geliehen wird nur noch als letzter Ausweg (Bauskript: `EXT_OWN`). Wo die Aufnahme wechselt, blenden die Körner über
+  ±15 % Drehzahl über (gleiche Leistung) statt an einer Grenze umzuspringen, und beim Laden wird jedes Stück an der
+  Übergabe an das Haupt-Stück (eigenes mit dem größten Drehzahlbereich) angeglichen: Pegel (±9 dB) und Helligkeit
+  (Pegel der ersten Differenz, Kuhschwanz-Filter ±6 dB). Prüfung: `node scripts/check_engine_audio.js` (Pegel an der
+  Übergabe nach dem Angleich ±2 dB, auch an den echten Stücken über ffmpeg).
+- **Turbo je Motorart** (`TUNE.tb`): Benziner Pfeifton 2,5–7 kHz + Abblasventil; Diesel (dsl) ohne Pfeifton und
+  Abblasventil – breites Rauschband 380–1300 Hz, träger (großer Lader), Pegel 0,035 statt 0,06, beim Gaswegnehmen
+  aus hohem Ladedruck höchstens alle 4 s ein leises Luft-/Wastegate-Zischen.
 
 ## Auswahl der Aufnahmen (Messung, Stand 2026-11)
 
@@ -136,5 +147,18 @@ Je Aufnahme: Grundton-Verlauf (Autokorrelation, Oktavsprünge repariert), Klarhe
   eine zufällige Stelle (WSOLA-Anschluss); Leerlauf-/Rückfall-Schleifen sind bis 2,4 s lang (0,25 s Überblendung).
   Schalten: Drehzahl fällt um den Gangsprung, 0,14–0,24 s Zugkraftunterbrechung mit hörbarem Pegel-Einbruch, bei
   Turbo-Motoren Abblasen, je nach Motorart Knall.
+- **Porsche 911 / GT3 R / RSR (f6)** – Nutzer: „ab 5200 U/min kommt eine andere mp3, die gar nicht passt“. Ursache: über
+  dem Porsche-Hochlauf 772802 (endet bei 5223) übernahm hart ein geliehener Maserati-V8-Hochlauf (465453, v8f,
+  Drehzahl × 8/6). Zusätzlich liegt die Beschriftung von 772802 eine Oktave über der physikalischen (auto_oct × 2;
+  Spektrum im Leerlauf: Linien bei 35/52/70/105 Hz = 3./4,5./6./9. Ordnung bei ~700 U/min) – der Maserati setzte
+  also auch eine Oktave höher ein. Die Beschriftung bleibt (der Porsche-Klang darunter war in Ordnung, alle
+  f6-Stücke sind untereinander stimmig), der V8 ist raus: f6 = nur Porsche-Aufnahmen (90404 ab 1100, 772802 bis 5223,
+  darüber gestreckt bis 1,75 × → 9100). Gesucht wurde auf Freesound (CC0/CC BY, Stand 2026-11) nach Porsche 911/GT3/
+  RS/Cup/991/997/996/993, Carrera, Boxster/Cayman, flat six, boxer, GT3-Rennen: kein Boxer-Hochlauf über ~3000
+  (echte) U/min – 207825 (911 Carrera S innen, unklar, ≤ 3000), 532108 (Porsche-Ausfahrt, fern), 113214 (≤ 2600),
+  675267/675268 (1972er 911, nur Vorbeifahrt), 556039 (GT3-Rennen, 997 GT3-R nur ein Auto im Feld) taugen nicht.
+- **Lkw/Bus (dsl)** – Nutzer: „Stand + Gas passt, on-435656-1 ist schlecht, der Lader passt nicht“. 435656 liefert
+  keine Hochläufe mehr (`on=False`, Abfall/Leerlauf/Gasstöße bleiben); 49988 (Dodge-Pickup-Diesel) deckt mit zwei
+  Stücken 520–2120 ab, darüber gestreckt. Lader siehe oben.
 - **BMW M3 Competition** (i6): fest auf BMWM3_02 (415275, gleiche Session wie BMWM3_01), Leerlauf, Hochlauf-Stücke und
   Abfall aus dieser Aufnahme; M2 Competition auf BMWM3_01.

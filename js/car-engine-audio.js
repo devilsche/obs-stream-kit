@@ -79,6 +79,7 @@
   // Körner: Länge und Abstand (s); Vorlauf der Planung (s) – überbrückt auch verspätete Bilder
   var GR = 0.08, HOP = 0.04, GR_LITE = 0.1, HOP_LITE = 0.05, AHEAD = 0.09;
   var RATE_LO = 0.75, RATE_HI = 1.5;                  // Tonhöhen-Nachzug außerhalb des Sweeps
+  var XW = 1.15;                                      // Wechsel der Aufnahme: Überblendung über Drehzahl / 1,15 … × 1,15
   // Abstimmung je Motorart:
   //   vtop    Drehzahl bei Höchsttempo im obersten Gang (Anteil am Begrenzer) – darunter, damit Vollgas oben nicht im
   //           Begrenzer hängt
@@ -88,12 +89,18 @@
   //   crackle Wahrscheinlichkeit für Knistern/Knallen, wenn nach dem Schnitt wieder Kraftstoff kommt
   //   soft    weicher Regler (Diesel): Drehzahl pendelt sinusförmig statt zu stottern
   //   noise   Ansaug-/Auspuffrauschen unter Last (überdeckt die Körnung bei gleichbleibender Drehzahl)
-  var TUNE_DEF = { vtop: 0.93, shift: 0.95, hz: 14, depth: 0.05, duty: 0.45, dip: 0.45, crackle: 0, soft: false, noise: 0.06 };
+  //   ext     oberstes eigenes Hochlauf-Stück bis ext × dessen Höchstdrehzahl strecken, bevor ein fremdes (geliehenes)
+  //           übernimmt (EXT_OWN in scripts/build_engine_sounds.py – gleich halten); Klangfarbe dabei ausgeglichen
+  //   tb      Turbo-Klang: { lo, hi } Rauschband in Hz (Ladedruck 0 → 1), tone = Anteil des Pfeiftons (0 = nur Rauschen),
+  //           q = Güte des Bands, hiss = Luft-/Wastegate-Zischen beim Gaswegnehmen statt Abblasventil (Diesel)
+  var TUNE_DEF = { vtop: 0.93, shift: 0.95, hz: 14, depth: 0.05, duty: 0.45, dip: 0.45, crackle: 0, soft: false, noise: 0.06, ext: 1.35,
+    tb: { lo: 2500, hi: 7000, tone: 1, q: 6, hiss: 0 } };
   var TUNE = {
     i4: { vtop: 0.92, shift: 0.94, hz: 12, depth: 0.05, dip: 0.5 },
     t4: { vtop: 0.92, shift: 0.92, hz: 13, depth: 0.06, dip: 0.42, crackle: 0.35 },
     i6: { vtop: 0.93, shift: 0.94, hz: 13, depth: 0.045, dip: 0.48, crackle: 0.2 },
-    f6: { vtop: 0.94, shift: 0.96, hz: 15, depth: 0.05, dip: 0.42 },
+    // f6: Porsche-Aufnahmen enden bei 5200 U/min → bis 1,75 × gestreckt statt fremdem V8 (Nutzer: „ab 5200 kommt eine andere mp3“)
+    f6: { vtop: 0.94, shift: 0.96, hz: 15, depth: 0.05, dip: 0.42, ext: 1.75 },
     v6t: { vtop: 0.93, shift: 0.95, hz: 17, depth: 0.06, duty: 0.5, dip: 0.35, crackle: 0.4 },
     v8m: { vtop: 0.91, shift: 0.92, hz: 10, depth: 0.065, dip: 0.4, crackle: 0.35 },
     v8f: { vtop: 0.94, shift: 0.96, hz: 16, depth: 0.05, dip: 0.4 },
@@ -101,7 +108,8 @@
     v10: { vtop: 0.94, shift: 0.96, hz: 17, depth: 0.05, duty: 0.5, dip: 0.36, crackle: 0.3, noise: 0.07 },
     v12: { vtop: 0.94, shift: 0.95, hz: 15, depth: 0.04, dip: 0.45, crackle: 0.25 },
     f1: { vtop: 0.95, shift: 0.97, hz: 20, depth: 0.04, duty: 0.5, dip: 0.3, noise: 0.07 },
-    dsl: { vtop: 0.9, shift: 0.92, hz: 5, depth: 0.03, duty: 0.5, dip: 0.7, soft: true, noise: 0.05 },
+    // dsl: großer Lader – tiefes, hauchiges Rauschen statt Pfeifen, kein Abblasventil, leises Zischen beim Gaswegnehmen
+    dsl: { vtop: 0.9, shift: 0.92, hz: 5, depth: 0.03, duty: 0.5, dip: 0.7, soft: true, noise: 0.05, tb: { lo: 380, hi: 1300, tone: 0, q: 1.2, hiss: 1 } },
     ev: { noise: 0 }
   };
 
@@ -317,6 +325,69 @@
       if (w.b - w.a < 0.35) w = Model.band(sw, rpm, 0.35, dur);
       return w;
     },
+    // ---- Übergabe zwischen Hochlauf-Stücken (alle Motorarten). list = Stücke einer Ebene in Vorzugsreihenfolge
+    // (prepSweep), from = geliehen (Stück einer verwandten Motorart). Auswahl je Drehzahl:
+    //   1. ein eigenes Stück, das die Drehzahl enthält
+    //   2. darüber das oberste eigene Stück, gestreckt bis ext × seine Höchstdrehzahl (eigener Klang vor fremdem)
+    //   3. ein geliehenes Stück, das sie enthält (letzter Ausweg)
+    //   4. sonst knapp daneben (Rand −13 % / +15 %) bzw. das nächstliegende
+    // ok(s) = Stück verwendbar (Puffer geladen) → Index oder −1
+    sweepSel: function (list, rpm, ext, ok) {
+      var i, s, top = -1, best = -1, bd = 1e9;
+      ok = ok || function () { return true; };
+      for (i = 0; i < list.length; i++) { s = list[i]; if (ok(s) && !s.from && rpm >= s.lo && rpm <= s.hi) return i; }
+      for (i = 0; i < list.length; i++) { s = list[i]; if (ok(s) && !s.from && (top < 0 || s.hi > list[top].hi)) top = i; }
+      if (top >= 0 && rpm > list[top].hi && rpm <= list[top].hi * (ext || 1)) return top;
+      for (i = 0; i < list.length; i++) { s = list[i]; if (ok(s) && rpm >= s.lo && rpm <= s.hi) return i; }
+      for (i = 0; i < list.length; i++) {
+        s = list[i];
+        if (!ok(s)) continue;
+        if (rpm >= s.lo * 0.87 && rpm <= s.hi * 1.15) return i;
+        var d = rpm > s.hi ? Math.log(rpm / s.hi) : Math.log(s.lo / rpm);
+        if (d < bd - 0.05) { bd = d; best = i; }
+      }
+      return best;
+    },
+    // Wechsel der Aufnahme weich: Auswahl (sweepSel) an 17 Stellen im Fenster rpm / xw … rpm · xw (log.) auszählen →
+    // höchstens zwei Stücke mit Gewicht (gleiche Leistung, Summe der Quadrate 1). Die Übergabe zieht sich so über
+    // ±(xw − 1) der Drehzahl, statt an einer Grenze umzuspringen („eine andere mp3 setzt ein“) → [{ i, g }]
+    sweepMix: function (list, rpm, ext, xw, ok) {
+      var n = 17, cnt = {}, k, i;
+      for (k = 0; k < n; k++) {
+        i = Model.sweepSel(list, rpm * Math.pow(xw || 1, 2 * k / (n - 1) - 1), ext, ok);
+        if (i >= 0) cnt[i] = (cnt[i] || 0) + 1;
+      }
+      var arr = Object.keys(cnt).map(function (x) { return { i: +x, c: cnt[x] }; })
+        .sort(function (a, b) { return b.c - a.c || a.i - b.i; }).slice(0, 2);
+      var sum = arr.reduce(function (a, e) { return a + e.c; }, 0);
+      return arr.map(function (e) { return { i: e.i, g: Math.sqrt(e.c / sum) }; });
+    },
+    // Pegel und Helligkeit von d[a…b): db = RMS in dB, tilt = Pegel der ersten Differenz minus Pegel (dB; höher = heller,
+    // grobes Maß für die spektrale Neigung) → { db, tilt } oder null (still)
+    segLevel: function (d, a, b) {
+      var e = 0, e1 = 0, n = 0;
+      a = Math.max(1, a | 0); b = Math.min(d.length, b | 0);
+      for (var i = a; i < b; i++) { var q = d[i] - d[i - 1]; e += d[i] * d[i]; e1 += q * q; n++; }
+      if (!n || e <= 1e-12) return null;
+      return { db: 10 * Math.log10(e / n), tilt: 10 * Math.log10(e1 / e) };
+    },
+    // Stück B an Stück A angleichen, wo die Übergabe liegt (Mitte der Überlappung, log.; ohne Überlappung A an seinem
+    // oberen und B an seinem unteren Rand bzw. umgekehrt): Pegel (Faktor gain, höchstens ±9 dB) und Helligkeit
+    // (shelf dB für ein Kuhschwanz-Filter, ±6 dB). dA/dB = Probendaten, sr = Abtastrate
+    // → { h, gain, shelf, lA, lB } (lA/lB = Pegel dB vor dem Angleich) oder null
+    matchPiece: function (A, dA, B, dB, sr) {
+      Model.prepSweep(A); Model.prepSweep(B);
+      var lo = Math.max(A.lo, B.lo), hi = Math.min(A.hi, B.hi), hA, hB;
+      if (hi > lo) hA = hB = Math.sqrt(lo * hi);
+      else if (B.lo >= A.hi) { hA = A.hi; hB = B.lo; } else { hA = A.lo; hB = B.hi; }
+      function lev(S, d, h) { var w = Model.band(S, h, 0.25, d.length / sr); return Model.segLevel(d, Math.round(w.a * sr), Math.round(w.b * sr)); }
+      var a = lev(A, dA, hA), b = lev(B, dB, hB);
+      if (!a || !b) return null;
+      return { h: Math.round(Math.sqrt(hA * hB)), gain: Math.pow(10, clamp(a.db - b.db, -9, 9) / 20), shelf: clamp(a.tilt - b.tilt, -6, 6), lA: a.db, lB: b.db };
+    },
+    // Klangfarben-Ausgleich beim Strecken: die Abspielrate schiebt das ganze Spektrum hoch (heller, „Mickey Mouse“) →
+    // Kuhschwanz-Absenkung um 9 dB je Oktave über 10 % Rate (dB, höchstens −12)
+    stretchShelf: function (rate) { return Math.max(-12, -9 * Math.log(Math.max(1, rate / 1.1)) / Math.LN2); },
     // Lesestelle des nächsten Korns: läuft die vorige natürlich weiter (nat) und liegt im Fenster, bleibt sie; sonst
     // Sprung an eine zufällige Stelle (beim Hochdrehen im vorderen Teil des Bands). Bei gleichbleibender Drehzahl
     // (steady) springt sie nach 2–7 Körnern ohnehin irgendwohin im ganzen Fenster – keine feste Wiederkehr.
@@ -654,38 +725,31 @@
       // Begrenzer-Schnitte auf der Audio-Uhr (limNext = Beginn des nächsten Schnitts)
       var rpmSlow = 0, steady = false, wob = 0, noise = null, limNext = 0, limOn = false;
 
-      // Sweep der Ebene für diese Drehzahl: der erste der Liste (bevorzugte Aufnahme zuerst), dessen Bereich passt;
-      // sonst der nächstliegende (Schub-Ebene oberhalb ihres Mitschnitts → Hochlauf-Mitschnitt, dumpfer)
-      function pickSweep(L, rpm) {
-        var best = null, bd = 1e9, i, s;
-        for (i = 0; i < L.list.length; i++) {             // zuerst eines, das die Drehzahl wirklich enthält
-          s = L.list[i];
-          if (s.buf && rpm >= s.lo && rpm <= s.hi) return s;
-        }
-        for (i = 0; i < L.list.length; i++) {
-          s = L.list[i];
-          if (!s.buf) continue;
-          if (rpm >= s.lo * 0.87 && rpm <= s.hi * 1.15) return s;
-          var d = rpm > s.hi ? Math.log(rpm / s.hi) : Math.log(s.lo / rpm);
-          if (d < bd - 0.05) { bd = d; best = s; }
-        }
-        return best;
+      // Sweeps der Ebene für diese Drehzahl (Model.sweepMix: eigene Stücke vor geliehenen, oberstes eigenes gestreckt bis
+      // TUNE.ext, Wechsel der Aufnahme über ±XW der Drehzahl überblendet) – je Stück ein Korn mit seinem Gewicht;
+      // Stücke außerhalb verlieren ihren Lesekopf (beim Wiedereinstieg frisch)
+      function hasBuf(s) { return !!s.buf; }
+      function grains(L, when, rpm, gap) {
+        var mx = Model.sweepMix(L.list, rpm, Model.tune(sp).ext, XW, hasBuf);
+        if (!mx.length) return;
+        var use = mx.map(function (m) { return L.list[m.i]; });
+        L.list.forEach(function (x) { if (use.indexOf(x) < 0) x.head = null; });
+        L.cur = use[0];
+        mx.forEach(function (m, k) { grain(L, use[k], when, rpm, gap, m.g); });
       }
-      // ein Korn eines Sweeps zur Zeit when: Zielstelle aus der Drehzahl; Lesekopf auf ganze Motorzyklen gezogen und
-      // dann per Wellenform-Vergleich (WSOLA) fein so gesetzt, dass das Korn an das vorige anschließt – überlappende
-      // Körner löschen sich so nicht aus (kein Flattern im Korn-Takt)
-      function grain(L, when, rpm, gap) {
-        var sw = pickSweep(L, rpm);
-        if (!sw) return;
-        if (L.cur !== sw) { if (L.cur) L.cur.head = null; L.cur = sw; }
+      // ein Korn eines Sweeps zur Zeit when (Gewicht wg): Zielstelle aus der Drehzahl; Lesekopf auf ganze Motorzyklen
+      // gezogen und dann per Wellenform-Vergleich (WSOLA) fein so gesetzt, dass das Korn an das vorige anschließt –
+      // überlappende Körner löschen sich so nicht aus (kein Flattern im Korn-Takt)
+      function grain(L, sw, when, rpm, gap, wg) {
+        var rmax = Math.max(RATE_HI, Model.tune(sp).ext || 1);   // oberstes eigenes Stück darf bis ext gestreckt werden
         var sp0 = Model.sweepPos(sw, rpm), pos = sp0.t, P = Model.period(sp0.r, sp.cyl);
         var adv = gap * (sw.rate || 1), nat = sw.head == null ? null : sw.head + adv;
         // Band um die Drehzahl (±4 %, verbreitert bis ≥ 0,35 s Material): solange der Lesekopf darin liegt, läuft er
         // natürlich vorwärts (kein kurzes Wiederholen derselben Stelle = kein „Schleifen“); verlässt er es, springt er
         // an eine zufällige Stelle im vorderen Teil des Bands. Bei gleichbleibender Drehzahl (Höchsttempo, Begrenzer)
         // ein langes Fenster mit zufälligen Sprüngen (Model.steadyBand/pickHead) – sonst hörbare Wiederholung
-        var span = gr * RATE_HI, lo = span / 2 + 0.002, hi = sw.buf.duration - span / 2 - 0.002;
-        var bd = steady ? Model.steadyBand(sw, rpm, sw.buf.duration, RATE_HI) : Model.band(sw, sp0.r, 0.35, sw.buf.duration), head;
+        var span = gr * rmax, lo = span / 2 + 0.002, hi = sw.buf.duration - span / 2 - 0.002;
+        var bd = steady ? Model.steadyBand(sw, rpm, sw.buf.duration, rmax) : Model.band(sw, sp0.r, 0.35, sw.buf.duration), head;
         bd.a = clamp(bd.a, lo, hi); bd.b = clamp(bd.b, lo, hi);              // nur Stellen, an denen ein Korn Platz hat
         var pk = Model.pickHead(L, bd, nat, adv, Math.random, steady);
         head = pk.jump ? Model.grainHead(nat == null ? pk.head : nat, pk.head, P, 0) : pk.head;
@@ -701,13 +765,16 @@
         // mehr), geglättet, damit Messrauschen der Beschriftung nicht als Zittern hörbar wird
         var want = rpm / Math.max(1, Model.sweepRpm(sw, head));
         sw.rc = sw.rc == null ? want : sw.rc + (want - sw.rc) * 0.35;
-        var rate = clamp(sw.rc, RATE_LO, RATE_HI);
+        var rate = clamp(sw.rc, RATE_LO, rmax);
         sw.head = head; sw.rate = rate * dop;                 // Lesekopf rückt um Abstand × Abspielrate weiter
-        var s = ctx.createBufferSource(), e = ctx.createGain();
+        // Angleich an der Übergabe (matchLayer: Pegel lv, Helligkeit shelf) + Ausgleich der Streckung (ohne Doppler)
+        if (sw.node) sw.node.gain.setTargetAtTime((sw.shelf || 0) + Model.stretchShelf(rate), when, 0.05);
+        var s = ctx.createBufferSource(), e = ctx.createGain(), k = wg * (sw.lv || 1), curve = HANN;
+        if (Math.abs(k - 1) > 1e-3) { curve = new Float32Array(HANN.length); for (var c = 0; c < HANN.length; c++) curve[c] = HANN[c] * k; }
         s.buffer = sw.buf; s.playbackRate.value = rate * dop;
         e.gain.value = 0;
-        try { e.gain.setValueCurveAtTime(HANN, when, gr); } catch (er) { e.gain.setValueAtTime(1, when); }
-        s.connect(e); e.connect(L.g);
+        try { e.gain.setValueCurveAtTime(curve, when, gr); } catch (er) { e.gain.setValueAtTime(k, when); }
+        s.connect(e); e.connect(sw.node || L.g);
         s.start(when, Math.max(0, head - gr * rate * dop / 2), gr * rate * dop + 0.005);
         s.onended = function () { try { e.disconnect(); } catch (er) { /* schon getrennt */ } };
       }
@@ -720,7 +787,7 @@
           if (w < 0.003) { L.next = 0; L.list.forEach(function (x) { x.head = null; }); L.cur = null; return; }
           if (!L.next || L.next < t) { L.next = t + 0.004; L.gap = hop; }
           // bei gleichbleibender Drehzahl Körner leicht unregelmäßig setzen (±10 %): kein fester Korn-Takt
-          while (L.next < until) { grain(L, L.next, rpm, L.gap || hop); L.gap = steady ? hop * (0.9 + 0.2 * Math.random()) : hop; L.next += L.gap; }
+          while (L.next < until) { grains(L, L.next, rpm, L.gap || hop); L.gap = steady ? hop * (0.9 + 0.2 * Math.random()) : hop; L.next += L.gap; }
         });
       }
 
@@ -746,6 +813,19 @@
         g.gain.exponentialRampToValueAtTime(0.0001, w + len);
         s.connect(f); f.connect(g); g.connect(pan || out);
         s.start(w, Math.random() * 1.9, len + 0.01);
+        s.onended = function () { try { g.disconnect(); } catch (e) { /* schon getrennt */ } };
+      }
+
+      // Luft-/Wastegate-Zischen (Diesel statt Abblasventil): gefiltertes Rauschen, weich ein, ~0,7 s aus, leise
+      function hiss(a) {
+        var w = ctx.currentTime, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+        s.buffer = noiseBuf();
+        f.type = 'bandpass'; f.frequency.value = 2600 + Math.random() * 800; f.Q.value = 0.7;
+        g.gain.setValueAtTime(0.0001, w);
+        g.gain.linearRampToValueAtTime(a * 0.08 * MIX * gainK, w + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, w + 0.75);
+        s.connect(f); f.connect(g); g.connect(pan || out);
+        s.start(w, Math.random() * 1.1, 0.8);
         s.onended = function () { try { g.disconnect(); } catch (e) { /* schon getrennt */ } };
       }
 
@@ -837,13 +917,17 @@
             noise.g.gain.setTargetAtTime(tn.noise * Math.pow(loadS, 1.5) * fr * fr, t, 0.06);
             noise.f.frequency.setTargetAtTime((350 + 2400 * fr) * dop, t, 0.08);
           }
-          // Turbo: Ladedruck folgt Last × Drehzahl träge (Aufladen ~0,6 s, Abfall schnell), Pfeifen 2,5–7 kHz
+          // Turbo: Ladedruck folgt Last × Drehzahl träge (Aufladen ~0,6 s, Abfall schnell); Klang je Motorart (TUNE.tb):
+          // Pfeifen 2,5–7 kHz + Abblasventil, beim Diesel tiefes Rauschen (großer, träger Lader) und leises Zischen
           if (turbo) {
-            var want = clamp((rpm / sp.red - 0.25) * 1.5, 0, 1) * loadS;
-            boost += (want - boost) * (1 - Math.exp(-dt / (want > boost ? 0.6 : 0.15)));
+            var tb = tn.tb, want = clamp((rpm / sp.red - 0.25) * 1.5, 0, 1) * loadS;
+            boost += (want - boost) * (1 - Math.exp(-dt / (want > boost ? (tb.tone ? 0.6 : 1.1) : 0.15)));
             turbo.g.gain.setTargetAtTime((sp.boost === true ? 0.12 : +sp.boost || 0.12) * MIX * boost * gainK * att, t, 0.05);
-            turbo.o.frequency.setTargetAtTime((2500 + 4500 * boost) * dop, t, 0.08);
-            if (lastThr > 0.6 && thr < 0.2 && boost > 0.45) v.oneShot('turbo', 0.35 * boost);
+            turbo.o.frequency.setTargetAtTime((tb.lo + (tb.hi - tb.lo) * boost) * dop, t, 0.08);
+            turbo.bp.frequency.setTargetAtTime((tb.tone ? 3200 : tb.lo + (tb.hi - tb.lo) * boost) * dop, t, 0.1);
+            if (tb.hiss) {
+              if (lastThr > 0.6 && thr < 0.2 && boost > 0.5 && t > turbo.hissT) { hiss(0.5 * boost * att); turbo.hissT = t + 4; }
+            } else if (lastThr > 0.6 && thr < 0.2 && boost > 0.45) v.oneShot('turbo', 0.35 * boost);
             else if (st.shifted > 0 && boost > 0.5) { v.oneShot('turbo', 0.16 * boost); boost *= 0.6; }   // Abblasen beim Schalten
           }
           // Knallen beim Gaswegnehmen bei hoher Drehzahl (nur manche Motorarten, nicht jedes Mal)
@@ -901,7 +985,7 @@
       };
 
       // Sweep-Ebene anlegen: die Stücke der bevorzugten Aufnahme zuerst (nach Drehzahl), dann die übrigen (nach Güte,
-      // wie in bank.json) – pickSweep nimmt je Drehzahl das erste passende; Ersatz-Stücke (Schub-Ebene: die Hochläufe)
+      // wie in bank.json) – Model.sweepSel nimmt je Drehzahl das erste passende; Ersatz-Stücke (Schub-Ebene: die Hochläufe)
       // hinten an. Je Ebene eigene Kopien (eigener Lesekopf), Puffer werden geteilt
       function makeLayer(list, pref, more) {
         if (!list || !list.length) return null;
@@ -911,6 +995,37 @@
           .concat((more || []).map(function (x) { return Object.assign({}, x, { head: null }); }));
         var g = ctx.createGain(); g.gain.value = 0; g.connect(mix);
         return { sw: all[0], list: all, g: g, next: 0, cur: null };
+      }
+
+      // Stücke einer Ebene an der Übergabe angleichen (Model.matchPiece): Bezug ist das eigene Stück mit dem größten
+      // Drehzahlbereich (die Haupt-Aufnahme bleibt, wie sie ist), die übrigen folgen nach unterer Drehzahl, jedes an dem
+      // schon angeglichenen mit der größten Überlappung (sonst dem nächstliegenden). Je Stück ein Kuhschwanz-Filter
+      // (Helligkeit + Ausgleich der Streckung) vor der Ebene
+      function matchLayer(L) {
+        var done = [], rest = L.list.filter(function (x) { return x.buf; }), ref = null;
+        if (!rest.length) return;
+        rest.forEach(function (x) { if (!x.from && (!ref || x.hi / x.lo > ref.hi / ref.lo)) ref = x; });
+        ref = ref || rest[0];
+        done.push(ref);
+        rest = rest.filter(function (x) { return x !== ref; });
+        rest.sort(function (a, b) { return a.lo - b.lo; });
+        rest.forEach(function (B) {
+          var A = null, best = -1e9;
+          done.forEach(function (x) {
+            var ov = Math.log(Math.min(x.hi, B.hi) / Math.max(x.lo, B.lo));   // < 0: Lücke
+            if (ov > best) { best = ov; A = x; }
+          });
+          if (A.buf !== B.buf) {
+            var m = Model.matchPiece(A, A.buf.getChannelData(0), B, B.buf.getChannelData(0), B.buf.sampleRate);
+            if (m) { B.lv = (A.lv || 1) * m.gain; B.shelf = (A.shelf || 0) + m.shelf; }
+          } else { B.lv = A.lv; B.shelf = A.shelf; }
+          done.push(B);
+        });
+        done.forEach(function (x) {
+          var f = ctx.createBiquadFilter();
+          f.type = 'highshelf'; f.frequency.value = 1200; f.gain.value = x.shelf || 0;
+          f.connect(L.g); x.node = f;
+        });
       }
 
       // eigene Schleife (Leerlauf/Begrenzer-Aufnahme) an Ebene g, Start an zufälliger Stelle
@@ -991,6 +1106,8 @@
         }
         return Promise.all(waits).then(function () {
           if (!alive) return;
+          if (layers.on) matchLayer(layers.on);
+          if (layers.off) matchLayer(layers.off);
           if (layers.on && !layers.on.sw.buf) {                 // Sweep nicht geladen → ohne Sweep weiter (stumm)
             if (root.console) console.warn('Engine sounds: sweep for ' + type + ' missing');
           }
@@ -1003,16 +1120,18 @@
             noise = { s: ns, f: nf, g: ng0 };
           }
           if (sp.boost) {
-            var o = ctx.createOscillator(), n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), tg = ctx.createGain();
-            o.type = 'sine'; o.frequency.value = 2500;
+            // Pfeifton (Sinus, Anteil tb.tone) + Rauschband; Diesel (tone 0): nur breites, tiefes Rauschen
+            var tbc = Model.tune(sp).tb, o = ctx.createOscillator(), n = ctx.createBufferSource(), bp = ctx.createBiquadFilter(), tg = ctx.createGain();
+            var og = ctx.createGain();
+            o.type = 'sine'; o.frequency.value = tbc.lo; og.gain.value = tbc.tone;
             var nb = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate), d = nb.getChannelData(0);
             for (var k = 0; k < d.length; k++) d[k] = Math.random() * 2 - 1;
-            n.buffer = nb; n.loop = true; bp.type = 'bandpass'; bp.frequency.value = 3200; bp.Q.value = 6;
-            var ng = ctx.createGain(); ng.gain.value = 0.25;
-            o.connect(tg); n.connect(bp); bp.connect(ng); ng.connect(tg); tg.gain.value = 0;
+            n.buffer = nb; n.loop = true; bp.type = 'bandpass'; bp.frequency.value = tbc.tone ? 3200 : tbc.lo; bp.Q.value = tbc.q;
+            var ng = ctx.createGain(); ng.gain.value = tbc.tone ? 0.25 : 1;
+            o.connect(og); og.connect(tg); n.connect(bp); bp.connect(ng); ng.connect(tg); tg.gain.value = 0;
             if (pan) tg.connect(pan); else tg.connect(out);
             o.start(); n.start();
-            turbo = { o: o, n: n, g: tg };
+            turbo = { o: o, n: n, g: tg, bp: bp, hissT: 0 };
           }
           started = true;
         });
