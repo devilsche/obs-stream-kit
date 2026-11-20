@@ -2210,11 +2210,22 @@
     }
 
     // ---- Server-Poll ----
+    // Nach einem Deploy (st.build = Stand der Overlay-Dateien ändert sich) neu laden – nur in Leerlauf/Lobby, nie in
+    // Countdown, Vorstellung, Rennen oder Siegerehrung; OBS behält die Seite sonst mit altem Code im Speicher.
+    var build0 = null;
+    function checkBuild(st) {
+      if (!st.build) return;
+      if (build0 == null) { build0 = st.build; return; }
+      if (st.build !== build0 && (st.phase === 'idle' || st.phase === 'lobby') && root.location) {
+        build0 = st.build;
+        root.location.reload();
+      }
+    }
     function poll() {
       var t0 = Date.now();
       fetch(base + 'api/fx/car-race/state', { credentials: 'same-origin', cache: 'no-store' })
         .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (st) { if (st) { syncClock(st.now, t0, Date.now()); apply(st); } })
+        .then(function (st) { if (st) { syncClock(st.now, t0, Date.now()); checkBuild(st); apply(st); } })
         .catch(function () { /* nächster Versuch */ })
         .then(function () { setTimeout(poll, POLL_MS); });
     }

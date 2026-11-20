@@ -1005,6 +1005,29 @@ def car_race_cmd(token):
     return jsonify({"ok": False, "say": "unknown command"}), 400
 
 
+_BUILD = {"at": 0.0, "v": 0}
+
+
+def _overlay_build(now):
+    """Stand der Overlay-Dateien (größte mtime von effects/car-race.*, js/*.js, alle 20 s neu): das Overlay lädt sich
+    neu, wenn er sich ändert – nur in Leerlauf/Lobby (js/car-race.js), damit OBS nach einem Deploy keinen alten Code
+    im Speicher behält."""
+    if now - _BUILD["at"] < 20:
+        return _BUILD["v"]
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    v = 0.0
+    for sub, pre in (("js", ""), ("effects", "car-race")):
+        try:
+            with os.scandir(os.path.join(root, sub)) as it:
+                for e in it:
+                    if e.name.startswith(pre) and e.name.endswith((".js", ".html", ".css")) and e.is_file():
+                        v = max(v, e.stat().st_mtime)
+        except OSError:
+            pass
+    _BUILD.update(at=now, v=int(v))
+    return _BUILD["v"]
+
+
 @bp_fx.route("/s/<token>/api/fx/car-race/state")
 def car_race_state(token):
     if g.tenant_id is None:
@@ -1014,7 +1037,9 @@ def car_race_state(token):
         drive_sync(g.tenant_id, now)
     except Exception:
         log.exception("fx car-race: drive sync failed")
-    return _no_store(jsonify(race.state(g.tenant_id, now)))
+    st = race.state(g.tenant_id, now)
+    st["build"] = _overlay_build(now)
+    return _no_store(jsonify(st))
 
 
 @bp_fx.route("/s/<token>/api/fx/car-race/result", methods=["POST"])

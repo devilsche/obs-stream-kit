@@ -617,3 +617,10 @@ def test_bump_has_no_target_and_ignores_q(conn, tmp_path, clock):
     ev = c.get("/s/tok/api/fx/car-race/state").get_json()["race_events"]
     t = round(clock["now"] - starts + 1.5, 2)
     assert ev == [{"t": t, "type": "bump", "id": "1"}, {"t": t, "type": "bump", "id": "2"}]
+
+
+def test_state_carries_overlay_build(conn, tmp_path, clock):
+    # Overlay lädt sich nach einem Deploy neu, wenn sich der Stand der Dateien ändert (nur Leerlauf/Lobby, js/car-race.js)
+    c = _client(conn, tmp_path)
+    b = c.get("/s/tok/api/fx/car-race/state").get_json()["build"]
+    assert isinstance(b, int) and b > 0
