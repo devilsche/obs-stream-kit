@@ -188,16 +188,26 @@ _PET_FONTS = [
 
 _WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"], ["night", "Clear night"], ["dawn", "Dawn"], ["dusk", "Dusk"]]
 
+# Dashboard-Domain je Effect (Tab in /app/urls, ?d=…): "domain" in EFFECT_META, Standard "stream".
+# Gültige Werte: EFFECT_DOMAINS. Item Rain und alle übrigen Effects bleiben in Stream.
+EFFECT_DOMAINS = ("stream", "race", "ducks")
+DEFAULT_EFFECT_DOMAIN = "stream"
+
 EFFECT_META = {
     "snow.html": {"hidden": True},
-    "car-burnout.html": {"switches": [
+    "duck-greet.html": {"domain": "ducks"},
+    "duck-parade.html": {"domain": "ducks"},
+    "duck-assembly.html": {"domain": "ducks"},
+    "duck-court.html": {"domain": "ducks"},
+    "knife-duck.html": {"domain": "ducks"},
+    "car-burnout.html": {"domain": "race", "switches": [
         {"key": "model", "label": "Car", "type": "select", "default": "mix", "options": [["mix", "Random mix"]],
          "tooltip": "Random car from the mix, all cars of one brand, or exactly one car (list from the Car overview)"},
     ]},
     # Car Race (js/car-race.js): Fenster 16:9, Standard 640×360 (bis 960×540); Befehle/Knöpfe folgen mit dem Podest.
     # Nachlauf nach dem Sieger gibt der Server vor (fest 15 s); ?finish= wirkt nur in der Vorschau.
     # Befehle/Knöpfe gehen an /api/fx/car-race (eigener Endpoint, nicht fx/commands.py).
-    "car-race.html": {"size": "640×360", "preview_query": "preview=1", "switches": [
+    "car-race.html": {"domain": "race", "size": "640×360", "preview_query": "preview=1", "switches": [
         {"key": "preview", "label": "Preview with test racers", "type": "select", "default": "0",
          "options": [["0", "Off"], ["1", "On"]],
          "tooltip": "For testing in the browser: local lobby with test racers, no server. Must be off in OBS"},
@@ -1033,5 +1043,6 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
                     "commands": meta.get("commands", []),
                     "controls": meta.get("controls", []),
                     "preview_query": meta.get("preview_query", ""),
+                    "domain": meta.get("domain", DEFAULT_EFFECT_DOMAIN),
                     "live": _live_keys(subdir, key, meta.get("switches", []))})
     return out

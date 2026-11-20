@@ -1221,6 +1221,8 @@ nie zweimal gefeiert wird.
   Oben an jeder Source-URL stehen **Copy** und **Preview** (letzteres
   öffnet sie mit `?demo=all`).
 
+**Navigation / Domain-Tabs:** `/app/urls?d=…` hat je Domain einen Tab in der Top-Nav: PUBG, Steam, Gothic 1, Stream, **Race**, **Ducks**. Race sammelt die Effects `car-race.html` und `car-burnout.html`, eine Info-Box mit dem Chat-Fahrerlink (`/drive/race/<kanal>`) und dem Rekord-Endpoint (`/s/<token>/api/fx/car-race?cmd=records`) sowie Link-Karten zu den Race-Tools (Car Drive, Car editor inkl. Enten-Fahrer, Car picker, Car gallery, Car viewer, Race HUD preview). Ducks sammelt `duck-greet`, `duck-parade`, `duck-assembly`, `duck-court`, `knife-duck` plus Duck editor/gallery/viewer. Die Zuordnung ist datengetrieben: Schlüssel `"domain"` je Effect in `EFFECT_META` (`overlay_app/overlay_catalog.py`, Standard `stream`, Item Rain bleibt dort) und je Tool in `TOOLS` (`app/views_app.py`). Die Tools stehen zusätzlich weiter unter `/app/tools`; die Suche auf `/app/urls` findet die Karten domainübergreifend.
+
 Die angezeigten Source-URLs tragen den Widget-Token (`/s/<token>/widgets/...`).
 Ohne ihn antwortet die Widget-Route mit **404** — eine URL ohne Token sieht
 richtig aus und ist unbrauchbar, deshalb reicht `_serve_tool` den Token als

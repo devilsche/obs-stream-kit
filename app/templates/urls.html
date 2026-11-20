@@ -66,6 +66,17 @@ G1R_STEAM_NAME=</code></pre>
             <span class="url-copied" id="g1rEnvStatus" role="status" aria-live="polite"></span>
           </div>
         </div>
+        {# ── Race: Info-Box (Chat-Fahrerlink + Rekorde) ── #}
+        <div class="url-g1r-setup" data-tab="race" hidden>
+          <div class="url-g1r-setup__head">
+            <span class="material-symbols-outlined" aria-hidden="true">sports_score</span>
+            <b>Chat race — links</b>
+          </div>
+          <p class="url-g1r-setup__txt">Steerable race for chat drivers (viewers who joined with <code>!race</code> sign in with Twitch and drive their own car):</p>
+          <pre class="url-g1r-setup__env"><code>{% if race_link %}{{ race_link }}{% else %}Set your Twitch channel under Settings to get the driver link.{% endif %}</code></pre>
+          <p class="url-g1r-setup__txt">Lap records (read-only JSON):</p>
+          <pre class="url-g1r-setup__env"><code>{{ base_url }}/s/{{ token }}/api/fx/car-race?cmd=records</code></pre>
+        </div>
         {% for o in overlays %}
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
@@ -98,7 +109,7 @@ G1R_STEAM_NAME=</code></pre>
         {% for e in effects %}
         {{ src_card('overlay','Effect',e.label,
                     base_url~'/s/'~token~'/effects/'~e.file,'effects/'~e.file,
-                    e.size,e.desc,e.switches or [],e.params or [],False,'','stream',None,
+                    e.size,e.desc,e.switches or [],e.params or [],False,'',e.domain,None,
                     e.commands or [],base_url~'/s/'~token~'/api/fx/'~e.key,
                     e.controls or [],e.live or [],e.preview_query or '') }}
         {% endfor %}
@@ -108,6 +119,20 @@ G1R_STEAM_NAME=</code></pre>
                     t.size,t.desc,t.switches or [],t.params or [],
                     t.chrome_preview|default(False),'','stream',
                     t.preview_size|default(None)) }}
+        {% endfor %}
+        {# ── Tool-Links der Domains Race/Ducks (Tools bleiben zusätzlich unter /app/tools) ── #}
+        {% for dom, tl in domain_tools.items() %}
+        {% for t in tl %}
+        <a class="url-card url-card--tool" hidden href="/app/tools/{{ t.key }}" target="_blank" rel="noopener"
+           data-kind="tool" data-label="{{ t.label }}" data-cat="Tools" data-tab="{{ dom }}"
+           data-path="tools/{{ t.key }}" data-desc="{{ t.desc }}">
+          <span class="url-card__top">
+            <span class="url-card__cat">Tools <span class="material-symbols-outlined" aria-hidden="true">open_in_new</span><span class="sw-sr-only">(opens in a new tab)</span></span>
+            <span class="url-card__nm">{{ t.label }}</span>
+            <span class="url-card__meta">{{ t.desc }}</span>
+          </span>
+        </a>
+        {% endfor %}
         {% endfor %}
       </div>
       <p class="url-empty" id="urlEmpty" hidden>No source found.</p>
@@ -453,7 +478,7 @@ G1R_STEAM_NAME=</code></pre>
   // Domain aus der URL (?d=… aus der Top-Nav), sonst Default pubg.
   let currentTab = (function () {
     var d = new URLSearchParams(location.search).get("d");
-    return ["pubg", "steam", "g1r", "stream", "decor"].indexOf(d) >= 0 ? d : "pubg";
+    return ["pubg", "steam", "g1r", "stream", "race", "ducks", "decor"].indexOf(d) >= 0 ? d : "pubg";
   })();
 
   function openDetail(card) {
@@ -1445,6 +1470,7 @@ G1R_STEAM_NAME=</code></pre>
 
   // ── Card → Detail ─────────────────────────────────────────
   allCards.forEach(card => {
+    if (card.dataset.kind === "tool") return;   // Link-Karte: normaler Link in neuen Tab
     card.addEventListener("click", () => {
       if (card.dataset.tab) currentTab = card.dataset.tab;
       openDetail(card);

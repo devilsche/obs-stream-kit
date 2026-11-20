@@ -68,47 +68,56 @@ TOOLS = [
      "label": "Rubber duck viewer",
      "desc": "The 3D rubber duck from the party rain, large and freely rotatable (drag, arrow keys, zoom).",
      "path": "tools/duck-viewer.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "ducks"},
     {"key": "duck-gallery",
      "label": "Rubber duck outfits",
      "desc": "All rubber duck outfits side by side — heroes, horror, jobs, fun and celebrities — with their URL parameter.",
      "path": "tools/duck-gallery.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "ducks"},
     {"key": "duck-editor",
      "label": "Rubber duck editor",
      "desc": "Rebuild any rubber duck outfit or make a new one: move, turn and resize hats and props, change colours. Saved outfits go live everywhere.",
      "path": "tools/duck-editor.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "ducks"},
     {"key": "car-gallery",
      "label": "Toy cars",
      "desc": "All cars of the BMW rain with their paints and all rims, with their URL parameter.",
      "path": "tools/car-gallery.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "race"},
     {"key": "car-picker",
      "label": "Car picker",
      "desc": "Free car models from Sketchfab by brand: tick the ones to keep for the car rain.",
      "path": "tools/car-picker.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "race"},
     {"key": "car-viewer",
      "label": "Car viewer",
      "desc": "One car model large on screen: turn, zoom, front/side/rear/top view.",
      "path": "tools/car-viewer.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "race"},
     {"key": "car-editor",
      "label": "Toy car editor",
      "desc": "Build rims, pick rims and tyres per car, add and tune lips, wings, diffusers, skirts, flares and exhausts. Saved cars go live in the BMW rain.",
      "path": "tools/car-editor.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "race"},
     {"key": "car-drive",
      "label": "Car Drive",
      "desc": "Drive the Car Race yourself: pick a car from the catalogue, a track, 0–7 AI opponents and 1–5 laps. Keyboard or gamepad, fullscreen.",
      "path": "tools/car-drive.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "race"},
     {"key": "car-race-hud-preview",
      "label": "Car Race ranking design",
      "desc": "Static preview of the race ranking (3, 6, 10 racers, small window) to style effects/car-race-hud.css – edit, then reload.",
      "path": "tools/car-race-hud-preview.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "race"},
     {"key": "vacuum-mockup",
      "label": "Sweeper duck mockup",
      "desc": "Mockup for the new vacuum duck: the rubber duck drives a sweeper robot. Try seats, sizes and outfits.",
@@ -658,7 +667,15 @@ def urls():
         if e["file"] in ("item-rain.html", "car-burnout.html"):
             e["switches"] = [_car_model_switch(project_root, sw) if sw["key"] == "model" else sw for sw in e["switches"]]
     transitions = TRANSITIONS
-    return render_template("urls.html",
+    visible = _visible_tools()
+    domain_tools = {d: _domain_tools(visible, d) for d in ("race", "ducks")}
+    race_link = None
+    try:
+        from fx.endpoints import drive_link
+        race_link = drive_link(g.tenant_id)
+    except Exception:
+        current_app.logger.exception("urls: race drive link failed")
+    return render_template("urls.html", domain_tools=domain_tools, race_link=race_link,
                            user=g.user, token=token,
                            pubg_ready=pubg_ready, steam_ready=steam_ready,
                            widgets=widgets_list, base_url=base_url,
@@ -807,6 +824,11 @@ def car_model_delete(kind, key):
     if kind not in car_models.KINDS:
         abort(404)
     return jsonify({"ok": True, "deleted": car_models.delete(_duck_root(), kind, key)})
+
+
+def _domain_tools(tools, domain):
+    """Tools einer Dashboard-Domain (Feld "domain" in TOOLS) als Link-Karten für /app/urls."""
+    return [t for t in tools if t.get("domain") == domain]
 
 
 def _visible_tools():
