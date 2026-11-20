@@ -1,7 +1,7 @@
 /* Fahrbahn und Streckenrand der Car-Race-Strecken (three r128), aufgerufen von js/car-track-scene.js nach der Deko
  * (Bodenfarbe und belegte Plätze stehen dann fest). Genutzt im Overlay (js/car-race.js) und in Car Drive.
  *
- *   CarTrackSurface.build(S) → { stats: { draws, tris, texBytes } }
+ *   CarTrackSurface.build(S) → { stats: { draws, tris, texBytes, chevrons, posts }, setMotionBlur(m) }
  *   S = { T, P, n, ds, HALF, g (Gruppe), own(x), heightAt, trackDist, runAt(i, sd), gravel: {1, -1} (Uint8Array je
  *         Rasterpunkt, Kiesbett-Regel wie js/car-drive-phys.js), curvy(i), theme, gc(x, z, h, d) (Bodenfarbe),
  *         place(x, z, r, ignoreTrack), rng(salt), lin(c), maxAniso, gantry, pit ({ sd, s0, s1 } Boxengasse) }
@@ -18,6 +18,9 @@
  *   Begrenzung   Leitplanke (doppeltes W-Profil auf Pfosten), Reifenstapel mit Gurt (Kurven-Außenseiten mit Kies;
  *                Kart überall), Betonmauer mit Fangzaun (Stadion). Vorderkante wie bisher: Auslauf + 0,3 m.
  *   Rand-Deko    Streckenposten, Countdown-Tafeln (Streifen statt Zahlen) vor Bremszonen, Startampel am Portal.
+ *   Tempo-Bezug  Leitpfosten im festen Takt (12–20 m, Seiten versetzt) und Richtungstafeln (Chevrons) an den
+ *                Kurven-Außenseiten, hinter der Begrenzung – nahe Dinge, die beim Fahren vorbeihuschen.
+ *   Unschärfe    setMotionBlur(m): Asphaltfarbe längs der Strecke um ±m Meter verwischt (Car Drive bei Tempo).
  * Auslauf/Leitplanke bleiben genau dort, wo Sim (js/car-race-sim.js) und Fahrphysik (js/car-drive-phys.js) sie
  * erwarten – hier ist alles nur Optik.
  * Texturen werden einmal je Seite erzeugt (Asphalt 1024², sonst ≤ 512²; Mipmaps, Anisotropie bis 16) und von allen
@@ -366,6 +369,17 @@
     }
     var roadMat = new THREE.MeshStandardMaterial({ map: tex(at.map), normalMap: tex(at.normal), normalScale: new THREE.Vector2(0.55, 0.55),
       roughnessMap: tex(at.rough), roughness: 1, metalness: 0, vertexColors: true, envMapIntensity: 0.5 });
+    // Bewegungsunschärfe längs der Fahrtrichtung (Car Drive, setMotionBlur): zwei zusätzliche Abtastungen der
+    // Farbtextur, versetzt entlang v (= Bogenlänge s); 0 = aus (Overlay, Stand) – dann nur eine Abtastung
+    var blurU = { value: 0 };
+    roadMat.onBeforeCompile = function (sh) {
+      sh.uniforms.uMoBlur = blurU;
+      sh.fragmentShader = 'uniform float uMoBlur;\n' + sh.fragmentShader.replace('#include <map_fragment>',
+        '#ifdef USE_MAP\nvec4 texelColor = mapTexelToLinear(texture2D(map, vUv));\n' +
+        'if (uMoBlur > 0.0) { vec2 bo = vec2(0.0, uMoBlur); texelColor = texelColor * 0.4 + mapTexelToLinear(texture2D(map, vUv + bo)) * 0.3 + ' +
+        'mapTexelToLinear(texture2D(map, vUv - bo)) * 0.3; }\ndiffuseColor *= texelColor;\n#endif');
+    };
+    roadMat.customProgramCacheKey = function () { return 'track-road-blur'; };
     addMesh(road.geo(), roadMat);
     // echtes Asphalt-Foto nachladen (geteilt, nicht je Strecke entsorgt); Ideallinie/Bremszonen bleiben als Ecken-Farbe
     photoAsphalt(aniso, function (ph) {
@@ -720,6 +734,49 @@
           }
         });
       });
+      // ---- Bezugspunkte fürs Tempogefühl (Car Drive): Richtungstafeln (Chevrons) an den Kurven-Außenseiten und
+      // Leitpfosten im festen Takt, beides HINTER der Begrenzung (Vorderkante + ≥ 0,6 m, nie auf Fahrbahn/Auslauf),
+      // ragt über Leitplanke/Mauer hinaus. Alles in hw (kein eigener Zeichenaufruf), deterministisch aus der Strecke.
+      var REF_OFF = barrier === 'tyres' ? 1.3 : barrier === 'wall' ? 0.8 : 0.65, POST_GAP = clamp(T.len / 64, 12, 20);
+      var nearPit = function (s, sd) { return !!pit && sd === pit.sd && s > pit.s0 - 20 && s < pit.s1 + 20; };
+      var refAt = function (s, sd, extra) {
+        var a = T.at(s), off = HALF + (sd > 0 ? a.runL : a.runR) + 0.3 + REF_OFF + (extra || 0);
+        return { a: a, off: off, x: a.x + a.nx * sd * off, z: a.z + a.nz * sd * off, fx: Math.cos(a.yaw), fz: -Math.sin(a.yaw), tx: -a.nx * sd, tz: -a.nz * sd };
+      };
+      var refFree = function (r, rad) { return S.trackDist(r.x, r.z, r.off + 1) >= r.off - 0.5 && S.place(r.x, r.z, rad, true); };
+      T.corners.forEach(function (c) {
+        var sd = -c.dir, cnt = c.len > 24 ? 4 : 3;
+        for (var k4 = 0; k4 < cnt; k4++) {
+          var s = c.s0 - 3 + (c.len + 6) * k4 / (cnt - 1);
+          if (nearPit(s, sd)) continue;
+          var r = refAt(s, sd, 0.15);
+          if (!refFree(r, 0.75)) continue;
+          var y = hAt(r.x, r.z), ry = r.a.yaw;
+          [-0.42, 0.42].forEach(function (u) { hw.add(new THREE.BoxGeometry(0.07, 2.25, 0.07), 0x5b6068, { x: r.x + r.fx * u - r.tx * 0.06, y: y + 0.72, z: r.z + r.fz * u - r.tz * 0.06, ry: ry }); });
+          hw.add(new THREE.BoxGeometry(1.1, 0.66, 0.04), 0xf2c200, { x: r.x, y: y + 1.52, z: r.z, ry: ry });
+          stats.chevrons = (stats.chevrons || 0) + 1;
+          // zwei schwarze Winkel auf der Front (zur Strecke), Spitze in Fahrtrichtung
+          var P3 = function (u, v) { return [r.x + r.fx * u + r.tx * 0.025, y + v, r.z + r.fz * u + r.tz * 0.025]; };
+          [-0.43, 0.07].forEach(function (u0) {
+            var w = 0.13, tip = 0.29;
+            tri(hw, P3(u0, 1.79), P3(u0 + w, 1.79), P3(u0 + tip + w, 1.52), 0x15161a); tri(hw, P3(u0, 1.79), P3(u0 + tip + w, 1.52), P3(u0 + tip, 1.52), 0x15161a);
+            tri(hw, P3(u0 + tip, 1.52), P3(u0 + tip + w, 1.52), P3(u0 + w, 1.25), 0x15161a); tri(hw, P3(u0 + tip, 1.52), P3(u0 + w, 1.25), P3(u0, 1.25), 0x15161a);
+          });
+        }
+      });
+      // Leitpfosten: weiß, schwarzes Kopfband mit orangem Rückstrahler; Seiten um einen halben Takt versetzt
+      [1, -1].forEach(function (sd) {
+        for (var ps = 12 + (sd > 0 ? 0 : POST_GAP / 2); ps < T.len - 12; ps += POST_GAP) {
+          if (nearPit(ps, sd)) continue;
+          var r = refAt(ps, sd, 0);
+          if (!refFree(r, 0.3)) continue;
+          var y = hAt(r.x, r.z), ry = r.a.yaw;
+          hw.add(new THREE.BoxGeometry(0.12, 1.85, 0.12), 0xf2f2ee, { x: r.x, y: y + 0.525, z: r.z, ry: ry });
+          hw.add(new THREE.BoxGeometry(0.125, 0.3, 0.125), 0x17181c, { x: r.x, y: y + 1.3, z: r.z, ry: ry });
+          hw.add(new THREE.BoxGeometry(0.13, 0.11, 0.13), 0xff8a1c, { x: r.x, y: y + 1.31, z: r.z, ry: ry });
+          stats.posts = (stats.posts || 0) + 1;
+        }
+      });
     }
     if (hw && !hw.empty()) addMesh(hw.geo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0, envMapIntensity: 0.5, side: THREE.DoubleSide }));
     if (metal && !metal.empty()) addMesh(metal.geo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.38, metalness: 0.65, envMapIntensity: 1.0, side: THREE.DoubleSide }));
@@ -737,7 +794,11 @@
       var slm = new THREE.Mesh(own(sk.geo()), own(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.2 })));
       slm.userData.surface = true; S.gantry.add(slm); stats.draws++;
     }
-    return { stats: stats };
+    return {
+      stats: stats,
+      // Unschärfe in Metern längs der Strecke (Kachel-Wiederholung der aktuellen Textur eingerechnet)
+      setMotionBlur: function (m) { blurU.value = Math.max(0, m || 0) * (roadMat.map ? roadMat.map.repeat.y : 1) / TILE; }
+    };
   }
 
   root.CarTrackSurface = { build: build, REG: REG };

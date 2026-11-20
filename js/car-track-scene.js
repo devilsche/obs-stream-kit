@@ -15,6 +15,7 @@
  *                              optional Hintergrundfarbe (Car Drive; das Overlay bleibt durchsichtig, der Himmel ist
  *                              eine Kuppel in der Gruppe),
  *       update(dt)             Fahnen, Wellen, Leuchtturm (bei reduzierter Bewegung steht alles),
+ *       setMotionBlur(m)       Bewegungsunschärfe der Fahrbahn längs der Strecke in Metern (Car Drive; 0 = aus),
  *       props                  Promise → propStats, sobald alle Kulissen-Modelle geladen/eingesetzt sind,
  *       propStats              { loaded: [key], failed: [key], tris, draws } der eingesetzten Kulissen-Modelle,
  *       dispose()              entfernt alles, gibt frei und setzt Licht/Nebel zurück }
@@ -673,12 +674,13 @@
       terrainGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
     })();
     // Fahrbahn, Curbs, Auslauf, Begrenzung, Rand-Deko (js/car-track-surface.js)
-    var surfaceStats = null;
-    if (Surface) surfaceStats = Surface.build({
+    var surfaceStats = null, surfaceRes = null;
+    if (Surface) surfaceRes = Surface.build({
       T: T, P: P, n: n, ds: ds, HALF: HALF, g: g, own: own, heightAt: heightAt, trackDist: trackDist, runAt: runAt, gravel: gravelK,
       curvy: curvy, theme: theme, gc: gc, place: ctx.place, rng: ctx.rng, lin: lin, maxAniso: maxAniso, gantry: gantry, pit: ctx.pit || null,
       grassTex: grassTex, flat: flat
-    }).stats;
+    });
+    if (surfaceRes) surfaceStats = surfaceRes.stats;
 
     // ---- Neigung ----
     function grad(x, z) { var e = 0.6; return [(heightAt(x + e, z) - heightAt(x - e, z)) / (2 * e), (heightAt(x, z + e) - heightAt(x, z - e)) / (2 * e)]; }
@@ -731,6 +733,8 @@
       group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
       heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update,
       props: propsReady, propStats: propStats, surfaceStats: surfaceStats,
+      // Bewegungsunschärfe der Fahrbahn in Metern (Car Drive, Tempogefühl); 0 = aus
+      setMotionBlur: function (m) { if (surfaceRes && surfaceRes.setMotionBlur) surfaceRes.setMotionBlur(m); },
       dispose: function () {
         disposed = true;
         restoreEnv();
