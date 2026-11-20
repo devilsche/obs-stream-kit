@@ -324,7 +324,11 @@
       </section>
 
       <section aria-labelledby="h-steer">
-        <h2 id="h-steer">Steering (preview)</h2>
+        <h2 id="h-steer">Wheels (preview)</h2>
+        <div class="row">
+          <input type="checkbox" id="spinWheels">
+          <label for="spinWheels">Wheels turn (driving)</label>
+        </div>
         <div class="row">
           <label for="steer">Front wheels</label>
           <input type="range" id="steer" min="-0.6" max="0.6" step="0.01" value="0">
@@ -431,7 +435,13 @@
       });
       function resize() { var r = canvas.getBoundingClientRect(); renderer.setSize(r.width, r.height, false); cam.aspect = r.width / Math.max(1, r.height); cam.updateProjectionMatrix(); }
       window.addEventListener('resize', resize);
-      function frame() {
+      var spinList = [], spinA = 0, spinT = 0;
+      function frame(now) {
+        var dt = spinT ? Math.min(0.05, (now - spinT) / 1000) : 0; spinT = now || 0;
+        // Räder rollen wie bei ~25 km/h (Spielzeug-Maßstab), aus = Grundstellung
+        var on = $('spinWheels').checked;
+        spinA = on ? (spinA + dt * 9) % (Math.PI * 2000) : 0;
+        spinList.forEach(function (w) { w.o.rotation[w.ax] = w.base - spinA * w.sgn; });
         var cp = Math.cos(orbit.pitch), T = orbit.t;
         cam.position.set(T.x + Math.cos(orbit.yaw) * cp * orbit.dist, T.y + Math.sin(orbit.pitch) * orbit.dist, T.z + Math.sin(orbit.yaw) * cp * orbit.dist);
         var fl = scene.getObjectByName('floor'); if (fl) fl.visible = cam.position.y > 0.02;   // von unten: Boden aus
@@ -476,6 +486,12 @@
         var flagged = wheels.some(function (o) { return o.userData.front != null; });
         var xs = wheels.map(function (o) { var w = new THREE.Vector3(); o.getWorldPosition(w); return w.x; }), maxX = Math.max.apply(null, xs.concat([-1e9]));
         wheels.forEach(function (o, i) { if (flagged ? o.userData.front : xs[i] > 0 && xs[i] > maxX - tpl.userData.dims.L * 0.08) o.rotation.y = s; });
+        // Vorschau „Räder drehen“: alle Radgruppen rollen lassen (auch falsch gebaute, damit man es sieht)
+        spinList = wheels.map(function (o) {
+          var sp = o.getObjectByName('Spin'), ax = sp ? sp.userData.ax || 'x' : 'x', sgn = 1;
+          if (sp) { var q = new THREE.Quaternion(); sp.getWorldQuaternion(q); sgn = new THREE.Vector3(ax === 'z' ? 0 : 1, 0, ax === 'z' ? 1 : 0).applyQuaternion(q).z >= 0 ? 1 : -1; }
+          return sp ? { o: sp, ax: ax, base: sp.rotation[ax], sgn: sgn } : null;
+        }).filter(Boolean);
         holder.add(car);
         // Fahrer-Ente (eigener Sitz oder Schätzung); Höhe/Drehung aus den Reglern stecken im Sitz
         if ($('showDriver').checked && window.RubberDuck) { var st = driverSeat(); if (st) TC.addDriver(car, cur.key, { seat: st, template: tpl }); }
