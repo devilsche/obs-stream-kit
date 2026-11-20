@@ -171,7 +171,12 @@ def _me(st, viewer):
         return None
     mine = next((r for r in st.get("racers") or [] if str(r.get("user_id")) == str(viewer["id"])), None)
     pilots = st.get("pilots")
-    taken = {e.get("id") for e in st.get("race_events") or [] if e.get("type") == "takeover"}
+    taken = set()
+    for e in st.get("race_events") or []:     # nach Zeit sortiert: KI übernimmt / gibt zurück
+        if e.get("type") == "takeover":
+            taken.add(e.get("id"))
+        elif e.get("type") == "release":
+            taken.discard(e.get("id"))
     return {"id": viewer["id"], "name": viewer.get("display") or viewer.get("login"), "in_race": mine is not None,
             "grid": mine.get("grid") if mine else None,
             "pilot": None if pilots is None or mine is None else viewer["id"] in pilots,

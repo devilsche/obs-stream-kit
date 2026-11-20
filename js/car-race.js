@@ -20,7 +20,8 @@
  * Schließen der Startaufstellung). Die Sim rechnet sie als Geister (ghost, ohne Wechselwirkung – jede Instanz rechnet
  * dasselbe), gezeigt werden sie aus dem Live-Takt des WS-Dienstes (js/car-drive-net.js, Zuschauer-Ticket über
  * <base>api/fx/car-race/spectate, 100 ms Puffer). KI-Übernahme (race_events type takeover bzw. WS „takeover“):
- * ab dann fährt CarRaceSim.follower das Auto. Platzierung/Ende aus allen zusammen (Zielzeiten, Sieger + Zielfrist),
+ * ab dann fährt CarRaceSim.follower das Auto; „release“ (Pilot übernimmt wieder, Esc-Menü/Taste P in Car Drive) →
+ * wieder Live-Takt (je Pilot gilt das jüngste Ereignis nach t). Platzierung/Ende aus allen zusammen (Zielzeiten, Sieger + Zielfrist),
  * gemeldet werden places (Sim) + times (KI und Nachfahrer); der Server rechnet die Piloten-Zeiten dazu und schickt
  * das Endergebnis zurück (Podest daraus). Namensschild und Rangliste zeigen, wer steuert: Controller-Symbol
  * (Material Symbols „sports_esports“) = Mensch, „AI“ = KI. Ohne Piloten ist alles wie vorher.
@@ -521,7 +522,7 @@
         startsAt: st.starts_at, introAt: null, intro: null, stage: 'grid', racers: {}, order: [], gridSim: null, rosterKey: '',
         sim: null, simKey: '', prev: null, alpha: 1, ended: false, fadeAt: null, endedAt: null, shownAt: srvNow(),
         cam: null, lastLeader: null, evIdx: 0, oil: [],
-        pilots: Array.isArray(st.pilots) ? st.pilots.map(String) : null, taken: {}, follow: {}, pilotFin: {}, pilotBad: {},
+        pilots: Array.isArray(st.pilots) ? st.pilots.map(String) : null, taken: {}, aiLast: {}, follow: {}, pilotFin: {}, pilotBad: {},
         vorder: null, lastT: 0
       };
       buildTrack(T);
@@ -546,11 +547,14 @@
     function pilotsKey() { return race && race.pilots ? race.pilots.join('|') : '-'; }
     // wer steuert: vor dem Einfrieren unbekannt (''), dann 'human' bzw. 'ai' (auch nach der Übernahme)
     function drvOf(r) { return !race || !race.pilots ? '' : isPilot(r.id) && !race.taken[r.id] ? 'human' : 'ai'; }
+    // KI übernimmt (takeover) bzw. Pilot übernimmt wieder (release): je Pilot zählt das jüngste Ereignis (nach t) –
+    // Reihenfolge des Eintreffens (WS, Poll) egal
     function addTakeover(ev) {
-      if (!race || !ev || ev.id == null) return;
-      var id = String(ev.id);
-      if (race.taken[id] || !isPilot(id)) return;
-      race.taken[id] = ev;
+      if (!race || !ev || ev.id == null || (ev.type !== 'takeover' && ev.type !== 'release')) return;
+      var id = String(ev.id), cur = race.aiLast[id];
+      if (!isPilot(id) || (cur && !(+ev.t > +cur.t))) return;
+      race.aiLast[id] = ev;
+      if (ev.type === 'takeover') race.taken[id] = ev; else delete race.taken[id];
       race.follow[id] = null;   // Nachfahrer wird beim ersten Bedarf gebaut (Startplatz aus der Sim)
     }
     function followerOf(r, i) {
@@ -655,7 +659,7 @@
     function netMsg(m) {
       if (m.t === 'welcome') { netTry = 0; netRace(m.race); }
       else if (m.t === 'race') netRace(m.race);
-      else if (m.t === 'takeover') addTakeover(m.ev);
+      else if (m.t === 'takeover' || m.t === 'release') addTakeover(m.ev);
       else if (m.t === 'lap' && race) {
         if (m.fin != null) race.pilotFin[String(m.id)] = +m.fin;
         if (m.ok === false) race.pilotBad[String(m.id)] = true;
@@ -960,7 +964,7 @@
     // Sim, wird sie aus dem Seed neu aufgebaut und vorgespult – so bleiben alle Instanzen gleich
     function takeRaceEvents(list) {
       if (!race || !Array.isArray(list)) return;
-      list.forEach(function (e) { if (e && e.type === 'takeover') addTakeover(e); });
+      list.forEach(function (e) { if (e && (e.type === 'takeover' || e.type === 'release')) addTakeover(e); });
       var key = JSON.stringify(list);
       if (key === race.extKey) return;
       race.extKey = key; race.ext = list.slice();

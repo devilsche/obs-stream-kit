@@ -11,7 +11,9 @@ Chatrennen steuerbar (Car Drive, Schritt 2b): Fahrer können ihr Auto auf stream
 steuern. Beim Schließen der Startaufstellung (Beginn von intro) friert der Endpoint per set_pilots ein, wer dann mit
 dem WS-Dienst (drive_ws.py) verbunden ist – `pilots` im Zustand. Die Sim rechnet diese Autos als Geister (keine
 Wechselwirkung), die Overlays zeigen sie aus dem Live-Takt. Fällt die Verbindung weg, übernimmt die KI: Ereignis
-`takeover` in race_events (add_takeovers), ab dann fährt js/car-race-sim.js follower() das Auto. Ohne Piloten ist alles
+`takeover` in race_events (add_takeovers), ab dann fährt js/car-race-sim.js follower() das Auto. Piloten können die KI
+auch selbst fahren lassen und wieder übernehmen (`release`, add_ai_events; taken = wer gerade von der KI gefahren
+wird). Ohne Piloten ist alles
 wie vorher. Zielzeiten der Piloten kommen vom WS-Dienst (accept_result, pilot_res).
 
 Alle Funktionen bekommen `now` (Unix-Sekunden) übergeben, damit Tests die Zeit
@@ -379,6 +381,47 @@ def add_takeovers(tenant_id, race_id, events):
             except (KeyError, TypeError, ValueError):
                 continue
             t["taken"][uid] = ev
+            t["events"].append(ev)
+            n += 1
+    return n
+
+
+def add_ai_events(tenant_id, race_id, events):
+    """Übernahmen und Rückgaben vom WS-Dienst in Reihenfolge (fx/drive_race.Room.log): takeover wie add_takeovers,
+    release {t, type: release, id, x, z, yaw, speed, prog, lap} gibt das Steuer zurück. Jedes Ereignis einmal
+    (type, id, t). → Anzahl übernommener Ereignisse."""
+    n = 0
+    with _LOCK:
+        t = _get(tenant_id)
+        if t.get("race_id") != race_id or not t.get("pilots"):
+            return 0
+        seen = t.setdefault("ai_seen", set())
+        for e in events or []:
+            if not isinstance(e, dict) or e.get("type") not in ("takeover", "release"):
+                continue
+            uid = str(e.get("id"))
+            try:
+                key = (e["type"], uid, round(float(e["t"]), 2))
+                ev = {"t": key[2], "type": e["type"], "id": uid}
+                if e.get("grid") and e["type"] == "takeover":
+                    ev["grid"] = 1
+                else:
+                    for k in _TAKE_KEYS:
+                        ev[k] = round(float(e[k]), 3)
+                    ev["lap"] = int(e.get("lap") or 0)
+            except (KeyError, TypeError, ValueError):
+                continue
+            if key in seen or uid not in t["pilots"]:
+                continue
+            seen.add(key)
+            if ev["type"] == "takeover":
+                if uid in t["taken"]:
+                    continue
+                t["taken"][uid] = ev
+            else:
+                if uid not in t["taken"]:
+                    continue
+                del t["taken"][uid]
             t["events"].append(ev)
             n += 1
     return n

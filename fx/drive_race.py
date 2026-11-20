@@ -21,7 +21,14 @@ Verstöße markieren die laufende Runde; ein Pilot mit ungültiger Runde wird ni
 
 KI-Übernahme: ein Pilot ohne Zustand seit TAKEOVER_GAP s im laufenden Rennen (oder nie verbunden) bekommt ein
 Ereignis {t, type: takeover, id, x, z, yaw, speed: 0, prog, lap} (t = Rennsekunden; ohne Zustand {…, grid: 1});
-ab dann fahren alle Instanzen das Auto mit CarRaceSim.follower, der Mensch kann nicht zurück.
+ab dann fahren alle Instanzen das Auto mit CarRaceSim.follower.
+Freiwillig (Esc-Menü „Let AI drive“, Taste P): ai() → dasselbe Ereignis aus dem letzten Zustand mit echtem Tempo
+(by: user). Zurück („Take the wheel“, auch nach einem Verbindungsabbruch): release() mit der Lage des Nachfahrers
+zur Rennsekunde rt (der Client rechnet denselben follower) → Ereignis {t, type: release, id, x, z, yaw, speed, prog,
+lap}; geprüft gegen die Übernahme (Fortschritt ≤ Tempo-Grenze × Zeit, nicht im Ziel). Danach gelten wieder die
+Zustände; die Prüfung setzt an der Übergabe neu auf, Runden mit KI-Anteil zählen nicht als Rekordrunde (ai im
+Runden-Ereignis), die Mindestrundenzeit gilt für sie nicht. Alle Übernahmen/Rückgaben in Reihenfolge: Room.log
+(report → ai_events → fx/race.add_ai_events → race_events, aus denen die Overlays deterministisch rechnen).
 
 Höchsttempo/Mindestrundenzeit je Auto: wie in fx/drive_room.py (Limits, data/car-rain/drive-limits.json).
 
@@ -69,7 +76,8 @@ class Driver:
         self.allow = 0.0            # erlaubte Meter seit dem Start
         self.base_prog = None       # Startplatz (erster gemeldeter Fortschritt, höchstens grid_front)
         self.first_prog = None
-        self.taken = None           # Übernahme-Ereignis der KI
+        self.taken = None           # Übernahme-Ereignis der KI (aktuell; None = Mensch fährt)
+        self.lap_ai = False         # laufende Runde mit KI-Anteil (kein Rekord, keine Mindestrundenzeit)
 
     def flag(self, why):
         self.lap_bad = True
@@ -93,6 +101,7 @@ class Room:
         self.pilots = None          # eingefroren ab intro (Liste) – vorher None
         self.active = now
         self.clients = 0
+        self.log = []               # Übernahmen/Rückgaben des Rennens in Reihenfolge
 
     @property
     def track_len(self):
@@ -112,6 +121,7 @@ class Room:
             self.race_id = info.get("race_id")
             self.drivers = {}
             self.pilots = None
+            self.log = []
             if limits_loader:
                 self.limits = limits_loader()
         self.phase = str(info.get("phase") or "idle")
@@ -167,7 +177,7 @@ class Room:
         return {"ok": True, "race_id": self.race_id,
                 "connected": sorted(u for u in connected if u in self.drivers),
                 "takeovers": [d.taken for d in self.drivers.values() if d.taken and d.taken.get("by") != "server"],
-                "pilots": res, "snap": snap}
+                "ai_events": list(self.log), "pilots": res, "snap": snap}
 
     def may_drive(self, uid, now):
         """Darf dieser Fahrer jetzt Zustände schicken? Vor dem Einfrieren alle Fahrer (Startaufstellung),
@@ -235,7 +245,7 @@ class Room:
         while d.lap < lap and d.finish_t is None:
             d.lap += 1
             lt = t - d.lap_start
-            ok = not d.lap_bad and lt >= self.limits.min_lap(d.car, self.track)
+            ok = not d.lap_bad and (d.lap_ai or lt >= self.limits.min_lap(d.car, self.track))
             if not ok and "lap time" not in d.reasons and not d.lap_bad:
                 d.reasons.append("lap time")
             d.laps.append((round(lt, 3), ok))
@@ -244,6 +254,9 @@ class Room:
             d.lap_start = t
             d.lap_bad = False
             ev = {"t": "lap", "id": d.id, "lap": d.lap, "time": round(lt, 3), "ok": ok}
+            if d.lap_ai:
+                ev["ai"] = True
+                d.lap_ai = False
             if d.lap >= self.laps:
                 d.finish_t = t
                 if not d.invalid:
@@ -271,8 +284,68 @@ class Room:
                 x, z, yaw, _r, _p, _s, _speed, prog = d.state[:8]
                 ev.update({"x": x, "z": z, "yaw": yaw, "speed": 0.0, "prog": prog, "lap": d.lap})
             d.taken = ev
+            d.lap_ai = True
+            self.log.append(ev)
             out.append(ev)
         return out
+
+    def _running(self, now):
+        return self.starts_at is not None and self.starts_at <= now < self.starts_at + RACE_MAX
+
+    def ai(self, uid, now):
+        """Pilot gibt das Steuer an die KI ab. → Übernahme-Ereignis (aus dem letzten Zustand, echtes Tempo) oder None."""
+        d = self.drivers.get(uid)
+        if (d is None or d.taken or d.finish_t is not None or not self.pilots or uid not in self.pilots
+                or not self._running(now)):
+            return None
+        elapsed = now - self.starts_at
+        ev = {"t": round(elapsed, 2), "type": "takeover", "id": uid, "by": "user"}
+        if d.state is None or d.last is None:
+            ev["grid"] = 1
+        else:
+            x, z, yaw, _r, _p, _s, speed, prog = d.state[:8]
+            ev.update({"t": round(min(max(d.last[0], 0.0), elapsed), 2), "x": x, "z": z, "yaw": yaw,
+                       "speed": max(0.0, speed), "prog": prog, "lap": d.lap})
+        d.taken = ev
+        d.lap_ai = True
+        self.log.append(ev)
+        return ev
+
+    def release(self, uid, msg, now):
+        """Pilot übernimmt wieder (Lage des Nachfahrers zur Rennsekunde rt). → Rückgabe-Ereignis oder None."""
+        d = self.drivers.get(uid)
+        if d is None or not d.taken or d.finish_t is not None or not self._running(now):
+            return None
+        f = {k: _num(msg.get(k)) for k in ("x", "z", "yaw", "speed", "prog", "rt")}
+        if any(v is None for v in f.values()):
+            return None
+        elapsed = now - self.starts_at
+        tk, rt, prog = d.taken, min(f["rt"], elapsed + CLOCK_AHEAD), f["prog"]
+        t0 = max(0.0, _num(tk.get("t")) or 0.0)
+        p0 = _num(tk.get("prog"))
+        if p0 is None:
+            p0 = grid_front(d.grid)
+        vcap = self.limits.vtop(d.car) * NITRO_V * SPEED_MARGIN + SPEED_SLACK
+        if rt < t0 or prog > p0 + vcap * (rt - t0) + PROG_SLACK or prog >= self.laps * self.track_len or f["speed"] > vcap:
+            return None
+        x, z, speed = round(f["x"], 2), round(f["z"], 2), round(max(0.0, f["speed"]), 2)
+        lap = int(math.floor(prog / self.track_len)) if prog > 0 else 0
+        ev = {"t": round(rt, 2), "type": "release", "id": uid, "x": x, "z": z, "yaw": round(f["yaw"], 3),
+              "speed": speed, "prog": round(prog, 2), "lap": lap}
+        d.taken = None
+        d.ts = now
+        if d.first_prog is None:
+            d.first_prog = d.base_prog = min(prog, grid_front(d.grid))
+        d.allow = max(d.allow, prog - d.base_prog)
+        while d.lap < lap:
+            d.lap += 1
+            d.laps.append((None, True))     # Runde der KI: keine Zeit, kein Rekord
+            d.lap_start = rt
+        d.lap_ai = True
+        d.last = (rt, x, z, prog)
+        d.state = [x, z, ev["yaw"], 0.0, 0.0, 0.0, speed, round(prog, 2), 0.0]
+        self.log.append(ev)
+        return ev
 
     def streaming(self, now):
         return self.starts_at is not None and self.starts_at - STREAM_LEAD < now < self.starts_at + RACE_MAX + STREAM_TAIL

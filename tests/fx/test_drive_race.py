@@ -329,3 +329,62 @@ def test_race_page_state_and_ticket(conn, root, service):
 def test_login_for_race_page(conn, root):
     c = _app(conn, root)
     assert c.get("/drive/login?race=../x").status_code == 400
+
+
+# ---- KI fahren lassen / Steuer zurück (Esc-Menü, Taste P) ----
+
+def test_ai_and_release_roundtrip_in_room():
+    _, room = room_for(dict(INFO, pilots=["a"], laps=2))
+    start, L = room.starts_at, room.track_len
+    send(room, "a", 0, -3.0, start - 1)
+    send(room, "a", 2.0, 20.0, start + 2, x=20.0, speed=15.0)
+    assert room.ai("zz", start + 2.1) is None
+    ev = room.ai("a", start + 2.1)
+    assert ev["type"] == "takeover" and ev["by"] == "user" and ev["t"] == 2.0 and ev["speed"] == 15.0 and ev["prog"] == 20.0
+    assert room.ai("a", start + 2.2) is None and not room.may_drive("a", start + 3)
+    assert room.tick(start + 10) == []             # schon übernommen: keine zweite Übernahme
+    # zu weit (schneller als erlaubt) → abgelehnt, Steuer bleibt bei der KI
+    assert room.release("a", {"x": 0, "z": 0, "yaw": 0, "speed": 20, "prog": 20 + 400.0, "rt": 3.0}, start + 3) is None
+    rel = room.release("a", {"x": 1, "z": 2, "yaw": 0.5, "speed": 20, "prog": L + 30.0, "rt": 40.0}, start + 40)
+    assert rel == {"t": 40.0, "type": "release", "id": "a", "x": 1.0, "z": 2.0, "yaw": 0.5, "speed": 20.0,
+                   "prog": round(L + 30.0, 2), "lap": 1, }
+    d = room.drivers["a"]
+    assert d.taken is None and d.lap == 1 and d.laps == [(None, True)] and room.may_drive("a", start + 41)
+    assert room.tick(start + 41) == []             # frischer Zeitstempel: keine sofortige Übernahme
+    # weiterfahren ohne Sprung-/Fortschritts-Flag, Zielrunde mit KI-Anteil: ai, kein Mindestzeit-Check
+    evs = send(room, "a", 41.0, L + 50.0, start + 41, x=1.0 + 20, speed=20.0)
+    assert d.reasons == [] and evs == []
+    evs = send(room, "a", 42.0, 2 * L + 1, start + 42, x=21.0, speed=20.0)
+    assert evs and evs[-1]["ai"] is True and "lap time" not in d.reasons   # (Sprung im Test: progress-Flag egal)
+    rep = room.report(set())
+    assert [e["type"] for e in rep["ai_events"]] == ["takeover", "release"]
+
+
+def test_release_after_disconnect_takeover_and_finish_blocked():
+    _, room = room_for(dict(INFO, pilots=["a"]))
+    start, L = room.starts_at, room.track_len
+    ev = room.tick(start + 2.5)[0]                 # nie verbunden → vom Startplatz
+    assert ev.get("grid") == 1
+    assert room.release("a", {"x": 0, "z": 0, "yaw": 0, "speed": 10, "prog": L * 1.0, "rt": 100.0}, start + 100) is None   # im Ziel
+    rel = room.release("a", {"x": 0, "z": 0, "yaw": 0, "speed": 10, "prog": 60.0, "rt": 10.0}, start + 10)
+    assert rel and rel["lap"] == 0
+    d = room.drivers["a"]
+    assert d.first_prog == d.base_prog == -1.5 and d.allow >= 61.5
+    send(room, "a", 10.5, 65.0, start + 10.5, x=5.0, speed=10.0)
+    assert d.reasons == []
+
+
+def test_add_ai_events_takeover_release_takeover(cars):
+    st = racing(cars)
+    rid = st["race_id"]
+    race.set_pilots(TID, rid, ["a", "b"], T)
+    log = [{"t": 5.0, "type": "takeover", "id": "a", "x": 1, "z": 2, "yaw": 0.5, "speed": 12, "prog": 40, "lap": 0, "by": "user"},
+           {"t": 9.0, "type": "release", "id": "a", "x": 3, "z": 4, "yaw": 0.1, "speed": 20, "prog": 120, "lap": 0}]
+    assert race.add_ai_events(TID, rid, log) == 2
+    assert race.drive_info(TID, T)["taken"] == []
+    log.append({"t": 20.0, "type": "takeover", "id": "a", "x": 5, "z": 6, "yaw": 0.2, "speed": 18, "prog": 300, "lap": 0})
+    assert race.add_ai_events(TID, rid, log) == 1  # schon gesehene einmal
+    assert race.drive_info(TID, T)["taken"] == ["a"]
+    evs = [(e["type"], e["t"]) for e in race.state(TID, T)["race_events"] if e["type"] in ("takeover", "release")]
+    assert evs == [("takeover", 5.0), ("release", 9.0), ("takeover", 20.0)]
+    assert race.add_ai_events(TID, rid, [{"t": 1, "type": "release", "id": "b", "x": 0, "z": 0, "yaw": 0, "speed": 0, "prog": 0}]) == 0

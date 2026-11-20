@@ -25,11 +25,12 @@ Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, geb
   ws  /drive-ws/race          Fahrer und Overlays (Zuschauen); erste Nachricht {"t": "hello", "ticket": …}
                               (Ticket mit tid + role driver|spectator, ohne code)
   GET /internal/sync?tenant=…&race=<JSON fx/race.drive_info oder leer>
-                              → {ok, race_id, connected, takeovers, pilots, snap}
-Client → Server: hello · ping {c} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin} (nur Fahrer, ~20 Hz).
+                              → {ok, race_id, connected, takeovers, ai_events, pilots, snap}
+Client → Server: hello · ping {c} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin} (nur Fahrer, ~20 Hz) ·
+ai (KI fährt mein Auto) · release {x, z, yaw, speed, prog, rt} (Steuer zurück, Lage des Nachfahrers).
 Server → Client: welcome {id, role, race, now} · race {race} (Rennen/Phase/Piloten/Übernahmen geändert) ·
-S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, fin?} · rec {…} (wie oben) · takeover {ev} · pong {c, s} ·
-error {msg}.
+S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, ai?, fin?} · rec {…} (wie oben, nicht für Runden mit KI) ·
+takeover {ev} · release {ev} · ai_denied {want} (nur an den Fahrer) · pong {c, s} · error {msg}.
 race = {race_id, phase, starts_at, track, track_name, laps, fw, pilots, taken, fin, now} (fx/drive_race.Room.info).
 """
 import asyncio
@@ -229,9 +230,16 @@ class DriveServer:
                         for ev in r.state(cl.id, msg, now):
                             self._send_race(tid, ev)
                             d = r.drivers.get(cl.id)
-                            if ev.get("t") == "lap" and ev.get("ok") and d:
+                            if ev.get("t") == "lap" and ev.get("ok") and not ev.get("ai") and d:
                                 self._lap(tid, r.track, d.car, cl.id, cl.ident.get("display") or cl.id, ev["time"],
                                           "race", lambda o, t=tid: self._send_race(t, o))
+                elif t in ("ai", "release") and cl.driver:
+                    r = self.races.rooms.get(tid)
+                    ev = (r.ai(cl.id, now) if t == "ai" else r.release(cl.id, msg, now)) if r else None
+                    if ev:
+                        self._send_race(tid, {"t": ev["type"], "ev": ev})
+                    else:
+                        broadcast([cl.ws], json.dumps({"t": "ai_denied", "want": t}))
                 elif t == "ping":
                     try:
                         broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))

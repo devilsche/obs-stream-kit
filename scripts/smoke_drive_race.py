@@ -2,11 +2,12 @@
 """Rauchtest Chatrennen steuerbar: startet drive_ws lokal (freier Port, Test-Secret), gleicht ein Chatrennen ab
 (1 Runde, 3 Fahrer), friert 2 Piloten ein, lässt Pilot A über den WS-Dienst eine Runde fahren, Pilot B nach 1 s
 wegbrechen – B muss nach ~2 s von der KI übernommen werden, ein Zuschauer (Overlay) muss den Live-Takt von A, die
-Übernahme von B und A's Zielzeit sehen, sync meldet beides an Flask zurück.
+Übernahme von B und A's Zielzeit sehen, sync meldet beides an Flask zurück. Zweites Rennen: A lässt die KI fahren
+(„ai“) und übernimmt wieder („release“) – Overlay sieht beides, sync meldet beides als ai_events.
 
     python3 scripts/smoke_drive_race.py
 
-Braucht das Paket websockets (>= 13). Dauert ~15 s.
+Braucht das Paket websockets (>= 13). Dauert ~25 s.
 """
 import asyncio
 import json
@@ -118,6 +119,44 @@ async def run(port):
     ok(any(t["id"] == "b" for t in rep["takeovers"]), "Übernahme als Ereignis für race_events")
     rec = [m for m in isp if m.get("t") == "rec"]
     ok(rec and rec[0]["id"] == "a" and rec[0]["track_rec"], "Rundenrekord von A an den Overlay gemeldet (%s)" % (rec[:1] or None))
+    await ai_round(port, base, key)
+
+
+async def ai_round(port, base, key):
+    start = time.time() + 1
+    info = {"race_id": "smoke-2", "phase": "intro", "starts_at": start, "track": 4, "laps": 2, "fw": 25,
+            "racers": [["a", "car-a", 0], ["c", "car-c", 1]], "pilots": None, "taken": []}
+    ia, isp = [], []
+    wa = await client(port, "a", "driver", ia)
+    await client(port, "spec-2", "spectator", isp)
+    await asyncio.sleep(0.3)
+    await asyncio.to_thread(sync, base, key, info)
+    info["pilots"] = ["a"]
+    await asyncio.to_thread(sync, base, key, info)
+    v, step = 10.0, 0
+    while time.time() - start < 6.0:
+        rt = time.time() - start
+        prog = -3.0 + v * max(0.0, rt)
+        if rt < 2.0 or rt > 4.0:
+            if rt > 4.0:
+                prog = 40.0 + v * (rt - 4.0)
+            await wa.send(json.dumps({"t": "s", "x": prog, "z": 0, "yaw": 0, "prog": prog, "rt": max(0.0, rt), "speed": v}))
+        elif step == 0:
+            await wa.send(json.dumps({"t": "ai"}))
+            step = 1
+        if rt > 3.98 and step == 1:
+            await wa.send(json.dumps({"t": "release", "x": 40.0, "z": 0, "yaw": 0, "speed": v, "prog": 40.0, "rt": rt}))
+            step = 2
+        await asyncio.sleep(0.05)
+    rep = await asyncio.to_thread(sync, base, key, dict(info, phase="race"))
+    tk = [m["ev"] for m in isp if m.get("t") == "takeover"]
+    rl = [m["ev"] for m in isp if m.get("t") == "release"]
+    ok(len(tk) == 1 and tk[0].get("by") == "user" and tk[0]["speed"] > 0, "„Let AI drive“ an den Overlay: %s" % tk)
+    ok(len(rl) == 1 and rl[0]["prog"] == 40.0, "„Take the wheel“ an den Overlay: %s" % rl)
+    ok([e["type"] for e in rep.get("ai_events", [])] == ["takeover", "release"] and not rep["pilots"]["a"]["taken"],
+       "sync: ai_events + A fährt wieder selbst (%s)" % [e["type"] for e in rep.get("ai_events", [])])
+    ok(not any(m.get("t") == "ai_denied" for m in ia) and rep["pilots"]["a"]["reasons"] == [],
+       "keine Ablehnung, keine Prüf-Verstöße nach der Übergabe (%s)" % rep["pilots"]["a"]["reasons"])
 
 
 def main():

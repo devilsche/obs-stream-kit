@@ -1138,7 +1138,9 @@ def drive_sync(tenant_id, now, force=False):
                 if again.get("ok"):
                     again["race_id"] = info["race_id"]
                     out = again
-        if out.get("takeovers"):
+        if out.get("ai_events"):
+            race.add_ai_events(tenant_id, info["race_id"], out["ai_events"])
+        elif out.get("takeovers"):
             race.add_takeovers(tenant_id, info["race_id"], out["takeovers"])
     else:
         out = dict(out, race_id=info["race_id"], failed=True)

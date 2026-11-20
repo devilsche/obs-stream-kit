@@ -472,9 +472,10 @@
     if (e.code === 'KeyN' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { cycleMap(); return; }
     if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { setSound(!sndOn); return; }
     if (e.code === 'Escape' && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) {
-      e.preventDefault(); setPaused(!race.paused); return;
+      e.preventDefault(); setPaused(!menuOpen()); return;
     }
-    if (!race || race.paused || !(race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) return;
+    if (e.code === 'KeyP' && race && race.chat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); rcToggleAi(); return; }
+    if (!race || race.paused || race.menu || !(race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) return;
     if (GAME_KEYS[e.code]) {
       e.preventDefault();
       if (!keys[e.code]) pressed[e.code] = true;
@@ -762,17 +763,31 @@
     soundStop(); lookReset();
   }
 
+  // Solo: echte Pause. Mehrspieler-Raum/Chatrennen: die Uhr läuft beim Server weiter → nur ein Menü, das Rennen
+  // läuft dahinter weiter (Chatrennen: „Let AI drive“ / „Take the wheel“)
+  function menuOpen() { return race ? (race.mp ? !!race.menu : race.paused) : false; }
   function setPaused(on) {
     if (!race) return;
-    race.paused = on;
+    if (race.mp) { race.menu = on; race.paused = false; } else race.paused = on;
     keys = {};
+    $('pauseTitle').textContent = race.mp ? 'Race menu' : 'Paused';
+    $('resumeBtn').textContent = race.mp ? 'Close menu' : 'Resume';
     $('restartBtn').hidden = !!race.mp;
-    $('menuBtn').textContent = race.mp ? 'Back to lobby' : 'Back to menu';
+    $('menuBtn').textContent = race.chat ? 'Leave race' : race.mp ? 'Back to lobby' : 'Back to menu';
+    aiBtnSync();
     if (on) showPanel('pause'); else { showPanel(null); try { canvas.focus({ preventScroll: true }); } catch (e) { /* */ } }
   }
   $('resumeBtn').addEventListener('click', function () { setPaused(false); });
   $('restartBtn').addEventListener('click', function () { if (race) { var s = race.s, o = race.opp; begin(s, o); } });
-  $('menuBtn').addEventListener('click', function () { var m = race && race.mp; teardown(); if (m && mp) showLobby(); else showPanel('menu'); });
+  $('menuBtn').addEventListener('click', function () {
+    if (race && race.chat) {
+      // Chatrennen verlassen: Verbindung zu, die KI übernimmt das Auto; kein automatisches Wieder-Einsteigen
+      rc.left = race.raceId; teardown(); mpStop(); showPanel('lobby'); if (rc.st) rcLobby(rc.st);
+      setLobbyStatus('You left the race – the AI drives your car.'); return;
+    }
+    var m = race && race.mp; teardown(); if (m && mp) showLobby(); else showPanel('menu');
+  });
+  $('aiBtn').addEventListener('click', function () { rcToggleAi(); setPaused(false); });
   $('againBtn').addEventListener('click', function () {
     if (race && race.chat) { teardown(); showLobby(); if (rc.st) rcLobby(rc.st); return; }
     if (race && race.mp) { teardown(); showLobby(); return; }
@@ -1056,6 +1071,7 @@
   }
 
   function lapDone(lapTime) {
+    if (race.lapAi) { race.lapAi = false; race.lastLap = lapTime; flash('Lap ' + fmt(lapTime) + ' – the AI drove part of it', 2); return; }
     race.lastLap = lapTime;
     if (race.bestLap == null || lapTime < race.bestLap) race.bestLap = lapTime;
     var big = false;
@@ -1477,7 +1493,7 @@
       if (mp) mpStop();
     }
     if (!(race && race.chat)) rcLobby(st);
-    if (!me.in_race || !live) return;
+    if (!me.in_race || !live || rc.left === st.race_id) return;
     if (!mp && !rc.busy) rcConnect();
     if (mp && !(race && race.chat) && !rc.busy && ph !== 'lobby' && rc.st.seed != null) rcBegin();
     if (race && race.chat) rcUpdate(st);
@@ -1519,7 +1535,8 @@
   }
   function rcMsg(m) {
     if (m.t === 'welcome' || m.t === 'race') { mp.info = m.race; if (race && race.chat) (m.race.taken || []).forEach(rcTakeover); }
-    else if (m.t === 'takeover') rcTakeover(m.ev);
+    else if (m.t === 'takeover' || m.t === 'release') rcTakeover(m.ev);
+    else if (m.t === 'ai_denied') rcDenied(m.want);
     else if (m.t === 'rec') recMsg(m);
     else if (m.t === 'lap') {
       if (m.fin != null) mp.fin[String(m.id)] = m.fin;
@@ -1567,7 +1584,7 @@
         mp: true, chat: true, raceId: st.race_id, me: null, pc: null, laps: st.laps || 2, phase: 'countdown', paused: false,
         t: 0, cd: rcGo(st) - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: null,
         prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
-        lapsShown: -1, posShown: '', opp: [], newBest: false, follow: {}, taken: {}, nitroSeen: {} };
+        lapsShown: -1, posShown: '', opp: [], newBest: false, follow: {}, taken: {}, aiLast: {}, nitroSeen: {} };
       mp.startAt = rcGo(st); mp.raceId = st.race_id;
       rcCars(st);
       ui.hud.hidden = false; showPanel(null);
@@ -1622,13 +1639,78 @@
     var pil = rcPilots(st);
     race.remotes = [];
     race.ai.forEach(function (c) { if (c && pil && pil.indexOf(c.id) >= 0) race.remotes.push(c); });
-    race.spect = !!(pil && pil.indexOf(mp.me) < 0);
-    if (race.spect && !race.spectSaid) { race.spectSaid = true; flash('You were not connected when the grid closed – the AI drives your car', 4); }
+    race.spect = !!(pil && pil.indexOf(mp.me) < 0) || !!race.taken[mp.me];
+    if (pil && pil.indexOf(mp.me) < 0 && !race.spectSaid) { race.spectSaid = true; flash('You were not connected when the grid closed – the AI drives your car', 4); }
   }
+  // KI übernimmt (takeover: Verbindung weg oder „Let AI drive“) bzw. Pilot übernimmt wieder (release). Je Fahrer gilt
+  // das jüngste Ereignis nach t; eigene Wünsche wirken sofort (local) und werden vom Server-Ereignis ersetzt.
   function rcTakeover(ev) {
-    if (!race || !race.chat || !ev || race.taken[ev.id]) return;
-    race.taken[String(ev.id)] = ev;
-    if (String(ev.id) === mp.me) { race.spect = true; flash('Connection lost – the AI took over your car', 4); }
+    if (!race || !race.chat || !ev || ev.id == null || (ev.type !== 'takeover' && ev.type !== 'release')) return;
+    var id = String(ev.id), cur = race.aiLast[id];
+    if (cur && !(+ev.t > +cur.t) && !(cur.local && !ev.local && cur.type === ev.type)) return;
+    var was = !!race.taken[id];
+    race.aiLast[id] = ev;
+    if (ev.type === 'takeover') race.taken[id] = ev; else delete race.taken[id];
+    delete race.follow[id];
+    if (id !== mp.me) return;
+    race.spect = !!race.taken[id] || !rcIsPilot();
+    if (ev.type === 'takeover') race.lapAi = true;
+    if (ev.type === 'takeover' && !was && !ev.local && ev.by !== 'user') flash('Connection lost – the AI took over your car. Press P to take the wheel', 4);
+    aiBtnSync();
+  }
+  function rcIsPilot() { var pil = rc.st ? rcPilots(rc.st) : null; return !!(pil && mp && pil.indexOf(mp.me) >= 0); }
+  // Taste P / Menü: KI fahren lassen bzw. wieder selbst steuern
+  function rcToggleAi() {
+    if (!race || !race.chat || !mp || !mp.net || race.phase !== 'race' || !race.pc) return;
+    var me = mp.me, pc = race.pc, t = mp.net.serverNow() - mp.startAt;
+    if (!rcIsPilot()) { flash('You are not steering in this race', 2); return; }
+    if (race.taken[me]) {
+      var f = rcFollower(me, race.myIdx), q = f && f.at(t);
+      if (!q || q.finish != null) { flash('The AI already finished the race for you', 2); return; }
+      // sanfte Übergabe: Fahrphysik übernimmt Lage und Tempo des Nachfahrers (alle anderen rechnen denselben)
+      pc.x = q.x; pc.z = q.z; pc.yaw = q.yaw; pc.u = q.v; pc.vx = Math.cos(q.yaw) * q.v; pc.vz = -Math.sin(q.yaw) * q.v;
+      pc.r = 0; pc.w = 0; pc.steer = q.steer; pc.spin = q.spin; pc.prog = q.s; pc.hint = -1;
+      pc.laps = Math.max(pc.laps, q.s > 0 ? Math.floor(q.s / race.T.len) : 0);
+      steerKb = thrKb = brkKb = 0;
+      mp.net.send({ t: 'release', x: q.x, z: q.z, yaw: q.yaw, speed: q.v, prog: q.s, rt: t });
+      rcTakeover({ t: t, type: 'release', id: me, local: true });
+      race.lapStart = race.t; race.lapAi = true;
+      flash('You have the wheel', 1.5); say('You have the wheel');
+    } else {
+      // letzter Zustand sofort, dann übernimmt die KI ab hier (mit echtem Tempo)
+      mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steer,
+        speed: Math.hypot(pc.vx, pc.vz), prog: pc.prog, t: race.t, spin: pc.spin }, true);
+      mp.net.send({ t: 'ai' });
+      rcTakeover({ t: race.t, type: 'takeover', id: me, by: 'user', local: true, x: pc.x, z: pc.z, yaw: pc.yaw,
+        speed: Math.max(0, pc.u), prog: pc.prog, lap: pc.laps });
+      flash('The AI is driving', 1.5); say('The AI is driving your car');
+    }
+  }
+  // Server lehnt ab (z. B. Rennen vorbei, Lage unplausibel): Zustand zurück auf das, was der Server hat
+  function rcDenied(want) {
+    if (!race || !race.chat || !mp) return;
+    var me = mp.me, cur = race.aiLast[me], prev = null;
+    if (!cur || !cur.local) return;
+    // jüngstes Ereignis, das der Server kennt
+    [].concat(mp.info && mp.info.taken || [], rc.st && rc.st.race_events || []).forEach(function (e) {
+      if (e && String(e.id) === me && (e.type === 'takeover' || e.type === 'release') && (!prev || +e.t >= +prev.t)) prev = e;
+    });
+    if (prev) race.aiLast[me] = prev; else delete race.aiLast[me];
+    if (prev && prev.type === 'takeover') race.taken[me] = prev; else delete race.taken[me];
+    delete race.follow[me];
+    race.spect = !!race.taken[me] || !rcIsPilot();
+    flash(want === 'release' ? 'Could not take the wheel right now' : 'The AI cannot take over right now', 2.5);
+    aiBtnSync();
+  }
+  function aiBtnSync() {
+    var b = $('aiBtn'), on = !!(race && race.chat && mp && race.taken[mp.me]);
+    b.hidden = !(race && race.chat && rcIsPilot() && race.phase === 'race');
+    $('aiText').textContent = on ? 'Take the wheel' : 'Let AI drive';
+    $('aiIcon').textContent = on ? 'sports_esports' : 'smart_toy';
+  }
+  function aiHud() {
+    var on = !!(race && race.chat && mp && race.taken[mp.me] && race.phase === 'race' && rcIsPilot()), el = $('hAi');
+    if (el.hidden === on) el.hidden = !on;
   }
   function rcFollower(id, i) {
     var ev = race.taken[id]; if (!ev) return null;
@@ -1646,7 +1728,7 @@
     if (race.phase === 'countdown' && rcRosterKey(st) !== race.rosterKey) rcCars(st);
     if ((rcPilots(st) || ['-']).join('|') !== race.pilotsKey) { rcBuildSim(st); rcRoles(st); }
     (st.race_events || []).forEach(function (e) {
-      if (e.type === 'takeover') rcTakeover(e);
+      if (e.type === 'takeover' || e.type === 'release') rcTakeover(e);
       // Nitro aus dem Chat für mich: wirkt hier (einmal je Ereignis)
       if (e.type === 'nitro' && String(e.id) === mp.me && !race.nitroSeen[e.t] && !race.spect) {
         race.nitroSeen[e.t] = 1; race.pc.nitroT = Phys.NITRO_T; flash('Nitro from the chat!', 2);
@@ -1677,7 +1759,7 @@
     });
     if (race.spect) {
       var pc = race.pc, f2 = rcFollower(mp.me, race.myIdx), q2 = f2 ? f2.at(t) : race.sim.cars[race.myIdx];
-      if (q2 && !q2.ghost) { pc.x = q2.x; pc.z = q2.z; pc.yaw = q2.yaw; pc.prog = q2.s; pc.vx = Math.cos(q2.yaw) * q2.v; pc.vz = -Math.sin(q2.yaw) * q2.v; pc.u = q2.v; pc.steer = q2.steer; pc.spin = q2.spin; }
+      if (q2 && !q2.ghost) { pc.x = q2.x; pc.z = q2.z; pc.yaw = q2.yaw; pc.prog = q2.s; if (q2.s > 0) pc.laps = Math.max(pc.laps, Math.min(race.laps, Math.floor(q2.s / race.T.len))); pc.vx = Math.cos(q2.yaw) * q2.v; pc.vz = -Math.sin(q2.yaw) * q2.v; pc.u = q2.v; pc.steer = q2.steer; pc.spin = q2.spin; }
     }
   }
   // ---- Schleife ----
@@ -1688,7 +1770,7 @@
     var p = readPad();
     sm.padThr = p ? p.throttle || 0 : 0;
     if (p && p.back && race) cycleMap();
-    if (p && p.start && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) setPaused(!race.paused);
+    if (p && p.start && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) setPaused(!menuOpen());
     else if (p) padMenu(p);
     if (!race || !trackRes) { idleCam(dt); soundFrame(null); renderer.render(scene, cam); return; }
     if (msgT > 0) { msgT -= dt; if (msgT <= 0) $('hMsg').classList.remove('show', 'big'); }
@@ -1747,6 +1829,7 @@
     trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
     grassFrame(dt);
     mapFrame(now);
+    aiHud();
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {

@@ -133,6 +133,8 @@
       border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50%; opacity: 0.92; }
     .hud-map[data-mode="track"] { border-radius: var(--cd-radius); }
     .hud-map[hidden] { display: none; }
+    .hud-ai { left: 50%; top: 20px; transform: translateX(-50%); color: var(--cd-accent); font-weight: 800; letter-spacing: 0.04em; font-size: 16px; display: flex; gap: 8px; align-items: center; }
+    .hud-ai[hidden] { display: none; }
     .hud-msg { left: 50%; top: 18%; transform: translateX(-50%); font-size: 28px; font-weight: 800; padding: 10px 24px; opacity: 0; transition: opacity 0.3s ease; }
     .hud-msg.show { opacity: 1; }
     .countdown { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-family: var(--cd-font); font-size: 140px; font-weight: 900;
@@ -212,6 +214,7 @@
       <canvas class="hud-map" id="hMap" width="200" height="200" aria-hidden="true"></canvas>
       <div class="hud-box hud-look" id="hLook" hidden><span class="icon" aria-hidden="true">360</span> Drag to look around · scroll or pinch to zoom</div>
       <div class="hud-box hud-msg" id="hMsg"></div>
+      <div class="hud-box hud-ai" id="hAi" hidden><span class="icon" aria-hidden="true">smart_toy</span> AI DRIVING – press <kbd>P</kbd> or <kbd>Esc</kbd> to take the wheel</div>
     </div>
     <div id="countdown" class="countdown" hidden aria-hidden="true"></div>
     <div id="welcome" aria-hidden="true"></div>
@@ -274,7 +277,8 @@
           <dt>Camera</dt><dd><kbd>C</kbd></dd><dd>Y</dd>
           <dt>Minimap: follow car / whole track / off</dt><dd><kbd>N</kbd></dd><dd>Back / View</dd>
           <dt>Back on track</dt><dd><kbd>R</kbd></dd><dd>–</dd>
-          <dt>Pause</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
+          <dt>Pause (multiplayer and chat race: menu, the race goes on)</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
+          <dt>Chat race: let the AI drive / take the wheel</dt><dd><kbd>P</kbd></dd><dd>Start, then the menu</dd>
           <dt>Sound on / off</dt><dd><kbd>M</kbd></dd><dd>–</dd>
           <dt>Look around (before the start)</dt><dd>Drag, scroll</dd><dd>Right stick</dd>
         </dl>
@@ -325,6 +329,7 @@
       <div class="stack">
         <button type="button" class="primary" id="resumeBtn">Resume</button>
         <button type="button" id="restartBtn">Restart race</button>
+        <button type="button" id="aiBtn" hidden><span class="icon" id="aiIcon" aria-hidden="true">smart_toy</span> <span id="aiText">Let AI drive</span> <kbd>P</kbd></button>
         <button type="button" class="ghost" id="menuBtn">Back to menu</button>
         <button type="button" class="ghost" id="mapBtn"><span class="icon" aria-hidden="true">map</span> <span id="mapText">Minimap: follow car</span> <kbd>N</kbd></button>
       </div>
