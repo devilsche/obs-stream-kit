@@ -48,7 +48,7 @@ _KEYS = {
     "sedan": ["1990-mercedes-benz-190e-2-5", "mercedes-benz-500te-w126-est", "vw-golf-gti-mk7",
               "2002-volkswagen-golf-r32-mk4", "1988-bmw-m5-e28", "audi-a4-b8", "audi-a4-l40-tfsi", "bmw-e39-free",
               "free-bmw-m3-e30", "mercedes-190e-evo-1982-3d-mo", "audi-a4-b5-5-avant", "2000-volkswagen-passat-varia",
-              "low-poly-car-bmw-e30-1985-wh", "1973-bmw-2002-turbo", "67-mustang-high-poly"],
+              "1973-bmw-2002-turbo", "67-mustang-high-poly"],
     "small": ["1992-volkswagen-golf-gti", "1999-volkswagen-gol-2000-gti", "1998-volkswagen-new-beetle",
               "1984-mercedes-190e", "volkswagen-golf-gti-1976", "ford-mustang-1965"],
     "fun": ["classic-crasher-c170-dominat", "caterpillar-ct680", "krabby-patty-wagon", "ural-4320-soviet-army-truck",
