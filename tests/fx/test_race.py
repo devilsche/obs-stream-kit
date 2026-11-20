@@ -47,6 +47,18 @@ I3 = race.intro_seconds(3)   # Vorstellung bei 3 Fahrern
 
 # --- Lobby und Uhr ---
 
+def test_go_at_is_real_race_start_in_every_phase(cars):
+    """Fahrerseite: go_at = erwarteter Rennstart (im Countdown inkl. Vorstellung, nach „Start now“ sofort richtig)."""
+    for u in "abc":
+        j(cars, u)
+    assert st()["go_at"] == T + 60 + I3
+    j(cars, "d", T + 1)
+    assert st(T + 1)["go_at"] == T + 60 + race.intro_seconds(4)
+    race.admin(TID, "start", T + 5)
+    assert st(T + 5)["go_at"] == T + 5 + race.intro_seconds(4) == st(T + 5)["starts_at"]
+    assert st(T + 5 + race.intro_seconds(4))["go_at"] == st(T + 5 + race.intro_seconds(4))["starts_at"]
+
+
 def test_lobby_opens_on_first_and_countdown_on_third(cars):
     j(cars, "a")
     assert st()["phase"] == "lobby"

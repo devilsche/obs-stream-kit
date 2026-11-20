@@ -1004,6 +1004,8 @@
       .then(rcState).catch(function () { setLobbyStatus('Could not reach the server – retrying…'); })
       .then(function () { setTimeout(rcPoll, race && race.chat && race.phase !== 'results' ? 1000 : 1500); });
   }
+  // erwarteter Rennstart: im Countdown liegt starts_at noch vor der Fahrervorstellung (Server liefert go_at)
+  function rcGo(st) { return st.go_at != null ? st.go_at : st.starts_at; }
   function rcRacer(st, id) { return (st.racers || []).filter(function (r) { return String(r.user_id) === String(id); })[0] || null; }
   function rcState(st) {
     rc.st = st;
@@ -1077,7 +1079,7 @@
     race.sim = Sim.create({ seed: st.seed | 0, track: T, laps: st.laps || 3, finishWindow: st.finish_window || 15, cars: cars, events: st.race_events || [] });
     race.pilotsKey = (rcPilots(st) || ['-']).join('|');
     race.follow = {};
-    var t = mp.net.serverNow() - st.starts_at;
+    var t = mp.net.serverNow() - rcGo(st);
     if (t > 0) race.sim.fastForward(Math.min(t, 120));
     snap();
   }
@@ -1091,7 +1093,7 @@
     var st = rc.st, meId = mp.me;
     rc.busy = true;
     var keys = (st.racers || []).map(function (r) { return r.car_key; }).filter(Boolean);
-    var wait = Math.max(0.3, (st.starts_at || 0) - mp.net.serverNow() - 2);
+    var wait = Math.max(0.3, (rcGo(st) || 0) - mp.net.serverNow() - 2);
     Promise.race([Promise.all(keys.map(mpLoad)), new Promise(function (res) { setTimeout(res, wait * 1000); })]).then(function () {
       rc.busy = false;
       if (rc.st.race_id !== st.race_id || !mp || (race && race.chat)) return;
@@ -1105,10 +1107,10 @@
       var me = makeCar(mineSrc.car_key, rcSet(mineSrc), { loaded: !!mp.loaded[mineSrc.car_key], duck: true, outfit: null });
       race = { s: { car: mineSrc.car_key, paint: 0, track: 0, laps: st.laps || 3 }, T: T, seed: T.seed, sim: null, ai: [], remotes: [],
         mp: true, chat: true, raceId: st.race_id, me: me, pc: null, laps: st.laps || 3, phase: 'countdown', paused: false,
-        t: 0, cd: st.starts_at - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mineSrc.car_key + '.' + T.seed, null),
+        t: 0, cd: rcGo(st) - mp.net.serverNow(), lapStart: 0, lastLap: null, bestLap: null, stored: load('best.' + mineSrc.car_key + '.' + T.seed, null),
         prev: null, finishT: null, doneT: 0, camMode: 'chase', camPos: null, camLook: null, tvIdx: -1, shake: 0,
         lapsShown: -1, posShown: '', opp: [], newBest: false, follow: {}, taken: {}, nitroSeen: {} };
-      mp.startAt = st.starts_at; mp.raceId = st.race_id;
+      mp.startAt = rcGo(st); mp.raceId = st.race_id;
       rcBuildSim(st);
       // KI-Autos (Index wie in der Sim), andere Fahrer als „remotes“ (live bzw. Nachfahrer), sich selbst weglassen
       race.simCars.forEach(function (sc, i) {
@@ -1152,6 +1154,8 @@
   }
   function rcUpdate(st) {
     if (st.race_id !== race.raceId) return;
+    // Startzeit verschoben (Vorstellung begonnen, „Start now“, neue Fahrer im Countdown): Uhr + Sim nachziehen
+    if (rcGo(st) != null && rcGo(st) !== mp.startAt && race.phase === 'countdown') { mp.startAt = rcGo(st); race.cd = mp.startAt - mp.net.serverNow(); rcBuildSim(st); }
     if ((rcPilots(st) || ['-']).join('|') !== race.pilotsKey) { rcBuildSim(st); rcRoles(st); }
     (st.race_events || []).forEach(function (e) {
       if (e.type === 'takeover') rcTakeover(e);
@@ -1242,7 +1246,7 @@
         ui.countdown.classList.remove('tick'); void ui.countdown.offsetWidth; ui.countdown.classList.add('tick');
         say(after > 0 ? String(after) : 'Go');
       }
-      if (race.cd <= 0) { race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0; setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700); }
+      if (race.cd <= 0 && (!race.chat || rc.st.phase === 'intro' || rc.st.phase === 'race')) { race.phase = 'race'; race.t = race.mp ? Math.max(0, -race.cd) : 0; race.lapStart = 0; setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700); }
       placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
       drawAI();
       if (race.chat) { rcDraw(); placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin); mpSend(); }

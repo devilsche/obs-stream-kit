@@ -314,6 +314,9 @@ def _view(t, now):
     out["racers"] = [{**{k: r[k] for k in ("grid", "user_id", "display", "color", "car_key", "uid", "paint")},
                       "sub": r.get("sub", 0), "sub_paint": r.get("sub_paint")}
                      for r in t["racers"]]
+    # erwarteter Rennstart (Fahrerseite): im Countdown erst nach der Vorstellung, sonst starts_at
+    out["go_at"] = (t["starts_at"] + intro_seconds(len(t["racers"]))
+                    if t["phase"] in ("lobby", "countdown") and t["starts_at"] is not None else t["starts_at"])
     out["race_events"] = sorted((dict(e) for e in t.get("events", [])), key=lambda e: e["t"])
     if t.get("pilots") is not None:
         out["pilots"] = list(t["pilots"])
