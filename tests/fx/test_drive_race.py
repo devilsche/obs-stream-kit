@@ -388,3 +388,37 @@ def test_add_ai_events_takeover_release_takeover(cars):
     evs = [(e["type"], e["t"]) for e in race.state(TID, T)["race_events"] if e["type"] in ("takeover", "release")]
     assert evs == [("takeover", 5.0), ("release", 9.0), ("takeover", 20.0)]
     assert race.add_ai_events(TID, rid, [{"t": 1, "type": "release", "id": "b", "x": 0, "z": 0, "yaw": 0, "speed": 0, "prog": 0}]) == 0
+
+
+# ---- Treffer eines Piloten auf ein KI-Auto (Room.hit → race_events type hit) ----
+
+def test_hit_on_ai_car_checked_and_rate_limited():
+    _, room = room_for(dict(INFO, pilots=["a"]))
+    start = room.starts_at
+    assert room.hit("a", {"id": "b", "rt": 5.0, "dv": -3, "dl": 2}, start - 1) is None    # Rennen läuft noch nicht
+    ev = room.hit("a", {"id": "b", "rt": 5.0, "dv": -30, "dl": 20, "spin": True}, start + 5)
+    assert ev == {"t": round(5.0 + dr.HIT_LEAD, 2), "type": "hit", "id": "b", "by": "a", "dv": dr.HIT_DV[0],
+                  "dl": dr.HIT_DL, "spin": 1}
+    assert room.hit("a", {"id": "b", "rt": 5.2, "dv": -1, "dl": 0}, start + 5.2) is None   # gleiches Ziel zu schnell
+    assert room.hit("a", {"id": "c", "rt": 5.2, "dv": -1, "dl": 0}, start + 5.2)["id"] == "c"
+    assert room.hit("a", {"id": "a", "rt": 6, "dv": -1, "dl": 0}, start + 6) is None        # sich selbst
+    assert room.hit("a", {"id": "zz", "rt": 6, "dv": -1, "dl": 0}, start + 6) is None       # kein Fahrer
+    assert room.hit("b", {"id": "c", "rt": 6, "dv": -1, "dl": 0}, start + 6) is None        # kein Pilot
+    assert room.hit("a", {"id": "b", "rt": 2.0, "dv": -1, "dl": 0}, start + 9)["t"] == round(8.0 + dr.HIT_LEAD, 2)  # alt → ≤ 1 s
+    assert [e["type"] for e in room.report(set())["ai_events"]] == ["hit", "hit", "hit"]
+
+
+def test_hit_on_pilot_rejected():
+    _, room = room_for(dict(INFO, pilots=["a", "b"]))
+    assert room.hit("a", {"id": "b", "rt": 5.0, "dv": -3, "dl": 2}, room.starts_at + 5) is None
+
+
+def test_add_ai_events_hits(cars):
+    st = racing(cars)
+    rid = st["race_id"]
+    race.set_pilots(TID, rid, ["a"], T)
+    hit = {"t": 7.25, "type": "hit", "id": "b", "by": "a", "dv": -4, "dl": 1.5, "spin": 0}
+    assert race.add_ai_events(TID, rid, [hit, dict(hit, id="a", by="b"), dict(hit, by="c")]) == 1   # nur Pilot → KI
+    assert race.add_ai_events(TID, rid, [hit]) == 0
+    evs = [e for e in race.state(TID, T)["race_events"] if e["type"] == "hit"]
+    assert evs == [{"t": 7.25, "type": "hit", "id": "b", "by": "a", "dv": -4.0, "dl": 1.5, "spin": 0}]

@@ -539,8 +539,12 @@
     var ext = [], extDone = {};   // Ereignisse von außen (Nitro/Bump) und schon angewandte (Schlüssel)
     function extKey(e) { return e.t + '|' + e.type + '|' + e.id + '|' + (e.target || ''); }
     function setExt(list) {
-      ext = (list || []).filter(function (e) { return e && (e.type === 'nitro' || e.type === 'bump') && isFinite(+e.t); })
-        .map(function (e) { return { t: +e.t, type: e.type, id: e.id, target: e.target }; })
+      ext = (list || []).filter(function (e) { return e && (e.type === 'nitro' || e.type === 'bump' || e.type === 'hit') && isFinite(+e.t); })
+        .map(function (e) {
+          // hit (Chatrennen, Car Drive): Pilot `by` hat KI-Auto `id` getroffen – Tempo längs dv, Seitenschub dl (m/s), spin
+          return e.type === 'hit' ? { t: +e.t, type: 'hit', id: e.id, target: e.by, dv: +e.dv || 0, dl: +e.dl || 0, spin: !!e.spin }
+            : { t: +e.t, type: e.type, id: e.id, target: e.target };
+        })
         .sort(function (a, b) { return a.t - b.t || (extKey(a) < extKey(b) ? -1 : 1); });
       var time = steps * DT;
       return ext.some(function (e) { return !extDone[extKey(e)] && e.t < time - 1e-9; });
@@ -557,6 +561,8 @@
         if (e.type === 'nitro') {
           if (c.place !== null || c.state === 'dnf' || P[i].parked) continue;
           P[i].nitroT = NITRO_T; emit('nitro', i);
+        } else if (e.type === 'hit') {
+          hitCar(i, e.dv, e.dl, e.spin ? 1 : 0);
         } else {
           // Bump ohne Ziel: scharf schalten, getroffen wird das nächste Auto, sobald es in Reichweite ist
           if (c.place !== null || c.state === 'dnf' || P[i].parked) continue;
@@ -596,6 +602,17 @@
           p.bumpUntil = null; c.hunting = false;
         }
       }
+    }
+
+    // Stoß von außen (Spielerauto): Tempo längs, Seitenschub, Dreher mit Wahrscheinlichkeit spinChance
+    // (1 = sicher: Chatrennen-Ereignis, entschieden beim Treffer – kein Zufall, damit alle Instanzen gleich rechnen)
+    function hitCar(i, dv, dLat, spinChance) {
+      var c = cars[i], p = P[i];
+      if (!c || p.parked || c.state === 'dnf' || c.place !== null && sim.done) return;
+      c.v = clamp(c.v + (+dv || 0), 0, p.st.vmax * 1.2);
+      p.pushV = clamp(p.pushV + (+dLat || 0), -9, 9);
+      p.latV = 0; p.ovJ = -1; p.obsT = 0;
+      if (spinChance > 0 && c.state === 'run' && !c.off && (spinChance >= 1 || rnd() < spinChance)) startEvent(i, c, p, 'spin');
     }
 
     // Startaufstellung: 2 nebeneinander, Pole (Index 0) vorn links, Reihenabstand nach Autolänge
@@ -882,14 +899,7 @@
       // Car Drive solo: Spielerauto als Hindernis ({s, d, v, len, w}; leer = keins)
       setObstacles: function (list) { obst = (list || []).filter(function (o) { return o && isFinite(o.s) && isFinite(o.d); }); },
       // Car Drive solo: Stoß vom Spieler – Tempo längs (dv), Seitenschub (dLat, m/s), harter Treffer kann drehen
-      hit: function (i, dv, dLat, spinChance) {
-        var c = cars[i], p = P[i];
-        if (!c || p.parked || c.state === 'dnf') return;
-        c.v = clamp(c.v + dv, 0, p.st.vmax * 1.2);
-        p.pushV = clamp(p.pushV + dLat, -9, 9);
-        p.latV = 0; p.ovJ = -1; p.obsT = 0;
-        if (spinChance > 0 && c.state === 'run' && !c.off && rnd() < spinChance) startEvent(i, c, p, 'spin');
-      },
+      hit: function (i, dv, dLat, spinChance) { hitCar(i, dv, dLat, spinChance); },
       step: function () {
         steps++;
         var time = steps * DT, i, j, c, p, h, hz;

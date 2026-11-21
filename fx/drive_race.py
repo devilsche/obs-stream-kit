@@ -47,6 +47,11 @@ RACE_MAX = 200.0           # wie fx/race.RACE_MAX
 TAKEOVER_GAP = 2.0         # so lange ohne Zustand → KI übernimmt
 STREAM_LEAD = 120.0        # Zustände schon in der Startaufstellung verteilen (Countdown/Vorstellung)
 STREAM_TAIL = 15.0         # und nach Rennende noch so lange (Auslaufen)
+HIT_LEAD = 0.25            # Treffer gelten so viele Rennsekunden nach dem Aufprall (Zeit zum Verteilen an alle Instanzen)
+HIT_GAP = 0.5              # je Pilot und KI-Auto höchstens ein Treffer in dieser Zeit
+HIT_MAX_PER_S = 4          # je Pilot höchstens so viele Treffer pro Sekunde
+HIT_DV = (-12.0, 6.0)      # Tempoänderung längs (m/s)
+HIT_DL = 9.0               # Seitenschub (m/s)
 
 
 
@@ -101,7 +106,8 @@ class Room:
         self.pilots = None          # eingefroren ab intro (Liste) – vorher None
         self.active = now
         self.clients = 0
-        self.log = []               # Übernahmen/Rückgaben des Rennens in Reihenfolge
+        self.log = []               # Übernahmen/Rückgaben/Treffer des Rennens in Reihenfolge
+        self.hits = {}              # (Pilot, Ziel) → Server-Zeit des letzten Treffers; Pilot → [Server-Zeiten]
 
     @property
     def track_len(self):
@@ -122,6 +128,7 @@ class Room:
             self.drivers = {}
             self.pilots = None
             self.log = []
+            self.hits = {}
             if limits_loader:
                 self.limits = limits_loader()
         self.phase = str(info.get("phase") or "idle")
@@ -344,6 +351,32 @@ class Room:
         d.lap_ai = True
         d.last = (rt, x, z, prog)
         d.state = [x, z, ev["yaw"], 0.0, 0.0, 0.0, speed, round(prog, 2), 0.0]
+        self.log.append(ev)
+        return ev
+
+    def hit(self, uid, msg, now):
+        """Pilot hat ein KI-Auto getroffen (Car Drive rechnet den Stoß). → Ereignis {t, type: hit, id (KI-Auto), by,
+        dv, dl, spin} oder None. t = Rennsekunde des Aufpralls + HIT_LEAD (alle Instanzen wenden es im selben
+        Sim-Schritt an); Ziel muss ein Fahrer ohne Car Drive sein (die KI der Sim), Werte begrenzt, Rate begrenzt."""
+        d = self.drivers.get(uid)
+        target = str(msg.get("id") or "")
+        if (d is None or d.taken or d.finish_t is not None or not self.pilots or uid not in self.pilots
+                or not self._running(now) or target == uid or target not in self.drivers or target in self.pilots):
+            return None
+        f = {k: _num(msg.get(k)) for k in ("rt", "dv", "dl")}
+        if any(v is None for v in f.values()):
+            return None
+        elapsed = now - self.starts_at
+        rt = min(max(f["rt"], elapsed - 1.0), elapsed + CLOCK_AHEAD)    # höchstens 1 s alte Treffer
+        recent = [x for x in self.hits.get(uid, []) if now - x < 1.0]
+        if len(recent) >= HIT_MAX_PER_S or now - self.hits.get((uid, target), -1e9) < HIT_GAP:
+            return None
+        recent.append(now)
+        self.hits[uid] = recent
+        self.hits[(uid, target)] = now
+        ev = {"t": round(rt + HIT_LEAD, 2), "type": "hit", "id": target, "by": uid,
+              "dv": round(max(HIT_DV[0], min(HIT_DV[1], f["dv"])), 2),
+              "dl": round(max(-HIT_DL, min(HIT_DL, f["dl"])), 2), "spin": 1 if msg.get("spin") else 0}
         self.log.append(ev)
         return ev
 

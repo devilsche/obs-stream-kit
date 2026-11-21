@@ -852,7 +852,9 @@
         if (race.remotes.indexOf(c) >= 0) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); return; }
         var q = race.sim.cars[i];
         if (q.state === 'dnf') return;   // ausgeschieden: durchscheinend, man fährt hindurch
-        out.push(poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass));
+        var o = poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass);
+        if (!q.ghost) { o.rq = q; o.i = i; }   // KI der Sim: Treffer gehen als Ereignis an alle (rcHitSend)
+        out.push(o);
       });
       return out;
     }
@@ -878,6 +880,45 @@
     }
     race.sim.hit(o.i, dvx * gx + dvz * gz, (dvx * a.nx + dvz * a.nz) * 1.3, spin);
   }
+  // Chatrennen: Treffer auf KI-Autos sammeln (je Bild) und als Ereignis an den Server – er verteilt es an Overlay und
+  // alle Fahrer, jede Instanz wendet es zur selben Rennsekunde an (fx/drive_race.Room.hit, CarRaceSim „hit“)
+  function rcHitAdd(o, h) {
+    if (!isFinite(o.mass) || !o.rq) return;
+    var q = o.rq, a = race.T.at(q.s), gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw);
+    var dvx = -h.jx / o.mass, dvz = -h.jz / o.mass, acc = race.hitAcc || (race.hitAcc = {});
+    var e = acc[o.i] || (acc[o.i] = { dv: 0, dl: 0, imp: 0 });
+    e.dv += dvx * gx + dvz * gz; e.dl += (dvx * a.nx + dvz * a.nz) * 1.3; e.imp = Math.max(e.imp, h.impact);
+  }
+  function rcHitSend() {
+    var acc = race.hitAcc;
+    race.hitAcc = null;
+    if (!acc || !mp || !mp.net || race.spect || race.phase !== 'race') return;
+    var cd = race.hitCd || (race.hitCd = {});
+    Object.keys(acc).forEach(function (i) {
+      var e = acc[i], q = race.sim.cars[i];
+      if (!q || Math.abs(e.dv) + Math.abs(e.dl) < 0.3 || cd[i] > race.t) return;
+      cd[i] = race.t + 0.5;
+      var spin = e.imp >= Phys.CRASH_V && Math.random() < clamp((e.imp - 4) / 12, 0, 0.7) * clamp(race.pc.P.mass / race.ai[i].st.mass, 0.2, 1.5);
+      mp.net.send({ t: 'hit', id: q.id, rt: Math.round(race.t * 100) / 100, dv: Math.round(e.dv * 100) / 100, dl: Math.round(e.dl * 100) / 100, spin: spin ? 1 : 0 });
+    });
+  }
+  // Ereignisse für die Sim: race_events vom Server + per WS schon gemeldete Treffer (bis Flask sie führt)
+  function rcHitKey(e) { return e.t + '|' + e.id + '|' + e.by; }
+  function rcEvents(st) {
+    var srv = (st && st.race_events) || [], have = {}, list = srv.slice();
+    srv.forEach(function (e) { if (e && e.type === 'hit') have[rcHitKey(e)] = 1; });
+    Object.keys(race && race.wsHits || {}).forEach(function (k) { if (!have[k]) list.push(race.wsHits[k]); });
+    return list;
+  }
+  function rcHitMsg(ev) {
+    if (!race || !race.chat || !race.sim || !ev || ev.type !== 'hit') return;
+    race.wsHits = race.wsHits || {};      // je Rennen (race wird je Chatrennen neu angelegt)
+    if (race.wsHits[rcHitKey(ev)]) return;
+    race.wsHits[rcHitKey(ev)] = ev;
+    var list = rcEvents(rc.st);
+    rc.evKey = JSON.stringify(list);
+    if (race.sim.setEvents(list) && rc.st) rcBuildSim(rc.st);   // zu spät angekommen: Sim mit dem Treffer neu nachrechnen
+  }
   // Solo: mein Auto als Hindernis für die KI (fährt nicht auf, lenkt nicht hinein, überholt außen herum)
   function simObstacles() {
     var pc = race.pc;
@@ -890,9 +931,11 @@
     var pc = race.pc, crash = null, scrape = null;
     Phys.stepContacts(pc, inp, dt, { len: race.me.len, w: race.me.w }, contactList(), function (o, h) {
       if (h.impact > 0 && o.q) nudgeAI(o, h);
+      else if (h.impact > 0 && o.rq) rcHitAdd(o, h);
       if (h.impact >= Phys.CRASH_V) { if (!crash || h.impact > crash.impact) crash = h; }
       else if (h.slide > 1.5 && (!scrape || h.slide > scrape.slide)) scrape = h;
     });
+    if (race.chat) rcHitSend();
     race.crashT = Math.max(0, (race.crashT || 0) - dt);
     if (crash && race.crashT <= 0) {
       var mP = pc.P.mass, mO = isFinite(crash.o.mass) ? crash.o.mass : mP * 4, heavy = mO / (mO + mP);
@@ -1582,6 +1625,7 @@
   function rcMsg(m) {
     if (m.t === 'welcome' || m.t === 'race') { mp.info = m.race; if (race && race.chat) (m.race.taken || []).forEach(rcTakeover); }
     else if (m.t === 'takeover' || m.t === 'release') rcTakeover(m.ev);
+    else if (m.t === 'hit') rcHitMsg(m.ev);
     else if (m.t === 'ai_denied') rcDenied(m.want);
     else if (m.t === 'rec') recMsg(m);
     else if (m.t === 'lap') {
@@ -1601,7 +1645,7 @@
   function rcBuildSim(st) {
     var cars = rcSimCars(st), T = race.T;
     race.simCars = cars;
-    race.sim = Sim.create({ seed: st.seed | 0, track: T, laps: st.laps || 2, finishWindow: st.finish_window || 25, cars: cars, events: st.race_events || [] });
+    race.sim = Sim.create({ seed: st.seed | 0, track: T, laps: st.laps || 2, finishWindow: st.finish_window || 25, cars: cars, events: rcEvents(st) });
     race.pilotsKey = (rcPilots(st) || ['-']).join('|');
     race.follow = {};
     var t = mp.net.serverNow() - rcGo(st);
@@ -1780,8 +1824,8 @@
         race.nitroSeen[e.t] = 1; race.pc.nitroT = Phys.NITRO_T; flash('Nitro from the chat!', 2);
       }
     });
-    var key = JSON.stringify(st.race_events || []);
-    if (key !== rc.evKey) { rc.evKey = key; if (race.sim.setEvents(st.race_events || [])) rcBuildSim(st); }
+    var evl = rcEvents(st), key = JSON.stringify(evl);
+    if (key !== rc.evKey) { rc.evKey = key; if (race.sim.setEvents(evl)) rcBuildSim(st); }
     if ((st.phase === 'podium' || st.phase === 'cooldown') && Array.isArray(st.result) && !mp.results) {
       mp.results = { race_id: st.race_id, list: st.result.map(function (x) {
         return { id: String(x.user_id), name: x.display, place: x.place, time: null, status: x.place ? 'finished' : x.invalid ? 'invalid' : 'dnf', reasons: [] };

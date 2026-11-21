@@ -27,10 +27,11 @@ Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, geb
   GET /internal/sync?tenant=…&race=<JSON fx/race.drive_info oder leer>
                               → {ok, race_id, connected, takeovers, ai_events, pilots, snap}
 Client → Server: hello · ping {c} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin} (nur Fahrer, ~20 Hz) ·
-ai (KI fährt mein Auto) · release {x, z, yaw, speed, prog, rt} (Steuer zurück, Lage des Nachfahrers).
+ai (KI fährt mein Auto) · release {x, z, yaw, speed, prog, rt} (Steuer zurück, Lage des Nachfahrers) ·
+hit {id (KI-Auto), rt, dv, dl, spin} (Treffer auf ein KI-Auto, fx/drive_race.Room.hit).
 Server → Client: welcome {id, role, race, now} · race {race} (Rennen/Phase/Piloten/Übernahmen geändert) ·
 S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, ai?, fin?} · rec {…} (wie oben, nicht für Runden mit KI) ·
-takeover {ev} · release {ev} · ai_denied {want} (nur an den Fahrer) · pong {c, s} · error {msg}.
+takeover {ev} · release {ev} · hit {ev} · ai_denied {want} (nur an den Fahrer) · pong {c, s} · error {msg}.
 race = {race_id, phase, starts_at, track, track_name, laps, fw, pilots, taken, fin, now} (fx/drive_race.Room.info).
 """
 import asyncio
@@ -240,6 +241,11 @@ class DriveServer:
                         self._send_race(tid, {"t": ev["type"], "ev": ev})
                     else:
                         broadcast([cl.ws], json.dumps({"t": "ai_denied", "want": t}))
+                elif t == "hit" and cl.driver:
+                    r = self.races.rooms.get(tid)
+                    ev = r.hit(cl.id, msg, now) if r else None
+                    if ev:
+                        self._send_race(tid, {"t": "hit", "ev": ev})
                 elif t == "ping":
                     try:
                         broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))

@@ -660,6 +660,7 @@
       if (m.t === 'welcome') { netTry = 0; netRace(m.race); }
       else if (m.t === 'race') netRace(m.race);
       else if (m.t === 'takeover' || m.t === 'release') addTakeover(m.ev);
+      else if (m.t === 'hit') addHit(m.ev);
       else if (m.t === 'lap' && race) {
         if (m.fin != null) race.pilotFin[String(m.id)] = +m.fin;
         if (m.ok === false) race.pilotBad[String(m.id)] = true;
@@ -962,8 +963,22 @@
     }
     // Zuschauer-Aktionen (Nitro/Anrempeln) an die Sim: liegt ein neues Ereignis schon in der Vergangenheit der
     // Sim, wird sie aus dem Seed neu aufgebaut und vorgespult – so bleiben alle Instanzen gleich
-    function takeRaceEvents(list) {
-      if (!race || !Array.isArray(list)) return;
+    // Treffer eines Piloten auf ein KI-Auto (WS „hit“, gilt 0,25 s nach dem Aufprall): sofort in die Ereignisse,
+    // bis Flask sie in race_events führt (sonst fiele er beim nächsten Abruf wieder heraus)
+    function hitKey(e) { return e.t + '|' + e.id + '|' + e.by; }
+    function addHit(ev) {
+      if (!race || !ev || ev.type !== 'hit' || ev.id == null) return;
+      race.wsHits = race.wsHits || {};
+      if (race.wsHits[hitKey(ev)]) return;
+      race.wsHits[hitKey(ev)] = ev;
+      takeRaceEvents(race.srvExt || []);
+    }
+    function takeRaceEvents(srv) {
+      if (!race || !Array.isArray(srv)) return;
+      race.srvExt = srv;
+      var have = {}, list = srv.slice();
+      srv.forEach(function (e) { if (e && e.type === 'hit') have[hitKey(e)] = 1; });
+      Object.keys(race.wsHits || {}).forEach(function (k) { if (!have[k]) list.push(race.wsHits[k]); });
       list.forEach(function (e) { if (e && (e.type === 'takeover' || e.type === 'release')) addTakeover(e); });
       var key = JSON.stringify(list);
       if (key === race.extKey) return;

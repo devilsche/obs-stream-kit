@@ -388,18 +388,35 @@ def add_takeovers(tenant_id, race_id, events):
 
 def add_ai_events(tenant_id, race_id, events):
     """Übernahmen und Rückgaben vom WS-Dienst in Reihenfolge (fx/drive_race.Room.log): takeover wie add_takeovers,
-    release {t, type: release, id, x, z, yaw, speed, prog, lap} gibt das Steuer zurück. Jedes Ereignis einmal
-    (type, id, t). → Anzahl übernommener Ereignisse."""
+    release {t, type: release, id, x, z, yaw, speed, prog, lap} gibt das Steuer zurück; hit {t, type: hit, id, by, dv,
+    dl, spin} = Pilot by trifft KI-Auto id (js/car-race-sim.js wendet es zur Rennsekunde t an). Jedes Ereignis einmal
+    (type, id, t[, by]). → Anzahl übernommener Ereignisse."""
     n = 0
     with _LOCK:
         t = _get(tenant_id)
         if t.get("race_id") != race_id or not t.get("pilots"):
             return 0
         seen = t.setdefault("ai_seen", set())
+        racer_ids = {str(r["user_id"]) for r in t["racers"]}
         for e in events or []:
-            if not isinstance(e, dict) or e.get("type") not in ("takeover", "release"):
+            if not isinstance(e, dict) or e.get("type") not in ("takeover", "release", "hit"):
                 continue
             uid = str(e.get("id"))
+            if e["type"] == "hit":
+                # Treffer eines Piloten (by) auf ein KI-Auto (id): Tempo dv, Seitenschub dl, spin – geprüft im WS-Dienst
+                try:
+                    by = str(e["by"])
+                    key = ("hit", uid, round(float(e["t"]), 2), by)
+                    ev = {"t": key[2], "type": "hit", "id": uid, "by": by, "dv": round(float(e["dv"]), 2),
+                          "dl": round(float(e["dl"]), 2), "spin": 1 if e.get("spin") else 0}
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if key in seen or uid not in racer_ids or uid in t["pilots"] or by not in t["pilots"]:
+                    continue
+                seen.add(key)
+                t["events"].append(ev)
+                n += 1
+                continue
             try:
                 key = (e["type"], uid, round(float(e["t"]), 2))
                 ev = {"t": key[2], "type": e["type"], "id": uid}
