@@ -633,7 +633,7 @@
         push: form * (0.985 + rnd() * 0.03),        // wie nah am Limit (pro Runde neu)
         pushLap: 0,
         dT: (i % 2 === 0 ? 1 : -1) * 2.3,
-        stuck: 0, ovJ: -1, ovD: 0, ovAge: 0, ovG: 0, latV: 0, detourT: 0, detourJ: -1, detourAge: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
+        stuck: 0, obsT: 0, obsD: 0, ovJ: -1, ovD: 0, ovAge: 0, ovG: 0, latV: 0, detourT: 0, detourJ: -1, detourAge: 0, timer: 0, dur: 0, yawOff: 0, yawTo: 0, slowT: 0, slowV: 0, parked: false,
         dDot: 0, latAng: 0, latCurv: 0, accel: 0, rollV: 0, pitchV: 0, wheelR: clamp(0.07 * st.len, 0.3, 0.55),
         // Darstellung (Einspurmodell): Vorder-/Hinterachse in Weltkoordinaten, Richtung Hinter- → Vorderachse
         wb: wheelbase(st.len), fx: 0, fz: 0, rx: 0, rz: 0, hdg: 0,
@@ -762,6 +762,28 @@
       return out;
     }
 
+    // Hindernisse von außen (Car Drive solo: das Auto des Spielers, {s, d, v, len, w}): die KI fährt nicht auf,
+    // lenkt nicht seitlich hinein und überholt außen herum. Ohne Hindernisse (Overlay, Chatrennen) ist alles wie vorher.
+    var obst = [];
+    function obsGap(i, o) { return (P[i].st.len + o.len) / 2 + 0.4; }
+    function obsLat(i, o, di) { return Math.abs(di - o.d) < (P[i].w + o.w) / 2 + 0.25; }
+    function obsLaneFree(i, dd, extra) {
+      for (var k = 0; k < obst.length; k++) {
+        var o = obst[k], g = gap(cars[i], o), mg = obsGap(i, o);
+        if (g > -mg + 0.05 && g < mg + extra && obsLat(i, o, dd)) return false;
+      }
+      return true;
+    }
+    // seitlicher Schritt auf nd würde näher an ein Hindernis daneben rücken
+    function obsBlocks(i, nd) {
+      for (var k = 0; k < obst.length; k++) {
+        var o = obst[k];
+        if (Math.abs(gap(cars[i], o)) >= obsGap(i, o) - 0.05) continue;
+        if (obsLat(i, o, nd) && Math.abs(nd - o.d) < Math.abs(cars[i].d - o.d)) return true;
+      }
+      return false;
+    }
+
     function startEvent(i, c, p, kind) {
       var crv = crvAt(c.s), out = crv > 0 ? -1 : 1;           // nach außen = weg vom Kurveninneren
       if (kind === 'off' && runAt(c.s, out) < 3) kind = 'slide';   // kein Auslauf: nur Verbremser
@@ -857,6 +879,17 @@
       DT: DT, track: T, cars: allCars, time: 0, done: false, laps: laps, counts: counts,
       events: events, hazards: hazards,
       setEvents: function (list) { return setExt(list); },
+      // Car Drive solo: Spielerauto als Hindernis ({s, d, v, len, w}; leer = keins)
+      setObstacles: function (list) { obst = (list || []).filter(function (o) { return o && isFinite(o.s) && isFinite(o.d); }); },
+      // Car Drive solo: Stoß vom Spieler – Tempo längs (dv), Seitenschub (dLat, m/s), harter Treffer kann drehen
+      hit: function (i, dv, dLat, spinChance) {
+        var c = cars[i], p = P[i];
+        if (!c || p.parked || c.state === 'dnf') return;
+        c.v = clamp(c.v + dv, 0, p.st.vmax * 1.2);
+        p.pushV = clamp(p.pushV + dLat, -9, 9);
+        p.latV = 0; p.ovJ = -1; p.obsT = 0;
+        if (spinChance > 0 && c.state === 'run' && !c.off && rnd() < spinChance) startEvent(i, c, p, 'spin');
+      },
       step: function () {
         steps++;
         var time = steps * DT, i, j, c, p, h, hz;
@@ -944,6 +977,12 @@
                 var free = ag - minGap(i, ahead);
                 target = Math.min(target, Math.max(0, cars[ahead].v + Math.max(0, free - 0.5) * 2));
               }
+              var oAhead = null, oag = Infinity;                  // Hindernis vorn (Spieler): ebenso nicht auffahren
+              for (j = 0; j < obst.length; j++) {
+                var og2 = gap(c, obst[j]);
+                if (og2 > 0 && og2 < oag && obsLat(i, obst[j], c.d)) { oag = og2; oAhead = obst[j]; }
+              }
+              if (oAhead) target = Math.min(target, Math.max(0, oAhead.v + Math.max(0, oag - obsGap(i, oAhead) - 0.5) * 2));
               if (c.v < target) {
                 var a = p.st.acc * nitro * (1 - Math.pow(c.v / vtop, DRAG_EXP));
                 if (c.v < 8 && c.lap <= 1) a *= p.st.launch * p.luck;   // Antrieb + Startglück beim Losfahren
@@ -1056,6 +1095,23 @@
                 } else if (time > 4 && laneFree(i, clamp(line, -p.lim, p.lim), 2)) {
                   p.dT = clamp(line, -p.lim, p.lim);
                 }
+                // Hindernis (Spieler) dicht vorn und langsamer: außen herum, Seite halten bis vorbei (wie ovJ)
+                if (obst.length) {
+                  if (p.obsT > 0) {
+                    p.obsT -= DT;
+                    if (obsLaneFree(i, p.obsD, 0.5) && laneFree(i, p.obsD, 0.5)) p.dT = p.obsD; else p.obsT = 0;
+                  } else if (oAhead && oag < obsGap(i, oAhead) + 4 + Math.max(0, c.v - oAhead.v) * 2.5 &&
+                             (oAhead.v < c.v * 0.99 || oAhead.v < freeV * 0.95) && (ahead < 0 || oag < ag)) {
+                    var oo = (P[i].w + oAhead.w) / 2 + 0.8, ob = null;
+                    [oAhead.d + oo, oAhead.d - oo].forEach(function (cand) {
+                      cand = clamp(cand, -p.lim, p.lim);
+                      if (Math.abs(cand - oAhead.d) < (P[i].w + oAhead.w) / 2 + 0.3) return;
+                      if (!laneFree(i, cand, 2) || !obsLaneFree(i, cand, Math.max(0.5 + c.v * 0.2, oag - obsGap(i, oAhead) + 1))) return;
+                      if (ob === null || Math.abs(cand - c.d) < Math.abs(ob - c.d)) ob = cand;
+                    });
+                    if (ob !== null) { p.dT = ob; p.obsD = ob; p.obsT = 3; }
+                  }
+                }
                 // Ölfleck voraus: ausweichen, wenn gesehen (nicht jeder sieht ihn) und Platz ist
                 for (h = 0; h < hazards.length; h++) {
                   hz = hazards[h];
@@ -1125,6 +1181,7 @@
               }
             }
           }
+          if (obst.length && nd !== c.d && obsBlocks(i, nd)) { nd = c.d; p.latV = 0; p.pushV = 0; }
           // Leitplanke: wer mit Schwung hineinrutscht, ist raus
           if (nd >= railHi || nd <= railLo) {
             var hard = (p.offTo !== null || Math.abs(p.pushV) > 1.5) && c.v > RAIL_V && c.state === 'run' && !sim.done;
@@ -1162,6 +1219,14 @@
                 if (cars[i].v > cars[j].v) cars[i].v = cars[j].v;
               }
             }
+          }
+        }
+        // 3b) nicht in ein Hindernis hineinfahren (Spieler vorn, gleiche Spur): zurücksetzen, Tempo angleichen
+        for (i = 0; i < cars.length && obst.length; i++) {
+          if (cars[i].state === 'dnf') continue;
+          for (j = 0; j < obst.length; j++) {
+            var ob2 = obst[j], g3 = gap(cars[i], ob2), mg3 = obsGap(i, ob2) - 0.4;
+            if (g3 >= 0 && g3 < mg3 && obsLat(i, ob2, cars[i].d)) { cars[i].s -= (mg3 - g3); if (cars[i].v > ob2.v) cars[i].v = Math.max(0, ob2.v); }
           }
         }
         // 4) Runden, Ziel, Darstellung

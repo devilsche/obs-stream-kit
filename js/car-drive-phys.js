@@ -391,11 +391,14 @@
     // Schiebt mich ein Auto auf fester Bahn (KI/Fremdauto, gibt nicht nach), drückt es höchstens mit dem, was seine
     // Reifen hergeben (Masse × Haftung) – ein leichter Wagen bewegt einen Lkw kaum, gleich schwere drängen ab;
     // Aufprall-Stöße (hartes Auffahren) bleiben
-    if (share < 1 && dtSub > 0 && impact < CRASH_V) Jn = Math.min(Jn, mA * (o.grip || P.grip) * dtSub);
+    // (halbe Haftung: der Schieber lenkt ja nicht absichtlich in mich hinein – ein Anstupser drängt, wirft aber nicht raus)
+    if (share < 1 && dtSub > 0 && impact < CRASH_V) Jn = Math.min(Jn, 0.5 * mA * (o.grip || P.grip) * dtSub);
     var Jt = clamp(-vt / (1 / mP + ct * ct / I + invA), -CONTACT_MU * Jn, CONTACT_MU * Jn);
     var jx = nx * Jn + tx * Jt, jz = nz * Jn + tz * Jt;
     car.vx += jx / mP; car.vz += jz / mP;
-    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR);
+    // Drehstoß: schiebt mich ein Auto auf fester Bahn nur seitlich an (Schrammen), dreht es mich kaum – sonst reicht
+    // ein Anstupser am Heck, um mich aus der Kurve zu drehen; eigene Treffer und harte Aufpralle drehen voll
+    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * (share < 1 && impact < CRASH_V ? 0.35 : 1);
     var scrape = impact < CRASH_V;
     if (!scrape) {
       // Knautschzone: zusätzlicher Tempoverlust nach Aufprall und Massenverhältnis (gegen schwere Autos mehr)

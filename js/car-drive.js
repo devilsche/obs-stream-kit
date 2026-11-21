@@ -861,19 +861,28 @@
       var q = race.sim.cars[i];
       if (q.state === 'dnf') return;     // ausgeschieden: durchscheinend, man fährt hindurch
       var o = poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass);
-      o.q = q; out.push(o);
+      o.q = q; o.i = i; out.push(o);
     });
     if (race.mp) race.remotes.forEach(function (c) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); });
     return out;
   }
-  // Solo: Gegenstoß auf die KI – Tempo längs, Seitenversatz quer (in Streckenkoordinaten)
+  // Solo: Gegenstoß auf die KI über die Sim (sim.hit) – Tempo längs, Seitenschub quer (Streckenkoordinaten),
+  // ein harter Treffer kann sie drehen (je schwerer ich im Verhältnis, desto eher)
   function nudgeAI(o, h) {
-    if (!isFinite(o.mass) || !o.q) return;
-    var q = o.q, T = race.T, a = T.at(q.s), gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw);
-    var dvx = -h.jx / o.mass, dvz = -h.jz / o.mass;
-    q.v = Math.max(0, q.v + (dvx * gx + dvz * gz));
-    var lim = T.width / 2 + Math.max(0, q.d > 0 ? a.runL : a.runR) - o.c.w / 2 - 0.2;
-    q.d = clamp(q.d + (dvx * a.nx + dvz * a.nz) * 0.12, -lim, lim);
+    if (!isFinite(o.mass) || !o.q || o.i == null || !race.sim.hit) return;
+    var q = o.q, a = race.T.at(q.s), gx = Math.cos(q.yaw), gz = -Math.sin(q.yaw);
+    var dvx = -h.jx / o.mass, dvz = -h.jz / o.mass, spin = 0;
+    if (h.impact >= Phys.CRASH_V && !(o.c.spinCd > race.t)) {
+      o.c.spinCd = race.t + 0.6;
+      spin = clamp((h.impact - 4) / 12, 0, 0.7) * clamp(race.pc.P.mass / o.mass, 0.2, 1.5);
+    }
+    race.sim.hit(o.i, dvx * gx + dvz * gz, (dvx * a.nx + dvz * a.nz) * 1.3, spin);
+  }
+  // Solo: mein Auto als Hindernis für die KI (fährt nicht auf, lenkt nicht hinein, überholt außen herum)
+  function simObstacles() {
+    var pc = race.pc;
+    if (!race.sim.setObstacles) return;
+    race.sim.setObstacles(race.phase === 'countdown' ? [] : [{ s: pc.s, d: pc.d, v: Math.max(0, pc.u), len: race.me.len, w: race.me.w }]);
   }
   // eigenes Auto fahren + Kontakte; Crash: Kamera-Ruck (reduzierte Bewegung: keiner), Funken/Splitter, Blech-Klang –
   // stärker je Aufprall und je schwerer der andere; Schrammen: Funkenstrom + Schleifgeräusch statt Abprallen
@@ -1877,6 +1886,7 @@
       var srvT = mp.net.serverNow() - mp.startAt;
       if (Math.abs(srvT - race.t) > 0.15) race.t = srvT;
     }
+    if (race.sim && !race.chat && !race.mp) simObstacles();
     if (race.sim) { while (race.sim.time + Sim.DT <= race.t + 1e-9) { snap(); race.sim.step(); } }
     var lapsPre = pc.laps;
     if (race.chat) rcDraw();   // fährt die KI mein Auto, setzt rcDraw Lage/Runden aus dem Nachfahrer
