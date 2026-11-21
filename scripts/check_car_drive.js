@@ -200,6 +200,35 @@ function crashRun(car, inp, others, secs, react) {
   var moved = Math.hypot(me.x - bx, me.z - bz), drove = Math.hypot(o.x - a.x, o.z - a.z);
   ok(moved < drove * 0.35, 'Bus (Masse ' + me.P.mass.toFixed(1) + ') von leichtem Auto (Masse ' + light.P.mass.toFixed(1) + ', 20 m/s, feste Bahn) gerammt: Bus ' + moved.toFixed(1) + ' m verschoben, Rammer fuhr ' + drove.toFixed(1) + ' m');
 })();
+// Schwung je Kontakt: ein leichter Rammer auf fester Bahn (gibt nie nach) bringt den rollenden Bus höchstens auf das
+// Tempo, das ein echter Stoß ergäbe (Masse × Anfahrtempo), nicht auf sein eigenes
+(function () {
+  var me = carFor('trolza-5265-00-megapolis', TB, { s: S0 + 20, d: 0 }), a = TB.at(S0), fx = Math.cos(a.yaw), fz = -Math.sin(a.yaw);
+  var light = carFor('1990-mercedes-benz-190e-2-5', TB, { s: S0, d: 0 }), v = 15;
+  var o = { x: a.x, z: a.z, yaw: a.yaw, len: light.P.len, w: light.P.width, vx: fx * v, vz: fz * v, mass: light.P.mass, x0: a.x, z0: a.z, yaw0: a.yaw };
+  crashRun(me, {}, [o], 2);
+  var got = Math.hypot(me.vx, me.vz), ideal = 2 * light.P.mass / (light.P.mass + me.P.mass) * v;
+  ok(got < ideal * 1.6 + 1, 'Bus rollend von leichtem Auto (' + v + ' m/s) gerammt: Bus danach ' + got.toFixed(1) + ' m/s (echter Stoß höchstens ' + ideal.toFixed(1) + ' m/s)');
+})();
+// Schräg angefahren (25°, leichtes Auto auf fester Bahn, 16 m/s): der fahrende Bus wird kaum versetzt und gerät
+// nicht ins Driften (keine Benommenheit/kein voller Drehstoß von einem viel leichteren Auto)
+(function () {
+  var braw = Stats.guess({ key: 'trolza-5265-00-megapolis', len: 12 }), me = Phys.create(TB, Phys.params(Sim.stats(braw), braw), { s: S0 + 20, d: 0 });
+  var a = TB.at(S0 + 20), fx = Math.cos(a.yaw), fz = -Math.sin(a.yaw);
+  var lc = carFor('1990-mercedes-benz-190e-2-5', TB, { s: S0, d: 0 }), th = 25 * Math.PI / 180, vo = 16;
+  setSpeed(me, 12);
+  var dx = fx * Math.cos(th) - a.nx * Math.sin(th), dz = fz * Math.cos(th) - a.nz * Math.sin(th);
+  var o = { x: me.x - dx * 8 + fx, z: me.z - dz * 8 + fz, yaw: Math.atan2(-dz, dx), len: lc.P.len, w: lc.P.width, vx: dx * vo, vz: dz * vo, mass: lc.P.mass };
+  o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw;
+  var d0 = (me.x - a.x) * a.nx + (me.z - a.z) * a.nz, rMax = 0;
+  for (var t = 0; t < 1.5; t += DT) {
+    Phys.stepContacts(me, { throttle: 0.4 }, DT, dims(me), [o], null);
+    rMax = Math.max(rMax, Math.abs(me.r));
+    o.x0 = o.x; o.z0 = o.z; o.yaw0 = o.yaw; o.x += o.vx * DT; o.z += o.vz * DT;
+  }
+  var d1 = (me.x - a.x) * a.nx + (me.z - a.z) * a.nz;
+  ok(Math.abs(d1 - d0) < 1.5 && rMax < 0.4, 'Bus schräg (25°) von leichtem Auto angefahren: ' + Math.abs(d1 - d0).toFixed(2) + ' m versetzt, Gierrate höchstens ' + rMax.toFixed(2) + ' rad/s');
+})();
 // Seitlich abdrängen (KI auf fester Bahn zieht 1,5 m/s nach innen, fährt gleich schnell daneben): ein Porsche-schweres
 // Auto bewegt einen Lkw kaum, ein gleich schweres drängt langsam und kontrolliert ab (kein Plopp)
 (function () {

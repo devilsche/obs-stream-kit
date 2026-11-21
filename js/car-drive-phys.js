@@ -393,19 +393,34 @@
     // Aufprall-Stöße (hartes Auffahren) bleiben
     // (halbe Haftung: der Schieber lenkt ja nicht absichtlich in mich hinein – ein Anstupser drängt, wirft aber nicht raus)
     if (share < 1 && dtSub > 0 && impact < CRASH_V) Jn = Math.min(Jn, 0.5 * mA * (o.grip || P.grip) * dtSub);
+    // Ein leichterer Schieber auf fester Bahn gibt nie nach: ohne Grenze stieße er in jedem Teilschritt neu, bis ich
+    // sein Tempo habe (ein Golf beschleunigt dann einen Bus wie ein Lkw). Je Kontakt bekommt er deshalb nur den Schwung,
+    // den ein echter Stoß überträgt (reduzierte Masse × Anfahrtempo × (1 + e)), danach nur noch das weiche Drängen nach Haftung.
+    if (lightPush) {
+      var st = o.c || o, tick = car.cTick || 0;
+      if (!(st.jTick >= tick - 1) || st.jCar !== car) { st.jUsed = 0; st.jMax = (1 + e) * impact * mA * mP / (mA + mP); st.jCar = car; }
+      st.jTick = tick;
+      var soft = dtSub > 0 ? 0.5 * mA * (o.grip || P.grip) * dtSub : 0;
+      Jn = Math.min(Jn, Math.max(st.jMax - st.jUsed, soft));
+      st.jUsed += Jn;
+    }
     var Jt = clamp(-vt / (1 / mP + ct * ct / I + invA), -CONTACT_MU * Jn, CONTACT_MU * Jn);
     var jx = nx * Jn + tx * Jt, jz = nz * Jn + tz * Jt;
     car.vx += jx / mP; car.vz += jz / mP;
     // Drehstoß: schiebt mich ein Auto auf fester Bahn nur seitlich an (Schrammen), dreht es mich kaum – sonst reicht
     // ein Anstupser am Heck, um mich aus der Kurve zu drehen; eigene Treffer und harte Aufpralle drehen voll
-    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * (share < 1 && impact < CRASH_V ? 0.35 : 1);
+    // (auch beim Crash, wenn ein leichteres Auto mich anfährt: ein Golf dreht keinen Bus)
+    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * (share < 1 && (impact < CRASH_V || mA < mP * 0.9) ? 0.35 : 1);
     var scrape = impact < CRASH_V;
     if (!scrape) {
       // Knautschzone: zusätzlicher Tempoverlust nach Aufprall und Massenverhältnis (gegen schwere Autos mehr)
       var heavy = invA ? mA / (mA + mP) : 1, keep = 1 - Math.min(0.35, impact * CRUMPLE * 1.3 * heavy);
       car.vx *= keep; car.vz *= keep;
-      car.hitT = Math.max(car.hitT || 0, Math.min(HIT_T, 0.12 + impact * 0.035));
-      car.steer *= 0.5;
+      // benommen (weniger Haftung/Lenkung) nach Massenverhältnis: gleich schwer wie bisher, ein Bus nach einem
+      // Golf-Treffer kaum – sonst bricht sein Heck schon bei einem Stups aus und bleibt im Drift
+      var daze = clamp(2 * heavy, 0.1, 1);
+      car.hitT = Math.max(car.hitT || 0, Math.min(HIT_T, (0.12 + impact * 0.035) * daze));
+      car.steer *= 1 - 0.5 * daze;
     }
     var fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw), lx = -Math.sin(car.yaw), lz = -Math.cos(car.yaw);
     car.u = car.vx * fx + car.vz * fz; car.w = car.vx * lx + car.vz * lz;
@@ -423,6 +438,7 @@
       vmax = Math.max(vmax, Math.hypot(car.vx, car.vz) + mv);
     }
     var n = others.length ? clamp(Math.ceil(vmax * Math.min(dt, 0.1) / CHUNK), 1, 12) : 1, rail = 0, hits = [];
+    car.cTick = (car.cTick || 0) + 1;   // Bildzähler: zusammenhängender Kontakt über mehrere Bilder
     for (var k = 1; k <= n; k++) {
       step(car, inp, dt / n);
       rail = Math.max(rail, car.rail);
@@ -431,7 +447,7 @@
         var f = k / n, pose = o;
         if (o.x0 != null && f < 1) {
           pose = { x: o.x0 + (o.x - o.x0) * f, z: o.z0 + (o.z - o.z0) * f, yaw: o.yaw0 + wrapAngle(o.yaw - o.yaw0) * f,
-            len: o.len, w: o.w, vx: o.vx, vz: o.vz, mass: o.mass };
+            len: o.len, w: o.w, vx: o.vx, vz: o.vz, mass: o.mass, grip: o.grip, c: o.c || o };
         }
         var reach = (o.len + (me && me.len > 0 ? me.len : car.P.len)) / 2 + 1;
         if (Math.abs(pose.x - car.x) > reach || Math.abs(pose.z - car.z) > reach) continue;
