@@ -117,7 +117,7 @@
     form: $('menuForm'), status: $('menuStatus'), menu: $('menu'), loading: $('loading'), loadBar: $('loadBar'),
     loadText: $('loadText'), pause: $('pause'), finish: $('finish'), results: $('results'), finishBest: $('finishBest'),
     hud: $('hud'), countdown: $('countdown'), announce: $('announce'), fs: $('fsBtn'),
-    lobby: $('lobby'), signin: $('signin'), roster: $('roster'), lobbyStatus: $('lobbyStatus'), qual: $('qualSel'), qualRace: $('qualRace'),
+    lobby: $('lobby'), signin: $('signin'), roster: $('roster'), lobbyStatus: $('lobbyStatus'),
     finishNote: $('finishNote')
   };
   var catalog = [], byKey = {};
@@ -1678,7 +1678,6 @@
     who.textContent = 'Signed in as ' + CFG.user.name + ' · ';
     out.href = CFG.logout; out.textContent = 'Sign out'; who.appendChild(out);
     $('startText').textContent = 'Join race';
-    ui.qual.value = load('quality', 'light') === 'full' ? 'full' : 'light';
     ui.status.textContent = 'Loading your garage…';
     fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j.signin) { $('signinBtn').href = CFG.login; showPanel('signin'); return; }
@@ -1709,11 +1708,9 @@
   function viewerJoin(s) {
     if (!viewerCars || !viewerCars.ticket) return;
     if (!Net) { ui.status.textContent = 'Network script failed to load – reload the page.'; return; }
-    var light = ui.qual.value !== 'full';
-    save('quality', light ? 'light' : 'full');
-    renderScale = light ? 0.75 : 1; resize();
+    renderScale = 1; resize();   // immer volle Grafik (Light = Rennmodelle, zu grob)
     mpStart({ code: CFG.code, ticket: viewerCars.ticket, role: 'viewer', me: viewerCars.me.id, room: viewerCars.room,
-      car: s.car, paint: s.paint, light: light, duck: true });
+      car: s.car, paint: s.paint, light: false, duck: true });
   }
 
   // ---- Chatrennen steuerbar (/drive/race/<kanal>) ----
@@ -1726,8 +1723,6 @@
     var who = $('whoamiRace'), out = doc.createElement('a');
     who.textContent = 'Signed in as ' + CFG.user.name + ' · ';
     out.href = CFG.logout; out.textContent = 'Sign out'; who.appendChild(out);
-    ui.qualRace.value = load('quality', 'light') === 'full' ? 'full' : 'light';
-    ui.qualRace.addEventListener('change', function () { save('quality', ui.qualRace.value); });
     $('lobbyTitle').textContent = 'Chat race';
     showLobby();
     rcPoll();
@@ -1779,9 +1774,8 @@
     fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
       rc.busy = false;
       if (!j.ok) { setLobbyStatus(j.error || 'Could not join.'); return; }
-      var light = ui.qualRace.value !== 'full';
-      renderScale = light ? 0.75 : 1; resize();
-      mp = { code: 'race', role: 'driver', me: String(j.me.id), room: {}, roster: [], light: light, duck: true, phase: '', raceId: j.race_id,
+      renderScale = 1; resize();
+      mp = { code: 'race', role: 'driver', me: String(j.me.id), room: {}, roster: [], light: false, duck: true, phase: '', raceId: j.race_id,
         startAt: null, grid: [], fin: {}, results: null, recorded: null, loaded: {}, loading: {}, info: null };
       var m = mp;
       mp.net = Net.connect({ url: wsUrl('race'), ticket: j.ticket, onMessage: function (msg) { if (mp === m) rcMsg(msg); },
