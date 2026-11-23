@@ -143,9 +143,13 @@
   function listPool() {
     if (!VIEWER) return catalog;
     if (!viewerCars) return [];
-    var out = [], seen = {};
-    if (viewerCars.rnd && byKey[viewerCars.rnd]) { out.push({ e: byKey[viewerCars.rnd], rnd: true }); seen[viewerCars.rnd] = 1; }
+    // Zuschauer: Zufallsauto + Garage fahrbar, alle übrigen fahrbaren Autos gesperrt mit Preis (Anreiz für !buy).
+    // Der Streamer (all) darf jedes Auto fahren.
+    var out = [], seen = {}, prices = viewerCars.prices || {};
+    if (viewerCars.rnd && byKey[viewerCars.rnd] && !viewerCars.all) { out.push({ e: byKey[viewerCars.rnd], rnd: true }); seen[viewerCars.rnd] = 1; }
     (viewerCars.garage || []).forEach(function (k) { if (byKey[k] && !seen[k]) { out.push({ e: byKey[k] }); seen[k] = 1; } });
+    out.sort(function (a, b) { return a.rnd ? -1 : b.rnd ? 1 : displayName(a.e).localeCompare(displayName(b.e)); });
+    catalog.forEach(function (e) { if (!seen[e.key] && prices[e.key] != null) out.push({ e: e, price: prices[e.key] }); });
     return out;
   }
   function fillList() {
@@ -156,10 +160,11 @@
       var e = x.e || x, label = (x.rnd ? 'Random car: ' : '') + displayName(e), hay = (label + ' ' + (e.brand || '') + ' ' + e.key).toLowerCase();
       if (q && hay.indexOf(q) < 0) return;
       var o = doc.createElement('option'); o.value = e.key; o.textContent = label + (e.brand ? ' (' + e.brand + ')' : '');
+      if (x.price != null) { o.disabled = true; o.textContent += ' – locked · !buy for ' + x.price + ' coins'; }
       ui.list.appendChild(o); shown++;
     });
-    if (cur && byKey[cur] && ui.list.querySelector('option[value="' + CSS.escape(cur) + '"]')) ui.list.value = cur;
-    else if (shown) ui.list.selectedIndex = 0;
+    if (cur && byKey[cur] && ui.list.querySelector('option[value="' + CSS.escape(cur) + '"]:not([disabled])')) ui.list.value = cur;
+    else if (ui.list.querySelector('option:not([disabled])')) ui.list.value = ui.list.querySelector('option:not([disabled])').value;
     carChanged();
     if (!shown) ui.info.textContent = VIEWER && !viewerCars ? '' : 'No car matches “' + ui.search.value + '”.';
   }
@@ -1678,10 +1683,11 @@
     fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j.signin) { $('signinBtn').href = CFG.login; showPanel('signin'); return; }
       if (!j.ok) { ui.status.textContent = j.error || 'This room is not available.'; $('startBtn').disabled = true; return; }
-      viewerCars = { garage: j.garage || [], rnd: j.rnd, ticket: j.ticket, room: j.room, me: j.me };
+      viewerCars = { garage: j.garage || [], rnd: j.rnd, ticket: j.ticket, room: j.room, me: j.me, all: !!j.all, prices: j.prices || {} };
       var T = Sim.track(Sim.TRACKS[j.room.track | 0] || 1);
       ui.status.textContent = T.name + ' · ' + j.room.laps + ' lap' + (j.room.laps === 1 ? '' : 's') + ' · ' + j.room.drivers + '/' + j.room.max + ' drivers' +
-        (viewerCars.garage.length ? '' : ' – no cars in your garage yet, you get a random one (buy cars in the chat with !buy).');
+        (viewerCars.all ? ' – streamer: all cars unlocked.' : viewerCars.garage.length ? '' :
+          ' – no cars in your garage yet, you get a random one (buy cars in the chat with !buy).');
       fillList();
     }).catch(function () { ui.status.textContent = 'Could not reach the server.'; });
   }
@@ -1692,6 +1698,7 @@
     fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
       if (!j.ok || !j.ticket) return;
       viewerCars.garage = j.garage || []; viewerCars.ticket = j.ticket; viewerCars.rnd = j.rnd;
+      viewerCars.all = !!j.all; viewerCars.prices = j.prices || viewerCars.prices;
       fillList();
       if (!fresh.length) return;
       var txt = 'New in your garage: ' + fresh.map(function (k) { return displayName(byKey[k]); }).join(', ');

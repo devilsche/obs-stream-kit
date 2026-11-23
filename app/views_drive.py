@@ -8,7 +8,9 @@
                                 Streamer-Login
   GET /drive/logout?code=…      Zuschauer-Cookie löschen
   GET /drive/<code>/ticket      Ticket für den WS-Dienst + Garage des Zuschauers (Autos aus fx_race_garage, die
-                                mitfahren dürfen) + ein Zufallsauto
+                                mitfahren dürfen) + ein Zufallsauto + prices {key: Coins} aller fahrbaren Autos
+                                (die Seite zeigt nicht gekaufte gesperrt mit Preis). Der Streamer (Owner des
+                                Tenants, gleiche Twitch-ID) bekommt all: true und darf jedes Auto fahren.
 
 Chatrennen steuerbar (Schritt 2b) – fester Link je Tenant, <kanal> = Twitch-Kanal (sonst Slug, fx/drive_auth):
   GET /drive/race/<kanal>         dieselbe Seite im Modus „race“ (window.__DRIVE__.mode = "race")
@@ -35,7 +37,7 @@ import urllib.parse
 from flask import (Blueprint, Response, abort, current_app, jsonify, make_response, redirect, request,
                    send_from_directory, session)
 
-from fx import car_models, drive_auth, race, race_db, track_props
+from fx import car_models, drive_auth, race, race_db, race_shop, track_props
 from webcore.serving import inject_theme, serve_asset
 
 bp_drive = Blueprint("drive", __name__)
@@ -60,6 +62,19 @@ def _catalog():
     except (OSError, ValueError):
         cat = []
     return cat if isinstance(cat, list) else []
+
+
+def _owner_id(tid):
+    """Twitch-User-ID des Tenant-Owners (Streamer) oder None."""
+    try:
+        from fx.endpoints import _with_conn
+        row = _with_conn(lambda conn: conn.execute(
+            "SELECT u.twitch_user_id AS tw FROM tenants t JOIN users u ON u.id = t.owner_user_id WHERE t.id = ?",
+            (tid,)).fetchone())
+        return str(row["tw"]) if row and row["tw"] else None
+    except Exception:
+        current_app.logger.exception("car-drive: owner lookup failed")
+        return None
 
 
 def _viewer():
@@ -285,7 +300,10 @@ def ticket(code):
         return _no_store(jsonify({"ok": False, "error": info.get("error") or "room not found"})), 404
     room = info["room"]
     tid = room["tenant"]
-    pool = [c["key"] for c in race.eligible(_catalog(), car_models.load(_root(), "vehicles")) if c.get("key")]
+    cars = [c for c in race.eligible(_catalog(), car_models.load(_root(), "vehicles")) if c.get("key")]
+    pool = [c["key"] for c in cars]
+    prices = {c["key"]: race_shop.price(c["key"], c) for c in cars}
+    owner = _owner_id(tid) == str(viewer["id"])
     garage = []
     try:
         from fx.endpoints import _with_conn
@@ -296,8 +314,9 @@ def ticket(code):
     rnd = random.choice(pool) if pool else None
     tk = drive_auth.make_ticket({"tid": tid, "code": code, "id": viewer["id"], "login": viewer.get("login") or "",
                                  "display": viewer.get("display") or viewer.get("login") or viewer["id"],
-                                 "role": "viewer", "garage": garage, "rnd": rnd})
-    return _no_store(jsonify({"ok": True, "ticket": tk, "garage": garage, "rnd": rnd, "room": room,
+                                 "role": "viewer", "garage": None if owner else garage, "rnd": rnd})
+    return _no_store(jsonify({"ok": True, "ticket": tk, "garage": pool if owner else garage, "rnd": rnd, "all": owner,
+                              "prices": prices, "room": room,
                               "roster": info.get("roster") or [],
                               "me": {"id": viewer["id"], "name": viewer.get("display")}}))
 

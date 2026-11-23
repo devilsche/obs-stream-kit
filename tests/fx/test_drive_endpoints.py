@@ -113,6 +113,18 @@ def test_ticket_needs_signin_then_filters_garage(conn, root, calls):
     tk = drive_auth.read_ticket(j["ticket"])
     assert tk["id"] == "42" and tk["role"] == "viewer" and tk["garage"] == ["a"] and tk["code"] == "ABC234"
     assert c.get("/drive/ZZZ999/ticket").status_code == 404
+    assert not j["all"] and set(j["prices"]) == {"a", "b"} and all(v > 0 for v in j["prices"].values())
+
+
+def test_ticket_owner_gets_all_cars(conn, root, calls, monkeypatch):
+    from app import views_drive
+    monkeypatch.setattr(views_drive, "_owner_id", lambda tid: "42")
+    c = _app(conn, root)
+    c.set_cookie(drive_auth.VIEWER_COOKIE, drive_auth.make_viewer({"id": 42, "login": "s", "display_name": "S"}),
+                 path="/drive")
+    j = c.get("/drive/ABC234/ticket").get_json()
+    assert j["ok"] and j["all"] and sorted(j["garage"]) == ["a", "b"]
+    assert drive_auth.read_ticket(j["ticket"])["garage"] is None
 
 
 def test_engine_sounds_without_token(conn, root, calls):
