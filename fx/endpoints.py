@@ -841,6 +841,7 @@ def _race_garage_cmd(cmd, now):
                 say = "the %s costs %d coins – you have %d" % (name, cost, left)
             else:
                 say = "bought the %s for %d coins – %d left. Drive it with !race %s" % (name, cost, left, q[:30])
+                _garage_push(g.tenant_id, uid)
             return _no_store(jsonify({"ok": status == "ok", "status": status, "coins": left,
                                       "say": _say(display, say)}))
         if cmd == "givecoins":
@@ -857,6 +858,19 @@ def _race_garage_cmd(cmd, now):
         log.exception("fx car-race: %s failed", cmd)
         return _no_store(jsonify({"ok": False, "say": _say(display, "garage unavailable, try again later")}))
     return jsonify({"ok": False, "say": "unknown command"}), 400
+
+
+def _garage_push(tenant_id, uid):
+    """Neues Auto in der Garage: offene Car-Drive-Seiten des Zuschauers sofort aktualisieren (WS-Dienst, Nachricht
+    garage). Best effort – ist der Dienst nicht erreichbar, sieht der Zuschauer das Auto nach dem Neuladen."""
+    from fx import drive_auth
+    try:
+        pool = {c["key"] for c in race.eligible(*_race_cars()) if c.get("key")}
+        keys = _with_conn(lambda conn: race_db.garage(conn, tenant_id, uid))
+        drive_auth.call("garage", timeout=1.0, tenant=tenant_id, user=uid,
+                        cars=",".join(k for k in keys if k in pool))
+    except Exception:
+        log.exception("fx car-race: garage push failed")
 
 
 def _race_boost_cmd(cmd, now):

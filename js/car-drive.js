@@ -1369,6 +1369,7 @@
       case 'joined':
         if (!m.ok) setLobbyStatus(m.msg);
         break;
+      case 'garage': garageChanged(m.garage); break;
       case 'roster':
         mp.roster = m.list || []; renderRoster();
         mp.roster.forEach(function (d) { mpLoad(d.car); });
@@ -1538,6 +1539,20 @@
         (viewerCars.garage.length ? '' : ' – no cars in your garage yet, you get a random one (buy cars in the chat with !buy).');
       fillList();
     }).catch(function () { ui.status.textContent = 'Could not reach the server.'; });
+  }
+  // Neues Auto gekauft (Server-Nachricht garage): Ticket neu holen, damit ein erneuter Beitritt das Auto annimmt
+  function garageChanged(keys) {
+    if (!VIEWER || !viewerCars || !Array.isArray(keys)) return;
+    var fresh = keys.filter(function (k) { return viewerCars.garage.indexOf(k) < 0 && byKey[k]; });
+    fetch(CFG.ticket, { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok || !j.ticket) return;
+      viewerCars.garage = j.garage || []; viewerCars.ticket = j.ticket; viewerCars.rnd = j.rnd;
+      fillList();
+      if (!fresh.length) return;
+      var txt = 'New in your garage: ' + fresh.map(function (k) { return displayName(byKey[k]); }).join(', ');
+      if (mp && mp.phase === 'lobby') setLobbyStatus(txt + ' – leave the grid and join again to drive it.');
+      else if (!mp) ui.status.textContent = txt + '.';
+    }).catch(function () { /* nächstes Neuladen holt die Garage */ });
   }
   function viewerJoin(s) {
     if (!viewerCars || !viewerCars.ticket) return;

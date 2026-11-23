@@ -475,7 +475,10 @@ def test_sub_join_via_endpoint_and_unresolved_sub(conn, tmp_path, clock):
     assert all(isinstance(x["paint"], int) for x in rs)
 
 
-def test_coins_buy_garage_and_race_with_own_car(conn, tmp_path, clock):
+def test_coins_buy_garage_and_race_with_own_car(conn, tmp_path, clock, monkeypatch):
+    from fx import drive_auth
+    pushed = []
+    monkeypatch.setattr(drive_auth, "call", lambda cmd, timeout=3.0, **k: pushed.append((cmd, k)) or {"ok": True})
     c = _client(conn, tmp_path)
     r = q(c, cmd="coins", id="7", user="Ann")
     assert r["say"] == "@Ann you have 0 race coins"
@@ -483,7 +486,9 @@ def test_coins_buy_garage_and_race_with_own_car(conn, tmp_path, clock):
     assert q(c, cmd="givecoins", id="7", user="Ann", n="500")["say"] == "@Ann got 500 race coins – now 500"
     r = q(c, cmd="buy", id="7", user="Ann", q="car 2")
     assert r["ok"] is True and r["say"] == "@Ann bought the Car 2 for 400 coins – 100 left. Drive it with !race car 2"
+    assert [p for p in pushed if p[0] == "garage"] == [("garage", {"tenant": 1, "user": "7", "cars": "k2"})]
     assert q(c, cmd="buy", id="7", user="Ann", q="Car 2")["status"] == "owned"
+    assert len([p for p in pushed if p[0] == "garage"]) == 1     # nur ein echter Kauf meldet sich
     assert q(c, cmd="buy", id="7", user="Ann", q="car")["say"].startswith("@Ann which one? Car 0, Car 1")
     assert q(c, cmd="buy", id="7", user="Ann", q="%rawInput%")["say"] == "@Ann usage: !buy <car>"
     g = q(c, cmd="garage", id="7", user="Ann")

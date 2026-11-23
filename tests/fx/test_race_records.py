@@ -185,3 +185,23 @@ def test_server_ignores_unverified_laps(monkeypatch):
         await asyncio.sleep(0.05)
     asyncio.run(go())
     assert calls == []
+
+
+def test_garage_push_updates_viewer_ticket_and_sends(monkeypatch):
+    sent = []
+    monkeypatch.setattr(drive_ws, "broadcast", lambda wss, data: sent.append((list(wss), json.loads(data))))
+    srv = drive_ws.DriveServer(secret="s")
+    room, _ = srv.hub.open(5, 0, 2, 1000.0)
+    me, other, host = FakeWs(), FakeWs(), FakeWs()
+    c1 = drive_ws.Client(me, {"id": "u1", "role": "viewer", "garage": []}, room.code)
+    c2 = drive_ws.Client(other, {"id": "u2", "role": "viewer", "garage": []}, room.code)
+    c3 = drive_ws.Client(host, {"id": "u1", "role": "host", "garage": None}, room.code)
+    srv.conns[room.code] = {c1, c2, c3}
+    out, status = srv.internal("garage", {"tenant": "5", "user": "u1", "cars": "car-a,car-b"})
+    assert status == 200 and out == {"ok": True, "sent": 1}
+    assert sent == [([me], {"t": "garage", "garage": ["car-a", "car-b"]})]
+    assert c1.ident["garage"] == ["car-a", "car-b"] and c2.ident["garage"] == [] and c3.ident["garage"] is None
+    # der neue Wagen wird beim Beitritt jetzt angenommen
+    assert room.join(c1.ident, "car-b", 0, 1000.0)[0]
+    # kein Raum → nichts zu tun
+    assert srv.internal("garage", {"tenant": "6", "user": "u1", "cars": "x"})[0] == {"ok": True, "sent": 0}

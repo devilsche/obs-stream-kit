@@ -9,6 +9,7 @@ Wege:
                               {"t": "hello", "ticket": …} (Ticket von Flask, fx/drive_auth.py)
   GET /internal/<cmd>?…       Flask (fx/endpoints.py, app/views_drive.py) mit Header X-Drive-Key;
                               open (tenant, track, laps) · start (tenant) · close (tenant) · status (tenant) · room (code)
+                              · garage (tenant, user, cars = Komma-Liste; nach !buy, an die Verbindungen des Zuschauers)
 
 Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · ping {c} · s {x, z, yaw, roll, pitch,
 steer, speed, prog, rt (Rennzeit), spin} (~20 Hz).
@@ -16,7 +17,8 @@ Server → Client: welcome {id, room, roster, now} · roster {list} · joined {o
 start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …]}
 (20 Hz) · lap {id, lap, time, ok, fin?} · results {race_id, list} · recorded {race_id, counted, points} ·
 rec {id, name, car, track, time, personal, car_rec, track_rec, best_car, best_track} (geprüfte Runde gespeichert,
-fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · pong {c, s} · closed {msg} · error {msg}.
+fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · garage {garage} (nur an den Zuschauer, neues
+Auto gekauft) · pong {c, s} · closed {msg} · error {msg}.
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
 
 Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
@@ -145,6 +147,8 @@ class DriveServer:
             if old:
                 asyncio.get_running_loop().create_task(self._close_room(old, "the host opened a new room"))
             return {"ok": True, "room": room.info(now), "roster": []}, 200
+        if cmd == "garage":
+            return self.garage_push(tenant, q.get("user"), q.get("cars")), 200
         room = self.hub.of_tenant(tenant)
         if cmd == "status":
             if not room:
@@ -163,6 +167,21 @@ class DriveServer:
             asyncio.get_running_loop().create_task(self._close_room(room, "the host closed the room"))
             return {"ok": True, "msg": "room closed", "room": room.info(now)}, 200
         return {"ok": False, "error": "unknown command"}, 400
+
+    def garage_push(self, tenant, user, cars):
+        """Garage eines Zuschauers geändert (Kauf): Ticket-Garage seiner Verbindungen im Raum des Tenants
+        aktualisieren (join prüft dagegen) und ihm {t: garage, garage} schicken. → {ok, sent}."""
+        room, user = self.hub.of_tenant(tenant), str(user or "")
+        if not room or not user:
+            return {"ok": True, "sent": 0}
+        keys = [k for k in (cars or "").split(",") if k][:500]
+        mine = [c for c in self.conns.get(room.code, ()) if str(c.ident.get("id")) == user
+                and c.ident.get("garage") is not None]
+        for c in mine:
+            c.ident["garage"] = keys
+        if mine:
+            broadcast([c.ws for c in mine], json.dumps({"t": "garage", "garage": keys}, separators=(",", ":")))
+        return {"ok": True, "sent": len(mine)}
 
     # ---- Chatrennen (fx/drive_race.py) ----
     def _send_race(self, tid, obj):
