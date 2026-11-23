@@ -76,12 +76,12 @@
   var app = $('app'), canvas = $('view');
   app.dataset.mode = VIEWER ? 'viewer' : RACE ? 'race' : 'solo';
   var renderScale = 1;   // Zuschauer „Light“: 0,75
-  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  // alpha: ohne Strecke (Menü, Lobby) bleibt die Szene durchsichtig, dahinter liegt der Theme-Hintergrund (.app);
+  // den Himmel setzt erst die Strecke (car-track-scene applyEnv) und nimmt ihn beim Abbau wieder weg.
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setClearColor(0x000000, 0);
   renderer.localClippingEnabled = true;   // Enten-Fahrer an der Karosserie abschneiden
   var scene = new THREE.Scene();
-  var SKY = 0x9cc3e6;
-  scene.background = new THREE.Color(SKY);
-  scene.fog = new THREE.Fog(SKY, 180, 900);
   if (root.CarStage) CarStage.setup(renderer, scene, { exposure: 1.1 });
   var cam = new THREE.PerspectiveCamera(62, 16 / 9, 0.1, 3000);
   cam.position.set(0, 60, 80); cam.lookAt(0, 0, 0);
