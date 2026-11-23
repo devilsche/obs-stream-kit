@@ -38,7 +38,7 @@ import math
 import time
 
 # Grenzwerte und Strecken wie bei den Car-Drive-Räumen mit Code (fx/drive_room.py)
-from fx.drive_room import (CLOCK_AHEAD, JUMP_MAX, LAP_FACTOR, NITRO_V, PROG_SLACK, SPEED_MARGIN, SPEED_SLACK,
+from fx.drive_room import (row, stamp, CLOCK_AHEAD, JUMP_MAX, LAP_FACTOR, NITRO_V, PROG_SLACK, SPEED_MARGIN, SPEED_SLACK,
                            TRACK_LEN, TRACK_NAMES, Limits, _num)
 
 MAX_CLIENTS = 60           # Verbindungen je Tenant (Piloten + Overlays)
@@ -70,7 +70,9 @@ class Driver:
         self.grid = grid
         self.last = None            # (rt, x, z, prog) der letzten geprüften Meldung
         self.state = None           # letzter Zustand für die Verteilung (Liste)
-        self.ts = None              # Server-Zeit des letzten Zustands
+        self.ts = None              # Server-Zeit des letzten Zustands (Empfang)
+        self.sts = 0.0              # Zeitstempel des letzten Zustands (Absender, für die Verteilung)
+        self.ping = None            # vom Client gemeldeter Ping (ms)
         self.lap = 0
         self.lap_start = 0.0
         self.lap_bad = False
@@ -210,6 +212,7 @@ class Room:
                 f[k] = 0.0
         self.active = now
         d.ts = now
+        stamp(d, msg, now)
         d.state = [round(f["x"], 2), round(f["z"], 2), round(f["yaw"], 3), round(f["roll"], 3),
                    round(f["pitch"], 3), round(f["steer"], 3), round(f["speed"], 2), round(f["prog"], 2),
                    round(f["spin"] % 6283.0, 2)]
@@ -341,6 +344,7 @@ class Room:
               "speed": speed, "prog": round(prog, 2), "lap": lap}
         d.taken = None
         d.ts = now
+        d.sts = max(now, (d.sts or 0.0) + 0.001)
         if d.first_prog is None:
             d.first_prog = d.base_prog = min(prog, grid_front(d.grid))
         d.allow = max(d.allow, prog - d.base_prog)
@@ -385,8 +389,12 @@ class Room:
 
     def batch(self, now):
         """Zustände der (noch nicht übernommenen) Fahrer: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …]."""
-        return [[d.id, round(d.ts, 3)] + d.state for d in self.drivers.values()
+        return [row(d) for d in self.drivers.values()
                 if d.state is not None and not d.taken and now - d.ts < 30]
+
+    def pings(self, now):
+        """Gemeldeter Ping je Fahrer mit frischem Zustand: {id: ms}."""
+        return {d.id: d.ping for d in self.drivers.values() if d.ping is not None and d.ts and now - d.ts < 5}
 
 
 class Hub:

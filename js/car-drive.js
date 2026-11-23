@@ -1316,10 +1316,58 @@
         if (!t[0]) return;
         var tg = doc.createElement('span'); tg.className = 'tag'; tg.textContent = t[1]; nm.appendChild(tg);
       });
+      if (d.connected) {
+        var pg = doc.createElement('span'); pg.className = 'ping'; nm.appendChild(pg);
+        pingText(pg, String(d.id) === mp.me ? (mp.net && mp.net.ping() ? mp.net.ping().ms : null) : mp.net && mp.net.peerPing(String(d.id)));
+      }
       var car = doc.createElement('span'); car.className = 'car'; car.textContent = byKey[d.car] ? displayName(byKey[d.car]) : d.car || '–';
       li.appendChild(nm); li.appendChild(car); ui.roster.appendChild(li);
     });
     $('mpStartBtn').disabled = !mp.roster.length || mp.phase === 'countdown' || mp.phase === 'race';
+  }
+  // Ping-Text (ms); ab PING_HIGH zusätzlich „high“, damit nicht nur die Farbe den Zustand zeigt
+  var PING_HIGH = 150, LAG_SHOW = 0.4;
+  function pingText(el, ms) {
+    var t = ms == null ? '' : ms + ' ms' + (ms >= PING_HIGH ? ' high' : '');
+    if (el.textContent !== t) el.textContent = t;
+    if (ms != null && ms >= PING_HIGH) el.dataset.high = '1'; else delete el.dataset.high;
+  }
+  // Lobby: Pings kommen einmal pro Sekunde (S mit pg) – Liste nur bei Änderung neu aufbauen
+  function rosterPings() {
+    if (!mp || ui.lobby.hidden) return;
+    var key = mp.roster.map(function (d) {
+      return String(d.id) === mp.me ? (mp.net.ping() ? mp.net.ping().ms : '') : mp.net.peerPing(String(d.id));
+    }).join(',');
+    if (key !== mp.pingKey) { mp.pingKey = key; renderRoster(); }
+  }
+  // HUD: eigener Ping + Zittern, darunter die anderen Fahrer mit Ping und „lag“, solange Daten fehlen
+  var netHudAt = 0;
+  function netHud() {
+    var box = $('hNet'), on = !!(race && (race.mp || race.chat) && mp && mp.net && race.phase !== 'results');
+    if (box.hidden === on) box.hidden = !on;
+    if (!on) return;
+    var t = performance.now();
+    if (t - netHudAt < 500) return;
+    netHudAt = t;
+    var me = mp.net.ping();
+    setText('hNetMe', me ? 'Ping ' + me.ms + ' ms · jitter ' + me.jitter + ' ms' + (me.ms >= PING_HIGH ? ' · high' : '') : 'Ping –');
+    if (me && me.ms >= PING_HIGH) $('hNetMe').dataset.high = '1'; else delete $('hNetMe').dataset.high;
+    var list = $('hNetList'), rows = (race.remotes || []).filter(function (c) { return c && !(race.taken && race.taken[c.id]); });
+    while (list.children.length > rows.length) list.removeChild(list.lastChild);
+    rows.forEach(function (c, i) {
+      var li = list.children[i];
+      if (!li) {
+        li = doc.createElement('li');
+        var n = doc.createElement('span'); n.className = 'nm'; li.appendChild(n);
+        var p = doc.createElement('span'); p.className = 'ping'; li.appendChild(p);
+        list.appendChild(li);
+      }
+      var lag = mp.net.lag(c.id) > LAG_SHOW;
+      if (li.firstChild.textContent !== c.label) li.firstChild.textContent = c.label;
+      pingText(li.lastChild, mp.net.peerPing(c.id));
+      if (lag) { li.dataset.lag = '1'; li.lastChild.textContent = (li.lastChild.textContent ? li.lastChild.textContent + ' · ' : '') + 'lag'; }
+      else delete li.dataset.lag;
+    });
   }
   function mpLoad(key) {
     var e = key && byKey[key];
@@ -1370,6 +1418,7 @@
         if (!m.ok) setLobbyStatus(m.msg);
         break;
       case 'garage': garageChanged(m.garage); break;
+      case 'S': if (m.pg) rosterPings(); break;
       case 'roster':
         mp.roster = m.list || []; renderRoster();
         mp.roster.forEach(function (d) { mpLoad(d.car); });
@@ -1469,9 +1518,9 @@
   }
   function drawRemotes() {
     if (!race.remotes || !mp || !mp.net) return;
-    var at = mp.net.serverNow() - Net.DELAY;
+    var at = mp.net.serverNow() - mp.net.delay();
     race.remotes.forEach(function (c) {
-      var q = mp.net.sample(c.id, at);
+      var q = mp.net.sample(c.id, at, race.T);
       c.smp = q;
       if (!q) return;
       c.prog = q.prog;
@@ -1852,11 +1901,11 @@
   // je Bild: andere Piloten live bzw. als Nachfahrer, eigenes Auto beim Zuschauen aus Sim/Nachfahrer
   function rcDraw() {
     if (!race || !race.chat || !race.sim) return;
-    var at = mp.net.serverNow() - Net.DELAY, t = mp.net.serverNow() - mp.startAt;
+    var at = mp.net.serverNow() - mp.net.delay(), t = mp.net.serverNow() - mp.startAt;
     race.remotes.forEach(function (c) {
       var f = rcFollower(c.id, c.idx), q;
       if (f) { var fq = f.at(t); q = { x: fq.x, z: fq.z, yaw: fq.yaw, roll: fq.roll, pitch: 0, steer: fq.steer, spin: fq.spin, speed: fq.v, prog: fq.s }; c.finQ = fq.finish; }
-      else q = mp.net.sample(c.id, at);
+      else q = mp.net.sample(c.id, at, race.T);
       c.smp = q;
       if (!q) { var g = race.sim.cars[c.idx]; placeCar(c, g.x, g.z, g.yaw, 0, 0, 0, 0); return; }
       c.prog = q.prog;
@@ -1928,6 +1977,7 @@
     }
     pressed = {};
     updateHud(standings());
+    netHud();
     updateCam(dt);
     lookPhase();
     fxFrame(dt, race.phase === 'countdown' ? null : inp);

@@ -255,3 +255,29 @@ def test_save_limits_filters(tmp_path):
                                                         "c": {"vtop": 500}}})
     assert n == 1
     assert drive_auth.load_limits(str(tmp_path)) == {"cars": {"a": {"vtop": 20.0, "lap": [20.0, 21.0]}}}
+
+
+# ---- Zeitstempel und Ping (fx/drive_room.stamp) ----
+def test_state_uses_sender_stamp_and_ping():
+    _, room = room_with(1)
+    room.start(T0)
+    now = room.start_at + 1.0
+    msg = {"x": -4, "z": 0, "yaw": 0, "prog": -4, "rt": 1.0, "speed": 0, "ts": now - 0.08, "pg": 47.4}
+    room.state("u0", msg, now)
+    d = room.drivers["u0"]
+    assert d.sts == pytest.approx(now - 0.08) and d.ts == now
+    assert room.batch(now)[0][1] == round(now - 0.08, 3)
+    assert room.pings() == {"u0": 47}
+
+
+def test_state_stamp_implausible_falls_back_and_stays_increasing():
+    _, room = room_with(1)
+    room.start(T0)
+    d, now = room.drivers["u0"], room.start_at + 1.0
+    base = {"x": -4, "z": 0, "yaw": 0, "prog": -4, "rt": 1.0, "speed": 0}
+    room.state("u0", dict(base, ts=now - 5, pg=-3), now)          # zu alt → Empfangszeit, Ping verworfen
+    assert d.sts == now and d.ping is None
+    room.state("u0", dict(base, rt=1.05, ts=now - 0.5), now + 0.01)  # älter als der letzte → knapp danach
+    assert d.sts == pytest.approx(now + 0.001)
+    room.state("u0", dict(base, rt=1.1, ts=now + 9), now + 0.05)   # zu weit voraus → Empfangszeit
+    assert d.sts == now + 0.05

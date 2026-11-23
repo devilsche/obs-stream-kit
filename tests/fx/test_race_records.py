@@ -205,3 +205,39 @@ def test_garage_push_updates_viewer_ticket_and_sends(monkeypatch):
     assert room.join(c1.ident, "car-b", 0, 1000.0)[0]
     # kein Raum → nichts zu tun
     assert srv.internal("garage", {"tenant": "6", "user": "u1", "cars": "x"})[0] == {"ok": True, "sent": 0}
+
+
+# ---- Verteilung: jeder Zustand sofort an die anderen, volle Liste + Pings einmal pro Sekunde ----
+def test_state_relayed_immediately_to_others_and_keyframe_with_pings(monkeypatch):
+    sent = []
+    monkeypatch.setattr(drive_ws, "broadcast", lambda wss, data: sent.append((list(wss), json.loads(data))))
+    srv = drive_ws.DriveServer(secret="s")
+    room, _ = srv.hub.open(5, 0, 2, 1000.0)
+    room.join({"id": "u1", "login": "u1", "display": "Uno", "role": "viewer", "garage": None}, "car-a", 0, 1000.0)
+    room.start(1000.0)
+    me, other = FakeWs(), FakeWs()
+    c1, c2 = drive_ws.Client(me, {"id": "u1"}, room.code), drive_ws.Client(other, {"id": "u2"}, room.code)
+    srv.conns[room.code] = {c1, c2}
+    now = room.start_at + 1.0
+    srv.clock = lambda: now
+    s0 = dr.grid_pose(0)[0]
+    srv.on_message(room, c1, {"t": "s", "x": s0, "z": 0, "yaw": 0, "prog": s0, "rt": 1.0, "speed": 0,
+                              "ts": now - 0.05, "pg": 33})
+    relays = [(w, m) for w, m in sent if m.get("t") == "S"]
+    assert len(relays) == 1 and relays[0][0] == [other]
+    assert relays[0][1]["d"][0][:2] == ["u1", round(now - 0.05, 3)] and "pg" not in relays[0][1]
+    full = []
+    monkeypatch.setattr(srv, "_send_room", lambda code, obj: full.append(obj))
+    srv.step(now)
+    srv.step(now + 0.05)                     # innerhalb der Sekunde: keine zweite volle Liste
+    srv.step(now + 1.0)
+    keys = [m for m in full if m.get("t") == "S"]
+    assert len(keys) == 2 and keys[0]["pg"] == {"u1": 33}
+
+
+def test_state_burst_allowed_then_limited():
+    cl = drive_ws.Client(FakeWs(), {"id": "u1"}, "X")
+    cl.last_s = 10.0
+    ok = [drive_ws._allow_state(cl, 10.0) for _ in range(12)]
+    assert ok.count(True) == int(drive_ws.STATE_BURST)
+    assert drive_ws._allow_state(cl, 10.0 + 1 / drive_ws.STATE_RATE)

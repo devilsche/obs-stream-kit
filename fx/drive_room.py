@@ -52,6 +52,9 @@ JUMP_MAX = 20.0
 PROG_SLACK = 8.0
 LAP_FACTOR = 0.75
 CLOCK_AHEAD = 0.5
+STAMP_BACK = 1.0         # Absender-Zeitstempel (Server-Uhr des Clients) höchstens so alt …
+STAMP_AHEAD = 0.25       # … bzw. so weit voraus, sonst gilt die Empfangszeit
+PING_MAX = 5000          # gemeldeter Ping (ms), darüber verworfen
 GRID_FRONT, GRID_ROW, GRID_SIDE = 4.0, 7.5, 2.3
 
 
@@ -62,6 +65,32 @@ def grid_pose(i):
 
 def race_max(laps):
     return laps * 150.0 + 60.0   # lange Strecken: Runde ~60–75 s (KI), Menschen langsamer
+
+
+def stamp(d, msg, now):
+    """Zeitstempel und Ping einer Zustandsmeldung übernehmen (d.sts, d.ping).
+
+    Der Client schickt ts = seine abgeglichene Server-Uhr beim Senden. So landet Netz-Zittern nur in der Ankunft,
+    nicht in der Bewegung, die andere interpolieren. Unplausibel (fehlt, zu alt, zu weit voraus) → Empfangszeit.
+    Streng steigend, damit Clients nichts als „unverändert“ verwerfen."""
+    ts = _num(msg.get("ts"))
+    if ts is None or not (now - STAMP_BACK <= ts <= now + STAMP_AHEAD):
+        ts = now
+    prev = d.sts or 0.0
+    d.sts = ts if ts > prev else prev + 0.001
+    note_ping(d, msg)
+
+
+def note_ping(d, msg):
+    """Vom Client gemeldeten Ping (pg, ms) übernehmen – aus Zustand oder ping-Nachricht."""
+    pg = _num(msg.get("pg")) if d is not None else None
+    if pg is not None and 0 <= pg <= PING_MAX:
+        d.ping = int(round(pg))
+
+
+def row(d):
+    """Ein Zustand für die Verteilung: [id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin]."""
+    return [d.id, round(d.sts, 3)] + d.state
 
 
 def _num(v):
@@ -112,12 +141,14 @@ class Driver:
         self.host = host
         self.connected = True
         self.grid = None
+        self.ping = None            # vom Client gemeldeter Ping (ms)
         self.reset_race()
 
     def reset_race(self):
         self.last = None            # (t, x, z, prog)
         self.state = None           # letzter Zustand für die Verteilung (Liste)
-        self.ts = 0.0               # Server-Zeit des letzten Zustands
+        self.ts = 0.0               # Server-Zeit des letzten Zustands (Empfang)
+        self.sts = 0.0              # Zeitstempel des letzten Zustands (Absender, für die Verteilung)
         self.lap = 0
         self.lap_start = 0.0
         self.lap_bad = False
@@ -269,6 +300,7 @@ class Room:
         d.connected = True
         self.active = now
         d.ts = now
+        stamp(d, msg, now)
         d.state = [round(f["x"], 2), round(f["z"], 2), round(f["yaw"], 3), round(f["roll"], 3),
                    round(f["pitch"], 3), round(f["steer"], 3), round(f["speed"], 2), round(f["prog"], 2),
                    round(f["spin"] % 6283.0, 2)]
@@ -326,7 +358,11 @@ class Room:
 
     def batch(self, now):
         """Zustände aller Fahrer für die Verteilung: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …]."""
-        return [[d.id, round(d.ts, 3)] + d.state for d in self.drivers.values() if d.state is not None]
+        return [row(d) for d in self.drivers.values() if d.state is not None]
+
+    def pings(self):
+        """Gemeldeter Ping je verbundenem Fahrer: {id: ms}."""
+        return {d.id: d.ping for d in self.drivers.values() if d.connected and d.ping is not None}
 
     # ---- Wertung ----
     def _results(self):

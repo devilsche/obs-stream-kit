@@ -687,7 +687,7 @@
         if (q.finish != null && race.pilotFin[r.id] == null) race.pilotFin[r.id] = q.finish;
         return { x: q.x, z: q.z, yaw: q.yaw, roll: q.roll, pitch: 0, steer: q.steer, speed: q.v, prog: q.s };
       }
-      return net && net.sample ? net.sample(r.id) : null;
+      return net && net.sample ? net.sample(r.id, null, race.T) : null;
     }
     // Teilnehmerliste abgleichen (nur vor dem Start); Neuzugänge rollen von hinten auf ihren Platz
     function syncRacers(list) {

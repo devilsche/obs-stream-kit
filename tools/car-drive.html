@@ -128,6 +128,16 @@
     .nitro[data-state="ready"] { color: var(--cd-accent); }
     .nitro[data-state="on"] { color: var(--cd-ok); }
     .hud-cam { left: 20px; bottom: 20px; font-size: 14px; color: var(--cd-dim); }
+    /* Netz: eigener Ping + andere Fahrer (js/car-drive.js netHud); „high“/„lag“ stehen als Text dabei */
+    .hud-net { left: 20px; top: 104px; font-size: 13px; color: var(--cd-dim); padding: 6px 10px; max-width: 240px; }
+    .hud-net[hidden] { display: none; }
+    .net-me { margin: 0; font-family: var(--cd-mono); }
+    .net-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+    .net-list li { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    .net-list .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--cd-text); }
+    .net-list .ping { font-family: var(--cd-mono); }
+    .net-list:empty { display: none; }
+    .hud-net [data-high], .net-list li[data-lag] .ping { color: var(--cd-accent); font-weight: 700; }
     /* Minimap (js/car-drive-minimap.js): rund beim Mitdrehen, eckig bei der ganzen Strecke; über der Kamera-Anzeige */
     .hud-map { position: absolute; left: 20px; bottom: 72px; width: 200px; height: 200px; display: block; background: var(--cd-hud-bg);
       border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 50%; opacity: 0.92; }
@@ -171,6 +181,8 @@
     .roster li.me { background: var(--cd-surface-2); box-shadow: inset 4px 0 0 var(--cd-accent); }
     .roster li[data-off] { opacity: 0.55; }
     .roster .tag { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--cd-accent); margin-left: 6px; }
+    .roster .ping { font-family: var(--cd-mono); font-size: 12px; color: var(--cd-dim); margin-left: 8px; }
+    .roster .ping[data-high] { color: var(--cd-accent); font-weight: 700; }
     .roster-empty { color: var(--cd-dim); padding: 8px 10px; }
 
     @media (max-width: 720px) {
@@ -179,6 +191,7 @@
       .hud-speed .hud-big { font-size: 38px; }
       .hud-times { font-size: 14px; }
       .hud-map { width: 136px; height: 136px; bottom: 64px; }
+      .hud-net { top: 80px; font-size: 12px; }
     }
     @media (prefers-reduced-motion: reduce) {
       .countdown.tick { animation: none; }
@@ -215,6 +228,10 @@
         <div class="nitro" id="hNitro" data-state="ready"><span class="icon" aria-hidden="true">bolt</span><span id="hNitroText">Nitro ready</span></div>
       </div>
       <div class="hud-box hud-cam" id="hCam">Chase camera</div>
+      <div class="hud-box hud-net" id="hNet" hidden>
+        <p class="net-me" id="hNetMe">Ping –</p>
+        <ul class="net-list" id="hNetList" aria-label="Other drivers: ping"></ul>
+      </div>
       <canvas class="hud-map" id="hMap" width="200" height="200" aria-hidden="true"></canvas>
       <div class="hud-box hud-look" id="hLook" hidden><span class="icon" aria-hidden="true">360</span> Drag to look around · scroll or pinch to zoom</div>
       <div class="hud-box hud-msg" id="hMsg"></div>

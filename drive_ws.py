@@ -11,11 +11,12 @@ Wege:
                               open (tenant, track, laps) · start (tenant) · close (tenant) · status (tenant) · room (code)
                               · garage (tenant, user, cars = Komma-Liste; nach !buy, an die Verbindungen des Zuschauers)
 
-Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · ping {c} · s {x, z, yaw, roll, pitch,
-steer, speed, prog, rt (Rennzeit), spin} (~20 Hz).
+Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · ping {c, pg} · s {x, z, yaw, roll, pitch,
+steer, speed, prog, rt (Rennzeit), spin, ts (Server-Uhr des Clients beim Senden), pg (Ping ms)} (~30 Hz).
 Server → Client: welcome {id, room, roster, now} · roster {list} · joined {ok, msg} · phase {phase, race_id,
-start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …]}
-(20 Hz) · lap {id, lap, time, ok, fin?} · results {race_id, list} · recorded {race_id, counted, points} ·
+start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …],
+pg?} – jeder neue Zustand sofort einzeln an alle anderen (ts = Absender-Zeitstempel, fx/drive_room.stamp), dazu
+einmal pro Sekunde die volle Liste mit pg = {id: Ping ms} (außerhalb des Rennens d = [], nur pg) · lap {id, lap, time, ok, fin?} · results {race_id, list} · recorded {race_id, counted, points} ·
 rec {id, name, car, track, time, personal, car_rec, track_rec, best_car, best_track} (geprüfte Runde gespeichert,
 fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · garage {garage} (nur an den Zuschauer, neues
 Auto gekauft) · pong {c, s} · closed {msg} · error {msg}.
@@ -28,11 +29,11 @@ Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, geb
                               (Ticket mit tid + role driver|spectator, ohne code)
   GET /internal/sync?tenant=…&race=<JSON fx/race.drive_info oder leer>
                               → {ok, race_id, connected, takeovers, ai_events, pilots, snap}
-Client → Server: hello · ping {c} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin} (nur Fahrer, ~20 Hz) ·
+Client → Server: hello · ping {c, pg} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin, ts, pg} (nur Fahrer, ~30 Hz) ·
 ai (KI fährt mein Auto) · release {x, z, yaw, speed, prog, rt} (Steuer zurück, Lage des Nachfahrers) ·
 hit {id (KI-Auto), rt, dv, dl, spin} (Treffer auf ein KI-Auto, fx/drive_race.Room.hit).
 Server → Client: welcome {id, role, race, now} · race {race} (Rennen/Phase/Piloten/Übernahmen geändert) ·
-S {now, d} (20 Hz, wie oben) · lap {id, lap, time, ok, ai?, fin?} · rec {…} (wie oben, nicht für Runden mit KI) ·
+S {now, d, pg?} (wie oben: sofort einzeln + 1 Hz voll) · lap {id, lap, time, ok, ai?, fin?} · rec {…} (wie oben, nicht für Runden mit KI) ·
 takeover {ev} · release {ev} · hit {ev} · ai_denied {want} (nur an den Fahrer) · pong {c, s} · error {msg}.
 race = {race_id, phase, starts_at, track, track_name, laps, fw, pilots, taken, fin, now} (fx/drive_race.Room.info).
 """
@@ -53,7 +54,9 @@ log = logging.getLogger("drive_ws")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TICK = 0.05
 DONE_STREAM = 12.0       # nach dem Ergebnis noch so lange Zustände verteilen (Auslaufen)
-STATE_MIN_GAP = 0.025    # mehr als 40 Zustände/s je Client werden verworfen
+STATE_RATE = 40.0        # Zustände/s je Client im Mittel (Clients senden 30 Hz) …
+STATE_BURST = 8.0        # … mit Puffer für gebündelt ankommende Pakete; darüber verworfen
+KEYFRAME = 1.0           # volle Zustandsliste + Pings (S mit pg) so oft; einzelne Zustände gehen sofort raus
 RACE_PATH = "/drive-ws/race"
 
 
@@ -63,6 +66,7 @@ class Client:
         self.ident = ident
         self.code = code
         self.last_s = 0.0
+        self.tokens = STATE_BURST
 
 
 class RaceClient:
@@ -72,6 +76,24 @@ class RaceClient:
         self.id = str(ident["id"])
         self.driver = ident.get("role") == "driver"
         self.last_s = 0.0
+        self.tokens = STATE_BURST
+
+
+def _allow_state(cl, now):
+    """Eimer mit Marken: im Mittel STATE_RATE Zustände/s, kurze Bündel bis STATE_BURST (Netz-Zittern)."""
+    cl.tokens = min(STATE_BURST, cl.tokens + max(0.0, now - cl.last_s) * STATE_RATE)
+    cl.last_s = now
+    if cl.tokens < 1.0:
+        return False
+    cl.tokens -= 1.0
+    return True
+
+
+def _relay(peers, sender, d, now):
+    """Neuen Zustand sofort an alle anderen Verbindungen (nicht erst im Takt)."""
+    wss = [c.ws for c in (peers or ()) if c is not sender]
+    if wss:
+        broadcast(wss, json.dumps({"t": "S", "now": round(now, 3), "d": [drive_room.row(d)]}, separators=(",", ":")))
 
 
 class DriveServer:
@@ -85,6 +107,7 @@ class DriveServer:
         self.lap_record = lap_record or _lap_db
         self.key = drive_auth.internal_key(secret)
         self._done_at = {}
+        self._key_at = {}        # letzte volle Zustandsliste je Raum-Code bzw. ("race", tenant)
         # Chatrennen: Raum je Tenant
         self.races = drive_race.Hub(limits_loader=lambda: drive_room.Limits(drive_auth.load_limits(self.root)))
         self.race_conns = {}     # tenant → set(RaceClient)
@@ -242,12 +265,16 @@ class DriveServer:
                     continue
                 t, now = msg.get("t"), self.clock()
                 if t == "s" and cl.driver:
-                    if now - cl.last_s < STATE_MIN_GAP:
+                    if not _allow_state(cl, now):
                         continue
-                    cl.last_s = now
                     r = self.races.rooms.get(tid)
                     if r:
-                        for ev in r.state(cl.id, msg, now):
+                        d0 = r.drivers.get(cl.id)
+                        before = d0.sts if d0 else None
+                        evs = r.state(cl.id, msg, now)
+                        if d0 and d0.state is not None and d0.sts != before and not d0.taken:
+                            _relay(self.race_conns.get(tid), cl, d0, now)
+                        for ev in evs:
                             self._send_race(tid, ev)
                             d = r.drivers.get(cl.id)
                             if ev.get("t") == "lap" and ev.get("ok") and not ev.get("ai") and d:
@@ -266,6 +293,8 @@ class DriveServer:
                     if ev:
                         self._send_race(tid, {"t": "hit", "ev": ev})
                 elif t == "ping":
+                    r = self.races.rooms.get(tid)
+                    drive_room.note_ping(r.drivers.get(cl.id) if r else None, msg)
                     try:
                         broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))
                     except Exception:
@@ -285,10 +314,12 @@ class DriveServer:
         for tid, room in list(self.races.rooms.items()):
             for ev in room.tick(now):
                 self._send_race(tid, {"t": "takeover", "ev": ev})
-            if room.streaming(now) and self.race_conns.get(tid):
+            key = ("race", tid)
+            if room.streaming(now) and self.race_conns.get(tid) and now - self._key_at.get(key, 0.0) >= KEYFRAME:
+                self._key_at[key] = now
                 d = room.batch(now)
                 if d:
-                    self._send_race(tid, {"t": "S", "now": round(now, 3), "d": d})
+                    self._send_race(tid, {"t": "S", "now": round(now, 3), "d": d, "pg": room.pings(now)})
 
     # ---- Clients ----
     async def handler(self, ws):
@@ -356,16 +387,21 @@ class DriveServer:
         t = msg.get("t")
         uid = cl.ident["id"]
         if t == "s":
-            if now - cl.last_s < STATE_MIN_GAP:
+            if not _allow_state(cl, now):
                 return
-            cl.last_s = now
-            for ev in room.state(uid, msg, now):
+            d0 = room.drivers.get(uid)
+            before = d0.sts if d0 else None
+            evs = room.state(uid, msg, now)
+            if d0 and d0.state is not None and d0.sts != before:
+                _relay(self.conns.get(room.code), cl, d0, now)
+            for ev in evs:
                 self._send_room(room.code, ev)
                 d = room.drivers.get(uid)
                 if ev.get("t") == "lap" and ev.get("ok") and d:
                     self._lap(room.tenant_id, room.track, d.car, uid, d.display, ev["time"], "room",
                               lambda o, c=room.code: self._send_room(c, o))
         elif t == "ping":
+            drive_room.note_ping(room.drivers.get(uid), msg)
             try:
                 broadcast([cl.ws], json.dumps({"t": "pong", "c": msg.get("c"), "s": now}))
             except Exception:
@@ -416,8 +452,10 @@ class DriveServer:
                 last_sweep = now
                 for r in self.hub.sweep(now):
                     self.conns.pop(r.code, None)
+                    self._key_at.pop(r.code, None)
                 for r in self.races.sweep(now):
                     self.race_conns.pop(r.tenant_id, None)
+                    self._key_at.pop(("race", r.tenant_id), None)
 
     def step(self, now):
         self.race_step(now)
@@ -429,8 +467,11 @@ class DriveServer:
                     self._save(room)
             streaming = room.phase in ("countdown", "race") or \
                 (room.phase == "done" and now - self._done_at.get(room.code, 0) < DONE_STREAM)
-            if streaming and self.conns.get(room.code):
-                self._send_room(room.code, {"t": "S", "now": round(now, 3), "d": room.batch(now)})
+            if self.conns.get(room.code) and now - self._key_at.get(room.code, 0.0) >= KEYFRAME:
+                # volle Liste beim Fahren, sonst (Lobby, nach dem Auslaufen) nur die Pings
+                self._key_at[room.code] = now
+                self._send_room(room.code, {"t": "S", "now": round(now, 3), "d": room.batch(now) if streaming else [],
+                                            "pg": room.pings()})
 
     def _save(self, room):
         rows = room.rows()
