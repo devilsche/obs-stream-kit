@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Sketchfab notes — OBS Stream Kit{% endblock %}
+{% block body %}
+{% include "_sidebar.html" %}
+<main id="main-content" class="dn dn-main" tabindex="-1">
+  <div class="dn-crumb"><a href="/admin/">Admin</a> / Sketchfab notes</div>
+  <h1 class="dn-title">Sketchfab notes</h1>
+
+  <section class="dn-simple" aria-labelledby="sk-new">
+    <h2 class="sec" id="sk-new">// New entry</h2>
+    <p class="dn-note">Paste one or more model links and note what they are for (car, track props, duck outfit, …).</p>
+    <form method="POST" action="/admin/sketchfab">
+      <div class="dn-field">
+        <label for="sk-urls">URLs (one per line)</label>
+        <textarea id="sk-urls" name="urls" rows="4" required
+          {% if error %}aria-invalid="true" aria-describedby="sk-err"{% endif %}>{{ form.urls or '' }}</textarea>
+        {% if error %}<p class="dn-key-err" id="sk-err" role="alert"><span class="material-symbols-outlined icon-sm" aria-hidden="true">error</span>{{ error }}</p>{% endif %}
+      </div>
+      <div class="dn-field">
+        <label for="sk-note">Note</label>
+        <textarea id="sk-note" name="note" rows="5">{{ form.note or '' }}</textarea>
+      </div>
+      <div class="dn-actions">
+        <button type="submit" class="dn-btn accent">
+          <span class="material-symbols-outlined icon-sm" aria-hidden="true">add</span>
+          Save entry
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="dn-simple" aria-labelledby="sk-list">
+    <h2 class="sec" id="sk-list">// Entries ({{ open_count }} open, {{ items|length }} total)</h2>
+    {% if not items %}<p class="dn-note">No entries yet.</p>{% endif %}
+    <ul class="sk-list">
+      {% for e in items %}
+      <li class="sk-item{% if e.done %} is-done{% endif %}" id="e-{{ e.id }}">
+        <p class="sk-meta">
+          <span class="dn-badge">{{ 'Done' if e.done else 'Open' }}</span>
+          <time datetime="{{ e.at }}">{{ e.at[:16]|replace('T', ' ') }}</time>
+        </p>
+        <ul class="sk-urls">
+          {% for u in e.urls %}<li><a href="{{ u }}" target="_blank" rel="noopener noreferrer">{{ u }}</a></li>{% endfor %}
+        </ul>
+        <details>
+          <summary>{{ e.note or 'No note' }}</summary>
+          <form method="POST" action="/admin/sketchfab/{{ e.id }}">
+            <div class="dn-field">
+              <label for="u-{{ e.id }}">URLs</label>
+              <textarea id="u-{{ e.id }}" name="urls" rows="3">{{ e.urls|join('\n') }}</textarea>
+            </div>
+            <div class="dn-field">
+              <label for="n-{{ e.id }}">Note</label>
+              <textarea id="n-{{ e.id }}" name="note" rows="4">{{ e.note }}</textarea>
+            </div>
+            <button type="submit" class="dn-btn" name="action" value="save">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">save</span>
+              Save
+            </button>
+          </form>
+        </details>
+        <div class="dn-actions sk-actions">
+          <form method="POST" action="/admin/sketchfab/{{ e.id }}" class="dn-inline-form">
+            {% if e.done %}
+            <button type="submit" class="dn-btn ghost" name="action" value="reopen">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">undo</span>
+              Reopen
+            </button>
+            {% else %}
+            <button type="submit" class="dn-btn ghost" name="action" value="done">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">check</span>
+              Mark done
+            </button>
+            {% endif %}
+          </form>
+          <form method="POST" action="/admin/sketchfab/{{ e.id }}" class="dn-inline-form">
+            <button type="submit" class="dn-btn danger" name="action" value="delete" aria-label="Delete entry from {{ e.at[:10] }}">
+              <span class="material-symbols-outlined icon-sm" aria-hidden="true">delete</span>
+              Delete
+            </button>
+          </form>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</main>
+{% endblock %}

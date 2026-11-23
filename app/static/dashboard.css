@@ -1386,3 +1386,17 @@ a.url-card{text-decoration:none}
 .archive-flash.ok,.archive-result.ok{border-left-color:var(--success,#3cb44b);color:var(--theme-text)}
 .archive-flash.err,.archive-result.err{border-left-color:var(--theme-danger);color:var(--theme-text)}
 .archive-result:empty{display:none}
+
+/* Admin: Sketchfab-Notizen (app/templates/admin_sketchfab.html) */
+.dn-field textarea{max-width:720px;background:var(--theme-bg);border:1px solid var(--theme-border);color:var(--theme-text);
+  font-family:var(--theme-font-mono);font-size:13px;border-radius:var(--theme-radius);resize:vertical}
+.dn-field textarea:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-color:var(--theme-accent)}
+.sk-list{list-style:none;margin:0;padding:0;display:grid;gap:14px}
+.sk-item{border:1px solid var(--theme-border);border-radius:var(--theme-radius);padding:14px 16px}
+.sk-item.is-done{opacity:.65}
+.sk-meta{display:flex;gap:10px;align-items:center;margin:0 0 8px;font-family:var(--theme-font-mono);font-size:12px;color:var(--theme-text-dim)}
+.sk-urls{margin:0 0 8px;padding-left:18px;word-break:break-all}
+.sk-urls a{color:var(--theme-accent)}
+.sk-item summary{cursor:pointer;white-space:pre-wrap;min-height:24px}
+.sk-item summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sk-actions{margin-top:10px}

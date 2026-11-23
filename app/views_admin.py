@@ -327,3 +327,38 @@ def admin_icon_crop_list():
                                   "url": f"/widgets-static/pubg/assets/achievements/{fn}",
                                   "has_file": True})
     return jsonify({"icons": icons})
+
+
+# ---- Sketchfab-Notizen: Modell-Links + Notiz, wofür sie gedacht sind (app/sketchfab_notes.py) ----
+def _project_root():
+    return current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
+        os.path.dirname(os.path.abspath(__file__)))
+
+
+@bp_admin.route("/admin/sketchfab", methods=["GET", "POST"])
+@require_admin
+def admin_sketchfab():
+    from app import sketchfab_notes as sn
+    root, error, form = _project_root(), None, {}
+    if request.method == "POST":
+        _, error = sn.add(root, request.form.get("urls", ""), request.form.get("note", ""))
+        if not error:
+            return redirect("/admin/sketchfab")
+        form = {"urls": request.form.get("urls", ""), "note": request.form.get("note", "")}
+    items = sn.load(root)
+    return render_template("admin_sketchfab.html", user=g.user, items=items, error=error, form=form,
+                           open_count=sum(1 for e in items if not e.get("done")))
+
+
+@bp_admin.route("/admin/sketchfab/<entry_id>", methods=["POST"])
+@require_admin
+def admin_sketchfab_edit(entry_id):
+    from app import sketchfab_notes as sn
+    root, act = _project_root(), request.form.get("action")
+    if act == "delete":
+        sn.delete(root, entry_id)
+    elif act in ("done", "reopen"):
+        sn.update(root, entry_id, done=act == "done")
+    else:
+        sn.update(root, entry_id, urls_text=request.form.get("urls"), note=request.form.get("note"))
+    return redirect("/admin/sketchfab#e-" + entry_id)
