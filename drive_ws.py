@@ -11,15 +11,21 @@ Wege:
                               open (tenant, track, laps) · start (tenant) · close (tenant) · status (tenant) · room (code)
                               · garage (tenant, user, cars = Komma-Liste; nach !buy, an die Verbindungen des Zuschauers)
 
-Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · ping {c, pg} · s {x, z, yaw, roll, pitch,
+Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · release {x, z, yaw, speed, prog, rt} ·
+ping {c, pg} · s {x, z, yaw, roll, pitch,
 steer, speed, prog, rt (Rennzeit), spin, ts (Server-Uhr des Clients beim Senden), pg (Ping ms)} (~30 Hz).
-Server → Client: welcome {id, room, roster, now} · roster {list} · joined {ok, msg} · phase {phase, race_id,
+Server → Client: welcome {id, room, roster, now, taken, carrier} · roster {list} · joined {ok, msg} · phase {phase, race_id,
 start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …],
 pg?} – jeder neue Zustand sofort einzeln an alle anderen (ts = Absender-Zeitstempel, fx/drive_room.stamp), dazu
 einmal pro Sekunde die volle Liste mit pg = {id: Ping ms} (außerhalb des Rennens d = [], nur pg) · lap {id, lap, time, ok, fin?} · results {race_id, list} · recorded {race_id, counted, points} ·
 rec {id, name, car, track, time, personal, car_rec, track_rec, best_car, best_track} (geprüfte Runde gespeichert,
 fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · garage {garage} (nur an den Zuschauer, neues
-Auto gekauft) · pong {c, s} · closed {msg} · error {msg}.
+Auto gekauft) · pong {c, s} · closed {msg} · error {msg} · takeover {ev} (3 s ohne Zustand im Rennen: die KI fährt
+weiter, ev = {t, type, id, x, z, yaw, speed, prog, lap} bzw. {…, d} vom Startplatz) · carrier {id} (wer die übernommenen
+Autos meldet) · release {ev} · ai_denied {want}.
+KI-Übernahme in Räumen: alle Clients fahren ein übernommenes Auto mit CarRaceSim.follower ab ev; der Träger schickt
+dessen Lage als s {for: id, …} (5 Hz, zählt Runden/Ziel, keine Rekorde). Der Fahrer übernimmt mit release {x, z, yaw,
+speed, prog, rt} wieder (fx/drive_room.Room.release).
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
 
 Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
@@ -54,8 +60,8 @@ log = logging.getLogger("drive_ws")
 ROOT = os.path.dirname(os.path.abspath(__file__))
 TICK = 0.05
 DONE_STREAM = 12.0       # nach dem Ergebnis noch so lange Zustände verteilen (Auslaufen)
-STATE_RATE = 40.0        # Zustände/s je Client im Mittel (Clients senden 30 Hz) …
-STATE_BURST = 8.0        # … mit Puffer für gebündelt ankommende Pakete; darüber verworfen
+STATE_RATE = 80.0        # Zustände/s je Client im Mittel (30 Hz eigene + 5 Hz je übernommenem Auto als Träger) …
+STATE_BURST = 16.0       # … mit Puffer für gebündelt ankommende Pakete; darüber verworfen
 KEYFRAME = 1.0           # volle Zustandsliste + Pings (S mit pg) so oft; einzelne Zustände gehen sofort raus
 RACE_PATH = "/drive-ws/race"
 
@@ -354,7 +360,8 @@ class DriveServer:
             d.connected = True
         try:
             await ws.send(json.dumps({"t": "welcome", "id": ident["id"], "role": ident.get("role"),
-                                      "room": room.info(now), "roster": room.roster(), "now": now}))
+                                      "room": room.info(now), "roster": room.roster(), "now": now,
+                                      "taken": room.taken_list(), "carrier": room.carrier()}))
             if room.phase != "lobby":
                 await ws.send(json.dumps(room.phase_msg(now)))
             if room.phase == "done" and room.results:
@@ -386,7 +393,13 @@ class DriveServer:
         now = self.clock()
         t = msg.get("t")
         uid = cl.ident["id"]
-        if t == "s":
+        if t == "s" and msg.get("for") is not None:
+            # Träger meldet ein übernommenes Auto (Lage seines Nachfahrers); nicht weiterleiten, alle rechnen selbst
+            if not _allow_state(cl, now) or room.carrier() != uid:
+                return
+            for ev in room.state(str(msg.get("for")), msg, now, ai=True):
+                self._send_room(room.code, ev)
+        elif t == "s":
             if not _allow_state(cl, now):
                 return
             d0 = room.drivers.get(uid)
@@ -397,7 +410,7 @@ class DriveServer:
             for ev in evs:
                 self._send_room(room.code, ev)
                 d = room.drivers.get(uid)
-                if ev.get("t") == "lap" and ev.get("ok") and d:
+                if ev.get("t") == "lap" and ev.get("ok") and not ev.get("ai") and d:
                     self._lap(room.tenant_id, room.track, d.car, uid, d.display, ev["time"], "room",
                               lambda o, c=room.code: self._send_room(c, o))
         elif t == "ping":
@@ -411,6 +424,12 @@ class DriveServer:
             broadcast([cl.ws], json.dumps({"t": "joined", "ok": ok, "msg": text}))
             if ok:
                 self._roster(room)
+        elif t == "release":
+            ev = room.release(uid, msg, now)
+            if ev:
+                self._send_room(room.code, ev)
+            else:
+                broadcast([cl.ws], json.dumps({"t": "ai_denied", "want": "release"}))
         elif t == "leave":
             if room.leave(uid, now):
                 self._roster(room)

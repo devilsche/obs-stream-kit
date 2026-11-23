@@ -118,7 +118,7 @@ def test_finish_window_ends_race_with_dnf():
     race_clean(room, "u0", 1)
     drive(room, "u1", 1.0, -5.0, room.start_at + 1)
     first = room.first_finish
-    assert room.tick(first + 1) == []
+    assert not any(e["t"] == "results" for e in room.tick(first + 1))
     evs = room.tick(first + dr.FINISH_WINDOW)
     res = next(e for e in evs if e["t"] == "results")
     assert [(r["id"], r["status"]) for r in res["list"]] == [("u0", "finished"), ("u1", "dnf")]
@@ -153,8 +153,12 @@ def test_disconnected_driver_in_race_stays_as_dnf_and_race_ends_when_rest_finish
     room.leave("u1", room.start_at + 1)
     assert "u1" in room.drivers and room.drivers["u1"].connected is False
     race_clean(room, "u0", 1)
-    evs = room.tick(room.start_at + 90)
-    assert any(e["t"] == "results" for e in evs)
+    room.tick(room.first_finish + 1)
+    # die KI fährt u1 weiter, solange u0 verbunden ist (Ziel offen bis zur Zielfrist)
+    assert room.drivers["u1"].taken
+    evs = room.tick(room.first_finish + dr.FINISH_WINDOW)
+    res = next(e for e in evs if e["t"] == "results")
+    assert [(r["id"], r["status"]) for r in res["list"]] == [("u0", "finished"), ("u1", "dnf")]
 
 
 # ---- Plausibilität ----
@@ -281,3 +285,71 @@ def test_state_stamp_implausible_falls_back_and_stays_increasing():
     assert d.sts == pytest.approx(now + 0.001)
     room.state("u0", dict(base, rt=1.1, ts=now + 9), now + 0.05)   # zu weit voraus → Empfangszeit
     assert d.sts == now + 0.05
+
+
+# ---- KI-Übernahme bei Verbindungsabbruch ----
+def _racing(n=2, laps=1):
+    hub, room = room_with(n, laps=laps)
+    room.start(T0)
+    room.tick(T0 + dr.COUNTDOWN)
+    return room
+
+
+def test_takeover_after_gap_with_last_state_and_carrier():
+    room = _racing()
+    sa = room.start_at
+    drive(room, "u0", 2.0, 30.0, sa + 2.0, speed=20.0)
+    drive(room, "u1", 2.0, 25.0, sa + 2.0, speed=18.0)
+    assert not [e for e in room.tick(sa + 2.0 + dr.TAKEOVER_GAP - 0.1) if e["t"] == "takeover"]
+    drive(room, "u0", 4.9, 80.0, sa + 4.9, speed=20.0)
+    evs = room.tick(sa + 2.0 + dr.TAKEOVER_GAP + 0.1)
+    tk = [e["ev"] for e in evs if e["t"] == "takeover"]
+    assert len(tk) == 1 and tk[0]["id"] == "u1" and tk[0]["t"] == 2.0 and tk[0]["prog"] == 25.0 and tk[0]["speed"] == 18.0
+    assert "x" in tk[0] and room.taken_list() == tk
+    assert {"t": "carrier", "id": "u0"} in evs
+    assert room.tick(sa + 6) == [] or not any(e["t"] == "takeover" for e in room.tick(sa + 6))
+
+
+def test_taken_car_moves_only_by_carrier_ai_states_and_laps_count_without_record():
+    room = _racing(laps=1)
+    sa, L = room.start_at, room.track_len
+    room.leave("u1", sa + 1)
+    drive(room, "u0", 4.0, 40.0, sa + 4.0)
+    room.tick(sa + 1 + dr.TAKEOVER_GAP + 0.1)
+    d = room.drivers["u1"]
+    assert d.taken and d.taken.get("d") is not None and not room.drivers["u0"].taken          # nie gefahren: Übernahme vom Startplatz
+    assert drive(room, "u1", 5.0, 50.0, sa + 5) == [] and d.last is None   # eigene Meldung ruht
+    s0 = dr.grid_pose(1)[0]
+    room.limits.min_lap = lambda car, track: 999.0          # ohne KI wäre jede Runde zu schnell
+    evs = []
+    for k in range(1, 81):
+        rt = 4.0 + 55.0 * k / 80
+        prog = s0 + (L - s0 + 0.5) * k / 80
+        evs += room.state("u1", {"x": prog, "z": 0, "yaw": 0, "prog": prog, "rt": rt, "speed": 20.0}, sa + rt, ai=True)
+    lap = [e for e in evs if e["t"] == "lap"]
+    assert lap and lap[0]["ok"] and lap[0]["ai"] and lap[0].get("fin") is not None   # gültig nur dank KI-Runde
+    assert d.connected is False
+
+
+def test_release_back_to_driver():
+    room = _racing(laps=2)
+    sa = room.start_at
+    drive(room, "u1", 1.0, 10.0, sa + 1, speed=15.0)
+    drive(room, "u0", 4.0, 40.0, sa + 4.0)
+    room.tick(sa + 1 + dr.TAKEOVER_GAP + 0.1)
+    d = room.drivers["u1"]
+    room.state("u1", {"x": 60, "z": 0, "yaw": 0, "prog": 60.0, "rt": 5.0, "speed": 15.0}, sa + 5, ai=True)
+    assert room.release("u1", {"x": 0, "z": 0, "yaw": 0, "speed": 15, "prog": 400.0, "rt": 5.1}, sa + 5.1) is None
+    ev = room.release("u1", {"x": 61, "z": 0, "yaw": 0, "speed": 15, "prog": 61.5, "rt": 5.1}, sa + 5.1)
+    assert ev and ev["t"] == "release" and ev["ev"]["prog"] == 61.5 and d.taken is None and d.connected
+    assert d.lap_ai                                             # laufende Runde bleibt ohne Rekord
+    assert drive(room, "u1", 5.2, 63.0, sa + 5.2, speed=15.0) == [] and d.last[3] == 63.0
+
+
+def test_race_ends_when_nobody_connected_to_carry():
+    room = _racing()
+    sa = room.start_at
+    room.leave("u0", sa + 1)
+    room.leave("u1", sa + 1)
+    evs = room.tick(sa + 1 + dr.TAKEOVER_GAP + 0.1)
+    assert any(e["t"] == "results" for e in evs)

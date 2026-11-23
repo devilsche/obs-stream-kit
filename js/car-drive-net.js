@@ -11,7 +11,7 @@
  *   net.delay()                   Puffer (s), um den fremde Autos hinter der Server-Uhr gezeigt werden: passt sich dem
  *                                 gemessenen Netz-Zittern der anderen an (MIN_DELAY…MAX_DELAY, Start 0,1 s), je Bild aufrufen
  *   net.sample(id, at, T)         Fremdauto zum Server-Zeitpunkt `at` (Standard: serverNow() − delay()), interpoliert
- *                                 zwischen den gepufferten Zuständen. Fehlen Daten, fährt es bis EXT_MAX s mit dem letzten
+ *                                 zwischen den gepufferten Zuständen. Fehlen Daten, fährt es bis EXT_MAX (3) s mit dem letzten
  *                                 Tempo weiter – mit Strecke T (CarRaceSim.track) entlang der Kurve und mit gleichem
  *                                 Seitenabstand, sonst geradeaus (höchstens 0,5 s). Kommen wieder Daten, wird der Versatz
  *                                 über SMOOTH s ausgeglichen statt zu springen. → {x, z, yaw, …, ts, lag (s ohne Daten)}
@@ -28,7 +28,7 @@
 })(typeof window !== 'undefined' ? window : this, function () {
   'use strict';
   var DELAY = 0.1, RATE = 1 / 30, KEEP = 60;
-  var MIN_DELAY = 0.06, MAX_DELAY = 0.35, EXT_MAX = 1.5, SMOOTH = 0.3, PING_EVERY = 2000;
+  var MIN_DELAY = 0.06, MAX_DELAY = 0.35, EXT_MAX = 3.0, SMOOTH = 0.3, PING_EVERY = 2000;
   function nowS() { return (typeof performance !== 'undefined' && performance.timeOrigin ? performance.timeOrigin + performance.now() : Date.now()) / 1000; }
   function wrapAngle(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
   function lerp(a, b, t) { return a + (b - a) * t; }

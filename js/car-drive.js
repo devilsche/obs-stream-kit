@@ -474,7 +474,7 @@
     if (e.code === 'Escape' && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) {
       e.preventDefault(); setPaused(!menuOpen()); return;
     }
-    if (e.code === 'KeyP' && race && race.chat && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); rcToggleAi(); return; }
+    if (e.code === 'KeyP' && race && (race.chat || (race.mp && mpTaken(mp.me))) && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); aiToggle(); return; }
     if (!race || race.paused || race.menu || !(race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) return;
     if (GAME_KEYS[e.code]) {
       e.preventDefault();
@@ -787,7 +787,8 @@
     }
     var m = race && race.mp; teardown(); if (m && mp) showLobby(); else showPanel('menu');
   });
-  $('aiBtn').addEventListener('click', function () { rcToggleAi(); setPaused(false); });
+  function aiToggle() { if (race && race.chat) rcToggleAi(); else mpTakeWheel(); }
+  $('aiBtn').addEventListener('click', function () { aiToggle(); setPaused(false); });
   $('againBtn').addEventListener('click', function () {
     if (race && race.chat) { teardown(); showLobby(); if (rc.st) rcLobby(rc.st); return; }
     if (race && race.mp) { teardown(); showLobby(); return; }
@@ -1142,8 +1143,9 @@
     if (nb.dataset.state !== state) { nb.dataset.state = state; setText('hNitroText', state === 'on' ? 'Nitro!' : state === 'ready' ? 'Nitro ready' : 'Nitro next lap'); }
   }
 
+  function aiDrivesMe() { return !!(race && mp && (race.chat ? race.taken[mp.me] : race.mp && mpTaken(mp.me))); }
   function lapDone(lapTime) {
-    if (race.lapAi || (race.chat && mp && race.taken[mp.me])) { race.lapAi = !!(race.chat && mp && race.taken[mp.me]); race.lastLap = lapTime; flash('Lap ' + fmt(lapTime) + ' – the AI drove part of it', 2); return; }
+    if (race.lapAi || aiDrivesMe()) { race.lapAi = aiDrivesMe(); race.lastLap = lapTime; flash('Lap ' + fmt(lapTime) + ' – the AI drove part of it', 2); return; }
     race.lastLap = lapTime;
     if (race.bestLap == null || lapTime < race.bestLap) race.bestLap = lapTime;
     var big = false;
@@ -1352,7 +1354,7 @@
     var me = mp.net.ping();
     setText('hNetMe', me ? 'Ping ' + me.ms + ' ms · jitter ' + me.jitter + ' ms' + (me.ms >= PING_HIGH ? ' · high' : '') : 'Ping –');
     if (me && me.ms >= PING_HIGH) $('hNetMe').dataset.high = '1'; else delete $('hNetMe').dataset.high;
-    var list = $('hNetList'), rows = (race.remotes || []).filter(function (c) { return c && !(race.taken && race.taken[c.id]); });
+    var list = $('hNetList'), rows = (race.remotes || []).filter(Boolean);
     while (list.children.length > rows.length) list.removeChild(list.lastChild);
     rows.forEach(function (c, i) {
       var li = list.children[i];
@@ -1362,9 +1364,11 @@
         var p = doc.createElement('span'); p.className = 'ping'; li.appendChild(p);
         list.appendChild(li);
       }
-      var lag = mp.net.lag(c.id) > LAG_SHOW;
+      var ai = !!((race.chat && race.taken && race.taken[c.id]) || (!race.chat && mpTaken(c.id)));
+      var lag = !ai && mp.net.lag(c.id) > LAG_SHOW;
       if (li.firstChild.textContent !== c.label) li.firstChild.textContent = c.label;
-      pingText(li.lastChild, mp.net.peerPing(c.id));
+      pingText(li.lastChild, ai ? null : mp.net.peerPing(c.id));
+      if (ai) li.lastChild.textContent = 'AI';
       if (lag) { li.dataset.lag = '1'; li.lastChild.textContent = (li.lastChild.textContent ? li.lastChild.textContent + ' · ' : '') + 'lag'; }
       else delete li.dataset.lag;
     });
@@ -1382,7 +1386,7 @@
     mpStop();
     mp = { code: o.code, url: o.url || '', role: o.role, me: String(o.me), room: o.room || {}, roster: [], car: o.car,
       paint: o.paint | 0, light: !!o.light, duck: o.duck !== false, phase: (o.room || {}).phase || 'lobby', raceId: null,
-      startAt: null, grid: [], fin: {}, results: null, recorded: null, loaded: {}, loading: {} };
+      startAt: null, grid: [], fin: {}, results: null, recorded: null, loaded: {}, loading: {}, taken: {}, follow: {}, carrier: null };
     app.dataset.role = o.role;
     $('lobbyCode').textContent = mp.code;
     $('lobbyUrl').value = mp.url;
@@ -1410,6 +1414,8 @@
     switch (m.t) {
       case 'welcome':
         mp.me = String(m.id); mp.room = m.room || mp.room; mp.phase = mp.room.phase; mp.roster = m.roster || [];
+        mp.carrier = m.carrier == null ? null : String(m.carrier);
+        (m.taken || []).forEach(function (ev) { mpTakeover(ev); });
         lobbyTrack(); renderRoster();
         mp.net.send({ t: 'join', car: mp.car, paint: mp.paint });
         setLobbyStatus(mp.role === 'host' ? 'Post the link in the chat, then start the race.' : 'Waiting for the streamer to start the race.');
@@ -1419,6 +1425,9 @@
         break;
       case 'garage': garageChanged(m.garage); break;
       case 'S': if (m.pg) rosterPings(); break;
+      case 'takeover': case 'release': mpTakeover(m.ev); break;
+      case 'carrier': mp.carrier = m.id == null ? null : String(m.id); break;
+      case 'ai_denied': mpDenied(); break;
       case 'roster':
         mp.roster = m.list || []; renderRoster();
         mp.roster.forEach(function (d) { mpLoad(d.car); });
@@ -1452,7 +1461,7 @@
     if (m.laps) mp.room.laps = m.laps;
     lobbyTrack();
     if ((m.phase === 'countdown' || m.phase === 'race') && m.race_id) {
-      if (m.race_id !== mp.raceId) { mp.fin = {}; mp.results = null; mp.recorded = null; }
+      if (m.race_id !== mp.raceId) { mp.fin = {}; mp.results = null; mp.recorded = null; mp.taken = {}; mp.follow = {}; mp.carrier = null; }
       mp.raceId = m.race_id; mp.startAt = m.start_at; mp.grid = m.grid || [];
       var mine = mp.grid.some(function (g) { return String(g.id) === mp.me; });
       if (!mine) setLobbyStatus('Race running – you will be on the grid next time.');
@@ -1518,14 +1527,101 @@
   }
   function drawRemotes() {
     if (!race.remotes || !mp || !mp.net) return;
-    var at = mp.net.serverNow() - mp.net.delay();
+    var now = mp.net.serverNow(), at = now - mp.net.delay(), t = now - mp.startAt;
     race.remotes.forEach(function (c) {
-      var q = mp.net.sample(c.id, at, race.T);
+      var f = mpTaken(c.id) ? mpFollower(c.id, c.st) : null, q;
+      if (f) { var fq = f.at(t); q = fqState(fq); c.finQ = fq.finish; }
+      else q = mp.net.sample(c.id, at, race.T);
       c.smp = q;
       if (!q) return;
+      q = blendSrc(c, q, f ? 'ai' : 'net');
       c.prog = q.prog;
       placeCar(c, q.x, q.z, q.yaw, q.roll, q.pitch, q.steer, q.spin);
     });
+    // eigenes Auto übernommen: Lage/Runden aus dem Nachfahrer (wie im Chatrennen)
+    if (mpTaken(mp.me) && race.phase === 'race') {
+      var pc = race.pc, f2 = mpFollower(mp.me, race.me.st), q2 = f2 && f2.at(t);
+      if (q2) {
+        pc.x = q2.x; pc.z = q2.z; pc.yaw = q2.yaw; pc.prog = q2.s; if (q2.s > 0) pc.laps = Math.max(pc.laps, Math.min(race.laps, Math.floor(q2.s / race.T.len)));
+        pc.vx = Math.cos(q2.yaw) * q2.v; pc.vz = -Math.sin(q2.yaw) * q2.v; pc.u = q2.v; pc.steer = q2.steer; pc.spin = q2.spin;
+      }
+    }
+  }
+  function fqState(fq) { return { x: fq.x, z: fq.z, yaw: fq.yaw, roll: fq.roll, pitch: 0, steer: fq.steer, spin: fq.spin, speed: fq.v, prog: fq.s }; }
+  // Wechsel der Quelle (Netz ↔ KI-Nachfahrer): Versatz über 0,5 s abbauen statt zu springen
+  function blendSrc(c, q, src) {
+    var b = c.blend || (c.blend = {}), t = performance.now() / 1000;
+    if (b.src && b.src !== src && b.x != null) {
+      var dx = b.x - q.x, dz = b.z - q.z;
+      if (dx * dx + dz * dz < 400) { b.dx = dx; b.dz = dz; b.dy = wrapAngle(b.yaw - q.yaw); b.t0 = t; } else b.t0 = null;
+    }
+    b.src = src;
+    var k = b.t0 != null ? 1 - (t - b.t0) / 0.5 : 0;
+    if (k > 0) q = Object.assign({}, q, { x: q.x + b.dx * k, z: q.z + b.dz * k, yaw: q.yaw + b.dy * k });
+    else b.t0 = null;
+    b.x = q.x; b.z = q.z; b.yaw = q.yaw;
+    return q;
+  }
+  // ---- Räume: KI-Übernahme bei Verbindungsabbruch (fx/drive_room.Room._takeovers) ----
+  // 3 s ohne Zustand im Rennen → takeover {ev}; alle fahren das Auto mit dem Nachfahrer ab ev weiter, der Träger
+  // (Server bestimmt, Nachricht carrier) meldet dessen Lage (s mit for, 5 Hz), damit Runden und Ziel zählen.
+  function mpTaken(id) { return !!(mp && mp.taken && mp.taken[id]); }
+  function mpTakeover(ev) {
+    if (!mp || !ev || ev.id == null) return;
+    var id = String(ev.id), was = mpTaken(id);
+    if (ev.type === 'release') delete mp.taken[id]; else mp.taken[id] = ev;
+    delete mp.follow[id];
+    if (id !== mp.me || !race || !race.mp || race.chat) return;
+    race.spect = mpTaken(id);
+    if (race.spect) { race.lapAi = true; if (!was) flash('Connection lost – the AI took over your car. Press P to take the wheel', 4); }
+    aiBtnSync();
+  }
+  function mpFollower(id, st) {
+    var ev = mp.taken[id];
+    if (!ev || !race || !st) return null;
+    if (!mp.follow[id]) {
+      var snap = ev.x != null ? ev : { t: ev.t, s: ev.prog, d: ev.d || 0, speed: ev.speed || 0 };
+      mp.follow[id] = Sim.follower(race.T, st, snap, { laps: race.laps });
+    }
+    return mp.follow[id];
+  }
+  var aiSendAt = 0;
+  function mpSendAi() {
+    if (!mp || !mp.net || mp.carrier !== mp.me || !race || !race.mp || race.chat || race.raceId !== mp.raceId) return;
+    var ids = Object.keys(mp.taken);
+    if (!ids.length) return;
+    var w = performance.now();
+    if (w - aiSendAt < 200) return;
+    aiSendAt = w;
+    var sn = mp.net.serverNow(), t = sn - mp.startAt;
+    ids.forEach(function (id) {
+      if (id === mp.me || mp.fin[id] != null) return;
+      var c = (race.remotes || []).filter(function (x) { return x.id === id; })[0];
+      var f = c && mpFollower(id, c.st), q = f && f.at(t);
+      if (!q) return;
+      mp.net.send({ t: 's', for: id, x: q.x, z: q.z, yaw: q.yaw, roll: q.roll || 0, pitch: 0, steer: q.steer, speed: q.v,
+        prog: q.s, rt: t, spin: q.spin, ts: Math.round(sn * 1000) / 1000 });
+    });
+  }
+  // Taste P / Menü: nach der Übernahme wieder selbst steuern (ab der Lage des Nachfahrers)
+  function mpTakeWheel() {
+    if (!race || !race.mp || race.chat || !mp || race.phase !== 'race' || !mpTaken(mp.me)) return;
+    var t = mp.net.serverNow() - mp.startAt, f = mpFollower(mp.me, race.me.st), q = f && f.at(t), pc = race.pc;
+    if (!q || q.finish != null) { flash('The AI already finished the race for you', 2); return; }
+    pc.x = q.x; pc.z = q.z; pc.yaw = q.yaw; pc.u = q.v; pc.vx = Math.cos(q.yaw) * q.v; pc.vz = -Math.sin(q.yaw) * q.v;
+    pc.r = 0; pc.w = 0; pc.steer = q.steer; pc.spin = q.spin; pc.prog = q.s; pc.hint = -1;
+    pc.laps = Math.max(pc.laps, q.s > 0 ? Math.floor(q.s / race.T.len) : 0);
+    steerKb = thrKb = brkKb = 0;
+    mp.wheelPrev = mp.taken[mp.me];
+    mp.net.send({ t: 'release', x: q.x, z: q.z, yaw: q.yaw, speed: q.v, prog: q.s, rt: t });
+    mpTakeover({ type: 'release', id: mp.me });
+    race.lapAi = true;
+    flash('You have the wheel', 1.5); say('You have the wheel');
+  }
+  function mpDenied() {
+    if (!mp || !race || !race.mp || race.chat || !mp.wheelPrev || mpTaken(mp.me)) return;
+    mpTakeover(mp.wheelPrev); mp.wheelPrev = null;
+    flash('Could not take the wheel right now', 2.5);
   }
   function mpFinishNote() {
     if (!mp) return;
@@ -1857,13 +1953,13 @@
     aiBtnSync();
   }
   function aiBtnSync() {
-    var b = $('aiBtn'), on = !!(race && race.chat && mp && race.taken[mp.me]);
-    b.hidden = !(race && race.chat && rcIsPilot() && race.phase === 'race');
+    var b = $('aiBtn'), on = aiDrivesMe();
+    b.hidden = !(race && race.phase === 'race' && (race.chat ? rcIsPilot() : on));
     $('aiText').textContent = on ? 'Take the wheel' : 'Let AI drive';
     $('aiIcon').textContent = on ? 'sports_esports' : 'smart_toy';
   }
   function aiHud() {
-    var on = !!(race && race.chat && mp && race.taken[mp.me] && race.phase === 'race' && rcIsPilot()), el = $('hAi');
+    var on = !!(race && race.phase === 'race' && aiDrivesMe() && (!race.chat || rcIsPilot())), el = $('hAi');
     if (el.hidden === on) el.hidden = !on;
   }
   function rcFollower(id, i) {
@@ -1976,6 +2072,7 @@
       stepWorld(dt, inp);
     }
     pressed = {};
+    mpSendAi();
     updateHud(standings());
     netHud();
     updateCam(dt);
@@ -1999,7 +2096,8 @@
     if (race.sim) { while (race.sim.time + Sim.DT <= race.t + 1e-9) { snap(); race.sim.step(); } }
     var lapsPre = pc.laps;
     if (race.chat) rcDraw();   // fährt die KI mein Auto, setzt rcDraw Lage/Runden aus dem Nachfahrer
-    var aiMine = !!(race.chat && mp && race.taken[mp.me] && rcIsPilot());
+    else if (race.mp && !inp) drawRemotes();   // Raum: dasselbe über den Nachfahrer der Übernahme
+    var aiMine = !!(race.chat && mp && race.taken[mp.me] && rcIsPilot()) || !!(race.mp && !race.chat && mpTaken(mp.me));
     if (!inp && aiMine && race.phase === 'race' && pc.laps > lapsPre) {
       // Runden/Ziel auch, solange die KI fährt (sonst hängt Car Drive hinter dem Overlay; zählt nicht als Rekord)
       lapDone(race.t - race.lapStart); race.lapStart = race.t;

@@ -238,6 +238,40 @@ def test_state_relayed_immediately_to_others_and_keyframe_with_pings(monkeypatch
 def test_state_burst_allowed_then_limited():
     cl = drive_ws.Client(FakeWs(), {"id": "u1"}, "X")
     cl.last_s = 10.0
-    ok = [drive_ws._allow_state(cl, 10.0) for _ in range(12)]
+    ok = [drive_ws._allow_state(cl, 10.0) for _ in range(24)]
     assert ok.count(True) == int(drive_ws.STATE_BURST)
-    assert drive_ws._allow_state(cl, 10.0 + 1 / drive_ws.STATE_RATE)
+    assert drive_ws._allow_state(cl, 10.0 + 1.5 / drive_ws.STATE_RATE)
+
+
+def test_ai_state_only_from_carrier_and_release_flow(monkeypatch):
+    sent, direct = [], []
+    monkeypatch.setattr(drive_ws, "broadcast", lambda wss, data: direct.append((list(wss), json.loads(data))))
+    srv = drive_ws.DriveServer(secret="s")
+    monkeypatch.setattr(srv, "_send_room", lambda code, obj: sent.append(obj))
+    room, _ = srv.hub.open(5, 0, 2, 1000.0)
+    for u in ("u1", "u2"):
+        room.join({"id": u, "login": u, "display": u, "role": "viewer", "garage": None}, "car-a", 0, 1000.0)
+    room.start(1000.0)
+    sa = room.start_at
+    c1, c2 = drive_ws.Client(FakeWs(), {"id": "u1"}, room.code), drive_ws.Client(FakeWs(), {"id": "u2"}, room.code)
+    srv.conns[room.code] = {c1, c2}
+    srv.clock = lambda: sa + 1
+    srv.step(sa)
+    for cl, p in ((c1, 20.0), (c2, 15.0)):
+        srv.on_message(room, cl, {"t": "s", "x": p, "z": 0, "yaw": 0, "prog": p, "rt": 1.0, "speed": 10})
+    srv.clock = lambda: sa + 4
+    srv.on_message(room, c1, {"t": "s", "x": 50, "z": 0, "yaw": 0, "prog": 50, "rt": 4.0, "speed": 10})
+    srv.step(sa + 4.1)
+    assert any(m.get("t") == "takeover" and m["ev"]["id"] == "u2" for m in sent)
+    assert {"t": "carrier", "id": "u1"} in sent
+    ai = {"t": "s", "for": "u2", "x": 45, "z": 0, "yaw": 0, "prog": 45, "rt": 4.2, "speed": 10}
+    srv.clock = lambda: sa + 4.2
+    srv.on_message(room, c2, dict(ai))                       # nicht Träger: verworfen
+    assert room.drivers["u2"].last[3] == 15.0
+    srv.on_message(room, c1, dict(ai))
+    assert room.drivers["u2"].last[3] == 45.0 and room.drivers["u2"].connected
+    srv.clock = lambda: sa + 4.3
+    srv.on_message(room, c2, {"t": "release", "x": 46, "z": 0, "yaw": 0, "speed": 10, "prog": 46, "rt": 4.3})
+    assert any(m.get("t") == "release" and m["ev"]["id"] == "u2" for m in sent) and not room.drivers["u2"].taken
+    srv.on_message(room, c2, {"t": "release", "x": 46, "z": 0, "yaw": 0, "speed": 10, "prog": 46, "rt": 4.3})
+    assert direct[-1][1] == {"t": "ai_denied", "want": "release"}
