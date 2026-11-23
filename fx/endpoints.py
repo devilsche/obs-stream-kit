@@ -788,7 +788,7 @@ def _race_join(now):
 
 
 def _race_garage_cmd(cmd, now):
-    """coins | garage | buy | reroll | paint | givecoins → Response."""
+    """coins | garage | buy | reroll | paint | givecoins | givecar → Response."""
     uid, display = _who()
     if not uid:
         return _no_store(jsonify({"ok": False, "say": "missing user"})), 400
@@ -844,6 +844,22 @@ def _race_garage_cmd(cmd, now):
                 _garage_push(g.tenant_id, uid)
             return _no_store(jsonify({"ok": status == "ok", "status": status, "coins": left,
                                       "say": _say(display, say)}))
+        if cmd == "givecar":
+            q = _arg("q")
+            if not q:
+                return _no_store(jsonify({"ok": False, "say": "usage: !givecar <name> <car>"}))
+            entry, hits = race_shop.find_car(q, race.eligible(*_race_cars()))
+            if entry is None:
+                return _no_store(jsonify({"ok": False, "say": _no_match(display, q, hits)}))
+            name = race_shop.clean_name(entry.get("name"))
+            status = _with_conn(lambda conn: race_db.grant(conn, g.tenant_id, uid, entry["key"]))
+            if status == "owned":
+                say = "already owns the %s" % name
+            else:
+                say = "got the %s as a gift – drive it with !race %s or in Car Drive" % (name, q[:30])
+                _garage_push(g.tenant_id, uid)
+            return _no_store(jsonify({"ok": status == "ok", "status": status, "car": entry["key"],
+                                      "say": _say(display, say)}))
         if cmd == "givecoins":
             try:
                 n = int(_arg("n"))
@@ -895,7 +911,7 @@ def _race_boost_cmd(cmd, now):
     return _no_store(jsonify({"ok": out["ok"], "say": _say(display, out["say"])}))
 
 
-RACE_GARAGE = ("coins", "garage", "buy", "reroll", "paint", "givecoins")
+RACE_GARAGE = ("coins", "garage", "buy", "reroll", "paint", "givecoins", "givecar")
 
 
 def _race_say_board(rows) -> str:

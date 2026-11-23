@@ -489,6 +489,14 @@ def test_coins_buy_garage_and_race_with_own_car(conn, tmp_path, clock, monkeypat
     assert [p for p in pushed if p[0] == "garage"] == [("garage", {"tenant": 1, "user": "7", "cars": "k2"})]
     assert q(c, cmd="buy", id="7", user="Ann", q="Car 2")["status"] == "owned"
     assert len([p for p in pushed if p[0] == "garage"]) == 1     # nur ein echter Kauf meldet sich
+    # Geschenk vom Streamer: ohne Coins, einmal, mit Push
+    r = q(c, cmd="givecar", id="9", user="Cy", q="car 3")
+    assert r["ok"] is True and r["say"] == "@Cy got the Car 3 as a gift – drive it with !race car 3 or in Car Drive"
+    assert pushed[-1] == ("garage", {"tenant": 1, "user": "9", "cars": "k3"})
+    assert q(c, cmd="givecar", id="9", user="Cy", q="Car 3")["say"] == "@Cy already owns the Car 3"
+    assert q(c, cmd="coins", id="9", user="Cy")["coins"] == 0
+    assert q(c, cmd="givecar", id="9", user="Cy", q="car")["ok"] is False
+    assert q(c, cmd="givecar", id="9", user="Cy")["say"] == "usage: !givecar <name> <car>"
     assert q(c, cmd="buy", id="7", user="Ann", q="car")["say"].startswith("@Ann which one? Car 0, Car 1")
     assert q(c, cmd="buy", id="7", user="Ann", q="%rawInput%")["say"] == "@Ann usage: !buy <car>"
     g = q(c, cmd="garage", id="7", user="Ann")

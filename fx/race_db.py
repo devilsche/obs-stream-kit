@@ -288,6 +288,22 @@ def owns(conn, tenant_id: int, user_id: str, car_key: str) -> bool:
                         (tenant_id, user_id, car_key)).fetchone() is not None
 
 
+def grant(conn, tenant_id: int, user_id: str, car_key: str) -> str:
+    """Auto schenken (Streamer, ohne Coins). → "ok" | "owned"."""
+    if owns(conn, tenant_id, user_id, car_key):
+        return "owned"
+    try:
+        conn.execute("INSERT INTO fx_race_garage (tenant_id, user_id, car_key, bought_at) VALUES (?, ?, ?, ?)",
+                     (tenant_id, user_id, car_key, _now()))
+        conn.commit()
+    except Exception:
+        _rollback(conn)
+        if owns(conn, tenant_id, user_id, car_key):     # gleichzeitig schon eingetragen
+            return "owned"
+        raise
+    return "ok"
+
+
 def buy(conn, tenant_id: int, user_id: str, car_key: str, cost: int):
     """Atomar: Stand prüfen, abziehen, eintragen. → (status, Stand) mit status
     "ok" | "owned" | "poor". Abziehen nur, wenn genug da ist (eine UPDATE-Bedingung);
