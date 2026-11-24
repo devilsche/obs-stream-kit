@@ -386,6 +386,51 @@
     } catch (e) { atlasTex = null; }
     return atlasTex;
   };
+  // Werbetafeln mit echten Events (Entry, fx/track_ads.py): ads = [{ name, when (ISO), city, image (geladenes Bild
+  // oder null) }] ersetzen die Fantasie-Sponsoren in den Kacheln ad0…ad7 (Banden, Hallen-/Brückenbanner, Großbildschirm).
+  // Plakat 512×128: Titelbild links (füllend, weich in den Grund verlaufend), rechts „UPCOMING“, Name (bis 2 Zeilen,
+  // Schrift schrumpft), Datum · Ort und myentry.info. Fehlen Events, bleiben die übrigen Sponsoren stehen.
+  Art.setAds = function (ads) {
+    var tex = Art.atlas(); if (!tex || !tex.image || !ads || !ads.length) return 0;
+    var g = tex.image.getContext('2d'), n = Math.min(Art.ADS, ads.length), F = "'DM Sans', 'Segoe UI', Arial, sans-serif";
+    function lines(text, w, size, max) {
+      g.font = '700 ' + size + 'px ' + F;
+      var words = String(text).split(/\s+/), out = [], cur = '';
+      for (var i = 0; i < words.length; i++) {
+        var t = cur ? cur + ' ' + words[i] : words[i];
+        if (g.measureText(t).width <= w || !cur) cur = t; else { out.push(cur); cur = words[i]; }
+      }
+      if (cur) out.push(cur);
+      if (out.length > max) { out = out.slice(0, max); var last = out[max - 1]; while (last.length > 1 && g.measureText(last + '…').width > w) last = last.slice(0, -1); out[max - 1] = last + '…'; }
+      return out;
+    }
+    for (var k = 0; k < n; k++) {
+      var a = ads[k], px = Art.TILES['ad' + k].px, x = px[0], y = px[1], W = px[2], H = px[3], IW = Math.round(W * 0.38);
+      g.save(); g.beginPath(); g.rect(x, y, W, H); g.clip();
+      g.fillStyle = '#1d1128'; g.fillRect(x, y, W, H);
+      if (a.image && a.image.width) {
+        var im = a.image, sc = Math.max(IW / im.width, H / im.height), dw = im.width * sc, dh = im.height * sc;
+        g.drawImage(im, x + (IW - dw) / 2, y + (H - dh) / 2, dw, dh);
+        var gr = g.createLinearGradient(x + IW - 46, 0, x + IW, 0); gr.addColorStop(0, 'rgba(29,17,40,0)'); gr.addColorStop(1, 'rgba(29,17,40,1)');
+        g.fillStyle = gr; g.fillRect(x + IW - 46, y, 46, H);
+      }
+      g.fillStyle = '#f2b705'; g.fillRect(x, y + H - 5, W, 5);
+      var tx = x + IW + 10, tw = W - IW - 20;
+      g.fillStyle = '#f2b705'; g.font = '700 13px ' + F; g.textBaseline = 'alphabetic'; g.fillText('UPCOMING ON ENTRY', tx, y + 22);
+      var size = 28, L = lines(a.name, tw, size, 2);
+      while (size > 17 && (L.length > 2 || L.some(function (l) { return g.measureText(l).width > tw; }))) { size -= 2; L = lines(a.name, tw, size, 2); }
+      if (L.length === 2 && size > 22) { size = 22; L = lines(a.name, tw, size, 2); }
+      g.fillStyle = '#ffffff';
+      L.forEach(function (l, i) { g.fillText(l, tx, y + 26 + size * (i + 1) * 1.05); });
+      var d = new Date(a.when), when = isNaN(d) ? '' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      g.font = '500 16px ' + F; g.fillStyle = '#c9bdd6';
+      g.fillText([when, a.city].filter(Boolean).join(' · '), tx, y + H - 15);
+      g.font = '800 15px ' + F; g.fillStyle = '#f2b705'; g.textAlign = 'right'; g.fillText('myentry.info', x + W - 10, y + H - 15); g.textAlign = 'left';
+      g.restore();
+    }
+    tex.needsUpdate = true;
+    return n;
+  };
   // Material mit Atlas: o = { side, roughness, metalness, flat, env, vary (Instanz-Kachel iVar), cut (Ausstanzen nach Alpha),
   //   inst (für Instanzen – eigenes Material, wie mat() in js/car-track-scene.js) }
   // seitenweit geteilt je Kombination (nicht freigeben)

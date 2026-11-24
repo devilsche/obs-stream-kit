@@ -721,6 +721,21 @@
       m.frustumCulled = false; g.add(m);
     };
     if (theme.decorate) theme.decorate(ctx);
+    // Werbetafeln: echte kommende Events (Entry) statt Fantasie-Sponsoren – einmal je Aufbau, andere Auswahl bei jedem
+    // Laden (fx/track_ads.py); Bilder kommen über den eigenen Server. Fehler/keine Events: Sponsoren bleiben.
+    if (PROP_BASE && root.fetch && Themes && Themes.Art.setAds && !opts.noAds) fetch(PROP_BASE + 'api/fx/track-ads.json', { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : { ads: [] }; })
+      .then(function (d) {
+        var ads = (d && d.ads || []).slice(0, Themes.Art.ADS);
+        return Promise.all(ads.map(function (a) {
+          return new Promise(function (ok) {
+            var im = new Image(); im.onload = function () { a.image = im; ok(a); }; im.onerror = function () { a.image = null; ok(a); };
+            im.src = PROP_BASE + a.img;
+          });
+        }));
+      })
+      .then(function (ads) { if (!disposed && ads.length) Themes.Art.setAds(ads); })
+      .catch(function () {});
 
     // Instanzen bauen: je Art und Teil ein InstancedMesh (Matrizen aus den Plätzen, Höhe = Gelände)
     var mtx = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3(), yAx = new THREE.Vector3(0, 1, 0), white1 = new THREE.Color(1, 1, 1);

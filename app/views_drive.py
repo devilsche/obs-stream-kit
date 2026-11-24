@@ -37,7 +37,7 @@ import urllib.parse
 from flask import (Blueprint, Response, abort, current_app, jsonify, make_response, redirect, request,
                    send_from_directory, session)
 
-from fx import car_models, drive_auth, race, race_db, race_shop, track_props
+from fx import car_models, drive_auth, race, race_db, race_shop, track_ads, track_props
 from webcore.serving import inject_theme, serve_asset
 
 bp_drive = Blueprint("drive", __name__)
@@ -392,6 +392,20 @@ def track_prop_file(uid):
     if not name:
         abort(404)
     return send_from_directory(track_props.folder(_root()), name, mimetype="model/gltf-binary", max_age=7 * 86400)
+
+
+@bp_drive.route("/drive/a/api/fx/track-ads.json")
+def track_ads_list():
+    """Werbetafeln: Zufallsauswahl kommender Entry-Events (fx/track_ads.py)."""
+    return _no_store(jsonify({"ads": track_ads.pick(12)}))
+
+
+@bp_drive.route("/drive/a/api/fx/track-ads/<eid>.webp")
+def track_ad_image(eid):
+    p = track_ads.image(_root(), eid)
+    if not p:
+        abort(404)
+    return send_from_directory(os.path.dirname(p), os.path.basename(p), mimetype="image/webp", max_age=86400)
 
 
 @bp_drive.route("/drive/a/api/fx/cars/custom.js")

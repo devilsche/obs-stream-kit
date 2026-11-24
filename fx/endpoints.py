@@ -21,7 +21,7 @@ from flask import Blueprint, Response, current_app, g, jsonify, abort, request, 
 from core.db_compat import SqliteCompatConn
 import datetime
 
-from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, race_shop, season_db, track_props, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
+from fx import (autumn_db, car_models, commands, duck_outfits, duck_viewers, race, race_db, race_shop, season_db, track_ads, track_props, weather, weather_chat, weather_credit, weather_db, weather_followers, weather_frost,
                 weather_season, weather_snow, weather_state, weather_theme, xmas_db)
 from webcore.middleware import _get_conn
 
@@ -599,6 +599,22 @@ def track_prop_file(token, uid):
     if not name:
         abort(404)
     return send_from_directory(track_props.folder(root), name, mimetype="model/gltf-binary", max_age=7 * 86400)
+
+
+@bp_fx.route("/s/<token>/api/fx/track-ads.json")
+def track_ads_list(token):
+    """Werbetafeln an der Strecke: Zufallsauswahl kommender Entry-Events (fx/track_ads.py)."""
+    if g.tenant_id is None:
+        abort(404)
+    return _no_store(jsonify({"ads": track_ads.pick(12)}))
+
+
+@bp_fx.route("/s/<token>/api/fx/track-ads/<eid>.webp")
+def track_ad_image(token, eid):
+    p = track_ads.image(current_app.config.get("_PROJECT_ROOT") or ".", eid) if g.tenant_id is not None else None
+    if not p:
+        abort(404)
+    return send_from_directory(os.path.dirname(p), os.path.basename(p), mimetype="image/webp", max_age=86400)
 
 
 @bp_fx.route("/s/<token>/api/fx/cars/custom.js")
