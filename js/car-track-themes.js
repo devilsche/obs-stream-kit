@@ -664,6 +664,26 @@
       bench.add(sp.x, sp.z, { rot: sp.rot + (ctx.rnd() < 0.5 ? 0 : Math.PI) });
       nb++;
     }
+    return { grass: grass, bush: bush, gTint: gTint };
+  }
+  // Unterwuchs zwischen den Bäumen (User: „zwischen den Bäumen ist es kahl“): um jeden Baum-Platz der Arten in kinds
+  // 1–3 Büsche, ein paar Grasbüschel und gelegentlich ein Stein (rock: Art mit ROCK_PROP); eigene Zufallsfolge, nie näher als
+  // 20 m an der Mittellinie (Auslauf bleibt frei); g = Rückgabe von greenery. o = { bush, grass, rock, pred }
+  function undergrowth(ctx, g, kinds, rock, o) {
+    var ur = ctx.rng(41);
+    kinds.forEach(function (kd) {
+      kd.spots.slice().forEach(function (sp) {
+        function near(r0, r1) {
+          var a = ur() * TAU, d = r0 + ur() * (r1 - r0), x = sp.x + Math.cos(a) * d, z = sp.z + Math.sin(a) * d;
+          if ((o.pred && !o.pred(x, z)) || ctx.trackDist(x, z, 24) < 20) return null;
+          return [x, z];
+        }
+        var nb = Math.floor(o.bush * (0.5 + ur())), ng = Math.floor(o.grass * (0.5 + ur())), p;
+        for (var i = 0; i < nb; i++) if ((p = near(2.2, 7))) g.bush.add(p[0], p[1], { rot: ur() * TAU, s: 0.6 + ur() * 0.7 });
+        for (i = 0; i < ng; i++) if ((p = near(1.2, 8))) g.grass.add(p[0], p[1], { rot: ur() * TAU, s: 0.9 + ur() * 0.6, tint: g.gTint() });
+        if (rock && ur() < o.rock && (p = near(2.5, 7))) rock.add(p[0], p[1], { rot: ur() * TAU, s: 0.35 + ur() * 0.6 });
+      });
+    });
   }
   function rockGeo(c1, c2) {
     var k = new Kit();
@@ -1063,7 +1083,8 @@
       ctx.scatter(pine, 200, { dmin: 15, dmax: 80, rad: 1.8, s: [0.8, 1.5], pred: offCreek, tint: green });
       ctx.scatter(pineD, 520, { dmin: 70, dmax: 270, rad: 2.2, s: [1.0, 1.8], pred: offCreek, tint: green });
       // Felsen
-      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6, prop: ROCK_PROP }), 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
+      var rockF = ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6, prop: ROCK_PROP });
+      ctx.scatter(rockF, 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
       // Bewaldete Hügelketten im Hintergrund (Wald bis fast oben, Lichtungen, wenig Fels), im Dunst
       ctx.bgMesh(ranges(new Relief(), ctx, { seed: 11, forest: 0.85, haze: THEMES.forest.sky.horizon, lambda: 200,
         layers: [[380, 700, 70, 0.08], [620, 1020, 120, 0.25], [920, 1260, 170, 0.4]],
@@ -1074,7 +1095,8 @@
       fk.add(box(4, 0.12, 0.08), 0x8a6239, { y: 0.55 }); fk.add(box(4, 0.12, 0.08), 0x8a6239, { y: 0.95 });
       var fence = ctx.kind('fence', [{ geo: fk.geo() }], { r: 2.1 });
       ctx.alongRail(fence, { step: 4, extra: 2.2, side: ctx.T.turnDir > 0 ? -1 : 1, every: function (s) { return Math.floor(s / 60) % 2 === 0; } });
-      greenery(ctx, { grass: 0.22, bush: 0.02, far: 220, farBush: 30, pred: offCreek });
+      var gF = greenery(ctx, { grass: 0.22, bush: 0.02, far: 220, farBush: 30, pred: offCreek });
+      undergrowth(ctx, gF, [treeN, pine], rockF, { bush: 2, grass: 5, rock: 0.25, pred: offCreek });
     }
   };
 
@@ -1134,7 +1156,8 @@
       var treeN = ctx.kind('tree', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
       ctx.scatter(treeN, 130, { dmin: 15, dmax: 110, rad: 2, s: [0.8, 1.3], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
       ctx.scatter(pine, 480, { dmin: 15, dmax: 360, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
-      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6, prop: ROCK_PROP }), 140, { dmin: 15, dmax: 300, rad: 1.6, s: [0.6, 2.2] });
+      var rockA = ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6, prop: ROCK_PROP });
+      ctx.scatter(rockA, 140, { dmin: 15, dmax: 300, rad: 1.6, s: [0.6, 2.2] });
       var hk = new Kit();
       hk.add(box(7, 5, 6), 0x8a5a33, { y: 1.0 });
       hk.add(box(7.2, 0.4, 0.1), 0x5e3c20, { y: 1.8, z: 3.02 });
@@ -1142,7 +1165,8 @@
       hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: -1.8, y: 2.2, z: 3.03 }); hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: 1.8, y: 2.2, z: 3.03 });
       hk.add(box(0.6, 2, 0.6), 0x77736d, { x: 2.2, y: 5.6, z: -1 });
       ctx.scatter(ctx.kind('hut', [{ geo: hk.geo() }], { r: 5, prop: { slot: 'hut', box: { w: 12, d: 12, h: 12 } } }), 4, { dmin: 26, dmax: 110, rad: 5.5, s: [0.9, 1.1] });
-      greenery(ctx, { grass: 0.16, bush: 0.02, far: 320, farBush: 90, farMax: 160 });
+      var gA = greenery(ctx, { grass: 0.16, bush: 0.02, far: 320, farBush: 90, farMax: 160 });
+      undergrowth(ctx, gA, [treeN, pine], rockA, { bush: 2.2, grass: 6, rock: 0.3 });
     }
   };
 
