@@ -975,7 +975,7 @@
       function green() { return mix(0xffffff, 0xc9d8b0, rnd()); }
       // nahe Bäume als Kulissen-Modelle (slot forestTree: Nadel-, Birken-, Eichen-Modelle im Wechsel; Ersatz: Nadelbaum)
       var treeN = ctx.kind('tree', [{ geo: pineGeo(false) }], { r: 2.2, tint: true, prop: { slot: 'forestTree', box: { w: 11, d: 11, h: 15 } } });
-      ctx.scatter(treeN, 70, { dmin: 15, dmax: 50, rad: 2.2, s: [0.8, 1.3], pred: offCreek, tint: green });
+      ctx.scatter(treeN, 110, { dmin: 15, dmax: 60, rad: 2.2, s: [0.8, 1.3], pred: offCreek, tint: green });
       ctx.scatter(pine, 200, { dmin: 15, dmax: 80, rad: 1.8, s: [0.8, 1.5], pred: offCreek, tint: green });
       ctx.scatter(pineD, 520, { dmin: 70, dmax: 270, rad: 2.2, s: [1.0, 1.8], pred: offCreek, tint: green });
       // Felsen

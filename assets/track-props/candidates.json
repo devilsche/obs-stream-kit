@@ -997,8 +997,8 @@
   "kind": "tree",
   "slot": "forestTree",
   "height": 14,
-  "tris": 3000,
-  "tex": 256,
+  "tris": 9000,
+  "tex": 512,
   "part": "l0",
   "keepNode": "EZTree0\\.Large_",
   "note": "Paket Realistic Trees Collection: großer Laubbaum",
@@ -1010,9 +1010,7 @@
    "forest",
    "stadium",
    "industrial"
-  ],
-  "aggressive": true,
-  "skip": "vereinfacht zerrupft (kaum Laub), passt nicht zum Low-Poly-Stil – im Bild geprüft 2026-11-24"
+  ]
  },
  {
   "uid": "fe67c886eebf4bcb988d7c45e69995ad",
@@ -1025,8 +1023,8 @@
   "kind": "tree",
   "slot": "forestTree",
   "height": 11,
-  "tris": 3000,
-  "tex": 256,
+  "tris": 9000,
+  "tex": 512,
   "part": "m10",
   "keepNode": "EZTree0\\.Medium010_",
   "note": "Paket Realistic Trees Collection: mittlerer Baum",
@@ -1038,9 +1036,7 @@
    "forest",
    "stadium",
    "industrial"
-  ],
-  "aggressive": true,
-  "skip": "vereinfacht zerrupft (kaum Laub), passt nicht zum Low-Poly-Stil – im Bild geprüft 2026-11-24"
+  ]
  },
  {
   "uid": "fe67c886eebf4bcb988d7c45e69995ad",
@@ -1053,8 +1049,8 @@
   "kind": "tree",
   "slot": "forestTree",
   "height": 9,
-  "tris": 3000,
-  "tex": 256,
+  "tris": 9000,
+  "tex": 512,
   "part": "m11",
   "keepNode": "EZTree0\\.Medium011_",
   "note": "Paket Realistic Trees Collection: kleiner Baum",
@@ -1068,9 +1064,7 @@
    "stadium",
    "industrial",
    "alpine"
-  ],
-  "aggressive": true,
-  "skip": "vereinfacht zerrupft (kaum Laub), passt nicht zum Low-Poly-Stil – im Bild geprüft 2026-11-24"
+  ]
  },
  {
   "uid": "fe67c886eebf4bcb988d7c45e69995ad",
@@ -1130,8 +1124,8 @@
   "kind": "tree",
   "slot": "forestTree",
   "height": 9,
-  "tris": 3000,
-  "tex": 256,
+  "tris": 9000,
+  "tex": 512,
   "part": "m2",
   "keepNode": "EZTree1\\.Medium002_",
   "note": "Paket Realistic Trees Collection: mittlerer Baum 2",
@@ -1142,9 +1136,7 @@
   "themes": [
    "forest",
    "alpine"
-  ],
-  "aggressive": true,
-  "skip": "vereinfacht zerrupft (kaum Laub), passt nicht zum Low-Poly-Stil – im Bild geprüft 2026-11-24"
+  ]
  },
  {
   "uid": "fe67c886eebf4bcb988d7c45e69995ad",
@@ -1191,11 +1183,9 @@
    "forest"
   ],
   "height": 11,
-  "tris": 5000,
-  "tex": 256,
-  "aggressive": true,
-  "note": "200 k Dreiecke → 5 k",
-  "skip": "vereinfacht zerrupft (kaum Laub), passt nicht zum Low-Poly-Stil – im Bild geprüft 2026-11-24"
+  "tris": 9000,
+  "tex": 512,
+  "note": "200 k Dreiecke → 5 k"
  },
  {
   "uid": "f2c2271c1cdb4db298f5f4e7b5896a1c",
