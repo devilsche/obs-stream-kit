@@ -641,10 +641,27 @@
     bk.add(ico(1), o.dry ? 0x8a8a4a : 0x3f6e32, { y: 0.7, sy: 0.75, jit: 0.35 });
     var bush = ctx.kind('bush', [{ geo: bk.geo() }], { r: 1.4, prop: { slot: 'bush', box: { w: 4, d: 4, h: 2.5 } } });
     function gTint() { return mix(0xffffff, o.dry ? 0xe8dcb0 : 0xc6e2a0, ctx.rnd()); }
-    ctx.scatterRail(grass, { perM: o.grass * 2.2, extra: [0.2, 8], rad: 0.4, s: [1.1, 1.9], pred: o.pred, tint: gTint });
+    // dicht (Grass Pack LP, vom User gewählt): ~7× so viele Büschel hinter der Planke, ~5× im Gelände
+    ctx.scatterRail(grass, { perM: o.grass * 7, extra: [0.1, 11], rad: 0.28, s: [0.9, 1.5], pred: o.pred, tint: gTint });
     ctx.scatterRail(bush, { perM: o.bush, extra: [1, 9], rad: 1.3, s: [0.7, 1.2], pred: o.pred });
-    if (o.far) ctx.scatter(grass, o.far * 2, { dmin: 14, dmax: 50, rad: 0.4, s: [1.1, 1.9], pred: o.pred, tint: gTint });
+    if (o.far) ctx.scatter(grass, o.far * 5, { dmin: 14, dmax: 60, rad: 0.28, s: [0.9, 1.5], pred: o.pred, tint: gTint });
     if (o.farBush) ctx.scatter(bush, o.farBush, { dmin: 14, dmax: 60, rad: 1.3, s: [0.8, 1.3], pred: o.pred });
+    // Parkbänke (Holz auf Metallfüßen, mit Lehne) mit Mülleimer daneben, verstreut im Gelände – Blick zur Strecke
+    var bk2 = new Kit(), wood = 0x8a5a33, metal = 0x2f3338;
+    [-0.22, 0, 0.22].forEach(function (z) { bk2.add(box(1.8, 0.05, 0.16), wood, { y: 0.45, z: z }); });
+    [0.62, 0.8].forEach(function (y) { bk2.add(box(1.8, 0.12, 0.05), wood, { y: y, z: 0.34, rx: -0.15 }); });
+    [-0.75, 0.75].forEach(function (x) {
+      bk2.add(box(0.06, 0.45, 0.5), metal, { x: x, y: 0.22 }); bk2.add(box(0.06, 0.5, 0.06), metal, { x: x, y: 0.68, z: 0.3, rx: -0.15 });
+    });
+    bk2.add(cyl(0.22, 0.2, 0.75, 8), 0x3c6e3a, { x: 1.35, y: 0.38 }); bk2.add(cyl(0.24, 0.24, 0.05, 8), 0x2a2d31, { x: 1.35, y: 0.77 });
+    var bench = ctx.kind('bench', [{ geo: bk2.geo() }], { r: 1.6 });
+    for (var bn = 0, nb = 0; bn < 200 && nb < (o.benches || 14); bn++) {
+      var sp = ctx.randomSpot(16, 45);
+      if (!sp || (o.pred && !o.pred(sp.x, sp.z)) || !ctx.place(sp.x, sp.z, 1.8)) continue;
+      // Platz-Drehung = Streckenrichtung; Bank (Lehne +z) so drehen, dass man zur Strecke schaut
+      bench.add(sp.x, sp.z, { rot: sp.rot + (ctx.rnd() < 0.5 ? 0 : Math.PI) });
+      nb++;
+    }
   }
   function rockGeo(c1, c2) {
     var k = new Kit();

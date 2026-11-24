@@ -172,6 +172,12 @@
         parts.push({ geo: gg, mat: mat });
       });
     });
+    // Gras-Karten: Normalen nach oben (Licht wie der Boden) – sonst sind schräge Karten von der Sonne weg fast schwarz
+    if (e.kind === 'grass') parts.forEach(function (pt) {
+      var nn = pt.geo.attributes.normal;
+      if (nn) { for (var i = 0; i < nn.count; i++) nn.setXYZ(i, 0, 1, 0); nn.needsUpdate = true; }
+      pt.mat.side = THREE.DoubleSide;
+    });
     var sz = box.isEmpty() ? new THREE.Vector3(1, 1, 1) : box.getSize(new THREE.Vector3());
     var Art = root.CarTrackThemes && root.CarTrackThemes.Art;
     // einfarbige Modelle bemalen (Katalog-Feld paint, CarTrackThemes.Art.paint): Teile ohne Textur bekommen Atlas-Kacheln

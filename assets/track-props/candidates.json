@@ -1643,5 +1643,131 @@
   "note": "Vergleichsseite /admin/grass-preview (in keinem Thema)",
   "len": 1.0,
   "aggressive": true
+ },
+ {
+  "uid": "3352f9d646ec4f25b8aeb28e4232814a",
+  "name": "Grass Pack LP",
+  "author": "Nicothin",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/grass-pack-lp-3352f9d646ec4f25b8aeb28e4232814a",
+  "kind": "grass",
+  "slot": "grass",
+  "tris": 200,
+  "tex": 512,
+  "key": "gplp-g1",
+  "part": "g1",
+  "keepNode": "#7$",
+  "height": 0.75,
+  "theme": "stadium",
+  "themes": [
+   "stadium",
+   "forest",
+   "alpine"
+  ],
+  "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
+ },
+ {
+  "uid": "3352f9d646ec4f25b8aeb28e4232814a",
+  "name": "Grass Pack LP",
+  "author": "Nicothin",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/grass-pack-lp-3352f9d646ec4f25b8aeb28e4232814a",
+  "kind": "grass",
+  "slot": "grass",
+  "tris": 200,
+  "tex": 512,
+  "key": "gplp-g2",
+  "part": "g2",
+  "keepNode": "#15$",
+  "height": 0.38,
+  "theme": "stadium",
+  "themes": [
+   "stadium",
+   "forest",
+   "alpine"
+  ],
+  "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
+ },
+ {
+  "uid": "3352f9d646ec4f25b8aeb28e4232814a",
+  "name": "Grass Pack LP",
+  "author": "Nicothin",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/grass-pack-lp-3352f9d646ec4f25b8aeb28e4232814a",
+  "kind": "grass",
+  "slot": "grass",
+  "tris": 200,
+  "tex": 512,
+  "key": "gplp-g3",
+  "part": "g3",
+  "keepNode": "#17$",
+  "height": 0.34,
+  "theme": "stadium",
+  "themes": [
+   "stadium",
+   "forest",
+   "alpine"
+  ],
+  "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
+ },
+ {
+  "uid": "3352f9d646ec4f25b8aeb28e4232814a",
+  "name": "Grass Pack LP",
+  "author": "Nicothin",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/grass-pack-lp-3352f9d646ec4f25b8aeb28e4232814a",
+  "kind": "grass",
+  "slot": "grass",
+  "tris": 200,
+  "tex": 512,
+  "key": "gplp-y1",
+  "part": "y1",
+  "keepNode": "#9$",
+  "height": 0.75,
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
+ },
+ {
+  "uid": "3352f9d646ec4f25b8aeb28e4232814a",
+  "name": "Grass Pack LP",
+  "author": "Nicothin",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/grass-pack-lp-3352f9d646ec4f25b8aeb28e4232814a",
+  "kind": "grass",
+  "slot": "grass",
+  "tris": 200,
+  "tex": 512,
+  "key": "gplp-y2",
+  "part": "y2",
+  "keepNode": "#23$",
+  "height": 0.38,
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
+ },
+ {
+  "uid": "3352f9d646ec4f25b8aeb28e4232814a",
+  "name": "Grass Pack LP",
+  "author": "Nicothin",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/grass-pack-lp-3352f9d646ec4f25b8aeb28e4232814a",
+  "kind": "grass",
+  "slot": "grass",
+  "tris": 200,
+  "tex": 512,
+  "key": "gplp-y3",
+  "part": "y3",
+  "keepNode": "#25$",
+  "height": 0.34,
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
  }
 ]

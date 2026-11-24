@@ -24,10 +24,10 @@
   var TILE = 8, CACHE_MAX = 700, STRIDE = 11, TRIS = 17;
   // Halmhöhe h (m), Breite w (m), Büschel je m², Radius R, Biegung, Fleckigkeit, Höhen-Streuung, Blüten-Anteil, Wind
   var PRESET = {
-    stadium:    { dens: 3.4, h: [0.22, 0.42], w: 0.022, R: 55, curve: 0.3, patch: 0.25, hvar: 0.45, flowers: 0, wind: 0.35 },
-    forest:     { dens: 1.5, h: [0.2, 0.5], w: 0.022, R: 60, curve: 0.4, patch: 0.5, hvar: 0.7, flowers: 0, wind: 0.45 },
-    alpine:     { dens: 1.6, h: [0.15, 0.4], w: 0.018, R: 60, curve: 0.35, patch: 0.35, hvar: 0.6, flowers: 0.08, wind: 0.6 },
-    coast:      { dens: 0.55, h: [0.3, 0.75], w: 0.014, R: 58, curve: 0.55, patch: 0.8, hvar: 0.6, flowers: 0, wind: 0.9, tint: [1.1, 1.0, 0.72] },
+    stadium:    { dens: 9, h: [0.22, 0.42], w: 0.022, R: 46, curve: 0.3, patch: 0.25, hvar: 0.45, flowers: 0, wind: 0.35 },
+    forest:     { dens: 8, h: [0.2, 0.5], w: 0.022, R: 48, curve: 0.4, patch: 0.5, hvar: 0.7, flowers: 0, wind: 0.45 },
+    alpine:     { dens: 7, h: [0.15, 0.4], w: 0.02, R: 48, curve: 0.35, patch: 0.35, hvar: 0.6, flowers: 0.08, wind: 0.6 },
+    coast:      { dens: 2.5, h: [0.3, 0.75], w: 0.016, R: 50, curve: 0.55, patch: 0.8, hvar: 0.6, flowers: 0, wind: 0.9, tint: [1.1, 1.0, 0.72] },
     industrial: { dens: 1.0, h: [0.12, 0.3], w: 0.02, R: 50, curve: 0.35, patch: 0.45, hvar: 0.5, flowers: 0, wind: 0.4 },
     plain:      { dens: 1.4, h: [0.15, 0.35], w: 0.02, R: 55, curve: 0.35, patch: 0.3, hvar: 0.4, flowers: 0, wind: 0.45 }
   };
@@ -114,7 +114,7 @@
     if (!THREE || !res || !res.grassAt || !res.group) return null;
     var reduce = !!opts.reduce, theme = res.theme || {}, pr = PRESET[theme.id] || PRESET.plain;
     var qMax = opts.quality === 'light' ? 0.55 : 1, q = qMax;
-    var CAP = opts.quality === 'light' ? 14000 : 30000;
+    var CAP = opts.quality === 'light' ? 24000 : 60000;   // dichtes Gras (2026-11-24, vom User gewünscht)
     var seed = ((res.P && res.P.length) || 1) * 7919 + Math.round((res.P && res.P[0] ? res.P[0].x * 13 + res.P[0].z * 7 : 0));
 
     var geo = clumpGeo(THREE);
