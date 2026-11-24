@@ -702,8 +702,8 @@
       [-12, 0, 12].forEach(function (x) { st.add(box(0.4, 9.5, 0.4), 0x50555f, { x: x, y: 4.75, z: 8.6 }); });
       st.add(box(27, 0.4, 10.5), prim, { y: 9.2, z: 4.2, rx: -0.08 });
       st.add(box(27.2, 0.2, 0.3), acc, { y: 8.75, z: -0.9 });
-      // Kulissen-Modelle (Tribünen/Sitzreihen): erste Reihe vorn wie die prozedurale, kleine nebeneinander bis 26 m
-      var stand = ctx.kind('stand', [{ geo: st.geo() }], { r: 14, prop: { slot: 'stand', box: { w: 26, d: 11, h: 12 }, front: -1, tile: true } });
+      // eigene Tribüne (die Tribünen-Modelle wirkten fleckig/kaputt und passten nicht zum Motodrom – im Bild geprüft)
+      var stand = ctx.kind('stand', [{ geo: st.geo() }], { r: 14 });
       // Flutlichtmast: Gittermast (schlank), Kopf mit Lampenfeld (leuchtend)
       var ms = new Kit();
       ms.add(cyl(0.3, 0.55, 26, 6), 0x9ea4ad, { y: 12 });
