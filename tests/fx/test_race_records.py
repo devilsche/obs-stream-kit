@@ -325,3 +325,22 @@ def test_test_room_saves_nothing(monkeypatch):
     monkeypatch.setattr(room, "rows", lambda: [{"user_id": "u1"}])
     srv._save(room)
     assert calls == [] and sent[-1]["t"] == "recorded" and not sent[-1]["counted"]
+
+
+def test_clog_written_rate_limited_and_cleaned(tmp_path, monkeypatch):
+    from fx import drive_log
+    monkeypatch.setattr(drive_ws, "broadcast", lambda wss, data: None)
+    srv = drive_ws.DriveServer(secret="s")
+    srv.log_root = str(tmp_path)
+    room = srv.hub.ensure_test(1000.0)
+    room.join({"id": "u1", "login": "u1", "display": "U", "role": "viewer", "garage": None}, "car-a", 0, 1000.0)
+    room.start(1000.0)
+    cl = drive_ws.Client(FakeWs(), {"id": "u1"}, room.code)
+    srv.clock = lambda: 1010.0
+    srv.on_message(room, cl, {"t": "clog", "d": [{"k": "hit", "rt": 1.5}, "junk", {"k": "x" * 5000}]})
+    srv.on_message(room, cl, {"t": "clog", "d": [{"k": "hit", "rt": 1.6}]})      # zu schnell: verworfen
+    srv.clock = lambda: 1011.0
+    srv.on_message(room, cl, {"t": "clog", "d": [{"k": "gap", "ms": 300}]})
+    lines = [json.loads(x) for x in open(drive_log.path_for(str(tmp_path), room.race_id), encoding="utf-8")]
+    assert [l["d"] for l in lines] == [[{"k": "hit", "rt": 1.5}], [{"k": "gap", "ms": 300}]]
+    assert all(l["uid"] == "u1" for l in lines)

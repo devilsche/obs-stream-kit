@@ -978,6 +978,7 @@
       c.bumpAcc = null;
       if (Math.hypot(a.jx, a.jz) < BUMP_MIN) return;
       c.bumpAt = race.t;
+      clog({ k: 'bumpOut', to: c.id, jx: r3(a.jx), jz: r3(a.jz), imp: r3(a.imp) });
       mp.net.send({ t: 'bump', to: c.id, jx: Math.round(a.jx * 1000) / 1000, jz: Math.round(a.jz * 1000) / 1000, imp: Math.round(a.imp * 100) / 100,
         px: a.w > 0 ? Math.round(a.px / a.w * 100) / 100 : undefined, pz: a.w > 0 ? Math.round(a.pz / a.w * 100) / 100 : undefined });
     });
@@ -986,7 +987,9 @@
   function peerBump(m) {
     if (!race || !race.pc || race.spect || race.phase !== 'race' || !(m.jx || m.jz)) return;
     var c = (race.remotes || []).filter(function (r) { return r.id === String(m.from); })[0];
-    if (c && c.contactAt != null && race.t - c.contactAt < 0.3) return;
+    var skip = c && c.contactAt != null && race.t - c.contactAt < 0.3;
+    clog({ k: 'bumpIn', from: String(m.from), jx: m.jx, jz: m.jz, imp: m.imp, px: m.px, pz: m.pz, applied: !skip, why: skip ? 'own contact < 0.3 s' : null });
+    if (skip) return;
     var pc = race.pc, jx = clamp(-m.jx, -60, 60), jz = clamp(-m.jz, -60, 60);
     Phys.impulse(pc, jx, jz, m.px, m.pz, m.imp);   // Schub + Drehstoß im Kontaktpunkt
     if (c) c.contactAt = race.t;
@@ -1066,9 +1069,41 @@
   }
   // eigenes Auto fahren + Kontakte; Crash: Kamera-Ruck (reduzierte Bewegung: keiner), Funken/Splitter, Blech-Klang –
   // stärker je Aufprall und je schwerer der andere; Schrammen: Funkenstrom + Schleifgeräusch statt Abprallen
+  // ---- Kontakt-Logs (Mehrspieler/Chatrennen): Ereignisse gesammelt, ~1/s an den Server (fx/drive_log.py →
+  // data/drive-logs/<race_id>.jsonl). hit: Kontakt (je Gegner höchstens alle 0,1 s, der erste immer), bumpOut/bumpIn,
+  // dv: Tempo-Sprung > 3 m/s in einem Bild, gap: Bildlücke > 250 ms, net: Ping/Puffer alle 2 s
+  var CLOG = { buf: [], at: 0, net: 0, last: {} };
+  function r3(v) { return Math.round(v * 1000) / 1000; }
+  function clog(e) {
+    if (!race || !race.mp || !mp || !mp.net || CLOG.buf.length >= 400) return;
+    e.rt = r3(race.t || 0); CLOG.buf.push(e);
+  }
+  function clogFrame() {
+    if (!race || !race.mp || !mp || !mp.net) return;
+    var now = performance.now();
+    if (now - CLOG.net > 2000) {
+      CLOG.net = now;
+      var pg = mp.net.ping ? mp.net.ping() : null;
+      clog({ k: 'net', ping: pg ? pg.ms : null, jit: pg ? pg.jitter : null, delay: mp.net.delay ? r3(mp.net.delay()) : null, phase: race.phase });
+    }
+    if (CLOG.buf.length && now - CLOG.at > 1000) { CLOG.at = now; mp.net.send({ t: 'clog', d: CLOG.buf }); CLOG.buf = []; }
+  }
+  function clogHit(o, h) {
+    var c = o.c, id = c ? (c.id || ('ai' + (o.i != null ? o.i : '?'))) : 'wreck', t = race.t || 0, last = CLOG.last[id];
+    var first = last == null || t - last.t > 0.3;
+    if (!first && t - last.w < 0.1) { last.t = t; return; }
+    CLOG.last[id] = { t: t, w: t };
+    var pc = race.pc;
+    clog({ k: 'hit', o: id, first: first, peer: !!o.peer, ai: !!(o.q || o.rq || (c && c.isAi)),
+      me: [r3(pc.x), r3(pc.z), r3(pc.yaw), r3(pc.vx), r3(pc.vz), r3(pc.r)],
+      ot: [r3(o.x), r3(o.z), r3(o.yaw), r3(o.vx || 0), r3(o.vz || 0)],
+      h: [r3(h.impact), r3(h.slide), r3(h.jx), r3(h.jz), r3(h.px), r3(h.pz), r3(h.pen)],
+      lag: c && c.smp && c.smp.lag != null ? r3(c.smp.lag) : null });
+  }
   function driveStep(dt, inp) {
-    var pc = race.pc, crash = null, scrape = null;
+    var pc = race.pc, crash = null, scrape = null, v0x = pc.vx, v0z = pc.vz;
     Phys.stepContacts(pc, inp, dt, { len: race.me.len, w: race.me.w, shape: race.me.shape }, contactList(), function (o, h) {
+      if (race.mp) clogHit(o, h);
       if (o.peer) peerHit(o, h);
       if (h.impact > 0 && o.q) nudgeAI(o, h);
       else if (h.impact > 0 && o.rq) rcHitAdd(o, h);
@@ -1076,7 +1111,11 @@
       else if (h.slide > 1.5 && (!scrape || h.slide > scrape.slide)) scrape = h;
     });
     if (race.chat) rcHitSend();
-    if (race.mp) peerBumpSend();
+    if (race.mp) {
+      peerBumpSend();
+      var dvj = Math.hypot(pc.vx - v0x, pc.vz - v0z);
+      if (dvj > 3) clog({ k: 'dv', dv: r3(dvj), v0: r3(Math.hypot(v0x, v0z)), v1: r3(Math.hypot(pc.vx, pc.vz)), crash: crash ? r3(crash.impact) : null, dt: r3(dt) });
+    }
     race.crashT = Math.max(0, (race.crashT || 0) - dt);
     if (crash && race.crashT <= 0) {
       var mP = pc.P.mass, mO = isFinite(crash.o.mass) ? crash.o.mass : mP * 4, heavy = mO / (mO + mP);
@@ -2164,6 +2203,7 @@
     root.requestAnimationFrame(frame);
     // Hänger im Mehrspieler sichtbar machen (3 s ohne Zustand = KI übernimmt): Bildlücke über 0,5 s in die Konsole
     if (race && race.mp && !doc.hidden && lastT && now - lastT > 500) console.warn('[car-drive] frame gap ' + Math.round(now - lastT) + ' ms at race time ' + (race.t || 0).toFixed(1) + ' s');
+    if (race && race.mp && lastT && now - lastT > 250) clog({ k: 'gap', ms: Math.round(now - lastT), hidden: !!doc.hidden });
     var dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     var p = readPad();
     sm.padThr = p ? p.throttle || 0 : 0;
@@ -2231,6 +2271,7 @@
     mapFrame(now);
     aiHud();
     tagsFrame();
+    clogFrame();
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {

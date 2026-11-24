@@ -29,6 +29,8 @@ dessen Lage als s {for: id, …} (5 Hz, zählt Runden/Ziel, keine Rekorde). Der 
 speed, prog, rt} wieder (fx/drive_room.Room.release).
 Testraum TESTME (fx/drive_room.TEST_CODE): immer offen (Admin-Tenant, Speedway, 2 Runden; umstellen mit
 GET /internal/test?track=0–4&laps=1–5, nur in Lobby/Ergebnis), startet von selbst, speichert nichts.
+Kontakt-Logs: clog {d: [Ereignisse]} (Client, ~1/s) → data/drive-logs/<race_id>.jsonl samt Server-Ereignissen
+(relay-bump, takeover, release), fx/drive_log.py.
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
 
 Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
@@ -59,7 +61,7 @@ import urllib.parse
 from websockets.asyncio.server import broadcast, serve
 from websockets.exceptions import ConnectionClosed
 
-from fx import drive_auth, drive_race, drive_room
+from fx import drive_auth, drive_log, drive_race, drive_room
 
 log = logging.getLogger("drive_ws")
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -79,6 +81,7 @@ class Client:
         self.last_s = 0.0
         self.tokens = STATE_BURST
         self.bump_at = 0.0
+        self.clog_at = 0.0
 
 
 class RaceClient:
@@ -90,8 +93,10 @@ class RaceClient:
         self.last_s = 0.0
         self.tokens = STATE_BURST
         self.bump_at = 0.0
+        self.clog_at = 0.0
 
 
+CLOG_GAP = 0.4      # s zwischen zwei Log-Bündeln eines Clients (fx/drive_log.py)
 BUMP_GAP = 0.1      # s zwischen zwei bump eines Clients
 BUMP_MAX = 60.0     # größter Stoß-Betrag je Achse
 
@@ -152,6 +157,7 @@ class DriveServer:
         self.hub = drive_room.Hub(limits_loader=lambda: drive_room.Limits(drive_auth.load_limits(self.root)))
         self.conns = {}          # code → set(Client)
         self.record = record or _record_db
+        self.log_root = ROOT      # Kontakt-Logs unter data/drive-logs/ (Tests: tmp)
         self.lap_record = lap_record or _lap_db
         self.key = drive_auth.internal_key(secret)
         self._done_at = {}
@@ -339,7 +345,14 @@ class DriveServer:
                     else:
                         broadcast([cl.ws], json.dumps({"t": "ai_denied", "want": t}))
                 elif t == "bump" and cl.driver:
-                    _bump(self.race_conns.get(tid), cl, cl.id, msg, now)
+                    n = _bump(self.race_conns.get(tid), cl, cl.id, msg, now)
+                    r = self.races.rooms.get(tid)
+                    if r:
+                        self._log("race-%s-%s" % (tid, r.race_id), {"uid": "server", "ev": {"k": "relay-bump", "from": cl.id, "to": msg.get("to"),
+                                                                                         "jx": msg.get("jx"), "jz": msg.get("jz"), "imp": msg.get("imp"), "n": n}}, now)
+                elif t == "clog" and cl.driver:
+                    r = self.races.rooms.get(tid)
+                    self._clog("race-%s-%s" % (tid, r.race_id) if r and r.race_id else None, cl, cl.id, msg, now)
                 elif t == "hit" and cl.driver:
                     r = self.races.rooms.get(tid)
                     ev = r.hit(cl.id, msg, now) if r else None
@@ -462,7 +475,11 @@ class DriveServer:
                               lambda o, c=room.code: self._send_room(c, o))
         elif t == "bump":
             if room.phase == "race" and uid in room.drivers:
-                _bump(self.conns.get(room.code), cl, uid, msg, now)
+                n = _bump(self.conns.get(room.code), cl, uid, msg, now)
+                self._log(room.race_id, {"uid": "server", "ev": {"k": "relay-bump", "from": uid, "to": msg.get("to"),
+                                                                   "jx": msg.get("jx"), "jz": msg.get("jz"), "imp": msg.get("imp"), "n": n}}, now)
+        elif t == "clog":
+            self._clog(room.race_id if room.phase in ("countdown", "race", "done") else None, cl, uid, msg, now)
         elif t == "ping":
             drive_room.note_ping(room.drivers.get(uid), msg)
             try:
@@ -478,6 +495,7 @@ class DriveServer:
             ev = room.release(uid, msg, now)
             if ev:
                 self._send_room(room.code, ev)
+                self._log(room.race_id, {"uid": "server", "ev": dict(ev.get("ev") or {}, k="release")}, now)
             else:
                 broadcast([cl.ws], json.dumps({"t": "ai_denied", "want": "release"}))
         elif t == "leave":
@@ -535,6 +553,8 @@ class DriveServer:
                 self._roster(room)
             for ev in room.tick(now):
                 self._send_room(room.code, ev)
+                if ev.get("t") in ("takeover", "release"):
+                    self._log(room.race_id, {"uid": "server", "ev": dict(ev.get("ev") or {}, k=ev.get("t"))}, now)
                 if ev.get("t") == "results":
                     self._done_at[room.code] = now
                     self._save(room)
@@ -545,6 +565,21 @@ class DriveServer:
                 self._key_at[room.code] = now
                 self._send_room(room.code, {"t": "S", "now": round(now, 3), "d": room.batch(now) if streaming else [],
                                             "pg": room.pings()})
+
+    # ---- Kontakt-Logs (fx/drive_log.py) ----
+    def _log(self, race_id, obj, now):
+        if race_id:
+            drive_log.write(self.log_root, race_id, obj, now)
+
+    def _clog(self, race_id, cl, uid, msg, now):
+        """Log-Bündel eines Clients ({t: clog, d: [...]}) an die Rennen-Datei hängen (höchstens alle CLOG_GAP s)."""
+        if not race_id or now - cl.clog_at < CLOG_GAP:
+            return
+        d = drive_log.clean_events(msg.get("d"))
+        if not d:
+            return
+        cl.clog_at = now
+        self._log(race_id, {"uid": str(uid), "d": d}, now)
 
     def _save(self, room):
         rows = room.rows()
