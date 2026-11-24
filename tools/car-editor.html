@@ -222,6 +222,11 @@
           <button type="button" id="pickFront" aria-pressed="false">Pick steering parts</button>
           <button type="button" id="wheelAuto" class="small">Automatic wheels</button>
         </div>
+        <div class="row" role="group" aria-label="Undo or clear wheel picks">
+          <button type="button" id="wheelUndo" class="small" disabled>Undo last pick</button>
+          <button type="button" id="clearRoll" class="small">Clear rolling parts</button>
+          <button type="button" id="clearSteer" class="small">Clear steering parts</button>
+        </div>
         <div class="row">
           <input type="checkbox" id="hidePicked">
           <label for="hidePicked">Hide picked parts while picking (reach pieces hidden behind the tyre or rim)</label>
@@ -761,6 +766,7 @@
       function load(key, keepView) {
         cur = list.filter(function (e) { return e.key === key; })[0];
         if (!cur) return;
+        if (!keepView) { wheelHist = []; $('wheelUndo').disabled = true; }   // anderes Auto: kein Rückgängig in fremde Räder
         def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : []; def.zones = Array.isArray(def.zones) ? def.zones : [];
         if (Array.isArray(def.frontWheelParts) && !def.steerParts) {   // alt: Vorderrad = lenkt und dreht
           def.steerParts = def.frontWheelParts.slice(); def.wheelParts = (def.wheelParts || []).concat(def.frontWheelParts);
@@ -1016,6 +1022,25 @@
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
       $('hidePicked').addEventListener('change', show);
+      // Rückgängig / Leeren der Radteile (Stand vor jedem Klick, „Add missing pieces“ und Leeren; bis 50 Schritte)
+      var wheelHist = [];
+      function wheelUndoPush() {
+        wheelHist.push({ w: (def.wheelParts || []).slice(), s: def.steerParts ? def.steerParts.slice() : undefined });
+        if (wheelHist.length > 50) wheelHist.shift();
+        $('wheelUndo').disabled = false;
+      }
+      function wheelRebuild() {
+        listParts();
+        if (picking === 'wheel' || picking === 'steer') show();
+        else reprepare({ wheelParts: (def.wheelParts || []).slice(), steerParts: def.steerParts && def.steerParts.length ? def.steerParts.slice() : undefined, frontWheelParts: undefined });
+      }
+      $('wheelUndo').addEventListener('click', function () {
+        var h = wheelHist.pop(); if (!h) return;
+        def.wheelParts = h.w; if (h.s) def.steerParts = h.s; else delete def.steerParts;
+        $('wheelUndo').disabled = !wheelHist.length; wheelRebuild(); say('Undone.');
+      });
+      $('clearRoll').addEventListener('click', function () { wheelUndoPush(); def.wheelParts = []; wheelRebuild(); say('Rolling parts cleared – pick them again or press Undo.'); });
+      $('clearSteer').addEventListener('click', function () { wheelUndoPush(); delete def.steerParts; wheelRebuild(); say('Steering parts cleared – the foremost axle steers. Undo brings them back.'); });
       // fehlende Stücke: Teile „X/n“, von denen schon ein Stück „X/m“ rollt bzw. lenkt, und die im Kasten der gewählten
       // Stücke desselben Rads liegen (Ferrari 488 Pista: je ein Viertel der hinteren Lauffläche stand still → eierte)
       $('wheelMissing').addEventListener('click', function () {
@@ -1024,7 +1049,7 @@
         var box = {}, all = [];
         car.traverse(function (o) { if (o.isMesh && o.userData.pkey) { box[o.userData.pkey] = new THREE.Box3().setFromObject(o); all.push(o.userData.pkey); } });
         var base = function (k) { var m = /^(.*)\/\d+$/.exec(k); return m ? m[1] : null; };
-        var added = 0;
+        var added = 0; wheelUndoPush();
         ['wheelParts', 'steerParts'].forEach(function (list) {
           var L = def[list]; if (!Array.isArray(L) || !L.length) return;
           var groups = {};
@@ -1203,6 +1228,7 @@
         if (picking === 'steer' || picking === 'wheel') {
           // zwei unabhängige Listen: rollt (dreht beim Fahren) und lenkt; ein Teil darf in beiden sein
           var mine = picking === 'steer' ? 'steerParts' : 'wheelParts';
+          wheelUndoPush();
           var L = (def[mine] || []).slice(), j1 = L.indexOf(key);
           // „Same part on all wheels“: beim Rad-Wählen gibt es noch keine Radgruppen – das baugleiche Teil auf der
           // anderen Wagenseite (gespiegelt) wird mitgenommen, sonst bleibt eine Seite ohne Räder (Monza SP2)
