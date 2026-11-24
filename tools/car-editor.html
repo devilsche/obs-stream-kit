@@ -222,6 +222,14 @@
           <button type="button" id="pickFront" aria-pressed="false">Pick steering parts</button>
           <button type="button" id="wheelAuto" class="small">Automatic wheels</button>
         </div>
+        <div class="row">
+          <input type="checkbox" id="hidePicked">
+          <label for="hidePicked">Hide picked parts while picking (reach pieces hidden behind the tyre or rim)</label>
+        </div>
+        <div class="row">
+          <button type="button" id="wheelMissing" class="small">Add missing pieces</button>
+        </div>
+        <p class="muted small-text">“Add missing pieces”: some models split a tyre or rim into several pieces. If only some of them are picked, the rest stands still while the wheel turns and it looks wobbly – this adds the pieces of the same part that sit inside a picked wheel.</p>
         <p class="small-text" id="wheelList"></p>
         <div class="row">
           <input type="checkbox" id="smoothWheels">
@@ -613,6 +621,8 @@
             if (!o.isMesh) return;
             var st = (def.steerParts || []).indexOf(o.userData.pkey) >= 0, ro = (def.wheelParts || []).indexOf(o.userData.pkey) >= 0;
             if (st && ro) o.material = green; else if (ro) o.material = orange; else if (st) o.material = blue;
+            // gewählte Teile ausblenden: dahinter liegende Stücke werden anklickbar
+            if ($('hidePicked').checked && (picking === 'wheel' ? ro : st)) o.visible = false;
           });
         }
         // Lenkeinschlag der Vorderräder: gewählte Vorderräder, sonst die vorderste Achse (Front: +x)
@@ -980,6 +990,33 @@
         show();
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
+      $('hidePicked').addEventListener('change', show);
+      // fehlende Stücke: Teile „X/n“, von denen schon ein Stück „X/m“ rollt bzw. lenkt, und die im Kasten der gewählten
+      // Stücke desselben Rads liegen (Ferrari 488 Pista: je ein Viertel der hinteren Lauffläche stand still → eierte)
+      $('wheelMissing').addEventListener('click', function () {
+        var car = holder.children[0]; if (!car) return;
+        car.updateMatrixWorld(true);
+        var box = {}, all = [];
+        car.traverse(function (o) { if (o.isMesh && o.userData.pkey) { box[o.userData.pkey] = new THREE.Box3().setFromObject(o); all.push(o.userData.pkey); } });
+        var base = function (k) { var m = /^(.*)\/\d+$/.exec(k); return m ? m[1] : null; };
+        var added = 0;
+        ['wheelParts', 'steerParts'].forEach(function (list) {
+          var L = def[list]; if (!Array.isArray(L) || !L.length) return;
+          var groups = {};
+          L.forEach(function (k) { var b = base(k); if (b && box[k]) (groups[b] || (groups[b] = [])).push(box[k]); });
+          all.forEach(function (k) {
+            var b = base(k); if (!b || !groups[b] || L.indexOf(k) >= 0) return;
+            var c = box[k].getCenter(new THREE.Vector3()), sz = box[k].getSize(new THREE.Vector3()).length();
+            // Kasten aller gewählten Stücke desselben Teils in der Nähe (= dasselbe Rad), etwas größer
+            var u = new THREE.Box3();
+            groups[b].forEach(function (g) { var d = g.getSize(new THREE.Vector3()).length(); if (g.getCenter(new THREE.Vector3()).distanceTo(c) < d * 1.2) u.union(g); });
+            var fits = !u.isEmpty() && u.expandByScalar(sz * 0.1 + 0.01).containsPoint(c);
+            if (fits) { L.push(k); added++; }
+          });
+        });
+        listParts(); show();
+        say(added ? 'Added ' + added + ' missing piece' + (added === 1 ? '' : 's') + ' – save to keep them.' : 'No missing pieces found.');
+      });
       $('pickFront').addEventListener('click', function () { setPick('steer'); });
       $('pickSplit').addEventListener('click', function () { setPick('split'); });
       $('pickCut').addEventListener('click', function () { setPick('cut'); if (picking === 'cut') say('Cut a part: click the part you want to cut.'); });
@@ -1087,6 +1124,7 @@
       function pickHit(hits, through) {
         var ok = hits.filter(function (h) {
           if (!h.object.isMesh || h.object.userData.driver) return false;   // die Fahrer-Ente ist nicht wählbar
+          for (var vo = h.object; vo; vo = vo.parent) if (vo.visible === false) return false;   // ausgeblendet (Hide picked parts)
           var m = Array.isArray(h.object.material) ? h.object.material[h.face.materialIndex] : h.object.material;
           if (!m || m.visible === false) return false;
           if (!through) return true;   // durchsichtige Teile wählbar
