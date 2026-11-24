@@ -1210,23 +1210,31 @@
       var x0 = ctx.minX - HALF - M, x1 = ctx.maxX + HALF + M, z0 = ctx.minZ - HALF - M, z1 = ctx.maxZ + HALF + M;
       var W = x1 - x0, D = z1 - z0, hx = (x0 + x1) / 2, hz = (z0 + z1) / 2;
       ctx.hallBox = { x0: x0, x1: x1, z0: z0, z1: z1, h: H };
-      function walls(nx, ny) { return Math.abs(ny) < 0.5; }
       // Reifenstapel statt Leitplanke (wie Industrie)
       var tyres = ctx.kind('tyres', [{ geo: tyreStack(0.5) }], { r: 0.5, tint: true });
       var tcol = [0x1a1a1c, 0x1a1a1c, 0xf2f2f2, 0xd8262b, 0x1a1a1c, 0xf2b705];
       ctx.alongRail(tyres, { step: 1.05, extra: 0.25, tint: function (k) { return tcol[k % tcol.length]; } });
-      // Hülle (sx −1: Flächen zeigen nach innen): Wellblech, Betonsockel, Fensterband, Dach-Unterseite
+      // Hülle aus einzelnen Flächen, die nach innen zeigen (keine Kästen: deren Boden/Deckel blieben als Platten stehen):
+      // Wellblech, Betonsockel, Rost-Band, Dach-Unterseite
+      function band(k, y0b, y1b, inset, color, o) {
+        var h = y1b - y0b, ym = (y0b + y1b) / 2, e = inset || 0;
+        var base = function (extra) { var r = { y: ym }; for (var f in o) r[f] = o[f]; for (var g in extra) r[g] = extra[g]; return r; };
+        k.add(new THREE.PlaneGeometry(W, h), color, base({ x: hx, z: z0 + e }));
+        k.add(new THREE.PlaneGeometry(W, h), color, base({ x: hx, z: z1 - e, ry: Math.PI }));
+        k.add(new THREE.PlaneGeometry(D, h), color, base({ x: x0 + e, z: hz, ry: Math.PI / 2 }));
+        k.add(new THREE.PlaneGeometry(D, h), color, base({ x: x1 - e, z: hz, ry: -Math.PI / 2 }));
+      }
       var sh = new Kit();
-      sh.add(box(W, H, D), 0xc2b3a2, { x: hx, y: H / 2, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 4, faces: walls });
-      sh.add(box(W - 0.1, 2.6, D - 0.1), 0xd1ccc2, { x: hx, y: 1.3, z: hz, sx: -1, tile: 'concrete', uv: 'box', m: 3, faces: walls });
-      sh.add(box(W - 0.12, 3.4, D - 0.12), 0xb08a68, { x: hx, y: 4.3, z: hz, sx: -1, tile: 'rust', uv: 'box', m: 4, faces: walls });   // Rost-Band
-      sh.add(box(W, 0.2, D), 0xc4c9cf, { x: hx, y: H, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 5, faces: function (nx, ny) { return ny < -0.5; } });
+      band(sh, 0, H, 0, 0xc2b3a2, { tile: 'corrugated', uv: 'box', m: 4 });
+      band(sh, 0, 2.6, 0.05, 0xd1ccc2, { tile: 'concrete', uv: 'box', m: 3 });
+      band(sh, 2.6, 6, 0.06, 0xb08a68, { tile: 'rust', uv: 'box', m: 4 });
+      sh.add(new THREE.PlaneGeometry(W, D), 0xc4c9cf, { x: hx, y: H, z: hz, rx: Math.PI / 2, tile: 'corrugated', uv: 'box', m: 5 });
       ctx.bg(sh);
       // Fensterband: Tageslicht von draußen (leuchtend, nur von innen sichtbar), Sprossen davor
       var fb = new Kit();
-      fb.add(box(W - 0.2, 2.4, D - 0.2), 0xd6e2ec, { x: hx, y: 11.4, z: hz, sx: -1, faces: walls });
+      band(fb, 10.2, 12.6, 0.1, 0xd6e2ec, {});
       var win = ctx.kind('windowBand', [{ geo: fb.geo(), mat: 'glow' }], { r: 1 });
-      win.add(hx, hz, { abs: true, y: 0 });
+      win.add(0, 0, { abs: true, y: 0 });
       var mk = new Kit();
       for (var mx = 0; mx <= Math.round(W / 3); mx++) {
         mk.add(box(0.14, 2.5, 0.14), 0x3a4048, { x: x0 + mx * W / Math.round(W / 3), y: 11.4, z: z0 + 0.2 });
