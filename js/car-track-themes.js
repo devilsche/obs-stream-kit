@@ -99,7 +99,8 @@
   // anderes Kit anhängen (Hintergrund: alles in eine Geometrie)
   Kit.prototype.merge = function (k) {
     var off = this.pos.length / 3;
-    Array.prototype.push.apply(this.pos, k.pos); Array.prototype.push.apply(this.col, k.col);
+    // ohne push.apply: große Kits (Stadt) sprengen sonst den Aufruf-Stapel
+    for (var i0 = 0; i0 < k.pos.length; i0++) { this.pos.push(k.pos[i0]); this.col.push(k.col[i0]); }
     for (var i = 0; i < k.chunks.length; i++) { var c = k.chunks[i], d = {}; for (var f in c) d[f] = c[f]; d.at += off; this.chunks.push(d); }
     return this;
   };
@@ -798,6 +799,7 @@
         }
       });
       leafTrees(ctx, 10, 4, 30, 120);
+      greenery(ctx, { grass: 0.14, bush: 0.01, far: 140, farBush: 12 });
       // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
       // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
       var R = ctx.radius + 170, N = 56, w = TAU * R / N * 1.02, up = new Kit();
@@ -808,6 +810,70 @@
       for (var i = 0; i < N; i++) {
         var am = (i + 0.5) / N * TAU;
         upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: Math.PI / 2 - am });
+      }
+      // Stadt hinter dem Oberrang (Speedway): drei Viertel als dichtes Raster aus Blöcken auf grauem Stadtboden (die
+      // Lücken sind die Straßen), innen niedrige Häuser, nach außen und zur Viertelmitte Hochhäuser; Ringstraße um den
+      // Oberrang, je Viertel eine Allee mit Bäumen, dichter Laubwald zwischen den Vierteln. Alles ein Zeichenaufruf (bg),
+      // Bäume als Instanzen. Flächen 0,6 m über dem Boden (flach würden sie auf Entfernung flackern)
+      var sky = new Kit(), srng = ctx.rng(91), FAC = ['office', 'glass', 'brickWin', 'panel', 'office', 'brickWin'];
+      function wallsOnly(nx, ny) { return Math.abs(ny) < 0.5; }
+      var SECT = [[0.05, 0.29], [0.41, 0.59], [0.71, 0.95]], RR = R + 50, C0 = RR + 26, C1 = R + 430, CELL = 34, STREET = 9;
+      function ell(a, d) { return [ctx.cx + Math.cos(a) * d, ctx.cz + Math.sin(a) * d * 0.8]; }
+      function quad(k, a0, a1, d0, d1, col, y) {
+        var p00 = ell(a0, d0), p10 = ell(a1, d0), p01 = ell(a0, d1), p11 = ell(a1, d1);
+        k.tri([p00[0], y, p00[1]], [p10[0], y, p10[1]], [p01[0], y, p01[1]], col);
+        k.tri([p10[0], y, p10[1]], [p11[0], y, p11[1]], [p01[0], y, p01[1]], col);
+      }
+      // Ringstraße und Stadtboden der Viertel
+      for (var ri = 0; ri < 128; ri++) quad(sky, ri / 128 * TAU, (ri + 1) / 128 * TAU, RR - 8, RR + 8, 0x4b4e53, 0.6);
+      SECT.forEach(function (sc) {
+        for (var sa = 0; sa < 24; sa++) {
+          var a0 = (sc[0] + (sc[1] - sc[0]) * sa / 24) * TAU, a1 = (sc[0] + (sc[1] - sc[0]) * (sa + 1) / 24) * TAU;
+          quad(sky, a0, a1, RR + 8, C1 + 20, 0x5e6167, 0.6);
+        }
+      });
+      // Raster: Ringe alle CELL m, je Ring so viele Zellen, dass die Bogenlänge ≈ CELL ist; eine Allee je Viertel frei
+      SECT.forEach(function (sc) {
+        var amid = (sc[0] + sc[1]) / 2;
+        for (var d = C0; d < C1; d += CELL) {
+          var arc = (sc[1] - sc[0]) * TAU * d, nCell = Math.max(2, Math.floor(arc / CELL)), depth = (d - C0) / (C1 - C0);
+          for (var ci = 0; ci < nCell; ci++) {
+            var u = (ci + 0.5) / nCell, a = (sc[0] + (sc[1] - sc[0]) * u) * TAU;
+            if (Math.abs(u - 0.5) * (sc[1] - sc[0]) * TAU * d < 14) continue;   // Allee
+            if (srng() < 0.06) continue;                                       // Platz/Park
+            var mid = 1 - Math.abs(u - 0.5) * 2, p = ell(a, d), size = CELL - STREET - srng() * 6;
+            var wB = size * (0.7 + srng() * 0.3), dB = size * (0.7 + srng() * 0.3);
+            var h = depth < 0.15 ? 6 + srng() * 12 : 10 + Math.pow(srng(), 1.4) * 40 + depth * mid * 120 * (0.5 + srng() * 0.5);
+            var tile = h < 22 ? (srng() < 0.6 ? 'brickWin' : 'panel') : FAC[Math.floor(srng() * FAC.length)];
+            var col = h < 22 ? mix(0xffffff, 0xd8cfc4, srng()) : mix(0xffffff, 0xc4ccd6, srng()), ry = -a;
+            sky.add(box(wB, h, dB), col, { x: p[0], y: 0.6 + h / 2, z: p[1], ry: ry, tile: tile, uv: 'box', m: tile === 'glass' ? 7 : 8, faces: wallsOnly });
+            sky.add(box(wB + 0.6, 0.9, dB + 0.6), h < 22 ? 0x5a5048 : 0x4a4f57, { x: p[0], y: 0.6 + h + 0.45, z: p[1], ry: ry });
+            if (h > 45 && srng() < 0.4) {   // Absatz
+              var h2 = h * (0.2 + srng() * 0.25);
+              sky.add(box(wB * 0.6, h2, dB * 0.6), col, { x: p[0], y: 1.5 + h + h2 / 2, z: p[1], ry: ry, tile: tile, uv: 'box', m: tile === 'glass' ? 7 : 8, faces: wallsOnly });
+              sky.add(box(wB * 0.6 + 0.5, 0.8, dB * 0.6 + 0.5), 0x4a4f57, { x: p[0], y: 1.9 + h + h2, z: p[1], ry: ry });
+              if (srng() < 0.5) sky.add(cyl(0.25, 0.4, 8 + srng() * 12, 5), 0x8c939c, { x: p[0], y: 2.3 + h + h2 + 5, z: p[1] });
+            }
+          }
+        }
+      });
+      ctx.bg(sky);
+      // Alleebäume beidseits der Allee, dichter Laubwald zwischen den Vierteln (vom Ring nach außen)
+      var alley = ctx.kind('alleyTree', [{ geo: leafTree(new Kit(), 0, 0.75).geo() }], { r: 2, tint: true });
+      SECT.forEach(function (sc) {
+        var a = (sc[0] + sc[1]) / 2 * TAU;
+        for (var dd = C0 + 4; dd < C1; dd += 13) [-1, 1].forEach(function (sd) {
+          var p = ell(a, dd), nx = -Math.sin(a), nz = Math.cos(a) * 0.8, L = Math.hypot(nx, nz);
+          alley.add(p[0] + nx / L * sd * 9, p[1] + nz / L * sd * 9, { rot: dd, s: 0.9 + srng() * 0.25, y: 0.6, tint: mix(0xffffff, 0xb8cc9c, srng()) });
+        });
+      });
+      var woods = ctx.kind('woodsTree', [{ geo: leafTree(new Kit(), 0, 1).geo() }], { r: 3, tint: true });
+      for (var wc = 0, placedW = 0; wc < 6000 && placedW < 1400; wc++) {
+        var wa = srng();
+        if (SECT.some(function (sc) { return wa > sc[0] - 0.012 && wa < sc[1] + 0.012; })) continue;
+        var wp = ell(wa * TAU, RR + 14 + Math.pow(srng(), 0.8) * 300);
+        woods.add(wp[0], wp[1], { rot: srng() * TAU, s: 1.0 + srng() * 0.9, tint: mix(0xffffff, 0xa9c48c, srng()) });
+        placedW++;
       }
     }
   };
