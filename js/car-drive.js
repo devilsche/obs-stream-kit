@@ -317,7 +317,7 @@
       holder.add(model);
       if (opts.duck) car.duck = addDuck(model, key, opts.outfit);
       car.wheels = collectWheels(holder, model, st.len, car.height);
-      car.rimBlur = SPD ? SPD.wheels(holder, car.wheels) : null;
+      car.rimBlur = null;   // Felgen-Unschärfe (durchsichtige Scheibe außen am Rad) aus – wirkte wie eine Platte (User 2026-11-24)
     } else {
       // Ersatz-Kiste (Modell nicht geladen)
       var mat = new THREE.MeshStandardMaterial({ color: new THREE.Color(set && set.c != null ? set.c : 0x9146ff), roughness: 0.4, metalness: 0.1 });
