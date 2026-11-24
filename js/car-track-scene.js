@@ -439,6 +439,7 @@
     decor.objs.push({ o: gantry, r: HALF + 13 });
 
     // ---- Himmel: Kuppel mit Verlauf (Horizont → Zenit), ohne Nebel/Tonemapping, hinter allem (nicht in Hallen) ----
+    var skyDome = null;
     if (!theme.indoor) (function () {
       var geo = own(new THREE.SphereGeometry(SKY_R, 32, 14)), p = geo.attributes.position, cols = [];
       var top = lin(theme.sky.top), hz = lin(theme.sky.horizon), c = new THREE.Color();
@@ -446,6 +447,7 @@
       geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
       var dome = new THREE.Mesh(geo, own(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false })));
       dome.position.set(cx, 0, cz); dome.renderOrder = -10; dome.frustumCulled = false; g.add(dome);
+      skyDome = dome;
     })();
 
     // ---- Deko (Thema) ----
@@ -766,6 +768,48 @@
         });
       }, 250);
     });
+    // ---- Himmel aus dem Katalog (slot sky: Kugel mit Panorama, Sketchfab) statt der Farbverlauf-Kuppel ----
+    // Kugel um die Streckenmitte (Horizont des Panoramas auf Bodenhöhe), ohne Nebel/Tonemapping, hinter allem; Nebel
+    // und Hintergrund bekommen die mittlere Farbe des Panorama-Horizonts (Berge/Skyline laufen sauber hinein)
+    var skyMesh = null, skyHz = null;
+    function horizonColor(img) {
+      try {
+        var cv = root.document.createElement('canvas'); cv.width = 64; cv.height = 32;
+        var x = cv.getContext('2d'); x.drawImage(img, 0, 0, 64, 32);
+        var d = x.getImageData(0, 14, 64, 3).data, r = 0, gg = 0, b = 0, n = d.length / 4;
+        for (var i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; }
+        return new THREE.Color(r / n / 255, gg / n / 255, b / n / 255);
+      } catch (e) { return null; }
+    }
+    if (skyDome) setTimeout(function () {
+      gateThen(function () {
+        loadPropCatalog().then(function (cat) {
+          var tids = theme.propTheme ? [theme.id, theme.propTheme] : [theme.id];
+          var e = cat.props.filter(function (p) {
+            return p && p.uid && p.slot === 'sky' && (Array.isArray(p.themes) ? p.themes.some(function (t) { return tids.indexOf(t) >= 0; }) : tids.indexOf(p.theme) >= 0);
+          })[0];
+          if (!e) return;
+          loadPropTpl(e).then(function (tpl) {
+            gateThen(function () {
+              if (disposed || !tpl.parts.length) return;
+              var pm = tpl.parts[0].mat, map = pm.map || pm.emissiveMap;
+              if (!map) return;
+              var k = SKY_R * 0.98 * 2 / Math.max(tpl.size.x, 1e-3);
+              skyMesh = new THREE.Mesh(tpl.parts[0].geo, own(new THREE.MeshBasicMaterial({ map: map, side: THREE.DoubleSide, fog: false, depthWrite: false, toneMapped: false })));
+              skyMesh.scale.setScalar(k); skyMesh.position.set(cx, -tpl.size.y / 2 * k + (theme.skyLift || 0), cz);
+              skyMesh.renderOrder = -10; skyMesh.frustumCulled = false; g.add(skyMesh);
+              skyDome.visible = false;
+              skyHz = map.image ? horizonColor(map.image) : null;
+              if (skyHz && envSaved && envSaved.scene) {
+                if (envSaved.scene.fog) envSaved.scene.fog.color.copy(skyHz);
+                if (envSaved.scene.background && envSaved.scene.background.isColor) envSaved.scene.background.copy(skyHz);
+              }
+              propStats.loaded.push(e.key || e.uid);
+            });
+          }, function () { propStats.failed.push(e.key || e.uid); });
+        });
+      });
+    }, 300);
     // Hintergrund: alles in eine Geometrie (ein Zeichenaufruf)
     if (bgKits.length) {
       var all = new Themes.Kit();
@@ -848,8 +892,8 @@
     function applyEnv(scene, renderer, o) {
       restoreEnv();
       envSaved = { scene: scene, renderer: renderer, fog: scene.fog, bg: scene.background, exp: renderer ? renderer.toneMappingExposure : null, lights: [] };
-      scene.fog = new THREE.Fog(theme.sky.horizon, theme.fog.near, theme.fog.far);
-      if (o && o.background) scene.background = new THREE.Color(theme.sky.horizon);
+      scene.fog = new THREE.Fog(skyHz || theme.sky.horizon, theme.fog.near, theme.fog.far);
+      if (o && o.background) scene.background = new THREE.Color(skyHz || theme.sky.horizon);
       var dirs = 0;
       scene.children.forEach(function (l) {
         if (!l.isLight) return;

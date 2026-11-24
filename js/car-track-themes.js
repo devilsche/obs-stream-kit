@@ -792,7 +792,7 @@
         }
       });
       leafTrees(ctx, 10, 4, 30, 120);
-      greenery(ctx, { grass: 0.14, bush: 0.012, far: 120, farBush: 14 });
+      greenery(ctx, { grass: 0.26, bush: 0.016, far: 300, farBush: 24 });
       // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
       // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
       var R = ctx.radius + 170, N = 56, w = TAU * R / N * 1.02, up = new Kit();
@@ -808,10 +808,59 @@
       // Paneele; ein Zeichenaufruf). Zur Mitte eines Viertels höher, mit Absätzen, Dachkanten und Antennen; im Dunst
       var sky = new Kit(), srng = ctx.rng(91), FAC = ['office', 'glass', 'brickWin', 'panel', 'office', 'glass'];
       function wallsOnly(nx, ny) { return Math.abs(ny) < 0.5; }
-      [[0.04, 0.3], [0.4, 0.6], [0.7, 0.96]].forEach(function (sc) {
+      var SECT = [[0.04, 0.3], [0.4, 0.6], [0.7, 0.96]];
+      function ell(a, d) { return [ctx.cx + Math.cos(a) * d, ctx.cz + Math.sin(a) * d * 0.8]; }
+      // Straßen (Asphalt-Platten 0,3 m hoch – flach auf dem Boden würden sie auf Entfernung flackern): Ringstraße um
+      // den Oberrang, je Viertel eine Allee in die Stadt mit Mittelstreifen; Bäume an den Alleen
+      var road = new Kit(), RR = R + 32;
+      function slab(a0, b0, wd, col, y, hgt) {
+        var dx = b0[0] - a0[0], dz = b0[1] - a0[1], L = Math.hypot(dx, dz);
+        road.add(box(L + wd * 0.02, hgt || 0.3, wd), col, { x: (a0[0] + b0[0]) / 2, y: y || 0.15, z: (a0[1] + b0[1]) / 2, ry: -Math.atan2(dz, dx) });
+      }
+      for (var ri = 0; ri < 96; ri++) slab(ell(ri / 96 * TAU, RR), ell((ri + 1) / 96 * TAU, RR), 14, 0x4b4e53);
+      var aves = SECT.map(function (sc) { var a = (sc[0] + sc[1]) / 2 * TAU; return { a0: ell(a, RR), a1: ell(a, R + 440) }; });
+      var alley = ctx.kind('alleyTree', [{ geo: leafTree(new Kit(), 0, 0.8).geo() }], { r: 2 });
+      aves.forEach(function (av) {
+        slab(av.a0, av.a1, 18, 0x4b4e53);
+        slab(av.a0, av.a1, 1.6, 0x6f8a5a, 0.35, 0.4);   // Grünstreifen in der Mitte
+        var dx = av.a1[0] - av.a0[0], dz = av.a1[1] - av.a0[1], L = Math.hypot(dx, dz), nx = -dz / L, nz = dx / L;
+        for (var tl = 20; tl < L - 10; tl += 16) [-1, 1].forEach(function (sd) {
+          alley.add(av.a0[0] + dx / L * tl + nx * sd * 12, av.a0[1] + dz / L * tl + nz * sd * 12, { rot: tl, s: 0.9 + srng() * 0.3, y: 0.3 });
+        });
+      });
+      ctx.bg(road);
+      function nearAve(x, z, m) {
+        return aves.some(function (av) {
+          var dx = av.a1[0] - av.a0[0], dz = av.a1[1] - av.a0[1], L2 = dx * dx + dz * dz, t = ((x - av.a0[0]) * dx + (z - av.a0[1]) * dz) / L2;
+          if (t < -0.02 || t > 1.05) return false;
+          return Math.hypot(av.a0[0] + dx * t - x, av.a0[1] + dz * t - z) < m;
+        });
+      }
+      // Wald zwischen den Vierteln (vom Ring bis zur Stadtgrenze), in Gruppen
+      var woods = ctx.kind('woodsTree', [{ geo: leafTree(new Kit(), 0, 1).geo() }], { r: 3, tint: true });
+      for (var wc = 0, placedW = 0; wc < 3000 && placedW < 520; wc++) {
+        var wa = srng(), inSect = SECT.some(function (sc) { return wa > sc[0] - 0.01 && wa < sc[1] + 0.01; });
+        if (inSect) continue;
+        var wd2 = RR + 14 + srng() * 360, wp = ell(wa * TAU, wd2);
+        woods.add(wp[0], wp[1], { rot: srng() * TAU, s: 0.8 + srng() * 0.7, tint: mix(0xffffff, 0xb8cc9c, srng()) });
+        placedW++;
+      }
+      // niedrige Häuser zwischen Ringstraße und Hochhäusern (Übergang), Backstein/Paneele
+      SECT.forEach(function (sc) {
+        for (var lr = 0; lr < 26; lr++) {
+          var la = (sc[0] + (sc[1] - sc[0]) * srng()) * TAU, ld = RR + 22 + srng() * 50, lp = ell(la, ld);
+          var lw = 12 + srng() * 14, lD = 10 + srng() * 12, lh = 7 + srng() * 15;
+          if (nearAve(lp[0], lp[1], Math.max(lw, lD) / 2 + 11)) continue;
+          var lt = srng() < 0.5 ? 'brickWin' : 'panel', lry = -la + (srng() - 0.5) * 0.2;
+          sky.add(box(lw, lh, lD), mix(0xffffff, 0xd8cfc4, srng()), { x: lp[0], y: lh / 2, z: lp[1], ry: lry, tile: lt, uv: 'box', m: 7, faces: wallsOnly });
+          sky.add(box(lw + 0.5, 0.6, lD + 0.5), 0x5a5048, { x: lp[0], y: lh + 0.3, z: lp[1], ry: lry });
+        }
+      });
+      SECT.forEach(function (sc) {
         for (var t = 0; t < 30; t++) {
           var u = srng(), am2 = (sc[0] + (sc[1] - sc[0]) * u) * TAU, mid = 1 - Math.abs(u - 0.5) * 2;
           var dist = R + 95 + srng() * 260, bx = ctx.cx + Math.cos(am2) * dist, bz = ctx.cz + Math.sin(am2) * dist * 0.8;
+          if (nearAve(bx, bz, 34)) continue;
           var h = 28 + Math.pow(srng(), 1.5) * 70 + mid * 70 * srng(), wB = 16 + srng() * 24, dB = 16 + srng() * 20;
           var tile = FAC[Math.floor(srng() * FAC.length)], col = mix(0xffffff, 0xc4ccd6, srng()), ry = -am2 + (srng() < 0.3 ? 0.3 : 0);
           sky.add(box(wB, h, dB), col, { x: bx, y: h / 2, z: bz, ry: ry, tile: tile, uv: 'box', m: tile === 'glass' ? 7 : 9, faces: wallsOnly });

@@ -1458,5 +1458,60 @@
   "aggressive": true,
   "note": "ganzes Stadtviertel als Skyline hinter dem Oberrang (Speedway)",
   "skip": "99 Materialien (= 99 Zeichenaufrufe je Stück), 12 MB, nur 44 m hoch – Skyline jetzt prozedural (js/car-track-themes.js, Stadion)"
+ },
+ {
+  "uid": "6ce2eb7cb56f4efaa4212c2fc37099b2",
+  "key": "sky-sunroof-city",
+  "name": "FREE - SkyBox Sunroof in the City",
+  "author": "Paul",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/free-skybox-sunroof-in-the-city-6ce2eb7cb56f4efaa4212c2fc37099b2",
+  "theme": "stadium",
+  "themes": [
+   "stadium"
+  ],
+  "kind": "sky",
+  "slot": "sky",
+  "len": 2,
+  "tris": 4000,
+  "tex": 1024,
+  "note": "Himmelskugel mit Panorama (ersetzt die Farbverlauf-Kuppel)"
+ },
+ {
+  "uid": "b270497defe24f9cb497b9a075eeb28f",
+  "key": "sky-in-the-cloud",
+  "name": "FREE - SkyBox In The Cloud",
+  "author": "Paul",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/free-skybox-in-the-cloud-b270497defe24f9cb497b9a075eeb28f",
+  "theme": "forest",
+  "themes": [
+   "forest",
+   "alpine"
+  ],
+  "kind": "sky",
+  "slot": "sky",
+  "len": 2,
+  "tris": 4000,
+  "tex": 1024,
+  "note": "Himmelskugel mit Panorama (ersetzt die Farbverlauf-Kuppel)"
+ },
+ {
+  "uid": "b2a4fd1b92c248abaae31975c9ea79e2",
+  "key": "sky-basic",
+  "name": "FREE - SkyBox Basic Sky",
+  "author": "Paul",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/free-skybox-basic-sky-b2a4fd1b92c248abaae31975c9ea79e2",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "sky",
+  "slot": "sky",
+  "len": 2,
+  "tris": 4000,
+  "tex": 1024,
+  "note": "Himmelskugel mit Panorama (ersetzt die Farbverlauf-Kuppel)"
  }
 ]
