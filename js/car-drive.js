@@ -606,7 +606,8 @@
   }
   // ---- Umschauen: Maus/Touch ziehen dreht die Kamera um das eigene Auto, Mausrad/Pinch zoomt ----
   // look.yaw = Winkel um das Auto (0 = hinter dem Auto), look.pitch = Höhe, look.dist = Abstand; im Countdown und im
-  // Rennen. Ohne Eingabe pendelt die Kamera nach LOOK_IDLE s sanft zurück hinter das Auto (reduzierte Bewegung: sofort).
+  // Rennen. Der eingestellte Blick bleibt, bis C / Y gedrückt wird – das holt die vorherige Kamera zurück (statt
+  // weiterzuschalten); ohne verstellten Blick schaltet C / Y wie gewohnt durch. (Früher: nach LOOK_IDLE s zurück.)
   var LOOK_IDLE = 2.5, LOOK_PITCH = 0.32;
   var look = { used: false, yaw: 0, pitch: LOOK_PITCH, dist: 0, ptrs: {}, pinch: 0, idle: 0 };
   function lookAllowed() { return !!(race && (race.phase === 'countdown' || race.phase === 'race' || race.phase === 'done') && !race.paused && race.pc); }
@@ -614,7 +615,7 @@
   function lookBase() { return race ? race.me.len * 1.15 + 4.2 : 9; }
   // je Bild: nach der Ruhezeit Winkel, Höhe und Abstand weich zur Verfolgerposition zurück, dann übernimmt die Kamera
   function lookReturn(dt) {
-    if (!look.used || Object.keys(look.ptrs).length) { look.idle = 0; return; }
+    if (!look.used || Object.keys(look.ptrs).length || !look.auto) { look.idle = 0; return; }
     look.idle += dt;
     if (look.idle < LOOK_IDLE) return;
     if (REDUCE) { lookReset(); race.camPos = null; return; }
@@ -2219,7 +2220,10 @@
       renderer.render(scene, cam); return;
     }
     var pc = race.pc;
-    if (pressed.KeyC || (p && p.cam)) setCam(CAM_ORDER[(CAM_ORDER.indexOf(race.camMode) + 1) % CAM_ORDER.length], true);
+    if (pressed.KeyC || (p && p.cam)) {
+      if (look.used) { var lp = look.ptrs; lookReset(); look.ptrs = lp; race.camPos = null; flash(CAMS[race.camMode], 1); }   // Blick zurück auf die letzte Kamera
+      else setCam(CAM_ORDER[(CAM_ORDER.indexOf(race.camMode) + 1) % CAM_ORDER.length], true);
+    }
     if (race.phase === 'countdown') {
       var before = Math.ceil(race.cd);
       race.cd = race.mp ? mp.startAt - mp.net.serverNow() : race.cd - dt;
