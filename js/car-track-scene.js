@@ -513,7 +513,7 @@
     // o = { r (Radius bei Größe 1), tint, prop }. prop = { slot (Katalog-Feld slot, sonst kind), box: { w, d, h } (Platz
     // in m, lokal x/z/y – das Modell wird nur verkleinert, nie vergrößert), yaw (Zusatzdrehung), y (Höhe über dem Platz),
     // front (Vorderkante auf lokal z), tile (kleine Modelle entlang x nebeneinander, bis box.w voll ist),
-    // cull (nur Modelle hinter der Kamera weglassen, z. B. Berge),
+    // cull (nur Modelle hinter der Kamera weglassen, z. B. Berge), cut (m: kleine Modelle – Farne, Blumen – nur bis hier),
     // noProc (nur Modelle, Bäume: die Ersatzform wird nie gezeichnet; fern zeigt lod() das leichteste Modell der Art),
     // onProp(spot, { height, scale, faceZ }) } – Modelle derselben Art wechseln sich je Platz
     // ab (Reihenfolge des Katalogs, unabhängig davon, welches zuerst geladen ist). o.vary: Atlas-Kachel je Platz
@@ -759,7 +759,7 @@
       });
       // schwere Modelle (≥ LOD_TRIS Dreiecke je Stück) mit prozeduraler Ersatzform: weit weg die Ersatzform (lod())
       // viele kleine Modelle (Gras, Büsche): jenseits SMALL_FAR m und hinter der Kamera gar nicht zeichnen (lod())
-      kd.propSets.push({ meshes: meshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: slots.length >= 200 && !P0.noProc });
+      kd.propSets.push({ meshes: meshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: (slots.length >= 200 || !!P0.cut) && !P0.noProc, cut: P0.cut || SMALL_FAR });
       propStats.tris += tpl.tris * slots.length; propStats.draws += meshes.length;
       // nur Modelle (noProc, Bäume): fern statt der Ersatzform das leichteste Modell der Art an allen fernen Plätzen
       if (P0.noProc && (!kd.farSet || tpl.tris < kd.farSet.tris)) {
@@ -1009,7 +1009,7 @@
           ps.slots.forEach(function (sl) {
             var sp = kd.spots[sl.spot];
             if (sp.hidden || sp.far || !sp.vis) return;
-            if (ps.many && Math.hypot(sp.x - x, sp.z - z) > SMALL_FAR) return;
+            if (ps.many && Math.hypot(sp.x - x, sp.z - z) > ps.cut) return;
             ps.meshes.forEach(function (m) { m.setMatrixAt(k, sl.m); });
             k++;
           });

@@ -669,8 +669,24 @@
   // Unterwuchs zwischen den Bäumen (User: „zwischen den Bäumen ist es kahl“): um jeden Baum-Platz der Arten in kinds
   // 1–3 Büsche, ein paar Grasbüschel und gelegentlich ein Stein (rock: Art mit ROCK_PROP); eigene Zufallsfolge, nie näher als
   // 20 m an der Mittellinie (Auslauf bleibt frei); g = Rückgabe von greenery. o = { bush, grass, rock, pred }
+  // Dazu Farne (slot fern, o.fern je Baum) und Blumen auf den Wiesen (slot flower, o.flowers Stück bis o.flowerMax m);
+  // beide nur als Kulissen-Modelle (Prop search), ohne Ersatzform
   function undergrowth(ctx, g, kinds, rock, o) {
     var ur = ctx.rng(41);
+    var fern = o.fern ? ctx.kind('fern', [], { r: 0.6, prop: { slot: 'fern', cut: 55, box: { w: 3.5, d: 3.5, h: 1.6 } } }) : null;
+    if (o.flowers) {
+      var flower = ctx.kind('flower', [], { r: 0.4, prop: { slot: 'flower', cut: 45, box: { w: 2, d: 2, h: 1.4 } } });
+      for (var fi = 0, fn = 0; fi < o.flowers * 3 && fn < o.flowers; fi++) {
+        // in Gruppen: Mittelpunkt im Gelände, 3–7 Blumen drumherum
+        var c = ctx.randomSpot(16, o.flowerMax || 120);
+        if (!c || (o.pred && !o.pred(c.x, c.z))) continue;
+        for (var fk = 0, fm = 3 + Math.floor(ur() * 5); fk < fm; fk++) {
+          var fa = ur() * TAU, fd = ur() * 3.5, fx = c.x + Math.cos(fa) * fd, fz = c.z + Math.sin(fa) * fd;
+          if (ctx.trackDist(fx, fz, 24) < 20) continue;
+          flower.add(fx, fz, { rot: ur() * TAU, s: 0.8 + ur() * 0.5 }); fn++;
+        }
+      }
+    }
     kinds.forEach(function (kd) {
       kd.spots.slice().forEach(function (sp) {
         function near(r0, r1) {
@@ -678,10 +694,11 @@
           if ((o.pred && !o.pred(x, z)) || ctx.trackDist(x, z, 24) < 20) return null;
           return [x, z];
         }
-        var nb = Math.floor(o.bush * (0.5 + ur())), ng = Math.floor(o.grass * (0.5 + ur())), p;
+        var nb = Math.floor(o.bush * (0.5 + ur())), ng = Math.floor(o.grass * (0.5 + ur())), p, nf;
         for (var i = 0; i < nb; i++) if ((p = near(2.2, 7))) g.bush.add(p[0], p[1], { rot: ur() * TAU, s: 0.6 + ur() * 0.7 });
         for (i = 0; i < ng; i++) if ((p = near(1.2, 8))) g.grass.add(p[0], p[1], { rot: ur() * TAU, s: 0.9 + ur() * 0.6, tint: g.gTint() });
         if (rock && ur() < o.rock && (p = near(2.5, 7))) rock.add(p[0], p[1], { rot: ur() * TAU, s: 0.35 + ur() * 0.6 });
+        if (fern) for (i = 0, nf = Math.floor(o.fern * (0.5 + ur())); i < nf; i++) if ((p = near(1.5, 7))) fern.add(p[0], p[1], { rot: ur() * TAU, s: 0.7 + ur() * 0.6 });
       });
     });
   }
@@ -1096,7 +1113,7 @@
       var fence = ctx.kind('fence', [{ geo: fk.geo() }], { r: 2.1 });
       ctx.alongRail(fence, { step: 4, extra: 2.2, side: ctx.T.turnDir > 0 ? -1 : 1, every: function (s) { return Math.floor(s / 60) % 2 === 0; } });
       var gF = greenery(ctx, { grass: 0.22, bush: 0.02, far: 220, farBush: 30, pred: offCreek });
-      undergrowth(ctx, gF, [treeN, pine], rockF, { bush: 2, grass: 5, rock: 0.25, pred: offCreek });
+      undergrowth(ctx, gF, [treeN, pine], rockF, { bush: 2, grass: 5, rock: 0.25, fern: 4, flowers: 700, flowerMax: 120, pred: offCreek });
     }
   };
 
@@ -1166,7 +1183,7 @@
       hk.add(box(0.6, 2, 0.6), 0x77736d, { x: 2.2, y: 5.6, z: -1 });
       ctx.scatter(ctx.kind('hut', [{ geo: hk.geo() }], { r: 5, prop: { slot: 'hut', box: { w: 12, d: 12, h: 12 } } }), 4, { dmin: 26, dmax: 110, rad: 5.5, s: [0.9, 1.1] });
       var gA = greenery(ctx, { grass: 0.16, bush: 0.02, far: 320, farBush: 90, farMax: 160 });
-      undergrowth(ctx, gA, [treeN, pine], rockA, { bush: 2.2, grass: 6, rock: 0.3 });
+      undergrowth(ctx, gA, [treeN, pine], rockA, { bush: 2.2, grass: 6, rock: 0.3, fern: 1.5, flowers: 1400, flowerMax: 160 });
     }
   };
 
