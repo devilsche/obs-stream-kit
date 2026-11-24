@@ -482,7 +482,9 @@
     // Drehstoß: schiebt mich ein Auto auf fester Bahn nur seitlich an (Schrammen), dreht es mich kaum – sonst reicht
     // ein Anstupser am Heck, um mich aus der Kurve zu drehen; eigene Treffer und harte Aufpralle drehen voll
     // (auch beim Crash, wenn ein leichteres Auto mich anfährt: ein Golf dreht keinen Bus)
-    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * (share < 1 && (impact < CRASH_V || mA < mP * 0.9) ? 0.35 : 1);
+    // Mitspieler: der andere bekommt seinen Teil ebenfalls – zusammen nicht doppelt drehen; Anlehnen kaum
+    var turnK = peer ? (impact < CRASH_V ? 0.12 : 0.6) : (share < 1 && (impact < CRASH_V || mA < mP * 0.9) ? 0.35 : 1);
+    car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * turnK;
     var scrape = impact < CRASH_V;
     if (!scrape) {
       // Knautschzone: zusätzlicher Tempoverlust nach Aufprall und Massenverhältnis (gegen schwere Autos mehr)
@@ -507,7 +509,8 @@
     car.vx += jx / mP; car.vz += jz / mP;
     if (isFinite(px) && isFinite(pz)) {
       var rx = px - car.x, rz = pz - car.z;
-      if (rx * rx + rz * rz < P.len * P.len) car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * ((imp || 0) >= CRASH_V ? 1 : 0.35);
+      // Anlehnen/Schrammen dreht kaum (zwei Autos Seite an Seite drehen sich nicht weg), echte Crashs deutlich
+      if (rx * rx + rz * rz < P.len * P.len) car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * ((imp || 0) >= CRASH_V ? 0.6 : 0.12);
     }
     if ((imp || 0) >= CRASH_V) { car.hitT = Math.max(car.hitT || 0, Math.min(HIT_T, 0.12 + imp * 0.035)); car.steer *= 0.5; }
     var fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw), lx = -Math.sin(car.yaw), lz = -Math.cos(car.yaw);

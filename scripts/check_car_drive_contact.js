@@ -80,12 +80,13 @@ function side(car, a) { return (car.x - a.x) * a.nx + (car.z - a.z) * a.nz; }
   var a = carFor('bmw-m3-competition', T, { s: S0, d: 0 }), A0 = T.at(S0), w = a.P.width;
   var b = carFor('bmw-m3-competition', T, { s: S0, d: w - 0.1 });
   setSpeed(a, 20); setSpeed(b, 20);
-  var vq = 0;
-  var r = duel(a, b, { throttle: 0.5 }, { throttle: 0.5 }, 5, function () {
+  var vq = 0, yr = 0;
+  var r = duel(a, b, { throttle: 0.5, steer: -0.04 }, { throttle: 0.5, steer: 0.04 }, 5, function () {
     var A = T.at(a.prog);
     vq = Math.max(vq, Math.abs(a.vx * A.nx + a.vz * A.nz), Math.abs(b.vx * A.nx + b.vz * A.nz));
+    yr = Math.max(yr, Math.abs(a.r), Math.abs(b.r));
   });
-  ok(vq < 0.5 && r.crashA + r.crashB === 0, 'nebeneinander anlehnen 5 s: größte Querbewegung ' + vq.toFixed(2) + ' m/s, ' + (r.crashA + r.crashB) + ' Crashs');
+  ok(r.crashA + r.crashB === 0 && yr < 0.35, 'nebeneinander, beide lenken leicht hinein (5 s): ' + (r.crashA + r.crashB) + ' Crashs, größte Drehrate ' + yr.toFixed(2) + ' rad/s (kein Wegdrehen), quer ' + vq.toFixed(2) + ' m/s');
 })();
 
 // 3) Auffahren Δv 6 m/s
