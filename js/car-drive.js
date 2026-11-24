@@ -357,6 +357,39 @@
     }
     if (c.duck && TC.updateDriverClip) TC.updateDriverClip(c.duck);
   }
+  // ---- Namen über den Gegnern (Sprite in der Szene, dreht sich zur Kamera; klein, blendet ab TAG_NEAR m aus, ab TAG_FAR
+  // weg; hinter Wänden verdeckt) – Mitspieler (label), KI im Solo und Fahrer im Chatrennen (name) ----
+  var TAG_NEAR = 40, TAG_FAR = 65, TAG_H = 0.42;
+  function nameTag(c, text) {
+    var cv = doc.createElement('canvas'), g = cv.getContext('2d'), fs = 40, pad = 18;
+    g.font = '700 ' + fs + 'px "DM Sans", system-ui, sans-serif';
+    var tw = Math.min(900, Math.ceil(g.measureText(text).width)), w = tw + pad * 2, h = fs + 22;
+    cv.width = w; cv.height = h;
+    g.font = '700 ' + fs + 'px "DM Sans", system-ui, sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'center';
+    g.fillStyle = 'rgba(13, 9, 18, 0.62)';
+    var r = h / 2; g.beginPath(); g.moveTo(r, 0); g.lineTo(w - r, 0); g.arc(w - r, r, r, -Math.PI / 2, Math.PI / 2); g.lineTo(r, h); g.arc(r, r, r, Math.PI / 2, Math.PI * 1.5); g.fill();
+    g.fillStyle = '#ffffff'; g.fillText(text, w / 2, h / 2 + 1);
+    var tex = new THREE.CanvasTexture(cv); tex.encoding = THREE.sRGBEncoding;
+    var mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false });
+    var sp = new THREE.Sprite(mat);
+    sp.scale.set(TAG_H * w / h, TAG_H, 1); sp.position.set(0, (c.height || 1.3) + 0.75, 0); sp.renderOrder = 3;
+    if (c.tag) { c.holder.remove(c.tag); }
+    c.holder.add(sp); c.owned.push(mat, tex); c.tag = sp; c.tagText = text;
+  }
+  function tagsFrame() {
+    if (!race) return;
+    var seen = [];
+    (race.ai || []).concat(race.remotes || []).forEach(function (c) {
+      if (!c || c === race.me || seen.indexOf(c) >= 0) return;
+      seen.push(c);
+      var t = c.label || c.name;
+      if (!t) return;
+      if (!c.tag || c.tagText !== t) nameTag(c, String(t).slice(0, 24));
+      var d = cam.position.distanceTo(c.holder.position), a = clamp((TAG_FAR - d) / (TAG_FAR - TAG_NEAR), 0, 1);
+      c.tag.material.opacity = a;
+      c.tag.visible = a > 0.02 && c.holder.visible;
+    });
+  }
   function disposeCar(c) {
     if (c.rimBlur) { c.rimBlur.dispose(); c.rimBlur = null; }
     scene.remove(c.holder);
@@ -2195,6 +2228,7 @@
     grassFrame(dt);
     mapFrame(now);
     aiHud();
+    tagsFrame();
     renderer.render(scene, cam);
   }
   function stepWorld(dt, inp) {
