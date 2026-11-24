@@ -81,6 +81,17 @@ def _viewer():
     return drive_auth.read_viewer(request.cookies.get(drive_auth.VIEWER_COOKIE))
 
 
+def _is_guest(viewer):
+    """Gast ohne Twitch-Login (nur im Testraum TESTME, id "guest-…")."""
+    return bool(viewer) and str(viewer.get("id", "")).startswith("guest-")
+
+
+def _new_guest():
+    """Gast-Kennung für den Testraum: zufällige id, Name „Guest 1234“."""
+    n = secrets.randbelow(9000) + 1000
+    return {"id": "guest-" + secrets.token_hex(6), "login": "guest", "display_name": "Guest %d" % n}
+
+
 def _theme(tenant_id):
     from pubg.db_pg import get_setting
     from webcore.middleware import _get_conn
@@ -106,6 +117,12 @@ def page(code):
     info = drive_auth.call("room", code=code)
     room = info.get("room") if info.get("ok") else None
     viewer = _viewer()
+    guest_cookie = None
+    if not viewer and room and room.get("test"):
+        # Testraum: ohne Anmeldung als Gast fahren (Cookie wie nach dem Twitch-Login, gilt nur hier)
+        info_g = _new_guest()
+        guest_cookie = drive_auth.make_viewer(info_g)
+        viewer = drive_auth.read_viewer(guest_cookie)
     root = _root()
     with open(os.path.join(root, "tools", "car-drive.html"), encoding="utf-8") as f:
         html = f.read()
@@ -126,7 +143,11 @@ def page(code):
     html = html.replace("</head>", inject + "\n</head>", 1)
     if room:
         html = inject_theme(html, _theme(room["tenant"]))
-    return html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate"}
+    resp = make_response(html, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate"})
+    if guest_cookie:
+        resp.set_cookie(drive_auth.VIEWER_COOKIE, guest_cookie, max_age=drive_auth.VIEWER_AGE, path="/drive",
+                        secure=request.is_secure, httponly=True, samesite="Lax")
+    return resp
 
 
 def _page_html(root):
@@ -246,7 +267,7 @@ def race_ticket(key):
     if tid is None:
         abort(404)
     viewer = _viewer()
-    if not viewer:
+    if not viewer or _is_guest(viewer):
         return _no_store(jsonify({"ok": False, "signin": True, "error": "sign in with Twitch first"})), 401
     now = time.time()
     _sync(tid, now)
@@ -299,11 +320,14 @@ def ticket(code):
     if not info.get("ok"):
         return _no_store(jsonify({"ok": False, "error": info.get("error") or "room not found"})), 404
     room = info["room"]
+    guest = _is_guest(viewer)
+    if guest and not room.get("test"):
+        return _no_store(jsonify({"ok": False, "signin": True, "error": "sign in with Twitch first"})), 401
     tid = room["tenant"]
     cars = [c for c in race.eligible(_catalog(), car_models.load(_root(), "vehicles")) if c.get("key")]
     pool = [c["key"] for c in cars]
     prices = {c["key"]: race_shop.price(c["key"], c) for c in cars}
-    owner = _owner_id(tid) == str(viewer["id"])
+    owner = guest or _owner_id(tid) == str(viewer["id"])   # Gast im Testraum: alle Autos zum Ausprobieren
     garage = []
     try:
         from fx.endpoints import _with_conn

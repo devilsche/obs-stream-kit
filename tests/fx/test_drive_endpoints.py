@@ -137,3 +137,36 @@ def test_engine_sounds_without_token(conn, root, calls):
     assert c.get("/drive/a/assets/sounds/engines/i4/loop-900-1.mp3").status_code == 200
     assert c.get("/drive/a/assets/sounds/engines/../../../tools/car-drive.html").status_code == 404
     assert c.get("/drive/a/assets/sounds/engines/i4/none.mp3").status_code == 404
+
+
+TEST_ROOM = dict(ROOM, code="TESTME", test=True)
+
+
+@pytest.fixture
+def calls_test(monkeypatch):
+    def fake(cmd, timeout=3.0, **params):
+        if cmd == "room":
+            code = params.get("code")
+            return {"ok": True, "room": TEST_ROOM if code == "TESTME" else ROOM, "roster": []} if code in ("TESTME", "ABC234") else {"ok": False}
+        return {"ok": True, "room": ROOM}
+    monkeypatch.setattr(drive_auth, "call", fake)
+
+
+def test_test_room_without_signin_gets_guest(conn, root, calls_test):
+    c = _app(conn, root)
+    r = c.get("/drive/TESTME")
+    html = r.get_data(as_text=True)
+    assert r.status_code == 200 and '"name": "Guest ' in html
+    ck = [h for h in r.headers.getlist("Set-Cookie") if h.startswith(drive_auth.VIEWER_COOKIE + "=")]
+    assert ck and "Path=/drive" in ck[0]
+    j = c.get("/drive/TESTME/ticket").get_json()
+    tk = drive_auth.read_ticket(j["ticket"])
+    assert j["ok"] and j["all"] and tk["id"].startswith("guest-") and tk["garage"] is None
+
+
+def test_guest_only_in_test_room(conn, root, calls_test):
+    c = _app(conn, root)
+    assert '"user": null' in c.get("/drive/ABC234").get_data(as_text=True)   # normaler Raum: kein Gast
+    c.get("/drive/TESTME")
+    r = c.get("/drive/ABC234/ticket")
+    assert r.status_code == 401 and r.get_json()["signin"]
