@@ -764,7 +764,18 @@
   "tex": 256,
   "part": "p4",
   "keepNode": "#(54|62)$",
-  "note": "Paket: Krone + Stamm eines der 4 Detail-Bäume (Hintergrund-Atlas-Bäume und Steine weggelassen)"
+  "note": "Paket: Krone + Stamm eines der 4 Detail-Bäume (Hintergrund-Atlas-Bäume und Steine weggelassen)",
+  "slots": [
+   "forestTree",
+   "alpineTree",
+   "parkTree"
+  ],
+  "themes": [
+   "forest",
+   "alpine",
+   "stadium",
+   "industrial"
+  ]
  },
  {
   "uid": "08014e92a59244c992884091218230b8",

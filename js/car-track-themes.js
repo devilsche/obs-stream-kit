@@ -620,8 +620,8 @@
   function leafTrees(ctx, nTree, nRow, dmin, dmax) {
     var lt = leafTree(new Kit(), 0, 1), row = new Kit();
     [-8.5, 0, 8.5].forEach(function (x, i) { leafTree(row, x, [0.9, 1.1, 0.95][i]); });
-    var tree = ctx.kind('parkTree', [{ geo: lt.geo() }], { r: 3.2, prop: { slot: 'parkTree', box: { w: 15, d: 15, h: 12 } } });
-    var rowK = ctx.kind('treeRow', [{ geo: row.geo() }], { r: 13, prop: { slot: 'treeRow', box: { w: 28, d: 12, h: 12 } } });
+    var tree = ctx.kind('parkTree', [{ geo: lt.geo() }], { r: 3.2, prop: { slot: 'parkTree', noProc: true, box: { w: 15, d: 15, h: 12 } } });
+    var rowK = ctx.kind('treeRow', [{ geo: row.geo() }], { r: 13, prop: { slot: 'parkTree', noProc: true, tile: true, box: { w: 28, d: 12, h: 12 } } });
     ctx.scatter(tree, nTree, { dmin: dmin, dmax: dmax, rad: 3.5, s: [0.85, 1.2] });
     ctx.scatter(rowK, nRow, { dmin: dmin + 10, dmax: dmax + 20, rad: 13, s: [0.9, 1.1] });
   }
@@ -980,7 +980,7 @@
       });
       ctx.bg(sky);
       // Alleebäume beidseits der Allee, dichter Laubwald zwischen den Vierteln (vom Ring nach außen)
-      var alley = ctx.kind('alleyTree', [{ geo: leafTree(new Kit(), 0, 0.75).geo() }], { r: 2, tint: true });
+      var alley = ctx.kind('alleyTree', [{ geo: leafTree(new Kit(), 0, 0.75).geo() }], { r: 2, tint: true, prop: { slot: 'parkTree', noProc: true, box: { w: 9, d: 9, h: 10 } } });
       SECT.forEach(function (sc) {
         var a = (sc[0] + sc[1]) / 2 * TAU;
         for (var dd = C0 + 4; dd < C1; dd += 13) [-1, 1].forEach(function (sd) {
@@ -988,7 +988,7 @@
           alley.add(p[0] + nx / L * sd * 9, p[1] + nz / L * sd * 9, { rot: dd, s: 0.9 + srng() * 0.25, y: 0.6, tint: mix(0xffffff, 0xb8cc9c, srng()) });
         });
       });
-      var woods = ctx.kind('woodsTree', [{ geo: leafTree(new Kit(), 0, 1).geo() }], { r: 3, tint: true });
+      var woods = ctx.kind('woodsTree', [{ geo: leafTree(new Kit(), 0, 1).geo() }], { r: 3, tint: true, prop: { slot: 'parkTree', noProc: true, box: { w: 15, d: 15, h: 14 } } });
       for (var wc = 0, placedW = 0; wc < 6000 && placedW < 1400; wc++) {
         var wa = srng();
         if (SECT.some(function (sc) { return wa > sc[0] - 0.012 && wa < sc[1] + 0.012; })) continue;
@@ -1052,11 +1052,11 @@
       });
       function offCreek(x, z) { return ctx.creekD(x, z) > 4.5; }
       // Nadelbäume: dicht nahe der Strecke, weiter draußen als Waldrand
-      var pine = ctx.kind('pine', [{ geo: pineGeo(false) }], { r: 2.2, tint: true });
-      var pineD = ctx.kind('pineDark', [{ geo: pineGeo(true) }], { r: 2.2, tint: true });
+      var pine = ctx.kind('pine', [{ geo: pineGeo(false) }], { r: 2.2, tint: true, prop: { slot: 'forestTree', noProc: true, box: { w: 11, d: 11, h: 15 } } });
+      var pineD = ctx.kind('pineDark', [{ geo: pineGeo(true) }], { r: 2.2, tint: true, prop: { slot: 'forestTree', noProc: true, box: { w: 11, d: 11, h: 15 } } });
       function green() { return mix(0xffffff, 0xc9d8b0, rnd()); }
       // nahe Bäume als Kulissen-Modelle (slot forestTree: Nadel-, Birken-, Eichen-Modelle im Wechsel; Ersatz: Nadelbaum)
-      var treeN = ctx.kind('tree', [{ geo: pineGeo(false) }], { r: 2.2, tint: true, prop: { slot: 'forestTree', box: { w: 11, d: 11, h: 15 } } });
+      var treeN = ctx.kind('tree', [{ geo: pineGeo(false) }], { r: 2.2, tint: true, prop: { slot: 'forestTree', noProc: true, box: { w: 11, d: 11, h: 15 } } });
       ctx.scatter(treeN, 110, { dmin: 15, dmax: 60, rad: 2.2, s: [0.8, 1.3], pred: offCreek, tint: green });
       ctx.scatter(pine, 200, { dmin: 15, dmax: 80, rad: 1.8, s: [0.8, 1.5], pred: offCreek, tint: green });
       ctx.scatter(pineD, 520, { dmin: 70, dmax: 270, rad: 2.2, s: [1.0, 1.8], pred: offCreek, tint: green });
@@ -1114,9 +1114,9 @@
       var cliff = ctx.kind('cliff', [{ geo: cliffGeo(0x6c6a66, 0x9a978f, 0xf4f7fb) }], { r: 8 });
       ctx.scatter(cliff, 16, { dmin: 22, dmax: 75, rad: 8, s: [0.8, 1.35], pred: function (x, z) { return (x - ctx.cx) * 0.8 - (z - ctx.cz) * 0.6 > -10; } });
       // vereinzelte Nadelbäume, Felsen, Almhütten
-      var pine = ctx.kind('pine', [{ geo: pineGeo(true) }], { r: 2, tint: true });
+      var pine = ctx.kind('pine', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
       // nahe Bäume als Kulissen-Modelle (slot alpineTree: Kiefer, Pappel, Nadelbäume aus dem Wald; Ersatz: Nadelbaum)
-      var treeN = ctx.kind('tree', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', box: { w: 10, d: 10, h: 16 } } });
+      var treeN = ctx.kind('tree', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
       ctx.scatter(treeN, 60, { dmin: 15, dmax: 70, rad: 2, s: [0.8, 1.3], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
       ctx.scatter(pine, 170, { dmin: 15, dmax: 240, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6 }), 55, { dmin: 15, dmax: 140, rad: 1.6, s: [0.6, 1.8] });
@@ -1178,7 +1178,7 @@
       }
       [0, 2.1, 4.2].forEach(function (a) { pk.add(ico(0.22), 0x5a3d22, { x: tx + Math.cos(a) * 0.35, y: ty - 0.3, z: Math.sin(a) * 0.35 }); });
       // Kulissen-Modelle (slot palm): Palmen-Modelle im Wechsel, Ersatz: die prozedurale Palme
-      var palm = ctx.kind('palm', [{ geo: pk.geo() }], { r: 2.2, tint: true, prop: { slot: 'palm', box: { w: 10, d: 10, h: 12 } } });
+      var palm = ctx.kind('palm', [{ geo: pk.geo() }], { r: 2.2, tint: true, prop: { slot: 'palm', noProc: true, box: { w: 10, d: 10, h: 12 } } });
       ctx.scatter(palm, 70, { dmin: 15, dmax: 130, rad: 2.2, s: [0.8, 1.25], pred: land, tint: function () { return mix(0xffffff, 0xd8e6c4, rnd()); } });
       // Strand: bunte Sonnenschirme (Gimmick)
       var uk = new Kit();

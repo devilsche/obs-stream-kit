@@ -837,8 +837,12 @@
       if (!race || !ToyCars.updateDriverClip) return;
       race.order.forEach(function (r) { if (r.duck && r.holder.visible) ToyCars.updateDriverClip(r.duck); });
     }
+    // Detailstufen der Kulisse (Bäume nur als Modelle: fern das leichteste, hinter der Kamera nichts), alle 200 ms
+    var lodAt = 0, lodDir = new THREE.Vector3();
     function renderScene() {
       updateDuckClips();
+      var tNow = root.performance ? performance.now() : Date.now();
+      if (trackRes && trackRes.lod && tNow - lodAt > 200) { lodAt = tNow; cam.getWorldDirection(lodDir); trackRes.lod(cam.position.x, cam.position.z, lodDir.x, lodDir.z); }
       if (!VIEW || !renderer.setViewport) { renderer.render(scene, cam); return; }
       var PH = Math.round(H * UIK), x = VIEW[0], y = PH - VIEW[1] - VIEW[3], w = VIEW[2], h = VIEW[3];
       renderer.setScissorTest(false); renderer.setViewport(0, 0, Math.round(W * UIK), PH); renderer.clear();

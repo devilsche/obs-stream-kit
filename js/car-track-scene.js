@@ -502,6 +502,7 @@
     // o = { r (Radius bei Größe 1), tint, prop }. prop = { slot (Katalog-Feld slot, sonst kind), box: { w, d, h } (Platz
     // in m, lokal x/z/y – das Modell wird nur verkleinert, nie vergrößert), yaw (Zusatzdrehung), y (Höhe über dem Platz),
     // front (Vorderkante auf lokal z), tile (kleine Modelle entlang x nebeneinander, bis box.w voll ist),
+    // noProc (nur Modelle, Bäume: die Ersatzform wird nie gezeichnet; fern zeigt lod() das leichteste Modell der Art),
     // onProp(spot, { height, scale, faceZ }) } – Modelle derselben Art wechseln sich je Platz
     // ab (Reihenfolge des Katalogs, unabhängig davon, welches zuerst geladen ist). o.vary: Atlas-Kachel je Platz
     // (kd.add(…, { v }) → iVar, Material mat 'atl'/'atlcut' mit Kit-Teilen o.vary). kd.refresh(i): Platz i neu setzen,
@@ -664,6 +665,7 @@
         if (vary) Themes.Art.setVary(p.geo, kd.spots.map(function (s) { return s.v; }));
         var im = own(new THREE.InstancedMesh(p.geo, mat(p.mat || 'v', vary ? 'iv' : tinted ? 'it' : 'i'), kd.spots.length));
         im.frustumCulled = false;   // Instanzen liegen überall – die Kugel der Grundform passt nicht
+        if (kd.prop && kd.prop.noProc) im.visible = false;   // nur Modelle (Bäume): Ersatzform nie zeigen
         kd.spots.forEach(function (s, i) {
           im.setMatrixAt(i, spotMatrix(s, mtx));
           if (tinted) im.setColorAt(i, s.tint != null ? lin(s.tint) : white1);
@@ -679,10 +681,11 @@
     });
     // Platz i neu setzen: Modell geladen → prozedurale Instanz auf null, Modell-Instanzen sichtbar (außer ausgeblendet)
     function applySpot(kd, i) {
-      var s = kd.spots[i], procOn = !s.hidden && (s.prop == null || s.far);
+      var noProc = !!(kd.prop && kd.prop.noProc), s = kd.spots[i], procOn = !noProc && !s.hidden && (s.prop == null || s.far);
       spotMatrix(s, mtx);
       // alle Plätze mit Modell → prozedurale Art gar nicht mehr zeichnen (spart den Zeichenaufruf)
-      var anyProc = kd.spots.some(function (x) { return x.prop == null || x.far; });
+      var anyProc = !noProc && kd.spots.some(function (x) { return x.prop == null || x.far; });
+      if (kd.farSet) kd.farSet.dirty = true;
       kd.meshes.forEach(function (m) { m.setMatrixAt(i, procOn ? mtx : ZERO_M); m.instanceMatrix.needsUpdate = true; m.visible = anyProc; });
       kd.propSets.forEach(function (ps1) {
         ps1.slots.forEach(function (sl, j) {
@@ -743,8 +746,21 @@
       });
       // schwere Modelle (≥ LOD_TRIS Dreiecke je Stück) mit prozeduraler Ersatzform: weit weg die Ersatzform (lod())
       // viele kleine Modelle (Gras, Büsche): jenseits SMALL_FAR m und hinter der Kamera gar nicht zeichnen (lod())
-      kd.propSets.push({ meshes: meshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: slots.length >= 200 });
+      kd.propSets.push({ meshes: meshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: slots.length >= 200 && !P0.noProc });
       propStats.tris += tpl.tris * slots.length; propStats.draws += meshes.length;
+      // nur Modelle (noProc, Bäume): fern statt der Ersatzform das leichteste Modell der Art an allen fernen Plätzen
+      if (P0.noProc && (!kd.farSet || tpl.tris < kd.farSet.tris)) {
+        if (kd.farSet) kd.farSet.meshes.forEach(function (m) { g.remove(m); });
+        var fslots = kd.spots.map(function (s, i) {
+          spotMatrix(s, m4);
+          off.compose(new THREE.Vector3(0, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k, k));
+          return { spot: i, m: new THREE.Matrix4().multiplyMatrices(m4, off) };
+        });
+        kd.farSet = { tris: tpl.tris, slots: fslots, dirty: true, meshes: tpl.parts.map(function (p) {
+          var im = own(new THREE.InstancedMesh(p.geo, p.mat, fslots.length));
+          im.frustumCulled = false; im.count = 0; g.add(im); return im;
+        }) };
+      }
       var seen = {};
       slots.forEach(function (sl) {
         var s = kd.spots[sl.spot];
@@ -961,7 +977,7 @@
       var fl = Math.hypot(fx || 0, fz || 0), dir = fl > 1e-6;
       if (dir) { fx /= fl; fz /= fl; }
       kinds.forEach(function (kd) {
-        var sets = kd.propSets ? kd.propSets.filter(function (ps) { return ps.lod || ps.many; }) : [];
+        var sets = kd.propSets ? kd.propSets.filter(function (ps) { return ps.lod || ps.many || kd.farSet; }) : [];
         if (!sets.length) return;
         var heavy = sets.some(function (ps) { return ps.lod; });
         kd.spots.forEach(function (s, i) {
@@ -985,6 +1001,18 @@
           });
           ps.meshes.forEach(function (m) { m.count = k; m.instanceMatrix.needsUpdate = true; });
         });
+        var fs = kd.farSet;
+        if (fs) {
+          var kf = 0;
+          fs.slots.forEach(function (sl) {
+            var sp = kd.spots[sl.spot];
+            if (sp.hidden || !sp.far || !sp.vis) return;
+            fs.meshes.forEach(function (m) { m.setMatrixAt(kf, sl.m); });
+            kf++;
+          });
+          fs.meshes.forEach(function (m) { m.count = kf; m.instanceMatrix.needsUpdate = true; });
+          fs.dirty = false;
+        }
       });
     }
     function update(dt) {
