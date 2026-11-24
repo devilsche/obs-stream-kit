@@ -43,7 +43,7 @@
   'use strict';
   var THREE = root.THREE;
   var TAU = Math.PI * 2, EXTENT = 1500, DROP = 0.06, SKY_R = 1900;
-  var LOD_TRIS = 1500, LOD_FAR = 400, LOD_NEAR = 380, SMALL_FAR = 120;   // Detailstufen (Dreiecke je Stück, m mit Hysterese; kleine Modelle bis SMALL_FAR m)
+  var LOD_TRIS = 1500, LOD_FAR = 400, LOD_NEAR = 380, SMALL_FAR = 400;   // Detailstufen (Dreiecke je Stück, m mit Hysterese; kleine Modelle bis SMALL_FAR m)
   function lerp(a, b, t) { return a + (b - a) * t; }
   function col(c, fb) { try { return new THREE.Color(c == null || c === '' ? fb : c); } catch (e) { return new THREE.Color(fb); } }
   // Rückfall ohne js/car-track-themes.js: flach, Wiese, keine Deko
