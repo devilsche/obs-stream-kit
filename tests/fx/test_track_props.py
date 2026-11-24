@@ -69,3 +69,24 @@ def test_pack_part_file_name(tmp_path):
     assert track_props.model_name(str(tmp_path), UID + "-") is None
     r = _client(tmp_path).get("/drive/a/api/fx/track-props/" + UID + "-b1.glb")
     assert r.status_code == 200 and r.data == b"glTF"
+
+
+def test_thrown_out_props_hidden_from_game(tmp_path):
+    d = tmp_path / "data" / "track-props"
+    d.mkdir(parents=True)
+    props = [{"uid": UID, "key": "tree-a", "kind": "tree", "theme": "forest"},
+             {"uid": UID + "-p2", "key": "tree-b", "kind": "tree", "theme": "forest"}]
+    (d / "catalog.json").write_text(json.dumps({"props": props, "credits": []}))
+    root = str(tmp_path)
+    assert track_props.off_keys(root) == set()
+    assert track_props.set_off(root, "tree-a", True) is True
+    assert track_props.set_off(root, "nope", True) is False          # nur Katalog-Schlüssel
+    assert [p["key"] for p in track_props.catalog(root)["props"]] == ["tree-b"]
+    full = track_props.catalog(root, include_off=True)["props"]
+    assert [(p["key"], p["off"]) for p in full] == [("tree-a", True), ("tree-b", False)]
+    r = _client(tmp_path).get("/drive/a/api/fx/track-props/catalog.json")
+    assert [p["key"] for p in r.json["props"]] == ["tree-b"]
+    assert track_props.set_off(root, "tree-a", False) is True
+    assert len(track_props.catalog(root)["props"]) == 2
+    (d / "off.json").write_text("kaputt")
+    assert track_props.off_keys(root) == set()

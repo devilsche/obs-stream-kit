@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree picker</title>
+<!-- Auswahlseite (Admin): alle Baum-/Palmen-Modelle der Strecken-Kulisse in 3D nebeneinander auf einer Wiese, je Baum ein
+     Haken „Keep“. Abgewählte Modelle landen in data/track-props/off.json und fehlen danach im ausgelieferten Katalog –
+     im Spiel stehen dort die übrigen Modelle bzw. der prozedurale Ersatzbaum. Daten: GET/POST /admin/api/track-props
+     (app/views_admin.py, fx/track_props.py), Modelle von /drive/a/api/fx/track-props/<uid>.glb. Route: /admin/tree-picker. -->
+<style>
+  :root { --tp-bg: #0d0912; --tp-panel: rgba(20, 12, 30, 0.92); --tp-text: #fff; --tp-dim: #c9bdd6; --tp-accent: #f2b705;
+    --tp-border: #5e2a79; --tp-off: #ff8a80; --tp-row: rgba(255, 255, 255, 0.04); }
+  html, body { margin: 0; height: 100%; background: var(--tp-bg); color: var(--tp-text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; overflow: hidden; }
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 12px; top: 12px; z-index: 10; background: var(--tp-accent); color: #1b1300; padding: 8px 12px; }
+  main { position: fixed; inset: 0; }
+  canvas { display: block; width: 100%; height: 100%; }
+  .panel { position: absolute; left: 16px; top: 16px; width: 430px; max-width: calc(100% - 32px); max-height: calc(100% - 32px);
+    overflow-y: auto; background: var(--tp-panel); border: 2px solid var(--tp-border); border-radius: 10px; padding: 14px 16px; box-sizing: border-box; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  h2 { font-size: 14px; margin: 14px 0 6px; color: var(--tp-accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  p { margin: 0 0 10px; color: var(--tp-dim); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; padding: 6px 6px; border-radius: 6px; }
+  li:nth-child(odd) { background: var(--tp-row); }
+  li.off .name { text-decoration: line-through; color: var(--tp-off); }
+  .num { font-weight: 700; color: var(--tp-accent); text-align: right; }
+  li.off .num { color: var(--tp-off); }
+  .meta { display: block; color: var(--tp-dim); font-size: 12px; }
+  .acts { display: flex; gap: 6px; align-items: center; }
+  label.keep { display: flex; gap: 6px; align-items: center; font-size: 13px; min-height: 28px; cursor: pointer; }
+  input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--tp-accent); margin: 0; }
+  a { color: var(--tp-accent); }
+  button { background: #5e2a79; color: #fff; border: 2px solid #5e2a79; border-radius: 8px; padding: 4px 10px; min-height: 30px; min-width: 30px; cursor: pointer; font: inherit; font-size: 13px; }
+  a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--tp-accent); outline-offset: 2px; }
+  .views { display: flex; gap: 8px; margin: 8px 0 4px; flex-wrap: wrap; }
+  .status { margin-top: 10px; color: var(--tp-dim); font-size: 13px; min-height: 20px; }
+  .status.err { color: var(--tp-off); }
+</style>
+</head>
+<body>
+<a class="skip" href="#lists">Skip to the tree list</a>
+<main>
+  <canvas id="view" aria-label="3D meadow with all tree models, numbered; drag to orbit, scroll to zoom"></canvas>
+  <section class="panel" aria-labelledby="t">
+    <h1 id="t">Tree picker</h1>
+    <p>All tree and palm models used on the tracks. Untick the bad ones – they are left out of the game immediately
+      (the remaining models or the simple low-poly tree take their place). Red number = thrown out.</p>
+    <div class="views">
+      <button type="button" id="vAll">Overview</button>
+      <button type="button" id="vDriver">Driver height</button>
+    </div>
+    <div id="lists"></div>
+    <p class="status" id="status" role="status" aria-live="polite">Loading…</p>
+  </section>
+</main>
+<script src="/drive/a/js/vendor/three-r128.min.js"></script>
+<script src="/drive/a/js/vendor/three-r128-GLTFLoader.js"></script>
+<script src="/drive/a/js/vendor/three-r128-OrbitControls.js"></script>
+<script>
+(function () {
+  'use strict';
+  var BASE = '/drive/a/api/fx/track-props/', API = '/admin/api/track-props';
+  var THEMES = { stadium: 'Speedway (stadium)', forest: 'Twister (forest)', alpine: 'Hairpin (alpine)', coast: 'Coast', industrial: 'Kart (hall / industrial)', hall: 'Kart (hall)' };
+  var SPACE = 16, COLS = 6;
+  var canvas = document.getElementById('view'), statusEl = document.getElementById('status'), lists = document.getElementById('lists');
+  function setStatus(t, err) { statusEl.textContent = t; statusEl.classList.toggle('err', !!err); }
+
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xbcd6ef);
+  scene.add(new THREE.HemisphereLight(0xdfeeff, 0x4d6a45, 0.9));
+  var sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(30, 60, 40); scene.add(sun);
+  var cam = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 2000);
+  var controls = new THREE.OrbitControls(cam, canvas);
+  controls.enableDamping = true; controls.maxPolarAngle = Math.PI / 2 - 0.02;
+  var ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ color: 0x4f9a46, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; scene.add(ground);
+
+  function labelTex(text, off) {
+    var c = document.createElement('canvas'), g = c.getContext('2d'); c.width = c.height = 128;
+    g.fillStyle = 'rgba(13,9,18,0.85)'; g.beginPath(); g.arc(64, 64, 60, 0, Math.PI * 2); g.fill();
+    g.fillStyle = off ? '#ff8a80' : '#f2b705'; g.font = '700 58px DM Sans, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(text, 64, 68);
+    if (off) { g.strokeStyle = '#ff8a80'; g.lineWidth = 8; g.beginPath(); g.moveTo(26, 102); g.lineTo(102, 26); g.stroke(); }
+    var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+  }
+
+  var items = [], bounds = { w: 0, d: 0 };
+  function pos(i) { return { x: (i % COLS) * SPACE, z: Math.floor(i / COLS) * SPACE }; }
+  function setOff(it, off) {
+    it.off = off; it.li.classList.toggle('off', off);
+    it.sprite.material.map.dispose(); it.sprite.material.map = labelTex(String(it.n), off); it.sprite.material.needsUpdate = true;
+  }
+  function focus(it) {
+    var p = pos(it.i), h = Math.max(4, it.h || 10);
+    controls.target.set(p.x, h * 0.45, p.z); cam.position.set(p.x + h * 0.6, h * 0.7, p.z + h * 1.5); controls.update();
+  }
+  function save(it, keep, cb) {
+    fetch(API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: it.key, off: !keep }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error(j.error || 'save failed');
+        setOff(it, !keep);
+        setStatus('Saved: #' + it.n + ' ' + it.name + (keep ? ' is used again.' : ' thrown out.'));
+      })
+      .catch(function (e) { cb.checked = !keep; setStatus('Could not save #' + it.n + ': ' + e.message, true); });
+  }
+
+  fetch(API, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (cat) {
+    var trees = (cat.props || []).filter(function (p) { return p.kind === 'tree' || p.kind === 'palm'; });
+    trees.sort(function (a, b) { return (a.theme || '').localeCompare(b.theme || '') || (a.key || '').localeCompare(b.key || ''); });
+    var groups = {};
+    trees.forEach(function (p, i) {
+      var it = { i: i, n: i + 1, key: p.key, uid: p.uid, name: p.name || p.key, off: !!p.off, h: p.size ? p.size[1] : 10 };
+      items.push(it);
+      var o = pos(i);
+      it.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTex(String(it.n), it.off), depthTest: false }));
+      it.sprite.position.set(o.x, 0.9, o.z + 5.5); it.sprite.scale.set(2.2, 2.2, 1); it.sprite.renderOrder = 5; scene.add(it.sprite);
+      var th = p.theme || 'other';
+      if (!groups[th]) {
+        var h2 = document.createElement('h2'); h2.textContent = THEMES[th] || th; lists.appendChild(h2);
+        groups[th] = document.createElement('ul'); lists.appendChild(groups[th]);
+      }
+      var li = document.createElement('li'); it.li = li;
+      var num = document.createElement('span'); num.className = 'num'; num.textContent = it.n; li.appendChild(num);
+      var info = document.createElement('div');
+      var nm = document.createElement('span'); nm.className = 'name'; nm.textContent = it.name; info.appendChild(nm);
+      var meta = document.createElement('span'); meta.className = 'meta';
+      meta.textContent = (p.author || '?') + ' · ' + (p.size ? p.size[1].toFixed(0) + ' m' : '') + ' · ' + ((p.tris || 0) / 1000).toFixed(1) + 'k tris · ' + (p.slot || '') + ' ';
+      if (p.url) { var a = document.createElement('a'); a.href = p.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Sketchfab'; meta.appendChild(a); }
+      info.appendChild(meta); li.appendChild(info);
+      var acts = document.createElement('div'); acts.className = 'acts';
+      var show = document.createElement('button'); show.type = 'button'; show.textContent = 'Show'; show.setAttribute('aria-label', 'Show #' + it.n + ' ' + it.name + ' in 3D');
+      show.addEventListener('click', function () { focus(it); });
+      var lab = document.createElement('label'); lab.className = 'keep';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !it.off; cb.setAttribute('aria-label', 'Keep #' + it.n + ' ' + it.name);
+      cb.addEventListener('change', function () { save(it, cb.checked, cb); });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode('Keep'));
+      acts.appendChild(show); acts.appendChild(lab); li.appendChild(acts);
+      groups[th].appendChild(li);
+      if (it.off) li.classList.add('off');
+    });
+    bounds.w = (Math.min(COLS, trees.length) - 1) * SPACE; bounds.d = Math.floor((trees.length - 1) / COLS) * SPACE;
+    overview();
+    if (!trees.length) { setStatus('No tree models in the catalogue.'); return; }
+    setStatus('Loading models… 0 / ' + trees.length);
+    var loader = new THREE.GLTFLoader(), done = 0;
+    // nacheinander laden (große Dateien), nächste zuerst
+    (function next(k) {
+      if (k >= items.length) return;
+      var it = items[k];
+      loader.load(BASE + it.uid + '.glb', function (g) {
+        var o = pos(it.i); g.scene.position.set(o.x, 0, o.z);
+        g.scene.traverse(function (m) { if (m.isMesh && m.material && m.material.map) { m.material.alphaTest = Math.max(m.material.alphaTest || 0, 0.3); m.material.side = THREE.DoubleSide; } });
+        scene.add(g.scene); it.obj = g.scene;
+        setStatus('Loading models… ' + (++done) + ' / ' + items.length + (done === items.length ? ' – all loaded.' : ''));
+        next(k + 1);
+      }, null, function () { done++; setStatus('Could not load #' + it.n + ' ' + it.name, true); next(k + 1); });
+    })(0);
+  }).catch(function () { setStatus('Could not load the catalogue (signed in as admin?).', true); });
+
+  function overview() {
+    var cx = bounds.w / 2, cz = bounds.d / 2;
+    // Abstand so, dass die Breite in den freien Bereich rechts neben der Liste passt
+    var free = Math.max(0.4, 1 - (canvas.clientWidth > 900 ? (document.querySelector('.panel').offsetWidth + 16) / canvas.clientWidth : 0));
+    var half = Math.atan(Math.tan(cam.fov * Math.PI / 360) * cam.aspect * free), dist = (bounds.w / 2 + 12) / Math.tan(half);
+    controls.target.set(cx, 4, cz); cam.position.set(cx, dist * 0.45, cz + dist * 0.9); controls.update();
+  }
+  document.getElementById('vAll').addEventListener('click', overview);
+  document.getElementById('vDriver').addEventListener('click', function () {
+    var cx = bounds.w / 2; controls.target.set(cx, 5, bounds.d / 2); cam.position.set(cx, 1.8, bounds.d + 18); controls.update();
+  });
+  // Bildmitte rechts neben die Liste schieben (die Liste deckt links ~450 px ab)
+  function resize() {
+    var w = canvas.clientWidth, h = canvas.clientHeight, panel = document.querySelector('.panel'), off = w > 900 ? (panel.offsetWidth + 16) / 2 : 0;
+    renderer.setSize(w, h, false); cam.aspect = w / h; cam.setViewOffset(w, h, -off, 0, w, h); cam.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize); resize();
+  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, cam); })();
+})();
+</script>
+</body>
+</html>

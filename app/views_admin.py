@@ -375,6 +375,34 @@ def admin_grass_preview():
         return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
+@bp_admin.route("/admin/tree-picker")
+@require_admin
+def admin_tree_picker():
+    """Auswahlseite für die Baum-Modelle der Strecken (tools/tree-picker.html): alle Bäume in 3D, Haken „Keep“."""
+    src = os.path.join(_project_root(), "tools", "tree-picker.html")
+    if not os.path.exists(src):
+        abort(404)
+    with open(src, encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@bp_admin.route("/admin/api/track-props", methods=["GET", "POST"])
+def admin_track_props():
+    """GET: voller Katalog inkl. ausgeworfener Modelle (Feld off). POST {key, off}: auswerfen/zurückholen."""
+    err, status = _admin_json_guard()
+    if err:
+        return err, status
+    from fx import track_props
+    root = _project_root()
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        key = body.get("key")
+        if not isinstance(key, str) or not track_props.set_off(root, key, bool(body.get("off"))):
+            return jsonify({"ok": False, "error": "unknown model"}), 400
+        return jsonify({"ok": True})
+    return jsonify(track_props.catalog(root, include_off=True))
+
+
 @bp_admin.route("/admin/car-list")
 @require_admin
 def admin_car_list():
