@@ -1136,6 +1136,11 @@
 
   // ---- Kameras ----
   var CAMS = { chase: 'Chase camera', hood: 'Hood camera', tv: 'TV camera' }, CAM_ORDER = ['chase', 'hood', 'tv'];
+  // über die Ziellinie: auf die TV-Kamera umschalten (Umsehen zurücksetzen); C/Y schaltet danach wie gewohnt weiter
+  function finishCam() {
+    if (typeof look !== 'undefined' && look.used && typeof lookReset === 'function') lookReset();
+    if (race.camMode !== 'tv') setCam('tv', true);
+  }
   function setCam(m, snapNow) {
     race.camMode = m; race.tvIdx = -1;
     $('hCam').textContent = CAMS[m] + ' – C / Y to switch';
@@ -2341,7 +2346,7 @@
       // Runden/Ziel auch, solange die KI fährt (sonst hängt Car Drive hinter dem Overlay; zählt nicht als Rekord)
       lapDone(race.t - race.lapStart); race.lapStart = race.t;
       if (pc.laps >= race.laps) {
-        race.finishT = race.t; race.phase = 'done'; race.doneT = 0;
+        race.finishT = race.t; race.phase = 'done'; race.doneT = 0; finishCam();
         var posA = 1; standings().forEach(function (x, i) { if (x.me) posA = i + 1; });
         flash('The AI finished your race – P' + posA, 3); say('Finished in position ' + posA);
       } else say('Lap ' + (pc.laps + 1) + ' of ' + race.laps);
@@ -2354,7 +2359,7 @@
       if (race.phase === 'race' && pc.laps > lapsBefore) {
         lapDone(race.t - race.lapStart); race.lapStart = race.t;
         if (pc.laps >= race.laps) {
-          race.finishT = race.t; race.phase = 'done'; race.doneT = 0;
+          race.finishT = race.t; race.phase = 'done'; race.doneT = 0; finishCam();
           var pos = 1; standings().forEach(function (x, i) { if (x.me) pos = i + 1; });
           flash('Finished – P' + pos, 3); say('Finished in position ' + pos);
         } else say('Lap ' + (pc.laps + 1) + ' of ' + race.laps);
