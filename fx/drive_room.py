@@ -145,6 +145,7 @@ class Driver:
         self.car = car
         self.paint = paint
         self.host = host
+        self.bot = ident.get("role") == "bot"     # Testfahrer (Skript): startet den Testraum nicht allein
         self.connected = True
         self.grid = None
         self.ping = None            # vom Client gemeldeter Ping (ms)
@@ -305,8 +306,8 @@ class Room:
 
     def auto_start(self, now):
         """Testraum: Lobby → Start TEST_WAIT s nach der letzten Änderung, Ergebnis → nächstes Rennen TEST_PAUSE s danach,
-        solange ein verbundener Fahrer da ist. → True, wenn gestartet."""
-        if not self.test or not any(d.connected for d in self.drivers.values()):
+        solange ein verbundener Mensch da ist (Bots allein warten). → True, wenn gestartet."""
+        if not self.test or not any(d.connected and not d.bot for d in self.drivers.values()):
             return False
         if self.phase == "lobby" and now - self.changed >= TEST_WAIT:
             return self.start(now)[0]

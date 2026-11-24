@@ -363,6 +363,8 @@ def test_test_room_always_there_auto_starts_and_never_expires():
     normal, old = hub.open(dr.TEST_TENANT, 0, 2, 1000.0)
     assert old is None and hub.get(dr.TEST_CODE) is room
     assert not room.auto_start(1100.0)                         # niemand da
+    room.join({"id": "b1", "login": "b1", "display": "Bot", "role": "bot", "garage": None}, "car-a", 0, 1050.0)
+    assert not room.auto_start(1100.0)                         # nur ein Bot: wartet
     ok, _ = room.join({"id": "u1", "login": "u1", "display": "U", "role": "viewer", "garage": None}, "car-a", 0, 1100.0)
     assert ok
     assert not room.auto_start(1100.0 + dr.TEST_WAIT - 1)

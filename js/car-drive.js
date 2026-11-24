@@ -1505,7 +1505,9 @@
           mp.role === 'host' ? 'Post the link in the chat, then start the race.' : 'Waiting for the streamer to start the race.');
         break;
       case 'joined':
-        if (!m.ok) setLobbyStatus(m.msg);
+        // Rennen läuft schon: Beitritt merken und beim nächsten Ergebnis/Lobby automatisch wiederholen
+        mp.wantJoin = !m.ok && /race running/.test(m.msg || '');
+        if (!m.ok) setLobbyStatus(mp.wantJoin ? 'A race is running – you join the next one automatically.' : m.msg);
         break;
       case 'garage': garageChanged(m.garage); break;
       case 'S': if (m.pg) rosterPings(); break;
@@ -1517,7 +1519,10 @@
         mp.roster = m.list || []; renderRoster();
         mp.roster.forEach(function (d) { mpLoad(d.car); });
         break;
-      case 'phase': mpPhase(m); break;
+      case 'phase':
+        mpPhase(m);
+        if (mp && mp.wantJoin && (m.phase === 'done' || m.phase === 'lobby')) { mp.wantJoin = false; mp.net.send({ t: 'join', car: mp.car, paint: mp.paint }); }
+        break;
       case 'lap':
         if (m.fin != null) mp.fin[String(m.id)] = m.fin;
         if (String(m.id) === mp.me && !m.ok && race && race.mp) flash('Lap not counted', 2.5);
