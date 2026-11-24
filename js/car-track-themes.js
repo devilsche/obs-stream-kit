@@ -694,7 +694,7 @@
 
   // Stadion: große Tribünen, Flutlichtmasten, Werbebanden, Fahnen, Boxengasse; flach, heller Tag
   THEMES.stadium = {
-    id: 'stadium', name: 'Stadium', flat: true,
+    id: 'stadium', name: 'Stadium', flat: true, skyImage: 'kloofendal_48d_partly_cloudy',
     sky: { top: 0x3d7cc9, horizon: 0xc8dcf0 }, fog: { near: 420, far: 1700 },
     sun: { color: 0xffffff, k: 1.05, pos: [4, 7, 5] }, hemi: { sky: 0xdfeeff, ground: 0x4d6a45, k: 1 }, fill: 1, exposure: 1.0,
     groundTex: { base: [232, 232, 232], spread: 0.12, stripes: true },
@@ -936,7 +936,7 @@
 
   // Wald: Nadelbäume, Felsen, Holzzaun, Bach mit Brücke; sanfte Hügel, weiches grünliches Licht
   THEMES.forest = {
-    id: 'forest', name: 'Forest',
+    id: 'forest', name: 'Forest', skyImage: 'kloppenheim_06',
     sky: { top: 0x5b8fc4, horizon: 0xcfe0d6 }, fog: { near: 300, far: 1300 },
     sun: { color: 0xfff1d6, k: 0.9, pos: [5, 7, 3] }, hemi: { sky: 0xd8ecd8, ground: 0x3d5a32, k: 1 }, fill: 0.85, exposure: 1.0,
     groundTex: { base: [232, 232, 232], spread: 0.26 },
@@ -1013,7 +1013,7 @@
 
   // Alpen: Berge im Hintergrund, Felswände, Schneereste, Kehren am Hang; deutliches Auf und Ab, kühles Licht
   THEMES.alpine = {
-    id: 'alpine', name: 'Alpine',
+    id: 'alpine', name: 'Alpine', skyImage: 'kloofendal_43d_clear',
     sky: { top: 0x2f6fc2, horizon: 0xdbe8f5 }, fog: { near: 380, far: 2100 },
     sun: { color: 0xeef4ff, k: 1.15, pos: [3, 8, 4] }, hemi: { sky: 0xe6f0ff, ground: 0x5d6b52, k: 1.05 }, fill: 1, exposure: 1.02,
     groundTex: { base: [232, 232, 232], spread: 0.24 },
@@ -1068,7 +1068,7 @@
 
   // Küste: Meer, Strand, Palmen, Leuchtturm, Klippe; leichtes Auf und Ab, warme Abendstimmung
   THEMES.coast = {
-    id: 'coast', name: 'Coast',
+    id: 'coast', name: 'Coast', skyImage: 'belfast_sunset',
     sky: { top: 0x46679e, horizon: 0xffbf94 }, fog: { near: 380, far: 1900 },
     sun: { color: 0xffc9a0, k: 1.0, pos: [6, 3.2, 3] }, hemi: { sky: 0xffd9c2, ground: 0x5b6a4a, k: 0.95 }, fill: 0.8, exposure: 1.02,
     groundTex: { base: [232, 232, 232], spread: 0.22 },

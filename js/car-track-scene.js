@@ -788,7 +788,30 @@
         return new THREE.Color(r / n / 255, gg / n / 255, b / n / 255);
       } catch (e) { return null; }
     }
-    if (skyDome) setTimeout(function () {
+    // Foto-Himmel (Poly Haven, CC0, assets/textures/sky/<theme.skyImage>.jpg, Rundum-Panorama): Kugel mit der Textur;
+    // sonst Panorama-Kugel aus dem Katalog (slot sky)
+    function useSky(map, w, h, k) {
+      if (disposed) return;
+      skyMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), own(new THREE.MeshBasicMaterial({ map: map, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false })));
+      own(skyMesh.geometry);
+      skyMesh.scale.setScalar(SKY_R * 0.98); skyMesh.position.set(cx, theme.skyLift || 0, cz); skyMesh.rotation.y = theme.skyRot || 0;
+      skyMesh.renderOrder = -10; skyMesh.frustumCulled = false; g.add(skyMesh);
+      skyDome.visible = false;
+      skyHz = map.image ? horizonColor(map.image) : null;
+      if (skyHz && envSaved && envSaved.scene) {
+        if (envSaved.scene.fog) envSaved.scene.fog.color.copy(skyHz);
+        if (envSaved.scene.background && envSaved.scene.background.isColor) envSaved.scene.background.copy(skyHz);
+      }
+    }
+    if (skyDome && theme.skyImage && PROP_BASE) setTimeout(function () {
+      gateThen(function () {
+        new THREE.TextureLoader().load(PROP_BASE + 'assets/textures/sky/' + theme.skyImage + '.jpg', function (tex) {
+          tex.encoding = THREE.sRGBEncoding; own(tex);
+          gateThen(function () { useSky(tex); propStats.loaded.push('sky:' + theme.skyImage); });
+        }, null, function () { propStats.failed.push('sky:' + theme.skyImage); });
+      });
+    }, 200);
+    else if (skyDome) setTimeout(function () {
       gateThen(function () {
         loadPropCatalog().then(function (cat) {
           var tids = theme.propTheme ? [theme.id, theme.propTheme] : [theme.id];
