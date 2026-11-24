@@ -502,6 +502,7 @@
     // o = { r (Radius bei Größe 1), tint, prop }. prop = { slot (Katalog-Feld slot, sonst kind), box: { w, d, h } (Platz
     // in m, lokal x/z/y – das Modell wird nur verkleinert, nie vergrößert), yaw (Zusatzdrehung), y (Höhe über dem Platz),
     // front (Vorderkante auf lokal z), tile (kleine Modelle entlang x nebeneinander, bis box.w voll ist),
+    // cull (nur Modelle hinter der Kamera weglassen, z. B. Berge),
     // noProc (nur Modelle, Bäume: die Ersatzform wird nie gezeichnet; fern zeigt lod() das leichteste Modell der Art),
     // onProp(spot, { height, scale, faceZ }) } – Modelle derselben Art wechseln sich je Platz
     // ab (Reihenfolge des Katalogs, unabhängig davon, welches zuerst geladen ist). o.vary: Atlas-Kachel je Platz
@@ -977,13 +978,14 @@
       var fl = Math.hypot(fx || 0, fz || 0), dir = fl > 1e-6;
       if (dir) { fx /= fl; fz /= fl; }
       kinds.forEach(function (kd) {
-        var sets = kd.propSets ? kd.propSets.filter(function (ps) { return ps.lod || ps.many || kd.farSet; }) : [];
+        var cull = !!(kd.prop && kd.prop.cull);   // nur hinter der Kamera weglassen (Berge)
+        var sets = kd.propSets ? kd.propSets.filter(function (ps) { return ps.lod || ps.many || kd.farSet || cull; }) : [];
         if (!sets.length) return;
         var heavy = sets.some(function (ps) { return ps.lod; });
         kd.spots.forEach(function (s, i) {
           if (s.prop == null) return;
           var dx = s.x - x, dz = s.z - z, d = Math.hypot(dx, dz);
-          s.vis = !dir || d < 25 || (dx * fx + dz * fz) / d > COS_BACK;
+          s.vis = !dir || d < 25 + (cull ? kd.r * s.s * 1.5 : 0) || (dx * fx + dz * fz) / d > COS_BACK;
           if (!heavy) return;
           var far = s.far ? d > LOD_NEAR : d > LOD_FAR;
           if (far !== !!s.far) { s.far = far; applySpot(kd, i); }

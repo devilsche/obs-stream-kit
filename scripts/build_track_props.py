@@ -201,6 +201,82 @@ def strip_parts(path, c):
     bcr.glb_write(path, g, binc)
 
 
+def prune_images(path):
+    """Ungenutzte Texturen/Bilder entfernen (gltfpack behält bei Paket-Teilen alle Bilder des Pakets – ein Stein mit
+    150 Dreiecken trug sonst 168 Bilder, 8 MB) und den Puffer ohne die verwaisten Abschnitte neu packen."""
+    g, binc = bcr.glb_read(path)
+    texs, imgs = g.get("textures", []), g.get("images", [])
+    if not imgs:
+        return
+    used_t = set()
+
+    def scan(o):   # Textur-Verweise: jedes Feld „…Texture“ mit {index} (auch in Erweiterungen)
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k.endswith("Texture") and isinstance(v, dict) and isinstance(v.get("index"), int):
+                    used_t.add(v["index"])
+                scan(v)
+        elif isinstance(o, list):
+            for v in o:
+                scan(v)
+    scan(g.get("materials", []))
+    used_t = {t for t in used_t if t < len(texs)}
+    tmap = {t: i for i, t in enumerate(sorted(used_t))}
+    used_i = sorted({texs[t].get("source") for t in used_t if texs[t].get("source") is not None}
+                    | {(texs[t].get("extensions") or {}).get(x, {}).get("source") for t in used_t
+                       for x in ("EXT_texture_webp", "KHR_texture_basisu") if (texs[t].get("extensions") or {}).get(x)})
+    used_i = [i for i in used_i if i is not None]
+    if len(used_i) == len(imgs) and len(used_t) == len(texs):
+        return
+    imap = {i: n for n, i in enumerate(used_i)}
+
+    def remap(o):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k.endswith("Texture") and isinstance(v, dict) and isinstance(v.get("index"), int):
+                    v["index"] = tmap[v["index"]]
+                remap(v)
+        elif isinstance(o, list):
+            for v in o:
+                remap(v)
+    remap(g.get("materials", []))
+    new_t = []
+    for t in sorted(used_t):
+        t = dict(texs[t])
+        if t.get("source") is not None:
+            t["source"] = imap[t["source"]]
+        for x in (t.get("extensions") or {}).values():
+            if isinstance(x, dict) and x.get("source") is not None:
+                x["source"] = imap[x["source"]]
+        new_t.append(t)
+    g["textures"] = new_t
+    g["images"] = [imgs[i] for i in used_i]
+    # Puffer neu packen: nur Abschnitte, die Accessoren oder Bilder noch nutzen
+    views = g.get("bufferViews", [])
+    keep = sorted({a["bufferView"] for a in g.get("accessors", []) if "bufferView" in a}
+                  | {im["bufferView"] for im in g["images"] if "bufferView" in im})
+    vmap, out, nv = {}, bytearray(), []
+    for vi in keep:
+        bv = dict(views[vi])
+        o = bv.get("byteOffset", 0)
+        data = binc[o:o + bv["byteLength"]]
+        out += b"\0" * (-len(out) % 4)
+        bv["byteOffset"] = len(out)
+        out += data
+        vmap[vi] = len(nv)
+        nv.append(bv)
+    for a in g.get("accessors", []):
+        if "bufferView" in a:
+            a["bufferView"] = vmap[a["bufferView"]]
+    for im in g["images"]:
+        if "bufferView" in im:
+            im["bufferView"] = vmap[im["bufferView"]]
+    g["bufferViews"] = nv
+    g["buffers"] = [{"byteLength": len(out)}]
+    bcr.glb_write(path, g, out)
+    print("  %d → %d Bilder" % (len(imgs), len(g["images"])))
+
+
 def normalize(path, c):
     """Wurzelknoten mit Drehung/Maßstab/Versatz; gibt (Maße [x, y, z] in m, Drehung) zurück."""
     import numpy as np
@@ -284,6 +360,7 @@ def build_one(c):
         if c.get("aggressive"):
             cmd += ["-sa"]
     subprocess.run(cmd, check=True, capture_output=True)
+    prune_images(dst)
     bcr.shrink_textures(dst, c.get("tex", DEF_TEX))
     size, yaw = normalize(dst, c)
     g, _ = bcr.glb_read(dst)

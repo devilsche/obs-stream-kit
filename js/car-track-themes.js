@@ -551,6 +551,8 @@
   // Bergketten in Tiefen-Schichten rund um die Strecke. o = { layers: [[r0, r1, Höhe, Dunst]], seed, lambda,
   //   back (Zusatzhöhe hinten −z), mask(θ) → 0…1, pal: { grass, forest, scree, rock, rock2, snow }, snow (Schneegrenze
   //   relativ, 0 = keiner), forest (bis zu dieser relativen Höhe Wald), haze (Farbe), seg, rows }
+  // Felsbrocken nur als Kulissen-Modelle (Prop search, slot rock), ohne Ersatzform
+  var ROCK_PROP = { slot: 'rock', noProc: true, box: { w: 6, d: 6, h: 4 } };
   function ranges(rl, ctx, o) {
     var rr = ctx.rng(o.seed || 19), seg = o.seg || 288, rows = o.rows || 14, pal = o.pal, haze = lin(o.haze);
     o.layers.forEach(function (L, li) {
@@ -1061,7 +1063,7 @@
       ctx.scatter(pine, 200, { dmin: 15, dmax: 80, rad: 1.8, s: [0.8, 1.5], pred: offCreek, tint: green });
       ctx.scatter(pineD, 520, { dmin: 70, dmax: 270, rad: 2.2, s: [1.0, 1.8], pred: offCreek, tint: green });
       // Felsen
-      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6 }), 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
+      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6, prop: ROCK_PROP }), 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
       // Bewaldete Hügelketten im Hintergrund (Wald bis fast oben, Lichtungen, wenig Fels), im Dunst
       ctx.bgMesh(ranges(new Relief(), ctx, { seed: 11, forest: 0.85, haze: THEMES.forest.sky.horizon, lambda: 200,
         layers: [[380, 700, 70, 0.08], [620, 1020, 120, 0.25], [920, 1260, 170, 0.4]],
@@ -1107,19 +1109,30 @@
       // Bergketten in drei Tiefen-Schichten, hinten (−z, Blickrichtung der Totalen) höher: Grat-Rauschen, Fels nach
       // Neigung, Schnee nach Höhe mit weicher Grenze, Wald an den unteren Hängen, Dunst zur Ferne hin
       for (var burn = 0; burn < 180; burn++) rnd();   // Zufallsfolge wie früher (Deko danach bleibt, wo sie war)
-      ctx.bgMesh(ranges(new Relief(), ctx, { seed: 13, back: 0.55, snow: 0.55, forest: 0.3, haze: THEMES.alpine.sky.horizon,
-        layers: [[430, 820, 160, 0.1], [720, 1250, 280, 0.28], [1120, 1760, 420, 0.42]],
-        pal: { grass: 0x5d7c46, grass2: 0x6f8c50, forest: 0x2b472d, forest2: 0x35553a, scree: 0x908b80, rock: 0x6a6761, rock2: 0x817d76, snow: 0xf2f5fa } }).geo());
-      // Felswände bergseitig nahe der Strecke
-      var cliff = ctx.kind('cliff', [{ geo: cliffGeo(0x6c6a66, 0x9a978f, 0xf4f7fb) }], { r: 8 });
-      ctx.scatter(cliff, 16, { dmin: 22, dmax: 75, rad: 8, s: [0.8, 1.35], pred: function (x, z) { return (x - ctx.cx) * 0.8 - (z - ctx.cz) * 0.6 > -10; } });
+      // (früher: Bergketten aus Grat-Rauschen in drei Schichten – ersetzt durch Berg-Modelle in zwei Ringen)
+      // Berge als Kulissen-Modelle (slot mountain, Prop search): Gelände-Kacheln mit Gipfeln, höchstens 800 m breit, im
+      // Ring so weit draußen, dass die Kachel-Kante ≥ 180 m hinter der Strecke liegt (sonst ragt sie als Decke über die
+      // Fahrbahn); eigene Zufallsfolge (die übrige Deko bleibt, wo sie war); ohne Ersatzform
+      var mr = ctx.rng(29), RI = ctx.radius + 180 + 400 * 1.42;
+      [{ n: 13, w: 800, h: 320, r0: RI + 220, dr: 250 }, { n: 12, w: 1400, h: 560, r0: RI + 850, dr: 200 }].forEach(function (ring, ri) {
+        var mtn = ctx.kind(ri ? 'mountainFar' : 'mountain', [], { r: 300, prop: { slot: 'mountain', cull: true, box: { w: ring.w, d: ring.w, h: ring.h } } });
+        for (var mi = 0; mi < ring.n; mi++) {
+          var ma = (mi + (ri ? 0.5 : 0) + mr() * 0.5) / ring.n * TAU, mR = ring.r0 + mr() * ring.dr;
+          mtn.add(ctx.cx + Math.cos(ma) * mR, ctx.cz + Math.sin(ma) * mR, { rot: mr() * TAU, s: 0.85 + mr() * 0.3, y: -(ri ? 60 : 45) });   // Kachel-Ränder unter den Boden
+        }
+      });
+      // Felsnadeln (slot rockSpire), vereinzelt weiter draußen
+      ctx.scatter(ctx.kind('spire', [], { r: 5, prop: { slot: 'rockSpire', box: { w: 14, d: 14, h: 18 } } }), 6, { dmin: 45, dmax: 170, rad: 6, s: [0.8, 1.2] });
+      // Felswände bergseitig nahe der Strecke (Modelle slot rockWall)
+      var cliff = ctx.kind('cliff', [{ geo: cliffGeo(0x6c6a66, 0x9a978f, 0xf4f7fb) }], { r: 8, prop: { slot: 'rockWall', noProc: true, box: { w: 22, d: 16, h: 18 } } });
+      ctx.scatter(cliff, 8, { dmin: 22, dmax: 75, rad: 8, s: [0.8, 1.35], pred: function (x, z) { return (x - ctx.cx) * 0.8 - (z - ctx.cz) * 0.6 > -10; } });
       // vereinzelte Nadelbäume, Felsen, Almhütten
       var pine = ctx.kind('pine', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
       // nahe Bäume als Kulissen-Modelle (slot alpineTree: Kiefer, Pappel, Nadelbäume aus dem Wald; Ersatz: Nadelbaum)
       var treeN = ctx.kind('tree', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
       ctx.scatter(treeN, 60, { dmin: 15, dmax: 70, rad: 2, s: [0.8, 1.3], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
       ctx.scatter(pine, 170, { dmin: 15, dmax: 240, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
-      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6 }), 55, { dmin: 15, dmax: 140, rad: 1.6, s: [0.6, 1.8] });
+      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6, prop: ROCK_PROP }), 55, { dmin: 15, dmax: 140, rad: 1.6, s: [0.6, 1.8] });
       var hk = new Kit();
       hk.add(box(7, 5, 6), 0x8a5a33, { y: 1.0 });
       hk.add(box(7.2, 0.4, 0.1), 0x5e3c20, { y: 1.8, z: 3.02 });
@@ -1339,7 +1352,7 @@
         var lx = a.x + a.nx * sd * off, lz = a.z + a.nz * sd * off;
         if (ctx.place(lx, lz, 1.2)) lamp.add(lx, lz, { rot: a.yaw + (sd > 0 ? -Math.PI / 2 : Math.PI / 2) });
       }
-      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f706b, 0x8d8e88) }], { r: 1.2 }), 18, { dmin: 15, dmax: 100, rad: 1.2, s: [0.4, 0.9] });
+      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f706b, 0x8d8e88) }], { r: 1.2, prop: ROCK_PROP }), 18, { dmin: 15, dmax: 100, rad: 1.2, s: [0.4, 0.9] });
       leafTrees(ctx, 6, 3, 30, 110);
       greenery(ctx, { grass: 0.1, bush: 0.008, far: 60, farBush: 6, dry: true });
       // Hintergrund: Fabrikhallen (dieselbe Art wie die Hallen am Hof → Kulissen-Modelle statt grauer Klötze),
