@@ -361,7 +361,7 @@
   }
   // ---- Namen über den Gegnern (Sprite in der Szene, dreht sich zur Kamera; klein, blendet ab TAG_NEAR m aus, ab TAG_FAR
   // weg; hinter Wänden verdeckt) – Mitspieler (label), KI im Solo und Fahrer im Chatrennen (name) ----
-  var TAG_NEAR = 40, TAG_FAR = 65, TAG_H = 0.42;
+  var TAG_NEAR = 40, TAG_FAR = 65, TAG_H = 0.42, lodAt = 0, lodDir = new THREE.Vector3();
   function nameTag(c, text) {
     var cv = doc.createElement('canvas'), g = cv.getContext('2d'), fs = 40, pad = 18;
     g.font = '700 ' + fs + 'px "DM Sans", system-ui, sans-serif';
@@ -2267,6 +2267,9 @@
     lookPhase();
     fxFrame(dt, race.phase === 'countdown' ? null : inp);
     trackRes.update(dt);   // Fahnen, Wellen, Leuchtturm (reduzierte Bewegung: steht)
+    if (trackRes.lod && now - (lodAt || 0) > 200) {   // Detailstufen + Blickrichtung (hinter der Kamera nichts zeichnen)
+      lodAt = now; cam.getWorldDirection(lodDir); trackRes.lod(cam.position.x, cam.position.z, lodDir.x, lodDir.z);
+    }
     grassFrame(dt);
     mapFrame(now);
     aiHud();

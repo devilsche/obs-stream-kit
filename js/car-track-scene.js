@@ -15,6 +15,9 @@
  *                              optional Hintergrundfarbe (Car Drive; das Overlay bleibt durchsichtig, der Himmel ist
  *                              eine Kuppel in der Gruppe),
  *       update(dt)             Fahnen, Wellen, Leuchtturm (bei reduzierter Bewegung steht alles),
+ *       lod(x, z, fx, fz)      Detailstufen: schwere Kulissen-Modelle (≥ 1500 Dreiecke) weiter als 130 m von (x, z) als
+ *                              prozedurale Ersatzform, viele kleine (Gras, Büsche) nur bis 120 m; was hinter der Kamera
+ *                              (Blickrichtung fx, fz) liegt, wird nicht gezeichnet (Aufrufer: Kamera, ~4×/s),
  *       setMotionBlur(m)       Bewegungsunschärfe der Fahrbahn längs der Strecke in Metern (Car Drive; 0 = aus),
  *       props                  Promise → propStats, sobald alle Kulissen-Modelle geladen/eingesetzt sind,
  *       propStats              { loaded: [key], failed: [key], tris, draws } der eingesetzten Kulissen-Modelle,
@@ -40,6 +43,7 @@
   'use strict';
   var THREE = root.THREE;
   var TAU = Math.PI * 2, EXTENT = 1500, DROP = 0.06, SKY_R = 1900;
+  var LOD_TRIS = 1500, LOD_FAR = 130, LOD_NEAR = 115, SMALL_FAR = 120;   // Detailstufen (Dreiecke je Stück, m mit Hysterese; kleine Modelle bis SMALL_FAR m)
   function lerp(a, b, t) { return a + (b - a) * t; }
   function col(c, fb) { try { return new THREE.Color(c == null || c === '' ? fb : c); } catch (e) { return new THREE.Color(fb); } }
   // Rückfall ohne js/car-track-themes.js: flach, Wiese, keine Deko
@@ -675,15 +679,16 @@
     });
     // Platz i neu setzen: Modell geladen → prozedurale Instanz auf null, Modell-Instanzen sichtbar (außer ausgeblendet)
     function applySpot(kd, i) {
-      var s = kd.spots[i], procOn = !s.hidden && s.prop == null;
+      var s = kd.spots[i], procOn = !s.hidden && (s.prop == null || s.far);
       spotMatrix(s, mtx);
       // alle Plätze mit Modell → prozedurale Art gar nicht mehr zeichnen (spart den Zeichenaufruf)
-      var anyProc = kd.spots.some(function (x) { return x.prop == null; });
+      var anyProc = kd.spots.some(function (x) { return x.prop == null || x.far; });
       kd.meshes.forEach(function (m) { m.setMatrixAt(i, procOn ? mtx : ZERO_M); m.instanceMatrix.needsUpdate = true; m.visible = anyProc; });
       kd.propSets.forEach(function (ps1) {
         ps1.slots.forEach(function (sl, j) {
           if (sl.spot !== i) return;
           if (sl.off) sl.m.multiplyMatrices(mtx, sl.off);   // Platz verschoben (refresh): Modell folgt
+          if (ps1.compact) { ps1.dirty = true; return; }      // Detailstufen aktiv: lod() packt neu
           ps1.meshes.forEach(function (m) { m.setMatrixAt(j, s.hidden ? ZERO_M : sl.m); m.instanceMatrix.needsUpdate = true; });
         });
       });
@@ -736,7 +741,9 @@
         im.instanceMatrix.needsUpdate = true;
         g.add(im); return im;
       });
-      kd.propSets.push({ meshes: meshes, slots: slots });
+      // schwere Modelle (≥ LOD_TRIS Dreiecke je Stück) mit prozeduraler Ersatzform: weit weg die Ersatzform (lod())
+      // viele kleine Modelle (Gras, Büsche): jenseits SMALL_FAR m und hinter der Kamera gar nicht zeichnen (lod())
+      kd.propSets.push({ meshes: meshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: slots.length >= 200 });
       propStats.tris += tpl.tris * slots.length; propStats.draws += meshes.length;
       var seen = {};
       slots.forEach(function (sl) {
@@ -944,6 +951,42 @@
       if (e.renderer && e.exp != null) e.renderer.toneMappingExposure = e.exp;
       e.lights.forEach(function (s) { s[0].color.copy(s[1]); s[0].intensity = s[2]; s[0].position.copy(s[3]); if (s[4]) s[0].groundColor.copy(s[4]); });
     }
+    // Detailstufen: schwere Kulissen-Modelle (Bäume) jenseits LOD_FAR m als prozedurale Ersatzform – kostet je Wechsel
+    // nur das Umschreiben der betroffenen Instanz-Matrizen. Aufruf aus dem Spiel mit der Kamera-Lage (x, z).
+    // Nahe Instanzen werden vorn in die Instanzliste gepackt und nur diese gezeichnet (count) – ausgeblendete Instanzen
+    // (Matrix 0) kosteten sonst trotzdem Ecken-Rechenzeit. (fx, fz) = Blickrichtung der Kamera: was deutlich dahinter
+    // liegt (außer ganz nah), wird ebenfalls weggelassen.
+    var COS_BACK = Math.cos(100 * Math.PI / 180);
+    function lod(x, z, fx, fz) {
+      var fl = Math.hypot(fx || 0, fz || 0), dir = fl > 1e-6;
+      if (dir) { fx /= fl; fz /= fl; }
+      kinds.forEach(function (kd) {
+        var sets = kd.propSets ? kd.propSets.filter(function (ps) { return ps.lod || ps.many; }) : [];
+        if (!sets.length) return;
+        var heavy = sets.some(function (ps) { return ps.lod; });
+        kd.spots.forEach(function (s, i) {
+          if (s.prop == null) return;
+          var dx = s.x - x, dz = s.z - z, d = Math.hypot(dx, dz);
+          s.vis = !dir || d < 25 || (dx * fx + dz * fz) / d > COS_BACK;
+          if (!heavy) return;
+          var far = s.far ? d > LOD_NEAR : d > LOD_FAR;
+          if (far !== !!s.far) { s.far = far; applySpot(kd, i); }
+          s.dist = d;
+        });
+        sets.forEach(function (ps) {
+          ps.compact = true; ps.dirty = false;
+          var k = 0;
+          ps.slots.forEach(function (sl) {
+            var sp = kd.spots[sl.spot];
+            if (sp.hidden || sp.far || !sp.vis) return;
+            if (ps.many && Math.hypot(sp.x - x, sp.z - z) > SMALL_FAR) return;
+            ps.meshes.forEach(function (m) { m.setMatrixAt(k, sl.m); });
+            k++;
+          });
+          ps.meshes.forEach(function (m) { m.count = k; m.instanceMatrix.needsUpdate = true; });
+        });
+      });
+    }
     function update(dt) {
       if (reduce || !(dt > 0)) return;
       timeU.value += dt;
@@ -952,7 +995,7 @@
 
     return {
       group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
-      heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update,
+      heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update, lod: lod,
       props: propsReady, propStats: propStats, surfaceStats: surfaceStats, grassAt: grassAt,
       // Bewegungsunschärfe der Fahrbahn in Metern (Car Drive, Tempogefühl); 0 = aus
       setMotionBlur: function (m) { if (surfaceRes && surfaceRes.setMotionBlur) surfaceRes.setMotionBlur(m); },
