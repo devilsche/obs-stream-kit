@@ -60,7 +60,7 @@ RELEASE_TOL = 25.0       # Rückgabe ans Steuer: Lage höchstens so weit (m) von
 GRID_FRONT, GRID_ROW, GRID_SIDE = 4.0, 7.5, 2.3
 # Testraum: immer offen unter festem Code (Admin-Tenant), Ergebnisse/Coins/Rekorde werden nicht gespeichert,
 # Rennen starten von selbst (TEST_WAIT s nach dem letzten Beitritt bzw. TEST_PAUSE s nach dem Ergebnis)
-TEST_CODE, TEST_TENANT, TEST_TRACK, TEST_LAPS = "TESTME", 1, 4, 2
+TEST_CODE, TEST_TENANT, TEST_TRACK, TEST_LAPS = "TESTME", 1, 0, 2   # Speedway; umstellen: /internal/test?track=&laps=
 TEST_WAIT, TEST_PAUSE = 10.0, 20.0
 
 
@@ -541,6 +541,23 @@ class Hub:
 
     def get(self, code):
         return self.rooms.get((code or "").upper())
+
+    def set_test(self, track, laps, now):
+        """Strecke/Runden des Testraums ändern (nur Lobby/Ergebnis). → (ok, Raum)."""
+        room = self.ensure_test(now)
+        if room.phase not in ("lobby", "done"):
+            return False, room
+        try:
+            t = int(track)
+            if 0 <= t < len(TRACK_LEN):
+                room.track = t
+        except (TypeError, ValueError):
+            pass
+        try:
+            room.laps = max(LAPS_MIN, min(int(laps), LAPS_MAX))
+        except (TypeError, ValueError):
+            pass
+        return True, room
 
     def ensure_test(self, now):
         """Testraum TEST_CODE anlegen, falls er fehlt (nicht an den Tenant gebunden: der normale Raum bleibt frei)."""

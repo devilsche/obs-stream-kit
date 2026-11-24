@@ -374,3 +374,12 @@ def test_test_room_always_there_auto_starts_and_never_expires():
     assert room.auto_start(1200.0 + dr.TEST_PAUSE) and room.phase == "countdown"
     room.clients = 0
     assert room not in hub.sweep(1e9)
+
+
+def test_set_test_room_track_only_when_idle():
+    hub = dr.Hub()
+    ok, room = hub.set_test(4, 3, 1000.0)
+    assert ok and room.track == 4 and room.laps == 3
+    room.phase = "race"
+    ok, room = hub.set_test(1, 1, 1001.0)
+    assert not ok and room.track == 4

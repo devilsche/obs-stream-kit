@@ -27,7 +27,8 @@ Absender, der Empfänger wendet −J samt Drehstoß im Punkt (px, pz) an, wenn e
 KI-Übernahme in Räumen: alle Clients fahren ein übernommenes Auto mit CarRaceSim.follower ab ev; der Träger schickt
 dessen Lage als s {for: id, …} (5 Hz, zählt Runden/Ziel, keine Rekorde). Der Fahrer übernimmt mit release {x, z, yaw,
 speed, prog, rt} wieder (fx/drive_room.Room.release).
-Testraum TESTME (fx/drive_room.TEST_CODE): immer offen (Admin-Tenant, Kart, 2 Runden), startet von selbst, speichert nichts.
+Testraum TESTME (fx/drive_room.TEST_CODE): immer offen (Admin-Tenant, Speedway, 2 Runden; umstellen mit
+GET /internal/test?track=0–4&laps=1–5, nur in Lobby/Ergebnis), startet von selbst, speichert nichts.
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
 
 Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
@@ -205,6 +206,9 @@ class DriveServer:
             return {"ok": False, "error": "bad tenant"}, 400
         if cmd == "sync":
             return self.race_sync(q, now)
+        if cmd == "test":
+            ok, room = self.hub.set_test(q.get("track"), q.get("laps"), now)
+            return {"ok": ok, "room": room.info(now)}, 200
         if cmd == "room":
             room = self.hub.get(q.get("code"))
             if not room:
