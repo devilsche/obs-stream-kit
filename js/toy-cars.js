@@ -1243,7 +1243,7 @@
     opts = opts || {};
     if (!root.RubberDuck || !car) return null;
     var st = opts.seat || seatOf(key || car.userData.key, opts.template); if (!st) return null;
-    var duck = root.RubberDuck.build({ color: opts.color, outfit: opts.outfit });
+    var duck = root.RubberDuck.build({ color: opts.color, outfit: opts.outfit, seated: true });   // Sitz-Ente: Hinterteil eingezogen
     var k = st.s / DUCK_H;
     // Drehung: Turn um y, dann Lean (x, seitlich) und Tilt (z, Schnabel hoch/runter) – Reihenfolge YXZ
     duck.scale.setScalar(k); duck.position.set(st.x, st.y - DUCK_FLOOR * k, st.z);

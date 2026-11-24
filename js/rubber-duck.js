@@ -5,7 +5,7 @@
  * Schnabel (Ober-/Unterteil), angelegte Flügel, aufgemalte Augen.
  * Einheiten: Ente ~2.4 lang (Schnabel zeigt nach +x), ~2.2 hoch, Boden bei y = -0.55.
  *
- *   var duck = RubberDuck.build({ color, outfit });   // → THREE.Group
+ *   var duck = RubberDuck.build({ color, outfit, seated });   // → THREE.Group (seated: Fahrer-Ente, kürzer, Schwanz eingezogen)
  *   RubberDuck.OUTFITS                                 // verfügbare Outfits
  *   RubberDuck.viewerOutfit(name)                      // Outfit, das sich der Zuschauer mit !outfit ausgesucht hat (oder null)
  */
@@ -35,9 +35,11 @@
   // Bauch vorn, Doppelkinn, Pausbacken; <1 schlanker), muscles = Brustmuskeln. Weitere Formen
   // (Kinn, Backen, Brustmuskeln) hängen hinter dem Kopf an und gehören nicht zum Rumpf.
   var CUR = PARTS, CUR_KEY = '';
-  function shapeFor(o) {
+  // seated: Fahrer-Ente (sitzt im Auto) – kürzerer Bauch, Schwanz eingezogen und tiefer, damit das Hinterteil nicht
+  // hinten aus dem Sitz ragt; Kopf, Hals und Brust bleiben, alle Outfits passen weiter
+  function shapeFor(o, seated) {
     var G = Math.max(0.7, Math.min(1.8, +o.girth || 1)), mu = !!o.muscles;
-    if (G === 1 && !mu) return { key: '', parts: PARTS };
+    if (G === 1 && !mu && !seated) return { key: '', parts: PARTS };
     var f = G - 1, P = PARTS.map(function (q) { return { c: q.c.slice(), r: q.r.slice(), k: q.k }; });
     P[0].c[0] += 0.12 * f; P[0].r[0] *= 1 + 0.4 * f; P[0].r[1] *= 1 + 0.15 * f; P[0].r[2] *= 1 + f;
     P[1].r[0] *= 1 + 0.35 * f; P[1].r[2] *= 1 + 0.8 * f;
@@ -50,7 +52,12 @@
       P[1].r[1] *= 1.05; P[1].r[2] *= 1.12;
       [-1, 1].forEach(function (s) { P.push({ c: [0.9, 0.4, s * 0.23], r: [0.2, 0.16, 0.21], k: 0.08 }); });
     }
-    return { key: G.toFixed(2) + (mu ? 'm' : ''), parts: P };
+    if (seated) {
+      P[0].c[0] += 0.08; P[0].r[0] *= 0.72; P[0].r[1] *= 0.97;          // Bauch kürzer (Länge ~2,4 → ~1,9)
+      P[2].c = [-0.5, 0.26, 0]; P[2].r = P[2].r.map(function (x) { return x * 0.85; });   // Schwanz eingezogen
+      P[3].c = [-0.66, 0.44, 0]; P[3].r = P[3].r.map(function (x) { return x * 0.75; });  // Spitze tiefer, kürzer
+    }
+    return { key: G.toFixed(2) + (mu ? 'm' : '') + (seated ? 's' : ''), parts: P };
   }
   // nur Rumpf (Bauch, Brust, Schwanz) – für Teile, die nicht über den Kopf dürfen
   function sdTrunk(p) {
@@ -419,7 +426,7 @@
 
   // Körperform des Outfits nur für die Dauer des Baus setzen (surface/surfaceAt der Zubehörteile folgen ihr)
   function build(opts) {
-    var o = OUTFITS[(opts || {}).outfit] || OUTFITS.none, sh = shapeFor(o), prev = CUR, prevKey = CUR_KEY;
+    var o = OUTFITS[(opts || {}).outfit] || OUTFITS.none, sh = shapeFor(o, !!(opts || {}).seated), prev = CUR, prevKey = CUR_KEY;
     CUR = sh.parts; CUR_KEY = sh.key;
     try { return buildDuck(opts); } finally { CUR = prev; CUR_KEY = prevKey; }
   }
@@ -967,7 +974,7 @@
   function hugger(key) {
     key = String(key || '');
     if (!HUGS[key]) {
-      var parts = key ? shapeFor({ girth: parseFloat(key) || 1, muscles: /m$/.test(key) }).parts : PARTS;
+      var parts = key ? shapeFor({ girth: parseFloat(key) || 1, muscles: /m/.test(key) }, /s$/.test(key)).parts : PARTS;
       HUGS[key] = function (q) { var pc = CUR; CUR = parts; try { return surface(q.clone().sub(CENTER)); } finally { CUR = pc; } };
     }
     return HUGS[key];
