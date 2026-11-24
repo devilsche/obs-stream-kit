@@ -49,7 +49,7 @@
 <script>
 (function () {
   'use strict';
-  var API = '/admin/api/prop-search', TITLES = { mountain: 'Mountains', rock: 'Rocks and cliffs' };
+  var API = '/admin/api/prop-search', TITLES = { mountain: 'Mountains', rock: 'Rocks and cliffs', shrub: 'Shrubs and bushes', fern: 'Ferns and foliage', flower: 'Flowers, mushrooms and small things' };
   var groups = document.getElementById('groups'), statusEl = document.getElementById('status'), picks = {};
   function setStatus(t, err) { statusEl.textContent = t; statusEl.classList.toggle('err', !!err); }
   function count() { document.getElementById('nOn').textContent = Object.keys(picks).filter(function (k) { return picks[k]; }).length; }
