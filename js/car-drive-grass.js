@@ -24,10 +24,10 @@
   var TILE = 8, CACHE_MAX = 700, STRIDE = 11, TRIS = 17;
   // Halmhöhe h (m), Breite w (m), Büschel je m², Radius R, Biegung, Fleckigkeit, Höhen-Streuung, Blüten-Anteil, Wind
   var PRESET = {
-    stadium:    { dens: 9, h: [0.22, 0.42], w: 0.022, R: 46, curve: 0.3, patch: 0.25, hvar: 0.45, flowers: 0, wind: 0.35 },
-    forest:     { dens: 8, h: [0.2, 0.5], w: 0.022, R: 48, curve: 0.4, patch: 0.5, hvar: 0.7, flowers: 0, wind: 0.45 },
-    alpine:     { dens: 7, h: [0.15, 0.4], w: 0.02, R: 48, curve: 0.35, patch: 0.35, hvar: 0.6, flowers: 0.08, wind: 0.6 },
-    coast:      { dens: 2.5, h: [0.3, 0.75], w: 0.016, R: 50, curve: 0.55, patch: 0.8, hvar: 0.6, flowers: 0, wind: 0.9, tint: [1.1, 1.0, 0.72] },
+    stadium:    { dens: 16, h: [0.22, 0.42], w: 0.026, R: 60, curve: 0.3, patch: 0.25, hvar: 0.45, flowers: 0, wind: 0.35 },
+    forest:     { dens: 14, h: [0.2, 0.5], w: 0.026, R: 60, curve: 0.4, patch: 0.5, hvar: 0.7, flowers: 0, wind: 0.45 },
+    alpine:     { dens: 12, h: [0.15, 0.4], w: 0.024, R: 60, curve: 0.35, patch: 0.35, hvar: 0.6, flowers: 0.08, wind: 0.6 },
+    coast:      { dens: 4, h: [0.3, 0.75], w: 0.02, R: 60, curve: 0.55, patch: 0.8, hvar: 0.6, flowers: 0, wind: 0.9, tint: [1.1, 1.0, 0.72] },
     industrial: { dens: 1.0, h: [0.12, 0.3], w: 0.02, R: 50, curve: 0.35, patch: 0.45, hvar: 0.5, flowers: 0, wind: 0.4 },
     plain:      { dens: 1.4, h: [0.15, 0.35], w: 0.02, R: 55, curve: 0.35, patch: 0.3, hvar: 0.4, flowers: 0, wind: 0.45 }
   };
@@ -99,7 +99,7 @@
     'vec2 gBendV = uWind * (0.6 + gSw) + gDir * aB.y * uCurve + gCd / max(gCl, 0.001) * gPress * 1.4;',
     'vec2 gBend = gBendV * gT * gT;',
     'float gBl = min(length(gBend), 0.9);',
-    'vec2 gXZ = gBase + gSide * position.x * iB.y + gBend * gH;',
+    'vec2 gXZ = gBase + gSide * position.x * iB.y * (1.0 + gDist / 9.0) + gBend * gH;',
     'vec3 gPos = vec3(gXZ.x, iA.y + gH * gT * (1.0 - 0.45 * gBl * gBl), gXZ.y);',
     'float gFs = 0.03 * step(0.5, iB.w) * aF.x * step(0.01, gH);',
     'gPos += vec3(gSide.x * aF.y * gFs, position.z * gFs, gSide.y * aF.y * gFs);',
@@ -109,12 +109,15 @@
     'if (aF.x > 0.5) vGC = iB.w < 1.5 ? vec3(0.9, 0.9, 0.86) : iB.w < 2.5 ? vec3(0.95, 0.72, 0.08) : iB.w < 3.5 ? vec3(0.42, 0.2, 0.62) : vec3(0.25, 0.38, 0.85);'
   ].join('\n');
 
+  // volle Dichte bis LOD_NEAR m, dahinter sanft weniger (vorher 12 m / 1,25 – ab ~20 m sah man kaum noch Halme)
+  var LOD_NEAR = 28, LOD_EXP = 0.9;
+
   function create(THREE, res, opts) {
     opts = opts || {};
     if (!THREE || !res || !res.grassAt || !res.group) return null;
     var reduce = !!opts.reduce, theme = res.theme || {}, pr = PRESET[theme.id] || PRESET.plain;
     var qMax = opts.quality === 'light' ? 0.55 : 1, q = qMax;
-    var CAP = opts.quality === 'light' ? 24000 : 60000;   // dichtes Gras (2026-11-24, vom User gewünscht)
+    var CAP = opts.quality === 'light' ? 40000 : 110000;   // dichtes Gras (2026-11-24, vom User gewünscht: „man sah nix dichtes“)
     var seed = ((res.P && res.P.length) || 1) * 7919 + Math.round((res.P && res.P[0] ? res.P[0].x * 13 + res.P[0].z * 7 : 0));
 
     var geo = clumpGeo(THREE);
@@ -128,7 +131,7 @@
     var U = {
       uTime: { value: 0 }, uSway: { value: reduce ? 0 : 0.5 }, uWind: { value: new THREE.Vector2(Math.cos(wa), Math.sin(wa)).multiplyScalar(pr.wind * 0.35) },
       uCar: { value: new THREE.Vector4(0, 0, 1, 0) }, uFade: { value: new THREE.Vector2(pr.R * 0.7, pr.R) },
-      uLod: { value: new THREE.Vector3(12, 1.25, q) }, uCurve: { value: pr.curve }, uTint: { value: new THREE.Vector3().fromArray(pr.tint || [1, 1, 1]) }
+      uLod: { value: new THREE.Vector3(LOD_NEAR, LOD_EXP, q) }, uCurve: { value: pr.curve }, uTint: { value: new THREE.Vector3().fromArray(pr.tint || [1, 1, 1]) }
     };
     var mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.6 });
     mat.onBeforeCompile = function (sh) {
@@ -183,7 +186,7 @@
       active.sort(function (u, v) { return u.dn - v.dn; });
       queue.sort(function (u, v) { return u.dn - v.dn; });
     }
-    function lodAt(d) { return q * Math.min(1, Math.pow(12 / Math.max(d, 12), 1.25)); }
+    function lodAt(d) { return q * Math.min(1, Math.pow(LOD_NEAR / Math.max(d, LOD_NEAR), LOD_EXP)); }
     function rebuild(px, pz) {
       var A = iA.array, B = iB.array, C = iC.array, n = 0;
       for (var i = 0; i < active.length && n < CAP; i++) {
