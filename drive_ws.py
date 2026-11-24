@@ -12,7 +12,7 @@ Wege:
                               · garage (tenant, user, cars = Komma-Liste; nach !buy, an die Verbindungen des Zuschauers)
 
 Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · release {x, z, yaw, speed, prog, rt} ·
-bump {to, jx, jz, imp} (harter Kontakt mit einem Mitspieler, nur im Rennen) · ping {c, pg} · s {x, z, yaw, roll, pitch,
+bump {to, jx, jz, imp, px?, pz?} (Kontakt mit einem Mitspieler samt Kontaktpunkt, nur im Rennen) · ping {c, pg} · s {x, z, yaw, roll, pitch,
 steer, speed, prog, rt (Rennzeit), spin, ts (Server-Uhr des Clients beim Senden), pg (Ping ms)} (~30 Hz).
 Server → Client: welcome {id, room, roster, now, taken, carrier} · roster {list} · joined {ok, msg} · phase {phase, race_id,
 start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …],
@@ -22,8 +22,8 @@ rec {id, name, car, track, time, personal, car_rec, track_rec, best_car, best_tr
 fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · garage {garage} (nur an den Zuschauer, neues
 Auto gekauft) · pong {c, s} · closed {msg} · error {msg} · takeover {ev} (3 s ohne Zustand im Rennen: die KI fährt
 weiter, ev = {t, type, id, x, z, yaw, speed, prog, lap} bzw. {…, d} vom Startplatz) · carrier {id} (wer die übernommenen
-Autos meldet) · release {ev} · ai_denied {want} · bump {from, jx, jz, imp} (nur an den Getroffenen: Stoß J auf den
-Absender, der Empfänger wendet −J an, wenn er den Kontakt nicht selbst gerechnet hat; je Client ≤ 10/s, |J| ≤ 60).
+Autos meldet) · release {ev} · ai_denied {want} · bump {from, jx, jz, imp, px?, pz?} (nur an den Getroffenen: Stoß J auf den
+Absender, der Empfänger wendet −J samt Drehstoß im Punkt (px, pz) an, wenn er den Kontakt nicht selbst gerechnet hat; je Client ≤ 10/s, |J| ≤ 60).
 KI-Übernahme in Räumen: alle Clients fahren ein übernommenes Auto mit CarRaceSim.follower ab ev; der Träger schickt
 dessen Lage als s {for: id, …} (5 Hz, zählt Runden/Ziel, keine Rekorde). Der Fahrer übernimmt mit release {x, z, yaw,
 speed, prog, rt} wieder (fx/drive_room.Room.release).
@@ -115,8 +115,14 @@ def _bump(peers, sender, uid, msg, now):
         return 0
     sender.bump_at = now
     clip = lambda v: round(max(-BUMP_MAX, min(BUMP_MAX, v)), 3)
-    broadcast(wss, json.dumps({"t": "bump", "from": str(uid), "jx": clip(jx), "jz": clip(jz),
-                               "imp": round(max(0.0, min(BUMP_MAX, imp)), 2)}, separators=(",", ":")))
+    out = {"t": "bump", "from": str(uid), "jx": clip(jx), "jz": clip(jz), "imp": round(max(0.0, min(BUMP_MAX, imp)), 2)}
+    try:   # Kontaktpunkt (Welt, m) für den Drehstoß beim Getroffenen – optional
+        px, pz = float(msg["px"]), float(msg["pz"])
+        if math.isfinite(px) and math.isfinite(pz) and abs(px) < 1e5 and abs(pz) < 1e5:
+            out["px"], out["pz"] = round(px, 2), round(pz, 2)
+    except (KeyError, TypeError, ValueError):
+        pass
+    broadcast(wss, json.dumps(out, separators=(",", ":")))
     return len(wss)
 
 

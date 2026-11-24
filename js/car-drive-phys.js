@@ -26,6 +26,8 @@
  *                                         Aufprall in Normalenrichtung), slide (m/s längs der Berührung), scrape bool,
  *                                         jx, jz (Stoß auf das eigene Auto, N·s in Spielzeug-Masse), px, pz, nx, nz, pen,
  *                                         tx, tz (Richtung, in die das eigene Auto an der Berührung entlanggleitet) }
+ *   CarDrivePhys.impulse(car, jx, jz, px, pz, imp)  Stoß von außen (Mitspieler-Meldung bump): Schub + Drehstoß im
+ *                                        Kontaktpunkt, ab CRASH_V kurz benommen
  *   CarDrivePhys.stepContacts(car, input, dt, me, others, onHit)
  *                                        step() in Teilstücken (≤ CHUNK m Relativweg) mit collide() gegen alle others
  *                                        nach jedem Stück (kein Durchtunneln bei Tempo/niedriger Bildrate); others wie o
@@ -498,6 +500,20 @@
     return res;
   }
 
+  // Stoß von außen (Mitspieler meldet den Kontakt, bump): J (N·s Spielzeug-Masse) im Punkt (px, pz) – Schub UND
+  // Drehstoß wie in collide (Treffer hinten außermittig dreht), harter Aufprall (imp ≥ CRASH_V) macht kurz benommen
+  function impulse(car, jx, jz, px, pz, imp) {
+    var P = car.P, mP = P.mass, I = mP * (P.len * P.len + P.width * P.width) / 12 * INERTIA_K;
+    car.vx += jx / mP; car.vz += jz / mP;
+    if (isFinite(px) && isFinite(pz)) {
+      var rx = px - car.x, rz = pz - car.z;
+      if (rx * rx + rz * rz < P.len * P.len) car.r += clamp((rz * jx - rx * jz) / I, -MAX_DR, MAX_DR) * ((imp || 0) >= CRASH_V ? 1 : 0.35);
+    }
+    if ((imp || 0) >= CRASH_V) { car.hitT = Math.max(car.hitT || 0, Math.min(HIT_T, 0.12 + imp * 0.035)); car.steer *= 0.5; }
+    var fx = Math.cos(car.yaw), fz = -Math.sin(car.yaw), lx = -Math.sin(car.yaw), lz = -Math.cos(car.yaw);
+    car.u = car.vx * fx + car.vz * fz; car.w = car.vx * lx + car.vz * lz;
+  }
+
   var CHUNK = 0.3;
   function stepContacts(car, inp, dt, me, others, onHit) {
     others = others || [];
@@ -534,6 +550,6 @@
 
   return {
     params: params, trackInfo: trackInfo, project: project, create: create, step: step, reset: reset,
-    speedKmh: speedKmh, nitroReady: nitroReady, overlap: overlap, outline: outline, roundedRect: roundedRect, collide: collide, stepContacts: stepContacts, CRASH_V: CRASH_V, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
+    speedKmh: speedKmh, nitroReady: nitroReady, impulse: impulse, overlap: overlap, outline: outline, roundedRect: roundedRect, collide: collide, stepContacts: stepContacts, CRASH_V: CRASH_V, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
   };
 });

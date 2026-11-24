@@ -287,11 +287,13 @@ def test_bump_only_to_target_rate_limited_and_clipped(monkeypatch):
     peers = {ca, cb, cc}
     assert drive_ws._bump(peers, ca, "u1", {"to": "u2", "jx": 500, "jz": -1.5, "imp": 7}, 10.0) == 1
     assert sent[-1] == ([b], {"t": "bump", "from": "u1", "jx": 60.0, "jz": -1.5, "imp": 7.0})
-    assert drive_ws._bump(peers, ca, "u1", {"to": "u3", "jx": 1, "jz": 1}, 10.05) == 0      # zu schnell
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u2", "jx": 1, "jz": 0, "imp": 1, "px": 3.456, "pz": -2}, 10.2) == 1
+    assert sent[-1][1]["px"] == 3.46 and sent[-1][1]["pz"] == -2.0
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u3", "jx": 1, "jz": 1}, 10.25) == 0      # zu schnell
     assert drive_ws._bump(peers, ca, "u1", {"to": "u3", "jx": "nan", "jz": 1}, 10.5) == 0  # ungültig
     assert drive_ws._bump(peers, ca, "u1", {"to": "u1", "jx": 1, "jz": 1}, 10.5) == 0      # sich selbst
     assert drive_ws._bump(peers, ca, "u1", {"to": "u9", "jx": 1, "jz": 1}, 10.5) == 0      # nicht da
-    assert len(sent) == 1
+    assert len(sent) == 2
 
 
 def test_room_bump_only_in_race(monkeypatch):

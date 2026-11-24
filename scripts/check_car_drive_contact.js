@@ -4,6 +4,7 @@
  * 1) Umriss: Hülle einer autoähnlichen Punktwolke hat ≤ 16 Ecken, ist konvex, kleiner als die Bounding-Box, Ecken frei
  * 2) Nebeneinander anlehnen (Mitspieler, gleich schnell, 0,1 m Überlappung, 5 s): kaum Querbewegung, kein Crash
  * 3) Auffahren mit Δv 6 m/s (Mitspieler): ein Crash, Hinterer langsamer, Vorderer schneller, kaum Rückprall
+ * 5) Stoß-Meldung (bump) 30° ans Hinterrad dreht, gerade mittig nicht
  * 4) Mehrspieler mit 150 ms Laufzeit: zwei Clients, einer drückt seitlich hinein – mit Voraussage + weichem Kontakt
  *    wenige Crashs, kein Wegschleudern (zum Vergleich der alte Weg: Puffer-Lage, harter Kontakt)
  */
@@ -143,6 +144,18 @@ function mpRun(newWay) {
   ok(newW.crash <= 2, 'Mehrspieler 150 ms: ' + newW.crash + ' Crashs (alter Weg ' + oldW.crash + ')');
   ok(newW.latB < 3, 'Mehrspieler 150 ms: B wird nicht weggeschleudert (quer bis ' + newW.latB.toFixed(2) + ' m/s)');
   ok(newW.maxJump < 0.05, 'Mehrspieler 150 ms: kein Sprung, größter Versatz je Bild ' + (newW.maxJump * 100).toFixed(1) + ' cm');
+})();
+
+// 5) Stoß von außen (bump) hinten außermittig: dreht das getroffene Auto, mittig kaum
+(function () {
+  var a = carFor('bmw-m3-competition', T, { s: S0, d: 0 }), b = carFor('bmw-m3-competition', T, { s: S0, d: 0 });
+  var fx = Math.cos(a.yaw), fz = -Math.sin(a.yaw), lx = -Math.sin(a.yaw), lz = -Math.cos(a.yaw), J = 12;
+  // Stoß schräg von hinten-links (30°) an die linke hintere Ecke bzw. mittig ans Heck
+  var jx = (fx * Math.cos(0.52) - lx * Math.sin(0.52)) * J, jz = (fz * Math.cos(0.52) - lz * Math.sin(0.52)) * J;
+  // schräg (30°, nach vorn-rechts) an die rechte hintere Ecke (Hinterrad) gegen gerade von hinten mittig
+  Phys.impulse(a, jx, jz, a.x - fx * 2 - lx * 0.9, a.z - fz * 2 - lz * 0.9, 4);
+  Phys.impulse(b, fx * J, fz * J, b.x - fx * 2.2, b.z - fz * 2.2, 4);
+  ok(Math.abs(a.r) > 0.5 && Math.abs(b.r) < 0.05, 'bump 30° ans Hinterrad dreht: Gierrate ' + a.r.toFixed(2) + ' rad/s (gerade mittig ' + b.r.toFixed(2) + ')');
 })();
 
 console.log(fails ? fails + ' Fehler' : 'alles ok');

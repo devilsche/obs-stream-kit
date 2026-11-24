@@ -931,8 +931,9 @@
   function peerHit(o, h) {
     var c = o.c; if (!c || !race) return;
     c.contactAt = race.t;
-    var a = c.bumpAcc || (c.bumpAcc = { jx: 0, jz: 0, imp: 0 });
-    a.jx += h.jx; a.jz += h.jz; a.imp = Math.max(a.imp, h.impact);
+    var a = c.bumpAcc || (c.bumpAcc = { jx: 0, jz: 0, imp: 0, px: 0, pz: 0, w: 0 });
+    var wj = Math.hypot(h.jx, h.jz);   // Kontaktpunkt nach Stoß gewichtet (für den Drehstoß beim Getroffenen)
+    a.jx += h.jx; a.jz += h.jz; a.imp = Math.max(a.imp, h.impact); a.px += h.px * wj; a.pz += h.pz * wj; a.w += wj;
   }
   function peerBumpSend() {
     if (!race || !race.remotes) return;
@@ -942,7 +943,8 @@
       c.bumpAcc = null;
       if (Math.hypot(a.jx, a.jz) < BUMP_MIN) return;
       c.bumpAt = race.t;
-      mp.net.send({ t: 'bump', to: c.id, jx: Math.round(a.jx * 1000) / 1000, jz: Math.round(a.jz * 1000) / 1000, imp: Math.round(a.imp * 100) / 100 });
+      mp.net.send({ t: 'bump', to: c.id, jx: Math.round(a.jx * 1000) / 1000, jz: Math.round(a.jz * 1000) / 1000, imp: Math.round(a.imp * 100) / 100,
+        px: a.w > 0 ? Math.round(a.px / a.w * 100) / 100 : undefined, pz: a.w > 0 ? Math.round(a.pz / a.w * 100) / 100 : undefined });
     });
   }
   // bump eines Mitspielers: Gegenstoß (−J) auf mein Auto, wenn ich den Kontakt nicht selbst gerade gerechnet habe
@@ -950,10 +952,8 @@
     if (!race || !race.pc || race.spect || race.phase !== 'race' || !(m.jx || m.jz)) return;
     var c = (race.remotes || []).filter(function (r) { return r.id === String(m.from); })[0];
     if (c && c.contactAt != null && race.t - c.contactAt < 0.3) return;
-    var pc = race.pc, mP = pc.P.mass, jx = clamp(-m.jx, -60, 60), jz = clamp(-m.jz, -60, 60);
-    pc.vx += jx / mP; pc.vz += jz / mP;
-    var fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), lx = -Math.sin(pc.yaw), lz = -Math.cos(pc.yaw);
-    pc.u = pc.vx * fx + pc.vz * fz; pc.w = pc.vx * lx + pc.vz * lz;
+    var pc = race.pc, jx = clamp(-m.jx, -60, 60), jz = clamp(-m.jz, -60, 60);
+    Phys.impulse(pc, jx, jz, m.px, m.pz, m.imp);   // Schub + Drehstoß im Kontaktpunkt
     if (c) c.contactAt = race.t;
     if ((m.imp || 0) >= Phys.CRASH_V) { race.crashT = Math.max(race.crashT || 0, 0.25); pc.hitT = Math.max(pc.hitT || 0, 0.2); }
   }
