@@ -545,6 +545,25 @@
       }
       return placed;
     };
+    // dicht an der Strecke streuen: hinter der Leitplanken-Linie (Auslauf + 0,3 m + extra[0…1] m), zufällig entlang der
+    // Strecke, je Seite `perM` Stück pro Meter; o = { perM, extra: [min, max], rad, s: [min, max], pred } (Gras, Büsche)
+    ctx.scatterRail = function (kd, o) {
+      var R = ctx.rnd, n = 0, e0 = o.extra ? o.extra[0] : 0.6, e1 = o.extra ? o.extra[1] : 6, s0 = o.s ? o.s[0] : 1, s1 = o.s ? o.s[1] : 1;
+      [1, -1].forEach(function (sd) {
+        var count = Math.round(T.len * (o.perM || 0.2));
+        for (var k = 0; k < count; k++) {
+          var sAt = R() * T.len, a = T.at(sAt), sc = lerp(s0, s1, R()), rad = (o.rad || kd.r) * sc;
+          var off = HALF + (sd > 0 ? a.runL : a.runR) + 0.3 + rad + lerp(e0, e1, R() * R());   // dichter an der Planke
+          var x = a.x + a.nx * sd * off, z = a.z + a.nz * sd * off;
+          if (trackDist(x, z, off + 1) < off - 0.3) continue;   // anderer Streckenteil näher
+          if (o.pred && !o.pred(x, z)) continue;
+          if (!ctx.place(x, z, rad, true)) continue;
+          kd.add(x, z, { rot: R() * TAU, s: sc });
+          n++;
+        }
+      });
+      return n;
+    };
     // Zufallsplatz im Band, Drehung wie der nächste Streckenpunkt
     ctx.randomSpot = function (dmin, dmax) {
       var R = ctx.rnd, ext = HALF + dmax;

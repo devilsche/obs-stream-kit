@@ -91,7 +91,9 @@
  },
  {
   "uid": "daa7fd3ff88945298d00045ca40a4c03",
-  "key": "warehouse-nicholas", "tris": 5000, "paint": "warehouse",
+  "key": "warehouse-nicholas",
+  "tris": 5000,
+  "paint": "warehouse",
   "name": "Warehouse FBX Model Free",
   "author": "Nicholas-3D",
   "license": "CC Attribution",
@@ -212,7 +214,8 @@
  },
  {
   "uid": "6bbe4c85d2a4489dbe5918831be5d886",
-  "key": "stand-arena", "tris": 2000,
+  "key": "stand-arena",
+  "tris": 2000,
   "name": "Low poly stadium/sports arena seats",
   "author": "anDDDres",
   "license": "CC Attribution",
@@ -246,7 +249,8 @@
  },
  {
   "uid": "10a22c724d1a4083bab2d64cdbac6f01",
-  "key": "stand-sports", "paint": "seats",
+  "key": "stand-sports",
+  "paint": "seats",
   "name": "Sports Bleachers",
   "author": "justice2free",
   "license": "CC Attribution",
@@ -316,7 +320,8 @@
  },
  {
   "uid": "9745757584ef46b7be11235af84225a9",
-  "key": "stand-tribunes", "paint": "seats",
+  "key": "stand-tribunes",
+  "paint": "seats",
   "name": "Stands/Tribunes",
   "author": "thenerdpoint60",
   "license": "CC Attribution",
@@ -334,7 +339,8 @@
  },
  {
   "uid": "8b1d8eed69c0405882e50e9099090dc0",
-  "key": "stand-nath", "paint": "seats",
+  "key": "stand-nath",
+  "paint": "seats",
   "name": "Stadium Stand",
   "author": "abhisekh_nath",
   "license": "CC Attribution",
@@ -351,7 +357,8 @@
  },
  {
   "uid": "086dda7566f64c6c930354687e2ec274",
-  "key": "pits-redbull", "paint": "pits",
+  "key": "pits-redbull",
+  "paint": "pits",
   "name": "Red Bull F1 Garage",
   "author": "paman0744",
   "license": "CC Attribution",
@@ -969,6 +976,344 @@
    "stadium",
    "industrial"
   ],
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-l0",
+  "theme": "forest",
+  "kind": "tree",
+  "slot": "forestTree",
+  "height": 14,
+  "tris": 3000,
+  "tex": 256,
+  "part": "l0",
+  "keepNode": "EZTree0\\.Large_",
+  "note": "Paket Realistic Trees Collection: großer Laubbaum",
+  "slots": [
+   "forestTree",
+   "parkTree"
+  ],
+  "themes": [
+   "forest",
+   "stadium",
+   "industrial"
+  ],
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-m10",
+  "theme": "forest",
+  "kind": "tree",
+  "slot": "forestTree",
+  "height": 11,
+  "tris": 3000,
+  "tex": 256,
+  "part": "m10",
+  "keepNode": "EZTree0\\.Medium010_",
+  "note": "Paket Realistic Trees Collection: mittlerer Baum",
+  "slots": [
+   "forestTree",
+   "parkTree"
+  ],
+  "themes": [
+   "forest",
+   "stadium",
+   "industrial"
+  ],
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-m11",
+  "theme": "forest",
+  "kind": "tree",
+  "slot": "forestTree",
+  "height": 9,
+  "tris": 3000,
+  "tex": 256,
+  "part": "m11",
+  "keepNode": "EZTree0\\.Medium011_",
+  "note": "Paket Realistic Trees Collection: kleiner Baum",
+  "slots": [
+   "forestTree",
+   "parkTree",
+   "alpineTree"
+  ],
+  "themes": [
+   "forest",
+   "stadium",
+   "industrial",
+   "alpine"
+  ],
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-l1",
+  "theme": "forest",
+  "kind": "tree",
+  "slot": "forestTree",
+  "height": 13,
+  "tris": 3000,
+  "tex": 256,
+  "part": "l1",
+  "keepNode": "EZTree1\\.Large001_",
+  "note": "Paket Realistic Trees Collection: großer Baum 2",
+  "slots": [
+   "forestTree",
+   "parkTree"
+  ],
+  "themes": [
+   "forest",
+   "stadium",
+   "industrial"
+  ],
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-l9",
+  "theme": "forest",
+  "kind": "tree",
+  "slot": "forestTree",
+  "height": 15,
+  "tris": 3000,
+  "tex": 256,
+  "part": "l9",
+  "keepNode": "EZTree1\\.Large009_",
+  "note": "Paket Realistic Trees Collection: sehr großer Baum",
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-m2",
+  "theme": "forest",
+  "kind": "tree",
+  "slot": "forestTree",
+  "height": 9,
+  "tris": 3000,
+  "tex": 256,
+  "part": "m2",
+  "keepNode": "EZTree1\\.Medium002_",
+  "note": "Paket Realistic Trees Collection: mittlerer Baum 2",
+  "slots": [
+   "forestTree",
+   "alpineTree"
+  ],
+  "themes": [
+   "forest",
+   "alpine"
+  ],
+  "aggressive": true
+ },
+ {
+  "uid": "fe67c886eebf4bcb988d7c45e69995ad",
+  "name": "Realistic Trees Collection",
+  "author": "jungle_jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-trees-collection-fe67c886eebf4bcb988d7c45e69995ad",
+  "key": "tree-rtc-b6",
+  "theme": "forest",
+  "kind": "bush",
+  "slot": "bush",
+  "height": 2.2,
+  "tris": 2000,
+  "tex": 256,
+  "part": "b6",
+  "keepNode": "EZTree1\\.Bush006_",
+  "note": "Paket Realistic Trees Collection: Busch",
+  "themes": [
+   "forest",
+   "stadium",
+   "alpine",
+   "industrial"
+  ],
+  "aggressive": true
+ },
+ {
+  "uid": "457c8c70eb5a45649d5b42b9bc9c3337",
+  "key": "tree-eucalyptus",
+  "name": "Realistic High Poly Tree",
+  "author": "chenuka_wy",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-high-poly-tree-457c8c70eb5a45649d5b42b9bc9c3337",
+  "theme": "stadium",
+  "kind": "tree",
+  "slot": "parkTree",
+  "slots": [
+   "parkTree",
+   "forestTree"
+  ],
+  "themes": [
+   "stadium",
+   "industrial",
+   "forest"
+  ],
+  "height": 11,
+  "tris": 5000,
+  "tex": 256,
+  "aggressive": true,
+  "note": "200 k Dreiecke → 5 k"
+ },
+ {
+  "uid": "f2c2271c1cdb4db298f5f4e7b5896a1c",
+  "key": "tree-oak-bbarts",
+  "name": "Realistic European Tree",
+  "author": "BBARTS",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/realistic-europan-tree-f2c2271c1cdb4db298f5f4e7b5896a1c",
+  "theme": "stadium",
+  "kind": "tree",
+  "slot": "parkTree",
+  "slots": [
+   "parkTree",
+   "forestTree"
+  ],
+  "themes": [
+   "stadium",
+   "industrial",
+   "forest"
+  ],
+  "height": 12,
+  "tris": 6000,
+  "tex": 256,
+  "aggressive": true,
+  "note": "681 k Dreiecke → 6 k (Probe, ob es vereinfacht gut bleibt)"
+ },
+ {
+  "uid": "73201f05280d48dcb10ed4ca362d69f8",
+  "key": "tree-lowpoly-amza",
+  "name": "Tree low poly lowpoly",
+  "author": "00amza",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/tree-low-poly-lowpoly-73201f05280d48dcb10ed4ca362d69f8",
+  "theme": "stadium",
+  "kind": "tree",
+  "slot": "parkTree",
+  "themes": [
+   "stadium",
+   "industrial"
+  ],
+  "height": 8,
+  "tris": 1700,
+  "tex": 256,
+  "part": "t1",
+  "note": "Füllbaum (Paket: Baum 1)",
+  "dropNode": "Tree 2"
+ },
+ {
+  "uid": "9d9ce79d3ae040619e96d5b22c7de1a6",
+  "key": "bush-stylized",
+  "name": "Stylized Bush",
+  "author": "Daniel",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/stylized-bush-9d9ce79d3ae040619e96d5b22c7de1a6",
+  "theme": "forest",
+  "kind": "bush",
+  "slot": "bush",
+  "themes": [
+   "forest",
+   "stadium",
+   "alpine",
+   "industrial",
+   "coast"
+  ],
+  "height": 1.3,
+  "tris": 1000,
+  "tex": 256
+ },
+ {
+  "uid": "d1484537470441b999d37077aeb9b47a",
+  "key": "grass-dry",
+  "name": "Dry grass",
+  "author": "Pixel-bit",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/dry-grass-d1484537470441b999d37077aeb9b47a",
+  "theme": "forest",
+  "kind": "grass",
+  "slot": "grass",
+  "themes": [
+   "forest",
+   "stadium",
+   "alpine",
+   "industrial",
+   "coast"
+  ],
+  "height": 0.9,
+  "tris": 120,
+  "tex": 256
+ },
+ {
+  "uid": "5948b8498f4845e0bbfd74ced30d6c6a",
+  "key": "grass-clump",
+  "name": "low poly grass clump",
+  "author": "sam",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/low-poly-grass-clump-5948b8498f4845e0bbfd74ced30d6c6a",
+  "theme": "forest",
+  "kind": "grass",
+  "slot": "grass",
+  "themes": [
+   "forest",
+   "stadium",
+   "alpine",
+   "industrial"
+  ],
+  "height": 0.6,
+  "tris": 600,
+  "tex": 256,
+  "part": "g",
+  "note": "Paket: nur die Grasbüschel (Rest ist ein Fahrzeug)",
+  "dropNode": "pCube|polySurface"
+ },
+ {
+  "uid": "eb4f6dc9d4e3455ea3435385faf58b60",
+  "key": "grass-patch",
+  "name": "Simple grass chunks",
+  "author": "3dhdscan",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/simple-grass-chunks-eb4f6dc9d4e3455ea3435385faf58b60",
+  "theme": "forest",
+  "kind": "grass",
+  "slot": "grass",
+  "themes": [
+   "forest",
+   "stadium",
+   "alpine",
+   "industrial"
+  ],
+  "len": 2.6,
+  "tris": 1500,
+  "tex": 256,
+  "keepNode": "rostlinka_7c_scater",
+  "part": "p",
+  "note": "Paket: nur das gestreute Gras-Feld",
   "aggressive": true
  }
 ]

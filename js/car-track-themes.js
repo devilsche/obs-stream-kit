@@ -624,6 +624,21 @@
     ctx.scatter(tree, nTree, { dmin: dmin, dmax: dmax, rad: 3.5, s: [0.85, 1.2] });
     ctx.scatter(rowK, nRow, { dmin: dmin + 10, dmax: dmax + 20, rad: 13, s: [0.9, 1.1] });
   }
+  // Gras-Büschel und Büsche (Kulissen-Modelle slot grass/bush; Ersatz: drei schräge Halme bzw. eine Kugel):
+  // dicht hinter der Leitplanke und locker im Gelände. o = { grass (je m und Seite), bush, far (Büschel im Gelände),
+  // farBush, pred, dry (Ersatzfarbe trocken) }
+  function greenery(ctx, o) {
+    var gk = new Kit(), gc = o.dry ? 0xb3a467 : 0x5d8a3c;
+    [[0, 0.35], [2.1, -0.3], [4.2, 0.25]].forEach(function (b) { gk.add(cone(0.09, 0.7, 3), gc, { y: 0.32, ry: b[0], rx: b[1] }); });
+    var grass = ctx.kind('grass', [{ geo: gk.geo() }], { r: 0.5, prop: { slot: 'grass', box: { w: 3, d: 3, h: 1.2 } } });
+    var bk = new Kit();
+    bk.add(ico(1), o.dry ? 0x8a8a4a : 0x3f6e32, { y: 0.7, sy: 0.75, jit: 0.35 });
+    var bush = ctx.kind('bush', [{ geo: bk.geo() }], { r: 1.4, prop: { slot: 'bush', box: { w: 4, d: 4, h: 2.5 } } });
+    ctx.scatterRail(grass, { perM: o.grass, extra: [0.2, 7], rad: 0.45, s: [0.7, 1.35], pred: o.pred });
+    ctx.scatterRail(bush, { perM: o.bush, extra: [1, 9], rad: 1.3, s: [0.7, 1.2], pred: o.pred });
+    if (o.far) ctx.scatter(grass, o.far, { dmin: 14, dmax: 45, rad: 0.45, s: [0.8, 1.4], pred: o.pred });
+    if (o.farBush) ctx.scatter(bush, o.farBush, { dmin: 14, dmax: 60, rad: 1.3, s: [0.8, 1.3], pred: o.pred });
+  }
   function rockGeo(c1, c2) {
     var k = new Kit();
     k.add(ico(1), function (x, y) { return mix(c1, c2, y * 0.8 + 0.3); }, { y: 0.25, sx: 1.5, sy: 0.85, sz: 1.15, jit: 0.45 });
@@ -777,6 +792,7 @@
         }
       });
       leafTrees(ctx, 10, 4, 30, 120);
+      greenery(ctx, { grass: 0.14, bush: 0.012, far: 120, farBush: 14 });
       // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
       // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
       var R = ctx.radius + 170, N = 56, w = TAU * R / N * 1.02, up = new Kit();
@@ -864,6 +880,7 @@
       fk.add(box(4, 0.12, 0.08), 0x8a6239, { y: 0.55 }); fk.add(box(4, 0.12, 0.08), 0x8a6239, { y: 0.95 });
       var fence = ctx.kind('fence', [{ geo: fk.geo() }], { r: 2.1 });
       ctx.alongRail(fence, { step: 4, extra: 2.2, side: ctx.T.turnDir > 0 ? -1 : 1, every: function (s) { return Math.floor(s / 60) % 2 === 0; } });
+      greenery(ctx, { grass: 0.22, bush: 0.02, far: 220, farBush: 30, pred: offCreek });
     }
   };
 
@@ -918,6 +935,7 @@
       hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: -1.8, y: 2.2, z: 3.03 }); hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: 1.8, y: 2.2, z: 3.03 });
       hk.add(box(0.6, 2, 0.6), 0x77736d, { x: 2.2, y: 5.6, z: -1 });
       ctx.scatter(ctx.kind('hut', [{ geo: hk.geo() }], { r: 5, prop: { slot: 'hut', box: { w: 12, d: 12, h: 12 } } }), 4, { dmin: 26, dmax: 110, rad: 5.5, s: [0.9, 1.1] });
+      greenery(ctx, { grass: 0.16, bush: 0.012, far: 160, farBush: 16 });
     }
   };
 
@@ -1017,6 +1035,8 @@
       ctx.bgMesh(rl.geo());
       // Felseninsel mit Leuchtturm im Meer zwischen Strand und Horizont (nur als Kulissen-Modell, slot sea)
       ctx.kind('seaIsland', [], { r: 30, prop: { slot: 'sea', box: { w: 70, d: 70, h: 50 } } }).add(ctx.maxX - 140, ctx.shoreZ - 260, { abs: true, y: sea, rot: 2.2 });
+      // Dünengras und Büsche nur an Land (über dem Wasser)
+      greenery(ctx, { grass: 0.08, bush: 0.01, far: 70, farBush: 10, dry: true, pred: function (x, z) { return z > ctx.shoreZ + 25; } });
     }
   };
 
@@ -1129,6 +1149,7 @@
       }
       ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x6f706b, 0x8d8e88) }], { r: 1.2 }), 18, { dmin: 15, dmax: 100, rad: 1.2, s: [0.4, 0.9] });
       leafTrees(ctx, 6, 3, 30, 110);
+      greenery(ctx, { grass: 0.1, bush: 0.008, far: 60, farBush: 6, dry: true });
       // Hintergrund: Fabrikhallen (dieselbe Art wie die Hallen am Hof → Kulissen-Modelle statt grauer Klötze),
       // Schornsteine (rot-weiß), Silos
       var bg = new Kit();
