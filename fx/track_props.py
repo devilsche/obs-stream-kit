@@ -53,6 +53,35 @@ def set_off(root, key, off):
     return True
 
 
+def picks(root):
+    """Im Admin angehakte Such-Kandidaten (tools/prop-search.html, data/track-props/picks.json) als Menge von uids."""
+    try:
+        with open(os.path.join(folder(root), "picks.json"), encoding="utf-8") as f:
+            d = json.load(f)
+    except (OSError, ValueError):
+        return set()
+    p = d.get("picks") if isinstance(d, dict) else None
+    return {u for u in p if isinstance(u, str)} if isinstance(p, list) else set()
+
+
+def set_pick(root, uid, on):
+    """Such-Kandidat an-/abhaken. Nur gültige Sketchfab-uids (32 Hex) → True."""
+    if not isinstance(uid, str) or not re.match(r"^[0-9a-f]{32}$", uid):
+        return False
+    with _lock:
+        cur = picks(root)
+        if on:
+            cur.add(uid)
+        else:
+            cur.discard(uid)
+        os.makedirs(folder(root), exist_ok=True)
+        p = os.path.join(folder(root), "picks.json")
+        with open(p + ".tmp", "w", encoding="utf-8") as f:
+            json.dump({"picks": sorted(cur)}, f, indent=1)
+        os.replace(p + ".tmp", p)
+    return True
+
+
 def catalog(root, include_off=False):
     """Katalog als Dict; kaputt oder fehlend → leere Listen. Ausgeworfene Modelle fehlen – mit include_off=True
     sind sie dabei, jedes Modell mit Feld "off" (für die Auswahlseite)."""

@@ -90,3 +90,12 @@ def test_thrown_out_props_hidden_from_game(tmp_path):
     assert len(track_props.catalog(root)["props"]) == 2
     (d / "off.json").write_text("kaputt")
     assert track_props.off_keys(root) == set()
+
+
+def test_search_picks(tmp_path):
+    root = str(tmp_path)
+    assert track_props.picks(root) == set()
+    assert track_props.set_pick(root, UID, True) is True
+    assert track_props.set_pick(root, "nope", True) is False          # nur Sketchfab-uids
+    assert track_props.picks(root) == {UID}
+    assert track_props.set_pick(root, UID, False) is True and track_props.picks(root) == set()

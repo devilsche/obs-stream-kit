@@ -403,6 +403,42 @@ def admin_track_props():
     return jsonify(track_props.catalog(root, include_off=True))
 
 
+@bp_admin.route("/admin/prop-search")
+@require_admin
+def admin_prop_search():
+    """Auswahlseite für neue Kulissen-Modelle (tools/prop-search.html): Such-Treffer mit Vorschaubild, Haken „Want“."""
+    src = os.path.join(_project_root(), "tools", "prop-search.html")
+    if not os.path.exists(src):
+        abort(404)
+    with open(src, encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@bp_admin.route("/admin/api/prop-search", methods=["GET", "POST"])
+def admin_prop_search_api():
+    """GET: Kandidaten (assets/track-props/search-*.json) + angehakte uids. POST {uid, on}: Haken setzen."""
+    err, status = _admin_json_guard()
+    if err:
+        return err, status
+    import glob
+    import json
+    from fx import track_props
+    root = _project_root()
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        if not track_props.set_pick(root, body.get("uid"), bool(body.get("on"))):
+            return jsonify({"ok": False, "error": "invalid uid"}), 400
+        return jsonify({"ok": True})
+    items = []
+    for fn in sorted(glob.glob(os.path.join(root, "assets", "track-props", "search-*.json"))):
+        try:
+            with open(fn, encoding="utf-8") as f:
+                items += [x for x in json.load(f) if isinstance(x, dict)]
+        except (OSError, ValueError):
+            pass
+    return jsonify({"items": items, "picks": sorted(track_props.picks(root))})
+
+
 @bp_admin.route("/admin/car-list")
 @require_admin
 def admin_car_list():

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prop search</title>
+<!-- Auswahlseite (Admin): Sketchfab-Treffer für neue Kulissen-Modelle (Berge, Felsen …) mit Vorschaubild, Urheber,
+     Lizenz, Dreiecken und Link; Haken „Want“ merkt das Modell vor (data/track-props/picks.json). Danach baut Claude
+     die angehakten mit scripts/build_track_props.py ein. Kandidaten: assets/track-props/search-*.json.
+     Daten: GET/POST /admin/api/prop-search (app/views_admin.py, fx/track_props.py). Route: /admin/prop-search. -->
+<style>
+  :root { --ps-bg: #0d0912; --ps-card: #1d1128; --ps-text: #fff; --ps-dim: #c9bdd6; --ps-accent: #f2b705; --ps-border: #5e2a79; --ps-nc: #ffcf6e; }
+  html, body { margin: 0; background: var(--ps-bg); color: var(--ps-text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 12px; top: 12px; z-index: 10; background: var(--ps-accent); color: #1b1300; padding: 8px 12px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { margin: 0 0 6px; font-size: 22px; }
+  h2 { margin: 24px 0 10px; font-size: 16px; color: var(--ps-accent); text-transform: uppercase; letter-spacing: 0.06em; }
+  p { margin: 0 0 12px; color: var(--ps-dim); }
+  .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .count { color: var(--ps-accent); font-weight: 700; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; }
+  li { background: var(--ps-card); border: 2px solid transparent; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  li.on { border-color: var(--ps-accent); }
+  img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
+  .body { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .name { font-weight: 700; }
+  .meta { color: var(--ps-dim); font-size: 13px; }
+  .nc { color: var(--ps-nc); }
+  .row { display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 6px; }
+  label.want { display: flex; gap: 6px; align-items: center; cursor: pointer; min-height: 28px; }
+  input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--ps-accent); margin: 0; }
+  a { color: var(--ps-accent); }
+  a:focus-visible, input:focus-visible { outline: 3px solid var(--ps-accent); outline-offset: 2px; }
+  .status { min-height: 22px; color: var(--ps-dim); }
+  .status.err { color: #ff8a80; }
+</style>
+</head>
+<body>
+<a class="skip" href="#groups">Skip to the models</a>
+<main>
+  <h1>Prop search</h1>
+  <p>Free Sketchfab models found for the track scenery. Tick <strong>Want</strong> for the ones worth trying – they get built in
+    and placed afterwards. Open “3D view” to look at a model on Sketchfab.</p>
+  <div class="bar"><span><span class="count" id="nOn">0</span> picked</span></div>
+  <p class="status" id="status" role="status" aria-live="polite">Loading…</p>
+  <div id="groups"></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var API = '/admin/api/prop-search', TITLES = { mountain: 'Mountains', rock: 'Rocks and cliffs' };
+  var groups = document.getElementById('groups'), statusEl = document.getElementById('status'), picks = {};
+  function setStatus(t, err) { statusEl.textContent = t; statusEl.classList.toggle('err', !!err); }
+  function count() { document.getElementById('nOn').textContent = Object.keys(picks).filter(function (k) { return picks[k]; }).length; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  fetch(API, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
+    (d.picks || []).forEach(function (u) { picks[u] = true; });
+    var lists = {};
+    (d.items || []).forEach(function (it) {
+      var g = it.group || 'other';
+      if (!lists[g]) { groups.appendChild(el('h2', null, TITLES[g] || g)); lists[g] = groups.appendChild(el('ul')); }
+      var li = el('li'); if (picks[it.uid]) li.classList.add('on');
+      var img = el('img'); img.src = it.thumb; img.alt = 'Preview of ' + it.name; img.loading = 'lazy'; li.appendChild(img);
+      var b = el('div', 'body');
+      b.appendChild(el('span', 'name', it.name));
+      var nc = /NonCommercial|NoDeriv/.test(it.license || '');
+      b.appendChild(el('span', 'meta', it.author + ' · ' + Math.round((it.tris || 0) / 1000) + 'k triangles'));
+      b.appendChild(el('span', 'meta' + (nc ? ' nc' : ''), it.license + (nc ? ' (restricted)' : '')));
+      var row = el('div', 'row');
+      var a = el('a', null, '3D view'); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; row.appendChild(a);
+      var lab = el('label', 'want'), cb = el('input'); cb.type = 'checkbox'; cb.checked = !!picks[it.uid];
+      cb.setAttribute('aria-label', 'Want ' + it.name);
+      cb.addEventListener('change', function () {
+        var on = cb.checked;
+        fetch(API, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: it.uid, on: on }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) { if (!j.ok) throw new Error(j.error || 'save failed'); picks[it.uid] = on; li.classList.toggle('on', on); count(); setStatus('Saved: ' + it.name + (on ? ' picked.' : ' removed.')); })
+          .catch(function (e) { cb.checked = !on; setStatus('Could not save ' + it.name + ': ' + e.message, true); });
+      });
+      lab.appendChild(cb); lab.appendChild(document.createTextNode('Want')); row.appendChild(lab);
+      b.appendChild(row); li.appendChild(b); lists[g].appendChild(li);
+    });
+    count(); setStatus((d.items || []).length + ' models.');
+  }).catch(function () { setStatus('Could not load (signed in as admin?).', true); });
+})();
+</script>
+</body>
+</html>
