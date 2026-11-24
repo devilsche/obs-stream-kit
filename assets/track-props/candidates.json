@@ -1383,9 +1383,9 @@
   "tris": 500,
   "tex": 256,
   "part": "fuse",
-  "keepNode": "#(66|67)$",
+  "keepNode": "#66$",
   "aggressive": true,
-  "note": "Paket: Sicherungskasten mit Kabel",
+  "note": "Paket: Sicherungskasten ohne Kabel-Fläche (lag deckungsgleich auf der Vorderseite → Flackern)",
   "height": 3.4
  },
  {

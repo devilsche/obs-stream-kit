@@ -1206,7 +1206,8 @@
       };
     },
     decorate: function (ctx) {
-      var rnd = ctx.rnd, HALF = ctx.HALF, H = 16, M = 26;
+      // LIFT: Bodenteile 2 cm über dem Hallenboden (flache Füße wie bei Pylonen flackern sonst gegen den Boden)
+      var rnd = ctx.rnd, HALF = ctx.HALF, H = 16, M = 26, LIFT = 0.02;
       var x0 = ctx.minX - HALF - M, x1 = ctx.maxX + HALF + M, z0 = ctx.minZ - HALF - M, z1 = ctx.maxZ + HALF + M;
       var W = x1 - x0, D = z1 - z0, hx = (x0 + x1) / 2, hz = (z0 + z1) / 2;
       ctx.hallBox = { x0: x0, x1: x1, z0: z0, z1: z1, h: H };
@@ -1323,9 +1324,9 @@
         if (!ctx.place(w4.x, w4.z, 1.1)) continue;
         if (kindR < 0.5) {
           var nD = 2 + Math.floor(rnd() * 3), tint = bcol[Math.floor(rnd() * bcol.length)];
-          for (var dd = 0; dd < nD; dd++) { var an = dd * 2.2 + rnd(), rr = dd ? 0.62 : 0; drum.add(w4.x + Math.cos(an) * rr, w4.z + Math.sin(an) * rr, { rot: rnd() * TAU, tint: tint }); }
-        } else if (kindR < 0.75) pallets.add(w4.x, w4.z, { rot: w4.rot + (rnd() - 0.5) * 0.4 });
-        else tyrePile.add(w4.x, w4.z, { rot: rnd() * TAU, s: 1 + rnd() * 0.4 });
+          for (var dd = 0; dd < nD; dd++) { var an = dd * 2.2 + rnd(), rr = dd ? 0.62 : 0; drum.add(w4.x + Math.cos(an) * rr, w4.z + Math.sin(an) * rr, { rot: rnd() * TAU, tint: tint, y: LIFT }); }
+        } else if (kindR < 0.75) pallets.add(w4.x, w4.z, { rot: w4.rot + (rnd() - 0.5) * 0.4, y: LIFT });
+        else tyrePile.add(w4.x, w4.z, { rot: rnd() * TAU, s: 1 + rnd() * 0.4, y: LIFT });
       }
       // Sicherungskästen an den Wänden (Modell slot fuseBox), liegende Tanks parallel zur Wand (slot tank)
       var fuse = ctx.kind('fuseBox', [{ geo: box(3, 3.2, 0.5).translate(0, 1.6, 0.25) }], { r: 1.6, prop: { slot: 'fuseBox', box: { w: 3.4, d: 0.7, h: 3.6 } } });
@@ -1339,7 +1340,7 @@
           var wf = onWall(sd, u + (rnd() - 0.5) * 0.08, 0.15);
           if (ctx.place(wf.x, wf.z, 1.5)) fuse.add(wf.x, wf.z, { rot: wf.rot });
         });
-        if (rnd() < 0.75) { var wt = onWall(sd, 0.3 + rnd() * 0.4, 2.2); if (ctx.place(wt.x, wt.z, 3.8)) tank.add(wt.x, wt.z, { rot: wt.rot }); }
+        if (rnd() < 0.75) { var wt = onWall(sd, 0.3 + rnd() * 0.4, 2.2); if (ctx.place(wt.x, wt.z, 3.8)) tank.add(wt.x, wt.z, { rot: wt.rot, y: LIFT }); }
       });
       // Betonwände (Modell slot jersey, 5 m) in kurzen Reihen an den Wänden, Pylonen in Grüppchen
       var jersey = ctx.kind('jersey', [{ geo: box(5, 1.2, 0.5).translate(0, 0.6, 0) }], { r: 2.6, prop: { slot: 'jersey', box: { w: 5.2, d: 0.8, h: 1.6 } } });
@@ -1348,13 +1349,13 @@
         var L = sd < 2 ? W : D, start = 0.1 + rnd() * 0.5, n = 2 + Math.floor(rnd() * 3);
         for (var j = 0; j < n; j++) {
           var wj = onWall(sd, start + j * 5.2 / L, 4.5);
-          if (ctx.place(wj.x, wj.z, 2.6)) jersey.add(wj.x, wj.z, { rot: wj.rot });
+          if (ctx.place(wj.x, wj.z, 2.6)) jersey.add(wj.x, wj.z, { rot: wj.rot, y: LIFT });
         }
         for (var cg = 0; cg < 3; cg++) {
           var wc = onWall(sd, 0.1 + rnd() * 0.8, 3 + rnd() * 8);
           for (var ci = 0; ci < 3 + Math.floor(rnd() * 3); ci++) {
             var cx2 = wc.x + (rnd() - 0.5) * 3, cz2 = wc.z + (rnd() - 0.5) * 3;
-            if (ctx.place(cx2, cz2, 0.3)) coneK.add(cx2, cz2, { rot: rnd() * TAU, tint: 0xff6a1a });
+            if (ctx.place(cx2, cz2, 0.3)) coneK.add(cx2, cz2, { rot: rnd() * TAU, tint: 0xff6a1a, y: LIFT });
           }
         }
       });
