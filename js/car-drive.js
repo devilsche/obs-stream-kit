@@ -543,6 +543,7 @@
   var GAME_KEYS = { KeyW: 1, KeyA: 1, KeyS: 1, KeyD: 1, ArrowUp: 1, ArrowDown: 1, ArrowLeft: 1, ArrowRight: 1, Space: 1, ShiftLeft: 1, ShiftRight: 1, KeyR: 1, KeyC: 1 };
   doc.addEventListener('keydown', function (e) {
     if (e.code === 'KeyN' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { cycleMap(); return; }
+    if (e.code === 'KeyI' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { $('hDebug').hidden = !$('hDebug').hidden; return; }
     if (e.code === 'KeyM' && !e.ctrlKey && !e.metaKey && !e.altKey && !/^(INPUT|SELECT|TEXTAREA)$/.test((e.target && e.target.tagName) || '')) { setSound(!sndOn); return; }
     if (e.code === 'Escape' && race && (race.phase === 'race' || race.phase === 'countdown' || race.phase === 'done')) {
       e.preventDefault(); setPaused(!menuOpen()); return;
@@ -2276,6 +2277,32 @@
     tagsFrame();
     clogFrame();
     renderer.render(scene, cam);
+    compassFrame(now);
+  }
+  // Kompass (Blickrichtung der Kamera; Norden = −z der Szene, Osten = +x) und Debug-Panel (Taste I), ~5×/s
+  var CMP = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'], cmpAt = 0, cmpDir = new THREE.Vector3(), dbgFps = 60, dbgLast = 0;
+  function compassFrame(now) {
+    if (dbgLast) dbgFps += (1000 / Math.max(1, now - dbgLast) - dbgFps) * 0.05;
+    dbgLast = now;
+    if (now - cmpAt < 200) return;
+    cmpAt = now;
+    cam.getWorldDirection(cmpDir);
+    var deg = (Math.round(Math.atan2(cmpDir.x, -cmpDir.z) * 180 / Math.PI) + 360) % 360;
+    $('hCmpDir').textContent = CMP[Math.round(deg / 45) % 8];
+    $('hCmpDeg').textContent = deg + '°';
+    var dbg = $('hDebug');
+    if (dbg.hidden) return;
+    var pc = race && race.pc, gi = grass && grass.stats ? grass.stats() : null, ri = renderer.info.render;
+    dbg.textContent = [
+      'Track   ' + (race && race.T ? (race.trackName || race.T.name || '') : '') + (trackRes && trackRes.theme ? ' (' + trackRes.theme.id + ')' : ''),
+      'Heading ' + CMP[Math.round(deg / 45) % 8] + ' ' + deg + '°',
+      pc ? 'Car     x ' + pc.x.toFixed(1) + '  z ' + pc.z.toFixed(1) + (trackRes && trackRes.heightAt ? '  h ' + trackRes.heightAt(pc.x, pc.z).toFixed(1) + ' m' : '') : 'Car     –',
+      pc && pc.prog != null ? 'Lap pos ' + Math.round(pc.prog) + ' m' : '',
+      'Camera  x ' + cam.position.x.toFixed(0) + '  y ' + cam.position.y.toFixed(1) + '  z ' + cam.position.z.toFixed(0),
+      'FPS     ' + Math.round(dbgFps),
+      'Draws   ' + ri.calls + '   Tris ' + (ri.triangles / 1e6).toFixed(2) + ' M',
+      gi ? 'Grass   ' + gi.instances + ' tufts  q ' + gi.q : ''
+    ].filter(Boolean).join('\n');
   }
   function stepWorld(dt, inp) {
     var pc = race.pc;

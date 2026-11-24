@@ -145,6 +145,13 @@
     .hud-map[hidden] { display: none; }
     .hud-ai { left: 50%; top: 20px; transform: translateX(-50%); color: var(--cd-accent); font-weight: 800; letter-spacing: 0.04em; font-size: 16px; display: flex; gap: 8px; align-items: center; }
     .hud-ai[hidden] { display: none; }
+    /* Kompass (Blickrichtung der Kamera, N = −z der Szene) und Debug-Panel (Taste I) – js/car-drive.js compassFrame */
+    .hud-compass { left: 50%; top: 20px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 14px; font-size: 16px; }
+    .hud-ai:not([hidden]) ~ .hud-compass { top: 72px; }
+    .cmp-dir { font-weight: 800; color: var(--cd-accent); min-width: 2.4em; text-align: center; letter-spacing: 0.04em; }
+    .cmp-deg { font-family: var(--cd-mono); color: var(--cd-dim); min-width: 3.2em; text-align: right; }
+    .hud-debug { right: 20px; top: 50%; transform: translateY(-50%); margin: 0; font-family: var(--cd-mono); font-size: 12px; line-height: 1.45; color: var(--cd-text); white-space: pre; max-width: 340px; }
+    .hud-debug[hidden] { display: none; }
     .hud-msg { left: 50%; top: 18%; transform: translateX(-50%); font-size: 28px; font-weight: 800; padding: 10px 24px; opacity: 0; transition: opacity 0.3s ease; }
     .hud-msg.show { opacity: 1; }
     .countdown { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); font-family: var(--cd-font); font-size: 140px; font-weight: 900;
@@ -236,6 +243,8 @@
       <div class="hud-box hud-look" id="hLook" hidden><span class="icon" aria-hidden="true">360</span> Drag to look around · scroll or pinch to zoom</div>
       <div class="hud-box hud-msg" id="hMsg"></div>
       <div class="hud-box hud-ai" id="hAi" hidden><span class="icon" aria-hidden="true">smart_toy</span> AI DRIVING – press <kbd>P</kbd> or <kbd>Esc</kbd> to take the wheel</div>
+      <div class="hud-box hud-compass" id="hCompass" aria-label="Camera heading"><span class="icon" aria-hidden="true">explore</span><span class="cmp-dir" id="hCmpDir">N</span><span class="cmp-deg" id="hCmpDeg">0°</span></div>
+      <pre class="hud-box hud-debug" id="hDebug" hidden aria-label="Debug info"></pre>
     </div>
     <div id="countdown" class="countdown" hidden aria-hidden="true"></div>
     <div id="welcome" aria-hidden="true"></div>
@@ -294,6 +303,7 @@
           <dt>Pause (multiplayer and chat race: menu, the race goes on)</dt><dd><kbd>Esc</kbd></dd><dd>Start</dd>
           <dt>Chat race: let the AI drive / take the wheel</dt><dd><kbd>P</kbd></dd><dd>Start, then the menu</dd>
           <dt>Sound on / off</dt><dd><kbd>M</kbd></dd><dd>–</dd>
+          <dt>Debug info (position, heading, frame rate)</dt><dd><kbd>I</kbd></dd><dd>–</dd>
           <dt>Look around (before the start)</dt><dd>Drag, scroll</dd><dd>Right stick</dd>
         </dl>
       </details>

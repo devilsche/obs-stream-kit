@@ -216,9 +216,20 @@
       });
       if (isFinite(zn) && isFinite(zp)) faceZ = [zn, zp];
     }
+    // Berg-Kacheln: Höhe des abgeschnittenen Randes (95 % der Punkte im äußeren Randstreifen liegen darunter) – so tief
+    // versenkt, liegen die Ränder unter dem Boden und die Kachel kann nah an der Strecke stehen (prop.sinkEdge)
+    var edgeH = 0;
+    if (e.kind === 'mountain') {
+      var ys = [], bx = sz.x * 0.44, bz = sz.z * 0.44, y0 = box.min.y;
+      parts.forEach(function (pt) {
+        var pa = pt.geo.attributes.position;
+        for (var q = 0; q < pa.count; q++) if (Math.abs(pa.getX(q)) > bx || Math.abs(pa.getZ(q)) > bz) ys.push(pa.getY(q) - y0);
+      });
+      if (ys.length) { ys.sort(function (a, b) { return a - b; }); edgeH = ys[Math.floor(ys.length * 0.95)]; }
+    }
     var tris = 0;
     parts.forEach(function (p) { tris += (p.geo.index ? p.geo.index.count : p.geo.attributes.position.count) / 3; });
-    return { parts: parts, size: sz, tris: tris, sink: +e.sink || 0, faceZ: faceZ };
+    return { parts: parts, size: sz, tris: tris, sink: +e.sink || 0, faceZ: faceZ, edgeH: edgeH };
   }
 
   function build(T, opts) {
@@ -721,9 +732,10 @@
     function swapIn(kd, v, nVar, tpl) {
       var P0 = kd.prop, box = P0.box || {}, size = tpl.size, yaw = P0.yaw || 0;
       // nur verkleinern: größte Ausdehnung muss in den reservierten Platz passen
-      var k = Math.min(1, box.w ? box.w / size.x : 1, box.d ? box.d / size.z : 1, box.h ? box.h / size.y : 1);
+      var ex = P0.exag || 1;   // Höhe überzeichnen (Berge)
+      var k = Math.min(1, box.w ? box.w / size.x : 1, box.d ? box.d / size.z : 1, box.h ? box.h / (size.y * ex) : 1);
       // front: Vorderkante (−z) des Modells auf lokal z = front (Tribüne: erste Reihe wie bei der prozeduralen)
-      var oz = P0.front != null ? P0.front + size.z * k / 2 : 0, oy = (P0.y || 0) - tpl.sink * size.y * k;
+      var oz = P0.front != null ? P0.front + size.z * k / 2 : 0, oy = (P0.y || 0) - tpl.sink * size.y * k * ex - (P0.sinkEdge ? (tpl.edgeH || 0) * k * ex : 0);
       var n = 1, step = 0;
       if (P0.tile && box.w) { step = size.x * k * 1.04; n = Math.max(1, Math.min(6, Math.floor(box.w / step))); }
       var slots = [], m4 = new THREE.Matrix4(), off = new THREE.Matrix4();
@@ -733,7 +745,7 @@
           var lx = (t - (n - 1) / 2) * step;
           spotMatrix(s, m4);
           // lokal: Versatz entlang x (Kacheln), Absenken (Fuß im Wasser/Gelände), Zusatzdrehung, Maßstab
-          off.compose(new THREE.Vector3(lx, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k, k));
+          off.compose(new THREE.Vector3(lx, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k * ex, k));
           slots.push({ spot: i, m: new THREE.Matrix4().multiplyMatrices(m4, off), off: off.clone() });
         }
       });
@@ -754,7 +766,7 @@
         if (kd.farSet) kd.farSet.meshes.forEach(function (m) { g.remove(m); });
         var fslots = kd.spots.map(function (s, i) {
           spotMatrix(s, m4);
-          off.compose(new THREE.Vector3(0, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k, k));
+          off.compose(new THREE.Vector3(0, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k * ex, k));
           return { spot: i, m: new THREE.Matrix4().multiplyMatrices(m4, off) };
         });
         kd.farSet = { tris: tpl.tris, slots: fslots, dirty: true, meshes: tpl.parts.map(function (p) {

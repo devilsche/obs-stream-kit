@@ -629,7 +629,7 @@
   }
   // Gras-Büschel und Büsche (Kulissen-Modelle slot grass/bush; Ersatz: drei schräge Halme bzw. eine Kugel):
   // dicht hinter der Leitplanke und locker im Gelände. o = { grass (je m und Seite), bush, far (Büschel im Gelände),
-  // farBush, pred, dry (Ersatzfarbe trocken) }
+  // farBush, farMax (Gelände bis m, Standard 60), pred, dry (Ersatzfarbe trocken) }
   function greenery(ctx, o) {
     // Büschel: 9 schmale Halme, nach außen geneigt, unten dunkler, oben heller (Farbe je Ecke), Grünton je Instanz
     var gk = new Kit(), dark = o.dry ? 0x8f8450 : 0x3f6e2a, light = o.dry ? 0xd6c98a : 0x9ccf5a;
@@ -646,8 +646,8 @@
     // dicht (Grass Pack LP, vom User gewählt): ~7× so viele Büschel hinter der Planke, ~5× im Gelände
     ctx.scatterRail(grass, { perM: o.grass * 7, extra: [0.1, 11], rad: 0.28, s: [0.9, 1.5], pred: o.pred, tint: gTint });
     ctx.scatterRail(bush, { perM: o.bush, extra: [1, 9], rad: 1.3, s: [0.7, 1.2], pred: o.pred });
-    if (o.far) ctx.scatter(grass, o.far * 5, { dmin: 14, dmax: 60, rad: 0.28, s: [0.9, 1.5], pred: o.pred, tint: gTint });
-    if (o.farBush) ctx.scatter(bush, o.farBush, { dmin: 14, dmax: 60, rad: 1.3, s: [0.8, 1.3], pred: o.pred });
+    if (o.far) ctx.scatter(grass, o.far * 5, { dmin: 14, dmax: o.farMax || 60, rad: 0.28, s: [0.9, 1.5], pred: o.pred, tint: gTint });
+    if (o.farBush) ctx.scatter(bush, o.farBush, { dmin: 14, dmax: o.farMax || 60, rad: 1.3, s: [0.8, 1.3], pred: o.pred });
     // Parkbänke (Holz auf Metallfüßen, mit Lehne) mit Mülleimer daneben, verstreut im Gelände – Blick zur Strecke
     var bk2 = new Kit(), wood = 0x8a5a33, metal = 0x2f3338;
     [-0.22, 0, 0.22].forEach(function (z) { bk2.add(box(1.8, 0.05, 0.16), wood, { y: 0.45, z: z }); });
@@ -1113,12 +1113,14 @@
       // Berge als Kulissen-Modelle (slot mountain, Prop search): Gelände-Kacheln mit Gipfeln, höchstens 800 m breit, im
       // Ring so weit draußen, dass die Kachel-Kante ≥ 180 m hinter der Strecke liegt (sonst ragt sie als Decke über die
       // Fahrbahn); eigene Zufallsfolge (die übrige Deko bleibt, wo sie war); ohne Ersatzform
-      var mr = ctx.rng(29), RI = ctx.radius + 180 + 400 * 1.42;
-      [{ n: 13, w: 800, h: 320, r0: RI + 220, dr: 250 }, { n: 12, w: 1400, h: 560, r0: RI + 850, dr: 200 }].forEach(function (ring, ri) {
-        var mtn = ctx.kind(ri ? 'mountainFar' : 'mountain', [], { r: 300, prop: { slot: 'mountain', cull: true, box: { w: ring.w, d: ring.w, h: ring.h } } });
+      // Ränder werden exakt unter den Boden versenkt (prop.sinkEdge, Randhöhe aus dem Modell) → Kacheln dürfen nah an die
+      // Strecke; Höhe überzeichnet (exag), damit die Gipfel über dem Tal aufragen
+      var mr = ctx.rng(29);
+      [{ n: 12, w: 900, h: 460, ex: 1.35, r0: ctx.radius + 470, dr: 180 }, { n: 12, w: 1400, h: 700, ex: 1.4, r0: ctx.radius + 950, dr: 200 }].forEach(function (ring, ri) {
+        var mtn = ctx.kind(ri ? 'mountainFar' : 'mountain', [], { r: 300, prop: { slot: 'mountain', cull: true, sinkEdge: true, exag: ring.ex, box: { w: ring.w, d: ring.w, h: ring.h } } });
         for (var mi = 0; mi < ring.n; mi++) {
           var ma = (mi + (ri ? 0.5 : 0) + mr() * 0.5) / ring.n * TAU, mR = ring.r0 + mr() * ring.dr;
-          mtn.add(ctx.cx + Math.cos(ma) * mR, ctx.cz + Math.sin(ma) * mR, { rot: mr() * TAU, s: 0.85 + mr() * 0.3, y: -(ri ? 60 : 45) });   // Kachel-Ränder unter den Boden
+          mtn.add(ctx.cx + Math.cos(ma) * mR, ctx.cz + Math.sin(ma) * mR, { rot: mr() * TAU, s: 0.9 + mr() * 0.25, y: -4 });
         }
       });
       // Felsnadeln (slot rockSpire), vereinzelt weiter draußen
@@ -1130,9 +1132,9 @@
       var pine = ctx.kind('pine', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
       // nahe Bäume als Kulissen-Modelle (slot alpineTree: Kiefer, Pappel, Nadelbäume aus dem Wald; Ersatz: Nadelbaum)
       var treeN = ctx.kind('tree', [{ geo: pineGeo(true) }], { r: 2, tint: true, prop: { slot: 'alpineTree', noProc: true, box: { w: 10, d: 10, h: 16 } } });
-      ctx.scatter(treeN, 60, { dmin: 15, dmax: 70, rad: 2, s: [0.8, 1.3], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
-      ctx.scatter(pine, 170, { dmin: 15, dmax: 240, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
-      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6, prop: ROCK_PROP }), 55, { dmin: 15, dmax: 140, rad: 1.6, s: [0.6, 1.8] });
+      ctx.scatter(treeN, 130, { dmin: 15, dmax: 110, rad: 2, s: [0.8, 1.3], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
+      ctx.scatter(pine, 480, { dmin: 15, dmax: 360, rad: 2, s: [0.8, 1.5], tint: function () { return mix(0xffffff, 0xbfd0c0, rnd()); } });
+      ctx.scatter(ctx.kind('rock', [{ geo: rockGeo(0x77756f, 0xa5a39b) }], { r: 1.6, prop: ROCK_PROP }), 140, { dmin: 15, dmax: 300, rad: 1.6, s: [0.6, 2.2] });
       var hk = new Kit();
       hk.add(box(7, 5, 6), 0x8a5a33, { y: 1.0 });
       hk.add(box(7.2, 0.4, 0.1), 0x5e3c20, { y: 1.8, z: 3.02 });
@@ -1140,7 +1142,7 @@
       hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: -1.8, y: 2.2, z: 3.03 }); hk.add(box(1.2, 1, 0.1), 0xdfe8f0, { x: 1.8, y: 2.2, z: 3.03 });
       hk.add(box(0.6, 2, 0.6), 0x77736d, { x: 2.2, y: 5.6, z: -1 });
       ctx.scatter(ctx.kind('hut', [{ geo: hk.geo() }], { r: 5, prop: { slot: 'hut', box: { w: 12, d: 12, h: 12 } } }), 4, { dmin: 26, dmax: 110, rad: 5.5, s: [0.9, 1.1] });
-      greenery(ctx, { grass: 0.16, bush: 0.012, far: 160, farBush: 16 });
+      greenery(ctx, { grass: 0.16, bush: 0.02, far: 320, farBush: 90, farMax: 160 });
     }
   };
 
