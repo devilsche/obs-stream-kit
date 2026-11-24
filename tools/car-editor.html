@@ -257,11 +257,12 @@
         </div>
         <div class="row"><button type="button" id="rideReset" class="small">Reset ride height</button></div>
         <h3 class="sub3">Axle parts</h3>
-        <p class="muted small-text">Parts that stay down with the wheels when the body is raised, but neither roll nor steer – brake calipers, suspension arms, drive shafts. Without your own pick they are found automatically (parts inside a wheel). “Clear axle parts” empties the list, so only the wheels stay down. “Pick axle parts”: click parts to add or remove them (purple = axle part; light purple = found automatically, shown until you pick). Leave the pick mode to see the result, then save.</p>
+        <p class="muted small-text">Parts that stay down with the wheels when the body is raised, but neither roll nor steer – brake calipers, suspension arms, drive shafts. Without your own pick they are found automatically (parts inside a wheel). “Clear axle parts” empties the list, so only the wheels stay down. “Undo” takes back the last change. “Pick axle parts”: click parts to add or remove them (purple = axle part; light purple = found automatically, shown until you pick). Leave the pick mode to see the result, then save.</p>
         <div class="row" role="group" aria-label="Axle parts">
           <button type="button" id="pickAxle" aria-pressed="false">Pick axle parts</button>
           <button type="button" id="axleAuto" class="small">Automatic axle parts</button>
           <button type="button" id="axleClear" class="small">Clear axle parts</button>
+          <button type="button" id="axleUndo" class="small" disabled>Undo</button>
         </div>
         <p class="small-text" id="axleInfo"></p>
       </section>
@@ -793,7 +794,7 @@
       function load(key, keepView) {
         cur = list.filter(function (e) { return e.key === key; })[0];
         if (!cur) return;
-        if (!keepView) { wheelHist = []; $('wheelUndo').disabled = true; }   // anderes Auto: kein Rückgängig in fremde Räder
+        if (!keepView) { wheelHist = []; $('wheelUndo').disabled = true; axleHist = []; $('axleUndo').disabled = true; }   // anderes Auto: kein Rückgängig in fremde Räder
         def = clone(TC.vehicle(cur.key)); def.paints = Array.isArray(def.paints) ? def.paints : []; def.zones = Array.isArray(def.zones) ? def.zones : [];
         if (Array.isArray(def.frontWheelParts) && !def.steerParts) {   // alt: Vorderrad = lenkt und dreht
           def.steerParts = def.frontWheelParts.slice(); def.wheelParts = (def.wheelParts || []).concat(def.frontWheelParts);
@@ -1057,9 +1058,24 @@
         $('axleInfo').textContent = Array.isArray(def.axleParts) ? 'Own axle parts: ' + def.axleParts.length + '.' : 'Automatic axle parts: ' + autoAxle().length + ' found.';
       }
       $('pickAxle').addEventListener('click', function () { setPick('axle'); });
-      $('axleClear').addEventListener('click', function () { def.axleParts = []; if (picking === 'axle') show(); else reprepare({ axleParts: [] }); axleFill(); say('Axle parts cleared – pick them again or press “Automatic axle parts”.'); });
-      $('axleAuto').addEventListener('click', function () { delete def.axleParts; if (picking === 'axle') setPick('axle'); else reprepare({ axleParts: undefined }); axleFill(); say('Axle parts found automatically again.'); });
+      $('axleClear').addEventListener('click', function () { axleUndoPush(); def.axleParts = []; if (picking === 'axle') show(); else reprepare({ axleParts: [] }); axleFill(); say('Axle parts cleared – pick them again or press “Automatic axle parts”.'); });
+      $('axleAuto').addEventListener('click', function () { axleUndoPush(); delete def.axleParts; if (picking === 'axle') setPick('axle'); else reprepare({ axleParts: undefined }); axleFill(); say('Axle parts found automatically again.'); });
       // Rückgängig / Leeren der Radteile (Stand vor jedem Klick, „Add missing pieces“ und Leeren; bis 50 Schritte)
+      // Achsteile: Rückgängig (50 Schritte, undefined = automatische Erkennung)
+      var axleHist = [];
+      function axleUndoPush() {
+        axleHist.push(Array.isArray(def.axleParts) ? def.axleParts.slice() : undefined);
+        if (axleHist.length > 50) axleHist.shift();
+        $('axleUndo').disabled = false;
+      }
+      $('axleUndo').addEventListener('click', function () {
+        if (!axleHist.length) return;
+        var h = axleHist.pop();
+        if (h) def.axleParts = h; else delete def.axleParts;
+        $('axleUndo').disabled = !axleHist.length;
+        if (picking === 'axle') { if (h) show(); else setPick('axle'); } else reprepare({ axleParts: h });
+        axleFill(); say('Axle parts: undone.');
+      });
       var wheelHist = [];
       function wheelUndoPush() {
         wheelHist.push({ w: (def.wheelParts || []).slice(), s: def.steerParts ? def.steerParts.slice() : undefined });
@@ -1267,7 +1283,7 @@
           var A = Array.isArray(def.axleParts) ? def.axleParts.slice() : autoAxle(), ja = A.indexOf(key);
           var mateA = $('allWheels').checked ? mirrorPart(key) : null;
           [key].concat(mateA ? [mateA] : []).forEach(function (k2) { var j = A.indexOf(k2); if (ja >= 0) { if (j >= 0) A.splice(j, 1); } else if (j < 0) A.push(k2); });
-          def.axleParts = A; axleFill(); show(); say((ja >= 0 ? 'Not an axle part: ' : 'Axle part: ') + key + (mateA ? ' (+ other side)' : '')); return;
+          axleUndoPush(); def.axleParts = A; axleFill(); show(); say((ja >= 0 ? 'Not an axle part: ' : 'Axle part: ') + key + (mateA ? ' (+ other side)' : '')); return;
         }
         if (picking === 'steer' || picking === 'wheel') {
           // zwei unabhängige Listen: rollt (dreht beim Fahren) und lenkt; ein Teil darf in beiden sein
