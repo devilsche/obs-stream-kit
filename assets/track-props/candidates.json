@@ -1769,5 +1769,103 @@
    "coast"
   ],
   "note": "Grass Pack LP (vom User gewählt, Vergleichsseite Nr. 6): ein Büschel je Teil"
+ },
+ {
+  "uid": "89daa5e21f0d4f08a59dba0d566e88bd",
+  "name": "Low Poly Tree Scene Free",
+  "author": "Nicholas-3D",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/low-poly-tree-scene-free-89daa5e21f0d4f08a59dba0d566e88bd",
+  "tex": 512,
+  "key": "lpts-tree-a",
+  "part": "ta",
+  "kind": "tree",
+  "slot": "forestTree",
+  "slots": [
+   "forestTree",
+   "alpineTree",
+   "parkTree"
+  ],
+  "themes": [
+   "forest",
+   "alpine",
+   "stadium"
+  ],
+  "theme": "forest",
+  "height": 10,
+  "tris": 5000,
+  "keepNode": "#(5340|5342)$",
+  "note": "Szene (User-Notiz „Neu: Tree“): freistehender Baum A (Stamm 2775 + Krone 1824 Dreiecke), Rest der Szene weggelassen"
+ },
+ {
+  "uid": "89daa5e21f0d4f08a59dba0d566e88bd",
+  "name": "Low Poly Tree Scene Free",
+  "author": "Nicholas-3D",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/low-poly-tree-scene-free-89daa5e21f0d4f08a59dba0d566e88bd",
+  "tex": 512,
+  "key": "lpts-tree-b",
+  "part": "tb",
+  "kind": "tree",
+  "slot": "forestTree",
+  "slots": [
+   "forestTree",
+   "alpineTree",
+   "parkTree"
+  ],
+  "themes": [
+   "forest",
+   "alpine",
+   "stadium"
+  ],
+  "theme": "forest",
+  "height": 8,
+  "tris": 2000,
+  "keepNode": "#(5344|5346)$",
+  "note": "Szene: freistehender Baum B (Stamm 276 + Krone 1530 Dreiecke)"
+ },
+ {
+  "uid": "89daa5e21f0d4f08a59dba0d566e88bd",
+  "name": "Low Poly Tree Scene Free",
+  "author": "Nicholas-3D",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/low-poly-tree-scene-free-89daa5e21f0d4f08a59dba0d566e88bd",
+  "tex": 512,
+  "key": "lpts-grass-l",
+  "part": "gl",
+  "kind": "grass",
+  "slot": "grass",
+  "themes": [
+   "stadium",
+   "forest",
+   "alpine"
+  ],
+  "theme": "stadium",
+  "height": 0.85,
+  "tris": 200,
+  "keepNode": "#5334$",
+  "note": "Szene: großes Gras-Büschel (80 Dreiecke, ~1,9 m breit)"
+ },
+ {
+  "uid": "89daa5e21f0d4f08a59dba0d566e88bd",
+  "name": "Low Poly Tree Scene Free",
+  "author": "Nicholas-3D",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/low-poly-tree-scene-free-89daa5e21f0d4f08a59dba0d566e88bd",
+  "tex": 512,
+  "key": "lpts-grass-s",
+  "part": "gs",
+  "kind": "grass",
+  "slot": "grass",
+  "themes": [
+   "stadium",
+   "forest",
+   "alpine"
+  ],
+  "theme": "stadium",
+  "height": 0.75,
+  "tris": 200,
+  "keepNode": "#5332$",
+  "note": "Szene: kleines Gras-Büschel (50 Dreiecke)"
  }
 ]
