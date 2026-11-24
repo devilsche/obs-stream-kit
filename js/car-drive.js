@@ -2125,6 +2125,8 @@
   var lastT = performance.now();
   function frame(now) {
     root.requestAnimationFrame(frame);
+    // Hänger im Mehrspieler sichtbar machen (3 s ohne Zustand = KI übernimmt): Bildlücke über 0,5 s in die Konsole
+    if (race && race.mp && !doc.hidden && lastT && now - lastT > 500) console.warn('[car-drive] frame gap ' + Math.round(now - lastT) + ' ms at race time ' + (race.t || 0).toFixed(1) + ' s');
     var dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     var p = readPad();
     sm.padThr = p ? p.throttle || 0 : 0;
