@@ -14,7 +14,7 @@ import os
 import re
 import threading
 
-UID_RE = re.compile(r"^[0-9a-f]{32}(-[a-z0-9]{1,16})?$")   # Paket-Teil: <uid>-<part>
+UID_RE = re.compile(r"^[0-9a-f]{32}(-[a-z0-9]{1,16})?(-lod)?$")   # Paket-Teil: <uid>-<part>, Fern-Fassung: …-lod
 
 
 def folder(root):

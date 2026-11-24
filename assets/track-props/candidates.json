@@ -156,7 +156,8 @@
   "kind": "bridge",
   "slot": "bridge",
   "len": 16,
-  "tris": 6000
+  "tris": 6000,
+  "skip": "Hängebrücke: tiefster Punkt ist das durchhängende Brett, die Enden schwebten über dem Bach – vom User gemeldet 2026-11-24"
  },
  {
   "uid": "015406b34db64859a6d17fb8c825bf52",
@@ -1893,7 +1894,10 @@
   "note": "Berg-Kulisse Alpen (Prop search, vom User gewählt)",
   "len": 1200,
   "tris": 30000,
-  "tex": 1024
+  "tex": 1024,
+  "themes": [
+   "alpine"
+  ]
  },
  {
   "uid": "83b3fd690ea44e988d086d5165a5f2ca",
@@ -1950,15 +1954,17 @@
   "license": "CC Attribution",
   "url": "https://sketchfab.com/3d-models/50338f06da754fd29481b0bdf86b7f29",
   "key": "mtn-bigterrain",
-  "theme": "alpine",
+  "theme": "forest",
   "kind": "mountain",
   "slot": "mountain",
   "sink": 0.04,
-  "note": "Berg-Kulisse Alpen (Prop search, vom User gewählt)",
+  "note": "Berg-Kulisse Wald (grün, ohne Schnee); Ränder per sinkEdge unter dem Boden",
   "len": 1800,
   "tris": 30000,
   "tex": 512,
-  "skip": "flache Gelände-Platte: wirkt von der Seite wie eine schwebende Tafel, nicht wie ein Berg – im Bild geprüft 2026-11-24"
+  "themes": [
+   "forest"
+  ]
  },
  {
   "uid": "6d15587128a5451d9e29d6b50061045e",
@@ -1967,15 +1973,17 @@
   "license": "CC Attribution",
   "url": "https://sketchfab.com/3d-models/6d15587128a5451d9e29d6b50061045e",
   "key": "mtn-haytor",
-  "theme": "alpine",
+  "theme": "forest",
   "kind": "mountain",
   "slot": "mountain",
   "sink": 0.04,
-  "note": "Berg-Kulisse Alpen (Prop search, vom User gewählt)",
+  "note": "Berg-Kulisse Wald (grün, ohne Schnee); Ränder per sinkEdge unter dem Boden",
   "len": 1000,
   "tris": 30000,
   "tex": 1024,
-  "skip": "flache Gelände-Platte: wirkt von der Seite wie eine schwebende Tafel, nicht wie ein Berg – im Bild geprüft 2026-11-24"
+  "themes": [
+   "forest"
+  ]
  },
  {
   "uid": "c5da5675001f4bec9ecfbc8343453417",

@@ -99,3 +99,11 @@ def test_search_picks(tmp_path):
     assert track_props.set_pick(root, "nope", True) is False          # nur Sketchfab-uids
     assert track_props.picks(root) == {UID}
     assert track_props.set_pick(root, UID, False) is True and track_props.picks(root) == set()
+
+
+def test_lod_file_name(tmp_path):
+    _setup(tmp_path)
+    for n in (UID + "-lod", UID + "-p4-lod"):
+        (tmp_path / "data" / "track-props" / (n + ".glb")).write_bytes(b"glTF")
+        assert track_props.model_name(str(tmp_path), n) == n + ".glb"
+    assert track_props.model_name(str(tmp_path), UID + "-lod-lod") is None

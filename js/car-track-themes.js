@@ -551,6 +551,19 @@
   // Bergketten in Tiefen-Schichten rund um die Strecke. o = { layers: [[r0, r1, Höhe, Dunst]], seed, lambda,
   //   back (Zusatzhöhe hinten −z), mask(θ) → 0…1, pal: { grass, forest, scree, rock, rock2, snow }, snow (Schneegrenze
   //   relativ, 0 = keiner), forest (bis zu dieser relativen Höhe Wald), haze (Farbe), seg, rows }
+  // Berg-Kulisse aus Modellen (slot mountain, Gelände-Kacheln): Ringe um die Strecke; Ränder exakt unter den Boden versenkt
+  // (prop.sinkEdge, Randhöhe aus dem Modell) → Kacheln dürfen nah an die Strecke; Höhe überzeichnet (ex); hinter der Kamera
+  // nicht gezeichnet (cull); eigene Zufallsfolge (die übrige Deko bleibt, wo sie war); ohne Ersatzform
+  function mountainRings(ctx, seed, rings) {
+    var mr = ctx.rng(seed);
+    rings.forEach(function (ring, ri) {
+      var mtn = ctx.kind(ri ? 'mountainFar' : 'mountain', [], { r: 300, prop: { slot: 'mountain', cull: true, sinkEdge: true, exag: ring.ex, box: { w: ring.w, d: ring.w, h: ring.h } } });
+      for (var mi = 0; mi < ring.n; mi++) {
+        var ma = (mi + (ri ? 0.5 : 0) + mr() * 0.5) / ring.n * TAU, mR = ring.r0 + mr() * ring.dr;
+        mtn.add(ctx.cx + Math.cos(ma) * mR, ctx.cz + Math.sin(ma) * mR, { rot: mr() * TAU, s: 0.9 + mr() * 0.25, y: -4 });
+      }
+    });
+  }
   // Felsbrocken nur als Kulissen-Modelle (Prop search, slot rock), ohne Ersatzform
   var ROCK_PROP = { slot: 'rock', noProc: true, box: { w: 6, d: 6, h: 4 } };
   function ranges(rl, ctx, o) {
@@ -1102,10 +1115,9 @@
       // Felsen
       var rockF = ctx.kind('rock', [{ geo: rockGeo(0x6f7069, 0x9a9b92) }], { r: 1.6, prop: ROCK_PROP });
       ctx.scatter(rockF, 40, { dmin: 15, dmax: 120, rad: 1.6, s: [0.6, 1.6], pred: offCreek });
-      // Bewaldete Hügelketten im Hintergrund (Wald bis fast oben, Lichtungen, wenig Fels), im Dunst
-      ctx.bgMesh(ranges(new Relief(), ctx, { seed: 11, forest: 0.85, haze: THEMES.forest.sky.horizon, lambda: 200,
-        layers: [[380, 700, 70, 0.08], [620, 1020, 120, 0.25], [920, 1260, 170, 0.4]],
-        pal: { grass: 0x5d7a3e, grass2: 0x6c8645, forest: 0x264a2a, forest2: 0x2f5a31, scree: 0x7c7466, rock: 0x6c6a63, rock2: 0x807d75, snow: 0xf2f5fa } }).geo());
+      // Hintergrund: grüne Berg-Modelle ohne Schnee (Range 01, Haytor, Big Terrain) statt der gezeichneten Hügelketten
+      // (User: „cartoonhaft … keine Eisberge“)
+      mountainRings(ctx, 31, [{ n: 11, w: 900, h: 330, ex: 2.2, r0: ctx.radius + 420, dr: 160 }, { n: 11, w: 1300, h: 480, ex: 2.6, r0: ctx.radius + 880, dr: 180 }]);
       // Holzzaun an Geraden hinter der Leitplanke (Abschnitte à 4 m)
       var fk = new Kit();
       [-1.9, 0, 1.9].forEach(function (x) { fk.add(box(0.16, 1.3, 0.16), 0x6e4c2c, { x: x, y: 0.45 }); });
@@ -1154,14 +1166,7 @@
       // Fahrbahn); eigene Zufallsfolge (die übrige Deko bleibt, wo sie war); ohne Ersatzform
       // Ränder werden exakt unter den Boden versenkt (prop.sinkEdge, Randhöhe aus dem Modell) → Kacheln dürfen nah an die
       // Strecke; Höhe überzeichnet (exag), damit die Gipfel über dem Tal aufragen
-      var mr = ctx.rng(29);
-      [{ n: 12, w: 900, h: 460, ex: 1.35, r0: ctx.radius + 470, dr: 180 }, { n: 12, w: 1400, h: 700, ex: 1.4, r0: ctx.radius + 950, dr: 200 }].forEach(function (ring, ri) {
-        var mtn = ctx.kind(ri ? 'mountainFar' : 'mountain', [], { r: 300, prop: { slot: 'mountain', cull: true, sinkEdge: true, exag: ring.ex, box: { w: ring.w, d: ring.w, h: ring.h } } });
-        for (var mi = 0; mi < ring.n; mi++) {
-          var ma = (mi + (ri ? 0.5 : 0) + mr() * 0.5) / ring.n * TAU, mR = ring.r0 + mr() * ring.dr;
-          mtn.add(ctx.cx + Math.cos(ma) * mR, ctx.cz + Math.sin(ma) * mR, { rot: mr() * TAU, s: 0.9 + mr() * 0.25, y: -4 });
-        }
-      });
+      mountainRings(ctx, 29, [{ n: 12, w: 900, h: 460, ex: 1.35, r0: ctx.radius + 470, dr: 180 }, { n: 12, w: 1400, h: 700, ex: 1.4, r0: ctx.radius + 950, dr: 200 }]);
       // Felsnadeln (slot rockSpire), vereinzelt weiter draußen
       ctx.scatter(ctx.kind('spire', [], { r: 5, prop: { slot: 'rockSpire', box: { w: 14, d: 14, h: 18 } } }), 6, { dmin: 45, dmax: 170, rad: 6, s: [0.8, 1.2] });
       // Felswände bergseitig nahe der Strecke (Modelle slot rockWall)

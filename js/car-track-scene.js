@@ -729,7 +729,7 @@
       if (opts.propGate && !opts.propGate()) { setTimeout(function () { gateThen(fn); }, 1000); return; }
       fn();
     }
-    function swapIn(kd, v, nVar, tpl) {
+    function swapIn(kd, v, nVar, tpl, tplLod) {
       var P0 = kd.prop, box = P0.box || {}, size = tpl.size, yaw = P0.yaw || 0;
       // nur verkleinern: größte Ausdehnung muss in den reservierten Platz passen
       var ex = P0.exag || 1;   // Höhe überzeichnen (Berge)
@@ -759,7 +759,13 @@
       });
       // schwere Modelle (≥ LOD_TRIS Dreiecke je Stück) mit prozeduraler Ersatzform: weit weg die Ersatzform (lod())
       // viele kleine Modelle (Gras, Büsche): jenseits SMALL_FAR m und hinter der Kamera gar nicht zeichnen (lod())
-      kd.propSets.push({ meshes: meshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: (slots.length >= 200 || !!P0.cut) && !P0.noProc, cut: P0.cut || SMALL_FAR });
+      // Fern-Fassung desselben Modells (gleiche Matrizen): weit weg statt des leichtesten Modells der Art – kein Formwechsel
+      var farMeshes = tplLod ? tplLod.parts.map(function (p) {
+        var im = own(new THREE.InstancedMesh(p.geo, p.mat, slots.length));
+        im.frustumCulled = false; im.count = 0; g.add(im); return im;
+      }) : null;
+      if (tplLod) (kd.varLod = kd.varLod || {})[v] = true;
+      kd.propSets.push({ meshes: meshes, farMeshes: farMeshes, slots: slots, lod: tpl.tris >= LOD_TRIS && kd.parts.length > 0, many: (slots.length >= 200 || !!P0.cut) && !P0.noProc, cut: P0.cut || SMALL_FAR });
       propStats.tris += tpl.tris * slots.length; propStats.draws += meshes.length;
       // nur Modelle (noProc, Bäume): fern statt der Ersatzform das leichteste Modell der Art an allen fernen Plätzen
       if (P0.noProc && (!kd.farSet || tpl.tris < kd.farSet.tris)) {
@@ -797,7 +803,11 @@
               list.forEach(function (e, v) {
                 jobs.push(function () {
                   return loadPropTpl(e).then(function (tpl) {
-                    return new Promise(function (ok) { gateThen(function () { if (!disposed) { swapIn(kd, v, list.length, tpl); propStats.loaded.push(e.key || e.uid); } ok(); }); });
+                    // Bäume: vereinfachte Fassung desselben Modells für die Ferne (Katalog-Feld lod, Datei <uid>-lod.glb)
+                    var lodP = e.lod && kd.prop.noProc ? loadPropTpl({ uid: e.uid + '-lod', bytes: e.lod, kind: e.kind, sink: e.sink }).then(null, function () { return null; }) : Promise.resolve(null);
+                    return lodP.then(function (tplLod) {
+                      return new Promise(function (ok) { gateThen(function () { if (!disposed) { swapIn(kd, v, list.length, tpl, tplLod); propStats.loaded.push(e.key || e.uid); } ok(); }); });
+                    });
                   }, function () { propStats.failed.push(e.key || e.uid); });
                 });
               });
@@ -1005,22 +1015,24 @@
         });
         sets.forEach(function (ps) {
           ps.compact = true; ps.dirty = false;
-          var k = 0;
+          var k = 0, kf = 0;
           ps.slots.forEach(function (sl) {
             var sp = kd.spots[sl.spot];
+            if (ps.farMeshes && sp.far && !sp.hidden && sp.vis) { ps.farMeshes.forEach(function (m) { m.setMatrixAt(kf, sl.m); }); kf++; return; }
             if (sp.hidden || sp.far || !sp.vis) return;
             if (ps.many && Math.hypot(sp.x - x, sp.z - z) > ps.cut) return;
             ps.meshes.forEach(function (m) { m.setMatrixAt(k, sl.m); });
             k++;
           });
           ps.meshes.forEach(function (m) { m.count = k; m.instanceMatrix.needsUpdate = true; });
+          if (ps.farMeshes) ps.farMeshes.forEach(function (m) { m.count = kf; m.instanceMatrix.needsUpdate = true; });
         });
         var fs = kd.farSet;
         if (fs) {
           var kf = 0;
           fs.slots.forEach(function (sl) {
             var sp = kd.spots[sl.spot];
-            if (sp.hidden || !sp.far || !sp.vis) return;
+            if (sp.hidden || !sp.far || !sp.vis || (kd.varLod && kd.varLod[sp.prop])) return;   // eigene Fern-Fassung vorhanden
             fs.meshes.forEach(function (m) { m.setMatrixAt(kf, sl.m); });
             kf++;
           });

@@ -40,6 +40,7 @@ WORK = os.path.join(tempfile.gettempdir(), "track-props-build")
 CANDS = os.path.join(os.path.dirname(HERE), "assets", "track-props", "candidates.json")
 DEF_TRIS = 25000
 DEF_TEX = 512
+LOD_MIN, LOD_TRIS = 900, 600   # Fern-Fassung für Bäume ab LOD_MIN Dreiecken, Ziel LOD_TRIS
 
 
 def world_points(g, binc):
@@ -371,6 +372,15 @@ def build_one(c):
     for f in ("slots", "themes", "paint"):
         if c.get(f):
             e[f] = c[f]
+    # Bäume/Palmen: vereinfachte Fassung desselben Modells für die Ferne (<id>-lod.glb, Katalog-Feld lod = Bytes) – sonst
+    # tauschte die Szene ab 130 m gegen ein anderes Modell, die Bäume „sprangen“ beim Fahren (User: flackert)
+    if c["kind"] in ("tree", "palm") and e["tris"] > LOD_MIN:
+        lod = os.path.join(WORK, fid + "-lod.glb")
+        subprocess.run(["npx", "-y", "gltfpack", "-i", dst, "-o", lod, "-noq", "-sa", "-si", "%.4f" % (LOD_TRIS / e["tris"])],
+                       check=True, capture_output=True)
+        prune_images(lod)
+        e["lod"] = os.path.getsize(lod)
+        e["lodTris"] = tri_count(bcr.glb_read(lod)[0])
     return dst, e
 
 
@@ -405,6 +415,8 @@ def main(only=None):
             print("FAIL %-40s %s" % (c["name"][:40], ex))
             continue
         subprocess.run(bcr.SCP + [dst, "%s:%s/data/track-props/%s.glb" % (HOST, REMOTE, uid)], check=True)
+        if e.get("lod"):
+            subprocess.run(bcr.SCP + [os.path.join(WORK, uid + "-lod.glb"), "%s:%s/data/track-props/%s-lod.glb" % (HOST, REMOTE, uid)], check=True)
         props.append(e)
         print("%-40s %-10s %6d tris %3d draws %5.2f MB  %s m" % (c["name"][:40], c["kind"], e["tris"], e["draws"], e["bytes"] / 1e6, e["size"]), flush=True)
     order = {file_id(c): i for i, c in enumerate(cands)}
