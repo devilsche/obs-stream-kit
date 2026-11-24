@@ -1095,7 +1095,7 @@
     },
     groundColor: function (ctx) {
       return function (x, z, h, d) {
-        var n = fbm(x / 30, z / 30), c = mix(0x6f9a4a, 0x8aab58, n);
+        var n = fbm(x / 30, z / 30), c = mix(0x4f7438, 0x648443, n);   // Almwiese, satter und dunkler (vorher 6f9a4a–8aab58: zu hellgrün)
         var rock = fbm(x / 55 + 9, z / 55 + 4);
         if (rock > 0.62 && d > 16) c = mix(c, 0x8b8a84, (rock - 0.62) * 4);
         var snow = fbm(x / 22 + 31, z / 22 + 17);
