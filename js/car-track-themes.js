@@ -705,22 +705,40 @@
     },
     decorate: function (ctx) {
       var P = ctx.T.at, HALF = ctx.HALF, rnd = ctx.rnd, prim = ctx.primary, acc = ctx.accent;
-      // Tribüne: 5 Ränge mit bunten Zuschauern, Rückwand, Dach in Primärfarbe auf Stützen (lokal: x längs, +z vom Track weg)
-      var st = new Kit(), crowd = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831];
-      for (var r = 0; r < 5; r++) {
-        var hh = 0.9 + r * 0.9;
-        st.add(box(26, hh + 2, 1.8), r % 2 ? 0x9aa0aa : 0x8a8f99, { y: hh / 2 - 1, z: r * 1.8 });
-        for (var q = 0; q < 34; q++) {
-          if (rnd() < 0.12) continue;
-          st.add(box(0.5, 0.75, 0.45), crowd[Math.floor(rnd() * crowd.length)], { x: -12.4 + q * 0.75 + (rnd() - 0.5) * 0.2, y: hh + 0.37, z: r * 1.8 - 0.3 });
+      // Tribünen (lokal: x längs, +z vom Track weg; 26 m je Platz, Plätze reihen sich): Stufen aus Beton, Zuschauer mit
+      // Körper (Shirt-Farbe) und Kopf (Hautton), ~12 % freie Sitze; Haupttribüne 10 Reihen mit Dach, Kurventribüne
+      // 6 Reihen ohne Dach auf einem Erdwall
+      var crowd = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831, 0x1f6f3f, 0xd94f8a];
+      var skin = [0xf1c8a5, 0xe0ac82, 0xc68863, 0x8d5a3b, 0x5c3a24];
+      function standKit(rows, covered) {
+        var k = new Kit(), RD = 0.95, RH = 0.58, W = 26;
+        for (var r = 0; r < rows; r++) {
+          var hh = 0.6 + r * RH, z0 = r * RD;
+          k.add(box(W, hh + 1, RD), r % 2 ? 0x9aa0aa : 0x8e939d, { y: (hh - 1) / 2, z: z0 });
+          for (var q = 0; q < 36; q++) {
+            var x = -12.6 + q * 0.72 + (rnd() - 0.5) * 0.12;
+            if (rnd() < 0.12) { k.add(box(0.46, 0.16, 0.42), 0x4a5260, { x: x, y: hh + 0.08, z: z0 - 0.1 }); continue; }
+            var tall = 0.52 + rnd() * 0.14;
+            k.add(box(0.42, tall, 0.3), crowd[Math.floor(rnd() * crowd.length)], { x: x, y: hh + tall / 2 + 0.1, z: z0 - 0.08 });
+            k.add(box(0.2, 0.24, 0.21), skin[Math.floor(rnd() * skin.length)], { x: x, y: hh + tall + 0.24, z: z0 - 0.08 });
+          }
         }
+        var top = 0.6 + (rows - 1) * RH;
+        k.add(box(W, top + 2.6, 0.4), 0x6d7280, { y: (top + 2.6) / 2 - 0.4, z: rows * RD - 0.25 });      // Rückwand
+        k.add(box(W, 1.0, 0.3), 0x5d626c, { y: 0.5, z: -0.65 });                                         // Brüstung vorn
+        if (covered) {
+          var depth = rows * RD + 2.5;
+          [-12, -4, 4, 12].forEach(function (x) { k.add(box(0.45, top + 5.2, 0.45), 0x50555f, { x: x, y: (top + 5.2) / 2, z: rows * RD }); });
+          k.add(box(W + 1, 0.4, depth), prim, { y: top + 5.2, z: rows * RD - depth / 2 + 0.6, rx: -0.07 });
+          k.add(box(W + 1.2, 0.5, 0.3), acc, { y: top + 4.5, z: rows * RD - depth + 0.4 });
+        }
+        return k;
       }
-      st.add(box(26, 9, 0.5), 0x6d7280, { y: 3.5, z: 9.2 });
-      [-12, 0, 12].forEach(function (x) { st.add(box(0.4, 9.5, 0.4), 0x50555f, { x: x, y: 4.75, z: 8.6 }); });
-      st.add(box(27, 0.4, 10.5), prim, { y: 9.2, z: 4.2, rx: -0.08 });
-      st.add(box(27.2, 0.2, 0.3), acc, { y: 8.75, z: -0.9 });
-      // eigene Tribüne (die Tribünen-Modelle wirkten fleckig/kaputt und passten nicht zum Motodrom – im Bild geprüft)
-      var stand = ctx.kind('stand', [{ geo: st.geo() }], { r: 14 });
+      var stand = ctx.kind('stand', [{ geo: standKit(10, true).geo() }], { r: 14 });
+      var bank = new Kit();
+      var cornerK = standKit(6, false);
+      bank.add(prism(26, 10, 4.2), 0x4c8a3f, { y: 1.4, z: 9.5 });     // Erdwall hinter der Kurventribüne
+      var cornerStand = ctx.kind('cornerStand', [{ geo: cornerK.geo() }, { geo: bank.geo() }], { r: 14 });
       // Flutlichtmast: Gittermast (schlank), Kopf mit Lampenfeld (leuchtend)
       var ms = new Kit();
       ms.add(cyl(0.3, 0.55, 26, 6), 0x9ea4ad, { y: 12 });
@@ -754,23 +772,89 @@
       var used = {};
       function along(s, sd, off) { var p = P(s); return { x: p.x + p.nx * sd * off, z: p.z + p.nz * sd * off, rot: p.yaw + (sd > 0 ? Math.PI : 0), p: p }; }
       function straightAt(s, span) { for (var k = -span; k <= span; k += 4) if (Math.abs(P(s + k).curv) > 1 / 70) return false; return true; }
-      var pitSide = 0;
+      var pitSide = 0, pitO = null;
       [1, -1].some(function (sd) {
         var o = along(-30, sd, HALF + 12 + 4);
         // Tiefe 14 m: Platz für das Kulissen-Modell (Boxen sind tiefer als das prozedurale Gebäude)
         if (!ctx.clearRect(o.x, o.z, o.rot, 24.5, -0.5, 14) || !ctx.place(o.x, o.z, 12, true)) return false;
-        pits.add(o.x, o.z, { rot: o.rot }); pitSide = sd;
+        pits.add(o.x, o.z, { rot: o.rot }); pitSide = sd; pitO = o;
         ctx.pit = { sd: sd, mid: -30, s0: -52, s1: -8 };   // Boxengasse vor dem Gebäude (Markierung: js/car-track-surface.js)
         return true;
       });
-      var L = ctx.T.len, nStand = 0;
-      for (var s = 0; s < L && nStand < 6; s += 6) {
-        for (var sd = 1; sd >= -1; sd -= 2) {
-          var o = along(s, sd, HALF + 12 + 4);
-          if (!ctx.clearRect(o.x, o.z, o.rot, 13.5, -1.2, 10) || !ctx.place(o.x, o.z, 13, true)) continue;
-          stand.add(o.x, o.z, { rot: o.rot }); nStand++; s += 20; break;
+      var L = ctx.T.len, mainSd = -(pitSide || -1);
+      // Boxenturm am Ende des Boxengebäudes (Glasband oben), Fahrerlager dahinter: Team-Lkw und Zelte
+      if (pitO) {
+        var tk3 = new Kit();
+        tk3.add(box(7, 18, 7), 0xd9dde2, { y: 9, tile: 'panel', uv: 'box', m: 6, faces: function (nx, ny) { return Math.abs(ny) < 0.5; } });
+        tk3.add(box(9, 3.2, 9), 0xffffff, { y: 19.6, tile: 'glassBand', uv: 'box', m: 9, faces: function (nx, ny) { return Math.abs(ny) < 0.5; } });
+        tk3.add(box(10, 0.6, 10), prim, { y: 21.5 }); tk3.add(box(10.2, 0.3, 10.2), acc, { y: 21.0 });
+        var tower = ctx.kind('pitTower', [{ geo: tk3.geo(), mat: 'atl' }], { r: 6 });
+        var ot = along(-30 + 30, pitSide, HALF + 12 + 4 + 7);
+        if (ctx.place(ot.x, ot.z, 6, true)) tower.add(ot.x, ot.z, { rot: ot.rot });
+        var trk = new Kit();
+        trk.add(box(13, 3.6, 2.5), 0xffffff, { x: -1.5, y: 2.3 });                   // Auflieger (Teamfarbe je Instanz)
+        trk.add(box(2.4, 2.8, 2.45), 0xffffff, { x: 6.4, y: 1.9 });                  // Zugmaschine
+        trk.add(box(0.1, 1.1, 2.2), 0x1c2733, { x: 7.62, y: 2.6 });                  // Frontscheibe
+        [[-6, 1], [-4.6, 1], [4.6, 1], [6.6, 1]].forEach(function (w) { [1.15, -1.15].forEach(function (z) { trk.add(cyl(0.5, 0.5, 0.3, 10), 0x15161a, { x: w[0], y: 0.5, z: z, rx: Math.PI / 2 }); }); });
+        var truck = ctx.kind('teamTruck', [{ geo: trk.geo() }], { r: 7.5, tint: true });
+        var tent = new Kit();
+        tent.add(box(8, 3, 6), 0xf4f4f2, { y: 1.5 }); tent.add(cone(5.6, 2.2, 4), 0xffffff, { y: 4.1, ry: Math.PI / 4, sz: 0.75 });
+        var tents = ctx.kind('tent', [{ geo: tent.geo() }], { r: 5 });
+        var TEAM = [prim, acc, 0xd8262b, 0x2563a8, 0x111111, 0x2e8b57, 0xf2f2f2];
+        for (var pd = 0; pd < 9; pd++) {
+          var opd = along(-70 + pd * 9, pitSide, HALF + 12 + 4 + 26 + (pd % 2) * 10);
+          if (ctx.place(opd.x, opd.z, 6.8)) truck.add(opd.x, opd.z, { rot: opd.rot + Math.PI / 2, tint: TEAM[pd % TEAM.length] });
+        }
+        for (var tn = 0; tn < 5; tn++) {
+          var otn = along(-60 + tn * 14, pitSide, HALF + 12 + 4 + 50);
+          if (ctx.place(otn.x, otn.z, 5)) tents.add(otn.x, otn.z, { rot: otn.rot });
         }
       }
+      // Großbildschirm gegenüber der Haupttribüne (Rahmen, Bildfläche mit Sponsor-Motiv je Instanz)
+      var scr = new Kit();
+      [-5.5, 5.5].forEach(function (x) { scr.add(box(0.6, 9, 0.6), 0x50555f, { x: x, y: 4.5 }); });
+      scr.add(box(12.6, 7, 0.6), 0x22252b, { y: 11.5 });
+      scr.add(new THREE.PlaneGeometry(12, 6.4), 0xffffff, { y: 11.5, z: -0.32, ry: Math.PI, tile: 'ad', vary: true });
+      var screen = ctx.kind('bigScreen', [{ geo: scr.geo(), mat: 'atl' }], { r: 7, vary: true });
+      [40, -60].some(function (ss) {
+        var osc = along(ss, -mainSd, HALF + 12 + 4 + 18);
+        if (!ctx.place(osc.x, osc.z, 7)) return false;
+        screen.add(osc.x, osc.z, { rot: osc.rot, v: 2 }); return true;
+      });
+      // Brücke über die Strecke (Sponsor-Banner beidseitig) auf einer Geraden weit weg von Start/Ziel
+      var brK = new Kit(), brW = 2 * (HALF + 14);
+      [-1, 1].forEach(function (sd2) { brK.add(box(2.2, 8.5, 3), 0x8e939d, { z: sd2 * (brW / 2), y: 4.25 }); });
+      brK.add(box(3, 2.2, brW + 3), 0x9aa0aa, { y: 7.8 });
+      [-1, 1].forEach(function (f) { brK.add(new THREE.PlaneGeometry(brW, 1.9), 0xffffff, { y: 7.8, x: f * 1.52, ry: f * Math.PI / 2, tile: 'ad', vary: true }); });
+      var bridge = ctx.kind('bridge', [{ geo: brK.geo(), mat: 'atl' }], { r: 4, vary: true });
+      // (Gerade ±25 m, mindestens 200 m von Start/Ziel; die Pfeiler stehen hinter dem Auslauf)
+      for (var bs = 200; bs < L - 200; bs += 10) {
+        if (!straightAt(bs, 25)) continue;
+        var pb = P(bs);
+        bridge.add(pb.x, pb.z, { rot: pb.yaw, v: 5 }); ctx.bridgeS = bs; break;
+      }
+      // Haupttribüne: von Start/Ziel aus in beide Richtungen Platz an Platz, solange die Gerade frei ist
+      [[0, 26.3], [-26.3, -26.3]].forEach(function (dir) {
+        for (var sm0 = dir[0], k0 = 0; k0 < 5; sm0 += dir[1], k0++) {
+          var om0 = along(sm0, mainSd, HALF + 12 + 4);
+          if (!straightAt(sm0, 14) || !ctx.clearRect(om0.x, om0.z, om0.rot, 13.2, -1.2, 14) || !ctx.place(om0.x, om0.z, 13, true)) break;
+          stand.add(om0.x, om0.z, { rot: om0.rot });
+        }
+      });
+      // Kurventribünen: außen an den längsten Kurven, je zwei Plätze nebeneinander
+      var corners = ctx.T.corners.slice().sort(function (a2, b2) { return b2.len - a2.len; }), nC = 0;
+      corners.forEach(function (c) {
+        if (nC >= 4) return;
+        var sdC = -c.dir, run = 0;
+        for (var ss = c.s0; ss < c.s0 + c.len; ss += 4) { var aa = P(ss); run = Math.max(run, sdC > 0 ? aa.runL : aa.runR); }
+        var placed = 0;
+        [c.s0 + c.len / 2 - 14, c.s0 + c.len / 2 + 14].forEach(function (sc) {
+          var oc = along(sc, sdC, HALF + run + 14);
+          if (!ctx.clearRect(oc.x, oc.z, oc.rot, 13, -1.2, 12) || !ctx.place(oc.x, oc.z, 13, true)) return;
+          cornerStand.add(oc.x, oc.z, { rot: oc.rot }); placed++;
+        });
+        if (placed) nC++;
+      });
       // Fahnenreihe gegenüber den Boxen, rund um Start/Ziel
       for (var fs = -34; fs <= 34; fs += 8.5) {
         var of = along(fs, -(pitSide || 1), HALF + 16);
@@ -817,27 +901,8 @@
       });
       leafTrees(ctx, 10, 4, 30, 120);
       greenery(ctx, { grass: 0.14, bush: 0.01, far: 140, farBush: 12 });
-      // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
-      // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
-      // Motodrom: hohe, steile Ränge mit Publikum rundum, Dach in Primärfarbe auf Stützen
-      var R = ctx.radius + 140, N = 64, w = TAU * R / N * 1.03, up = new Kit();
-      // 10 Stufen (lokal +z = zum Feld): Front je Stufe mit Publikum (Atlas „crowd“), steigen nach hinten (−z) an
-      var TIERS = 10, TD = 3, TH = 2.6;
-      for (var tr = 0; tr < TIERS; tr++) {
-        var hT = 1.2 + tr * TH;
-        up.add(box(w, hT, TD), 0xffffff, { y: hT / 2, z: 15 - tr * TD - TD / 2, tile: 'crowd', uv: 'box', m: TH,
-          faces: function (nx, ny, nz) { return nz > 0.5; } });
-      }
-      var topY = 1.2 + (TIERS - 1) * TH;
-      up.add(box(w, topY + 8, 1.2), 0x6c717b, { y: (topY + 8) / 2, z: -15.6 });           // Rückwand
-      up.add(box(w, 1.2, 24), prim, { y: topY + 7.5, z: -4, rx: 0.08 });                    // Dach
-      [-0.45, 0.45].forEach(function (u) { up.add(box(0.7, topY + 7, 0.7), 0x8a8f99, { x: u * w, y: (topY + 7) / 2, z: -14.8 }); });
-      // durchgehende Schüssel (Motodrom) – ohne Tribünen-Modelle: die ließen Lücken, durch die man direkt auf die Stadt sah
-      var upper = ctx.kind('upper', [{ geo: up.geo(), mat: 'atl' }], { r: w / 2 });
-      for (var i = 0; i < N; i++) {
-        var am = (i + 0.5) / N * TAU;
-        upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: -Math.PI / 2 - am });   // Publikum zur Strecke
-      }
+      // Bezugsradius für Parkplätze und Stadt (früher der Oberrang/Motodrom, der wurde durch einzelne Tribünen ersetzt)
+      var R = ctx.radius + 140;
       // Parkplätze auf der Wiese zwischen Strecke und Oberrang: Asphaltfläche mit weißen Markierungen, zwei Reihen je
       // Fahrgasse, ~75 % belegt mit einfachen Autos (Karosserie + Kabine, Farbe je Instanz)
       var lotK = new Kit(), prng = ctx.rng(57), PCOL = [0xc0392b, 0x2563a8, 0xe8e8e8, 0x222428, 0x7f8c8d, 0xd4ac0d, 0x2e8b57, 0x9aa3ad, 0x5b2c6f];
