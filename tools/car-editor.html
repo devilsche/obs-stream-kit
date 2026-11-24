@@ -196,6 +196,16 @@
           <input type="checkbox" id="allWheels" checked>
           <label for="allWheels">Same part on all wheels (a click on a wheel part picks the matching part on every wheel)</label>
         </div>
+        <div class="row">
+          <label for="brushR">Pick radius</label>
+          <input type="range" id="brushR" min="0" max="60" step="1" value="0" aria-describedby="brushHelp">
+          <output id="brushOut" for="brushR">off</output>
+        </div>
+        <div class="row">
+          <input type="checkbox" id="brushMat" checked>
+          <label for="brushMat">Same material only (the radius picks only pieces with the material of the clicked piece)</label>
+        </div>
+        <p class="muted small-text" id="brushHelp">For models made of hundreds of tiny pieces (rims, tyre tread): a click picks or removes every piece within this radius around the click point – for zones, rolling, steering and axle parts. About 20 cm takes a rim without the tyre, 40 cm a whole wheel. With “Same part on all wheels” the same spot on every wheel is taken too. Off = one piece per click.</p>
       </section>
       <section aria-labelledby="h-parts">
         <h2 id="h-parts">Parts</h2>
@@ -1224,6 +1234,37 @@
       // Treffer wählen: through = „Click through glass“. Durchklicken nur bei echtem Glas (durchsichtig ohne
       // Ausschnitt-Maske, oder Glas-Name); ausgeschnittene Plaketten (alphaTest/alphaMap) zählen als fest. Liegen
       // Treffer fast deckungsgleich (< 2 mm, z. B. Wappen auf dem Kotflügel), gewinnt das kleinere Teil (die Plakette)
+      // Pinsel „Pick radius“: alle Stücke, deren Mitte im Umkreis des Klickpunkts liegt (Meter → Welt über die
+      // Karosserielänge), wahlweise nur mit dem Material des geklickten Stücks (Original-Material aus der Vorlage);
+      // mit „Same part on all wheels“ dieselbe Stelle an jedem Rad (Versatz zur Radmitte, quer gespiegelt)
+      function brushKeys(hit, key) {
+        var rcm = +$('brushR').value, car = holder.children[0];
+        if (!rcm || !car || !tpl) return null;
+        var unit = car.userData.dims.B / ((cur && cur.len) || 4.5), R = rcm / 100 * unit, M = {};
+        tpl.traverse(function (o) { if (o.isMesh && o.userData.pkey) { var m = Array.isArray(o.material) ? o.material[0] : o.material; M[o.userData.pkey] = m ? (m.name || m.uuid) : ''; } });
+        car.updateMatrixWorld(true);
+        var pts = [hit.point.clone()];
+        if ($('allWheels').checked) {
+          var wheels = [], my = null;
+          car.traverse(function (o) { if (/^Wheel /.test(o.name || '')) wheels.push(o); });
+          for (var p = hit.object; p; p = p.parent) if (/^Wheel /.test(p.name || '')) { my = p; break; }
+          if (my) {
+            var mc = my.getWorldPosition(new THREE.Vector3()), off = hit.point.clone().sub(mc);
+            wheels.forEach(function (w) { if (w === my) return; var wc = w.getWorldPosition(new THREE.Vector3()), o = off.clone(); if ((wc.z > 0) !== (mc.z > 0)) o.z = -o.z; pts.push(wc.add(o)); });
+          } else pts.push(new THREE.Vector3(hit.point.x, hit.point.y, -hit.point.z));
+        }
+        var want = M[key], same = $('brushMat').checked, seen = {}, out = [key], c = new THREE.Vector3();
+        seen[key] = 1;
+        car.traverse(function (o) {
+          if (!o.isMesh || !o.userData.pkey || o.userData.driver) return;
+          var k = o.userData.pkey; if (seen[k] || (same && M[k] !== want)) return;
+          var g = o.geometry; if (!g.boundingSphere) g.computeBoundingSphere();
+          c.copy(g.boundingSphere.center).applyMatrix4(o.matrixWorld);
+          for (var i = 0; i < pts.length; i++) if (c.distanceTo(pts[i]) <= R) { seen[k] = 1; out.push(k); break; }
+        });
+        return out;
+      }
+      $('brushR').addEventListener('input', function () { var v = +$('brushR').value; $('brushOut').textContent = v ? v + ' cm' : 'off'; });
       function pickHit(hits, through) {
         var ok = hits.filter(function (h) {
           if (!h.object.isMesh || h.object.userData.driver) return false;   // die Fahrer-Ente ist nicht wählbar
@@ -1270,20 +1311,20 @@
         }
         var zp = zonePicking();
         if (zp) {
-          var had = zp.parts.indexOf(key) >= 0, tw = twins(key);
+          var had = zp.parts.indexOf(key) >= 0, tw = brushKeys(hit, key) || twins(key);
           tw.forEach(function (k2) {
             if (had) { var j0 = zp.parts.indexOf(k2); if (j0 >= 0) zp.parts.splice(j0, 1); return; }
             def.zones.forEach(function (z) { var j = z.parts.indexOf(k2); if (j >= 0) z.parts.splice(j, 1); });
             if (zp.parts.indexOf(k2) < 0) zp.parts.push(k2);
           });
-          zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key + (tw.length > 1 ? ' (+' + (tw.length - 1) + ' on the other wheels)' : '')); return;
+          zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key + (tw.length > 1 ? ' (+' + (tw.length - 1) + ($('brushR').value > 0 ? ' pieces around it)' : ' on the other wheels)') : '')); return;
         }
         if (picking === 'axle') {
           // Achsteile: bleiben bei der Fahrhöhe unten beim Rad (eigene Liste ersetzt die automatische Erkennung)
           var A = Array.isArray(def.axleParts) ? def.axleParts.slice() : autoAxle(), ja = A.indexOf(key);
-          var mateA = $('allWheels').checked ? mirrorPart(key) : null;
-          [key].concat(mateA ? [mateA] : []).forEach(function (k2) { var j = A.indexOf(k2); if (ja >= 0) { if (j >= 0) A.splice(j, 1); } else if (j < 0) A.push(k2); });
-          axleUndoPush(); def.axleParts = A; axleFill(); show(); say((ja >= 0 ? 'Not an axle part: ' : 'Axle part: ') + key + (mateA ? ' (+ other side)' : '')); return;
+          var bA = brushKeys(hit, key), mateA = !bA && $('allWheels').checked ? mirrorPart(key) : null;
+          (bA || [key].concat(mateA ? [mateA] : [])).forEach(function (k2) { var j = A.indexOf(k2); if (ja >= 0) { if (j >= 0) A.splice(j, 1); } else if (j < 0) A.push(k2); });
+          axleUndoPush(); def.axleParts = A; axleFill(); show(); say((ja >= 0 ? 'Not an axle part: ' : 'Axle part: ') + key + (bA && bA.length > 1 ? ' (+' + (bA.length - 1) + ' pieces around it)' : mateA ? ' (+ other side)' : '')); return;
         }
         if (picking === 'steer' || picking === 'wheel') {
           // zwei unabhängige Listen: rollt (dreht beim Fahren) und lenkt; ein Teil darf in beiden sein
@@ -1292,9 +1333,9 @@
           var L = (def[mine] || []).slice(), j1 = L.indexOf(key);
           // „Same part on all wheels“: beim Rad-Wählen gibt es noch keine Radgruppen – das baugleiche Teil auf der
           // anderen Wagenseite (gespiegelt) wird mitgenommen, sonst bleibt eine Seite ohne Räder (Monza SP2)
-          var mate = $('allWheels').checked ? mirrorPart(key) : null;
-          [key].concat(mate ? [mate] : []).forEach(function (k2) { var j = L.indexOf(k2); if (j1 >= 0) { if (j >= 0) L.splice(j, 1); } else if (j < 0) L.push(k2); });
-          def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'steer' ? 'Steers: ' : 'Rolls: ')) + key + (mate ? ' (+ other side)' : '')); return;
+          var bW = brushKeys(hit, key), mate = !bW && $('allWheels').checked ? mirrorPart(key) : null;
+          (bW || [key].concat(mate ? [mate] : [])).forEach(function (k2) { var j = L.indexOf(k2); if (j1 >= 0) { if (j >= 0) L.splice(j, 1); } else if (j < 0) L.push(k2); });
+          def[mine] = L; listParts(); show(); say((j1 >= 0 ? 'Removed: ' : (picking === 'steer' ? 'Steers: ' : 'Rolls: ')) + key + (bW && bW.length > 1 ? ' (+' + (bW.length - 1) + ' pieces around it)' : mate ? ' (+ other side)' : '')); return;
         }
       });
       $('note').addEventListener('input', function () { def.note = $('note').value; });
