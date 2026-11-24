@@ -1279,16 +1279,22 @@
       // Oberlichter (leuchtend, nur von unten sichtbar) in jedem zweiten Feld, Hallenstrahler unter dem Untergurt
       var lk = new Kit(); lk.add(new THREE.PlaneGeometry(4.2, D - 12), 0xe6edf2, { y: H - 0.12, rx: Math.PI / 2 });
       var sky = ctx.kind('skylight', [{ geo: lk.geo(), mat: 'glow' }], { r: 2 });
-      var hk = new Kit(), hg = new Kit();
-      hk.add(box(0.05, 2.6, 0.05), 0x2b2e33, { y: 1.3 }); hk.add(box(1.5, 0.32, 0.7), 0x2b2e33, { y: 0 });
-      hg.add(box(1.3, 0.06, 0.52), 0xfff1d2, { y: -0.18 });
-      var lamp = ctx.kind('hallLamp', [{ geo: hk.geo() }, { geo: hg.geo(), mat: 'glow' }], { r: 1 });
+      // Hängelampe: Schirm (Modell slot hallLamp, Ersatz Kasten), Kabel und Leuchtfläche bleiben prozedural
+      var hk = new Kit(), hc = new Kit(), hg = new Kit();
+      hk.add(cone(0.55, 0.45, 10), 0x2b2e33, { y: 0.22 });
+      hc.add(box(0.04, 2.6, 0.04), 0x1f2226, { y: 1.75 });
+      hg.add(new THREE.CircleGeometry(0.42, 12), 0xfff1d2, { y: 0.03, rx: Math.PI / 2 });
+      var lamp = ctx.kind('hallLamp', [{ geo: hk.geo() }], { r: 1, prop: { slot: 'hallLamp', box: { w: 1.6, d: 1.6, h: 1.2 } } });
+      var lampC = ctx.kind('lampCable', [{ geo: hc.geo() }], { r: 0.2 });
+      var lampG = ctx.kind('lampGlow', [{ geo: hg.geo(), mat: 'glow' }], { r: 0.5 });
       var nT = Math.max(2, Math.round(W / 12));
       for (var t = 0; t <= nT; t++) {
         var tx = x0 + W * t / nT;
         if (t > 0 && t < nT) truss.add(tx, hz, { abs: true, y: 0 });
         if (t < nT && t % 2 === 0) sky.add(tx + W / nT / 2, hz, { abs: true, y: 0 });
-        if (t > 0 && t < nT) for (var lz = z0 + 10; lz < z1 - 6; lz += 14) lamp.add(tx, lz, { abs: true, y: yb - 2.9 });
+        if (t > 0 && t < nT) for (var lz = z0 + 10; lz < z1 - 6; lz += 14) {
+          lamp.add(tx, lz, { abs: true, y: yb - 2.9 }); lampC.add(tx, lz, { abs: true, y: yb - 2.9 }); lampG.add(tx, lz, { abs: true, y: yb - 2.9 });
+        }
       }
       // Rolltore und Graffiti an den Wänden (je Wand ein paar, nach innen)
       var dk = new Kit(); dk.add(new THREE.PlaneGeometry(7, 6.5), 0xffffff, { y: 3.25, tile: 'door' });
@@ -1319,20 +1325,55 @@
           for (var l = 0; l < lv; l++) cont.add(w3.x, w3.z, { rot: w3.rot, y: l * 2.6, tint: ccol[Math.floor(rnd() * ccol.length)] });
         }
       });
-      // Fässer in Dreiergruppen (Instanzfarbe) und Paletten-Stapel in der Nähe der Wände
-      var bk = new Kit();
-      [[0, 0], [0.62, 0.15], [0.3, -0.55]].forEach(function (b) { bk.add(cyl(0.29, 0.29, 0.9, 10), 0xffffff, { x: b[0], y: 0.45, z: b[1] }); });
-      var barrels = ctx.kind('barrels', [{ geo: bk.geo() }], { r: 0.9, tint: true });
+      // Ölfässer in Gruppen (Modell slot drum, Ersatz Zylinder in Instanzfarbe), Paletten-Stapel, Reifenhaufen
+      var drum = ctx.kind('drum', [{ geo: cyl(0.3, 0.3, 0.95, 10).translate(0, 0.475, 0) }], { r: 0.35, tint: true, prop: { slot: 'drum', box: { w: 0.8, d: 0.8, h: 1.1 } } });
       var pk2 = new Kit();
       for (var pl = 0; pl < 4; pl++) pk2.add(box(1.2, 0.14, 1.0), 0x9c7a4d, { y: 0.07 + pl * 0.16 });
       var pallets = ctx.kind('pallets', [{ geo: pk2.geo() }], { r: 0.8 });
+      var tk2 = new Kit();
+      for (var ty = 0; ty < 3; ty++) tk2.add(new THREE.TorusGeometry(0.3, 0.12, 6, 12), 0x18191b, { y: 0.12 + ty * 0.24, rx: Math.PI / 2 });
+      var tyrePile = ctx.kind('tyrePile', [{ geo: tk2.geo() }], { r: 0.5, prop: { slot: 'tyrePile', box: { w: 1.4, d: 1.4, h: 1.4 } } });
       var bcol = [0x2f5d8a, 0xa13a2a, 0x6d6b3a, 0x8a5a2b];
-      for (var b2 = 0; b2 < 40; b2++) {
-        var sd2 = Math.floor(rnd() * 4), w4 = onWall(sd2, 0.05 + rnd() * 0.9, 2 + rnd() * 6);
-        if (!ctx.place(w4.x, w4.z, 1)) continue;
-        if (rnd() < 0.6) barrels.add(w4.x, w4.z, { rot: rnd() * TAU, tint: bcol[Math.floor(rnd() * bcol.length)] });
-        else pallets.add(w4.x, w4.z, { rot: w4.rot + (rnd() - 0.5) * 0.4 });
+      for (var b2 = 0; b2 < 46; b2++) {
+        var sd2 = Math.floor(rnd() * 4), w4 = onWall(sd2, 0.05 + rnd() * 0.9, 2 + rnd() * 6), kindR = rnd();
+        if (!ctx.place(w4.x, w4.z, 1.1)) continue;
+        if (kindR < 0.5) {
+          var nD = 2 + Math.floor(rnd() * 3), tint = bcol[Math.floor(rnd() * bcol.length)];
+          for (var dd = 0; dd < nD; dd++) { var an = dd * 2.2 + rnd(), rr = dd ? 0.62 : 0; drum.add(w4.x + Math.cos(an) * rr, w4.z + Math.sin(an) * rr, { rot: rnd() * TAU, tint: tint }); }
+        } else if (kindR < 0.75) pallets.add(w4.x, w4.z, { rot: w4.rot + (rnd() - 0.5) * 0.4 });
+        else tyrePile.add(w4.x, w4.z, { rot: rnd() * TAU, s: 1 + rnd() * 0.4 });
       }
+      // Sicherungskästen an den Wänden (Modell slot fuseBox), liegende Tanks parallel zur Wand (slot tank)
+      var fuse = ctx.kind('fuseBox', [{ geo: box(3, 3.2, 0.5).translate(0, 1.6, 0.25) }], { r: 1.6, prop: { slot: 'fuseBox', box: { w: 3.4, d: 0.7, h: 3.6 } } });
+      var tankK = new Kit();
+      tankK.add(cyl(1.3, 1.3, 7, 14), 0x8a8f86, { y: 1.5, rz: Math.PI / 2 });
+      tankK.add(box(0.4, 1, 2), 0x4a4d52, { x: -2.5, y: 0.5 }); tankK.add(box(0.4, 1, 2), 0x4a4d52, { x: 2.5, y: 0.5 });
+      var tank = ctx.kind('tank', [{ geo: tankK.geo() }], { r: 3.6, prop: { slot: 'tank', box: { w: 7.4, d: 3, h: 3.2 } } });
+      [0, 1, 2, 3].forEach(function (sd) {
+        [0.2, 0.5, 0.8].forEach(function (u) {
+          if (rnd() < 0.4) return;
+          var wf = onWall(sd, u + (rnd() - 0.5) * 0.08, 0.15);
+          if (ctx.place(wf.x, wf.z, 1.5)) fuse.add(wf.x, wf.z, { rot: wf.rot });
+        });
+        if (rnd() < 0.6) { var wt = onWall(sd, 0.3 + rnd() * 0.4, 2.2); if (ctx.place(wt.x, wt.z, 3.8)) tank.add(wt.x, wt.z, { rot: wt.rot }); }
+      });
+      // Betonwände (Modell slot jersey, 5 m) in kurzen Reihen an den Wänden, Pylonen in Grüppchen
+      var jersey = ctx.kind('jersey', [{ geo: box(5, 1.2, 0.5).translate(0, 0.6, 0) }], { r: 2.6, prop: { slot: 'jersey', box: { w: 5.2, d: 0.8, h: 1.6 } } });
+      var coneK = ctx.kind('cone', [{ geo: cone(0.2, 0.6, 8).translate(0, 0.3, 0) }], { r: 0.25, tint: true, prop: { slot: 'cone', box: { w: 0.6, d: 0.6, h: 0.7 } } });
+      [0, 1, 2, 3].forEach(function (sd) {
+        var L = sd < 2 ? W : D, start = 0.1 + rnd() * 0.5, n = 2 + Math.floor(rnd() * 3);
+        for (var j = 0; j < n; j++) {
+          var wj = onWall(sd, start + j * 5.2 / L, 4.5);
+          if (ctx.place(wj.x, wj.z, 2.6)) jersey.add(wj.x, wj.z, { rot: wj.rot });
+        }
+        for (var cg = 0; cg < 3; cg++) {
+          var wc = onWall(sd, 0.1 + rnd() * 0.8, 3 + rnd() * 8);
+          for (var ci = 0; ci < 3 + Math.floor(rnd() * 3); ci++) {
+            var cx2 = wc.x + (rnd() - 0.5) * 3, cz2 = wc.z + (rnd() - 0.5) * 3;
+            if (ctx.place(cx2, cz2, 0.3)) coneK.add(cx2, cz2, { rot: rnd() * TAU, tint: 0xff6a1a });
+          }
+        }
+      });
       // Container-Gruppen (nur als Kulissen-Modell) in zwei Ecken
       var pile = ctx.kind('containerPile', [], { r: 10, prop: { slot: 'containerPile', box: { w: 20, d: 13, h: 7 } } });
       [[x0 + 14, z0 + 11, 0], [x1 - 14, z1 - 11, Math.PI]].forEach(function (c) { if (ctx.place(c[0], c[1], 10)) pile.add(c[0], c[1], { rot: c[2] }); });

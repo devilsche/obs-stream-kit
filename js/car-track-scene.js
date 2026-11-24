@@ -688,8 +688,9 @@
       var slot = kd.prop.slot || kd.name;
       return cat.props.filter(function (e) {
         if (!e || !e.uid) return false;
-        var tid = theme.propTheme || theme.id;   // Halle: Modelle aus dem Industrie-Katalog
-        if (Array.isArray(e.themes) ? e.themes.indexOf(tid) < 0 : e.theme && e.theme !== tid) return false;
+        // eigenes Thema und optional ein zweites (Halle: dazu die Container aus dem Industrie-Katalog)
+        var tids = theme.propTheme ? [theme.id, theme.propTheme] : [theme.id];
+        if (Array.isArray(e.themes) ? !e.themes.some(function (t) { return tids.indexOf(t) >= 0; }) : e.theme && tids.indexOf(e.theme) < 0) return false;
         return Array.isArray(e.slots) ? e.slots.indexOf(slot) >= 0 : (e.slot || e.kind) === slot;
       });
     }
