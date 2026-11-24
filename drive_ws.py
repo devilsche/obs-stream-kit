@@ -27,6 +27,7 @@ Absender, der Empfänger wendet −J an, wenn er den Kontakt nicht selbst gerech
 KI-Übernahme in Räumen: alle Clients fahren ein übernommenes Auto mit CarRaceSim.follower ab ev; der Träger schickt
 dessen Lage als s {for: id, …} (5 Hz, zählt Runden/Ziel, keine Rekorde). Der Fahrer übernimmt mit release {x, z, yaw,
 speed, prog, rt} wieder (fx/drive_room.Room.release).
+Testraum TESTME (fx/drive_room.TEST_CODE): immer offen (Admin-Tenant, Kart, 2 Runden), startet von selbst, speichert nichts.
 Räume, Phasen und Plausibilität: fx/drive_room.py. Ergebnisse: fx/race_db.record (einmal je race_id).
 
 Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, gebunden an das aktuelle Chatrennen
@@ -446,7 +447,7 @@ class DriveServer:
             for ev in evs:
                 self._send_room(room.code, ev)
                 d = room.drivers.get(uid)
-                if ev.get("t") == "lap" and ev.get("ok") and not ev.get("ai") and d:
+                if ev.get("t") == "lap" and ev.get("ok") and not ev.get("ai") and d and not room.test:
                     self._lap(room.tenant_id, room.track, d.car, uid, d.display, ev["time"], "room",
                               lambda o, c=room.code: self._send_room(c, o))
         elif t == "bump":
@@ -517,7 +518,11 @@ class DriveServer:
 
     def step(self, now):
         self.race_step(now)
+        self.hub.ensure_test(now)
         for room in list(self.hub.rooms.values()):
+            if room.auto_start(now):
+                self._send_room(room.code, room.phase_msg(now))
+                self._roster(room)
             for ev in room.tick(now):
                 self._send_room(room.code, ev)
                 if ev.get("t") == "results":
@@ -533,7 +538,7 @@ class DriveServer:
 
     def _save(self, room):
         rows = room.rows()
-        if not rows:
+        if not rows or room.test:     # Testraum: nichts speichern
             self._send_room(room.code, {"t": "recorded", "race_id": room.race_id, "counted": False, "points": {}})
             return
         room.recorded = True     # Sperre: dieses Rennen wird genau einmal gemeldet

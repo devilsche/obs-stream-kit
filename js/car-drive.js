@@ -1501,7 +1501,8 @@
         (m.taken || []).forEach(function (ev) { mpTakeover(ev); });
         lobbyTrack(); renderRoster();
         mp.net.send({ t: 'join', car: mp.car, paint: mp.paint });
-        setLobbyStatus(mp.role === 'host' ? 'Post the link in the chat, then start the race.' : 'Waiting for the streamer to start the race.');
+        setLobbyStatus(mp.room && mp.room.test ? 'Test room – races start by themselves 10 s after the last driver joined; nothing is saved.' :
+          mp.role === 'host' ? 'Post the link in the chat, then start the race.' : 'Waiting for the streamer to start the race.');
         break;
       case 'joined':
         if (!m.ok) setLobbyStatus(m.msg);

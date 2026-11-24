@@ -312,3 +312,14 @@ def test_room_bump_only_in_race(monkeypatch):
     srv.clock = lambda: 1020.0
     srv.on_message(room, c1, {"t": "bump", "to": "u2", "jx": 3, "jz": 0, "imp": 4})
     assert [m for m in sent if m.get("t") == "bump"] == [{"t": "bump", "from": "u1", "jx": 3.0, "jz": 0.0, "imp": 4.0}]
+
+
+def test_test_room_saves_nothing(monkeypatch):
+    calls, sent = [], []
+    srv = drive_ws.DriveServer(secret="s", record=lambda *a: calls.append(a) or (True, {}))
+    monkeypatch.setattr(srv, "_send_room", lambda code, obj: sent.append(obj))
+    room = srv.hub.ensure_test(1000.0)
+    room.join({"id": "u1", "login": "u1", "display": "U", "role": "viewer", "garage": None}, "car-a", 0, 1000.0)
+    monkeypatch.setattr(room, "rows", lambda: [{"user_id": "u1"}])
+    srv._save(room)
+    assert calls == [] and sent[-1]["t"] == "recorded" and not sent[-1]["counted"]

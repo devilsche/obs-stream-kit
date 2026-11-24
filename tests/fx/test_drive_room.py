@@ -353,3 +353,22 @@ def test_race_ends_when_nobody_connected_to_carry():
     room.leave("u1", sa + 1)
     evs = room.tick(sa + 1 + dr.TAKEOVER_GAP + 0.1)
     assert any(e["t"] == "results" for e in evs)
+
+
+def test_test_room_always_there_auto_starts_and_never_expires():
+    hub = dr.Hub()
+    room = hub.ensure_test(1000.0)
+    assert room.code == dr.TEST_CODE and room.test and room.info()["test"] and hub.ensure_test(1001.0) is room
+    assert hub.of_tenant(dr.TEST_TENANT) is None              # normaler Raum des Tenants bleibt frei
+    normal, old = hub.open(dr.TEST_TENANT, 0, 2, 1000.0)
+    assert old is None and hub.get(dr.TEST_CODE) is room
+    assert not room.auto_start(1100.0)                         # niemand da
+    ok, _ = room.join({"id": "u1", "login": "u1", "display": "U", "role": "viewer", "garage": None}, "car-a", 0, 1100.0)
+    assert ok
+    assert not room.auto_start(1100.0 + dr.TEST_WAIT - 1)
+    assert room.auto_start(1100.0 + dr.TEST_WAIT) and room.phase == "countdown"
+    room.phase, room.done_at = "done", 1200.0
+    assert not room.auto_start(1200.0 + dr.TEST_PAUSE - 1)
+    assert room.auto_start(1200.0 + dr.TEST_PAUSE) and room.phase == "countdown"
+    room.clients = 0
+    assert room not in hub.sweep(1e9)

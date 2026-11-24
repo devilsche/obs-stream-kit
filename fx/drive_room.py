@@ -58,6 +58,10 @@ PING_MAX = 5000          # gemeldeter Ping (ms), darüber verworfen
 TAKEOVER_GAP = 3.0       # so lange ohne Zustand im Rennen → die KI fährt das Auto weiter (Ereignis takeover)
 RELEASE_TOL = 25.0       # Rückgabe ans Steuer: Lage höchstens so weit (m) von der letzten KI-Meldung entfernt
 GRID_FRONT, GRID_ROW, GRID_SIDE = 4.0, 7.5, 2.3
+# Testraum: immer offen unter festem Code (Admin-Tenant), Ergebnisse/Coins/Rekorde werden nicht gespeichert,
+# Rennen starten von selbst (TEST_WAIT s nach dem letzten Beitritt bzw. TEST_PAUSE s nach dem Ergebnis)
+TEST_CODE, TEST_TENANT, TEST_TRACK, TEST_LAPS = "TESTME", 1, 4, 2
+TEST_WAIT, TEST_PAUSE = 10.0, 20.0
 
 
 def grid_pose(i):
@@ -191,6 +195,9 @@ class Room:
         self.created = now
         self.active = now
         self.clients = 0
+        self.test = False           # Testraum (TEST_CODE): nichts speichern, Start von selbst
+        self.changed = now          # letzte Änderung der Startaufstellung (Testraum: Start TEST_WAIT s danach)
+        self.done_at = None
 
     @property
     def track_len(self):
@@ -199,7 +206,7 @@ class Room:
     def info(self, now=None):
         return {"code": self.code, "tenant": self.tenant_id, "track": self.track, "track_name": TRACK_NAMES[self.track],
                 "laps": self.laps, "phase": self.phase, "race_id": self.race_id, "start_at": self.start_at,
-                "drivers": len(self.drivers), "max": MAX_DRIVERS, "now": now}
+                "drivers": len(self.drivers), "max": MAX_DRIVERS, "now": now, "test": self.test}
 
     def roster(self):
         return [d.public() for d in self.drivers.values()]
@@ -209,6 +216,7 @@ class Room:
         """ident = Ticket-Inhalt {id, login, display, role, garage (Liste oder None = alle), rnd}.
         → (ok, Meldung)."""
         self.active = now
+        self.changed = now
         if not isinstance(car, str) or not car or len(car) > 120:
             return False, "pick a car"
         garage = ident.get("garage")
@@ -235,6 +243,7 @@ class Room:
     def leave(self, uid, now):
         """Fahrer verlässt den Raum (oder Verbindung weg). In Lobby/Ergebnis: raus, im Rennen: bleibt als DNF."""
         self.active = now
+        self.changed = now
         d = self.drivers.get(uid)
         if not d:
             return False
@@ -289,9 +298,21 @@ class Room:
                 self.results = self._results()
                 self.phase = "done"
                 self.active = now
+                self.done_at = now
                 out.append(self.phase_msg(now))
                 out.append(dict(self.results, t="results"))
         return out
+
+    def auto_start(self, now):
+        """Testraum: Lobby → Start TEST_WAIT s nach der letzten Änderung, Ergebnis → nächstes Rennen TEST_PAUSE s danach,
+        solange ein verbundener Fahrer da ist. → True, wenn gestartet."""
+        if not self.test or not any(d.connected for d in self.drivers.values()):
+            return False
+        if self.phase == "lobby" and now - self.changed >= TEST_WAIT:
+            return self.start(now)[0]
+        if self.phase == "done" and self.done_at is not None and now - max(self.done_at, self.changed) >= TEST_PAUSE:
+            return self.start(now)[0]
+        return False
 
     def phase_msg(self, now):
         return {"t": "phase", "phase": self.phase, "race_id": self.race_id, "start_at": self.start_at,
@@ -520,6 +541,15 @@ class Hub:
     def get(self, code):
         return self.rooms.get((code or "").upper())
 
+    def ensure_test(self, now):
+        """Testraum TEST_CODE anlegen, falls er fehlt (nicht an den Tenant gebunden: der normale Raum bleibt frei)."""
+        room = self.rooms.get(TEST_CODE)
+        if room is None:
+            room = Room(TEST_CODE, TEST_TENANT, TEST_TRACK, TEST_LAPS, self._limits(), now)
+            room.test = True
+            self.rooms[TEST_CODE] = room
+        return room
+
     def of_tenant(self, tenant_id):
         code = self.by_tenant.get(tenant_id)
         return self.rooms.get(code) if code else None
@@ -530,7 +560,7 @@ class Hub:
 
     def sweep(self, now):
         """Räume ohne Verbindungen nach ROOM_TTL entfernen. → entfernte Räume."""
-        gone = [r for r in self.rooms.values() if r.clients <= 0 and now - r.active > ROOM_TTL]
+        gone = [r for r in self.rooms.values() if r.clients <= 0 and now - r.active > ROOM_TTL and not r.test]
         for r in gone:
             self.rooms.pop(r.code, None)
             if self.by_tenant.get(r.tenant_id) == r.code:
