@@ -51,7 +51,7 @@
     var inv = new THREE.Matrix4().copy(scene.matrixWorld).invert(), groups = {};
     function inWheel(o) { for (var p = o; p && p !== scene; p = p.parent) if (/^Wheel /.test(p.name || '')) return true; return false; }
     scene.traverse(function (o) {
-      if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || inWheel(o)) return;
+      if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || inWheel(o) || o.userData.unsprung) return;   // Teile im Rad: einzeln für die Fahrhöhe
       var g = o.geometry; if (!g || !g.attributes.position || Object.keys(g.morphAttributes || {}).length) return;
       var sig = o.material.uuid + '|' + Object.keys(g.attributes).sort().join(',') + '|' + (g.index ? 'i' : 'n') + '|' + o.renderOrder;
       (groups[sig] = groups[sig] || { mat: o.material, order: o.renderOrder, list: [] }).list.push(o);
@@ -695,6 +695,7 @@
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
     META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, twin: twin, splitFail: splitFail, cutKids: cutKids, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
+    markUnsprung(scene);
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     // Längsachse und Front-Schätzung wie bisher über Box3 (sonst kippt bei knappen Überhängen die Fahrtrichtung)
@@ -748,6 +749,7 @@
     var body = bodyOf(car); if (!body || body === car) return;
     var wheels = []; car.traverse(function (o) { if (/^Wheel /.test(o.name || '')) wheels.push(o); });
     body.position.set(0, 0, 0); body.rotation.set(0, 0, 0);
+    body.traverse(function (o) { var r0 = o.userData.r0; if (r0) { o.position.fromArray(r0[0]); o.quaternion.fromArray(r0[1]); o.scale.fromArray(r0[2]); } });
     wheels.forEach(function (w) {
       if (w.userData.p0) { w.position.fromArray(w.userData.p0); w.quaternion.fromArray(w.userData.q0); }
       else { w.userData.p0 = w.position.toArray(); w.userData.q0 = w.quaternion.toArray(); }
@@ -760,6 +762,9 @@
       var p = new THREE.Vector3(), q = new THREE.Quaternion(); w.getWorldPosition(p); w.getWorldQuaternion(q);
       return { p: p, q: q, x: p.clone().applyMatrix4(inv).x };
     });
+    // Teile im Rad, die weder rollen noch lenken (beim Aufbau markiert): bleiben beim Rad, nicht bei der Karosserie
+    var unsprung = [];
+    body.traverse(function (o) { if (o.isMesh && o.userData.unsprung) unsprung.push({ o: o, m: o.matrixWorld.clone() }); });
     var xs = keep.map(function (k) { return k.x; }), xF = Math.max.apply(null, xs.concat([-1e9])), xR = Math.min.apply(null, xs.concat([1e9]));
     if (axles && axles.xF - axles.xR > L * 0.2) { xF = axles.xF; xR = axles.xR; }
     else if (wheels.length < 2 || xF - xR < L * 0.2) { xF = L * 0.3; xR = -L * 0.3; }
@@ -771,6 +776,25 @@
       w.position.copy(par.worldToLocal(keep[i].p.clone()));
       par.getWorldQuaternion(pq); w.quaternion.copy(pq.invert().multiply(keep[i].q));
       w.updateMatrixWorld(true);
+    });
+    unsprung.forEach(function (u) {
+      if (!u.o.userData.r0) u.o.userData.r0 = [u.o.position.toArray(), u.o.quaternion.toArray(), u.o.scale.toArray()];
+      new THREE.Matrix4().copy(u.o.parent.matrixWorld).invert().multiply(u.m).decompose(u.o.position, u.o.quaternion, u.o.scale);
+    });
+  }
+  // Teile im Rad, die weder rollen noch lenken (hintere Bremssättel, Beläge): bleiben bei der Fahrhöhe beim Rad
+  function inWheelBox(o, wbox) {
+    var b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+    return wbox.some(function (wb) { var ws = wb.getSize(new THREE.Vector3()); return wb.containsPoint(c) && sz.x <= ws.x && sz.y <= ws.y && sz.z <= ws.z * 1.5; });
+  }
+  function markUnsprung(scene) {
+    scene.updateMatrixWorld(true);
+    var wbox = []; scene.traverse(function (o) { if (/^Wheel /.test(o.name || '')) wbox.push(new THREE.Box3().setFromObject(o).expandByScalar(0.01 * UNIT)); });
+    if (!wbox.length) return;
+    scene.traverse(function (o) {
+      if (!o.isMesh || o.userData.driver) return;
+      for (var p = o; p; p = p.parent) if (/^Wheel /.test(p.name || '')) return;
+      if (inWheelBox(o, wbox)) o.userData.unsprung = true;
     });
   }
   // Sitz-/Wand-Schätzung in Karosserie-Koordinaten: kurz ohne Fahrhöhe rechnen

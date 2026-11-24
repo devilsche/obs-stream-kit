@@ -629,7 +629,14 @@
           if ((rv.f || rv.r) && picked.length) {
             car.updateMatrixWorld(true);
             var inv = new THREE.Matrix4().copy(car.matrixWorld).invert(), xs = [], meshes = [];
-            car.traverse(function (o) { if (o.isMesh && picked.indexOf(o.userData.pkey) >= 0) { meshes.push(o); xs.push(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).applyMatrix4(inv).x); } });
+            var pboxes = [];
+            car.traverse(function (o) { if (o.isMesh && picked.indexOf(o.userData.pkey) >= 0) { var pb = new THREE.Box3().setFromObject(o); meshes.push(o); pboxes.push(pb.expandByScalar(0.01 * TC.UNIT)); xs.push(pb.getCenter(new THREE.Vector3()).applyMatrix4(inv).x); } });
+            // Teile im Rad, die weder rollen noch lenken (Bremssättel): bleiben beim Rad wie im Spiel
+            car.traverse(function (o) {
+              if (!o.isMesh || o.userData.driver || meshes.indexOf(o) >= 0) return;
+              var b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+              if (pboxes.some(function (wb) { var ws = wb.getSize(new THREE.Vector3()); return wb.containsPoint(c) && sz.x <= ws.x && sz.y <= ws.y && sz.z <= ws.z * 1.5; })) meshes.push(o);
+            });
             var xF = Math.max.apply(null, xs), xR = Math.min.apply(null, xs);
             TC.applyRide(car, rv.f, rv.r, xF - xR > tpl.userData.dims.L * 0.2 ? { xF: xF, xR: xR } : null);
             car.updateMatrixWorld(true);
