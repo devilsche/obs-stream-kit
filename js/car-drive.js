@@ -1711,7 +1711,7 @@
   function mpSend() {
     if (!mp || !mp.net || !race || !race.mp || race.raceId !== mp.raceId || race.spect) return;
     var pc = race.pc;
-    mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steer,
+    mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steerVis != null ? pc.steerVis : pc.steer,
       speed: Math.hypot(pc.vx, pc.vz), prog: pc.prog, t: race.phase === 'countdown' ? 0 : race.t, spin: pc.spin });
   }
   function drawRemotes() {
@@ -2114,7 +2114,7 @@
       flash('You have the wheel', 1.5); say('You have the wheel');
     } else {
       // letzter Zustand sofort, dann übernimmt die KI ab hier (mit echtem Tempo)
-      mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steer,
+      mp.net.sendState({ x: pc.x, z: pc.z, yaw: pc.yaw, roll: pc.roll, pitch: pc.pitch, steer: pc.steerVis != null ? pc.steerVis : pc.steer,
         speed: Math.hypot(pc.vx, pc.vz), prog: pc.prog, t: race.t, spin: pc.spin }, true);
       mp.net.send({ t: 'ai' });
       rcTakeover({ t: race.t, type: 'takeover', id: me, by: 'user', local: true, x: pc.x, z: pc.z, yaw: pc.yaw,
@@ -2250,9 +2250,9 @@
         // Umschauen bleibt beim Start erhalten und pendelt nach der Ruhezeit von selbst zurück
         setTimeout(function () { ui.countdown.hidden = true; ui.countdown.textContent = ''; }, 700);
       }
-      placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin);
+      placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steerVis != null ? pc.steerVis : pc.steer, pc.spin);
       drawAI();
-      if (race.chat) { rcDraw(); placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steer, pc.spin); mpSend(); }
+      if (race.chat) { rcDraw(); placeCar(race.me, pc.x, pc.z, pc.yaw, pc.roll, pc.pitch, pc.steerVis != null ? pc.steerVis : pc.steer, pc.spin); mpSend(); }
       else if (race.mp) { drawRemotes(); mpSend(); }
     } else {
       var inp = race.spect ? null : race.phase === 'done' ? cruise(pc) : playerInput(dt, p);

@@ -191,7 +191,7 @@
     // Gegenlenken beim Rutschen: je driftfreudiger, desto mehr Einschlag über den Grenzwinkel hinaus
     var slideX = (inp.steer || 0) * car.r < 0 ? clamp((car.slip - 0.45) / 0.35, 0, 1) * dr0 * 0.25 : 0;
     var maxSteer = clamp(P.wb * Gs / Math.max(1, u * u) + ALPHA_PEAK * 0.9 + slideX, 0.1, lock);
-    var want = clamp(inp.steer || 0, -1, 1) * maxSteer;
+    var want = clamp(inp.steer || 0, -1, 1) * maxSteer, wantVis = want;
     // Lenkhilfe gegen Untersteuern: die Vorderräder nie weiter als bis zum Haftungsmaximum über die Fahrtrichtung der
     // Vorderachse hinaus einschlagen (mehr Einschlag würde nur rutschen – lange Busse/Lkw schoben sonst geradeaus);
     // bei Schritttempo bleibt der volle Einschlag (kinematisch), dazwischen weich
@@ -206,6 +206,9 @@
     var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
     if (car.hitT > 0) car.hitT = Math.max(0, car.hitT - dt);
     car.steer += clamp(want - car.steer, -3.2 * dt * (1 - 0.7 * stun), 3.2 * dt * (1 - 0.7 * stun));
+    // Anzeige-Einschlag (steerVis): was der Fahrer lenkt, ohne die Lenkhilfe – im Drift begrenzt die Hilfe den
+    // wirksamen Winkel oft auf 0, die Räder standen dann trotz Lenken gerade; Physik rechnet weiter mit car.steer
+    car.steerVis = (car.steerVis || 0) + clamp(wantVis - (car.steerVis || 0), -3.2 * dt, 3.2 * dt);
     var delta = car.steer;
     var thr = clamp(inp.throttle || 0, 0, 1), brk = clamp(inp.brake || 0, 0, 1), hb = !!inp.handbrake;
     var nitro = car.nitroT > 0;
@@ -322,7 +325,7 @@
   function reset(car) {
     var a = car.T.at(car.s);
     car.x = a.x; car.z = a.z; car.yaw = car.yaw + wrapAngle(a.yaw - car.yaw);
-    car.vx = car.vz = car.r = car.u = car.w = car.steer = 0;
+    car.vx = car.vz = car.r = car.u = car.w = car.steer = car.steerVis = 0;
     car.roll = car.pitch = car.rollV = car.pitchV = 0; car.ax = car.ay = 0; car.hitT = 0;
     var pr = project(car.T, car.x, car.z, car.hint); car.d = pr.d; car.hint = pr.i; car.surface = 'asphalt';
     return car;
