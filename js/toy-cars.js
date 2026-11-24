@@ -333,6 +333,21 @@
   // Hüllquader aus den Eckpunkten selbst (Weltlage): Box3.setFromObject in three r128 dreht nur den Quader der
   // Geometrie mit – bei schräg liegenden Teilen (Ferrari 296 GT3, Teile-Achsen ~53° bzw. leicht gekippt) wird er
   // zu groß, das Auto schwebt dann über dem Boden und wird zu klein skaliert
+  // Karosserie-Länge (x) aus den Punkten unterhalb von 55 % der Höhe; zu wenig Punkte → ganze Länge
+  function bodyLength(obj, box, size) {
+    var y1 = box.min.y + size.y * 0.55, lo = Infinity, hi = -Infinity, v = new THREE.Vector3(), n = 0;
+    obj.traverse(function (o) {
+      if (!o.isMesh || !o.geometry || !o.geometry.attributes.position) return;
+      var p = o.geometry.attributes.position, M = o.matrixWorld, step = Math.max(1, Math.floor(p.count / 60000));
+      for (var i = 0; i < p.count; i += step) {
+        v.fromBufferAttribute(p, i).applyMatrix4(M);
+        if (v.y > y1) continue;
+        if (v.x < lo) lo = v.x; if (v.x > hi) hi = v.x; n++;
+      }
+    });
+    var L = hi - lo;
+    return n > 50 && L > size.x * 0.6 ? L : size.x;
+  }
   function exactBox(obj) {
     obj.updateMatrixWorld(true);
     var b = new THREE.Box3(), v = new THREE.Vector3();
@@ -676,12 +691,14 @@
     rot.rotation.y = lx ? (front > 0 ? 0 : Math.PI) : (front > 0 ? Math.PI / 2 : -Math.PI / 2);
     rot.updateMatrixWorld(true);
     box = exactBox(rot); box.getSize(size);
-    var k = (e.len || 4.5) * UNIT / Math.max(1e-6, size.x);
+    // Länge der Karosserie (Stoßstangen, Seiten) statt des ganzen Kastens: nur Punkte in der unteren Hälfte der Höhe –
+    // ein überstehender Heckflügel oder Spiegel macht das Auto sonst kürzer, als es ist
+    var bodyL = bodyLength(rot, box, size), k = (e.len || 4.5) * UNIT / Math.max(1e-6, bodyL);
     var wrap = new THREE.Group(); wrap.add(rot); wrap.scale.setScalar(k);
     var c = new THREE.Vector3(); box.getCenter(c); size.multiplyScalar(k);
     rot.position.sub(c);
     var car = new THREE.Group(); car.add(wrap); car.name = e.key; car.updateMatrixWorld(true);
-    car.userData.dims = { L: size.x, W: size.z, H: size.y, belt: size.y * 0.62 };
+    car.userData.dims = { L: size.x, B: bodyL * k, W: size.z, H: size.y, belt: size.y * 0.62 };
     car.userData.key = e.key;
     delete ud.wheels; delete ud.paintMats; delete ud.rimMats; delete ud.rimFromPaint;
     return car;

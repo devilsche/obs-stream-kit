@@ -132,6 +132,27 @@
 
   function inRange(k, n) { return isFinite(n) && n >= RANGE[k][0] && n <= RANGE[k][1]; }
 
+  // Echte Längen (m, Herstellerangaben/Datenblätter, gerundet) je Katalog-Schlüssel – ohne Eintrag gilt entry.len.
+  // Das Modell wird auf diese Länge skaliert (Karosserie ohne überstehenden Flügel, js/toy-cars.js bodyLength)
+  var LEN = {
+    '1962-chevrolet-corvette-gran': 4.45, '1973-bmw-2002-turbo': 4.22, '1982-porsche-930-911-turbo-3': 4.29, '1984-mercedes-190e': 4.42,
+    '1988-bmw-m5-e28': 4.62, '1988-ferrari-testarossa': 4.49, '1990-bmw-m3-sport-evolution': 4.35, '1990-mercedes-benz-190e-2-5': 4.43,
+    '1992-porsche-911-964-turbo-s': 4.25, '1992-volkswagen-golf-gti': 4.02, '1995-lamborghini-diablo-sv': 4.47, '1998-volkswagen-new-beetle': 4.08,
+    '1999-volkswagen-gol-2000-gti': 3.81, '2000-volkswagen-passat-varia': 4.68, '2002-volkswagen-golf-r32-mk4': 4.17, '2010-bmw-m3-e92': 4.62,
+    '2015-porsche-911-carrera-s': 4.49, '2017-porsche-gt-rsr-991-duke': 4.56, '2019-ferrari-monza-sp2': 4.66, '2020-abt-sportline-audi-rs6': 5.0,
+    '2020-audi-rs5-coup': 4.72, '2020-audi-rs-6-avant': 4.99, '2020-ferrari-roma': 4.66, '2021-ferrari-sf90-spider': 4.7,
+    '2021-porsche-911-turbo-s-992': 4.54, '2022-lamborghini-countach-lp': 4.87, '2022-porsche-911-gt3-touring': 4.57, '2023-ferrari-sf90-xx-stradal': 4.85,
+    '2023-porsche-911-gt3-rs-2-7': 4.57, '2024-audi-rs6-avant-gt': 5.0, '2024-porsche-992-gt3-r': 4.62, '2025-koenigsegg-gemera': 4.98,
+    '2026-ferrari-849-testarossa': 4.72, '67-mustang-high-poly': 4.69, 'amg-w14-s1': 5.6, 'audi-a4-b5-5-avant': 4.49, 'audi-a4-b8': 4.7,
+    'audi-a4-l40-tfsi': 4.86, 'audi-a4-r9-dtm-a': 4.75, 'bmw-e39-free': 4.78, 'bmw-m2-competition-f87': 4.46, 'bmw-m3-competition': 4.79,
+    'caterpillar-ct680': 7.6, 'classic-crasher-c170-dominat': 5.3, 'ferrari-296-gt3-verstappen': 4.69, 'ferrari-488-pista-widebody': 4.61,
+    'ferrari-550-barchetta-2000-a': 4.55, 'ferrari-gtc4-lusso': 4.92, 'ferrari-laferrari': 4.7, 'ford-mustang-1965': 4.61,
+    'ford-mustang-shelby-gt500': 4.82, 'free-1975-porsche-911-930-tu': 4.29, 'mercedes-190e-evo-1982-3d-mo': 4.49,
+    'mercedes-benz-500te-w126-est': 4.77, 'mercedes-benz-a45-amg-2018': 4.45, 'mersedes-benz-g63-amg': 4.87, 'mitsubishi-lancer-evo-ix': 4.49,
+    'porsche-911-gt3-2': 4.57, 'porsche-911-rauh-welt-free': 4.35, 'porsche-911-turbo-996-2000-b': 4.44, 'porsche-911-turbo-s': 4.51,
+    'porsche-917k-lm-red': 4.13, 'porsche-918-free': 4.64, 'trolza-5265-00-megapolis': 12.4, 'ural-4320-soviet-army-truck': 7.37,
+    'volkswagen-golf-gti-1976': 3.73, 'vw-golf-gti-mk7': 4.27
+  };
   function guess(entry) {
     var t = entry && entry.key && TABLE.hasOwnProperty(entry.key) ? TABLE[entry.key] : null;
     var c = klass(entry), v = t || c.v, len = entry && +entry.len;
@@ -139,6 +160,7 @@
     KEYS.forEach(function (k) { r[k] = v[k]; });
     // Ferrari-Supercars ohne Tabellenzeile fahren Heckantrieb
     r.drive = t ? t.drive : /ferrari/i.test((entry && (entry.brand || '') + ' ' + (entry.name || '')) || '') ? 'rwd' : v.drive;
+    if (entry && entry.key && LEN.hasOwnProperty(entry.key)) len = LEN[entry.key];
     r.len = inRange('len', len) ? len : 4.5;
     r.steer = steerGuess(entry);
     r.drift = driftGuess(entry, r, c.id);
@@ -262,7 +284,7 @@
     return r;
   }
 
-  var api = { guess: guess, of: of, clean: clean, RCLASSES: RCLASSES, rclassName: rclassName, KEYS: KEYS, RANGE: RANGE, TABLE: TABLE, ENGINES: ENGINES, ENGINE: ENGINE };
+  var api = { guess: guess, of: of, LEN: LEN, clean: clean, RCLASSES: RCLASSES, rclassName: rclassName, KEYS: KEYS, RANGE: RANGE, TABLE: TABLE, ENGINES: ENGINES, ENGINE: ENGINE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.CarRaceStats = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -307,7 +307,7 @@
       model = TC.build(key, set.c, set);
       var d = model.userData.dims || TC.dims(key);
       if (d && d.L > 0) {
-        var k = st.len / d.L;
+        var k = st.len / (d.B || d.L);   // Karosserie-Länge (ohne überstehenden Flügel) = echte Länge
         car.shape = footprint(key, model, d, k);
         model.scale.setScalar(k); model.position.y = d.H / 2 * k + 0.03;
         car.height = d.H * k; car.w = d.W * k;

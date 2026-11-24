@@ -321,7 +321,7 @@
       var model = ToyCars.build(r.key, r.set ? r.set.c : null, r.set || {});
       var d = model.userData.dims || ToyCars.dims(r.key);
       if (!d || !(d.L > 0)) return;
-      var k = r.len / d.L;
+      var k = r.len / (d.B || d.L);   // Karosserie-Länge (ohne überstehenden Flügel) = echte Länge
       model.scale.setScalar(k); model.position.y = d.H / 2 * k + 0.03;   // Asphalt liegt 3 cm über dem Boden (sonst sinken die Reifen ein)
       if (r.body) r.holder.remove(r.body);   // Kisten-Geometrie wird mit dem Fahrer entsorgt
       r.holder.add(model); r.body = model; r.isModel = true;
