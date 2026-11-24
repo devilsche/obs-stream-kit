@@ -520,7 +520,7 @@
     // (kd.add(…, { v }) → iVar, Material mat 'atl'/'atlcut' mit Kit-Teilen o.vary). kd.refresh(i): Platz i neu setzen,
     // nachdem x/z/y/rot geändert wurden (nach dem Aufbau, z. B. in onProp)
     ctx.kind = function (name, parts, o) {
-      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), vary: !!(o && o.vary), spots: [], prop: (o && o.prop) || null };
+      var kd = { name: name, parts: parts, r: (o && o.r) || 2, tint: !!(o && o.tint), vary: !!(o && o.vary), spots: [], prop: (o && o.prop) || null, people: (o && o.people && o.people.length) ? o.people : null };
       parts.forEach(function (p) { own(p.geo); });
       // a.abs: y ist absolut (nicht über dem Gelände) – z. B. auf einer Insel im Meer
       kd.add = function (x, z, a) {
@@ -763,9 +763,71 @@
       entry.setHidden = function (i, hidden) { kd.spots[i].hidden = !!hidden; applySpot(kd, i); };
       decor.inst.push(entry);
     });
+    buildCrowd();
     // Platz i neu setzen: Modell geladen → prozedurale Instanz auf null, Modell-Instanzen sichtbar (außer ausgeblendet)
+    // Zuschauer als Bild-Figuren (assets/textures/crowd/people.png: 32 Figuren à 128×256 px = 1,025 × 2,05 m, gerendert
+    // aus „Low Detail Animated Crowd“ von Shahriar Shahrabi, CC BY): ein InstancedMesh für alle Arten mit o.people
+    // ([x, Fußhöhe, z] je Figur in Kit-Koordinaten), jede Figur dreht sich um die Hochachse zur Kamera (Shader), Zelle
+    // und Größe je Figur zufällig. Zeigt ein Platz ein Kulissen-Modell statt der eigenen Tribüne, fallen seine Figuren weg.
+    var crowd;   // (kein Vorbelegen: buildCrowd läuft im Code weiter oben)
+    function buildCrowd() {
+      var CROWD_W = 1.025, CROWD_H = 2.05;
+      var list = kinds.filter(function (kd) { return kd.people && kd.spots.length; });
+      if (!list.length || !PROP_BASE) return;
+      var n = 0; list.forEach(function (kd) { n += kd.people.length * kd.spots.length; });
+      var geo = own(new THREE.PlaneGeometry(CROWD_W, CROWD_H)); geo.translate(0, CROWD_H / 2 - 0.03, 0);
+      var cell = new Float32Array(n), cr = ctx.rng(913);
+      for (var c = 0; c < n; c++) cell[c] = Math.floor(cr() * 32);
+      geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
+      var mat = own(new THREE.MeshBasicMaterial({ color: new THREE.Color().setScalar(theme.crowdK || 0.95), alphaTest: 0.5, side: THREE.DoubleSide, visible: false }));
+      mat.onBeforeCompile = function (sh) {
+        sh.vertexShader = 'attribute float aCell;\n' + sh.vertexShader
+          .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_UV\n  vUv = (vec2(mod(aCell, 8.0), 3.0 - floor(aCell / 8.0)) + uv) / vec2(8.0, 4.0);\n#endif')
+          .replace('#include <project_vertex>', [
+            'vec4 cW = modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);',
+            'float sY = length(instanceMatrix[1].xyz);',
+            'vec3 rgt = normalize(vec3(viewMatrix[0][0], 0.0, viewMatrix[2][0]) + vec3(1e-5, 0.0, 0.0));',
+            'vec3 wpC = cW.xyz + rgt * transformed.x * sY + vec3(0.0, transformed.y * sY, 0.0);',
+            'vec4 mvPosition = viewMatrix * vec4(wpC, 1.0);',
+            'gl_Position = projectionMatrix * mvPosition;'].join('\n'));
+      };
+      var im = own(new THREE.InstancedMesh(geo, mat, n)); im.frustumCulled = false; g.add(im);
+      var k = 0, local = new THREE.Vector3(), cm = new THREE.Matrix4(), sm = new THREE.Matrix4();
+      list.forEach(function (kd) {
+        kd.crowdAt = k;
+        kd.spots.forEach(function (sp) {
+          spotMatrix(sp, sm);
+          kd.people.forEach(function (pp) {
+            local.set(pp[0], pp[1], pp[2]).applyMatrix4(sm);
+            var sc = 0.93 + cr() * 0.14;
+            im.setMatrixAt(k++, cm.makeScale(sc, sc, sc).setPosition(local));
+          });
+        });
+      });
+      im.instanceMatrix.needsUpdate = true;
+      crowd = { im: im, mat: mat, saved: {} };
+      new THREE.TextureLoader().load(PROP_BASE + 'assets/textures/crowd/people.png', function (tex) {
+        if (disposed) { tex.dispose(); return; }
+        tex.encoding = THREE.sRGBEncoding; tex.anisotropy = Math.min(4, maxAniso || 1); own(tex);
+        mat.map = tex; mat.visible = true; mat.needsUpdate = true;
+      });
+    }
+    // Figuren eines Platzes aus-/einblenden (Kulissen-Modell statt Tribüne, Kamerafahrten)
+    function crowdSpot(kd, i, on) {
+      if (!crowd || kd.crowdAt == null) return;
+      var per = kd.people.length, a = kd.crowdAt + i * per, key = kd.name + ':' + i, im = crowd.im, tmp = new THREE.Matrix4();
+      if (!on && !crowd.saved[key]) {
+        crowd.saved[key] = [];
+        for (var j = 0; j < per; j++) { im.getMatrixAt(a + j, tmp); crowd.saved[key].push(tmp.clone()); im.setMatrixAt(a + j, ZERO_M); }
+      } else if (on && crowd.saved[key]) {
+        crowd.saved[key].forEach(function (m, j) { im.setMatrixAt(a + j, m); });
+        delete crowd.saved[key];
+      } else return;
+      im.instanceMatrix.needsUpdate = true;
+    }
     function applySpot(kd, i) {
       var noProc = !!(kd.prop && kd.prop.noProc), s = kd.spots[i], procOn = !noProc && !s.hidden && (s.prop == null || s.far);
+      if (kd.people) crowdSpot(kd, i, procOn);
       spotMatrix(s, mtx);
       // alle Plätze mit Modell → prozedurale Art gar nicht mehr zeichnen (spart den Zeichenaufruf)
       var anyProc = !noProc && kd.spots.some(function (x) { return x.prop == null || x.far; });

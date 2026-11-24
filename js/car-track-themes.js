@@ -808,16 +808,14 @@
       var crowd = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831, 0x1f6f3f, 0xd94f8a];
       var skin = [0xf1c8a5, 0xe0ac82, 0xc68863, 0x8d5a3b, 0x5c3a24];
       function standKit(rows, covered) {
-        var k = new Kit(), RD = 0.95, RH = 0.58, W = 26;
+        var k = new Kit(), RD = 0.95, RH = 0.58, W = 26; k.people = [];
         for (var r = 0; r < rows; r++) {
           var hh = 0.6 + r * RH, z0 = r * RD;
           k.add(box(W, hh + 1, RD), r % 2 ? 0x9aa0aa : 0x8e939d, { y: (hh - 1) / 2, z: z0 });
           for (var q = 0; q < 36; q++) {
             var x = -12.6 + q * 0.72 + (rnd() - 0.5) * 0.12;
             if (rnd() < 0.12) { k.add(box(0.46, 0.16, 0.42), 0x4a5260, { x: x, y: hh + 0.08, z: z0 - 0.1 }); continue; }
-            var tall = 0.52 + rnd() * 0.14;
-            k.add(box(0.42, tall, 0.3), crowd[Math.floor(rnd() * crowd.length)], { x: x, y: hh + tall / 2 + 0.1, z: z0 - 0.08 });
-            k.add(box(0.2, 0.24, 0.21), skin[Math.floor(rnd() * skin.length)], { x: x, y: hh + tall + 0.24, z: z0 - 0.08 });
+            k.people.push([x, hh + 0.02, z0 - 0.08]);   // Zuschauer: Bild-Figur (js/car-track-scene.js ctx.crowd)
           }
         }
         var top = 0.6 + (rows - 1) * RH;
@@ -831,11 +829,11 @@
         }
         return k;
       }
-      var stand = ctx.kind('stand', [{ geo: standKit(10, true).geo() }], { r: 14 });
+      var mainK = standKit(10, true), stand = ctx.kind('stand', [{ geo: mainK.geo() }], { r: 14, people: mainK.people });
       var bank = new Kit();
       var cornerK = standKit(6, false);
       bank.add(prism(26, 10, 4.2), 0x4c8a3f, { y: 1.4, z: 9.5 });     // Erdwall hinter der Kurventribüne
-      var cornerStand = ctx.kind('cornerStand', [{ geo: cornerK.geo() }, { geo: bank.geo() }], { r: 14 });
+      var cornerStand = ctx.kind('cornerStand', [{ geo: cornerK.geo() }, { geo: bank.geo() }], { r: 14, people: cornerK.people });
       // Flutlichtmast: Gittermast (schlank), Kopf mit Lampenfeld (leuchtend)
       var ms = new Kit();
       ms.add(cyl(0.3, 0.55, 26, 6), 0x9ea4ad, { y: 12 });
@@ -1427,7 +1425,7 @@
       // Zuschauer: kleine Holztribünen an der Start/Ziel-Geraden (Landseite), Fahnen davor
       var crowd = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831, 0x1f6f3f, 0xd94f8a];
       var skin = [0xf1c8a5, 0xe0ac82, 0xc68863, 0x8d5a3b, 0x5c3a24];
-      var bk = new Kit(), RD = 0.9, RH = 0.5;
+      var bk = new Kit(), RD = 0.9, RH = 0.5, bkPeople = [];
       for (var r = 0; r < 5; r++) {
         var hh = 0.5 + r * RH, z0 = r * RD;
         bk.add(box(18, 0.12, RD), 0x9c7a52, { y: hh, z: z0 });
@@ -1435,14 +1433,12 @@
         for (var q = 0; q < 24; q++) {
           var cxq = -8.6 + q * 0.75 + (rnd() - 0.5) * 0.12;
           if (rnd() < 0.18) continue;
-          var tall = 0.5 + rnd() * 0.14;
-          bk.add(box(0.42, tall, 0.3), crowd[Math.floor(rnd() * crowd.length)], { x: cxq, y: hh + tall / 2 + 0.06, z: z0 - 0.05 });
-          bk.add(box(0.2, 0.24, 0.21), skin[Math.floor(rnd() * skin.length)], { x: cxq, y: hh + tall + 0.2, z: z0 - 0.05 });
+          bkPeople.push([cxq, hh + 0.06, z0 - 0.05]);
         }
       }
       [-8.8, 0, 8.8].forEach(function (xx) { bk.add(box(0.2, 3.4, 0.2), 0x6b5238, { x: xx, y: 1.7, z: 5 * RD - 0.4 }); });
       bk.add(box(18.6, 0.25, 5.6), 0x2a7de1, { y: 3.5, z: 1.8, rx: -0.12 });
-      var bleach = ctx.kind('bleacher', [{ geo: bk.geo() }], { r: 9.5 });
+      var bleach = ctx.kind('bleacher', [{ geo: bk.geo() }], { r: 9.5, people: bkPeople });
       var nB = 0;
       [1, -1].forEach(function (sd) {
         for (var sb = -60; sb <= 80 && nB < 6; sb += 19) {
@@ -1731,7 +1727,7 @@
       var crowdC = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831, 0x1f6f3f, 0xd94f8a];
       var skinC = [0xf1c8a5, 0xe0ac82, 0xc68863, 0x8d5a3b, 0x5c3a24];
       // Galerie an der hinteren Längswand: Stahlbühne auf 3,2 m, Geländer, Treppen an beiden Enden, Publikum in 2 Reihen
-      var GL = Math.min(64, W * 0.5), GD = 5, GY = 3.2, gk = new Kit(), gz0 = z1 - GD / 2 - 0.3;
+      var GL = Math.min(64, W * 0.5), GD = 5, GY = 3.2, gk = new Kit(), gz0 = z1 - GD / 2 - 0.3, gPeople = [];
       gk.add(box(GL, 0.3, GD), 0x5c6570, { y: GY });
       gk.add(box(GL, 0.08, GD - 0.2), 0x7d858e, { y: GY + 0.19 });
       for (var gp = 0; gp <= Math.round(GL / 6); gp++) {
@@ -1744,16 +1740,10 @@
       [-1, 1].forEach(function (sd) { gk.add(box(1.6, 0.25, 7.5), 0x5c6570, { x: sd * (GL / 2 + 0.9), y: GY / 2, z: GD / 2 - 3.9, rx: -Math.atan2(GY, 7.5) * (-1) }); });
       for (var gr = 0; gr < 2; gr++) for (var gq = 0; gq < Math.round(GL / 0.8); gq++) {
         if (rnd() < 0.22) continue;
-        // stehende Figur: Beine (Jeans/dunkel), Oberkörper (Shirt-Farbe), Arme, Kopf (Hautton) – ~1,75 m
-        var gx2 = -GL / 2 + 0.6 + gq * 0.8 + (rnd() - 0.5) * 0.3, gzz = -GD / 2 + 0.6 + gr * 1.1 + (rnd() - 0.5) * 0.3, k2 = 0.92 + rnd() * 0.14, fy = GY + 0.23;
-        var shirt = crowdC[Math.floor(rnd() * crowdC.length)], legC = rnd() < 0.6 ? 0x2c3e5c : 0x2a2a2e;
-        gk.add(box(0.3, 0.82 * k2, 0.2), legC, { x: gx2, y: fy + 0.41 * k2, z: gzz });
-        gk.add(box(0.4, 0.6 * k2, 0.24), shirt, { x: gx2, y: fy + (0.82 + 0.3) * k2, z: gzz });
-        gk.add(box(0.1, 0.55 * k2, 0.12), shirt, { x: gx2 - 0.26, y: fy + 1.12 * k2, z: gzz });
-        gk.add(box(0.1, 0.55 * k2, 0.12), shirt, { x: gx2 + 0.26, y: fy + 1.12 * k2, z: gzz });
-        gk.add(box(0.21, 0.25, 0.22), skinC[Math.floor(rnd() * skinC.length)], { x: gx2, y: fy + 1.42 * k2 + 0.13, z: gzz });
+        var gx2 = -GL / 2 + 0.6 + gq * 0.8 + (rnd() - 0.5) * 0.3, gzz = -GD / 2 + 0.6 + gr * 1.1 + (rnd() - 0.5) * 0.3;
+        gPeople.push([gx2, GY + 0.23, gzz]);
       }
-      ctx.kind('gallery', [{ geo: gk.geo() }], { r: 3 }).add(hx, gz0, { rot: Math.PI, y: LIFT });
+      ctx.kind('gallery', [{ geo: gk.geo() }], { r: 3, people: gPeople }).add(hx, gz0, { rot: Math.PI, y: LIFT });
       for (var gu = -GL / 2 - 2; gu <= GL / 2 + 2; gu += 3) ctx.place(hx + gu, gz0, 3, true);
       // unter der Galerie: Spielautomaten an der Wand (slot arcade), davor Picknick-Tische (slot picnic)
       var arcK = new Kit(); arcK.add(box(0.9, 1.9, 0.8), 0x2b2e57, { y: 0.95 }); arcK.add(box(0.7, 0.5, 0.05), 0x7fd8ff, { y: 1.45, z: -0.42 });
