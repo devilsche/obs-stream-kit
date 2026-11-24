@@ -257,10 +257,11 @@
         </div>
         <div class="row"><button type="button" id="rideReset" class="small">Reset ride height</button></div>
         <h3 class="sub3">Axle parts</h3>
-        <p class="muted small-text">Parts that stay down with the wheels when the body is raised, but neither roll nor steer – brake calipers, suspension arms, drive shafts. Without your own pick they are found automatically (parts inside a wheel). “Pick axle parts”: click parts to add or remove them (purple = axle part; light purple = found automatically, shown until you pick). Leave the pick mode to see the result, then save.</p>
+        <p class="muted small-text">Parts that stay down with the wheels when the body is raised, but neither roll nor steer – brake calipers, suspension arms, drive shafts. Without your own pick they are found automatically (parts inside a wheel). “Clear axle parts” empties the list, so only the wheels stay down. “Pick axle parts”: click parts to add or remove them (purple = axle part; light purple = found automatically, shown until you pick). Leave the pick mode to see the result, then save.</p>
         <div class="row" role="group" aria-label="Axle parts">
           <button type="button" id="pickAxle" aria-pressed="false">Pick axle parts</button>
           <button type="button" id="axleAuto" class="small">Automatic axle parts</button>
+          <button type="button" id="axleClear" class="small">Clear axle parts</button>
         </div>
         <p class="small-text" id="axleInfo"></p>
       </section>
@@ -1056,6 +1057,7 @@
         $('axleInfo').textContent = Array.isArray(def.axleParts) ? 'Own axle parts: ' + def.axleParts.length + '.' : 'Automatic axle parts: ' + autoAxle().length + ' found.';
       }
       $('pickAxle').addEventListener('click', function () { setPick('axle'); });
+      $('axleClear').addEventListener('click', function () { def.axleParts = []; if (picking === 'axle') show(); else reprepare({ axleParts: [] }); axleFill(); say('Axle parts cleared – pick them again or press “Automatic axle parts”.'); });
       $('axleAuto').addEventListener('click', function () { delete def.axleParts; if (picking === 'axle') setPick('axle'); else reprepare({ axleParts: undefined }); axleFill(); say('Axle parts found automatically again.'); });
       // Rückgängig / Leeren der Radteile (Stand vor jedem Klick, „Add missing pieces“ und Leeren; bis 50 Schritte)
       var wheelHist = [];
