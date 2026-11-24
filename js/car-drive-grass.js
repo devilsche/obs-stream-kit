@@ -24,7 +24,7 @@
   var TILE = 8, CACHE_MAX = 700, STRIDE = 11, TRIS = 17;
   // Halmhöhe h (m), Breite w (m), Büschel je m², Radius R, Biegung, Fleckigkeit, Höhen-Streuung, Blüten-Anteil, Wind
   var PRESET = {
-    stadium:    { dens: 3.0, h: [0.07, 0.12], w: 0.014, R: 42, curve: 0.18, patch: 0.0, hvar: 0.1, flowers: 0, wind: 0.22 },
+    stadium:    { dens: 3.4, h: [0.22, 0.42], w: 0.022, R: 55, curve: 0.3, patch: 0.25, hvar: 0.45, flowers: 0, wind: 0.35 },
     forest:     { dens: 1.5, h: [0.2, 0.5], w: 0.022, R: 60, curve: 0.4, patch: 0.5, hvar: 0.7, flowers: 0, wind: 0.45 },
     alpine:     { dens: 1.6, h: [0.15, 0.4], w: 0.018, R: 60, curve: 0.35, patch: 0.35, hvar: 0.6, flowers: 0.08, wind: 0.6 },
     coast:      { dens: 0.55, h: [0.3, 0.75], w: 0.014, R: 58, curve: 0.55, patch: 0.8, hvar: 0.6, flowers: 0, wind: 0.9, tint: [1.1, 1.0, 0.72] },

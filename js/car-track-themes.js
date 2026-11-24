@@ -802,14 +802,24 @@
       greenery(ctx, { grass: 0.14, bush: 0.01, far: 140, farBush: 12 });
       // Hintergrund: Oberrang rund um das Stadion (Schüssel) – N Plätze einer Art (slot upper: Tribünen-Modelle, kleine
       // nebeneinander), Ersatz: geneigter Rang mit Zuschauerpunkten und Dachkante (lokal: +z vom Stadion weg)
-      var R = ctx.radius + 170, N = 56, w = TAU * R / N * 1.02, up = new Kit();
-      up.add(box(w, 16, 18), function (x, y) { return y > 14 ? 0x5a5f69 : hash3(x * 3, y * 3, 0) > 0.5 ? crowd[Math.floor(hash3(x, y, 1) * crowd.length)] : 0x7c8290; },
-        { y: 6, rx: 0.32 });
-      up.add(box(w, 1.2, 14), prim, { y: 18, z: 6 });
-      var upper = ctx.kind('upper', [{ geo: up.geo() }], { r: w / 2, prop: { slot: 'upper', box: { w: w, d: 20, h: 22 }, front: -9, tile: true } });
+      // Motodrom: hohe, steile Ränge mit Publikum rundum, Dach in Primärfarbe auf Stützen
+      var R = ctx.radius + 140, N = 64, w = TAU * R / N * 1.03, up = new Kit();
+      // 10 Stufen (lokal +z = zum Feld): Front je Stufe mit Publikum (Atlas „crowd“), steigen nach hinten (−z) an
+      var TIERS = 10, TD = 3, TH = 2.6;
+      for (var tr = 0; tr < TIERS; tr++) {
+        var hT = 1.2 + tr * TH;
+        up.add(box(w, hT, TD), 0xffffff, { y: hT / 2, z: 15 - tr * TD - TD / 2, tile: 'crowd', uv: 'box', m: TH,
+          faces: function (nx, ny, nz) { return nz > 0.5; } });
+      }
+      var topY = 1.2 + (TIERS - 1) * TH;
+      up.add(box(w, topY + 8, 1.2), 0x6c717b, { y: (topY + 8) / 2, z: -15.6 });           // Rückwand
+      up.add(box(w, 1.2, 24), prim, { y: topY + 7.5, z: -4, rx: 0.08 });                    // Dach
+      [-0.45, 0.45].forEach(function (u) { up.add(box(0.7, topY + 7, 0.7), 0x8a8f99, { x: u * w, y: (topY + 7) / 2, z: -14.8 }); });
+      // durchgehende Schüssel (Motodrom) – ohne Tribünen-Modelle: die ließen Lücken, durch die man direkt auf die Stadt sah
+      var upper = ctx.kind('upper', [{ geo: up.geo(), mat: 'atl' }], { r: w / 2 });
       for (var i = 0; i < N; i++) {
         var am = (i + 0.5) / N * TAU;
-        upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: Math.PI / 2 - am });
+        upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: -Math.PI / 2 - am });   // Publikum zur Strecke
       }
       // Parkplätze auf der Wiese zwischen Strecke und Oberrang: Asphaltfläche mit weißen Markierungen, zwei Reihen je
       // Fahrgasse, ~75 % belegt mit einfachen Autos (Karosserie + Kabine, Farbe je Instanz)
@@ -822,7 +832,7 @@
       var parked = ctx.kind('parkedCar', [{ geo: ck2.geo() }], { r: 2.3, tint: true });
       var nLot = 0;
       for (var lt = 0; lt < 40 && nLot < 7; lt++) {
-        var la = (lt / 40 + prng() * 0.02) * TAU, ld = R - 55 - prng() * 25, lx = ctx.cx + Math.cos(la) * ld, lz = ctx.cz + Math.sin(la) * ld * 0.8;
+        var la = (lt / 40 + prng() * 0.02) * TAU, ld = R - 50 - prng() * 20, lx = ctx.cx + Math.cos(la) * ld, lz = ctx.cz + Math.sin(la) * ld * 0.8;
         if (!ctx.place(lx, lz, 40)) continue;
         var lry = -la + Math.PI / 2, LW = 72, LD = 44, c0 = Math.cos(lry), s0 = Math.sin(lry);
         lotK.add(box(LW, 0.3, LD), 0x55585d, { x: lx, y: 0.15, z: lz, ry: lry });
