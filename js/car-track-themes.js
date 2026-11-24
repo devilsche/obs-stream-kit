@@ -811,6 +811,35 @@
         var am = (i + 0.5) / N * TAU;
         upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: Math.PI / 2 - am });
       }
+      // Parkplätze auf der Wiese zwischen Strecke und Oberrang: Asphaltfläche mit weißen Markierungen, zwei Reihen je
+      // Fahrgasse, ~75 % belegt mit einfachen Autos (Karosserie + Kabine, Farbe je Instanz)
+      var lotK = new Kit(), prng = ctx.rng(57), PCOL = [0xc0392b, 0x2563a8, 0xe8e8e8, 0x222428, 0x7f8c8d, 0xd4ac0d, 0x2e8b57, 0x9aa3ad, 0x5b2c6f];
+      var ck2 = new Kit();
+      ck2.add(box(4.3, 0.75, 1.8), 0xffffff, { y: 0.62 });
+      ck2.add(box(2.3, 0.62, 1.62), 0xffffff, { x: -0.25, y: 1.3 });
+      ck2.add(box(2.32, 0.4, 1.64), 0x1c2733, { x: -0.25, y: 1.32 });
+      [[-1.4, 0.82], [1.4, 0.82], [-1.4, -0.82], [1.4, -0.82]].forEach(function (w) { ck2.add(cyl(0.34, 0.34, 0.24, 8), 0x141414, { x: w[0], y: 0.34, z: w[1], rx: Math.PI / 2 }); });
+      var parked = ctx.kind('parkedCar', [{ geo: ck2.geo() }], { r: 2.3, tint: true });
+      var nLot = 0;
+      for (var lt = 0; lt < 40 && nLot < 7; lt++) {
+        var la = (lt / 40 + prng() * 0.02) * TAU, ld = R - 55 - prng() * 25, lx = ctx.cx + Math.cos(la) * ld, lz = ctx.cz + Math.sin(la) * ld * 0.8;
+        if (!ctx.place(lx, lz, 40)) continue;
+        var lry = -la + Math.PI / 2, LW = 72, LD = 44, c0 = Math.cos(lry), s0 = Math.sin(lry);
+        lotK.add(box(LW, 0.3, LD), 0x55585d, { x: lx, y: 0.15, z: lz, ry: lry });
+        // zwei Fahrgassen längs (lokal x), je Gasse zwei Reihen Stellplätze à 2,7 m
+        [-11, 11].forEach(function (az) {
+          [-1, 1].forEach(function (side) {
+            var rz = az + side * 6.2;
+            for (var sx = -LW / 2 + 3; sx < LW / 2 - 2; sx += 2.7) {
+              var wx = lx + sx * c0 + rz * s0, wz = lz - sx * s0 + rz * c0;
+              lotK.add(box(0.12, 0.06, 5), 0xf2f2f2, { x: lx + (sx - 1.35) * c0 + rz * s0, y: 0.33, z: lz - (sx - 1.35) * s0 + rz * c0, ry: lry });
+              if (prng() < 0.75) parked.add(wx, wz, { rot: lry + Math.PI / 2 + (side > 0 ? Math.PI : 0) + (prng() - 0.5) * 0.08, y: 0.3, tint: PCOL[Math.floor(prng() * PCOL.length)] });
+            }
+          });
+        });
+        nLot++;
+      }
+      ctx.bg(lotK);
       // Stadt hinter dem Oberrang (Speedway): drei Viertel als dichtes Raster aus Blöcken auf grauem Stadtboden (die
       // Lücken sind die Straßen), innen niedrige Häuser, nach außen und zur Viertelmitte Hochhäuser; Ringstraße um den
       // Oberrang, je Viertel eine Allee mit Bäumen, dichter Laubwald zwischen den Vierteln. Alles ein Zeichenaufruf (bg),
