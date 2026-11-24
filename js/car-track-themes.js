@@ -1309,22 +1309,6 @@
           var w2 = onWall(sd, u + (rnd() - 0.5) * 0.05, 0.1); tag.add(w2.x, w2.z, { rot: w2.rot, v: (nTag++) % Art.TAGS });
         });
       });
-      // Container an den Wänden (Farbe je Instanz, Modelle slot container), 1–2 hoch, parallel zur Wand
-      var cK = new Kit();
-      cK.add(box(6.1, 2.6, 2.45), 0xffffff, { y: 1.3 });
-      for (var r = 0; r < 9; r++) cK.add(box(0.12, 2.3, 2.5), 0xd9d9d9, { x: -2.6 + r * 0.65, y: 1.3 });
-      var cont = ctx.kind('container', [{ geo: cK.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 } } });
-      var ccol = [0xc0392b, 0x2563a8, 0x2e8b57, 0xe67e22, 0x7f8c8d, 0xd4ac0d];
-      [0, 1, 2, 3].forEach(function (sd) {
-        var L = sd < 2 ? W : D;
-        for (var u = 0.08; u < 0.95; u += 7.5 / L) {
-          if (rnd() < 0.45) continue;
-          var w3 = onWall(sd, u, 2.1);
-          if (!ctx.place(w3.x, w3.z, 3.3)) continue;
-          var lv = rnd() < 0.35 ? 2 : 1;
-          for (var l = 0; l < lv; l++) cont.add(w3.x, w3.z, { rot: w3.rot, y: l * 2.6, tint: ccol[Math.floor(rnd() * ccol.length)] });
-        }
-      });
       // Ölfässer in Gruppen (Modell slot drum, Ersatz Zylinder in Instanzfarbe), Paletten-Stapel, Reifenhaufen
       var drum = ctx.kind('drum', [{ geo: cyl(0.3, 0.3, 0.95, 10).translate(0, 0.475, 0) }], { r: 0.35, tint: true, prop: { slot: 'drum', box: { w: 0.8, d: 0.8, h: 1.1 } } });
       var pk2 = new Kit();
@@ -1334,7 +1318,7 @@
       for (var ty = 0; ty < 3; ty++) tk2.add(new THREE.TorusGeometry(0.3, 0.12, 6, 12), 0x18191b, { y: 0.12 + ty * 0.24, rx: Math.PI / 2 });
       var tyrePile = ctx.kind('tyrePile', [{ geo: tk2.geo() }], { r: 0.5, prop: { slot: 'tyrePile', box: { w: 1.4, d: 1.4, h: 1.4 } } });
       var bcol = [0x2f5d8a, 0xa13a2a, 0x6d6b3a, 0x8a5a2b];
-      for (var b2 = 0; b2 < 46; b2++) {
+      for (var b2 = 0; b2 < 30; b2++) {
         var sd2 = Math.floor(rnd() * 4), w4 = onWall(sd2, 0.05 + rnd() * 0.9, 2 + rnd() * 6), kindR = rnd();
         if (!ctx.place(w4.x, w4.z, 1.1)) continue;
         if (kindR < 0.5) {
@@ -1350,12 +1334,12 @@
       tankK.add(box(0.4, 1, 2), 0x4a4d52, { x: -2.5, y: 0.5 }); tankK.add(box(0.4, 1, 2), 0x4a4d52, { x: 2.5, y: 0.5 });
       var tank = ctx.kind('tank', [{ geo: tankK.geo() }], { r: 3.6, prop: { slot: 'tank', box: { w: 7.4, d: 3, h: 3.2 } } });
       [0, 1, 2, 3].forEach(function (sd) {
-        [0.2, 0.5, 0.8].forEach(function (u) {
-          if (rnd() < 0.4) return;
+        [0.15, 0.35, 0.55, 0.75, 0.9].forEach(function (u) {
+          if (rnd() < 0.35) return;
           var wf = onWall(sd, u + (rnd() - 0.5) * 0.08, 0.15);
           if (ctx.place(wf.x, wf.z, 1.5)) fuse.add(wf.x, wf.z, { rot: wf.rot });
         });
-        if (rnd() < 0.6) { var wt = onWall(sd, 0.3 + rnd() * 0.4, 2.2); if (ctx.place(wt.x, wt.z, 3.8)) tank.add(wt.x, wt.z, { rot: wt.rot }); }
+        if (rnd() < 0.75) { var wt = onWall(sd, 0.3 + rnd() * 0.4, 2.2); if (ctx.place(wt.x, wt.z, 3.8)) tank.add(wt.x, wt.z, { rot: wt.rot }); }
       });
       // Betonwände (Modell slot jersey, 5 m) in kurzen Reihen an den Wänden, Pylonen in Grüppchen
       var jersey = ctx.kind('jersey', [{ geo: box(5, 1.2, 0.5).translate(0, 0.6, 0) }], { r: 2.6, prop: { slot: 'jersey', box: { w: 5.2, d: 0.8, h: 1.6 } } });
@@ -1372,6 +1356,23 @@
             var cx2 = wc.x + (rnd() - 0.5) * 3, cz2 = wc.z + (rnd() - 0.5) * 3;
             if (ctx.place(cx2, cz2, 0.3)) coneK.add(cx2, cz2, { rot: rnd() * TAU, tint: 0xff6a1a });
           }
+        }
+      });
+      // Container an den Wänden (Farbe je Instanz, Modelle slot container), 1–2 hoch, parallel zur Wand – nach den
+      // kleineren Teilen, die sonst an den belegten Wänden keinen Platz mehr fänden
+      var cK = new Kit();
+      cK.add(box(6.1, 2.6, 2.45), 0xffffff, { y: 1.3 });
+      for (var r = 0; r < 9; r++) cK.add(box(0.12, 2.3, 2.5), 0xd9d9d9, { x: -2.6 + r * 0.65, y: 1.3 });
+      var cont = ctx.kind('container', [{ geo: cK.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 } } });
+      var ccol = [0xc0392b, 0x2563a8, 0x2e8b57, 0xe67e22, 0x7f8c8d, 0xd4ac0d];
+      [0, 1, 2, 3].forEach(function (sd) {
+        var L = sd < 2 ? W : D;
+        for (var u = 0.08; u < 0.95; u += 7.5 / L) {
+          if (rnd() < 0.4) continue;
+          var w3 = onWall(sd, u, 2.1);
+          if (!ctx.place(w3.x, w3.z, 3.3)) continue;
+          var lv = rnd() < 0.35 ? 2 : 1;
+          for (var l = 0; l < lv; l++) cont.add(w3.x, w3.z, { rot: w3.rot, y: l * 2.6, tint: ccol[Math.floor(rnd() * ccol.length)] });
         }
       });
       // Container-Gruppen (nur als Kulissen-Modell) in zwei Ecken
