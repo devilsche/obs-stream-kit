@@ -256,6 +256,13 @@
           <input type="number" id="rideRN" class="ride-in driver-num" data-k="r" min="-20" max="30" step="0.5" value="0" aria-label="Rear ride height in cm">
         </div>
         <div class="row"><button type="button" id="rideReset" class="small">Reset ride height</button></div>
+        <h3 class="sub3">Axle parts</h3>
+        <p class="muted small-text">Parts that stay down with the wheels when the body is raised, but neither roll nor steer – brake calipers, suspension arms, drive shafts. Without your own pick they are found automatically (parts inside a wheel). “Pick axle parts”: click parts to add or remove them (purple = axle part; light purple = found automatically, shown until you pick). Leave the pick mode to see the result, then save.</p>
+        <div class="row" role="group" aria-label="Axle parts">
+          <button type="button" id="pickAxle" aria-pressed="false">Pick axle parts</button>
+          <button type="button" id="axleAuto" class="small">Automatic axle parts</button>
+        </div>
+        <p class="small-text" id="axleInfo"></p>
       </section>
 
       <section aria-labelledby="h-driver">
@@ -647,6 +654,7 @@
             // Teile im Rad, die weder rollen noch lenken (Bremssättel): bleiben beim Rad wie im Spiel
             car.traverse(function (o) {
               if (!o.isMesh || o.userData.driver || meshes.indexOf(o) >= 0) return;
+              if (Array.isArray(def.axleParts)) { if (def.axleParts.indexOf(o.userData.pkey) >= 0) meshes.push(o); return; }
               var b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
               if (pboxes.some(function (wb) { var ws = wb.getSize(new THREE.Vector3()); return wb.containsPoint(c) && sz.x <= ws.x && sz.y <= ws.y && sz.z <= ws.z * 1.5; })) meshes.push(o);
             });
@@ -662,6 +670,16 @@
               Lm.decompose(o.position, o.quaternion, o.scale);
             });
           }
+        }
+        if (picking === 'axle') {
+          var purple = show.purple || (show.purple = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xa64dff).convertSRGBToLinear(), roughness: 0.5 }));
+          var lilac = show.lilac || (show.lilac = new THREE.MeshStandardMaterial({ color: new THREE.Color(0xd9b3ff).convertSRGBToLinear(), roughness: 0.5 }));
+          var own = Array.isArray(def.axleParts);
+          car.traverse(function (o) {
+            if (!o.isMesh || o.userData.driver) return;
+            var isA = own ? def.axleParts.indexOf(o.userData.pkey) >= 0 : !!o.userData.unsprung;
+            if (isA) { o.material = own ? purple : lilac; if ($('hidePicked').checked) o.visible = false; }
+          });
         }
         // Lenkeinschlag der Vorderräder: gewählte Vorderräder, sonst die vorderste Achse (Front: +x)
         var s = +$('steer').value;
@@ -815,7 +833,7 @@
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
         $('texOff').checked = !!def.texOff; $('smoothWheels').checked = !!def.smoothWheels; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
-        raceFill(); paints(); zones(); driverFill(); rideFill();
+        raceFill(); paints(); zones(); driverFill(); rideFill(); axleFill();
         if (sndEd) sndEd.fill(true);
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
@@ -1004,6 +1022,7 @@
       }
       // Modell mit geänderten Einstellungen neu aufbereiten (Räder, Richtung …), Eingaben behalten
       function reprepare(patch) {
+        patch = Object.assign({ axleParts: Array.isArray(def.axleParts) ? def.axleParts.slice() : undefined }, patch);
         var c = current(); c[cur.key] = Object.assign({}, TC.vehicle(cur.key), patch);
         Object.keys(patch).forEach(function (k) { if (patch[k] === undefined) delete c[cur.key][k]; });
         TC.applyCustom({ vehicles: c });
@@ -1014,8 +1033,9 @@
         picking = picking === w ? null : w;
         $('pickWheel').setAttribute('aria-pressed', String(picking === 'wheel')); $('pickFront').setAttribute('aria-pressed', String(picking === 'steer')); $('pickSplit').setAttribute('aria-pressed', String(picking === 'split'));
         $('pickCut').setAttribute('aria-pressed', String(picking === 'cut')); if (picking !== 'cut') cutCancel();
-        $('pickDriver').setAttribute('aria-pressed', String(picking === 'driver'));
+        $('pickDriver').setAttribute('aria-pressed', String(picking === 'driver')); $('pickAxle').setAttribute('aria-pressed', String(picking === 'axle'));
         canvas.classList.toggle('picking', !!picking); zones();
+        if (was === 'axle' && picking !== 'axle') { reprepare({}); return; }   // Achsteile anwenden (Fahrhöhe neu)
         var wheelMode = function (x) { return x === 'wheel' || x === 'steer'; };
         if (wheelMode(picking) && !wheelMode(was)) {
           // eigene Räder: ohne Räder neu laden, damit die Teile ganz und anklickbar sind (Räder entstehen beim Verlassen)
@@ -1030,6 +1050,13 @@
       }
       $('pickWheel').addEventListener('click', function () { setPick('wheel'); });
       $('hidePicked').addEventListener('change', show);
+      // automatisch erkannte Achsteile (beim Aufbau markiert) als Startliste für die eigene Auswahl
+      function autoAxle() { var L = []; if (tpl) tpl.traverse(function (o) { if (o.isMesh && o.userData.unsprung && o.userData.pkey && L.indexOf(o.userData.pkey) < 0) L.push(o.userData.pkey); }); return L; }
+      function axleFill() {
+        $('axleInfo').textContent = Array.isArray(def.axleParts) ? 'Own axle parts: ' + def.axleParts.length + '.' : 'Automatic axle parts: ' + autoAxle().length + ' found.';
+      }
+      $('pickAxle').addEventListener('click', function () { setPick('axle'); });
+      $('axleAuto').addEventListener('click', function () { delete def.axleParts; if (picking === 'axle') setPick('axle'); else reprepare({ axleParts: undefined }); axleFill(); say('Axle parts found automatically again.'); });
       // Rückgängig / Leeren der Radteile (Stand vor jedem Klick, „Add missing pieces“ und Leeren; bis 50 Schritte)
       var wheelHist = [];
       function wheelUndoPush() {
@@ -1233,6 +1260,13 @@
           });
           zones(); listParts(); show(); say((had ? 'Removed from ' : 'Added to ') + (zp.name || 'zone') + ': ' + key + (tw.length > 1 ? ' (+' + (tw.length - 1) + ' on the other wheels)' : '')); return;
         }
+        if (picking === 'axle') {
+          // Achsteile: bleiben bei der Fahrhöhe unten beim Rad (eigene Liste ersetzt die automatische Erkennung)
+          var A = Array.isArray(def.axleParts) ? def.axleParts.slice() : autoAxle(), ja = A.indexOf(key);
+          var mateA = $('allWheels').checked ? mirrorPart(key) : null;
+          [key].concat(mateA ? [mateA] : []).forEach(function (k2) { var j = A.indexOf(k2); if (ja >= 0) { if (j >= 0) A.splice(j, 1); } else if (j < 0) A.push(k2); });
+          def.axleParts = A; axleFill(); show(); say((ja >= 0 ? 'Not an axle part: ' : 'Axle part: ') + key + (mateA ? ' (+ other side)' : '')); return;
+        }
         if (picking === 'steer' || picking === 'wheel') {
           // zwei unabhängige Listen: rollt (dreht beim Fahren) und lenkt; ein Teil darf in beiden sein
           var mine = picking === 'steer' ? 'steerParts' : 'wheelParts';
@@ -1397,6 +1431,7 @@
         if (def.texOff) d.texOff = true;
         if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
+        if (Array.isArray(def.axleParts)) d.axleParts = def.axleParts.slice(0, 400);
         if (def.ride && (def.ride.f || def.ride.r)) d.ride = { f: +def.ride.f || 0, r: +def.ride.r || 0 };
         if (def.race) d.race = CarRaceStats.clean(def.race);
         if (def.sound && window.CarEngineAudio) { var snd = CarEngineAudio.Model.cleanSound(def.sound); if (snd) d.sound = snd; }

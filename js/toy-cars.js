@@ -644,7 +644,7 @@
       });
       return out;
     }
-    v = Object.assign({}, v, { paintParts: norm(v.paintParts), rimParts: norm(v.rimParts), wheelParts: norm(v.wheelParts), steerParts: norm(v.steerParts),
+    v = Object.assign({}, v, { paintParts: norm(v.paintParts), rimParts: norm(v.rimParts), wheelParts: norm(v.wheelParts), steerParts: norm(v.steerParts), axleParts: norm(v.axleParts),
       zones: Array.isArray(v.zones) ? v.zones.map(function (z) { return Object.assign({}, z, { parts: norm(z.parts) }); }) : v.zones });
     var wheelKeys = Array.isArray(v.wheelParts) || Array.isArray(v.steerParts) ? (v.wheelParts || []) : null;
     if (!wheelKeys && own) {
@@ -695,7 +695,7 @@
       if (ms.some(function (m) { return m && autoRim[m.uuid]; })) autoRimParts.push(o.userData.pkey);
     });
     META[e.key] = { all: all, paint: paint, rim: rim, zones: zones, norm: norm, kids: kids, twin: twin, splitFail: splitFail, cutKids: cutKids, autoPaintParts: autoPaintParts, autoRimParts: autoRimParts, wheels: ownWheels || (ud.wheels || []).length };
-    markUnsprung(scene);
+    markUnsprung(scene, v.axleParts);
     if (!EDIT) mergeStatic(scene);   // im Editor einzeln lassen: Teile müssen anklickbar bleiben
     scene.updateMatrixWorld(true);
     // Längsachse und Front-Schätzung wie bisher über Box3 (sonst kippt bei knappen Überhängen die Fahrtrichtung)
@@ -787,7 +787,16 @@
     var b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
     return wbox.some(function (wb) { var ws = wb.getSize(new THREE.Vector3()); return wb.containsPoint(c) && sz.x <= ws.x && sz.y <= ws.y && sz.z <= ws.z * 1.5; });
   }
-  function markUnsprung(scene) {
+  // own: Liste aus dem Car editor („Pick axle parts“) – ersetzt die automatische Erkennung
+  function markUnsprung(scene, own) {
+    if (Array.isArray(own)) {
+      scene.traverse(function (o) {
+        if (!o.isMesh || own.indexOf(o.userData.pkey) < 0) return;
+        for (var p = o; p; p = p.parent) if (/^Wheel /.test(p.name || '')) return;
+        o.userData.unsprung = true;
+      });
+      return;
+    }
     scene.updateMatrixWorld(true);
     var wbox = []; scene.traverse(function (o) { if (/^Wheel /.test(o.name || '')) wbox.push(new THREE.Box3().setFromObject(o).expandByScalar(0.01 * UNIT)); });
     if (!wbox.length) return;
