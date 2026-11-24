@@ -760,7 +760,7 @@
         function put(geo, col, lx, ly, lz2, o) { var p3 = at3(lx, ly, lz2); o = o || {}; o.x = p3.x; o.y = p3.y; o.z = p3.z; o.ry = ry + (o.ry || 0); hw.add(geo, col, o); }
         put(new THREE.BoxGeometry(2.0, 0.2, 1.6), 0x9a9a94, 0, 0.0, 0);
         put(new THREE.BoxGeometry(1.7, 2.1, 1.3), 0xf1f1ee, 0, 1.15, 0);
-        put(new THREE.BoxGeometry(1.72, 0.55, 1.32), 0x2e3540, 0, 1.55, lz * 0.01);
+        put(new THREE.BoxGeometry(1.74, 0.55, 1.34), 0x2e3540, 0, 1.55, 0);
         put(new THREE.BoxGeometry(2.1, 0.14, 1.7), 0xf08a24, 0, 2.27, 0);
         put(new THREE.BoxGeometry(0.06, 1.8, 0.06), 0xdadada, 0.75, 1.0, lz * 0.95);
         put(new THREE.BoxGeometry(0.02, 0.4, 0.55), 0xf2c200, 0.75, 1.65, lz * 0.95);
@@ -809,7 +809,7 @@
           hw.add(new THREE.BoxGeometry(1.1, 0.66, 0.04), 0xf2c200, { x: r.x, y: y + 1.52, z: r.z, ry: ry });
           stats.chevrons = (stats.chevrons || 0) + 1;
           // zwei schwarze Winkel auf der Front (zur Strecke), Spitze in Fahrtrichtung
-          var P3 = function (u, v) { return [r.x + r.fx * u + r.tx * 0.025, y + v, r.z + r.fz * u + r.tz * 0.025]; };
+          var P3 = function (u, v) { return [r.x + r.fx * u + r.tx * 0.04, y + v, r.z + r.fz * u + r.tz * 0.04]; };
           [-0.43, 0.07].forEach(function (u0) {
             var w = 0.13, tip = 0.29;
             tri(hw, P3(u0, 1.79), P3(u0 + w, 1.79), P3(u0 + tip + w, 1.52), 0x15161a); tri(hw, P3(u0, 1.79), P3(u0 + tip + w, 1.52), P3(u0 + tip, 1.52), 0x15161a);
@@ -825,8 +825,10 @@
           if (!refFree(r, 0.3)) continue;
           var y = hAt(r.x, r.z), ry = r.a.yaw;
           hw.add(new THREE.BoxGeometry(0.12, 1.85, 0.12), 0xf2f2ee, { x: r.x, y: y + 0.525, z: r.z, ry: ry });
-          hw.add(new THREE.BoxGeometry(0.125, 0.3, 0.125), 0x17181c, { x: r.x, y: y + 1.3, z: r.z, ry: ry });
-          hw.add(new THREE.BoxGeometry(0.13, 0.11, 0.13), 0xff8a1c, { x: r.x, y: y + 1.31, z: r.z, ry: ry });
+          // Kopfband und Rückstrahler je ≥ 1,5 cm dicker als das Teil darunter: mit 2–3 mm flackerten sie auf
+          // Entfernung gegeneinander (Tiefengenauigkeit)
+          hw.add(new THREE.BoxGeometry(0.15, 0.3, 0.15), 0x17181c, { x: r.x, y: y + 1.3, z: r.z, ry: ry });
+          hw.add(new THREE.BoxGeometry(0.18, 0.1, 0.18), 0xff8a1c, { x: r.x, y: y + 1.31, z: r.z, ry: ry });
           stats.posts = (stats.posts || 0) + 1;
         }
       });

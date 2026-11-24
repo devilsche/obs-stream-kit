@@ -674,6 +674,7 @@
       kd.propSets.forEach(function (ps1) {
         ps1.slots.forEach(function (sl, j) {
           if (sl.spot !== i) return;
+          if (sl.off) sl.m.multiplyMatrices(mtx, sl.off);   // Platz verschoben (refresh): Modell folgt
           ps1.meshes.forEach(function (m) { m.setMatrixAt(j, s.hidden ? ZERO_M : sl.m); m.instanceMatrix.needsUpdate = true; });
         });
       });
@@ -715,7 +716,7 @@
           spotMatrix(s, m4);
           // lokal: Versatz entlang x (Kacheln), Absenken (Fuß im Wasser/Gelände), Zusatzdrehung, Maßstab
           off.compose(new THREE.Vector3(lx, oy, oz), new THREE.Quaternion().setFromAxisAngle(yAx, yaw), new THREE.Vector3(k, k, k));
-          slots.push({ spot: i, m: new THREE.Matrix4().multiplyMatrices(m4, off) });
+          slots.push({ spot: i, m: new THREE.Matrix4().multiplyMatrices(m4, off), off: off.clone() });
         }
       });
       if (!slots.length) return;

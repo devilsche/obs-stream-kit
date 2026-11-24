@@ -1364,7 +1364,15 @@
       var cK = new Kit();
       cK.add(box(6.1, 2.6, 2.45), 0xffffff, { y: 1.3 });
       for (var r = 0; r < 9; r++) cK.add(box(0.12, 2.3, 2.5), 0xd9d9d9, { x: -2.6 + r * 0.65, y: 1.3 });
-      var cont = ctx.kind('container', [{ geo: cK.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 } } });
+      // Stapel: der obere sitzt auf der echten Höhe des unteren Modells (fest 2,6 m ließ die Modelle ineinander stecken –
+      // die Seitenwände lagen auf einem Streifen deckungsgleich und flackerten)
+      function stackFix(i) {
+        var sp = cont.spots[i];
+        if (sp.up != null && sp.h) { var u2 = cont.spots[sp.up]; u2.y = sp.y + sp.h + 0.01; cont.refresh(sp.up); }
+        if (sp.down != null) { var dn = cont.spots[sp.down]; if (dn.h) { sp.y = dn.y + dn.h + 0.01; cont.refresh(i); } }
+      }
+      var cont = ctx.kind('container', [{ geo: cK.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 },
+        onProp: function (sp, info) { sp.h = info.height; stackFix(sp.idx); } } });
       var ccol = [0xc0392b, 0x2563a8, 0x2e8b57, 0xe67e22, 0x7f8c8d, 0xd4ac0d];
       [0, 1, 2, 3].forEach(function (sd) {
         var L = sd < 2 ? W : D;
@@ -1373,7 +1381,11 @@
           var w3 = onWall(sd, u, 2.1);
           if (!ctx.place(w3.x, w3.z, 3.3)) continue;
           var lv = rnd() < 0.35 ? 2 : 1;
-          for (var l = 0; l < lv; l++) cont.add(w3.x, w3.z, { rot: w3.rot, y: l * 2.6, tint: ccol[Math.floor(rnd() * ccol.length)] });
+          for (var l = 0; l < lv; l++) {
+            cont.add(w3.x, w3.z, { rot: w3.rot, y: LIFT + l * 2.61, tint: ccol[Math.floor(rnd() * ccol.length)] });
+            var i3 = cont.spots.length - 1; cont.spots[i3].idx = i3;
+            if (l) { cont.spots[i3].down = i3 - 1; cont.spots[i3 - 1].up = i3; }
+          }
         }
       });
       // Container-Gruppen (nur als Kulissen-Modell) in zwei Ecken
