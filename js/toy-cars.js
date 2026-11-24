@@ -440,7 +440,8 @@
   // schmalsten ist (Lauffläche: Breite·cos + Durchmesser·sin der Schräglage – unabhängig davon, wie dicht der Reifen
   // vernetzt ist, anders als Mittelwert/Streuung), Mitte = Mitte der Ausdehnung. Zwischen Spin und seine Eltern
   // kommt eine Gruppe „Axle“ (Lage = echte Achse); Spin und alle Verbraucher (rotation[ax]) bleiben unverändert.
-  function trueAxles(scene) {
+  // straight: im Modell eingelenkte Räder geradestellen (Car editor „Set turned front wheels straight“, Standard an)
+  function trueAxles(scene, straight) {
     scene.updateMatrixWorld(true);
     var v = new THREE.Vector3(), list = []; scene.traverse(function (o) { if (/^Wheel /.test(o.name || '')) list.push(o); });
     function frame(a) {   // zwei Richtungen in der Radebene
@@ -462,7 +463,8 @@
         // Mitte und Prüfung auf allen – sonst fehlen die äußersten Punkte)
         var sub = ring, st2 = Math.ceil(ring.length / 1500); if (st2 > 1) sub = ring.filter(function (q, i) { return i % st2 === 0; });
         var F = frame(e0), best = a.clone(), bw = ext(sub, a), bW = bw[1] - bw[0];
-        [[6, 1], [1, 0.2], [0.2, 0.04]].forEach(function (g) {
+        // bis ±25° (Räder im Modell eingelenkt, Porsche 930: ~20°), dann feiner
+        [[25, 2.5], [3, 0.5], [0.6, 0.1], [0.15, 0.03]].forEach(function (g) {
           var b0 = best.clone();
           for (var x = -g[0]; x <= g[0] + 1e-9; x += g[1]) for (var y = -g[0]; y <= g[0] + 1e-9; y += g[1]) {
             var d = b0.clone().addScaledVector(F[0], Math.tan(x * D)).addScaledVector(F[1], Math.tan(y * D)).normalize();
@@ -472,7 +474,7 @@
         a.copy(best);
         var Fa = frame(a), eu = ext(ring, Fa[0]), ew = ext(ring, Fa[1]), ea = ext(ring, a); bW = ea[1] - ea[0];
         // nur echte Räder: rund (in der Ebene gleich weit) und quer schmaler als hoch, nahe der bisherigen Achse
-        if (Math.abs((eu[1] - eu[0]) - (ew[1] - ew[0])) > 0.12 * Math.max(eu[1] - eu[0], ew[1] - ew[0]) || bW > 0.9 * (eu[1] - eu[0]) || a.dot(e0) < Math.cos(10 * D)) return null;
+        if (Math.abs((eu[1] - eu[0]) - (ew[1] - ew[0])) > 0.12 * Math.max(eu[1] - eu[0], ew[1] - ew[0]) || bW > 0.9 * (eu[1] - eu[0]) || a.dot(e0) < Math.cos(30 * D)) return null;
         c.copy(Fa[0]).multiplyScalar((eu[0] + eu[1]) / 2).addScaledVector(Fa[1], (ew[0] + ew[1]) / 2).addScaledVector(a, (ea[0] + ea[1]) / 2);
       }
       return { a: a, c: c, R: R };
@@ -513,6 +515,20 @@
         return vals.length < 12 ? Infinity : Math.max.apply(null, vals) - Math.min.apply(null, vals);
       }
       if (spPts.length >= 30 && wob(spPts, a, c) >= wob(spPts, e0, sp.position) * 0.9) return;
+      // eingelenktes Rad (Abweichung um die Hochachse > 2°): Rad samt Lenkteilen um die Hochachse geradedrehen, Sturz bleibt
+      if (straight !== false) {
+        var up = new THREE.Vector3(0, 1, 0).transformDirection(inv);
+        var ah = a.clone().addScaledVector(up, -a.dot(up)).normalize(), eh = e0.clone().addScaledVector(up, -e0.dot(up)).normalize();
+        if (ah.dot(eh) < Math.cos(2 * Math.PI / 180)) {
+          var qy = new THREE.Quaternion().setFromUnitVectors(ah, eh);
+          var turn = function (k) { P.attach(k); k.position.sub(c).applyQuaternion(qy).add(c); k.quaternion.premultiply(qy); };
+          var spKids = sp.children.slice();
+          spKids.forEach(turn); spKids.forEach(function (k) { sp.attach(k); });
+          if (P === w) w.children.slice().forEach(function (k) { if (k !== sp) turn(k); });
+          a = a.clone().applyQuaternion(qy);
+          scene.updateMatrixWorld(true);
+        }
+      }
       // kaum Abweichung (unter 0,1° und 0,2 % des Radius): Aufbau lassen, wie er ist
       var off = c.clone().sub(sp.position), offR = off.addScaledVector(a, -off.dot(a)).length() / Math.max(1e-9, R);
       if (a.dot(e0) > Math.cos(0.1 * Math.PI / 180) && offR < 0.002) return;
@@ -657,7 +673,7 @@
       });
     }
     var ownWheels = own && wheelKeys && (wheelKeys.length || (v.steerParts || []).length) ? buildWheels(scene, wheelKeys, v.steerParts || []) : 0;
-    trueAxles(scene);   // eigene und automatische Räder: Drehachse = echte Radachse (kein Eiern)
+    trueAxles(scene, v.straight);   // eigene und automatische Räder: Drehachse = echte Radachse (kein Eiern)
     var ud = scene.userData;
     ud.modelRoot = true;   // Car editor „Cut a part“: Schnittebene in den Koordinaten dieses Knotens
     // „Smooth wheel shading“ im Car editor: alle Teile an den Rädern weich schattieren
