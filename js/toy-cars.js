@@ -289,13 +289,18 @@
       if (w.ring) return;
       var up = new THREE.Vector3(0, 1, 0), side = new THREE.Vector3().crossVectors(w.ax, up).normalize(), eu = [Infinity, -Infinity], es = [Infinity, -Infinity], n = 0;
       w.inner.updateMatrixWorld(true);
-      w.inner.traverse(function (o) {
-        if (!o.isMesh || !/tire|tyre|reifen/i.test(((o.material && o.material.name) || '') + ' ' + (o.name || ''))) return;
-        var p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 3000));
-        for (var i = 0; i < p.count; i += step) {
-          v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).sub(w.c); var pu = v.dot(up), ps = v.dot(side); n++;
-          eu = [Math.min(eu[0], pu), Math.max(eu[1], pu)]; es = [Math.min(es[0], ps), Math.max(es[1], ps)];
-        }
+      // erst die benannten Reifen; heißen sie nicht so (Porsche RAUH: alles „material_34“, Rad eierte 1,5–3 cm), alle
+      // Radteile – der Reifen ist ohnehin der äußerste Ring, die Ausdehnung in der Radebene gibt seine Mitte
+      [true, false].some(function (named) {
+        w.inner.traverse(function (o) {
+          if (!o.isMesh || (named && !/tire|tyre|reifen/i.test(((o.material && o.material.name) || '') + ' ' + (o.name || '')))) return;
+          var p = o.geometry.attributes.position, step = Math.max(1, Math.floor(p.count / 3000));
+          for (var i = 0; i < p.count; i += step) {
+            v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld).sub(w.c); var pu = v.dot(up), ps = v.dot(side); n++;
+            eu = [Math.min(eu[0], pu), Math.max(eu[1], pu)]; es = [Math.min(es[0], ps), Math.max(es[1], ps)];
+          }
+        });
+        return n > 20;
       });
       var hu = eu[1] - eu[0], hs = es[1] - es[0];
       // nur wenn der Reifen rund und etwa so groß wie das Rad ist (keine halben Reifen o. Ä.)
@@ -487,9 +492,27 @@
       // Spin-Achse in P-Koordinaten (Spin selbst ist ungedreht)
       var e0 = new THREE.Vector3(sp.userData.ax === 'z' ? 0 : 1, 0, sp.userData.ax === 'z' ? 1 : 0).applyQuaternion(sp.quaternion);
       // erst nur die rollenden Teile (Reifen dabei), sonst das ganze Rad (z. B. nur Felgenstücke rollen, Reifen lenkt nur)
-      var fit = fitAxle(points(sp), e0) || fitAxle(points(w), e0);
+      var spPts = points(sp), fit = fitAxle(spPts, e0) || fitAxle(points(w), e0);
       if (!fit) return;
       var a = fit.a, c = fit.c, R = fit.R;
+      // nur übernehmen, wenn der Reifen um die neue Achse wirklich runder läuft als um die alte (Porsche RAUH: die
+      // schmalste Richtung durch das tiefe Felgenprofil kippte die Achse, drei Räder eierten 1,5–3 cm, das vierte ohne
+      // Anpassung lief rund): Schwankung des Außenradius (äußerste 15 % der Punkte) vorher/nachher vergleichen
+      function wob(pts, ax, cc) {
+        var rs = pts.map(function (q) { var d = q.clone().sub(cc); return d.addScaledVector(ax, -d.dot(ax)).length(); });
+        var mx = Math.max.apply(null, rs), lo = Infinity;
+        rs.forEach(function (r) { if (r >= mx * 0.85 && r < lo) lo = r; });
+        // Ringpunkte je Winkel: größter Radius in 24 Sektoren, Spanne darüber
+        var F = frame(ax), sec = [];
+        pts.forEach(function (q, i) {
+          if (rs[i] < mx * 0.85) return;
+          var d = q.clone().sub(cc), k = Math.floor((Math.atan2(d.dot(F[1]), d.dot(F[0])) + Math.PI) / (2 * Math.PI) * 24) % 24;
+          sec[k] = Math.max(sec[k] || 0, rs[i]);
+        });
+        var vals = sec.filter(function (x) { return x > 0; });
+        return vals.length < 12 ? Infinity : Math.max.apply(null, vals) - Math.min.apply(null, vals);
+      }
+      if (spPts.length >= 30 && wob(spPts, a, c) >= wob(spPts, e0, sp.position) * 0.9) return;
       // kaum Abweichung (unter 0,1° und 0,2 % des Radius): Aufbau lassen, wie er ist
       var off = c.clone().sub(sp.position), offR = off.addScaledVector(a, -off.dot(a)).length() / Math.max(1e-9, R);
       if (a.dot(e0) > Math.cos(0.1 * Math.PI / 180) && offR < 0.002) return;
