@@ -804,6 +804,28 @@
         var am = (i + 0.5) / N * TAU;
         upper.add(ctx.cx + Math.cos(am) * R, ctx.cz + Math.sin(am) * R * 0.8, { rot: Math.PI / 2 - am });
       }
+      // Skyline: Hochhäuser hinter dem Oberrang in drei Stadtvierteln (Fassaden aus dem Atlas: Büro, Glas, Backstein,
+      // Paneele; ein Zeichenaufruf). Zur Mitte eines Viertels höher, mit Absätzen, Dachkanten und Antennen; im Dunst
+      var sky = new Kit(), srng = ctx.rng(91), FAC = ['office', 'glass', 'brickWin', 'panel', 'office', 'glass'];
+      function wallsOnly(nx, ny) { return Math.abs(ny) < 0.5; }
+      [[0.04, 0.3], [0.4, 0.6], [0.7, 0.96]].forEach(function (sc) {
+        for (var t = 0; t < 30; t++) {
+          var u = srng(), am2 = (sc[0] + (sc[1] - sc[0]) * u) * TAU, mid = 1 - Math.abs(u - 0.5) * 2;
+          var dist = R + 95 + srng() * 260, bx = ctx.cx + Math.cos(am2) * dist, bz = ctx.cz + Math.sin(am2) * dist * 0.8;
+          var h = 28 + Math.pow(srng(), 1.5) * 70 + mid * 70 * srng(), wB = 16 + srng() * 24, dB = 16 + srng() * 20;
+          var tile = FAC[Math.floor(srng() * FAC.length)], col = mix(0xffffff, 0xc4ccd6, srng()), ry = -am2 + (srng() < 0.3 ? 0.3 : 0);
+          sky.add(box(wB, h, dB), col, { x: bx, y: h / 2, z: bz, ry: ry, tile: tile, uv: 'box', m: tile === 'glass' ? 7 : 9, faces: wallsOnly });
+          sky.add(box(wB + 0.8, 1.4, dB + 0.8), 0x4a4f57, { x: bx, y: h + 0.7, z: bz, ry: ry });
+          if (srng() < 0.35) {   // Absatz: schmalerer Turm obendrauf
+            var h2 = h * (0.25 + srng() * 0.3);
+            sky.add(box(wB * 0.6, h2, dB * 0.6), col, { x: bx, y: h + 1.4 + h2 / 2, z: bz, ry: ry, tile: tile, uv: 'box', m: tile === 'glass' ? 7 : 9, faces: wallsOnly });
+            sky.add(box(wB * 0.6 + 0.6, 1, dB * 0.6 + 0.6), 0x4a4f57, { x: bx, y: h + 1.9 + h2, z: bz, ry: ry });
+            h += 1.4 + h2;
+          }
+          if (srng() < 0.25) sky.add(cyl(0.25, 0.4, 10 + srng() * 14, 5), 0x8c939c, { x: bx, y: h + 7, z: bz });
+        }
+      });
+      ctx.bg(sky);
     }
   };
 

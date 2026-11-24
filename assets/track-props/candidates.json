@@ -1441,5 +1441,22 @@
   "aggressive": true,
   "note": "Paket: Pylone (verschmutzt)",
   "height": 0.6
+ },
+ {
+  "uid": "102eef4837d84cfd9dae03af7ebe751a",
+  "key": "skyline-citypack8",
+  "name": "City pack 8",
+  "author": "Pasha.",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/city-pack-8-102eef4837d84cfd9dae03af7ebe751a",
+  "theme": "stadium",
+  "kind": "skyline",
+  "slot": "skyline",
+  "len": 420,
+  "tris": 30000,
+  "tex": 512,
+  "aggressive": true,
+  "note": "ganzes Stadtviertel als Skyline hinter dem Oberrang (Speedway)",
+  "skip": "99 Materialien (= 99 Zeichenaufrufe je Stück), 12 MB, nur 44 m hoch – Skyline jetzt prozedural (js/car-track-themes.js, Stadion)"
  }
 ]
