@@ -628,15 +628,21 @@
   // dicht hinter der Leitplanke und locker im Gelände. o = { grass (je m und Seite), bush, far (Büschel im Gelände),
   // farBush, pred, dry (Ersatzfarbe trocken) }
   function greenery(ctx, o) {
-    var gk = new Kit(), gc = o.dry ? 0xb3a467 : 0x5d8a3c;
-    [[0, 0.35], [2.1, -0.3], [4.2, 0.25]].forEach(function (b) { gk.add(cone(0.09, 0.7, 3), gc, { y: 0.32, ry: b[0], rx: b[1] }); });
-    var grass = ctx.kind('grass', [{ geo: gk.geo() }], { r: 0.5, prop: { slot: 'grass', box: { w: 3, d: 3, h: 1.2 } } });
+    // Büschel: 9 schmale Halme, nach außen geneigt, unten dunkler, oben heller (Farbe je Ecke), Grünton je Instanz
+    var gk = new Kit(), dark = o.dry ? 0x8f8450 : 0x3f6e2a, light = o.dry ? 0xd6c98a : 0x9ccf5a;
+    for (var gb = 0; gb < 9; gb++) {
+      var ga = gb / 9 * TAU + (gb % 2) * 0.4, gr = 0.06 + (gb % 3) * 0.05, gh = 0.55 + ((gb * 7) % 5) * 0.12;
+      gk.add(cone(0.045, gh, 3), function (x, y) { return mix(dark, light, y / 1.1); },
+        { x: Math.cos(ga) * gr, y: gh / 2, z: Math.sin(ga) * gr, ry: -ga, rz: 0.32 + (gb % 3) * 0.1 });
+    }
+    var grass = ctx.kind('grass', [{ geo: gk.geo() }], { r: 0.5, tint: true, prop: { slot: 'grass', box: { w: 3, d: 3, h: 1.2 } } });
     var bk = new Kit();
     bk.add(ico(1), o.dry ? 0x8a8a4a : 0x3f6e32, { y: 0.7, sy: 0.75, jit: 0.35 });
     var bush = ctx.kind('bush', [{ geo: bk.geo() }], { r: 1.4, prop: { slot: 'bush', box: { w: 4, d: 4, h: 2.5 } } });
-    ctx.scatterRail(grass, { perM: o.grass, extra: [0.2, 7], rad: 0.45, s: [0.7, 1.35], pred: o.pred });
+    function gTint() { return mix(0xffffff, o.dry ? 0xe8dcb0 : 0xc6e2a0, ctx.rnd()); }
+    ctx.scatterRail(grass, { perM: o.grass * 2.2, extra: [0.2, 8], rad: 0.4, s: [1.1, 1.9], pred: o.pred, tint: gTint });
     ctx.scatterRail(bush, { perM: o.bush, extra: [1, 9], rad: 1.3, s: [0.7, 1.2], pred: o.pred });
-    if (o.far) ctx.scatter(grass, o.far, { dmin: 14, dmax: 45, rad: 0.45, s: [0.8, 1.4], pred: o.pred });
+    if (o.far) ctx.scatter(grass, o.far * 2, { dmin: 14, dmax: 50, rad: 0.4, s: [1.1, 1.9], pred: o.pred, tint: gTint });
     if (o.farBush) ctx.scatter(bush, o.farBush, { dmin: 14, dmax: 60, rad: 1.3, s: [0.8, 1.3], pred: o.pred });
   }
   function rockGeo(c1, c2) {

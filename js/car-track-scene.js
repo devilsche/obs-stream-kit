@@ -84,6 +84,7 @@
     img.src = PROP_BASE + 'assets/textures/track/grass_lawn_diff_1k.jpg';
   }
   var PROP_BASE = (function () {
+    if (root.CAR_PROP_BASE) return root.CAR_PROP_BASE;   // Prüf-Seiten: Modelle von einem anderen Server
     var s = root.document && document.currentScript && document.currentScript.src || '';
     var m = /^(.*\/s\/[^/]+\/)/.exec(s) || /^(.*\/)js\/car-track-scene\.js/.exec(s);
     return m ? m[1] : null;
@@ -560,7 +561,7 @@
           if (trackDist(x, z, off + 1) < off - 0.3) continue;   // anderer Streckenteil näher
           if (o.pred && !o.pred(x, z)) continue;
           if (!ctx.place(x, z, rad, true)) continue;
-          kd.add(x, z, { rot: R() * TAU, s: sc });
+          kd.add(x, z, { rot: R() * TAU, s: sc, tint: o.tint ? o.tint() : null });
           n++;
         }
       });
