@@ -1187,8 +1187,10 @@
   // Container-Modelle aus dem Industrie-Katalog (propTheme).
   THEMES.hall = {
     id: 'hall', name: 'Hall', flat: true, indoor: true, propTheme: 'industrial',
-    sky: { top: 0x2a2d31, horizon: 0x3b3f44 }, fog: { near: 150, far: 520 },
-    sun: { color: 0xfff3e0, k: 0.85, pos: [0.25, 10, 0.4] }, hemi: { sky: 0xd7dde4, ground: 0x5a5550, k: 0.9 }, fill: 0.6, exposure: 0.95,
+    // Nebel erst weit hinter der Halle (sonst wird die ferne Wand zur grauen Fläche); Hemisphäre unten hell (Licht vom
+    // Boden auf die Dach-Unterseite und die Träger)
+    sky: { top: 0x2a2d31, horizon: 0x3b3f44 }, fog: { near: 320, far: 1100 },
+    sun: { color: 0xfff3e0, k: 0.85, pos: [0.25, 10, 0.4] }, hemi: { sky: 0xd7dde4, ground: 0x9a948a, k: 1.0 }, fill: 0.7, exposure: 1.0,
     groundTex: { base: [232, 232, 232], spread: 0.3 },
     rail: false,
     surface: { curb: [0x2a6fd6, 0xf2c200], runoff: 'tarmac', barrier: 'tyres', stripes: false },
@@ -1217,9 +1219,24 @@
       var sh = new Kit();
       sh.add(box(W, H, D), 0xc2b3a2, { x: hx, y: H / 2, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 4, faces: walls });
       sh.add(box(W - 0.1, 2.6, D - 0.1), 0xd1ccc2, { x: hx, y: 1.3, z: hz, sx: -1, tile: 'concrete', uv: 'box', m: 3, faces: walls });
-      sh.add(box(W - 0.14, 2.2, D - 0.14), 0xffffff, { x: hx, y: 11.4, z: hz, sx: -1, tile: 'glassBand', uv: 'box', m: 7, faces: walls });
-      sh.add(box(W, 0.2, D), 0x8a9098, { x: hx, y: H, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 5, faces: function (nx, ny) { return ny < -0.5; } });
+      sh.add(box(W - 0.12, 3.4, D - 0.12), 0xb08a68, { x: hx, y: 4.3, z: hz, sx: -1, tile: 'rust', uv: 'box', m: 4, faces: walls });   // Rost-Band
+      sh.add(box(W, 0.2, D), 0xc4c9cf, { x: hx, y: H, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 5, faces: function (nx, ny) { return ny < -0.5; } });
       ctx.bg(sh);
+      // Fensterband: Tageslicht von draußen (leuchtend, nur von innen sichtbar), Sprossen davor
+      var fb = new Kit();
+      fb.add(box(W - 0.2, 2.4, D - 0.2), 0xd6e2ec, { x: hx, y: 11.4, z: hz, sx: -1, faces: walls });
+      var win = ctx.kind('windowBand', [{ geo: fb.geo(), mat: 'glow' }], { r: 1 });
+      win.add(hx, hz, { abs: true, y: 0 });
+      var mk = new Kit();
+      for (var mx = 0; mx <= Math.round(W / 3); mx++) {
+        mk.add(box(0.14, 2.5, 0.14), 0x3a4048, { x: x0 + mx * W / Math.round(W / 3), y: 11.4, z: z0 + 0.2 });
+        mk.add(box(0.14, 2.5, 0.14), 0x3a4048, { x: x0 + mx * W / Math.round(W / 3), y: 11.4, z: z1 - 0.2 });
+      }
+      for (var mz = 0; mz <= Math.round(D / 3); mz++) {
+        mk.add(box(0.14, 2.5, 0.14), 0x3a4048, { x: x0 + 0.2, y: 11.4, z: z0 + mz * D / Math.round(D / 3) });
+        mk.add(box(0.14, 2.5, 0.14), 0x3a4048, { x: x1 - 0.2, y: 11.4, z: z0 + mz * D / Math.round(D / 3) });
+      }
+      ctx.kind('mullions', [{ geo: mk.geo() }], { r: 1 }).add(0, 0, { abs: true, y: 0 });
       // Plätze an den Wänden: Seite → Lage (t = 0…1 entlang der Wand), Drehung nach innen (+z der Platz-Form zeigt in die Halle)
       function onWall(side, t, inset) {
         inset = inset || 0;
