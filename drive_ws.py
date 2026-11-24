@@ -12,7 +12,7 @@ Wege:
                               · garage (tenant, user, cars = Komma-Liste; nach !buy, an die Verbindungen des Zuschauers)
 
 Nachrichten Client → Server: hello {ticket} · join {car, paint} · leave · release {x, z, yaw, speed, prog, rt} ·
-ping {c, pg} · s {x, z, yaw, roll, pitch,
+bump {to, jx, jz, imp} (harter Kontakt mit einem Mitspieler, nur im Rennen) · ping {c, pg} · s {x, z, yaw, roll, pitch,
 steer, speed, prog, rt (Rennzeit), spin, ts (Server-Uhr des Clients beim Senden), pg (Ping ms)} (~30 Hz).
 Server → Client: welcome {id, room, roster, now, taken, carrier} · roster {list} · joined {ok, msg} · phase {phase, race_id,
 start_at, track, laps, grid, now} · S {now, d: [[id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin], …],
@@ -22,7 +22,8 @@ rec {id, name, car, track, time, personal, car_rec, track_rec, best_car, best_tr
 fx/race_db.lap_submit; nur wenn persönliche Bestzeit oder Rekord) · garage {garage} (nur an den Zuschauer, neues
 Auto gekauft) · pong {c, s} · closed {msg} · error {msg} · takeover {ev} (3 s ohne Zustand im Rennen: die KI fährt
 weiter, ev = {t, type, id, x, z, yaw, speed, prog, lap} bzw. {…, d} vom Startplatz) · carrier {id} (wer die übernommenen
-Autos meldet) · release {ev} · ai_denied {want}.
+Autos meldet) · release {ev} · ai_denied {want} · bump {from, jx, jz, imp} (nur an den Getroffenen: Stoß J auf den
+Absender, der Empfänger wendet −J an, wenn er den Kontakt nicht selbst gerechnet hat; je Client ≤ 10/s, |J| ≤ 60).
 KI-Übernahme in Räumen: alle Clients fahren ein übernommenes Auto mit CarRaceSim.follower ab ev; der Träger schickt
 dessen Lage als s {for: id, …} (5 Hz, zählt Runden/Ziel, keine Rekorde). Der Fahrer übernimmt mit release {x, z, yaw,
 speed, prog, rt} wieder (fx/drive_room.Room.release).
@@ -37,14 +38,16 @@ Zusätzlich – Chatrennen steuerbar (fx/drive_race.py): ein Raum je Tenant, geb
                               → {ok, race_id, connected, takeovers, ai_events, pilots, snap}
 Client → Server: hello · ping {c, pg} · s {x, z, yaw, roll, pitch, steer, speed, prog, rt, spin, ts, pg} (nur Fahrer, ~30 Hz) ·
 ai (KI fährt mein Auto) · release {x, z, yaw, speed, prog, rt} (Steuer zurück, Lage des Nachfahrers) ·
-hit {id (KI-Auto), rt, dv, dl, spin} (Treffer auf ein KI-Auto, fx/drive_race.Room.hit).
+hit {id (KI-Auto), rt, dv, dl, spin} (Treffer auf ein KI-Auto, fx/drive_race.Room.hit) · bump {to, jx, jz, imp}
+(wie in Räumen, nur an den getroffenen Piloten).
 Server → Client: welcome {id, role, race, now} · race {race} (Rennen/Phase/Piloten/Übernahmen geändert) ·
 S {now, d, pg?} (wie oben: sofort einzeln + 1 Hz voll) · lap {id, lap, time, ok, ai?, fin?} · rec {…} (wie oben, nicht für Runden mit KI) ·
-takeover {ev} · release {ev} · hit {ev} · ai_denied {want} (nur an den Fahrer) · pong {c, s} · error {msg}.
+takeover {ev} · release {ev} · hit {ev} · bump {from, jx, jz, imp} · ai_denied {want} (nur an den Fahrer) · pong {c, s} · error {msg}.
 race = {race_id, phase, starts_at, track, track_name, laps, fw, pilots, taken, fin, now} (fx/drive_race.Room.info).
 """
 import asyncio
 import json
+import math
 import logging
 import os
 import sys
@@ -73,6 +76,7 @@ class Client:
         self.code = code
         self.last_s = 0.0
         self.tokens = STATE_BURST
+        self.bump_at = 0.0
 
 
 class RaceClient:
@@ -83,6 +87,36 @@ class RaceClient:
         self.driver = ident.get("role") == "driver"
         self.last_s = 0.0
         self.tokens = STATE_BURST
+        self.bump_at = 0.0
+
+
+BUMP_GAP = 0.1      # s zwischen zwei bump eines Clients
+BUMP_MAX = 60.0     # größter Stoß-Betrag je Achse
+
+
+def _bump(peers, sender, uid, msg, now):
+    """Harter Kontakt zwischen zwei Fahrern ({t: bump, to, jx, jz, imp}): nur an den Getroffenen weiterleiten
+    ({t: bump, from, jx, jz, imp}), höchstens alle BUMP_GAP s je Client, Werte begrenzt. → Anzahl Empfänger."""
+    to = msg.get("to")
+    if to is None or now - sender.bump_at < BUMP_GAP:
+        return 0
+    try:
+        jx, jz, imp = (float(msg.get(k) or 0) for k in ("jx", "jz", "imp"))
+    except (TypeError, ValueError):
+        return 0
+    if not all(math.isfinite(v) for v in (jx, jz, imp)):
+        return 0
+    to = str(to)
+    if to == str(uid):
+        return 0
+    wss = [c.ws for c in (peers or ()) if c is not sender and str(c.ident.get("id")) == to]
+    if not wss:
+        return 0
+    sender.bump_at = now
+    clip = lambda v: round(max(-BUMP_MAX, min(BUMP_MAX, v)), 3)
+    broadcast(wss, json.dumps({"t": "bump", "from": str(uid), "jx": clip(jx), "jz": clip(jz),
+                               "imp": round(max(0.0, min(BUMP_MAX, imp)), 2)}, separators=(",", ":")))
+    return len(wss)
 
 
 def _allow_state(cl, now):
@@ -293,6 +327,8 @@ class DriveServer:
                         self._send_race(tid, {"t": ev["type"], "ev": ev})
                     else:
                         broadcast([cl.ws], json.dumps({"t": "ai_denied", "want": t}))
+                elif t == "bump" and cl.driver:
+                    _bump(self.race_conns.get(tid), cl, cl.id, msg, now)
                 elif t == "hit" and cl.driver:
                     r = self.races.rooms.get(tid)
                     ev = r.hit(cl.id, msg, now) if r else None
@@ -413,6 +449,9 @@ class DriveServer:
                 if ev.get("t") == "lap" and ev.get("ok") and not ev.get("ai") and d:
                     self._lap(room.tenant_id, room.track, d.car, uid, d.display, ev["time"], "room",
                               lambda o, c=room.code: self._send_room(c, o))
+        elif t == "bump":
+            if room.phase == "race" and uid in room.drivers:
+                _bump(self.conns.get(room.code), cl, uid, msg, now)
         elif t == "ping":
             drive_room.note_ping(room.drivers.get(uid), msg)
             try:

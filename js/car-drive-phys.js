@@ -12,10 +12,15 @@
  *                                         Bremse im Stand = Rückwärtsgang (bis REV_V), rückwärts bremst das Gas
  *   CarDrivePhys.reset(car)              zurück auf die Mittellinie an der aktuellen Stelle, steht
  *   CarDrivePhys.speedKmh(car)           Tacho: Spielzeug-Tempo auf echte km/h hochgerechnet (vtop ↔ echte vmax)
- *   CarDrivePhys.overlap(a, b)           Rechteck gegen Rechteck (Trennachsen): a/b = { x, z, yaw, len, w } →
- *                                         null oder { pen, nx, nz (Normale von b zu a), px, pz (Kontaktpunkt) }
+ *   CarDrivePhys.overlap(a, b)           Umriss gegen Umriss (konvexe Polygone, Trennachsen): a/b = { x, z, yaw, len, w,
+ *                                         shape? } → null oder { pen, nx, nz (Normale von b zu a), px, pz (Kontaktpunkt) }
+ *                                         shape = [[a vorn, b links], …] m (aus dem Modell, outline), sonst Rechteck mit
+ *                                         runden Ecken (Radius 0,35 × Breite, roundedRect(len, w))
+ *   CarDrivePhys.outline(pts, maxN)      konvexe Hülle einer Punktwolke [[a, b], …], vereinfacht auf ≤ maxN (16) Ecken
  *   CarDrivePhys.collide(car, me, o)     Kontakt eigenes Auto ↔ anderes Auto: me = { len, w } (echte Grundfläche des
- *                                         eigenen Modells), o = { x, z, yaw, len, w, vx, vz, mass } (mass Infinity = Wrack).
+ *                                         eigenen Modells, optional shape), o = { x, z, yaw, len, w, shape?, vx, vz, mass,
+ *                                         peer? } (mass Infinity = Wrack; peer = Mitspieler, der denselben Kontakt bei sich
+ *                                         rechnet: nur Massenanteil, weich, ein Stoß je Berührung).
  *                                         Nur das eigene Auto reagiert: ganz aus der Überlappung geschoben, Stoß im
  *                                         Kontaktpunkt (unelastisch, Reibung, Drehimpuls) → null oder { impact (m/s
  *                                         Aufprall in Normalenrichtung), slide (m/s längs der Berührung), scrape bool,
@@ -75,6 +80,7 @@
   };
   // Kontakte: Rückprall, Reibung längs der Berührung, Trägheitsfaktor (< 1 = dreht leichter, Arcade),
   // ab CRASH_V m/s Aufprall ist es ein Crash (sonst Schrammen), Knautsch-Tempoverlust je m/s, größte Drehung durch Stoß
+  var PEER_SOFT = 0.3, PEER_CORR = 4;   // Mitspieler: Anteil der Überlappung je Teilschritt, größtes Korrekturtempo (m/s)
   var RESTITUTION = 0.12, CONTACT_MU = 0.4, INERTIA_K = 0.7, CRASH_V = 2.5, CRUMPLE = 0.014, MAX_DR = 3.2, HIT_T = 0.7;
   var DRIVE = { rwd: [0, 1.4], fwd: [1.4, 0], awd: [0.75, 0.75] };   // Antriebsanteil vorn/hinten (Reibungskreis)
 
@@ -321,42 +327,98 @@
   }
 
   // ---- Kontakte Auto ↔ Auto ----
-  function box(o) {
-    var c = Math.cos(o.yaw), sn = Math.sin(o.yaw);
-    return { x: o.x, z: o.z, fx: c, fz: -sn, lx: -sn, lz: -c, hl: o.len / 2, hw: o.w / 2 };
+  // Umriss = konvexes Polygon im Fahrzeugsystem [[a (vorn +), b (links +)], …] in Metern, gegen den Uhrzeigersinn
+  // von oben (x/z) gesehen. o.shape aus dem Modell (outline), sonst Rechteck mit runden Ecken aus len/w.
+  var ROUND = 0.35, shapeCache = {};
+  function roundedRect(len, w) {
+    var key = len.toFixed(3) + '|' + w.toFixed(3);
+    if (shapeCache[key]) return shapeCache[key];
+    var hl = len / 2, hw = w / 2, r = Math.min(ROUND * w, hl * 0.9, hw * 0.9), out = [];
+    // Ecken vorn links → hinten links → hinten rechts → vorn rechts, je Ecke ein Viertelkreis aus 4 Punkten
+    [[1, 1, 0], [-1, 1, 1], [-1, -1, 2], [1, -1, 3]].forEach(function (c) {
+      var ca = c[0] * (hl - r), cb = c[1] * (hw - r), a0 = c[2] * Math.PI / 2;
+      for (var k = 0; k < 4; k++) { var t = a0 + k / 3 * Math.PI / 2; out.push([ca + Math.cos(t) * r, cb + Math.sin(t) * r]); }
+    });
+    return (shapeCache[key] = out);
   }
-  function radius(b, nx, nz) { return b.hl * Math.abs(b.fx * nx + b.fz * nz) + b.hw * Math.abs(b.lx * nx + b.lz * nz); }
-  function corners(b) {
-    var out = [];
-    [1, -1].forEach(function (sf) { [1, -1].forEach(function (sl) {
-      out.push([b.x + b.fx * b.hl * sf + b.lx * b.hw * sl, b.z + b.fz * b.hl * sf + b.lz * b.hw * sl]);
-    }); });
+  // konvexe Hülle (Andrew) einer Punktwolke [[a, b], …], auf höchstens maxN Ecken vereinfacht (kleinste Dreiecksfläche
+  // zuerst weg, Visvalingam) – Umriss eines Modells von oben
+  function outline(pts, maxN) {
+    var P = pts.filter(function (p) { return isFinite(p[0]) && isFinite(p[1]); }).sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    if (P.length < 3) return null;
+    function cross(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+    var lo = [], hi = [], i;
+    for (i = 0; i < P.length; i++) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], P[i]) <= 0) lo.pop(); lo.push(P[i]); }
+    for (i = P.length - 1; i >= 0; i--) { while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], P[i]) <= 0) hi.pop(); hi.push(P[i]); }
+    var H = lo.slice(0, -1).concat(hi.slice(0, -1));
+    maxN = maxN || 16;
+    while (H.length > maxN) {
+      var best = -1, bestA = Infinity;
+      for (i = 0; i < H.length; i++) {
+        var a = Math.abs(cross(H[(i + H.length - 1) % H.length], H[i], H[(i + 1) % H.length]));
+        if (a < bestA) { bestA = a; best = i; }
+      }
+      H.splice(best, 1);
+    }
+    return H.length >= 3 ? H : null;
+  }
+  function shapeOf(o) { return o.shape && o.shape.length >= 3 ? o.shape : roundedRect(o.len, o.w); }
+  // Umriss in Weltkoordinaten: a längs (cos yaw, −sin yaw), b links (−sin yaw, −cos yaw)
+  function poly(o) {
+    var c = Math.cos(o.yaw), sn = Math.sin(o.yaw), sh = shapeOf(o), out = new Array(sh.length);
+    for (var i = 0; i < sh.length; i++) { var a = sh[i][0], b = sh[i][1]; out[i] = [o.x + c * a - sn * b, o.z - sn * a - c * b]; }
     return out;
   }
-  function inside(b, p, eps) {
-    var dx = p[0] - b.x, dz = p[1] - b.z;
-    return Math.abs(dx * b.fx + dz * b.fz) <= b.hl + eps && Math.abs(dx * b.lx + dz * b.lz) <= b.hw + eps;
+  function projPoly(P, nx, nz) {
+    var lo = Infinity, hi = -Infinity;
+    for (var i = 0; i < P.length; i++) { var d = P[i][0] * nx + P[i][1] * nz; if (d < lo) lo = d; if (d > hi) hi = d; }
+    return [lo, hi];
   }
-  function overlap(a0, b0) {
-    var a = box(a0), b = box(b0), dx = a.x - b.x, dz = a.z - b.z, best = null;
-    var axes = [[a.fx, a.fz], [a.lx, a.lz], [b.fx, b.fz], [b.lx, b.lz]];
-    for (var i = 0; i < 4; i++) {
-      var nx = axes[i][0], nz = axes[i][1], dist = dx * nx + dz * nz;
-      var pen = radius(a, nx, nz) + radius(b, nx, nz) - Math.abs(dist);
-      if (pen <= 0) return null;                       // Trennachse gefunden
-      if (!best || pen < best.pen - 1e-9) best = { pen: pen, nx: dist < 0 ? -nx : nx, nz: dist < 0 ? -nz : nz };
+  // Punkt im konvexen Polygon (beliebiger Umlaufsinn, Rand + eps zählt mit)
+  function insidePoly(P, p, eps) {
+    var sgn = 0;
+    for (var i = 0; i < P.length; i++) {
+      var a = P[i], b = P[(i + 1) % P.length], ex = b[0] - a[0], ez = b[1] - a[1], L = Math.hypot(ex, ez) || 1;
+      var cr = (ex * (p[1] - a[1]) - ez * (p[0] - a[0])) / L;
+      if (Math.abs(cr) <= eps) continue;
+      var s1 = cr > 0 ? 1 : -1;
+      if (sgn && s1 !== sgn) return false;
+      sgn = s1;
     }
-    // Kontaktpunkt: Mittel der Ecken, die im anderen Rechteck stecken (sonst Mitte der Überlappung auf der Verbindung)
-    var sx = 0, sz = 0, n = 0;
-    corners(a).forEach(function (p) { if (inside(b, p, 0.02)) { sx += p[0]; sz += p[1]; n++; } });
-    corners(b).forEach(function (p) { if (inside(a, p, 0.02)) { sx += p[0]; sz += p[1]; n++; } });
+    return true;
+  }
+  // Polygon gegen Polygon (Trennachsen über alle Kantennormalen beider Umrisse): a/b = { x, z, yaw, len, w, shape? } →
+  // null oder { pen, nx, nz (Normale von b zu a), px, pz (Kontaktpunkt) }
+  function overlap(a0, b0) {
+    var A = poly(a0), B = poly(b0), dx = a0.x - b0.x, dz = a0.z - b0.z, best = null;
+    for (var pass = 0; pass < 2; pass++) {
+      var P = pass ? B : A;
+      for (var i = 0; i < P.length; i++) {
+        var p = P[i], q = P[(i + 1) % P.length], nx = -(q[1] - p[1]), nz = q[0] - p[0], L = Math.hypot(nx, nz);
+        if (L < 1e-9) continue;
+        nx /= L; nz /= L;
+        var pa = projPoly(A, nx, nz), pb = projPoly(B, nx, nz), pen = Math.min(pa[1] - pb[0], pb[1] - pa[0]);
+        if (pen <= 0) return null;                     // Trennachse gefunden
+        var dist = dx * nx + dz * nz;
+        if (!best || pen < best.pen - 1e-9) best = { pen: pen, nx: dist < 0 ? -nx : nx, nz: dist < 0 ? -nz : nz };
+      }
+    }
+    if (!best) return null;
+    // Kontaktpunkt: Mittel der Ecken, die im anderen Umriss stecken (sonst Stützpunkt von a gegen die Normale)
+    var sx = 0, sz = 0, n = 0, k;
+    for (k = 0; k < A.length; k++) if (insidePoly(B, A[k], 0.02)) { sx += A[k][0]; sz += A[k][1]; n++; }
+    for (k = 0; k < B.length; k++) if (insidePoly(A, B[k], 0.02)) { sx += B[k][0]; sz += B[k][1]; n++; }
     if (n) { best.px = sx / n; best.pz = sz / n; }
-    else { var ra = radius(a, best.nx, best.nz) - best.pen / 2; best.px = a.x - best.nx * ra; best.pz = a.z - best.nz * ra; }
+    else {
+      var lo = Infinity, bp = A[0];
+      for (k = 0; k < A.length; k++) { var d = A[k][0] * best.nx + A[k][1] * best.nz; if (d < lo) { lo = d; bp = A[k]; } }
+      best.px = bp[0] + best.nx * best.pen / 2; best.pz = bp[1] + best.nz * best.pen / 2;
+    }
     return best;
   }
   function collide(car, me, o, dtSub) {
     var P = car.P, len = me && me.len > 0 ? me.len : P.len, w = me && me.w > 0 ? me.w : P.width;
-    var h = overlap({ x: car.x, z: car.z, yaw: car.yaw, len: len, w: w }, o);
+    var h = overlap({ x: car.x, z: car.z, yaw: car.yaw, len: len, w: w, shape: me && me.shape }, o);
     if (!h) return null;
     var nx = h.nx, nz = h.nz, tx = -nz, tz = nx;
     var mP = P.mass, mA = o.mass > 0 ? o.mass : P.mass, invA = isFinite(mA) ? 1 / mA : 0;
@@ -366,16 +428,22 @@
     // Gilt immer, wenn nicht ich hineinfahre (auch seitliches Abdrängen in der Kurve), und weich über ein paar
     // Teilschritte statt in einem Ruck (kein „Plopp“): Abdrängen wirkt langsam und nach Gewicht.
     var myIn = -(car.vx * nx + car.vz * nz), oIn = (o.vx || 0) * nx + (o.vz || 0) * nz;
-    var share = invA && oIn > 0.05 && oIn >= myIn ? Math.max(0.08, mA / (mA + mP)) * 0.45 : 1;
+    // Mitspieler (o.peer): der andere Client rechnet denselben Kontakt bei sich – jeder nimmt nur seinen Massenanteil,
+    // weich über die Teilschritte (zusammen einmal, nicht doppelt; kein Sprung)
+    var peer = !!o.peer && invA > 0;
+    var share = peer ? clamp(mA / (mA + mP), 0.1, 0.9) : invA && oIn > 0.05 && oIn >= myIn ? Math.max(0.08, mA / (mA + mP)) * 0.45 : 1;
     // Steckt ein leichterer Rammer schon tiefer drin: weder schieben noch Stoß – er fährt durch (wie im Overlay, wo die Sim
     // fährt), statt mich Bild für Bild auf sein Tempo mitzunehmen
     // (auch wenn die Berührungsnormale beim Durchfahren umklappt – sonst ein Sprung um die halbe Breite; 0,45 m liegt
     // über dem Teilschritt CHUNK, eigenes Hineinfahren erreicht das nie)
-    if (invA && mA < mP * 0.9 && h.pen > 0.45) return { impact: 0, slide: 0, scrape: false, jx: 0, jz: 0, px: h.px, pz: h.pz, nx: nx, nz: nz, pen: h.pen, tx: tx, tz: tz };
+    if (!peer && invA && mA < mP * 0.9 && h.pen > 0.45) return { impact: 0, slide: 0, scrape: false, jx: 0, jz: 0, px: h.px, pz: h.pz, nx: nx, nz: nz, pen: h.pen, tx: tx, tz: tz };
     // leichterer Schieber: keine Lagekorrektur (sie würde mich Bild für Bild mit seinem Tempo mitnehmen), nur der
     // begrenzte Stoß unten; gleich schwere/schwerere drängen weich nach Massenanteil ab
-    var lightPush = share < 1 && mA < mP * 0.9;
-    if (!lightPush) { car.x += nx * (h.pen * share + 0.002); car.z += nz * (h.pen * share + 0.002); }
+    var lightPush = !peer && share < 1 && mA < mP * 0.9;
+    if (peer) {
+      var corr = Math.min(h.pen * share * PEER_SOFT, PEER_CORR * (dtSub > 0 ? dtSub : SUB));
+      car.x += nx * corr; car.z += nz * corr;
+    } else if (!lightPush) { car.x += nx * (h.pen * share + 0.002); car.z += nz * (h.pen * share + 0.002); }
     var I = mP * (len * len + w * w) / 12 * INERTIA_K;
     var rx = h.px - car.x, rz = h.pz - car.z;            // Hebel vom Schwerpunkt zum Kontaktpunkt
     // Tempo im Kontaktpunkt: v + Gierrate × Hebel (Gierrate + = links: Punkt bewegt sich um (rz, −rx))
@@ -392,11 +460,13 @@
     // Reifen hergeben (Masse × Haftung) – ein leichter Wagen bewegt einen Lkw kaum, gleich schwere drängen ab;
     // Aufprall-Stöße (hartes Auffahren) bleiben
     // (halbe Haftung: der Schieber lenkt ja nicht absichtlich in mich hinein – ein Anstupser drängt, wirft aber nicht raus)
-    if (share < 1 && dtSub > 0 && impact < CRASH_V) Jn = Math.min(Jn, 0.5 * mA * (o.grip || P.grip) * dtSub);
+    if (!peer && share < 1 && dtSub > 0 && impact < CRASH_V) Jn = Math.min(Jn, 0.5 * mA * (o.grip || P.grip) * dtSub);
     // Ein leichterer Schieber auf fester Bahn gibt nie nach: ohne Grenze stieße er in jedem Teilschritt neu, bis ich
     // sein Tempo habe (ein Golf beschleunigt dann einen Bus wie ein Lkw). Je Kontakt bekommt er deshalb nur den Schwung,
     // den ein echter Stoß überträgt (reduzierte Masse × Anfahrtempo × (1 + e)), danach nur noch das weiche Drängen nach Haftung.
-    if (lightPush) {
+    // Mitspieler genauso: sein Tempo kommt erst mit dem nächsten Zustand – ohne Grenze stieße er bis dahin in jedem
+    // Teilschritt neu (Flipper). Ein Stoß je Berührung, danach nur das weiche Anlehnen.
+    if (lightPush || peer) {
       var st = o.c || o, tick = car.cTick || 0;
       if (!(st.jTick >= tick - 1) || st.jCar !== car) { st.jUsed = 0; st.jMax = (1 + e) * impact * mA * mP / (mA + mP); st.jCar = car; }
       st.jTick = tick;
@@ -464,6 +534,6 @@
 
   return {
     params: params, trackInfo: trackInfo, project: project, create: create, step: step, reset: reset,
-    speedKmh: speedKmh, nitroReady: nitroReady, overlap: overlap, collide: collide, stepContacts: stepContacts, CRASH_V: CRASH_V, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
+    speedKmh: speedKmh, nitroReady: nitroReady, overlap: overlap, outline: outline, roundedRect: roundedRect, collide: collide, stepContacts: stepContacts, CRASH_V: CRASH_V, MAX_STEER: MAX_STEER, NITRO_T: NITRO_T, REV_V: REV_V
   };
 });

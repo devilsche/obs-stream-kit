@@ -15,6 +15,11 @@
  *                                 Tempo weiter – mit Strecke T (CarRaceSim.track) entlang der Kurve und mit gleichem
  *                                 Seitenabstand, sonst geradeaus (höchstens 0,5 s). Kommen wieder Daten, wird der Versatz
  *                                 über SMOOTH s ausgeglichen statt zu springen. → {x, z, yaw, …, ts, lag (s ohne Daten)}
+ *   net.predict(id, T)            Fremdauto auf JETZT (Server-Uhr) vorausgesagt: letzter Zustand + Tempo × Alter entlang
+ *                                 der Strecke (höchstens PRED_MAX s, wie extrapolate), Sprünge bei neuen Zuständen über
+ *                                 PRED_SMOOTH s ausgeglichen. Für Kontakte und die Anzeige in der Nähe – der Puffer
+ *                                 (sample) zeigt die Vergangenheit, man würde sonst einen Geist rammen. → wie sample
+ *   CarDriveNet.extrapolate(a, dt, T)  Zustand a um dt s mit seinem Tempo weiter (entlang T, sonst geradeaus) → neuer Zustand
  *   net.ping()                    eigener Ping {ms, jitter} (geglättet, alle 2 s gemessen) oder null
  *   net.peerPing(id)              Ping eines anderen Fahrers (ms, vom Server einmal pro Sekunde verteilt) oder null
  *   net.lag(id)                   wie lange (s) zum aktuellen Anzeigezeitpunkt schon Daten dieses Fahrers fehlen
@@ -28,17 +33,31 @@
 })(typeof window !== 'undefined' ? window : this, function () {
   'use strict';
   var DELAY = 0.1, RATE = 1 / 30, KEEP = 60;
-  var MIN_DELAY = 0.06, MAX_DELAY = 0.35, EXT_MAX = 3.0, SMOOTH = 0.3, PING_EVERY = 2000;
+  var MIN_DELAY = 0.06, MAX_DELAY = 0.35, EXT_MAX = 3.0, SMOOTH = 0.3, PING_EVERY = 2000, PRED_MAX = 0.6, PRED_SMOOTH = 0.15;
   function nowS() { return (typeof performance !== 'undefined' && performance.timeOrigin ? performance.timeOrigin + performance.now() : Date.now()) / 1000; }
   function wrapAngle(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   // Felder eines Zustands im Server-Batch [id, ts, x, z, yaw, roll, pitch, steer, speed, prog, spin]
   var F = ['x', 'z', 'yaw', 'roll', 'pitch', 'steer', 'speed', 'prog', 'spin'];
 
+  // Zustand a um dt s mit seinem Tempo weiterfahren: entlang der Strecke T mit gleichem Seitenabstand, sonst geradeaus
+  function extrapolate(a, dt, T) {
+    var o = {}, v = Math.max(0, a.speed || 0);
+    F.forEach(function (f) { o[f] = a[f]; });
+    if (!(dt > 0)) return o;
+    if (T && T.at) {
+      var A = T.at(a.prog), side = (a.x - A.x) * A.nx + (a.z - A.z) * A.nz, B = T.at(a.prog + v * dt);
+      o.x = B.x + B.nx * side; o.z = B.z + B.nz * side; o.yaw = a.yaw + wrapAngle(B.yaw - A.yaw); o.prog = a.prog + v * dt;
+    } else {
+      o.x += Math.cos(a.yaw) * v * dt; o.z -= Math.sin(a.yaw) * v * dt; o.prog += v * dt;
+    }
+    return o;
+  }
+
   function connect(opts) {
     var WS = opts.WebSocket || (typeof WebSocket !== 'undefined' ? WebSocket : null);
     var ws = null, open = false, closed = false, tries = 0, lastSent = -1, offset = 0, bestRtt = Infinity, pingT = null;
-    var buf = {}, jt = {}, vis = {}, peer = {};
+    var buf = {}, jt = {}, vis = {}, peer = {}, pv = {};
     var rttS = null, jit = 0, dly = DELAY, dlyAt = 0, tgt = DELAY, tgtAt = 0;
     // Puffer-Ziel: je Fahrer Paketabstand + Streuung der Ankunftsverspätung (90 %-Wert − kleinster Wert)
     function target(now) {
@@ -113,6 +132,25 @@
         o.ts = a.ts; o.lag = ext;
         return o;
       },
+      predict: function (id, T) {
+        var b = buf[id];
+        if (!b || !b.length) return null;
+        var a = b[b.length - 1], now = net.serverNow(), age = Math.max(0, now - a.ts);
+        var o = extrapolate(a, Math.min(PRED_MAX, age), T), w = pv[id], t = nowS();
+        // neuer Zustand: Versatz zur alten Voraussage über PRED_SMOOTH s abbauen (kein Ruck im Kontakt)
+        if (w && w.base !== a.ts) {
+          var cx = w.x - o.x, cz = w.z - o.z;
+          if (cx * cx + cz * cz < 25) { w.cx = cx; w.cz = cz; w.cy = wrapAngle(w.yaw - o.yaw); w.cAt = t; } else w.cAt = null;
+        }
+        if (!w) w = pv[id] = { cAt: null };
+        if (w.cAt != null) {
+          var q = 1 - (t - w.cAt) / PRED_SMOOTH;
+          if (q <= 0) w.cAt = null; else { o.x += w.cx * q; o.z += w.cz * q; o.yaw += w.cy * q; }
+        }
+        w.base = a.ts; w.x = o.x; w.z = o.z; w.yaw = o.yaw;
+        o.ts = a.ts; o.lag = age;
+        return o;
+      },
       ping: function () { return rttS == null ? null : { ms: Math.round(rttS * 1000), jitter: Math.round(jit * 1000) }; },
       peerPing: function (id) { var v = peer[id]; return v == null ? null : v; },
       lag: function (id) {
@@ -120,7 +158,7 @@
         return b && b.length ? Math.max(0, net.serverNow() - dly - b[b.length - 1].ts) : 0;
       },
       ids: function () { return Object.keys(buf); },
-      forget: function (id) { delete buf[id]; delete jt[id]; delete vis[id]; },
+      forget: function (id) { delete buf[id]; delete jt[id]; delete vis[id]; delete pv[id]; },
       close: function () { closed = true; if (pingT) clearInterval(pingT); try { if (ws) ws.close(); } catch (e) { /* */ } },
       isOpen: function () { return open; }
     };
@@ -156,7 +194,7 @@
         });
         if (m.pg && typeof m.pg === 'object') peer = m.pg;
       }
-      if (m.t === 'phase' && m.phase === 'countdown') { buf = {}; jt = {}; vis = {}; }
+      if (m.t === 'phase' && m.phase === 'countdown') { buf = {}; jt = {}; vis = {}; pv = {}; }
       if (opts.onMessage) opts.onMessage(m);
     }
     function start() {
@@ -187,5 +225,5 @@
     return net;
   }
 
-  return { connect: connect, DELAY: DELAY, RATE: RATE, MIN_DELAY: MIN_DELAY, MAX_DELAY: MAX_DELAY, EXT_MAX: EXT_MAX };
+  return { connect: connect, extrapolate: extrapolate, PRED_MAX: PRED_MAX, DELAY: DELAY, RATE: RATE, MIN_DELAY: MIN_DELAY, MAX_DELAY: MAX_DELAY, EXT_MAX: EXT_MAX };
 });

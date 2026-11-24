@@ -263,6 +263,38 @@
     try { return TC.addDriver(model, key, { outfit: outfit || undefined }); } catch (e) { return null; }
     finally { RD.build = build0; }
   }
+  // Grundriss des Modells für die Kontakte (CarDrivePhys.overlap): Vertices der Karosserie zwischen 8 und 50 % der
+  // Höhe (ohne Räder, Fahrer-Ente, Dach und Spiegelspitzen), je Längsscheibe der äußerste Punkt links/rechts, daraus die
+  // konvexe Hülle mit ≤ 16 Ecken in Metern ([vorn, links]); einmal je Auto. Unbrauchbar (zu klein) → null = runde Box.
+  var footCache = {};
+  function footprint(key, model, d, k) {
+    if (Object.prototype.hasOwnProperty.call(footCache, key)) return scaleShape(footCache[key], k);
+    var N = 48, lo = new Float32Array(N).fill(Infinity), hi = new Float32Array(N).fill(-Infinity);
+    var y0 = -d.H / 2 + d.H * 0.08, y1 = -d.H / 2 + d.H * 0.5, v = new THREE.Vector3(), inv = new THREE.Matrix4();
+    try {
+      model.updateMatrixWorld(true); inv.copy(model.matrixWorld).invert();
+      model.traverse(function (o) {
+        if (!o.isMesh || o.isInstancedMesh || o.userData.driver || !o.geometry || !o.geometry.attributes.position) return;
+        for (var p = o; p && p !== model; p = p.parent) if (/^Wheel /.test(p.name || '') || p.userData.driver) return;
+        var m = [].concat(o.material)[0]; if (m && m.visible === false) return;
+        var pos = o.geometry.attributes.position, step = Math.max(1, Math.floor(pos.count / 40000));
+        var mw = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+        for (var i = 0; i < pos.count; i += step) {
+          v.fromBufferAttribute(pos, i).applyMatrix4(mw);
+          if (v.y < y0 || v.y > y1) continue;
+          var b = Math.floor((v.x / d.L + 0.5) * N); if (b < 0 || b >= N) continue;
+          if (v.z < lo[b]) lo[b] = v.z; if (v.z > hi[b]) hi[b] = v.z;
+        }
+      });
+    } catch (e) { footCache[key] = null; return null; }
+    var pts = [];
+    for (var b = 0; b < N; b++) if (lo[b] <= hi[b]) { var x = ((b + 0.5) / N - 0.5) * d.L; pts.push([x, -lo[b]], [x, -hi[b]]); }
+    var sh = Phys.outline(pts, 16), area = 0;
+    if (sh) for (var i = 0; i < sh.length; i++) { var a = sh[i], c = sh[(i + 1) % sh.length]; area += a[0] * c[1] - c[0] * a[1]; }
+    footCache[key] = sh && Math.abs(area) / 2 > 0.45 * d.L * d.W ? sh : null;
+    return scaleShape(footCache[key], k);
+  }
+  function scaleShape(sh, k) { return sh ? sh.map(function (p) { return [p[0] * k, p[1] * k]; }) : null; }
   function makeCar(key, set, opts) {
     var entry = byKey[key], raw = Stats.of(key, entry), st = Sim.stats(raw);
     var holder = new THREE.Group(); holder.rotation.order = 'YXZ';
@@ -274,6 +306,7 @@
       var d = model.userData.dims || TC.dims(key);
       if (d && d.L > 0) {
         var k = st.len / d.L;
+        car.shape = footprint(key, model, d, k);
         model.scale.setScalar(k); model.position.y = d.H / 2 * k + 0.03;
         car.height = d.H * k; car.w = d.W * k;
       } else model = null;
@@ -842,7 +875,7 @@
   // (stepContacts/collide). Nur das eigene Auto reagiert (andere Clients rechnen dasselbe bei sich), im Solo-Rennen
   // bekommt die KI zusätzlich den Gegenstoß ab. Ausgeschiedene (DNF) sind durchscheinend und kein Hindernis.
   function poseOf(c, x, z, yaw, v, mass) {
-    var o = { c: c, x: x, z: z, yaw: yaw, len: c.len, w: c.w, vx: Math.cos(yaw) * v, vz: -Math.sin(yaw) * v, mass: mass };
+    var o = { c: c, x: x, z: z, yaw: yaw, len: c.len, w: c.w, shape: c.shape, vx: Math.cos(yaw) * v, vz: -Math.sin(yaw) * v, mass: mass };
     var p = c.cPose;   // Lage im vorigen Bild: wird über die Teilschritte mitgezogen (kein Durchtunneln)
     if (p && Math.hypot(p.x - x, p.z - z) < 8) { o.x0 = p.x; o.z0 = p.z; o.yaw0 = p.yaw; }
     c.cPose = { x: x, z: z, yaw: yaw };
@@ -855,7 +888,10 @@
       if (race.spect) return out;
       race.ai.forEach(function (c, i) {
         if (!c) return;
-        if (race.remotes.indexOf(c) >= 0) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); return; }
+        if (race.remotes.indexOf(c) >= 0) {
+          var r = c.smp; if (!r) return;
+          var po = poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass); po.peer = !c.isAi; out.push(po); return;
+        }
         var q = race.sim.cars[i];
         if (q.state === 'dnf') return;   // ausgeschieden: durchscheinend, man fährt hindurch
         var o = poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass);
@@ -871,8 +907,49 @@
       var o = poseOf(c, q.x, q.z, q.yaw, q.v, c.st.mass);
       o.q = q; o.i = i; out.push(o);
     });
-    if (race.mp) race.remotes.forEach(function (c) { var r = c.smp; if (r) out.push(poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass)); });
+    if (race.mp) race.remotes.forEach(function (c) {
+      var r = c.smp; if (!r) return;
+      var o = poseOf(c, r.x, r.z, r.yaw, r.speed || 0, c.st.mass);
+      o.peer = !c.isAi;   // Mitspieler rechnet denselben Kontakt bei sich; übernommene (KI) fahren feste Bahn
+      out.push(o);
+    });
     return out;
+  }
+  // Mitspieler: harte Kontakte melden (bump), damit der andere sofort reagiert, auch wenn er den Kontakt bei sich
+  // knapp verpasst; je Gegner höchstens alle 0,3 s. Eigene Kontakte merken (ankommende bump nicht doppelt anwenden).
+  function peerHit(o, h) {
+    var c = o.c; if (!c || !race) return;
+    c.contactAt = race.t;
+    if (h.impact < Phys.CRASH_V || !mp || !mp.net || race.spect || (c.bumpAt != null && race.t - c.bumpAt < 0.3)) return;
+    c.bumpAt = race.t;
+    mp.net.send({ t: 'bump', to: c.id, jx: Math.round(h.jx * 1000) / 1000, jz: Math.round(h.jz * 1000) / 1000, imp: Math.round(h.impact * 100) / 100 });
+  }
+  // bump eines Mitspielers: Gegenstoß (−J) auf mein Auto, wenn ich den Kontakt nicht selbst gerade gerechnet habe
+  function peerBump(m) {
+    if (!race || !race.pc || race.spect || race.phase !== 'race' || !(m.jx || m.jz)) return;
+    var c = (race.remotes || []).filter(function (r) { return r.id === String(m.from); })[0];
+    if (c && c.contactAt != null && race.t - c.contactAt < 0.3) return;
+    var pc = race.pc, mP = pc.P.mass, jx = clamp(-m.jx, -60, 60), jz = clamp(-m.jz, -60, 60);
+    pc.vx += jx / mP; pc.vz += jz / mP;
+    var fx = Math.cos(pc.yaw), fz = -Math.sin(pc.yaw), lx = -Math.sin(pc.yaw), lz = -Math.cos(pc.yaw);
+    pc.u = pc.vx * fx + pc.vz * fz; pc.w = pc.vx * lx + pc.vz * lz;
+    if (c) c.contactAt = race.t;
+    if ((m.imp || 0) >= Phys.CRASH_V) { race.crashT = Math.max(race.crashT || 0, 0.25); pc.hitT = Math.max(pc.hitT || 0, 0.2); }
+  }
+  // Fremdauto für Anzeige + Kontakt: Puffer (ruhig, Vergangenheit), in der Nähe weich auf die Voraussage (Gegenwart)
+  // überblendet – dort, wo man sich berühren kann, stimmen Bild und Kontakt mit der echten Lage überein
+  var NEAR_PRED = 8, FAR_PRED = 14;
+  function netPose(c, at) {
+    var q = mp.net.sample(c.id, at, race.T);
+    if (!q || !mp.net.predict) return q;
+    var p = mp.net.predict(c.id, race.T), pc = race.pc;
+    if (!p || !pc) return q;
+    var dist = Math.hypot(p.x - pc.x, p.z - pc.z), k = clamp((FAR_PRED - dist) / (FAR_PRED - NEAR_PRED), 0, 1);
+    if (k <= 0) return q;
+    var o = Object.assign({}, q);
+    ['x', 'z', 'roll', 'pitch', 'steer', 'speed', 'prog'].forEach(function (f) { o[f] = q[f] + (p[f] - q[f]) * k; });
+    o.yaw = q.yaw + wrapAngle(p.yaw - q.yaw) * k;
+    return o;
   }
   // Solo: Gegenstoß auf die KI über die Sim (sim.hit) – Tempo längs, Seitenschub quer (Streckenkoordinaten),
   // ein harter Treffer kann sie drehen (je schwerer ich im Verhältnis, desto eher)
@@ -935,7 +1012,8 @@
   // stärker je Aufprall und je schwerer der andere; Schrammen: Funkenstrom + Schleifgeräusch statt Abprallen
   function driveStep(dt, inp) {
     var pc = race.pc, crash = null, scrape = null;
-    Phys.stepContacts(pc, inp, dt, { len: race.me.len, w: race.me.w }, contactList(), function (o, h) {
+    Phys.stepContacts(pc, inp, dt, { len: race.me.len, w: race.me.w, shape: race.me.shape }, contactList(), function (o, h) {
+      if (o.peer) peerHit(o, h);
       if (h.impact > 0 && o.q) nudgeAI(o, h);
       else if (h.impact > 0 && o.rq) rcHitAdd(o, h);
       if (h.impact >= Phys.CRASH_V) { if (!crash || h.impact > crash.impact) crash = h; }
@@ -1431,6 +1509,7 @@
       case 'garage': garageChanged(m.garage); break;
       case 'S': if (m.pg) rosterPings(); break;
       case 'takeover': case 'release': mpTakeover(m.ev); break;
+      case 'bump': peerBump(m); break;
       case 'carrier': mp.carrier = m.id == null ? null : String(m.id); break;
       case 'ai_denied': mpDenied(); break;
       case 'roster':
@@ -1536,8 +1615,8 @@
     race.remotes.forEach(function (c) {
       var f = mpTaken(c.id) ? mpFollower(c.id, c.st) : null, q;
       if (f) { var fq = f.at(t); q = fqState(fq); c.finQ = fq.finish; }
-      else q = mp.net.sample(c.id, at, race.T);
-      c.smp = q;
+      else q = netPose(c, at);
+      c.smp = q; c.isAi = !!f;
       if (!q) return;
       q = blendSrc(c, q, f ? 'ai' : 'net');
       c.prog = q.prog;
@@ -1786,6 +1865,7 @@
   function rcMsg(m) {
     if (m.t === 'welcome' || m.t === 'race') { mp.info = m.race; if (race && race.chat) (m.race.taken || []).forEach(rcTakeover); }
     else if (m.t === 'takeover' || m.t === 'release') rcTakeover(m.ev);
+    else if (m.t === 'bump') peerBump(m);
     else if (m.t === 'hit') rcHitMsg(m.ev);
     else if (m.t === 'ai_denied') rcDenied(m.want);
     else if (m.t === 'rec') recMsg(m);
@@ -2002,8 +2082,8 @@
     race.remotes.forEach(function (c) {
       var f = rcFollower(c.id, c.idx), q;
       if (f) { var fq = f.at(t); q = { x: fq.x, z: fq.z, yaw: fq.yaw, roll: fq.roll, pitch: 0, steer: fq.steer, spin: fq.spin, speed: fq.v, prog: fq.s }; c.finQ = fq.finish; }
-      else q = mp.net.sample(c.id, at, race.T);
-      c.smp = q;
+      else q = netPose(c, at);
+      c.smp = q; c.isAi = !!f;
       if (!q) { var g = race.sim.cars[c.idx]; placeCar(c, g.x, g.z, g.yaw, 0, 0, 0, 0); return; }
       c.prog = q.prog;
       placeCar(c, q.x, q.z, q.yaw, q.roll, q.pitch, q.steer, q.spin);

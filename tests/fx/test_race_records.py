@@ -275,3 +275,40 @@ def test_ai_state_only_from_carrier_and_release_flow(monkeypatch):
     assert any(m.get("t") == "release" and m["ev"]["id"] == "u2" for m in sent) and not room.drivers["u2"].taken
     srv.on_message(room, c2, {"t": "release", "x": 46, "z": 0, "yaw": 0, "speed": 10, "prog": 46, "rt": 4.3})
     assert direct[-1][1] == {"t": "ai_denied", "want": "release"}
+
+
+def test_bump_only_to_target_rate_limited_and_clipped(monkeypatch):
+    sent = []
+    monkeypatch.setattr(drive_ws, "broadcast", lambda wss, data: sent.append((list(wss), json.loads(data))))
+    a, b, c = FakeWs(), FakeWs(), FakeWs()
+    ca = drive_ws.Client(a, {"id": "u1"}, "X")
+    cb = drive_ws.Client(b, {"id": "u2"}, "X")
+    cc = drive_ws.Client(c, {"id": "u3"}, "X")
+    peers = {ca, cb, cc}
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u2", "jx": 500, "jz": -1.5, "imp": 7}, 10.0) == 1
+    assert sent[-1] == ([b], {"t": "bump", "from": "u1", "jx": 60.0, "jz": -1.5, "imp": 7.0})
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u3", "jx": 1, "jz": 1}, 10.05) == 0      # zu schnell
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u3", "jx": "nan", "jz": 1}, 10.5) == 0  # ungültig
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u1", "jx": 1, "jz": 1}, 10.5) == 0      # sich selbst
+    assert drive_ws._bump(peers, ca, "u1", {"to": "u9", "jx": 1, "jz": 1}, 10.5) == 0      # nicht da
+    assert len(sent) == 1
+
+
+def test_room_bump_only_in_race(monkeypatch):
+    sent = []
+    monkeypatch.setattr(drive_ws, "broadcast", lambda wss, data: sent.append(json.loads(data)))
+    srv = drive_ws.DriveServer(secret="s")
+    room, _ = srv.hub.open(5, 0, 2, 1000.0)
+    for u in ("u1", "u2"):
+        room.join({"id": u, "login": u, "display": u, "role": "viewer", "garage": None}, "car-a", 0, 1000.0)
+    c1 = drive_ws.Client(FakeWs(), {"id": "u1"}, room.code)
+    c2 = drive_ws.Client(FakeWs(), {"id": "u2"}, room.code)
+    srv.conns[room.code] = {c1, c2}
+    srv.clock = lambda: 1000.0
+    srv.on_message(room, c1, {"t": "bump", "to": "u2", "jx": 3, "jz": 0, "imp": 4})
+    assert not [m for m in sent if m.get("t") == "bump"]           # Lobby: nichts
+    room.start(1000.0)
+    room.phase = "race"
+    srv.clock = lambda: 1020.0
+    srv.on_message(room, c1, {"t": "bump", "to": "u2", "jx": 3, "jz": 0, "imp": 4})
+    assert [m for m in sent if m.get("t") == "bump"] == [{"t": "bump", "from": "u1", "jx": 3.0, "jz": 0.0, "imp": 4.0}]
