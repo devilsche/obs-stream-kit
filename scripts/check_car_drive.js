@@ -109,6 +109,16 @@ function slideAfter(d) {
 var hbHi = hbTurn(0.95), hbLo = hbTurn(0.05), slHi = slideAfter(0.95), slLo = slideAfter(0.05);
 ok(hbHi > hbLo, 'Drift: Handbremse dreht driftfreudig ' + hbHi.toFixed(2) + ' rad, wenig Driftfreude ' + hbLo.toFixed(2) + ' rad');
 ok(slLo.r < slHi.r, 'Drift: nach dem Kick Gierrate driftfreudig ' + slHi.r.toFixed(2) + ' rad/s (hält quer), wenig Driftfreude ' + slLo.r.toFixed(2) + ' rad/s (fängt sich)');
+// 7c) Im Drift lenken die Räder sichtbar in beide Richtungen (die Lenkhilfe blendet aus, Einschlag bis zur
+//     Fahrtrichtung der Vorderachse und darüber) – vorher standen sie beim Querstehen fast still
+function driftSteer(st) {
+  var k = run(driftCar(0.95), { throttle: 1 }, 2.5);
+  run(k, { throttle: 0.3, steer: 0.7, handbrake: true }, 0.35);
+  run(k, { throttle: 0.6, steer: st }, 0.35);
+  return k.steer;
+}
+var dsL = driftSteer(1), dsR = driftSteer(-1);
+ok(dsL > 0.3 && dsR < -0.3, 'Drift: Räder lenken quer sichtbar, links ' + (dsL * 180 / Math.PI).toFixed(0) + '°, rechts ' + (dsR * 180 / Math.PI).toFixed(0) + '°');
 var dg = function (k) { return Stats.guess({ key: k }).drift; };
 ok(dg('1962-chevrolet-corvette-gran') > dg('bmw-m3-competition') && dg('bmw-m3-competition') > dg('volkswagen-golf-gti-1976') && dg('amg-w14-s1') <= 0.15,
    'Drift-Schätzung: Corvette ' + dg('1962-chevrolet-corvette-gran') + ' > M3 ' + dg('bmw-m3-competition') + ' > Golf Mk1 ' + dg('volkswagen-golf-gti-1976') + ', W14 ' + dg('amg-w14-s1'));

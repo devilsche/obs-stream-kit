@@ -191,24 +191,33 @@
     // Gegenlenken beim Rutschen: je driftfreudiger, desto mehr Einschlag über den Grenzwinkel hinaus
     var slideX = (inp.steer || 0) * car.r < 0 ? clamp((car.slip - 0.45) / 0.35, 0, 1) * dr0 * 0.25 : 0;
     var maxSteer = clamp(P.wb * Gs / Math.max(1, u * u) + ALPHA_PEAK * 0.9 + slideX, 0.1, lock);
-    var want = clamp(inp.steer || 0, -1, 1) * maxSteer, wantVis = want;
+    // Rutschen/Querstehen (q 0…1): der Einschlag reicht bis zur Fahrtrichtung der Vorderachse und
+    // ein Stück darüber hinaus, die Lenkhilfe blendet aus – die Räder bewegen sich immer sichtbar, und die Physik nutzt
+    // genau den gezeigten Winkel (Vorderreifen sättigen über dem Haftungsmaximum von selbst)
+    // q aus dem Schräglauf der Hinterachse (bricht das Heck aus?): beim normalen Kurvenfahren unter dem Haftungsmaximum
+    // (~7°), im Drift deutlich darüber – ab ~9° beginnend, ab ~18° voll (der Schwimmwinkel der Mitte täuscht bei langen Bussen)
+    var beta = Math.abs(u) > 2 ? Math.abs(Math.atan2(w - car.r * (P.wb / 2), Math.max(Math.abs(u), 4))) : 0;
+    var q = clamp((beta - 0.16) / 0.16, 0, 1), aim = 0, band = 0, dirS = u < -0.5 ? -1 : 1;
+    if (Math.abs(u) > 2) {
+      aim = Math.atan2(w + car.r * (P.wb / 2), Math.max(Math.abs(u), 4)) * dirS;
+      band = ALPHA_PEAK * 1.15 + Math.max(0, 7 - Math.abs(u)) * 0.12 + slideX;
+    }
+    if (q > 0) maxSteer += (Math.min(lock, Math.max(maxSteer, Math.abs(aim) + band + 0.15)) - maxSteer) * q;
+    var want = clamp(inp.steer || 0, -1, 1) * maxSteer, wantRaw = want;
     // Lenkhilfe gegen Untersteuern: die Vorderräder nie weiter als bis zum Haftungsmaximum über die Fahrtrichtung der
     // Vorderachse hinaus einschlagen (mehr Einschlag würde nur rutschen – lange Busse/Lkw schoben sonst geradeaus);
-    // bei Schritttempo bleibt der volle Einschlag (kinematisch), dazwischen weich
+    // bei Schritttempo bleibt der volle Einschlag (kinematisch), dazwischen weich; im Rutschen ausgeblendet (q)
     if (Math.abs(u) > 2) {
-      var dirS = u < -0.5 ? -1 : 1, aim = Math.atan2(w + car.r * (P.wb / 2), Math.max(Math.abs(u), 4)) * dirS;
-      var band = ALPHA_PEAK * 1.15 + Math.max(0, 7 - Math.abs(u)) * 0.12 + slideX;
       // nur begrenzen, nie selbst gegenlenken: höchstens bis zur Mitte zurück, Gegenlenken macht der Spieler
       if (want > 0) want = Math.min(want, Math.max(0, aim + band));
       else if (want < 0) want = Math.max(want, Math.min(0, aim - band));
+      want += (wantRaw - want) * q;
     }
     // nach einem Crash kurz benommen: Lenkung träger, weniger Haftung, Drehung wird nicht kinematisch weggebügelt
     var stun = car.hitT > 0 ? clamp(car.hitT / 0.4, 0, 1) : 0;
     if (car.hitT > 0) car.hitT = Math.max(0, car.hitT - dt);
     car.steer += clamp(want - car.steer, -3.2 * dt * (1 - 0.7 * stun), 3.2 * dt * (1 - 0.7 * stun));
-    // Anzeige-Einschlag (steerVis): was der Fahrer lenkt, ohne die Lenkhilfe – im Drift begrenzt die Hilfe den
-    // wirksamen Winkel oft auf 0, die Räder standen dann trotz Lenken gerade; Physik rechnet weiter mit car.steer
-    car.steerVis = (car.steerVis || 0) + clamp(wantVis - (car.steerVis || 0), -3.2 * dt, 3.2 * dt);
+    car.steerVis = car.steer;   // Anzeige = wirksamer Winkel
     var delta = car.steer;
     var thr = clamp(inp.throttle || 0, 0, 1), brk = clamp(inp.brake || 0, 0, 1), hb = !!inp.handbrake;
     var nitro = car.nitroT > 0;
