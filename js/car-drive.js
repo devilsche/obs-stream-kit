@@ -522,7 +522,14 @@
   });
   doc.addEventListener('keyup', function (e) { keys[e.code] = false; });
   root.addEventListener('blur', function () { keys = {}; if (race && !race.mp && race.phase === 'race' && !race.paused) setPaused(true); });
-  doc.addEventListener('visibilitychange', function () { if (doc.hidden && race && !race.mp && race.phase === 'race' && !race.paused) setPaused(true); });
+  doc.addEventListener('visibilitychange', function () {
+    if (doc.hidden && race && !race.mp && race.phase === 'race' && !race.paused) setPaused(true);
+    // Raum: Tab war im Hintergrund, die KI hat übernommen (keine Zustände) → beim Zurückkommen Steuer automatisch zurück
+    // (kurz warten, bis Bildtakt und Verbindung wieder laufen)
+    if (!doc.hidden && race && race.mp && !race.chat) setTimeout(function () {
+      if (!doc.hidden && race && race.mp && !race.chat && mp && mpTaken(mp.me)) mpTakeWheel();
+    }, 400);
+  });
 
   var pad = { prev: [], active: false };
   function readPad() {
@@ -917,12 +924,26 @@
   }
   // Mitspieler: harte Kontakte melden (bump), damit der andere sofort reagiert, auch wenn er den Kontakt bei sich
   // knapp verpasst; je Gegner höchstens alle 0,3 s. Eigene Kontakte merken (ankommende bump nicht doppelt anwenden).
+  // Auch Schrammen/Anlehnen zählen: sonst merkt der Gerammte nichts, wenn sein Bild den Kontakt knapp verpasst
+  // (Kotflügel in der Kurve) und er „schrammt“ ohne Wirkung vorbei. Stöße je Gegner im Bild summiert, gesendet in
+  // peerBumpSend (höchstens alle 0,12 s je Gegner, ab BUMP_MIN N·s).
+  var BUMP_MIN = 0.4;
   function peerHit(o, h) {
     var c = o.c; if (!c || !race) return;
     c.contactAt = race.t;
-    if (h.impact < Phys.CRASH_V || !mp || !mp.net || race.spect || (c.bumpAt != null && race.t - c.bumpAt < 0.3)) return;
-    c.bumpAt = race.t;
-    mp.net.send({ t: 'bump', to: c.id, jx: Math.round(h.jx * 1000) / 1000, jz: Math.round(h.jz * 1000) / 1000, imp: Math.round(h.impact * 100) / 100 });
+    var a = c.bumpAcc || (c.bumpAcc = { jx: 0, jz: 0, imp: 0 });
+    a.jx += h.jx; a.jz += h.jz; a.imp = Math.max(a.imp, h.impact);
+  }
+  function peerBumpSend() {
+    if (!race || !race.remotes) return;
+    race.remotes.forEach(function (c) {
+      var a = c.bumpAcc; if (!a) return;
+      if (!mp || !mp.net || race.spect || (c.bumpAt != null && race.t - c.bumpAt < 0.12)) return;   // weiter sammeln
+      c.bumpAcc = null;
+      if (Math.hypot(a.jx, a.jz) < BUMP_MIN) return;
+      c.bumpAt = race.t;
+      mp.net.send({ t: 'bump', to: c.id, jx: Math.round(a.jx * 1000) / 1000, jz: Math.round(a.jz * 1000) / 1000, imp: Math.round(a.imp * 100) / 100 });
+    });
   }
   // bump eines Mitspielers: Gegenstoß (−J) auf mein Auto, wenn ich den Kontakt nicht selbst gerade gerechnet habe
   function peerBump(m) {
@@ -1020,6 +1041,7 @@
       else if (h.slide > 1.5 && (!scrape || h.slide > scrape.slide)) scrape = h;
     });
     if (race.chat) rcHitSend();
+    if (race.mp) peerBumpSend();
     race.crashT = Math.max(0, (race.crashT || 0) - dt);
     if (crash && race.crashT <= 0) {
       var mP = pc.P.mass, mO = isFinite(crash.o.mass) ? crash.o.mass : mP * 4, heavy = mO / (mO + mP);
