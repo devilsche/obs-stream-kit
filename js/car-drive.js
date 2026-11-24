@@ -1169,7 +1169,9 @@
     var live = race && race.pc && !race.paused && race.phase !== 'results' && race.phase !== 'countdown';
     var so = live ? race.sos : null, onboard = live && so && !look.used && (race.camMode === 'chase' || race.camMode === 'hood');
     var r = so ? so.r : 0;
-    if (SPD) SPD.set(onboard ? smooth(0.6, 1.0, r) * (race.camMode === 'hood' ? 1.15 : 1) : 0, onboard ? 0.32 * smooth(0.45, 1.05, r) : 0, dt, W, H);
+    // Halle (dunkle Decke): helle Fahrtwind-Streifen würden zum grauen Schleier – dort nur angedeutet
+    var dim = trackRes && trackRes.theme && trackRes.theme.indoor ? 0.3 : 1;
+    if (SPD) SPD.set(onboard ? smooth(0.6, 1.0, r) * (race.camMode === 'hood' ? 1.15 : 1) * dim : 0, onboard ? 0.32 * smooth(0.45, 1.05, r) : 0, dt, W, H);
     if (trackRes && trackRes.setMotionBlur) trackRes.setMotionBlur(onboard && !REDUCE ? 0.3 * smooth(0.3, 1.0, r) : 0);
     if (!race) return;
     if (race.paused) dt = 0;
