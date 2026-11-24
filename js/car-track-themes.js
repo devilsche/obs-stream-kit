@@ -1681,6 +1681,81 @@
           var w2 = onWall(sd, u + (rnd() - 0.5) * 0.05, 0.1); tag.add(w2.x, w2.z, { rot: w2.rot, v: (nTag++) % Art.TAGS });
         });
       });
+      // ---- Zuschauer-Galerie, Kart-Box, Spielecke, Banner, Lichtband, Wimpel ----
+      var prim = ctx.primary || 0x5e2a79, acc = ctx.accent || 0xf2b705;
+      var crowdC = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831, 0x1f6f3f, 0xd94f8a];
+      var skinC = [0xf1c8a5, 0xe0ac82, 0xc68863, 0x8d5a3b, 0x5c3a24];
+      // Galerie an der hinteren Längswand: Stahlbühne auf 3,2 m, Geländer, Treppen an beiden Enden, Publikum in 2 Reihen
+      var GL = Math.min(64, W * 0.5), GD = 5, GY = 3.2, gk = new Kit(), gz0 = z1 - GD / 2 - 0.3;
+      gk.add(box(GL, 0.3, GD), 0x5c6570, { y: GY });
+      gk.add(box(GL, 0.08, GD - 0.2), 0x7d858e, { y: GY + 0.19 });
+      for (var gp = 0; gp <= Math.round(GL / 6); gp++) {
+        var gxp = -GL / 2 + gp * GL / Math.round(GL / 6);
+        gk.add(box(0.3, GY, 0.3), 0x4c5661, { x: gxp, y: GY / 2, z: -GD / 2 + 0.3 });
+        gk.add(box(0.06, 1.1, 0.06), 0x9aa3ad, { x: gxp, y: GY + 0.7, z: -GD / 2 + 0.05 });
+      }
+      gk.add(box(GL, 0.08, 0.08), 0xe0e4e8, { y: GY + 1.25, z: -GD / 2 + 0.05 });
+      gk.add(box(GL, 0.6, 0.04), prim, { y: GY - 0.45, z: -GD / 2 - 0.02 });   // Blende in Vereinsfarbe
+      [-1, 1].forEach(function (sd) { gk.add(box(1.6, 0.25, 7.5), 0x5c6570, { x: sd * (GL / 2 + 0.9), y: GY / 2, z: GD / 2 - 3.9, rx: -Math.atan2(GY, 7.5) * (-1) }); });
+      for (var gr = 0; gr < 2; gr++) for (var gq = 0; gq < Math.round(GL / 0.8); gq++) {
+        if (rnd() < 0.22) continue;
+        // stehende Figur: Beine (Jeans/dunkel), Oberkörper (Shirt-Farbe), Arme, Kopf (Hautton) – ~1,75 m
+        var gx2 = -GL / 2 + 0.6 + gq * 0.8 + (rnd() - 0.5) * 0.3, gzz = -GD / 2 + 0.6 + gr * 1.1 + (rnd() - 0.5) * 0.3, k2 = 0.92 + rnd() * 0.14, fy = GY + 0.23;
+        var shirt = crowdC[Math.floor(rnd() * crowdC.length)], legC = rnd() < 0.6 ? 0x2c3e5c : 0x2a2a2e;
+        gk.add(box(0.3, 0.82 * k2, 0.2), legC, { x: gx2, y: fy + 0.41 * k2, z: gzz });
+        gk.add(box(0.4, 0.6 * k2, 0.24), shirt, { x: gx2, y: fy + (0.82 + 0.3) * k2, z: gzz });
+        gk.add(box(0.1, 0.55 * k2, 0.12), shirt, { x: gx2 - 0.26, y: fy + 1.12 * k2, z: gzz });
+        gk.add(box(0.1, 0.55 * k2, 0.12), shirt, { x: gx2 + 0.26, y: fy + 1.12 * k2, z: gzz });
+        gk.add(box(0.21, 0.25, 0.22), skinC[Math.floor(rnd() * skinC.length)], { x: gx2, y: fy + 1.42 * k2 + 0.13, z: gzz });
+      }
+      ctx.kind('gallery', [{ geo: gk.geo() }], { r: 3 }).add(hx, gz0, { rot: Math.PI, y: LIFT });
+      for (var gu = -GL / 2 - 2; gu <= GL / 2 + 2; gu += 3) ctx.place(hx + gu, gz0, 3, true);
+      // unter der Galerie: Spielautomaten an der Wand (slot arcade), davor Picknick-Tische (slot picnic)
+      var arcK = new Kit(); arcK.add(box(0.9, 1.9, 0.8), 0x2b2e57, { y: 0.95 }); arcK.add(box(0.7, 0.5, 0.05), 0x7fd8ff, { y: 1.45, z: -0.42 });
+      var arcade = ctx.kind('arcade', [{ geo: arcK.geo() }], { r: 0.6, prop: { slot: 'arcade', box: { w: 1.2, d: 1, h: 2.2 } } });
+      for (var ai = 0; ai < 10; ai++) arcade.add(hx - GL / 2 + 4 + ai * 1.3 + (ai > 4 ? GL - 17 : 0), z1 - 0.9, { rot: Math.PI, y: LIFT });
+      var picK = new Kit(); picK.add(box(2, 0.08, 0.9), 0x9c7a4d, { y: 0.75 }); [-0.75, 0.75].forEach(function (zz) { picK.add(box(2, 0.06, 0.3), 0x8a6a44, { y: 0.45, z: zz }); });
+      var picnic = ctx.kind('picnic', [{ geo: picK.geo() }], { r: 1.6, prop: { slot: 'picnic', box: { w: 4.4, d: 2.1, h: 1.1 } } });
+      for (var pi2 = 0; pi2 < 4; pi2++) picnic.add(hx - 9 + pi2 * 6, z1 - 3.2, { rot: 0, y: LIFT });
+      // Kart-Box an der vorderen Längswand: zwei Reihen geparkter Karts (slot kart), Werkzeugwagen (slot toolCart),
+      // Boden-Markierung in Vereinsfarbe
+      var kk = new Kit();
+      kk.add(box(1.8, 0.12, 1.1), 0xffffff, { y: 0.18 }); kk.add(box(0.5, 0.45, 0.45), 0x1a1a1c, { x: -0.2, y: 0.45 });
+      [[-0.65, 0.55], [-0.65, -0.55], [0.65, 0.55], [0.65, -0.55]].forEach(function (w) { kk.add(cyl(0.14, 0.14, 0.2, 10), 0x15161a, { x: w[0], y: 0.14, z: w[1], rx: Math.PI / 2 }); });
+      var kart = ctx.kind('kart', [{ geo: kk.geo() }], { r: 1, tint: true, prop: { slot: 'kart', box: { w: 2, d: 1.3, h: 0.9 } } });
+      var kcol = [prim, acc, 0xd8262b, 0x2563a8, 0x2e8b57, 0xf2f2f2];
+      var mk2 = new Kit(); mk2.add(new THREE.PlaneGeometry(24, 7.5), prim, { y: 0.015, rx: -Math.PI / 2 });
+      mk2.add(new THREE.PlaneGeometry(24.4, 0.25), acc, { y: 0.02, z: -3.9, rx: -Math.PI / 2 }); mk2.add(new THREE.PlaneGeometry(24.4, 0.25), acc, { y: 0.02, z: 3.9, rx: -Math.PI / 2 });
+      ctx.kind('pitFloor', [{ geo: mk2.geo() }], { r: 12 }).add(hx, z0 + 6, { rot: 0 });
+      for (var kr = 0; kr < 2; kr++) for (var kc = 0; kc < 8; kc++) {
+        var kxp = hx - 10.5 + kc * 3, kzp = z0 + 4.2 + kr * 3.6;
+        if (rnd() < 0.15) continue;
+        kart.add(kxp, kzp, { rot: Math.PI / 2 + (rnd() - 0.5) * 0.1, tint: kcol[(kc + kr) % kcol.length], y: LIFT });
+      }
+      var tcK = new Kit(); tcK.add(box(1, 1, 0.6), 0xc0392b, { y: 0.5 });
+      var toolCart = ctx.kind('toolCart', [{ geo: tcK.geo() }], { r: 0.7, prop: { slot: 'toolCart', box: { w: 1.3, d: 0.7, h: 1.05 } } });
+      [-13.5, 13.5, -12, 12].forEach(function (dx, i) { toolCart.add(hx + dx, z0 + 4 + (i > 1 ? 3.6 : 0), { rot: rnd() * 0.6, y: LIFT }); });
+      for (var ku = -14; ku <= 14; ku += 3) ctx.place(hx + ku, z0 + 6, 3, true);
+      // Lichtband in Vereinsfarbe rundum über dem Rost-Band
+      var led = new Kit(); band(led, 6.1, 6.45, 0.12, prim, {});
+      var led2 = new Kit(); band(led2, 6.55, 6.65, 0.12, acc, {});
+      ctx.kind('ledBand', [{ geo: led.geo(), mat: 'glow' }, { geo: led2.geo(), mat: 'glow' }], { r: 1 }).add(0, 0, { abs: true, y: 0 });
+      // Sponsor-Banner unter den Fachwerkträgern (beidseitig, Fantasie-Sponsoren aus dem Atlas) und Wimpelketten
+      var bnK = new Kit();
+      [1, -1].forEach(function (f) { bnK.add(new THREE.PlaneGeometry(8, 1.8), 0xffffff, { y: 0, x: f * 0.03, ry: f * Math.PI / 2, tile: 'ad', vary: true }); });
+      var banner = ctx.kind('hallBanner', [{ geo: bnK.geo(), mat: 'atl' }], { r: 4, vary: true });
+      var buK = new Kit(), fcol = [prim, acc, 0xd8262b, 0xf2f2f2, 0x2563a8];
+      for (var bf = 0; bf < Math.floor(D / 0.9); bf++) {
+        var bzf = -D / 2 + 0.45 + bf * 0.9, sag = 0.9 * (1 - Math.pow((bzf / (D / 2)), 2));
+        buK.add(cone(0.28, 0.55, 3), fcol[bf % fcol.length], { y: -sag - 0.3, z: bzf, rx: Math.PI, sx: 0.15 });
+      }
+      var bunting = ctx.kind('bunting', [{ geo: buK.geo() }], { r: 1 });
+      var nTb = Math.max(2, Math.round(W / 12)), adN = 0;
+      for (var tb = 1; tb < nTb; tb++) {
+        var tbx = x0 + W * tb / nTb, ybb = H - 3.4 - 0.25;
+        bunting.add(tbx, hz, { abs: true, y: ybb });
+        if (tb % 2) [-D / 4, D / 4].forEach(function (oz) { banner.add(tbx, hz + oz, { abs: true, y: ybb - 1.3, rot: 0, v: (adN++) % Art.ADS }); });
+      }
       // Ölfässer in Gruppen (Modell slot drum, Ersatz Zylinder in Instanzfarbe), Paletten-Stapel, Reifenhaufen
       var drum = ctx.kind('drum', [{ geo: cyl(0.3, 0.3, 0.95, 10).translate(0, 0.475, 0) }], { r: 0.35, tint: true, prop: { slot: 'drum', box: { w: 0.8, d: 0.8, h: 1.1 } } });
       var pk2 = new Kit();

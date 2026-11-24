@@ -3038,5 +3038,107 @@
   "tex": 512,
   "len": 24,
   "tris": 6300
+ },
+ {
+  "uid": "2338810f0b1e444bace9bd7796b8c9e4",
+  "key": "kart-lowpoly",
+  "name": "Go Kart",
+  "author": "Samuel Thomas",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/go-kart-2338810f0b1e444bace9bd7796b8c9e4",
+  "theme": "hall",
+  "themes": [
+   "hall"
+  ],
+  "kind": "kart",
+  "slot": "kart",
+  "tex": 512,
+  "len": 1.9,
+  "tris": 3400
+ },
+ {
+  "uid": "b6845c7028ff4c73a0b62e78ef2b3500",
+  "key": "toolcart-mechanic",
+  "name": "Mechanic Tool Cart",
+  "author": "dinoxwave",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/mechanic-tool-cart-b6845c7028ff4c73a0b62e78ef2b3500",
+  "theme": "hall",
+  "themes": [
+   "hall"
+  ],
+  "kind": "toolCart",
+  "slot": "toolCart",
+  "tex": 512,
+  "height": 1.0,
+  "tris": 4000
+ },
+ {
+  "uid": "da8955e5c8c448e58b013951f48148a0",
+  "key": "toolcart-drawer",
+  "name": "[Free] Drawer Tool Cart (Used)",
+  "author": "Robert Prispilović",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/free-drawer-tool-cart-used-da8955e5c8c448e58b013951f48148a0",
+  "theme": "hall",
+  "themes": [
+   "hall"
+  ],
+  "kind": "toolCart",
+  "slot": "toolCart",
+  "tex": 512,
+  "height": 1.0,
+  "tris": 900
+ },
+ {
+  "uid": "a914bf3651e3496ea708dc0782eca212",
+  "key": "arcade-cabinet",
+  "name": "arcade machine",
+  "author": "Logotyp",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/arcade-machine-a914bf3651e3496ea708dc0782eca212",
+  "theme": "hall",
+  "themes": [
+   "hall"
+  ],
+  "kind": "arcade",
+  "slot": "arcade",
+  "tex": 512,
+  "height": 1.9,
+  "tris": 5000
+ },
+ {
+  "uid": "1bb221027d914639907eb6ea7f1551af",
+  "key": "arcade-claw",
+  "name": "Claw Machine",
+  "author": "Victoria Reinhold",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/claw-machine-1bb221027d914639907eb6ea7f1551af",
+  "theme": "hall",
+  "themes": [
+   "hall"
+  ],
+  "kind": "arcade",
+  "slot": "arcade",
+  "tex": 512,
+  "height": 2.1,
+  "tris": 5000
+ },
+ {
+  "uid": "c962b28e2612421b9392d3ee403b9309",
+  "key": "picnic-tables",
+  "name": "Picnic Tables",
+  "author": "Caboose3d",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/picnic-tables-c962b28e2612421b9392d3ee403b9309",
+  "theme": "hall",
+  "themes": [
+   "hall"
+  ],
+  "kind": "picnic",
+  "slot": "picnic",
+  "tex": 512,
+  "len": 4.4,
+  "tris": 2000
  }
 ]
