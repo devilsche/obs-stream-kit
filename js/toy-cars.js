@@ -743,7 +743,8 @@
     function c(x) { x = +x || 0; return Math.max(RIDE_MIN, Math.min(RIDE_MAX, x)); }
     return { f: c(r.f), r: c(r.r) };
   }
-  function applyRide(car, f, r) {
+  // axles (optional): {xF, xR} Lage der Achsen in Auto-Koordinaten (Car editor beim Radteile-Wählen: noch keine Radgruppen)
+  function applyRide(car, f, r, axles) {
     var body = bodyOf(car); if (!body || body === car) return;
     var wheels = []; car.traverse(function (o) { if (/^Wheel /.test(o.name || '')) wheels.push(o); });
     body.position.set(0, 0, 0); body.rotation.set(0, 0, 0);
@@ -760,7 +761,8 @@
       return { p: p, q: q, x: p.clone().applyMatrix4(inv).x };
     });
     var xs = keep.map(function (k) { return k.x; }), xF = Math.max.apply(null, xs.concat([-1e9])), xR = Math.min.apply(null, xs.concat([1e9]));
-    if (wheels.length < 2 || xF - xR < L * 0.2) { xF = L * 0.3; xR = -L * 0.3; }
+    if (axles && axles.xF - axles.xR > L * 0.2) { xF = axles.xF; xR = axles.xR; }
+    else if (wheels.length < 2 || xF - xR < L * 0.2) { xF = L * 0.3; xR = -L * 0.3; }
     var yF = f / 100 * UNIT, yR = r / 100 * UNIT, sl = (yF - yR) / (xF - xR);
     body.position.y = yR - xR * sl; body.rotation.z = Math.atan(sl);
     car.updateMatrixWorld(true);

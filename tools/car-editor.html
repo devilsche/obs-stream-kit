@@ -624,6 +624,24 @@
             // gewählte Teile ausblenden: dahinter liegende Stücke werden anklickbar
             if ($('hidePicked').checked && (picking === 'wheel' ? ro : st)) o.visible = false;
           });
+          // Fahrhöhe auch beim Wählen: noch keine Radgruppen – Achsen aus den gewählten Teilen, diese bleiben am Boden
+          var rv = rideVal(), picked = (def.wheelParts || []).concat(def.steerParts || []);
+          if ((rv.f || rv.r) && picked.length) {
+            car.updateMatrixWorld(true);
+            var inv = new THREE.Matrix4().copy(car.matrixWorld).invert(), xs = [], meshes = [];
+            car.traverse(function (o) { if (o.isMesh && picked.indexOf(o.userData.pkey) >= 0) { meshes.push(o); xs.push(new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3()).applyMatrix4(inv).x); } });
+            var xF = Math.max.apply(null, xs), xR = Math.min.apply(null, xs);
+            TC.applyRide(car, rv.f, rv.r, xF - xR > tpl.userData.dims.L * 0.2 ? { xF: xF, xR: xR } : null);
+            car.updateMatrixWorld(true);
+            var body = TC.bodyOf(car), Bi = new THREE.Matrix4().compose(body.position, body.quaternion, body.scale).invert();
+            var C = car.matrixWorld, Ci = new THREE.Matrix4().copy(C).invert();
+            meshes.forEach(function (o) {
+              // Lage ohne Karosserie-Anhebung: C · B⁻¹ · C⁻¹ · Welt
+              var W = new THREE.Matrix4().multiplyMatrices(C, Bi).multiply(Ci).multiply(o.matrixWorld);
+              var Lm = new THREE.Matrix4().copy(o.parent.matrixWorld).invert().multiply(W);
+              Lm.decompose(o.position, o.quaternion, o.scale);
+            });
+          }
         }
         // Lenkeinschlag der Vorderräder: gewählte Vorderräder, sonst die vorderste Achse (Front: +x)
         var s = +$('steer').value;
