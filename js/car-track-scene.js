@@ -957,6 +957,15 @@
       var gr = grad(x, z), c = Math.cos(yaw), s = Math.sin(yaw);
       return { pitch: Math.atan(gr[0] * c - gr[1] * s), roll: -Math.atan(gr[0] * s + gr[1] * c) };
     }
+    // Auflage eines Autos: Geländehöhe an Vorder-/Hinterachse (± a m) und linker/rechter Spur (± b m) statt nur in der
+    // Wagenmitte – Neigung aus den Achsen, Höhe so, dass auf Kuppe und in Senke kein Rad im Boden steckt
+    function restAt(x, z, yaw, a, b) {
+      if (flat) return { y: 0, pitch: 0, roll: 0 };
+      var c = Math.cos(yaw), s = Math.sin(yaw);
+      var hC = heightAt(x, z), hF = heightAt(x + c * a, z - s * a), hR = heightAt(x - c * a, z + s * a);
+      var hL = heightAt(x + s * b, z + c * b), hN = heightAt(x - s * b, z - c * b);
+      return { y: Math.max(hC, (hF + hR) / 2, (hL + hN) / 2), pitch: Math.atan((hF - hR) / (2 * a)), roll: -Math.atan((hL - hN) / (2 * b)) };
+    }
     function normalAt(x, z, out) {
       out = out || new THREE.Vector3();
       if (flat) return out.set(0, 1, 0);
@@ -1049,7 +1058,7 @@
 
     return {
       group: g, theme: theme, nearTrack: nearTrack, trackDist: trackDist, decor: decor, P: P, gantry: gantry,
-      heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, normalAt: normalAt, applyEnv: applyEnv, update: update, lod: lod,
+      heightAt: heightAt, groundAt: groundAt, slopeAt: slopeAt, restAt: restAt, normalAt: normalAt, applyEnv: applyEnv, update: update, lod: lod,
       props: propsReady, propStats: propStats, surfaceStats: surfaceStats, grassAt: grassAt,
       // Bewegungsunschärfe der Fahrbahn in Metern (Car Drive, Tempogefühl); 0 = aus
       setMotionBlur: function (m) { if (surfaceRes && surfaceRes.setMotionBlur) surfaceRes.setMotionBlur(m); },

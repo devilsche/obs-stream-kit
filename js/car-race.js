@@ -378,9 +378,11 @@
       }
       r.lastX = x; r.lastZ = z;
       // Höhe ist nur Optik: Auto auf die Geländehöhe, zur Steigung geneigt (Sim bleibt 2D)
-      var sl = slope(x, z, yaw);
-      r.holder.position.set(x, gh(x, z), z);
-      r.holder.rotation.set(roll + sl.roll, yaw, pitch + sl.pitch);
+      // Auflage an den Achsen; Wanken/Nicken anheben, damit kein Rad im Boden steckt
+      var rs = trackRes && trackRes.restAt ? trackRes.restAt(x, z, yaw, r.len * 0.32, (r.w || 1.8) * 0.42) : { y: gh(x, z), pitch: 0, roll: 0 };
+      var lift = Math.abs(Math.sin(roll || 0)) * (r.w || 1.8) * 0.5 + Math.abs(Math.sin(pitch || 0)) * r.len * 0.35;
+      r.holder.position.set(x, rs.y + lift, z);
+      r.holder.rotation.set(roll + rs.roll, yaw, pitch + rs.pitch);
       r.steer = ease(r.steer, clamp(steer, -MAX_STEER, MAX_STEER), 0.12, dt, 1.6);
       for (var i = 0; i < r.wheels.length; i++) {
         var w = r.wheels[i];

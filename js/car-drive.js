@@ -348,9 +348,12 @@
     return c.spinShown || 0;
   }
   function placeCar(c, x, z, yaw, roll, pitch, steer, spin) {
-    var sl = trackRes ? trackRes.slopeAt(x, z, yaw) : null;
-    c.holder.position.set(x, gh(x, z), z);
-    c.holder.rotation.set(roll + (sl ? sl.roll : 0), yaw, pitch + (sl ? sl.pitch : 0));
+    // Auflage an den Achsen (nicht nur Wagenmitte); Wanken/Nicken dreht um den Boden-Mittelpunkt – so weit anheben,
+    // dass das tiefere Rad auf dem Boden bleibt (sonst tauchen die Reifen in die Straße)
+    var rs = trackRes && trackRes.restAt ? trackRes.restAt(x, z, yaw, c.len * 0.32, c.w * 0.42) : { y: gh(x, z), pitch: 0, roll: 0 };
+    var lift = Math.abs(Math.sin(roll || 0)) * c.w * 0.5 + Math.abs(Math.sin(pitch || 0)) * c.len * 0.35;
+    c.holder.position.set(x, rs.y + lift, z);
+    c.holder.rotation.set(roll + rs.roll, yaw, pitch + rs.pitch);
     spin = shownSpin(c, x, z, yaw);
     for (var i = 0; i < c.wheels.length; i++) {
       var w = c.wheels[i];
@@ -1666,11 +1669,19 @@
     var keys = [mp.car], seen = {}, done = 0;
     mp.grid.forEach(function (g) { var d = rosterById(g.id); if (d && d.car) keys.push(d.car); });
     keys = keys.filter(function (k) { if (seen[k]) return false; seen[k] = 1; return true; });
-    ui.loadBar.max = keys.length; ui.loadBar.value = 0;
-    ui.loadText.textContent = 'Loading ' + keys.length + ' car' + (keys.length === 1 ? '' : 's') + '…';
+    // Strecke samt Kulissen-Modellen schon hinter dem Ladebalken aufbauen (sonst laden Bäume, Berge und Himmel erst
+    // im Countdown nach und es ruckelt beim Start); danach Shader vorab übersetzen
+    var idx = mp.room.track | 0;
+    buildTrack(Sim.track(Sim.TRACKS[idx] || 1)); trackRes.mpTrack = idx;
+    ui.loadBar.max = keys.length + 1; ui.loadBar.value = 0;
+    ui.loadText.textContent = 'Loading track scenery and ' + keys.length + ' car' + (keys.length === 1 ? '' : 's') + '…';
     var token = {}; begin.token = token; mpBeginRace.pending = true;
-    var all = Promise.all(keys.map(function (k) { return mpLoad(k).then(function () { done++; ui.loadBar.value = done; }); }));
-    var wait = Math.max(0.3, mp.startAt - mp.net.serverNow() - 1.2);
+    function step(label) { done++; ui.loadBar.value = done; if (label) ui.loadText.textContent = label; }
+    var scenery = Promise.resolve(trackRes.props).catch(function () { /* fehlende Modelle: prozedurale Kulisse bleibt */ })
+      .then(function () { step(done < keys.length ? 'Scenery ready – loading cars…' : 'Scenery ready.'); });
+    var all = Promise.all(keys.map(function (k) { return mpLoad(k).then(function () { step(); }); }).concat([scenery]))
+      .then(function () { ui.loadText.textContent = 'Preparing the start…'; try { renderer.compile(scene, cam); } catch (e) { /* */ } });
+    var wait = Math.max(0.3, mp.startAt - mp.net.serverNow() - 1.5);
     Promise.race([all, new Promise(function (res) { setTimeout(res, wait * 1000); })]).then(function () {
       mpBeginRace.pending = false;
       if (begin.token !== token || !mp) return;
@@ -1679,7 +1690,11 @@
   }
   function setupRaceMP() {
     var idx = mp.room.track | 0, seed = Sim.TRACKS[idx] || 1, T = Sim.track(seed);
-    buildTrack(T);
+    if (!trackRes || trackRes.mpTrack !== idx) {   // sonst schon hinter dem Ladebalken gebaut (mpBeginRace)
+      if (trackRes) { trackRes.dispose(); trackRes = null; }
+      if (grass) { grass.dispose(); grass = null; }
+      buildTrack(T);
+    }
     var RD = root.RubberDuck, outfits = RD && RD.OUTFITS ? RD.OUTFITS : [], myGrid = 0, remotes = [];
     mp.grid.forEach(function (g) {
       if (String(g.id) === mp.me) { myGrid = g.grid | 0; return; }

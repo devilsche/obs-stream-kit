@@ -720,11 +720,63 @@
     var wrap = new THREE.Group(); wrap.add(rot); wrap.scale.setScalar(k);
     var c = new THREE.Vector3(); box.getCenter(c); size.multiplyScalar(k);
     rot.position.sub(c);
-    var car = new THREE.Group(); car.add(wrap); car.name = e.key; car.updateMatrixWorld(true);
+    // Karosserie in eigener Ebene „Body“: Fahrhöhe (Car editor „Ride height“) hebt/neigt nur sie, die Räder bleiben
+    var body = new THREE.Group(); body.name = 'Body'; body.add(wrap);
+    var car = new THREE.Group(); car.add(body); car.name = e.key; car.updateMatrixWorld(true);
     car.userData.dims = { L: size.x, B: bodyL * k, W: size.z, H: size.y, belt: size.y * 0.62 };
     car.userData.key = e.key;
     delete ud.wheels; delete ud.paintMats; delete ud.rimMats; delete ud.rimFromPaint;
+    var rd = rideOf(e.key); applyRide(car, rd.f, rd.r);
     return car;
+  }
+  // ── Fahrhöhe je Achse (Car editor „Ride height“): vehicle.ride = {f, r} in cm, + = höher. Hebt die Karosserie-Ebene
+  // („Body“) an der Vorder-/Hinterachse an (Neigung dazwischen) und setzt die Radgruppen zurück an ihren Platz –
+  // die Räder bleiben auf dem Boden. Wiederholbar (Ausgangslage der Räder in userData.p0/q0, auch in Kopien).
+  var RIDE_MIN = -20, RIDE_MAX = 30;
+  function bodyOf(car) {
+    if (!car) return car;
+    for (var i = 0; i < car.children.length; i++) if (car.children[i].name === 'Body') return car.children[i];
+    return car;
+  }
+  function rideOf(key) {
+    var r = vehicle(key).ride || {};
+    function c(x) { x = +x || 0; return Math.max(RIDE_MIN, Math.min(RIDE_MAX, x)); }
+    return { f: c(r.f), r: c(r.r) };
+  }
+  function applyRide(car, f, r) {
+    var body = bodyOf(car); if (!body || body === car) return;
+    var wheels = []; car.traverse(function (o) { if (/^Wheel /.test(o.name || '')) wheels.push(o); });
+    body.position.set(0, 0, 0); body.rotation.set(0, 0, 0);
+    wheels.forEach(function (w) {
+      if (w.userData.p0) { w.position.fromArray(w.userData.p0); w.quaternion.fromArray(w.userData.q0); }
+      else { w.userData.p0 = w.position.toArray(); w.userData.q0 = w.quaternion.toArray(); }
+    });
+    car.updateMatrixWorld(true);
+    car.userData.ride = { f: +f || 0, r: +r || 0 };
+    if (!f && !r) return;
+    var inv = new THREE.Matrix4().copy(car.matrixWorld).invert(), L = (car.userData.dims || { L: 4.4 }).L;
+    var keep = wheels.map(function (w) {
+      var p = new THREE.Vector3(), q = new THREE.Quaternion(); w.getWorldPosition(p); w.getWorldQuaternion(q);
+      return { p: p, q: q, x: p.clone().applyMatrix4(inv).x };
+    });
+    var xs = keep.map(function (k) { return k.x; }), xF = Math.max.apply(null, xs.concat([-1e9])), xR = Math.min.apply(null, xs.concat([1e9]));
+    if (wheels.length < 2 || xF - xR < L * 0.2) { xF = L * 0.3; xR = -L * 0.3; }
+    var yF = f / 100 * UNIT, yR = r / 100 * UNIT, sl = (yF - yR) / (xF - xR);
+    body.position.y = yR - xR * sl; body.rotation.z = Math.atan(sl);
+    car.updateMatrixWorld(true);
+    wheels.forEach(function (w, i) {
+      var par = w.parent, pq = new THREE.Quaternion();
+      w.position.copy(par.worldToLocal(keep[i].p.clone()));
+      par.getWorldQuaternion(pq); w.quaternion.copy(pq.invert().multiply(keep[i].q));
+      w.updateMatrixWorld(true);
+    });
+  }
+  // Sitz-/Wand-Schätzung in Karosserie-Koordinaten: kurz ohne Fahrhöhe rechnen
+  function noRide(t, fn) {
+    var b = bodyOf(t), rd = t && t.userData.ride;
+    if (!b || b === t || !rd || (!rd.f && !rd.r)) return fn();
+    applyRide(t, 0, 0);
+    try { return fn(); } finally { applyRide(t, rd.f, rd.r); }
   }
   // opts.race: leichte Renn-Version (<uid>.race.glb, Texturen ≤ 256 px; der Server liefert sonst das volle Modell).
   // Die Vorlage liegt unter demselben Schlüssel wie das volle Modell (build() sucht dort) – eine Seite lädt nur eine Variante.
@@ -751,7 +803,7 @@
     t.traverse(function (o) {
       if (!o.isMesh || o.isSkinnedMesh || Array.isArray(o.material) || !o.geometry || !o.geometry.attributes.position) return;
       if (Object.keys(o.geometry.morphAttributes || {}).length) return;
-      var owner = t;
+      var owner = bodyOf(t);
       for (var p = o.parent; p && p !== t; p = p.parent) if (p.name === 'Spin' || /^Wheel /.test(p.name || '')) { owner = p; break; }
       var k = owner.uuid + '|' + o.material.uuid + '|' + o.renderOrder;
       (groups[k] || (groups[k] = { owner: owner, mat: o.material, order: o.renderOrder, list: [] })).list.push(o);
@@ -775,7 +827,7 @@
       var merged = null;
       try { merged = BGU.mergeBufferGeometries(geos, false); } catch (err) { merged = null; }
       if (!merged) return;
-      var mesh = new THREE.Mesh(merged, g.mat); mesh.renderOrder = g.order; mesh.userData.wheelPart = g.owner !== t;
+      var mesh = new THREE.Mesh(merged, g.mat); mesh.renderOrder = g.order; mesh.userData.wheelPart = g.owner !== t && g.owner.name !== 'Body';
       g.owner.add(mesh);
       g.list.forEach(function (o) { if (o.parent) o.parent.remove(o); });
     });
@@ -1064,7 +1116,8 @@
     ray.set(o, d); ray.far = Infinity;
     return ray.intersectObjects(meshes, false).map(function (h) { return h.distance; });
   }
-  function autoSeat(t) {
+  function autoSeat(t) { return noRide(t, function () { return autoSeat0(t); }); }
+  function autoSeat0(t) {
     var D = t.userData.dims || { L: 4.4, W: 1.8, H: 1.3 }, L = D.L, W = D.W, H = D.H, y0 = -H / 2;
     var meshes = hullMeshes(t), ray = new THREE.Raycaster();
     ray.params.Line = { threshold: 0 }; ray.params.Points = { threshold: 0 };
@@ -1172,7 +1225,7 @@
     duck.name = 'Driver'; duck.userData.driver = true;
     duck.traverse(function (o) { o.userData.driver = true; });
     // Vorlage liegt in car.children[0] (wrap) – Sitz gilt in Auto-Koordinaten, also direkt am Auto
-    car.add(duck);
+    bodyOf(car).add(duck);   // Karosserie-Ebene: hebt sich mit der Fahrhöhe
     // Schnittwände (seat.clip, Auto-Koordinaten): was jenseits liegt, wird nicht gezeichnet – Ente guckt nicht
     // seitlich oder hinten heraus. Eigene Material-Kopien je Ente; Ebenen in Weltlage per updateDriverClip
     var planes = clipPlanes(st.clip);
@@ -1214,6 +1267,9 @@
   // Wände aus der Kabine schätzen (Car editor „Auto walls“): Türinnenseiten, Frontscheibe, Heckscheibe/Rückwand, Dach
   function autoWalls(key, t, st) {
     t = t || TPL[key]; st = st || seatOf(key, t); if (!t || !st) return null;
+    return noRide(t, function () { return autoWalls0(t, st); });
+  }
+  function autoWalls0(t, st) {
     var meshes = hullMeshes(t), ray = new THREE.Raycaster(), U = UNIT, D = t.userData.dims;
     function hits(o, d) { return castAll(ray, meshes, o, d); }
     var mid = new THREE.Vector3(st.x, st.y + st.s * 0.5, st.z), head = new THREE.Vector3(st.x, st.y + st.s * 0.8, st.z), c = {};
@@ -1237,6 +1293,6 @@
     forget: function (k) { delete TPL[k]; delete loading[k]; delete SEATS[k]; var i = MODELS.indexOf(k); if (i >= 0) MODELS.splice(i, 1); },
     paintTemplate: paintTemplate, has: function (k) { return !!BYKEY[k] || !!TPL[k]; }, catalog: function () { return CATALOG; },
     loadCatalog: loadCatalog, loadModel: loadModel, mergeForRace: mergeForRace, vehicle: vehicle,
-    seatOf: seatOf, autoSeat: autoSeat, addDriver: addDriver, updateDriverClip: updateDriverClip, updateDriverClips: updateDriverClips, autoWalls: autoWalls, forgetSeat: function (k) { delete SEATS[k]; }, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
+    seatOf: seatOf, autoSeat: autoSeat, bodyOf: bodyOf, rideOf: rideOf, applyRide: applyRide, RIDE_MIN: RIDE_MIN, RIDE_MAX: RIDE_MAX, addDriver: addDriver, updateDriverClip: updateDriverClip, updateDriverClips: updateDriverClips, autoWalls: autoWalls, forgetSeat: function (k) { delete SEATS[k]; }, MODELS: MODELS, UNIT: UNIT, base: function () { return BASE; }
   };
 })(typeof window !== 'undefined' ? window : this);

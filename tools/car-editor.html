@@ -229,6 +229,22 @@
         </div>
       </section>
 
+      <section aria-labelledby="h-ride">
+        <h2 id="h-ride">Ride height</h2>
+        <p class="muted small-text">Raise or lower the body at the front and rear axle (cm, + = higher). The wheels stay on the ground, the body moves – different values tilt it. Applies in the chat race and in Car Drive after saving.</p>
+        <div class="row driver-row">
+          <label for="rideF">Front axle (cm)</label>
+          <input type="range" id="rideF" class="ride-in" data-k="f" min="-20" max="30" step="0.5" value="0">
+          <input type="number" id="rideFN" class="ride-in driver-num" data-k="f" min="-20" max="30" step="0.5" value="0" aria-label="Front ride height in cm">
+        </div>
+        <div class="row driver-row">
+          <label for="rideR">Rear axle (cm)</label>
+          <input type="range" id="rideR" class="ride-in" data-k="r" min="-20" max="30" step="0.5" value="0">
+          <input type="number" id="rideRN" class="ride-in driver-num" data-k="r" min="-20" max="30" step="0.5" value="0" aria-label="Rear ride height in cm">
+        </div>
+        <div class="row"><button type="button" id="rideReset" class="small">Reset ride height</button></div>
+      </section>
+
       <section aria-labelledby="h-driver">
         <h2 id="h-driver">Driver</h2>
         <p class="muted small-text">A rubber duck sits in the driver's seat during races. Without your own seat it is placed automatically (left seat, behind the windscreen, sized to fit under the roof). “Place driver”: click the seat in the 3D view – the duck sits on that spot (keep “Click through glass” ticked to reach the seat behind the windows). Fine-tune with the sliders and number fields or drag the duck with Move/Rotate; “Auto place” goes back to the automatic seat.</p>
@@ -720,6 +736,7 @@
         TC.loadModel(cur).then(function (t) {
           if (cur.key !== key) return;
           tpl = t; $('msg').hidden = true;
+          var rv = rideVal(); TC.applyRide(t, rv.f, rv.r);   // ungespeicherte Fahrhöhe (Neuladen nach Split/Cut)
           var mt = TC.meta(cur.key);
           if (mt && mt.norm) {
             ['rimParts', 'wheelParts', 'steerParts'].forEach(function (k) { if (def[k]) def[k] = mt.norm(def[k]); });
@@ -749,7 +766,7 @@
         $('rework').checked = !!def.rework; $('note').value = def.note || '';
         $('texOff').checked = !!def.texOff; $('smoothWheels').checked = !!def.smoothWheels; $('straight').checked = def.straight !== false;
         Array.prototype.forEach.call(document.querySelectorAll('.iss'), function (x) { x.checked = (def.issues || []).indexOf(x.value) >= 0; });
-        raceFill(); paints(); zones(); driverFill();
+        raceFill(); paints(); zones(); driverFill(); rideFill();
         if (sndEd) sndEd.fill(true);
       }
       // kleines Farbfeld mit Schalter „eigene Farbe“: get() → Farbe oder undefined, set(Farbe|undefined)
@@ -1002,6 +1019,25 @@
       document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && picking === 'cut' && cutState) { e.preventDefault(); cutCancel(); say('Cut cancelled.'); } });
       $('wheelAuto').addEventListener('click', function () { delete def.wheelParts; delete def.steerParts; delete def.frontWheelParts; picking = null; $('pickWheel').setAttribute('aria-pressed', 'false'); $('pickFront').setAttribute('aria-pressed', 'false'); canvas.classList.remove('picking'); reprepare({ wheelParts: undefined, steerParts: undefined, frontWheelParts: undefined }); });
       $('texOff').addEventListener('change', function () { def.texOff = $('texOff').checked; show(); });
+      // ── Fahrhöhe je Achse (def.ride = {f, r} in cm): Vorlage direkt anpassen, Vorschau neu ──
+      function rideVal() { var r = def.ride || {}; return { f: +r.f || 0, r: +r.r || 0 }; }
+      function rideFill() {
+        var r = rideVal();
+        $('rideF').value = r.f; $('rideFN').value = r.f; $('rideR').value = r.r; $('rideRN').value = r.r;
+      }
+      function rideSet(f, r) {
+        f = Math.max(TC.RIDE_MIN, Math.min(TC.RIDE_MAX, +f || 0)); r = Math.max(TC.RIDE_MIN, Math.min(TC.RIDE_MAX, +r || 0));
+        def.ride = f || r ? { f: f, r: r } : undefined;
+        if (tpl) TC.applyRide(tpl, f, r);
+        rideFill(); show();
+      }
+      Array.prototype.forEach.call(document.querySelectorAll('.ride-in'), function (el) {
+        el.addEventListener('input', function () {
+          if (el.value === '' || !isFinite(+el.value)) return;
+          var r = rideVal(); r[el.dataset.k] = +el.value; rideSet(r.f, r.r);
+        });
+      });
+      $('rideReset').addEventListener('click', function () { rideSet(0, 0); say('Ride height back to the model.'); });
       $('smoothWheels').addEventListener('change', function () { def.smoothWheels = $('smoothWheels').checked; reprepare({ smoothWheels: def.smoothWheels || undefined }); });
       $('straight').addEventListener('change', function () {
         def.straight = $('straight').checked;
@@ -1079,7 +1115,7 @@
         if (picking === 'driver') {
           // Klickpunkt in Auto-Koordinaten (Vorlage), Ente sitzt darauf; Größe bleibt
           var carObj = holder.children[0]; if (!carObj) return;
-          var lp = carObj.worldToLocal(hit.point.clone()), st0 = ownSeat(); if (!st0) return;
+          var lp = TC.bodyOf(carObj).worldToLocal(hit.point.clone())   // Karosserie-Koordinaten (Fahrhöhe), st0 = ownSeat(); if (!st0) return;
           def.seat = { x: +lp.x.toFixed(4), y: +lp.y.toFixed(4), z: +lp.z.toFixed(4), s: st0.s, r: st0.r || 0, p: st0.p || 0, l: st0.l || 0, clip: st0.clip };
           setPick('driver'); driverFill(); show(); say('Driver placed. Adjust size, height and turn, then save.'); return;
         }
@@ -1264,6 +1300,7 @@
         if (def.texOff) d.texOff = true;
         if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
+        if (def.ride && (def.ride.f || def.ride.r)) d.ride = { f: +def.ride.f || 0, r: +def.ride.r || 0 };
         if (def.race) d.race = CarRaceStats.clean(def.race);
         if (def.sound && window.CarEngineAudio) { var snd = CarEngineAudio.Model.cleanSound(def.sound); if (snd) d.sound = snd; }
         if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
