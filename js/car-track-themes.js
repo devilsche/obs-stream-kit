@@ -1180,7 +1180,141 @@
     }
   };
 
-  var BY_LAYOUT = { Speedway: 'stadium', Twister: 'forest', Hairpin: 'alpine', Coast: 'coast', Kart: 'industrial' };
+  // Alte Industriehalle (Kart): die Bahn steht in einer großen Halle – Wellblech über Betonsockel, Stahlstützen,
+  // Fachwerkträger, Oberlichter, Hallenstrahler, Rolltore, Graffiti, Container und Fässer an den Wänden. Wände und Dach
+  // sind nur von innen sichtbar (nach innen gerichtete Flächen): Kameras außerhalb (Overlay-Regie) schauen hinein wie in
+  // ein Puppenhaus, Kameras innen sehen eine geschlossene Halle. Kein Himmel (indoor), Licht steil von oben.
+  // Container-Modelle aus dem Industrie-Katalog (propTheme).
+  THEMES.hall = {
+    id: 'hall', name: 'Hall', flat: true, indoor: true, propTheme: 'industrial',
+    sky: { top: 0x2a2d31, horizon: 0x3b3f44 }, fog: { near: 150, far: 520 },
+    sun: { color: 0xfff3e0, k: 0.85, pos: [0.25, 10, 0.4] }, hemi: { sky: 0xd7dde4, ground: 0x5a5550, k: 0.9 }, fill: 0.6, exposure: 0.95,
+    groundTex: { base: [232, 232, 232], spread: 0.3 },
+    rail: false,
+    surface: { curb: [0x2a6fd6, 0xf2c200], runoff: 'tarmac', barrier: 'tyres', stripes: false },
+    height: function () { return function () { return 0; }; },
+    groundColor: function (ctx) {
+      var B = ctx.hallBox;
+      return function (x, z) {
+        if (B && (x < B.x0 || x > B.x1 || z < B.z0 || z > B.z1)) return 0x1c1d20;   // außerhalb der Halle
+        var n = fbm(x / 18, z / 18), c = mix(0x6c6d69, 0x7f807b, n);                // Hallenboden aus Beton
+        if (n < 0.32) c = mix(c, 0x4c4d50, (0.32 - n) * 3.5);                       // Öl-/Wasserflecken
+        if (fbm(x / 5 + 40, z / 5) > 0.72) c = mix(c, 0x8a8478, 0.35);             // Staub
+        return c;
+      };
+    },
+    decorate: function (ctx) {
+      var rnd = ctx.rnd, HALF = ctx.HALF, H = 16, M = 26;
+      var x0 = ctx.minX - HALF - M, x1 = ctx.maxX + HALF + M, z0 = ctx.minZ - HALF - M, z1 = ctx.maxZ + HALF + M;
+      var W = x1 - x0, D = z1 - z0, hx = (x0 + x1) / 2, hz = (z0 + z1) / 2;
+      ctx.hallBox = { x0: x0, x1: x1, z0: z0, z1: z1, h: H };
+      function walls(nx, ny) { return Math.abs(ny) < 0.5; }
+      // Reifenstapel statt Leitplanke (wie Industrie)
+      var tyres = ctx.kind('tyres', [{ geo: tyreStack(0.5) }], { r: 0.5, tint: true });
+      var tcol = [0x1a1a1c, 0x1a1a1c, 0xf2f2f2, 0xd8262b, 0x1a1a1c, 0xf2b705];
+      ctx.alongRail(tyres, { step: 1.05, extra: 0.25, tint: function (k) { return tcol[k % tcol.length]; } });
+      // Hülle (sx −1: Flächen zeigen nach innen): Wellblech, Betonsockel, Fensterband, Dach-Unterseite
+      var sh = new Kit();
+      sh.add(box(W, H, D), 0xc2b3a2, { x: hx, y: H / 2, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 4, faces: walls });
+      sh.add(box(W - 0.1, 2.6, D - 0.1), 0xd1ccc2, { x: hx, y: 1.3, z: hz, sx: -1, tile: 'concrete', uv: 'box', m: 3, faces: walls });
+      sh.add(box(W - 0.14, 2.2, D - 0.14), 0xffffff, { x: hx, y: 11.4, z: hz, sx: -1, tile: 'glassBand', uv: 'box', m: 7, faces: walls });
+      sh.add(box(W, 0.2, D), 0x8a9098, { x: hx, y: H, z: hz, sx: -1, tile: 'corrugated', uv: 'box', m: 5, faces: function (nx, ny) { return ny < -0.5; } });
+      ctx.bg(sh);
+      // Plätze an den Wänden: Seite → Lage (t = 0…1 entlang der Wand), Drehung nach innen (+z der Platz-Form zeigt in die Halle)
+      function onWall(side, t, inset) {
+        inset = inset || 0;
+        if (side === 0) return { x: x0 + W * t, z: z0 + inset, rot: 0 };
+        if (side === 1) return { x: x0 + W * t, z: z1 - inset, rot: Math.PI };
+        if (side === 2) return { x: x0 + inset, z: z0 + D * t, rot: Math.PI / 2 };
+        return { x: x1 - inset, z: z0 + D * t, rot: -Math.PI / 2 };
+      }
+      // Stahlstützen (Doppel-T) alle 12 m an den Wänden
+      var ck = new Kit();
+      ck.add(box(0.7, H, 0.12), 0x55606b, { y: H / 2, z: 0.3 }); ck.add(box(0.7, H, 0.12), 0x55606b, { y: H / 2, z: -0.3 });
+      ck.add(box(0.12, H, 0.6), 0x4c5661, { y: H / 2 });
+      ck.add(box(1.1, 0.3, 1.1), 0x6b6a66, { y: 0.15 });
+      var column = ctx.kind('column', [{ geo: ck.geo() }], { r: 0.8 });
+      [0, 1, 2, 3].forEach(function (sd) {
+        var L = sd < 2 ? W : D, nC = Math.max(2, Math.round(L / 12));
+        for (var i = 0; i <= nC; i++) { var w0 = onWall(sd, i / nC, 0.45); column.add(w0.x, w0.z, { rot: w0.rot }); }
+      });
+      // Fachwerkträger quer (über die Tiefe D) alle 12 m: Ober-/Untergurt, Pfosten, Diagonalen
+      var tk = new Kit(), yb = H - 3.4, yt = H - 0.6, hh = yt - yb, nP = Math.max(2, Math.round(D / 3)), dz = D / nP;
+      tk.add(box(0.35, 0.45, D), 0x66707b, { y: yb }); tk.add(box(0.35, 0.45, D), 0x66707b, { y: yt });
+      for (var p = 0; p <= nP; p++) {
+        var zz = -D / 2 + p * dz;
+        tk.add(box(0.2, hh, 0.2), 0x5c6570, { y: (yb + yt) / 2, z: zz });
+        if (p < nP) tk.add(box(0.14, Math.hypot(dz, hh), 0.14), 0x5c6570, { y: (yb + yt) / 2, z: zz + dz / 2, rx: (p % 2 ? 1 : -1) * Math.atan2(dz, hh) });
+      }
+      var truss = ctx.kind('truss', [{ geo: tk.geo() }], { r: 1 });
+      // Pfetten längs (über die Breite W) zwischen den Trägern
+      var pk = new Kit(); pk.add(box(W, 0.3, 0.22), 0x5f6873, { y: H - 0.5 });
+      var purlin = ctx.kind('purlin', [{ geo: pk.geo() }], { r: 1 });
+      for (var pz = z0 + 6; pz < z1 - 3; pz += 9) purlin.add(hx, pz, { abs: true, y: 0 });
+      // Oberlichter (leuchtend, nur von unten sichtbar) in jedem zweiten Feld, Hallenstrahler unter dem Untergurt
+      var lk = new Kit(); lk.add(new THREE.PlaneGeometry(4.2, D - 12), 0xe6edf2, { y: H - 0.12, rx: Math.PI / 2 });
+      var sky = ctx.kind('skylight', [{ geo: lk.geo(), mat: 'glow' }], { r: 2 });
+      var hk = new Kit(), hg = new Kit();
+      hk.add(box(0.05, 2.6, 0.05), 0x2b2e33, { y: 1.3 }); hk.add(box(1.5, 0.32, 0.7), 0x2b2e33, { y: 0 });
+      hg.add(box(1.3, 0.06, 0.52), 0xfff1d2, { y: -0.18 });
+      var lamp = ctx.kind('hallLamp', [{ geo: hk.geo() }, { geo: hg.geo(), mat: 'glow' }], { r: 1 });
+      var nT = Math.max(2, Math.round(W / 12));
+      for (var t = 0; t <= nT; t++) {
+        var tx = x0 + W * t / nT;
+        if (t > 0 && t < nT) truss.add(tx, hz, { abs: true, y: 0 });
+        if (t < nT && t % 2 === 0) sky.add(tx + W / nT / 2, hz, { abs: true, y: 0 });
+        if (t > 0 && t < nT) for (var lz = z0 + 10; lz < z1 - 6; lz += 14) lamp.add(tx, lz, { abs: true, y: yb - 2.9 });
+      }
+      // Rolltore und Graffiti an den Wänden (je Wand ein paar, nach innen)
+      var dk = new Kit(); dk.add(new THREE.PlaneGeometry(7, 6.5), 0xffffff, { y: 3.25, tile: 'door' });
+      var door = ctx.kind('door', [{ geo: dk.geo(), mat: 'atl' }], { r: 3.5 });
+      var gk = new Kit(); gk.add(new THREE.PlaneGeometry(3.2, 2.1), 0xffffff, { y: 1.5, tile: 'tag', vary: true });
+      var tag = ctx.kind('wallTag', [{ geo: gk.geo(), mat: 'atlcut' }], { r: 1.6, vary: true });
+      var nTag = 0;
+      [0, 1, 2, 3].forEach(function (sd) {
+        [0.27, 0.73].forEach(function (u) { var w1 = onWall(sd, u, 0.08); door.add(w1.x, w1.z, { rot: w1.rot }); });
+        [0.12, 0.42, 0.58, 0.88].forEach(function (u) {
+          if (rnd() < 0.3) return;
+          var w2 = onWall(sd, u + (rnd() - 0.5) * 0.05, 0.1); tag.add(w2.x, w2.z, { rot: w2.rot, v: (nTag++) % Art.TAGS });
+        });
+      });
+      // Container an den Wänden (Farbe je Instanz, Modelle slot container), 1–2 hoch, parallel zur Wand
+      var cK = new Kit();
+      cK.add(box(6.1, 2.6, 2.45), 0xffffff, { y: 1.3 });
+      for (var r = 0; r < 9; r++) cK.add(box(0.12, 2.3, 2.5), 0xd9d9d9, { x: -2.6 + r * 0.65, y: 1.3 });
+      var cont = ctx.kind('container', [{ geo: cK.geo() }], { r: 3.4, tint: true, prop: { slot: 'container', box: { w: 6.3, d: 2.7, h: 2.9 } } });
+      var ccol = [0xc0392b, 0x2563a8, 0x2e8b57, 0xe67e22, 0x7f8c8d, 0xd4ac0d];
+      [0, 1, 2, 3].forEach(function (sd) {
+        var L = sd < 2 ? W : D;
+        for (var u = 0.08; u < 0.95; u += 7.5 / L) {
+          if (rnd() < 0.45) continue;
+          var w3 = onWall(sd, u, 2.1);
+          if (!ctx.place(w3.x, w3.z, 3.3)) continue;
+          var lv = rnd() < 0.35 ? 2 : 1;
+          for (var l = 0; l < lv; l++) cont.add(w3.x, w3.z, { rot: w3.rot, y: l * 2.6, tint: ccol[Math.floor(rnd() * ccol.length)] });
+        }
+      });
+      // Fässer in Dreiergruppen (Instanzfarbe) und Paletten-Stapel in der Nähe der Wände
+      var bk = new Kit();
+      [[0, 0], [0.62, 0.15], [0.3, -0.55]].forEach(function (b) { bk.add(cyl(0.29, 0.29, 0.9, 10), 0xffffff, { x: b[0], y: 0.45, z: b[1] }); });
+      var barrels = ctx.kind('barrels', [{ geo: bk.geo() }], { r: 0.9, tint: true });
+      var pk2 = new Kit();
+      for (var pl = 0; pl < 4; pl++) pk2.add(box(1.2, 0.14, 1.0), 0x9c7a4d, { y: 0.07 + pl * 0.16 });
+      var pallets = ctx.kind('pallets', [{ geo: pk2.geo() }], { r: 0.8 });
+      var bcol = [0x2f5d8a, 0xa13a2a, 0x6d6b3a, 0x8a5a2b];
+      for (var b2 = 0; b2 < 40; b2++) {
+        var sd2 = Math.floor(rnd() * 4), w4 = onWall(sd2, 0.05 + rnd() * 0.9, 2 + rnd() * 6);
+        if (!ctx.place(w4.x, w4.z, 1)) continue;
+        if (rnd() < 0.6) barrels.add(w4.x, w4.z, { rot: rnd() * TAU, tint: bcol[Math.floor(rnd() * bcol.length)] });
+        else pallets.add(w4.x, w4.z, { rot: w4.rot + (rnd() - 0.5) * 0.4 });
+      }
+      // Container-Gruppen (nur als Kulissen-Modell) in zwei Ecken
+      var pile = ctx.kind('containerPile', [], { r: 10, prop: { slot: 'containerPile', box: { w: 20, d: 13, h: 7 } } });
+      [[x0 + 14, z0 + 11, 0], [x1 - 14, z1 - 11, Math.PI]].forEach(function (c) { if (ctx.place(c[0], c[1], 10)) pile.add(c[0], c[1], { rot: c[2] }); });
+    }
+  };
+
+  var BY_LAYOUT = { Speedway: 'stadium', Twister: 'forest', Hairpin: 'alpine', Coast: 'coast', Kart: 'hall' };
   function forTrack(T) { return THEMES[BY_LAYOUT[T && T.name] || 'stadium']; }
 
   root.CarTrackThemes = { forTrack: forTrack, THEMES: THEMES, BY_LAYOUT: BY_LAYOUT, Kit: Kit, Art: Art, lin: lin, mix: mix, smooth: smooth, fbm: fbm, tyreStack: tyreStack, Relief: Relief, ranges: ranges };

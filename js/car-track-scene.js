@@ -438,8 +438,8 @@
     gantry.position.set(p0.x, heightAt(p0.x, p0.z), p0.z); gantry.rotation.y = p0.yaw; g.add(gantry);
     decor.objs.push({ o: gantry, r: HALF + 13 });
 
-    // ---- Himmel: Kuppel mit Verlauf (Horizont → Zenit), ohne Nebel/Tonemapping, hinter allem ----
-    (function () {
+    // ---- Himmel: Kuppel mit Verlauf (Horizont → Zenit), ohne Nebel/Tonemapping, hinter allem (nicht in Hallen) ----
+    if (!theme.indoor) (function () {
       var geo = own(new THREE.SphereGeometry(SKY_R, 32, 14)), p = geo.attributes.position, cols = [];
       var top = lin(theme.sky.top), hz = lin(theme.sky.horizon), c = new THREE.Color();
       for (var i = 0; i < p.count; i++) { var t = Math.max(0, p.getY(i) / SKY_R); c.copy(hz).lerp(top, Math.pow(t, 0.55)); cols.push(c.r, c.g, c.b); }
@@ -688,7 +688,8 @@
       var slot = kd.prop.slot || kd.name;
       return cat.props.filter(function (e) {
         if (!e || !e.uid) return false;
-        if (Array.isArray(e.themes) ? e.themes.indexOf(theme.id) < 0 : e.theme && e.theme !== theme.id) return false;
+        var tid = theme.propTheme || theme.id;   // Halle: Modelle aus dem Industrie-Katalog
+        if (Array.isArray(e.themes) ? e.themes.indexOf(tid) < 0 : e.theme && e.theme !== tid) return false;
         return Array.isArray(e.slots) ? e.slots.indexOf(slot) >= 0 : (e.slot || e.kind) === slot;
       });
     }
