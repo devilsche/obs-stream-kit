@@ -373,3 +373,14 @@ def admin_grass_preview():
         abort(404)
     with open(src, encoding="utf-8") as f:
         return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
+
+
+@bp_admin.route("/admin/car-list")
+@require_admin
+def admin_car_list():
+    """Abwahl-Liste der Autos (tools/car-list.html): Haken „In races“ = vehicles[key].race.on."""
+    src = os.path.join(_project_root(), "tools", "car-list.html")
+    if not os.path.exists(src):
+        abort(404)
+    with open(src, encoding="utf-8") as f:
+        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}

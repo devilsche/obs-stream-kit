@@ -189,6 +189,8 @@
   ui.list.addEventListener('change', carChanged);
   ui.status.textContent = 'Loading car catalogue…';
   TC.loadCatalog().then(function (list) {
+    // abgewählte Autos (Car list / Car editor: „In races“ aus) fahren auch in Car Drive nicht mit
+    list = list.filter(function (e) { var v = TC.vehicle(e.key) || {}; return !(v.race && v.race.on === false); });
     catalog = list.slice().sort(function (a, b) { return displayName(a).localeCompare(displayName(b)); });
     catalog.forEach(function (e) { byKey[e.key] = e; });
     ui.status.textContent = catalog.length ? '' : 'The car catalogue is empty.';

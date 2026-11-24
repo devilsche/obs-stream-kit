@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Car list</title>
+<!-- Abwahl-Liste (Admin): alle Autos des Katalogs mit Haken „In races“ (vehicles[key].race.on, wie im Car editor) –
+     abgewählte fahren weder im Chatrennen noch in Car Drive mit. Werte aus js/car-race-stats.js (Länge, PS, kg, km/h).
+     Route: /admin/car-list (app/views_admin.py), Speichern über POST /app/api/cars/vehicles. -->
+<style>
+  :root { --cl-bg: #0d0912; --cl-panel: #1d1128; --cl-row: #241634; --cl-text: #fff; --cl-dim: #c9bdd6; --cl-accent: #f2b705; --cl-border: #5e2a79; --cl-off: #7a6a8a; }
+  html, body { margin: 0; background: var(--cl-bg); color: var(--cl-text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 12px; top: 12px; background: var(--cl-accent); color: #1b1300; padding: 8px 12px; z-index: 5; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { margin: 0 0 6px; font-size: 22px; }
+  p { margin: 0 0 12px; color: var(--cl-dim); }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+  label.search { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--cl-dim); }
+  input[type="search"] { background: #0e0a14; color: var(--cl-text); border: 1px solid #6a5a80; border-radius: 6px; padding: 6px 8px; min-height: 36px; min-width: 240px; }
+  button { background: #5e2a79; color: #fff; border: 2px solid #5e2a79; border-radius: 8px; padding: 6px 12px; min-height: 36px; cursor: pointer; font: inherit; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--cl-accent); outline-offset: 2px; }
+  .count { color: var(--cl-accent); font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; background: var(--cl-panel); border: 2px solid var(--cl-border); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 6px 10px; text-align: left; border-bottom: 1px solid #33204a; }
+  th { font-size: 13px; color: var(--cl-dim); font-weight: 600; background: #160d20; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr.off td { color: var(--cl-off); }
+  tr.off td.name { text-decoration: line-through; }
+  input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--cl-accent); }
+  .status { min-height: 22px; margin: 10px 0 0; color: var(--cl-dim); }
+  .err { color: #ff8a80; }
+</style>
+</head>
+<body>
+<a class="skip" href="#list">Skip to the list</a>
+<main>
+  <h1>Car list</h1>
+  <p>Untick cars that should no longer take part. Unticked cars are left out of chat races and Car Drive. Saved immediately.</p>
+  <div class="bar">
+    <label class="search">Search<input type="search" id="q" autocomplete="off" aria-controls="list"></label>
+    <span><span class="count" id="nOn">–</span> of <span id="nAll">–</span> cars take part</span>
+  </div>
+  <table id="list" aria-describedby="status">
+    <caption class="skip">Cars in the catalogue</caption>
+    <thead><tr>
+      <th scope="col">In races</th><th scope="col">Car</th><th scope="col">Brand</th>
+      <th scope="col" class="num">Length</th><th scope="col" class="num">hp</th><th scope="col" class="num">kg</th><th scope="col" class="num">km/h</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <p class="status" id="status" role="status" aria-live="polite">Loading…</p>
+</main>
+<script src="/drive/a/js/car-race-stats.js"></script>
+<script>
+(function () {
+  'use strict';
+  var rows = document.getElementById('rows'), statusEl = document.getElementById('status'), q = document.getElementById('q');
+  var defs = {}, cars = [], trs = [];
+  function setStatus(t, err) { statusEl.textContent = t; statusEl.classList.toggle('err', !!err); }
+  function count() {
+    var on = cars.filter(function (e) { return isOn(e.key); }).length;
+    document.getElementById('nOn').textContent = on; document.getElementById('nAll').textContent = cars.length;
+  }
+  function isOn(key) { var d = defs[key]; return !(d && d.race && d.race.on === false); }
+  function save(key, on, cb, tr) {
+    var d = JSON.parse(JSON.stringify(defs[key] || {}));
+    d.race = d.race || {}; d.race.on = on;
+    fetch('/app/api/cars/vehicles', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: key, def: d }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error(j.error || 'save failed');
+        defs[key] = d; tr.classList.toggle('off', !on); count();
+        setStatus('Saved: ' + tr.dataset.name + (on ? ' takes part.' : ' left out.'));
+      })
+      .catch(function (e) { cb.checked = !on; setStatus('Could not save ' + tr.dataset.name + ': ' + e.message, true); });
+  }
+  function cell(tr, text, cls) { var td = document.createElement('td'); td.textContent = text; if (cls) td.className = cls; tr.appendChild(td); return td; }
+  Promise.all([
+    fetch('/drive/a/api/fx/cars/catalog.json').then(function (r) { return r.json(); }),
+    fetch('/app/api/cars/vehicles', { credentials: 'same-origin' }).then(function (r) { return r.json(); })
+  ]).then(function (res) {
+    cars = (res[0] || []).slice().sort(function (a, b) { return (a.brand || '').localeCompare(b.brand || '') || (a.name || '').localeCompare(b.name || ''); });
+    defs = (res[1] && res[1].items) || {};
+    cars.forEach(function (e) {
+      var raw = window.CarRaceStats ? CarRaceStats.of(e.key, e) : {}, tr = document.createElement('tr'), name = (defs[e.key] && defs[e.key].label) || e.name || e.key;
+      tr.dataset.name = name; tr.dataset.text = (name + ' ' + (e.brand || '') + ' ' + e.key).toLowerCase();
+      var td = document.createElement('td'), cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.checked = isOn(e.key); cb.setAttribute('aria-label', 'In races: ' + name);
+      cb.addEventListener('change', function () { save(e.key, cb.checked, cb, tr); });
+      td.appendChild(cb); tr.appendChild(td);
+      cell(tr, name, 'name'); cell(tr, e.brand || '');
+      cell(tr, raw.len ? (+raw.len).toFixed(1) + ' m' : '–', 'num'); cell(tr, raw.hp ? Math.round(raw.hp) : '–', 'num');
+      cell(tr, raw.kg ? Math.round(raw.kg) : '–', 'num'); cell(tr, raw.vmax ? Math.round(raw.vmax) : '–', 'num');
+      if (!isOn(e.key)) tr.classList.add('off');
+      rows.appendChild(tr); trs.push(tr);
+    });
+    count(); setStatus('');
+  }).catch(function () { setStatus('Could not load the catalogue (signed in as admin?).', true); });
+  q.addEventListener('input', function () { var s = q.value.trim().toLowerCase(); trs.forEach(function (tr) { tr.hidden = !!s && tr.dataset.text.indexOf(s) < 0; }); });
+})();
+</script>
+</body>
+</html>

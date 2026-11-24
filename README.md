@@ -1425,6 +1425,8 @@ auf das Backend; kein Streaming nötig.
 | Datei | Zweck | Größe |
 |---|---|---|
 | `tools/match-replay.html` | Animierter Replay eines PUBG-Matches auf der Karte | Browser-Tab |
+| `/admin/car-list` (`tools/car-list.html`) | **Car list**: alle Autos des Katalogs mit Haken „In races“ (= `vehicles[key].race.on` wie im Car editor, sofort gespeichert), dazu Länge/PS/kg/km/h aus `js/car-race-stats.js`; abgewählte fahren weder im Chatrennen noch in Car Drive mit | Browser-Tab (admin) |
+| `/admin/grass-preview` (`tools/grass-preview.html`) | **Grass preview**: freie Sketchfab-Gras-Modelle nebeneinander auf einer Wiese (drehbar, Ansichten Fahrerhöhe/tief/oben), Grundlage für die Auswahl des Grases an den Strecken | Browser-Tab (admin) |
 | `/admin/sketchfab` (`app/templates/admin_sketchfab.html`) | **Sketchfab notes**: ein oder mehrere Modell-Links plus Notiz, wofür sie gedacht sind (Auto, Kulisse, Enten-Outfit …); offen/erledigt, bearbeiten, löschen. Ablage `data/sketchfab-notes.json` (global, `app/sketchfab_notes.py`, je Eintrag `{id, urls, uids (Sketchfab-UID je Link), note, at, done}`) – daraus liest Claude die Aufträge | Browser-Tab (admin) |
 | `tools/landing-spots.html` | **Landing Spot Analyzer**: Tabelle je Landeplatz mit eigenem Ergebnis gegen die Lobby, Karte auf Klick | Browser-Tab |
 | `tools/g1r-database.html` | Vollständiger G1R-Item-Katalog aus dem Object-Dump (Nah-/Fernkampf, Runen, Schriftrollen) mit Live-Suche | Browser-Tab (admin) |
