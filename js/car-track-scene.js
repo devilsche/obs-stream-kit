@@ -634,16 +634,73 @@
       return m;
     };
     // Meer: große Fläche bis zum Horizont (−z), Wellenmuster zieht langsam
+    // Meer: eigener Wasser-Shader ohne zweiten Render-Durchgang (Car Drive bleibt flüssig): zwei gegenläufig wandernde
+    // Wellen-Normalen (assets/textures/water/waternormals.jpg, three.js-Beispieltextur, MIT), Spiegelung des
+    // Foto-Himmels nach Fresnel, Sonnenglitzern, Farbe nach Wassertiefe (Gelände-Höhe je Ecke: türkis im Flachen,
+    // tiefblau draußen) und Schaum an der Küste; Nebel wie die übrige Szene. Ohne Textur: ruhige Fläche mit Himmelsfarbe.
+    var seaU = null;
     ctx.sea = function (y, zEdge) {
-      var st = own(canvasTex(128, 128, function (x, w, h) {
-        x.fillStyle = 'rgb(225,232,236)'; x.fillRect(0, 0, w, h);
-        for (var i = 0; i < 260; i++) { x.fillStyle = 'rgba(255,255,255,' + (0.25 + rnd() * 0.5).toFixed(2) + ')'; x.fillRect(Math.floor(rnd() * w), Math.floor(rnd() * h), 4 + Math.floor(rnd() * 10), 1); }
-      }, true));
-      var len = zEdge - (cz - EXTENT - 300), wd = 2 * EXTENT + 600;
-      st.repeat.set(wd / 14, len / 14);
-      var m = new THREE.Mesh(own(new THREE.PlaneGeometry(wd, len)), own(new THREE.MeshStandardMaterial({ map: st, color: 0x2a6e8c, roughness: 0.3, metalness: 0.15, envMapIntensity: 0.9 })));
-      m.rotation.x = -Math.PI / 2; m.position.set(cx, y, zEdge - len / 2); g.add(m);
-      anims.push(function (dt) { st.offset.y = (st.offset.y + dt * 0.035) % 1; st.offset.x = 0.04 * Math.sin(timeU.value * 0.5); });
+      var len = zEdge - (cz - EXTENT - 300) + 40, wd = 2 * EXTENT + 600;
+      var geo = own(new THREE.PlaneGeometry(wd, len, 160, 80)); geo.rotateX(-Math.PI / 2); geo.translate(cx, y, zEdge + 40 - len / 2);
+      var pos = geo.attributes.position, dep = new Float32Array(pos.count);
+      for (var i = 0; i < pos.count; i++) dep[i] = Math.max(0, y - ctx.height(pos.getX(i), pos.getZ(i)));
+      geo.setAttribute('aDepth', new THREE.BufferAttribute(dep, 1));
+      var sp = theme.sun && theme.sun.pos ? new THREE.Vector3().fromArray(theme.sun.pos).normalize() : new THREE.Vector3(0.6, 0.5, 0.3).normalize();
+      var flat = new THREE.DataTexture(new Uint8Array([128, 128, 255, 255]), 1, 1, THREE.RGBAFormat); flat.needsUpdate = true; own(flat);
+      seaU = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
+        tNorm: { value: flat }, tSky: { value: flat }, hasSky: { value: 0 }, skyRot: { value: theme.skyRot || 0 },
+        time: timeU, sunDir: { value: sp }, sunCol: { value: lin(theme.sun ? theme.sun.color : 0xffffff) },
+        skyTop: { value: lin(theme.sky.top) }, skyHz: { value: lin(theme.sky.horizon) },
+        deep: { value: lin(0x0b3a5c) }, mid: { value: lin(0x14708a) }, shallow: { value: lin(0x3fc1c0) }, sand: { value: lin(0xd9c38f) }
+      }]);
+      seaU.time = timeU;
+      var mat = own(new THREE.ShaderMaterial({
+        uniforms: seaU, fog: true, transparent: true, depthWrite: true,
+        vertexShader: [
+          'attribute float aDepth; varying float vDepth; varying vec3 vW;',
+          '#include <fog_pars_vertex>',
+          'void main() { vDepth = aDepth; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz;',
+          '  vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;',
+          '  #include <fog_vertex>',
+          '}'].join('\n'),
+        fragmentShader: [
+          'uniform sampler2D tNorm; uniform sampler2D tSky; uniform float hasSky; uniform float skyRot; uniform float time;',
+          'uniform vec3 sunDir; uniform vec3 sunCol; uniform vec3 skyTop; uniform vec3 skyHz; uniform vec3 deep; uniform vec3 mid; uniform vec3 shallow; uniform vec3 sand;',
+          'varying float vDepth; varying vec3 vW;',
+          '#include <fog_pars_fragment>',
+          'vec3 nrm(vec2 uv) { return texture2D(tNorm, uv).rbg * 2.0 - 1.0; }',
+          'void main() {',
+          '  vec2 p = vW.xz; float t = time;',
+          '  vec3 n = nrm(p / 38.0 + vec2(t * 0.011, t * 0.007)) + nrm(p / 23.0 - vec2(t * 0.009, -t * 0.012)) + 0.5 * nrm(p / 9.0 + vec2(-t * 0.02, t * 0.015));',
+          '  float dist = length(cameraPosition - vW);',
+          '  n = normalize(vec3(n.x, n.y * (2.2 + dist / 90.0), n.z));',   // in der Ferne ruhiger (kein Flimmern)
+          '  vec3 V = normalize(cameraPosition - vW); float ndv = max(dot(n, V), 0.0);',
+          '  float fres = 0.02 + 0.98 * pow(1.0 - ndv, 5.0);',
+          '  vec3 R = reflect(-V, n); R.y = abs(R.y);',
+          '  vec3 sky = mix(skyHz, skyTop, smoothstep(0.0, 0.6, R.y));',
+          '  if (hasSky > 0.5) { float a = atan(R.z, -R.x) + skyRot; vec2 suv = vec2(fract(a / 6.2831853), 0.5 + asin(clamp(R.y, -1.0, 1.0)) / 3.1415927);',
+          '    vec3 st = texture2D(tSky, suv).rgb; sky = mix(sky, pow(st, vec3(2.2)), 0.85); }',
+          '  float d = vDepth;',
+          '  vec3 body = mix(shallow, mid, smoothstep(0.2, 2.5, d)); body = mix(body, deep, smoothstep(2.5, 14.0, d));',
+          '  body = mix(sand, body, smoothstep(0.0, 0.35, d));',   // ganz flach: Sand scheint durch
+          '  float sun = pow(max(dot(R, sunDir), 0.0), 420.0) * 6.0 + pow(max(dot(R, sunDir), 0.0), 40.0) * 0.25;',
+          '  vec3 col = mix(body, sky, fres) + sunCol * sun;',
+          '  float foamN = texture2D(tNorm, p / 6.0 + vec2(t * 0.03, -t * 0.02)).r;',
+          '  float band = 1.0 - smoothstep(0.0, 0.7, d); float surge = 0.5 + 0.5 * sin(t * 0.9 - d * 5.0);',
+          '  float foam = band * smoothstep(0.35, 0.75, foamN + surge * 0.35) * 0.9;',
+          '  col = mix(col, vec3(0.92, 0.95, 0.97), foam);',
+          '  gl_FragColor = vec4(col, mix(0.75, 1.0, smoothstep(0.05, 0.6, d)));',
+          '  #include <tonemapping_fragment>',
+          '  #include <encodings_fragment>',
+          '  #include <fog_fragment>',
+          '}'].join('\n')
+      }));
+      var m = new THREE.Mesh(geo, mat); m.renderOrder = 1; g.add(m);
+      if (PROP_BASE) new THREE.TextureLoader().load(PROP_BASE + 'assets/textures/water/waternormals.jpg', function (tex) {
+        if (disposed) { tex.dispose(); return; }
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = Math.min(4, maxAniso || 1); own(tex);
+        seaU.tNorm.value = tex;
+      });
       return m;
     };
     // Lichtkegel des Leuchtturms (additiv, dreht sich langsam)
@@ -844,6 +901,7 @@
       skyMesh.renderOrder = -10; skyMesh.frustumCulled = false; g.add(skyMesh);
       skyDome.visible = false;
       skyHz = map.image ? horizonColor(map.image) : null;
+      if (seaU) { map.wrapS = THREE.RepeatWrapping; map.needsUpdate = true; seaU.tSky.value = map; seaU.hasSky.value = 1; }   // Meer spiegelt den Foto-Himmel
       if (skyHz && envSaved && envSaved.scene) {
         if (envSaved.scene.fog) envSaved.scene.fog.color.copy(skyHz);
         if (envSaved.scene.background && envSaved.scene.background.isColor) envSaved.scene.background.copy(skyHz);

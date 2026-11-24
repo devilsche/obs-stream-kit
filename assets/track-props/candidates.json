@@ -2915,5 +2915,128 @@
   "note": "Unterwuchs (Prop search, vom User gewählt)",
   "part": "b",
   "keepNode": "#7$"
+ },
+ {
+  "uid": "2f147eeb428847f7b06244026db6c07e",
+  "key": "lifeguard-tower",
+  "name": "Lifeguard Tower",
+  "author": "Sololopenko",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/lifeguard-tower-2f147eeb428847f7b06244026db6c07e",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "lifeguard",
+  "slot": "lifeguard",
+  "tex": 512,
+  "height": 5.5,
+  "tris": 4000
+ },
+ {
+  "uid": "421f3239115c44539686fcb62835f115",
+  "key": "boat-trawler",
+  "name": "Trawler",
+  "author": "JasperTobias",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/trawler-421f3239115c44539686fcb62835f115",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "boat",
+  "slot": "boat",
+  "tex": 512,
+  "len": 15,
+  "tris": 5300,
+  "sink": 0.18
+ },
+ {
+  "uid": "f791868a8b5f4996a49a3c8cd99336f6",
+  "key": "boat-fishing-ship",
+  "name": "Fishing Ship game-ready asset",
+  "author": "Dominik Biały",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/fishing-ship-game-ready-asset-f791868a8b5f4996a49a3c8cd99336f6",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "boat",
+  "slot": "boat",
+  "tex": 512,
+  "len": 13,
+  "tris": 8000,
+  "sink": 0.15,
+  "dropMat": "Boat_Interior"
+ },
+ {
+  "uid": "0dd451f295d049cea20c17d3ffa87ee3",
+  "key": "boat-yacht",
+  "name": "Yacht",
+  "author": "Sergei",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/yacht-0dd451f295d049cea20c17d3ffa87ee3",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "boat",
+  "slot": "boat",
+  "tex": 512,
+  "len": 16,
+  "tris": 8500,
+  "sink": 0.1
+ },
+ {
+  "uid": "627ba38e06aa4536b90706a8626c74d4",
+  "key": "boat-rowing",
+  "name": "Wooden Boat",
+  "author": "donnichols",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/wooden-boat-627ba38e06aa4536b90706a8626c74d4",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "rowboat",
+  "slot": "rowboat",
+  "tex": 512,
+  "len": 4.5,
+  "tris": 3000
+ },
+ {
+  "uid": "315a424af54a46099831898b156ecf2b",
+  "key": "beach-bar-sharky",
+  "name": "Sharky's Beach Bar",
+  "author": "Vin L",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/sharkys-beach-bar-concept-by-a-s-g-kang-315a424af54a46099831898b156ecf2b",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "beachBar",
+  "slot": "beachBar",
+  "tex": 512,
+  "len": 11,
+  "tris": 12000
+ },
+ {
+  "uid": "5bf117cb734a46559d10971c3098165c",
+  "key": "pier-simple",
+  "name": "Simple Wooden Pier or Dock",
+  "author": "Jungle Jim",
+  "license": "CC Attribution",
+  "url": "https://sketchfab.com/3d-models/simple-wooden-pier-or-dock-5bf117cb734a46559d10971c3098165c",
+  "theme": "coast",
+  "themes": [
+   "coast"
+  ],
+  "kind": "pier",
+  "slot": "pier",
+  "tex": 512,
+  "len": 24,
+  "tris": 6300
  }
 ]

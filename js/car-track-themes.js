@@ -1201,15 +1201,18 @@
     sea: -3.0,
     surface: { curb: [0x2a6fd6, 0xf4f4f4], runoff: 'sand', barrier: 'armco', sausage: true },
     height: function (ctx) {
-      var w = waveSet(ctx.rng(17), 2, 1.8, 100, 160), zs = ctx.minZ - 64;
+      var w = waveSet(ctx.rng(17), 2, 1.8, 100, 160), zs = ctx.minZ - 50;   // Meer näher an der Strecke
       ctx.shoreZ = zs;
       return function (x, z) { return w(x - ctx.cx, z - ctx.cz) - 9 * smooth(zs, zs - 46, z); };
     },
     groundColor: function (ctx) {
       var sea = THEMES.coast.sea;
       return function (x, z, h, d) {
-        var n = fbm(x / 26, z / 26), c = mix(0x6f8f45, 0x8a9d52, n);
-        c = mix(c, 0xe3cf9c, smooth(0.9, -0.3, h) * smooth(ctx.shoreZ + 30, ctx.shoreZ + 6, z));   // Strand
+        // trockenes Küstengras (oliv bis strohgelb), dazwischen Sandflecken; zum Strand hin sandig
+        var n = fbm(x / 26, z / 26), c = mix(0x74883f, 0x9a9852, n);
+        var sp = fbm(x / 15 + 9, z / 15 - 4);
+        if (sp > 0.62) c = mix(c, 0xd2bd8a, clamp((sp - 0.62) * 5, 0, 0.85));
+        c = mix(c, 0xe3cf9c, smooth(0.9, -0.3, h) * smooth(ctx.shoreZ + 34, ctx.shoreZ + 6, z));   // Strand
         if (h < sea + 0.3) c = mix(0xd9c38f, 0x9c8a62, clamp((sea + 0.3 - h) / 2, 0, 1));
         return c;
       };
@@ -1240,14 +1243,14 @@
       [0, 2.1, 4.2].forEach(function (a) { pk.add(ico(0.22), 0x5a3d22, { x: tx + Math.cos(a) * 0.35, y: ty - 0.3, z: Math.sin(a) * 0.35 }); });
       // Kulissen-Modelle (slot palm): Palmen-Modelle im Wechsel, Ersatz: die prozedurale Palme
       var palm = ctx.kind('palm', [{ geo: pk.geo() }], { r: 2.2, tint: true, prop: { slot: 'palm', noProc: true, box: { w: 10, d: 10, h: 12 } } });
-      ctx.scatter(palm, 70, { dmin: 15, dmax: 130, rad: 2.2, s: [0.8, 1.25], pred: land, tint: function () { return mix(0xffffff, 0xd8e6c4, rnd()); } });
+      ctx.scatter(palm, 140, { dmin: 13, dmax: 170, rad: 2.2, s: [0.8, 1.25], pred: land, tint: function () { return mix(0xffffff, 0xd8e6c4, rnd()); } });
       // Strand: bunte Sonnenschirme (Gimmick)
       var uk = new Kit();
       uk.add(cyl(0.04, 0.04, 2.4, 4), 0xeeeeee, { y: 1.2 });
       uk.add(new THREE.ConeGeometry(1.4, 0.55, 8, 1), function (x, y, z) { return Math.floor((Math.atan2(z, x) + Math.PI) / (TAU / 8)) % 2 ? 0xffffff : 0xfafafa; }, { y: 2.3 });
       var umb = ctx.kind('umbrella', [{ geo: uk.geo() }], { r: 1.5, tint: true });
       var ucol = [0xe23b3b, 0x2a7de1, 0xffbe0b, 0x2ec4b6, 0xfb5607];
-      ctx.scatter(umb, 14, { dmin: 22, dmax: 220, rad: 2, pred: function (x, z) { var h = ctx.height(x, z); return h > sea + 0.5 && h < sea + 2.2; }, tint: function () { return ucol[Math.floor(rnd() * ucol.length)]; } });
+      ctx.scatter(umb, 26, { dmin: 22, dmax: 220, rad: 2, pred: function (x, z) { var h = ctx.height(x, z); return z < ctx.shoreZ + 26 && h > sea + 0.5 && h < sea + 2.2; }, tint: function () { return ucol[Math.floor(rnd() * ucol.length)]; } });
       // Leuchtturm auf einer Felsklippe an der Küste (rot-weiß, Laterne leuchtet, Lichtkegel dreht sich)
       var lx = ctx.maxX + 18, lz = ctx.shoreZ - 22;
       var rkK = new Kit(), lk = new Kit(), glow = new Kit();
@@ -1288,6 +1291,121 @@
       ctx.bgMesh(rl.geo());
       // Felseninsel mit Leuchtturm im Meer zwischen Strand und Horizont (nur als Kulissen-Modell, slot sea)
       ctx.kind('seaIsland', [], { r: 30, prop: { slot: 'sea', box: { w: 70, d: 70, h: 50 } } }).add(ctx.maxX - 140, ctx.shoreZ - 260, { abs: true, y: sea, rot: 2.2 });
+      // ---- Strandleben, Hafen, Zuschauer ----
+      var P = ctx.T.at, HALF = ctx.HALF, L = ctx.T.len;
+      function along(s0, sd, off) { var p = P(s0); return { x: p.x + p.nx * sd * off, z: p.z + p.nz * sd * off, rot: p.yaw + (sd > 0 ? Math.PI : 0), p: p }; }
+      function straightAt(s0, span) { for (var q = -span; q <= span; q += 4) if (Math.abs(P(s0 + q).curv) > 1 / 70) return false; return true; }
+      function shoreAt(x) { var i = Math.round((x - (ctx.cx - 900)) / 6); return shore[Math.max(0, Math.min(shore.length - 1, i))][1]; }
+      // Strandhütten (bunte Holzwände, Strohdach) in lockerer Reihe kurz hinter dem Wasser
+      var hutK = new Kit(), hutR = new Kit();
+      hutK.add(box(3.2, 2.4, 2.6), 0xffffff, { y: 1.2 });
+      hutK.add(box(1.0, 1.9, 0.06), 0x5a3d22, { y: 0.95, z: -1.32 });
+      hutR.add(cone(2.7, 1.6, 4), 0xc9a865, { y: 3.2, ry: Math.PI / 4, sx: 1.15 });
+      var hut = ctx.kind('beachHut', [{ geo: hutK.geo() }, { geo: hutR.geo(), notint: true }], { r: 2.2, tint: true });
+      var hcol = [0x3aa0d8, 0xf4f4f2, 0xe8584a, 0xf2c14e, 0x5cc8a8, 0xf08fb0];
+      for (var hx = ctx.minX - 60, nh = 0; hx < ctx.maxX + 60; hx += 9 + rnd() * 14) {
+        var hz = shoreAt(hx) + 10 + rnd() * 6;
+        if (ctx.height(hx, hz) < sea + 0.5 || !ctx.place(hx, hz, 2.6)) continue;
+        hut.add(hx, hz, { rot: Math.PI + (rnd() - 0.5) * 0.3, tint: hcol[nh++ % hcol.length] });
+      }
+      // Liegen + Handtücher neben den Schirmen am Strand
+      var lgK = new Kit(); lgK.add(box(0.7, 0.12, 1.9), 0xffffff, { y: 0.32 }); lgK.add(box(0.7, 0.1, 0.6), 0xffffff, { y: 0.55, z: 0.95, rx: -0.6 });
+      lgK.add(box(0.06, 0.3, 0.06), 0xdddddd, { x: 0.3, y: 0.15, z: 0.8 }); lgK.add(box(0.06, 0.3, 0.06), 0xdddddd, { x: -0.3, y: 0.15, z: -0.8 });
+      var lounger = ctx.kind('lounger', [{ geo: lgK.geo() }], { r: 1, tint: true });
+      for (var li = 0; li < 40; li++) {
+        var lx2 = ctx.minX - 80 + rnd() * (ctx.maxX - ctx.minX + 160), lz2 = shoreAt(lx2) + 3 + rnd() * 6;
+        var hl = ctx.height(lx2, lz2);
+        if (hl < sea + 0.3 || hl > sea + 2.4 || !ctx.place(lx2, lz2, 1)) continue;
+        lounger.add(lx2, lz2, { rot: Math.PI + (rnd() - 0.5) * 0.6, tint: ucol[Math.floor(rnd() * ucol.length)] });
+      }
+      // Hafen: Holzsteg ins Meer, Boote (Rumpf in Instanzfarbe, Kajüte, Mast) zu beiden Seiten
+      var PIER_Y = -1.0, pierX = ctx.minX + (ctx.maxX - ctx.minX) * 0.3, pierZ = shoreAt(pierX), PL = 46;
+      var pierK = new Kit();
+      pierK.add(box(3, 0.3, PL), 0x8a6a48, { y: 0.9, z: -PL / 2 + 6 });
+      for (var pp = 0; pp <= PL; pp += 4) [-1.4, 1.4].forEach(function (px) { pierK.add(cyl(0.16, 0.16, 4.2, 5), 0x5d4630, { x: px, y: -1.0, z: 6 - pp }); });
+      pierK.add(box(0.12, 0.9, PL), 0x6d5238, { x: 1.45, y: 1.45, z: -PL / 2 + 6 }); pierK.add(box(0.12, 0.9, PL), 0x6d5238, { x: -1.45, y: 1.45, z: -PL / 2 + 6 });
+      // Kulissen-Modell (slot pier, Längsseite = x): ins Meer gedreht, Deck knapp über dem Wasser
+      ctx.kind('pier', [{ geo: pierK.geo() }], { r: 2, prop: { slot: 'pier', box: { w: 24, d: 8, h: 11 }, y: PIER_Y } }).add(pierX, pierZ - 6, { abs: true, y: sea, rot: Math.PI / 2 });
+      var boatK = new Kit(), boatW = new Kit();
+      boatK.add(box(2.4, 1.0, 7), 0xffffff, { y: 0.3 });
+      boatK.add(prism(2.4, 2.4, 1.0), 0xffffff, { y: 0.47, z: -4.2, ry: Math.PI / 2, sx: 0.7 });
+      boatW.add(box(2.5, 0.16, 7.1), 0xf4f4f2, { y: 0.86 });
+      boatW.add(box(1.8, 1.1, 2.4), 0xf4f4f2, { y: 1.45, z: 1 });
+      boatW.add(box(1.82, 0.4, 2.2), 0x2b3a4a, { y: 1.65, z: 1 });
+      boatW.add(cyl(0.06, 0.08, 7, 5), 0xdddddd, { y: 4.4, z: -0.8 });
+      var boat = ctx.kind('boat', [{ geo: boatK.geo() }, { geo: boatW.geo(), notint: true }], { r: 3.5, tint: true, prop: { slot: 'boat', box: { w: 16, d: 5, h: 9 } } });
+      var bcl = [0x1f4e8c, 0xc0392b, 0x2e8b57, 0x1a1a1a, 0xf2f2f2, 0xe9a23b];
+      for (var bi = 0; bi < 8; bi++) {
+        if (bi >= 6) break;
+        var bz = pierZ - 6 - (bi >> 1) * 7 - rnd() * 1.5, bxo = (bi % 2 ? 1 : -1) * (3.2 + rnd() * 0.6);
+        if (ctx.height(pierX + bxo, bz) > sea - 0.4) continue;
+        boat.add(pierX + bxo * 2.2, bz - 4, { abs: true, y: sea - 0.1, rot: Math.PI / 2 + (rnd() - 0.5) * 0.15, tint: bcl[bi % bcl.length] });
+      }
+      // Ruderboote am Strand (slot rowboat), Rettungstürme (slot lifeguard), Strandbar (slot beachBar)
+      var rowK = new Kit(); rowK.add(box(1.3, 0.5, 4), 0xffffff, { y: 0.25 });
+      var rowB = ctx.kind('rowboat', [{ geo: rowK.geo() }], { r: 2.2, prop: { slot: 'rowboat', box: { w: 4.5, d: 4.5, h: 1.2 } } });
+      for (var rbi = 0; rbi < 7; rbi++) {
+        var rbx2 = ctx.minX - 60 + rnd() * (ctx.maxX - ctx.minX + 120), rbz2 = shoreAt(rbx2) + 2 + rnd() * 3;
+        var hr = ctx.height(rbx2, rbz2);
+        if (hr < sea + 0.1 || hr > sea + 1.6 || Math.abs(rbx2 - pierX) < 10 || !ctx.place(rbx2, rbz2, 2.4)) continue;
+        rowB.add(rbx2, rbz2, { rot: rnd() * TAU });
+      }
+      var lgT = new Kit(); [-1, 1].forEach(function (a) { [-1, 1].forEach(function (b) { lgT.add(box(0.15, 3, 0.15), 0xeeeeee, { x: a, y: 1.5, z: b }); }); });
+      lgT.add(box(2.6, 2, 2.6), 0xe23b3b, { y: 4 }); lgT.add(box(3, 0.2, 3), 0xf4f4f4, { y: 5.1 });
+      var guard = ctx.kind('lifeguard', [{ geo: lgT.geo() }], { r: 3.2, prop: { slot: 'lifeguard', box: { w: 7.5, d: 5.2, h: 5.5 } } });
+      for (var gx = ctx.minX - 40 + rnd() * 30; gx < ctx.maxX + 60; gx += 70 + rnd() * 40) {
+        var gz = shoreAt(gx) + 7;
+        if (ctx.height(gx, gz) < sea + 0.3 || Math.abs(gx - pierX) < 14 || !ctx.place(gx, gz, 3.4)) continue;
+        guard.add(gx, gz, { rot: Math.PI / 2 + (rnd() - 0.5) * 0.3 });
+      }
+      var barK = new Kit(); barK.add(box(8, 3, 6), 0xc9a865, { y: 1.5 }); barK.add(cone(6, 2.4, 4), 0xb08a50, { y: 4.2, ry: Math.PI / 4, sx: 1.3 });
+      var bar = ctx.kind('beachBar', [{ geo: barK.geo() }], { r: 6, prop: { slot: 'beachBar', box: { w: 11, d: 11, h: 11 } } });
+      [0.62, 0.15].forEach(function (u) {
+        var bx = ctx.minX + (ctx.maxX - ctx.minX) * u, bz = shoreAt(bx) + 16;
+        if (ctx.height(bx, bz) > sea + 0.5 && ctx.place(bx, bz, 6.5)) bar.add(bx, bz, { rot: Math.PI + (rnd() - 0.5) * 0.4 });
+      });
+      // weitere Boote weiter draußen (Segel als helles Dreieck)
+      var sailK = new Kit(); sailK.add(box(1.6, 0.8, 5.5), 0xffffff, { y: 0.2 });
+      var sailW = new Kit(); sailW.add(cyl(0.05, 0.06, 8, 4), 0xdddddd, { y: 4.6 }); sailW.add(prism(0.05, 3.6, 7), 0xfbfbf6, { y: 4.8, z: 1.4, ry: Math.PI / 2 });
+      var sailor = ctx.kind('sailboat', [{ geo: sailK.geo() }, { geo: sailW.geo(), notint: true }], { r: 3, tint: true });
+      for (var si = 0; si < 9; si++) {
+        var sx2 = ctx.cx + (rnd() - 0.5) * 900, sz2 = ctx.shoreZ - 90 - rnd() * 380;
+        if (ctx.height(sx2, sz2) > sea - 1) continue;
+        sailor.add(sx2, sz2, { abs: true, y: sea - 0.1, rot: rnd() * TAU, s: 1 + rnd() * 0.5, tint: bcl[si % bcl.length] });
+      }
+      // Felsbrocken an der Wasserlinie
+      for (var rb = 0; rb < 26; rb++) {
+        var rbx = ctx.minX - 120 + rnd() * (ctx.maxX - ctx.minX + 240), rbz = shoreAt(rbx) - 2 + rnd() * 5;
+        if (Math.abs(rbx - pierX) < 12 || !ctx.place(rbx, rbz, 3)) continue;
+        rk.add(rbx, rbz, { rot: rnd() * TAU, s: 0.25 + rnd() * 0.35, y: -0.8 });
+      }
+      // Zuschauer: kleine Holztribünen an der Start/Ziel-Geraden (Landseite), Fahnen davor
+      var crowd = [0xe04848, 0x3a86ff, 0xffbe0b, 0xf2f2f2, 0x8338ec, 0x2ec4b6, 0xfb5607, 0x222831, 0x1f6f3f, 0xd94f8a];
+      var skin = [0xf1c8a5, 0xe0ac82, 0xc68863, 0x8d5a3b, 0x5c3a24];
+      var bk = new Kit(), RD = 0.9, RH = 0.5;
+      for (var r = 0; r < 5; r++) {
+        var hh = 0.5 + r * RH, z0 = r * RD;
+        bk.add(box(18, 0.12, RD), 0x9c7a52, { y: hh, z: z0 });
+        bk.add(box(18, hh, 0.08), 0x7d6143, { y: hh / 2, z: z0 - RD / 2 });
+        for (var q = 0; q < 24; q++) {
+          var cxq = -8.6 + q * 0.75 + (rnd() - 0.5) * 0.12;
+          if (rnd() < 0.18) continue;
+          var tall = 0.5 + rnd() * 0.14;
+          bk.add(box(0.42, tall, 0.3), crowd[Math.floor(rnd() * crowd.length)], { x: cxq, y: hh + tall / 2 + 0.06, z: z0 - 0.05 });
+          bk.add(box(0.2, 0.24, 0.21), skin[Math.floor(rnd() * skin.length)], { x: cxq, y: hh + tall + 0.2, z: z0 - 0.05 });
+        }
+      }
+      [-8.8, 0, 8.8].forEach(function (xx) { bk.add(box(0.2, 3.4, 0.2), 0x6b5238, { x: xx, y: 1.7, z: 5 * RD - 0.4 }); });
+      bk.add(box(18.6, 0.25, 5.6), 0x2a7de1, { y: 3.5, z: 1.8, rx: -0.12 });
+      var bleach = ctx.kind('bleacher', [{ geo: bk.geo() }], { r: 9.5 });
+      var nB = 0;
+      [1, -1].forEach(function (sd) {
+        for (var sb = -60; sb <= 80 && nB < 6; sb += 19) {
+          var ob = along(sb, sd, HALF + 14);
+          if (ctx.height(ob.x, ob.z) < sea + 1.5 || !straightAt(sb, 10) || !ctx.clearRect(ob.x, ob.z, ob.rot, 9.2, -0.8, 5) || !ctx.place(ob.x, ob.z, 9.4, true)) continue;
+          bleach.add(ob.x, ob.z, { rot: ob.rot }); nB++;
+        }
+      });
       // Dünengras und Büsche nur an Land (über dem Wasser)
       greenery(ctx, { grass: 0.08, bush: 0.01, far: 70, farBush: 10, dry: true, pred: function (x, z) { return z > ctx.shoreZ + 25; } });
     }
