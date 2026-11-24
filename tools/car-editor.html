@@ -1101,7 +1101,7 @@
         car.updateMatrixWorld(true);
         var box = {}, all = [];
         car.traverse(function (o) { if (o.isMesh && o.userData.pkey) { box[o.userData.pkey] = new THREE.Box3().setFromObject(o); all.push(o.userData.pkey); } });
-        var base = function (k) { var m = /^(.*)\/\d+$/.exec(k); return m ? m[1] : null; };
+        var base = function (k) { var m = /^(.*)\/\d+$/.exec(k) || /^[A-Za-z]+\d+_(.+)$/.exec(k); return m ? m[1] : null; };   // „Teil/3“ oder „polySurface1584_Felge“
         var added = 0; wheelUndoPush();
         ['wheelParts', 'steerParts'].forEach(function (list) {
           var L = def[list]; if (!Array.isArray(L) || !L.length) return;
@@ -1443,18 +1443,18 @@
           if (p.z) { var z = {}; Object.keys(p.z).forEach(function (k) { if (zids.indexOf(k) >= 0 && p.z[k] != null) z[k] = p.z[k]; }); if (Object.keys(z).length) o.z = z; }
           return o;
         }) };
-        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', flat: !!z.flat, o: z.f === 'glass' && z.o != null ? z.o : undefined, parts: (z.parts || []).slice(0, 400) }; });
+        if (def.zones.length) d.zones = def.zones.slice(0, 12).map(function (z) { return { id: z.id, name: (z.name || '').slice(0, 30), c: z.c != null ? z.c : null, f: z.f || 'satin', flat: !!z.flat, o: z.f === 'glass' && z.o != null ? z.o : undefined, parts: (z.parts || []).slice(0, 4000) }; });
         if (def.label) d.label = def.label.slice(0, 40);
         if (def.flip) d.flip = true;
         if (def.texOff) d.texOff = true;
         if (def.smoothWheels) d.smoothWheels = true;
         if (def.straight === false) d.straight = false;
-        if (Array.isArray(def.axleParts)) d.axleParts = def.axleParts.slice(0, 400);
+        if (Array.isArray(def.axleParts)) d.axleParts = def.axleParts.slice(0, 4000);
         if (def.ride && (def.ride.f || def.ride.r)) d.ride = { f: +def.ride.f || 0, r: +def.ride.r || 0 };
         if (def.race) d.race = CarRaceStats.clean(def.race);
         if (def.sound && window.CarEngineAudio) { var snd = CarEngineAudio.Model.cleanSound(def.sound); if (snd) d.sound = snd; }
-        if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 400);
-        if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 400);
+        if (def.wheelParts) d.wheelParts = def.wheelParts.slice(0, 4000);
+        if (def.steerParts && def.steerParts.length) d.steerParts = def.steerParts.slice(0, 4000);
         if (def.splitParts && def.splitParts.length) d.splitParts = def.splitParts.slice(0, 60);
         if (def.seat && def.seat.s > 0) {
           d.seat = { x: def.seat.x, y: def.seat.y, z: def.seat.z, s: def.seat.s, r: def.seat.r || 0, p: def.seat.p || 0, l: def.seat.l || 0 };

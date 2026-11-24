@@ -17,7 +17,7 @@ import tempfile
 import threading
 
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
-MAX_DEF_BYTES = 256 * 1024   # viele gewählte Teile mit langen Namen (Lack, Räder, Farbbereiche)
+MAX_DEF_BYTES = 768 * 1024   # viele gewählte Teile mit langen Namen (Lack, Räder, Farbbereiche)
 MAX_DEPTH = 8
 KINDS = {"vehicles": 200, "rims": 200, "picks": 600, "scan": 600}   # picks: Auswahl im Car-Picker, scan: Vermessung (Sketchfab-uid → …)
 

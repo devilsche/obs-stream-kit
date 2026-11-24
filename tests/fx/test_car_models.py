@@ -117,6 +117,13 @@ def test_many_picked_parts_fit(tmp_path):
     assert cm.save(str(tmp_path), "vehicles", "abt", d) is None
 
 
+def test_thousands_of_rim_pieces_fit(tmp_path):
+    # Modelle mit Felgen aus über 2000 Einzelstücken (Porsche 911 GT3 RS Tribute): alle müssen speicherbar sein
+    keys = ["polySurface%d_Porsche_911GT3RS992Tribute_2023_Wheel1A_3D_3DWheel1G_Material_0" % i for i in range(2200)]
+    calli = ["polySurface%d_Porsche_911GT3RS992Tribute_2023_CallipersCalliperA_Zone_Material_0" % i for i in range(520)]
+    assert cm.save(str(tmp_path), "vehicles", "gt3", {"wheelParts": keys, "axleParts": calli}) is None
+
+
 def _sound(**kw):
     s = {"src": 415275, "idle": [1.0, 3.0], "sweep": {"t0": 4.0, "t1": 9.5, "rpm0": 1200, "rpm1": 7200},
          "lift": {"t0": 10.0, "t1": 12.0, "rpm0": 7000, "rpm1": 1500}, "start": [0.0, 2.5],
