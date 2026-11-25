@@ -39,7 +39,7 @@
     // Körperbau-Vorlagen (Shiba-Modell umgeformt). Jack Russell: kompakt, etwas länger als hoch, kürzeres Bein,
     // Rute aufrecht. Pinscher: schlank, hochbeinig, hochgezogener Bauch, Rute schräg.
     var BODIES = {
-      pinscher: { build: { len: 1.02, height: 1.04, width: 0.86 }, slim: { belly: 0.78, chest: 0.86, neck: 0.72 }, tailUp: 0.45, tailThin: 0.45, muzzle: 1.4, headW: 0.8, upperLeg: 0.72 },
+      pinscher: { build: { len: 1.02, height: 1.04, width: 0.86 }, slim: { belly: 0.78, chest: 0.86, neck: 0.72 }, tailUp: 0.45, tailThin: 0.28, muzzle: 1.4, headW: 0.8, upperLeg: 0.72 },
       jack: { build: { len: 1.08, height: 0.95, width: 0.9 }, slim: { belly: 0.82, chest: 0.88, neck: 0.78 }, tailUp: 1.0, tailThin: 0.6, muzzle: 1.15, headW: 0.9, upperLeg: 0.85 }
     };
     var BUILD = BODIES.pinscher.build, SLIM = BODIES.pinscher.slim, MUZZLE = 1, HEADW = 1, UPLEG = 1, buildGroup = null, slimMeshes = [];
@@ -56,7 +56,7 @@
     var area = AREAS[opt.area] || AREAS.full, RANGE = halfW - 0.4;
 
     var LABEL = {};
-    var S = { face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0 };
+    var S = { resume: null, face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0 };
     var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1 };
     var FUR_KEY = opt.fur || 'pinscher', BODY_KEY = opt.body || 'pinscher';
 
@@ -239,7 +239,13 @@
     }
 
 
-    function setMode(m) {
+    function setMode(m, keep) {
+      if (!keep) S.resume = null;   // neuer Befehl: angefangenes „aufstehen, drehen, wieder hinsetzen“ verwerfen
+      // hinsetzen/hinlegen mit Blickrichtung, steht aber anders: erst im Stand drehen, dann absetzen
+      if ((m === 'sit' || m === 'lie') && S.face != null && holder) {
+        var d0 = -(S.face - 3) * Math.PI / 6 - holder.rotation.y;
+        if (Math.abs(Math.atan2(Math.sin(d0), Math.cos(d0))) > 0.35) { if (CLIPS[S.mode]) S.rise = S.mode === 'lie' || S.mode === 'roll' ? 0.8 : 0.5; S.resume = m; m = 'idle'; }
+      }
       // aus Sitzen/Liegen/… loslaufen: erst aufstehen (Überblenden in die Stehhaltung), dann in Blickrichtung los
       if ((m === 'walk' || m === 'run') && CLIPS[S.mode]) S.rise = S.mode === 'lie' || S.mode === 'roll' ? 0.8 : 0.5;
       S.mode = m;
@@ -364,15 +370,22 @@
       // Stand: Blickrichtung nach Uhrzeit (12 = weg, 3 = rechts, 6 = zu dir, 9 = links), beim Drehen tritt er auf der Stelle.
       var h = holder.rotation.y, moveOn = S.gait > 0.15 && S.mode !== 'idle' || (want > 0 && S.gait > 0.05);
       var hour = S.face;
-      if (hour == null) hour = S.mode === 'shake' ? 6 : S.mode === 'idle' ? (S.dir > 0 ? 4.5 : 7.5) : (S.dir > 0 ? 3.7 : 8.3);
+      var hm = S.resume || S.mode;
+      if (hour == null) hour = hm === 'shake' ? 6 : hm === 'idle' ? (S.dir > 0 ? 4.5 : 7.5) : (S.dir > 0 ? 3.7 : 8.3);
       var aim;
       if (moveOn) {
         aim = (S.dir > 0 ? 0 : Math.PI) + S.dir * Math.max(-0.5, Math.min(0.5, 0.7 * S.z));   // zurück auf die Laufbahn (z = 0)
       } else aim = -(hour - 3) * Math.PI / 6;
       var dy = Math.atan2(Math.sin(aim - h), Math.cos(aim - h));
       if (Math.abs(dy) > 2.6) dy = (Math.cos(h) > 0 ? -1 : 1) * Math.abs(dy);   // fast entgegengesetzt: über die Zuschauerseite wenden
+      // Drehen aus dem Sitzen/Liegen: erst aufstehen, im Stand drehen, dann wieder hinsetzen/hinlegen.
+      // Während anderer Clips (Rollen, Pfote) gar nicht drehen – sonst laufen Beine und Rücken über die Clip-Haltung (Knoten).
+      if (!moveOn && (S.mode === 'sit' || S.mode === 'lie') && S.face != null && Math.abs(dy) > 0.35) {
+        var back = S.mode; setMode('idle'); S.resume = back; S.rise = back === 'lie' ? 0.8 : 0.5;
+      } else if (S.resume && S.mode === 'idle' && S.rise <= 0 && Math.abs(dy) < 0.08) setMode(S.resume);
+      var inClip = !moveOn && CLIPS[S.mode];
       var maxRate = moveOn ? 1.1 + 1.0 * speed : 2.2;
-      var rate = S.rise > 0 ? 0 : Math.max(-maxRate, Math.min(maxRate, dy * 4));   // beim Aufstehen nicht drehen
+      var rate = S.rise > 0 || inClip ? 0 : Math.max(-maxRate, Math.min(maxRate, dy * 4));   // beim Aufstehen nicht drehen
       h += rate * dt; holder.rotation.y = h;
       S.yawRate += (rate - S.yawRate) * Math.min(1, dt * 8);
       // im Stand beim Drehen auf der Stelle treten (Beine laufen leicht mit)
