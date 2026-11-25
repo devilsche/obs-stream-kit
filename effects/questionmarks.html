@@ -1,328 +1,116 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
-  <title>Question Marks Stinger</title>
+  <title>Question Marks</title>
+  <!-- Fragezeichen (!wtf): Fragezeichen steigen von unten auf, werden dichter, zum Schluss zieht ein großes durch die Mitte.
+       Dazu die Akte-X-Musik. Schrift und Farben aus dem Theme (--theme-font-display, --theme-accent, --theme-text),
+       Theme-Wechsel greift ohne Neuladen. Ersetzt das alte Greenscreen-Video.
+       URL: duration (Sekunden bis zum Ausblenden, Standard 9), count (Dichte 0.3–2), sound (1/0), volume (0–1, Faktor). -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      width: 1920px;
-      height: 1080px;
-      overflow: hidden;
-      background: transparent;
-    }
-
-    :root {
-      --stage-out:   9.00s;
-      --time-offset: 0s;
-    }
-
-    html.paused *, html.paused *::before, html.paused *::after {
-      animation-play-state: paused !important;
-    }
-
-    @keyframes fadeOutAll { from { opacity: 1; } to { opacity: 0; } }
-
-    .bg-video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      /* Greuener Chroma-Key entfernen, dann schwarze Fragezeichen auf weiss invertieren */
-      filter: url(#greenKey) invert(1);
-    }
-
-    .stage {
-      position: absolute; inset: 0;
-      animation: fadeOutAll 0.6s ease-in var(--stage-out) forwards;
-    }
-
-    /* ── Tune-Panel ── */
-    .tune-panel {
-      position: fixed; top: 80px; right: 16px; width: 420px;
-      background: rgba(20, 10, 30, 0.92);
-      border: 2px solid #f2b705; padding: 16px; border-radius: 10px;
-      color: #f2b705; font-family: 'Courier New', monospace; font-size: 13px;
-      z-index: 1000; display: none;
-      box-shadow: 0 0 30px rgba(242, 183, 5, 0.4);
-    }
-    .tune-panel.visible { display: block; }
-    .tune-panel h2 { font-size: 16px; margin-bottom: 12px; letter-spacing: 2px; text-transform: uppercase; }
-    .tune-panel table { width: 100%; border-collapse: collapse; }
-    .tune-panel th, .tune-panel td { padding: 4px 6px; text-align: left; border-bottom: 1px solid rgba(242, 183, 5, 0.2); }
-    .tune-panel th { font-size: 11px; text-transform: uppercase; }
-    .tune-panel input {
-      width: 70px; background: rgba(242, 183, 5, 0.1); border: 1px solid rgba(242, 183, 5, 0.4);
-      color: #f2b705; padding: 3px 6px; font-family: inherit; font-size: 12px;
-      text-align: right; border-radius: 3px;
-    }
-    .tune-panel input:focus { outline: 1px solid #f2b705; }
-    .tune-panel tr.clickable { cursor: pointer; }
-    .tune-panel tr.clickable:hover { background: rgba(242, 183, 5, 0.15); }
-    .tune-panel tr.clickable:hover .tune-label { color: #fff; }
-    .tune-panel .tune-label { font-size: 11px; color: rgba(255, 220, 150, 0.75); max-width: 200px; }
-    .tune-actions { display: flex; gap: 8px; margin-top: 12px; }
-    .tune-btn {
-      flex: 1; background: rgba(242, 183, 5, 0.15); border: 1px solid #f2b705;
-      color: #f2b705; padding: 8px 10px; font-family: inherit; font-size: 12px;
-      font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
-      border-radius: 4px; cursor: pointer;
-    }
-    .tune-btn:hover { background: rgba(242, 183, 5, 0.3); }
-    .tune-btn.reset { border-color: #ff8888; color: #ff8888; }
-    .tune-btn.reset:hover { background: rgba(255, 136, 136, 0.2); }
-    .tune-hint { margin-top: 10px; font-size: 10px; color: rgba(255, 220, 150, 0.6); line-height: 1.4; }
-    .time-indicator {
-      position: fixed; bottom: 16px; right: 16px;
-      background: rgba(20, 10, 30, 0.85); border: 1px solid #f2b705;
-      color: #f2b705; padding: 6px 14px; font-family: 'Courier New', monospace;
-      font-size: 14px; z-index: 1000; display: none; border-radius: 4px;
-    }
-    .time-indicator.visible { display: block; }
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    canvas { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
   </style>
 </head>
 <body>
-
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-    <defs>
-      <filter id="greenKey" color-interpolation-filters="sRGB">
-        <feColorMatrix type="matrix" values="
-          1 0 0 0 0
-          0 1 0 0 0
-          0 0 1 0 0
-          -2 3 -2 0 -0.25
-        " result="chroma"/>
-        <feComponentTransfer in="chroma" result="alphaRamp">
-          <feFuncA type="linear" slope="-4" intercept="1.4"/>
-        </feComponentTransfer>
-        <feGaussianBlur in="alphaRamp" stdDeviation="1" result="mask"/>
-        <feComposite in="SourceGraphic" in2="mask" operator="in" result="keyed"/>
-        <!-- Despill: reduce green tint in remaining pixels -->
-        <feColorMatrix in="keyed" type="matrix" values="
-          1    0    0    0 0
-          0.35 0.3  0.35 0 0
-          0    0    1    0 0
-          0    0    0    1 0
-        "/>
-      </filter>
-    </defs>
-  </svg>
-
-  <div class="stage">
-    <video class="bg-video" data-stinger-autoplay autoplay preload="auto" playsinline
-           src="../assets/stingers/questionmarks.mp4"></video>
-  </div>
-
-  <div class="tune-panel" id="tunePanel">
-    <h2>Questionmarks Tune Mode</h2>
-    <table id="tuneTable"></table>
-    <div class="tune-actions">
-      <button class="tune-btn" id="applyBtn">&gt; Apply</button>
-      <button class="tune-btn" id="copyBtn">&#128203; Copy</button>
-      <button class="tune-btn reset" id="resetBtn">Reset</button>
-    </div>
-    <div style="margin-top: 14px; border-top: 1px solid rgba(242,183,5,0.3); padding-top: 12px;">
-      <div style="font-size: 11px; text-transform: uppercase; margin-bottom: 6px;">Playback</div>
-      <div class="tune-actions" style="margin-top: 6px;">
-        <button class="tune-btn" id="pauseBtn">&#9208; Pause</button>
-        <button class="tune-btn" id="replayBtn">&#8634; Replay 0s</button>
-      </div>
-      <div style="margin-top: 10px; display: flex; align-items: center; gap: 6px; font-size: 11px;">
-        <span>Von:</span>
-        <input type="number" id="fromInput" value="0" step="0.1" min="0" max="12" style="width: 60px;">
-        <span>Bis:</span>
-        <input type="number" id="toInput" value="9" step="0.1" min="0" max="12" style="width: 60px;">
-        <button class="tune-btn" id="segmentBtn" style="flex: 0 0 auto; padding: 6px 12px;">&#9658; Play</button>
-      </div>
-    </div>
-    <div class="tune-hint">
-      <b>Apply</b>: speichert + Reload. <b>Pause</b>/<b>Replay</b>/<b>Play Segment</b>: ohne Reload.<br>
-      Shortcuts: <b>Space</b> = Pause, <b>R</b> = Replay, <b>S</b> = Apply, <b>C</b> = Copy.
-    </div>
-  </div>
-
-  <div class="time-indicator" id="timeInd">t = 0.00s</div>
-
+  <canvas id="qm" width="1920" height="1080" aria-hidden="true"></canvas>
+  <audio id="music" data-stinger-autoplay data-volume="0.12" preload="auto" src="../assets/stingers/xfiles.mp3"></audio>
   <script>
     (function () {
       'use strict';
-      var DEFAULTS = {
-        'stage-out': 9.00
-      };
-      var LABELS = {
-        'stage-out': 'Stage Fade-Out'
-      };
-      var KEYS = ['stage-out'];
-      var STORAGE_KEY = 'questionmarks-tune-values';
+      var p = new URLSearchParams(location.search);
+      function num(k, d, lo, hi) { var v = parseFloat(p.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
+      var DUR = num('duration', 9, 3, 14), DENS = num('count', 1, 0.3, 2), FADE = 0.6;
+      var cv = document.getElementById('qm'), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+      var music = document.getElementById('music');
 
-      var params = new URLSearchParams(window.location.search);
-      var tuneMode = params.get('tune') === '1';
+      // Theme: Schrift + Farben; bei Theme-Wechsel neu lesen
+      var font, colors;
+      function readTheme() {
+        var cs = getComputedStyle(document.documentElement);
+        var get = function (k, d) { return cs.getPropertyValue(k).trim() || d; };
+        font = get('--theme-font-display', '"DM Sans", system-ui, sans-serif');
+        colors = [get('--theme-accent', '#f2b705'), get('--theme-text', '#e8e0f0'), get('--theme-accent-2', get('--theme-accent', '#f2b705'))];
+      }
+      function loadFont() {   // Canvas lädt Webfonts nicht von selbst
+        try { return document.fonts.load('800 80px ' + font, '?'); } catch (e) { return Promise.resolve(); }
+      }
+      readTheme();
+      window.addEventListener('themechange', function () { readTheme(); loadFont(); });
 
-      var saved = {};
-      try { var raw = localStorage.getItem(STORAGE_KEY); if (raw) saved = JSON.parse(raw); } catch (e) {}
-      function getValue(key) { return (saved[key] !== undefined) ? saved[key] : DEFAULTS[key]; }
-
-      function applyToRoot() {
-        var root = document.documentElement;
-        KEYS.forEach(function (k) {
-          root.style.setProperty('--' + k, getValue(k) + 's');
+      var marks = [], hero = null, spawnAcc = 0;
+      function rnd(a, b) { return a + Math.random() * (b - a); }
+      function spawn(t, big) {
+        var depth = Math.pow(Math.random(), 1.6);                 // 0 = fern/klein, 1 = nah/groß
+        var size = big ? 420 : 14 + depth * 92;
+        marks.push({
+          x: big ? W * rnd(0.42, 0.58) : rnd(-0.02, 1.02) * W, y: H + size * 0.7,
+          size: size, speed: big ? 230 : 60 + depth * 260, born: t,
+          sway: rnd(8, 26) * (0.4 + depth), phase: rnd(0, 6.28), spin: rnd(-0.25, 0.25), rot: rnd(-0.25, 0.25),
+          col: big ? 0 : (Math.random() < 0.55 ? 1 : Math.random() < 0.5 ? 0 : 2),
+          alpha: big ? 1 : 0.35 + depth * 0.65, depth: depth
         });
-      }
-      applyToRoot();
-
-      if (!tuneMode) return;
-
-      var table = document.getElementById('tuneTable');
-      var header = document.createElement('tr');
-      header.innerHTML = '<th>Event</th><th>Zeit</th>';
-      table.appendChild(header);
-
-      function addRow(label, key) {
-        var tr = document.createElement('tr');
-        tr.className = 'clickable';
-        var tdLabel = document.createElement('td');
-        tdLabel.className = 'tune-label';
-        tdLabel.textContent = label;
-        tdLabel.title = 'Click: Von/Bis befuellen';
-        tr.appendChild(tdLabel);
-        var td = document.createElement('td');
-        var inp = document.createElement('input');
-        inp.type = 'number'; inp.step = '0.1'; inp.min = '0'; inp.max = '15';
-        inp.value = getValue(key); inp.dataset.key = key;
-        td.appendChild(inp);
-        tr.appendChild(td);
-        tr.addEventListener('click', function (e) {
-          if (e.target.tagName === 'INPUT') return;
-          var v = currentVals();
-          var from = Math.max(0, v[key] - 0.5);
-          var to   = v[key] + 1.0;
-          document.getElementById('fromInput').value = from.toFixed(2);
-          document.getElementById('toInput').value   = to.toFixed(2);
-        });
-        table.appendChild(tr);
-      }
-      KEYS.forEach(function (k) { addRow(LABELS[k], k); });
-
-      document.getElementById('tunePanel').classList.add('visible');
-      document.getElementById('timeInd').classList.add('visible');
-
-      function currentVals() {
-        var vals = {};
-        document.querySelectorAll('.tune-panel input').forEach(function (inp) {
-          if (inp.dataset.key) vals[inp.dataset.key] = parseFloat(inp.value) || 0;
-        });
-        return vals;
+        marks.sort(function (a, b) { return a.size - b.size; });  // kleine (ferne) zuerst zeichnen
       }
 
-      function apply() {
-        var vals = currentVals();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(vals));
-        location.reload();
+      function rate(t) {   // Fragezeichen pro Sekunde: anschwellen, oben halten, zum Ende auslaufen
+        var up = Math.min(1, t / 3), down = 1 - Math.max(0, (t - (DUR - 1.8)) / 1.8);
+        return (8 + 52 * up) * Math.max(0, down) * DENS;
       }
-      function reset() { localStorage.removeItem(STORAGE_KEY); location.reload(); }
 
-      document.getElementById('applyBtn').addEventListener('click', apply);
-      document.getElementById('resetBtn').addEventListener('click', reset);
+      var start = null, last = 0;
+      function frame(now) {
+        if (start === null) start = now;
+        var t = (now - start) / 1000, dt = Math.min(0.05, t - last); last = t;
+        spawnAcc += rate(t) * dt;
+        while (spawnAcc >= 1) { spawn(t, false); spawnAcc--; }
+        if (!hero && t > DUR * 0.55) { spawn(t, true); hero = true; }
 
-      function copyValues() {
-        var v = currentVals();
-        var lines = ['Questionmarks Tune Values:'];
-        KEYS.forEach(function (k) {
-          lines.push((LABELS[k] + ':').padEnd(34) + v[k].toFixed(2) + 's');
-        });
-        var text = lines.join('\n');
-        var btn = document.getElementById('copyBtn');
-        var original = btn.innerHTML;
-        var restore = function () { btn.innerHTML = original; };
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          navigator.clipboard.writeText(text).then(function () {
-            btn.innerHTML = '&#10003; Copied!';
-            setTimeout(restore, 1200);
-          }).catch(function () { fallbackCopy(text, btn, restore); });
-        } else { fallbackCopy(text, btn, restore); }
-      }
-      function fallbackCopy(text, btn, restore) {
-        var ta = document.createElement('textarea');
-        ta.value = text; ta.style.position = 'fixed'; ta.style.top = '-9999px';
-        document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); btn.innerHTML = '&#10003; Copied!'; }
-        catch (e) { btn.innerHTML = 'Error'; }
-        document.body.removeChild(ta);
-        setTimeout(restore, 1200);
-      }
-      document.getElementById('copyBtn').addEventListener('click', copyValues);
-
-      var html = document.documentElement;
-      var pauseBtn = document.getElementById('pauseBtn');
-      var replayBtn = document.getElementById('replayBtn');
-      var segmentBtn = document.getElementById('segmentBtn');
-      var fromInp = document.getElementById('fromInput');
-      var toInp = document.getElementById('toInput');
-      var segmentTimer = null;
-
-      function setPaused(paused) {
-        if (paused) { html.classList.add('paused'); pauseBtn.innerHTML = '&#9654; Resume'; }
-        else        { html.classList.remove('paused'); pauseBtn.innerHTML = '&#9208; Pause'; }
-      }
-      function togglePause() { setPaused(!html.classList.contains('paused')); }
-
-      function resetAnimations(offsetSec) {
-        clearTimeout(segmentTimer);
-        html.style.setProperty('--time-offset', (offsetSec || 0) + 's');
-        var stage = document.querySelector('.stage');
-        var clone = stage.cloneNode(true);
-        stage.parentNode.replaceChild(clone, stage);
-        html.classList.remove('paused');
-        pauseBtn.innerHTML = '&#9208; Pause';
-      }
-      function replayFrom0() { resetAnimations(0); }
-      function playSegment() {
-        var from = parseFloat(fromInp.value) || 0;
-        var to   = parseFloat(toInp.value) || getValue('stage-out');
-        if (to <= from) return;
-        resetAnimations(from);
-        segmentTimer = setTimeout(function () { setPaused(true); }, (to - from) * 1000);
-      }
-      pauseBtn.addEventListener('click', togglePause);
-      replayBtn.addEventListener('click', replayFrom0);
-      segmentBtn.addEventListener('click', playSegment);
-
-      document.addEventListener('keydown', function (e) {
-        if (e.target.tagName === 'INPUT') return;
-        if (e.key === 'r' || e.key === 'R') replayFrom0();
-        else if (e.key === 's' || e.key === 'S') apply();
-        else if (e.key === 'c' || e.key === 'C') copyValues();
-        else if (e.key === ' ') { e.preventDefault(); togglePause(); }
-      });
-
-      var events = [];
-      KEYS.forEach(function (k) { events.push({ t: getValue(k), label: LABELS[k] }); });
-      events.sort(function (a, b) { return a.t - b.t; });
-
-      var timeInd = document.getElementById('timeInd');
-      var startRef = null;
-      function tick() {
-        if (html.classList.contains('stinger-loading')) { requestAnimationFrame(tick); return; }
-        if (startRef === null) startRef = performance.now();
-        var t = (performance.now() - startRef) / 1000;
-        if (html.classList.contains('paused')) t = 0;
-        var currentEvent = null;
-        for (var i = 0; i < events.length; i++) {
-          if (events[i].t <= t) currentEvent = events[i]; else break;
+        var stage = t < DUR ? 1 : Math.max(0, 1 - (t - DUR) / FADE);
+        g.clearRect(0, 0, W, H);
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        for (var i = marks.length - 1; i >= 0; i--) {
+          var m = marks[i], age = t - m.born;
+          m.y -= m.speed * dt; m.rot += m.spin * dt;
+          if (m.y < -m.size) { marks.splice(i, 1); continue; }
         }
-        var txt = 't = ' + t.toFixed(2) + 's';
-        if (html.classList.contains('paused')) txt += ' [PAUSED]';
-        if (currentEvent) txt += '  |  ' + currentEvent.label + ' @ ' + currentEvent.t.toFixed(2) + 's';
-        timeInd.textContent = txt;
-        requestAnimationFrame(tick);
+        for (var j = 0; j < marks.length; j++) {
+          var q = marks[j], a = t - q.born;
+          var pop = Math.min(1, a / 0.35), s = q.size * (0.4 + 0.6 * (1 - Math.pow(1 - pop, 3)) + 0.08 * Math.sin(Math.min(1, a / 0.35) * Math.PI));
+          // weich ausblenden zum oberen Rand (nie hart abschneiden)
+          var edge = Math.min(1, Math.max(0, (q.y + q.size * 0.5) / (H * 0.18)));
+          g.save();
+          g.translate(q.x + Math.sin(a * 1.7 + q.phase) * q.sway, q.y);
+          g.rotate(q.rot + Math.sin(a * 2.1 + q.phase) * 0.12);
+          g.globalAlpha = q.alpha * edge * stage * pop;
+          g.font = '800 ' + Math.round(s) + 'px ' + font;
+          g.shadowColor = colors[0]; g.shadowBlur = q.depth * 22 + (q.col === 0 ? 10 : 0);
+          g.lineWidth = Math.max(1.5, s * 0.045); g.strokeStyle = 'rgba(0,0,0,0.55)';
+          g.strokeText('?', 0, 0);
+          g.fillStyle = colors[q.col];
+          g.fillText('?', 0, 0);
+          g.restore();
+        }
+        // Musik zum Ende weich ausblenden (Quelle wird danach ausgeblendet)
+        if (music && t > DUR - 0.8 && !music.muted) {
+          var base = parseFloat(music.getAttribute('data-volume')) || 1, f = parseFloat(p.get('volume'));
+          base *= isNaN(f) ? 1 : f;
+          try { music.volume = Math.max(0, base * Math.min(1, (DUR + FADE - t) / (0.8 + FADE))); } catch (e) { /* egal */ }
+        }
+        if (t < DUR + FADE + 0.1) requestAnimationFrame(frame);
+        else { g.clearRect(0, 0, W, H); try { music.pause(); } catch (e) { /* egal */ } }
       }
-      requestAnimationFrame(tick);
+
+      // Start, sobald stinger-ready Schrift und Musik geladen hat (gleichzeitig mit dem Ton)
+      function go() {
+        if (document.documentElement.classList.contains('stinger-loading')) { setTimeout(go, 30); return; }
+        requestAnimationFrame(frame);
+      }
+      if (document.fonts) Promise.race([loadFont(), new Promise(function (r) { setTimeout(r, 1500); })]).then(go, go); else go();
     })();
   </script>
-
 </body>
 </html>
