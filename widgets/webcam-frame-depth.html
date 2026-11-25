@@ -145,6 +145,8 @@
           T = 0.45 + h(2) * 0.25;
         }
         var p = new THREE.Vector2(side * (W / 2 + 70), -H * 0.3 + h(3) * H * 0.7);
+        // weiter Weg → längerer, höherer Bogen statt Querschuss (sonst rutschen sie über eine kleine Oberkante weg)
+        T = Math.max(T, Math.min(1.7, Math.abs(tgt.x - p.x) / 1000 + h(7) * 0.2));
         var v = tgt.clone().sub(p).sub(new THREE.Vector2(0, 0.5 * GRAV * T * T)).divideScalar(T);
         E.push({ p: p, v: v, a: 0, w: (h(5) - 0.5) * 14, tex: item.tex[k], born: t, id: item.seq * 10 + k });
       }
@@ -170,8 +172,8 @@
             e.p.x = qx + nx * R; e.p.y = qy + ny * R;
             if (vn < 0) {
               if (-vn > 380) hits.push({ t: t, x: qx, y: qy, k: Math.min(1, -vn / 1400), nx: nx, ny: ny });
-              var tx = -ny, ty = nx, vt = e.v.x * tx + e.v.y * ty;
-              e.v.set(-vn * 0.42 * nx + vt * 0.86 * tx, -vn * 0.42 * ny + vt * 0.86 * ty);
+              var tx = -ny, ty = nx, vt = e.v.x * tx + e.v.y * ty, fr = ny > 0.7 ? 0.5 : 0.86;   // oben bremst es stärker
+              e.v.set(-vn * 0.42 * nx + vt * fr * tx, -vn * 0.42 * ny + vt * fr * ty);
               e.w = e.w * 0.6 - vt / R * 0.4;
             }
           }
