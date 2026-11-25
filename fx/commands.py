@@ -294,7 +294,7 @@ EFFECTS = {
                                        "burnout", "pet"),
                       "name": _name},
             "act": {"action": _choice("walk", "run", "stand", "sit", "lie", "paw", "roll", "bark", "wag", "turn", "come",
-                                      "sleep"),
+                                      "sleep", "playdead", "beg", "growl", "shakeoff"),
                     "face": _float_range(1, 12)},
         },
     },

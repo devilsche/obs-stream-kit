@@ -7,7 +7,10 @@
  *   f.ready.then(...);  f.react('follow');  f.act('sit', { face: 6 });
  *
  * Verhalten: läuft von sich aus herum, schaut sich um, setzt sich, legt sich nach längerer Ruhe hin (roam=false: steht).
- * Reaktionen (Vorlagen): happy, roll, zoomies, paw, bark, sit, none. Blickrichtung nach Uhrzeit (12 = weg, 3 = rechts,
+ * Reaktionen (Vorlagen): happy, roll, zoomies, paw, bark, sit, beg, growl, none. Zusatzhaltungen über den Clips (am Skelett):
+ * Männchen (beg), Kampfstellung mit Knurren (stance), Ducken (cower), Wasser abschütteln (shakeoff), Strampeln in der Luft
+ * (flail). Wetter (weather(kind)): Regen → schütteln, Blitz → ducken, Hagel → wegrennen und ducken, Tornado → wirbelt
+ * ihn hoch, Tsunami/Lawine → spült ihn weg, Schnee → Zoomies, Aurora/Regenbogen/Meteore → schaut und wedelt. Blickrichtung nach Uhrzeit (12 = weg, 3 = rechts,
  * 6 = zum Zuschauer, 9 = links). Erkenntnisse (gemessen, nicht raten): siehe Kommentare an Beinen/Kehre/Zurücksetzen.
  */
 (function (root) {
@@ -59,8 +62,12 @@
     var area = AREAS[opt.area] || AREAS.full, RANGE = halfW - 0.4;
 
     var LABEL = {};
-    var S = { resume: null, face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0 };
-    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1 };
+    var S = { resume: null, face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0,
+              pose: null, poseW: 0, growlLeft: 0, growlNext: 0, growlT: 9, fly: null };
+    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1 };
+    // Zusatzhaltungen am Skelett (über dem Steh- bzw. Sitz-Clip), weich ein- und ausgeblendet
+    var POSES = { beg: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1 };
+    var fxg = null;   // Gruppe für Wirbeln (Tornado) zwischen holder und Körper
     var FUR_KEY = opt.fur || 'pinscher', BODY_KEY = opt.body || 'pinscher';
 
     var ready = new Promise(function (resolve, reject) {
@@ -70,7 +77,8 @@
         dog.scale.setScalar(1.25 * SIZE / size.y);
         box.setFromObject(dog); dog.position.y -= box.min.y; dog.position.x -= (box.min.x + box.max.x) / 2; dog.position.z -= (box.min.z + box.max.z) / 2;
         var inner = new THREE.Group(); inner.add(dog);
-        buildGroup = new THREE.Group(); buildGroup.add(inner); holder.add(buildGroup);   // Körperbau: in Hund-Achsen (x vorn, y hoch, z quer)
+        buildGroup = new THREE.Group(); buildGroup.add(inner);   // Körperbau: in Hund-Achsen (x vorn, y hoch, z quer)
+        fxg = new THREE.Group(); fxg.add(buildGroup); holder.add(fxg);
         dog.traverse(function (o) {
           if (o.isBone) { var k = o.name.replace(/_jnt\d+_\d+$/, ''); if (!B[k]) B[k] = o; BIND.push([o, o.quaternion.clone(), o.position.clone()]); }
           if (o.isMesh) o.frustumCulled = false;
@@ -299,8 +307,9 @@
       // aus Sitzen/Liegen/… loslaufen: erst aufstehen (Überblenden in die Stehhaltung), dann in Blickrichtung los
       if ((m === 'walk' || m === 'run') && CLIPS[S.mode]) S.rise = S.mode === 'lie' || S.mode === 'roll' ? 0.8 : 0.5;
       S.mode = m;
-      if (m === 'walk' || m === 'run' || m === 'idle') play('standing');
-      if (m === 'sit') play('sitting');
+      if (POSES[m]) S.pose = m;
+      if (m === 'walk' || m === 'run' || m === 'idle' || m === 'stance' || m === 'cower' || m === 'shakeoff' || m === 'flail') play('standing');
+      if (m === 'sit' || m === 'beg') play('sitting');
       if (m === 'shake') play('shake', { once: true });
       if (m === 'roll') play('rollover', { once: true });
       if (m === 'lie') play('play_dead', { once: true });
@@ -329,16 +338,32 @@
       o.connect(fl); fl.connect(gn); gn.connect(actx.destination); o.start(t0); o.stop(t0 + 0.2);
     }
     function bark() { S.bark = 1; S.barkT = 0; woof(); }
+    // Knurren (opt.growlSound, CC0 „Dog Growl“ von bonebrah, OpenGameArt): kurze Stöße, leicht variiert
+    var growlSrc = opt.growlSound || null;
+    function growl() {
+      S.growlT = 0;
+      if (!opt.sound || vol <= 0 || !growlSrc) return;
+      var a = new Audio(growlSrc); a.volume = Math.min(1, vol * 0.9);
+      a.preservesPitch = false; a.mozPreservesPitch = false; a.playbackRate = 0.85 + Math.random() * 0.15;
+      var pr = a.play(); if (pr && pr.catch) pr.catch(function () {});
+    }
 
     // ── Ablauf: Schritte nacheinander (Reaktionen und eigenes Verhalten) ──
-    // goto {x, gait: 'walk'|'run'} · mode {m, dur} · bark {n, gap} · wag {v, dur} · face {hour, dur} · wait {dur}
+    // goto {x, gait: 'walk'|'run'} · mode {m, dur, growl} · bark {n, gap} · wag {v, dur} · face {hour, dur} · wait {dur}
+    // fly {kind: 'tornado'|'tsunami', dur, dir}: hochgewirbelt bzw. weggespült (Versatz über der normalen Position)
     var plan = [], step = null, stepT = 0, lastEvent = 0, clockT = 0, roam = opt.roam !== false;
     function rnd(a, b) { return a + Math.random() * (b - a); }
     function hourToward(x) { return x > S.x ? 4 : 8; }
     function startStep(s) {
       step = s; stepT = 0;
       if (s.do === 'goto') { S.dir = s.x > S.x ? 1 : -1; S.face = null; setMode(s.gait || 'walk'); }
-      else if (s.do === 'mode') { if (s.face != null) S.face = s.face; setMode(s.m); }
+      else if (s.do === 'mode') { if (s.face != null) S.face = s.face; setMode(s.m); if (s.growl) { S.growlLeft = s.growl; S.growlNext = 0.2; } }
+      else if (s.do === 'fly') {
+        var dir = s.dir || (S.x > 0 ? -1 : 1);
+        S.fly = { kind: s.kind, t0: t, dur: s.dur || 3, x0: S.x, dir: dir,
+                  dist: s.kind === 'tsunami' ? Math.min(2.6, Math.abs((dir > 0 ? area[1] : area[0]) - S.x)) : 0 };
+        S.face = null; setMode('flail');
+      }
       else if (s.do === 'face') { S.face = s.hour; if (S.mode !== 'sit' && !CLIPS[S.mode]) setMode('idle'); }
       else if (s.do === 'wag') S.wag = s.v;
       else if (s.do === 'bark') { s.left = s.n || 1; s.next = 0; }
@@ -354,6 +379,11 @@
         s.next -= dt;
         if (s.next <= 0 && s.left > 0) { bark(); s.left--; s.next = s.gap || 0.45; }
         return s.left <= 0 && s.next <= 0;
+      }
+      if (s.do === 'fly' && stepT >= (s.dur || 3)) {
+        if (S.fly && S.fly.kind === 'tsunami') S.x = S.fly.x0 + S.fly.dir * S.fly.dist;   // bleibt, wo die Welle ihn abgesetzt hat
+        S.fly = null; if (fxg) fxg.rotation.set(0, 0, 0);
+        setMode('idle'); return true;
       }
       return stepT >= (s.dur || 0);
     }
@@ -388,6 +418,11 @@
         { do: 'bark', n: p && p.n || 6, gap: 0.6 }, { do: 'wait', dur: 1 }, { do: 'wag', v: 0.4, dur: 0 }]; },
       sit: function () { return [{ do: 'face', hour: 6, dur: 0.6 }, { do: 'mode', m: 'sit', face: 6, dur: 8 }]; },
       pet: function () { return [{ do: 'face', hour: 6, dur: 0.6 }, { do: 'wag', v: 1, dur: 0 }, { do: 'mode', m: 'sit', face: 6, dur: 5 }, { do: 'wag', v: 0.4, dur: 0 }]; },
+      beg: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.6 }, { do: 'wag', v: 1, dur: 0 }, { do: 'mode', m: 'sit', face: f, dur: 0.8 },
+        { do: 'mode', m: 'beg', face: f, dur: 5 }, { do: 'mode', m: 'sit', face: f, dur: 1.5 }, { do: 'wag', v: 0.4, dur: 0 }]; },
+      growl: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.5 }, { do: 'wag', v: 0, dur: 0 }, { do: 'mode', m: 'stance', dur: 4.5, growl: 4 },
+        { do: 'bark', n: 2, gap: 0.35 }, { do: 'mode', m: 'idle', dur: 1 }, { do: 'wag', v: 0.4, dur: 0 }]; },
+      shakeoff: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.5 }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }]; },
       none: function () { return []; }
     };
     function clamp(x) { return Math.max(area[0], Math.min(area[1], x)); }
@@ -408,11 +443,30 @@
         sit: [{ do: 'mode', m: 'sit', face: face == null ? 6 : face, dur: 10 }],
         lie: [{ do: 'mode', m: 'lie', face: face, dur: 20 }], sleep: [{ do: 'wag', v: 0, dur: 0 }, { do: 'mode', m: 'lie', face: face, dur: 40 }],
         paw: PRESETS.paw(), roll: PRESETS.roll(), bark: PRESETS.bark({ n: 3 }), wag: [{ do: 'wag', v: 1, dur: 4 }, { do: 'wag', v: 0.4, dur: 0 }],
+        playdead: [{ do: 'face', hour: 6, dur: 0.5 }, { do: 'wag', v: 0, dur: 0 }, { do: 'mode', m: 'lie', dur: 8 }, { do: 'mode', m: 'idle', dur: 1 }, { do: 'wag', v: 0.4, dur: 0 }],
+        beg: PRESETS.beg(face), growl: PRESETS.growl(face), shakeoff: PRESETS.shakeoff(face),
         turn: [{ do: 'goto', x: clamp(S.x - S.dir * 1.2), gait: 'walk' }],
         come: [{ do: 'goto', x: (area[0] + area[1]) / 2, gait: 'walk' }, { do: 'mode', m: 'sit', face: 6, dur: 6 }]
       };
       plan = (map[action] || []).slice();
       if (face != null && action !== 'sit' && action !== 'stand' && action !== 'lie' && action !== 'sleep') plan.push({ do: 'face', hour: face, dur: 6 });
+    }
+
+    // Wetter: was der Hund bei welchem Wetter-Befehl tut (weather.html bekommt dieselben Befehle)
+    function weather(kind) {
+      var edge = S.x > 0 ? area[1] : area[0], seq = null;
+      if (kind === 'rain' || kind === 'drizzle' || kind === 'storm' || kind === 'sleet') seq = [{ do: 'wait', dur: 2.5 }].concat(PRESETS.shakeoff(), [{ do: 'wait', dur: 4 }], PRESETS.shakeoff());
+      else if (kind === 'strike' || kind === 'megabolt' || kind === 'ballbolt') seq = [{ do: 'mode', m: 'cower', dur: 3 }, { do: 'mode', m: 'idle', dur: 0.8 }];
+      else if (kind === 'hail') seq = [{ do: 'goto', x: edge, gait: 'run' }, { do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 5 }, { do: 'mode', m: 'idle', dur: 1 }];
+      else if (kind === 'tornado') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 1.4 }, { do: 'fly', kind: 'tornado', dur: 3.6 },
+        { do: 'mode', m: 'shakeoff', dur: 1.4 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'mode', m: 'idle', dur: 0.5 }];
+      else if (kind === 'tsunami' || kind === 'avalanche') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 0.8 },
+        { do: 'fly', kind: 'tsunami', dur: 3.4 }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }];
+      else if (kind === 'snow' || kind === 'blizzard') seq = PRESETS.zoomies();
+      else if (kind === 'aurora' || kind === 'rainbow') seq = [{ do: 'face', hour: 6, dur: 0.5 }, { do: 'wag', v: 1, dur: 0 }, { do: 'mode', m: 'sit', face: 6, dur: 6 }, { do: 'wag', v: 0.4, dur: 0 }];
+      else if (kind === 'meteors') seq = [{ do: 'face', hour: 6, dur: 0.4 }, { do: 'bark', n: 4, gap: 0.5 }, { do: 'mode', m: 'sit', face: 6, dur: 4 }];
+      if (!seq) return;
+      lastEvent = clockT; plan = seq; step = null; S.face = null;
     }
 
     var clock = new THREE.Clock(), t = 0;
@@ -461,7 +515,10 @@
         // Steh-Clips), dann nur die eigene Bewegung – sonst addieren sich Drehungen auf (gemessen: bis 2,4 rad nach einer Kehre).
         // Stehen und Clips: nur Knochen zurücksetzen, die der laufende Clip nicht selbst schreibt.
         unSnout();   // Schnauzen-Versatz vom letzten Bild zurücknehmen (Knochen ohne Positionsspur würden sonst aufaddieren)
-        var locomotion = moving > 0.02 && cur === actions.standing;
+        // Haltungen im Stand (Kampfstellung, Ducken, Schütteln, Strampeln) wie das Laufen: alle Knochen aus der Grundstellung,
+        // sonst addieren sich die Drehungen Bild für Bild auf (gemessen: Vorderbein nach 1 s senkrecht nach oben)
+        var standPose = POSES[S.mode] && S.mode !== 'beg' || (S.poseW > 0.01 && S.pose !== 'beg' && !CLIPS[S.mode]);
+        var locomotion = (moving > 0.02 || standPose) && cur === actions.standing;
         if (locomotion) {
           for (var bi = 0; bi < BIND.length; bi++) { BIND[bi][0].quaternion.copy(BIND[bi][1]); BIND[bi][0].position.copy(BIND[bi][2]); }
         } else {
@@ -473,6 +530,12 @@
           }
           if (cur === actions.standing) cur.timeScale = 1;
           mixer.update(dt);
+          // Männchen baut auf der Sitzhaltung auf; der Sitz-Clip ist ein Standbild (Länge 0) und wird nicht jedes Bild neu
+          // geschrieben – deshalb die Sitzhaltung einmal merken und jedes Bild wiederherstellen (sonst addiert sich die Pose auf)
+          if (S.mode === 'beg' || (S.pose === 'beg' && S.poseW > 0.01)) {
+            if (!S.begSnap) S.begSnap = BIND.map(function (b) { return [b[0].quaternion.clone(), b[0].position.clone()]; });
+            else for (var bs = 0; bs < BIND.length; bs++) { BIND[bs][0].quaternion.copy(S.begSnap[bs][0]); BIND[bs][0].position.copy(S.begSnap[bs][1]); }
+          } else S.begSnap = null;
         }
         holder.updateMatrixWorld(true);
         FWD.set(1, 0, 0).applyAxisAngle(UP, holder.rotation.y);
@@ -535,12 +598,34 @@
         var look = 0;
         if (S.mode === 'idle') look = (1 - moving) * (-S.dir * 0.3 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.9) * 0.03);
         turn(B.neck_base, UP, look * 0.4); turn(B.head, UP, look * 0.6);
+        // Zusatzhaltungen (weich ein-/ausgeblendet), Knurren
+        S.poseW += ((POSES[S.mode] ? 1 : 0) - S.poseW) * Math.min(1, dt * 6);
+        if (S.poseW > 0.01 && S.pose) pose(S.pose, S.poseW);
+        if (S.growlLeft > 0) { S.growlNext -= dt; if (S.growlNext <= 0) { growl(); S.growlLeft--; S.growlNext = 0.9 + Math.random() * 0.3; } }
+        S.growlT += dt;
         // Boden: keine Pfote unter dem Boden (der Sitz-Clip drückt ein Hinterbein durch)
         holder.updateMatrixWorld(true);
         var minY = Infinity, wp = new THREE.Vector3();
         FEET.forEach(function (n) { if (B[n]) { B[n].getWorldPosition(wp); if (wp.y < minY) minY = wp.y; } });
         if (minY < 0.01 && moving < 0.05) holder.position.y += 0.01 - minY;   // nur im Stand/bei Clips (in Bewegung wippt der Gang selbst)
       }
+      // Tornado: hochgewirbelt (dreht sich, kippt), fällt zurück · Tsunami: auf der Welle seitlich weggetragen, wippt
+      if (S.fly && fxg) {
+        var fu = Math.min(1, (t - S.fly.t0) / S.fly.dur), lift;
+        if (S.fly.kind === 'tornado') {
+          lift = Math.pow(Math.sin(Math.PI * fu), 0.8) * visH * 0.45;
+          fxg.rotation.set(Math.sin(t * 5) * 0.5 * Math.sin(Math.PI * fu), t * 9 * Math.sin(Math.PI * fu), Math.cos(t * 4) * 0.4 * Math.sin(Math.PI * fu));
+          holder.position.x += Math.sin(t * 3) * 0.3 * Math.sin(Math.PI * fu);
+        } else {
+          var wave = Math.sin(Math.PI * Math.min(1, fu * 1.15));
+          lift = wave * 0.55 + Math.sin(t * 7) * 0.06 * wave;
+          holder.position.x += S.fly.dir * S.fly.dist * (1 - Math.pow(1 - fu, 2));
+          fxg.rotation.set(Math.sin(t * 6) * 0.25 * wave, 0, Math.sin(t * 5) * 0.3 * wave);
+        }
+        holder.position.y += lift;
+        shadow.position.x = holder.position.x;
+        shadow.scale.set(2.2 * SIZE * (1 - 0.5 * Math.min(1, lift / visH * 2)), 0.8 * SIZE, 1);
+      } else if (shadow.scale.x !== 2.2 * SIZE) shadow.scale.set(2.2 * SIZE, 0.8 * SIZE, 1);
 
       renderer.render(scene, cam);
       requestAnimationFrame(frame);
@@ -549,6 +634,47 @@
     // Aufsetzen nacheinander hinten links → hinten rechts → vorne rechts → vorne links, je Bein kurze Stützphase
     // (Duty-Faktor ~0,3), zwei Flugphasen; Rücken krümmt sich (gesammelt, Hinterbeine unter dem Bauch) und streckt sich
     // (Vorderbeine weit vorn); Kopf bleibt ruhig (gleicht den Rücken aus).
+    // Haltungen am Skelett. Vorzeichen (gemessen wie beim Gang): turn(…, LAT, +) kippt nach vorn-unten (Nase runter,
+    // Bein nach hinten), − nach oben (Bein nach vorn); FWD = Längsachse (Rollen).
+    function pose(name, w) {
+      var LEGS = [[B.L_shoulder, B.L_elbow, B.L_wrist], [B.R_shoulder, B.R_elbow, B.R_wrist]];
+      var HIND = [[B.L_hip, B.L_knee, B.L_ankle], [B.R_hip, B.R_knee, B.R_ankle]];
+      if (name === 'beg') {   // Männchen: aus dem Sitzen Oberkörper aufrichten, Vorderpfoten angewinkelt hoch, leicht wippen
+        var bob = Math.sin(t * 3.2) * 0.05;
+        turn(B.spine_1, LAT, -(0.2 + bob) * w); turn(B.spine_2, LAT, -0.14 * w); turn(B.chest, LAT, -0.1 * w);
+        LEGS.forEach(function (l) { turn(l[0], LAT, -0.55 * w); turn(l[1], LAT, 1.2 * w); turn(l[2], LAT, 0.7 * w); });
+        turn(B.neck_base, LAT, 0.3 * w); turn(B.head, LAT, 0.15 * w);
+      } else if (name === 'stance') {   // Kampfstellung: vorne tief, Kopf gesenkt nach vorn, Rute steif hoch, knurrt
+        var tr = Math.sin(t * 38) * 0.012 * w;
+        turn(B.COG, LAT, 0.22 * w + tr); turn(B.chest, LAT, 0.06 * w);
+        // im Stand gemessen: + schiebt das Vorderbein nach vorn (anders als beim Schwingen im Gang)
+        LEGS.forEach(function (l) { turn(l[0], LAT, 0.5 * w); turn(l[1], LAT, -0.1 * w); });
+        HIND.forEach(function (l) { turn(l[0], LAT, 0.1 * w); turn(l[1], LAT, 0.25 * w); });
+        turn(B.neck_base, LAT, -0.1 * w); turn(B.head, LAT, -0.12 * w);
+        var snarl = S.growlT < 0.8 ? Math.sin(Math.min(1, S.growlT / 0.8) * Math.PI) : 0;
+        turn(B.jaw, LAT, (0.08 + 0.18 * snarl + Math.sin(t * 30) * 0.02) * w);
+        tailOver(0.9 * w, 0);
+      } else if (name === 'cower') {   // ducken: tief, Kopf runter, Rute eingezogen
+        turn(B.COG, LAT, 0.1 * w);
+        LEGS.forEach(function (l) { turn(l[0], LAT, 0.25 * w); turn(l[1], LAT, -0.9 * w); turn(l[2], LAT, 0.6 * w); });
+        HIND.forEach(function (l) { turn(l[0], LAT, -0.5 * w); turn(l[1], LAT, 1.1 * w); turn(l[2], LAT, -0.9 * w); });
+        turn(B.neck_base, LAT, 0.5 * w); turn(B.head, LAT, 0.25 * w);
+        tailOver(-1.3 * w, 0);
+        turn(B.COG, FWD, Math.sin(t * 22) * 0.015 * w);   // zittert
+      } else if (name === 'shakeoff') {   // Wasser abschütteln: Welle von Kopf bis Becken, schnell, klingt ab
+        var k = Math.sin(t * 26) * w;
+        turn(B.head, FWD, 0.55 * k); turn(B.neck_base, FWD, 0.35 * k); turn(B.chest, FWD, 0.25 * k);
+        turn(B.spine_2, FWD, -0.15 * k); turn(B.pelvis, FWD, -0.12 * k);
+      } else if (name === 'flail') {   // in der Luft: Beine strampeln
+        var f = Math.sin(t * 16) * w;
+        LEGS.forEach(function (l, i) { turn(l[0], LAT, (i ? f : -f) * 0.7); turn(l[1], LAT, 0.4 * w); });
+        HIND.forEach(function (l, i) { turn(l[0], LAT, (i ? -f : f) * 0.6); });
+        turn(B.head, LAT, -0.3 * w);
+      }
+    }
+    // Rute zusätzlich heben/senken (nach dem Ausrichten): oben + , unten − (gemessen: + LAT hebt die Rute)
+    function tailOver(up) { turn(B.tail_1, LAT, up * 0.9); turn(B.tail_2, LAT, up * 0.2); }
+
     var GAL = { LH: 0.0, RH: 0.1, RF: 0.38, LF: 0.48 }, DUTY = 0.3;
     function gallopLeg(ph) {
       var f = ((ph % 1) + 1) % 1;
@@ -601,7 +727,7 @@
     }
 
     ready.then(function () { setMode('idle'); requestAnimationFrame(frame); });
-    return { ready: ready, react: react, act: act, setFur: function (k) { FUR_KEY = k; applyFur(k); }, setBody: function (k) { BODY_KEY = k; applyBody(k); } };
+    return { ready: ready, react: react, act: act, weather: weather, setFur: function (k) { FUR_KEY = k; applyFur(k); }, setBody: function (k) { BODY_KEY = k; applyBody(k); } };
   }
 
   root.FriendDog = { create: create, REACTIONS: Object.keys(DEFAULT_REACTIONS) };

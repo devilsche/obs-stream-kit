@@ -28,12 +28,15 @@
       var reactions = {};
       FriendDog.REACTIONS.forEach(function (ev) { if (p.get('on_' + ev)) reactions[ev] = p.get('on_' + ev); });
       var f = FriendDog.create({
-        canvas: document.getElementById('friend'), model: '../assets/friend/dog.glb', barkSound: '../assets/friend/bark.mp3',
+        canvas: document.getElementById('friend'), model: '../assets/friend/dog.glb', barkSound: '../assets/friend/bark.mp3', growlSound: '../assets/friend/growl.mp3',
         sizePx: num('size', 170, 60, 500), fur: p.get('fur') || 'pinscher', body: p.get('body') || 'pinscher', ears: p.has('ears') ? num('ears', 85, 0, 100) / 100 : null,
         area: p.get('area') || 'full', roam: p.get('roam') !== '0', sound: p.get('sound') !== '0', volume: num('volume', 0.5, 0, 1),
         reactions: reactions
       });
       f.ready.then(function () {
+        // ?try=beg|growl|shakeoff|roll|playdead … bzw. ?try=weather:tornado – zum Ausprobieren in der Vorschau
+        var tr = p.get('try');
+        if (tr) setTimeout(function () { if (/^weather:/.test(tr)) f.weather(tr.slice(8)); else f.act(tr, { face: p.has('tryface') ? +p.get('tryface') : 6 }); }, 1500);
         if (p.get('demo') === '1') {
           var evs = ['follow', 'sub', 'raid', 'bits', 'welcome', 'pet'], i = 0;
           setInterval(function () { f.react(evs[i++ % evs.length]); }, 14000);
@@ -42,6 +45,28 @@
         var m = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
         if (!m) return;
         var url = '/s/' + m[1] + '/api/fx/friend/poll', seq = null, epoch = null;
+        // Wetter-Befehle mitlesen (dieselben wie weather.html): Regen, Blitz, Hagel, Tornado, Tsunami … wirken auf den Hund
+        if (p.get('weather') !== '0') (function () {
+          var wurl = '/s/' + m[1] + '/api/fx/weather/poll', wseq = null, wep = null;
+          (function wpoll() {
+            var delay = 1000;
+            fetch(wurl + (wseq === null ? '' : '?since=' + wseq), { cache: 'no-store' })
+              .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+              .then(function (d) {
+                if (wep !== null && d.epoch !== wep) { wep = d.epoch; wseq = 0; delay = 0; return; }
+                wep = d.epoch;
+                if (wseq !== null) (d.commands || []).forEach(function (c) {
+                  var q = c.params || {};
+                  if (c.cmd === 'weather' && q.to) f.weather(q.to);
+                  else if (c.cmd === 'strike') f.weather('strike');
+                  else if (c.cmd === 'spectacle' && q.type) f.weather(q.type);
+                });
+                wseq = d.seq;
+              })
+              .catch(function () { delay = 4000; })
+              .then(function () { setTimeout(wpoll, delay); });
+          })();
+        })();
         (function poll() {
           var delay = 600;
           fetch(url + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
