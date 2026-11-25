@@ -50,6 +50,9 @@ def _remember_order(tenant_id, slot, p, now):
 def _weather_persist(conn, tenant_id, cmd):
     """Übersteuerung speichern; der Befehl geht trotzdem in die Warteschlange,
     damit das Overlay den Zustand sofort neu holt."""
+    if cmd["cmd"] == "spectacle" and cmd["params"].get("type") in ("tsunami", "avalanche") and "side" not in cmd["params"]:
+        import random
+        cmd["params"]["side"] = random.choice(("left", "right"))
     if cmd["cmd"] == "power":
         # Wetter an/aus: gespeichert je Tenant; toggle wird hier aufgelöst, damit alle Quellen dasselbe zeigen
         from pubg.db_pg import get_setting, set_setting

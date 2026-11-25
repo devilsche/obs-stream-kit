@@ -64,10 +64,10 @@
     var LABEL = {};
     var S = { resume: null, face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0,
               pose: null, poseW: 0, growlLeft: 0, growlNext: 0, growlT: 9, fly: null };
-    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1 };
+    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1, cower: 1, lookup: 1 };
     // Zusatzhaltungen am Skelett (über dem Steh- bzw. Sitz-Clip), weich ein- und ausgeblendet
-    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1 };
-    var SIT_POSES = { beg: 1, hide: 1 };   // bauen auf der gemerkten Sitzhaltung auf
+    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1, lookup: 1 };
+    var SIT_POSES = { beg: 1, hide: 1, cower: 1, lookup: 1 };   // bauen auf der gemerkten Sitzhaltung auf
     var fxg = null;   // Gruppe für Wirbeln (Tornado) zwischen holder und Körper
     var FUR_KEY = opt.fur || 'pinscher', BODY_KEY = opt.body || 'pinscher';
 
@@ -309,7 +309,7 @@
       if ((m === 'walk' || m === 'run') && CLIPS[S.mode]) S.rise = S.mode === 'lie' || S.mode === 'roll' ? 0.8 : 0.5;
       S.mode = m;
       if (POSES[m]) S.pose = m;
-      if (m === 'walk' || m === 'run' || m === 'idle' || m === 'stance' || m === 'cower' || m === 'shakeoff' || m === 'flail') play('standing');
+      if (m === 'walk' || m === 'run' || m === 'idle' || m === 'stance' || m === 'shakeoff' || m === 'flail') play('standing');
       if (m === 'sit' || SIT_POSES[m]) play('sitting');
       if (m === 'shake') play('shake', { once: true });
       if (m === 'roll') play('rollover', { once: true });
@@ -456,7 +456,8 @@
     }
 
     // Wetter: was der Hund bei welchem Wetter-Befehl tut (weather.html bekommt dieselben Befehle)
-    function weather(kind) {
+    function weather(kind, p) {
+      p = p || {};
       var edge = S.x > 0 ? area[1] : area[0], seq = null;
       if (kind === 'rain' || kind === 'drizzle' || kind === 'storm' || kind === 'sleet') seq = [{ do: 'wait', dur: 2.5 }].concat(PRESETS.shakeoff(), [{ do: 'wait', dur: 4 }], PRESETS.shakeoff());
       else if (kind === 'strike') seq = [{ do: 'mode', m: 'cower', dur: 2 }, { do: 'mode', m: 'idle', dur: 0.8 }];
@@ -465,11 +466,20 @@
       else if (kind === 'hail') seq = [{ do: 'goto', x: edge, gait: 'run' }, { do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 5 }, { do: 'mode', m: 'idle', dur: 1 }];
       else if (kind === 'tornado') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 1.4 }, { do: 'fly', kind: 'tornado', dur: 3.6 },
         { do: 'mode', m: 'shakeoff', dur: 1.4 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'mode', m: 'idle', dur: 0.5 }];
-      else if (kind === 'tsunami' || kind === 'avalanche') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 0.8 },
-        { do: 'fly', kind: 'tsunami', dur: 3.4 }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }];
+      else if (kind === 'tsunami' || kind === 'avalanche') {
+        // Herkunft der Welle (vom Server, gleich wie im Wetter): weggespült wird er von ihr weg; die Front erreicht ihn
+        // je nach Abstand zur Herkunftsseite (Tsunami: 1,8 s Rückzug, dann 4,6 s Lauf über das Bild)
+        var from = p.side === 'right' ? -1 : p.side === 'left' ? 1 : (Math.random() < 0.5 ? 1 : -1);
+        var sx = (S.x / halfW + 1) / 2, reach = from > 0 ? sx : 1 - sx;
+        var arrive = kind === 'tsunami' ? 1.8 + 4.6 * Math.min(1, reach * 1.2) : 1.4 + 5 * reach;
+        seq = [{ do: 'face', hour: from > 0 ? 9 : 3, dur: 0.4 }, { do: 'wait', dur: Math.max(0, arrive - 1.6) }, { do: 'mode', m: 'cower', dur: 1.2 },
+          { do: 'fly', kind: 'tsunami', dur: 3.2, dir: from }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }];
+      }
       else if (kind === 'snow' || kind === 'blizzard') seq = PRESETS.zoomies();
-      else if (kind === 'aurora' || kind === 'rainbow') seq = [{ do: 'face', hour: 6, dur: 0.5 }, { do: 'wag', v: 1, dur: 0 }, { do: 'mode', m: 'sit', face: 6, dur: 6 }, { do: 'wag', v: 0.4, dur: 0 }];
-      else if (kind === 'meteors') seq = [{ do: 'face', hour: 6, dur: 0.4 }, { do: 'bark', n: 4, gap: 0.5 }, { do: 'mode', m: 'sit', face: 6, dur: 4 }];
+      else if (kind === 'aurora' || kind === 'rainbow') seq = [{ do: 'face', hour: 6, dur: 0.5 }, { do: 'wag', v: 1, dur: 0 }, { do: 'mode', m: 'sit', face: 6, dur: 0.8 },
+        { do: 'mode', m: 'lookup', face: 6, dur: 6 }, { do: 'mode', m: 'sit', face: 6, dur: 1 }, { do: 'wag', v: 0.4, dur: 0 }];
+      else if (kind === 'meteors') seq = [{ do: 'face', hour: 6, dur: 0.4 }, { do: 'mode', m: 'sit', face: 6, dur: 0.6 }, { do: 'mode', m: 'lookup', face: 6, dur: 1.5 },
+        { do: 'bark', n: 4, gap: 0.5 }, { do: 'mode', m: 'lookup', face: 6, dur: 3 }, { do: 'mode', m: 'sit', face: 6, dur: 1 }];
       if (!seq) return;
       lastEvent = clockT; plan = seq; step = null; S.face = null;
     }
@@ -654,22 +664,25 @@
         LEGS.forEach(function (l) { turn(l[0], LAT, -1.7 * w); turn(l[1], LAT, 2.3 * w); turn(l[2], LAT, 1.1 * w); });
         turn(B.neck_base, LAT, 0.6 * w); turn(B.head, LAT, 0.45 * w);
         tailOver(-0.9 * w);
-      } else if (name === 'stance') {   // Kampfstellung: vorne tief, Kopf gesenkt nach vorn, Rute steif hoch, knurrt
-        var tr = Math.sin(t * 38) * 0.012 * w;
-        turn(B.COG, LAT, 0.22 * w + tr); turn(B.chest, LAT, 0.06 * w);
-        // im Stand gemessen: + schiebt das Vorderbein nach vorn (anders als beim Schwingen im Gang)
-        LEGS.forEach(function (l) { turn(l[0], LAT, 0.5 * w); turn(l[1], LAT, -0.1 * w); });
-        HIND.forEach(function (l) { turn(l[0], LAT, 0.1 * w); turn(l[1], LAT, 0.25 * w); });
-        turn(B.neck_base, LAT, -0.1 * w); turn(B.head, LAT, -0.12 * w);
+      } else if (name === 'stance') {
+        // Drohen (Quellen: VCA, ASPCA, Penn Vet): groß machen, Beine steif gestreckt, Gewicht nach VORN, Kopf waagrecht
+        // nach vorn mit direktem Blick, Lefzen hoch, Rute hoch und steif. Vorne tief wäre die Spielaufforderung.
+        turn(B.COG, LAT, 0.06 * w);                                    // leicht nach vorn gelehnt
+        LEGS.forEach(function (l) { turn(l[0], LAT, -0.18 * w); turn(l[1], LAT, -0.05 * w); });   // Vorderbeine schräg unter den Körper: Brust vor den Pfoten
+        HIND.forEach(function (l) { turn(l[0], LAT, 0.1 * w); });      // Hinterbeine schieben
+        turn(B.neck_base, LAT, 0.12 * w); turn(B.head, LAT, -0.16 * w); // Hals vor, Kopf waagrecht
         var snarl = S.growlT < 0.8 ? Math.sin(Math.min(1, S.growlT / 0.8) * Math.PI) : 0;
-        turn(B.jaw, LAT, (0.08 + 0.18 * snarl + Math.sin(t * 30) * 0.02) * w);
-        tailOver(0.9 * w, 0);
-      } else if (name === 'cower') {   // ducken: tief, Kopf runter, Rute eingezogen
-        turn(B.COG, LAT, 0.1 * w);
-        LEGS.forEach(function (l) { turn(l[0], LAT, 0.25 * w); turn(l[1], LAT, -0.9 * w); turn(l[2], LAT, 0.6 * w); });
-        HIND.forEach(function (l) { turn(l[0], LAT, -0.5 * w); turn(l[1], LAT, 1.1 * w); turn(l[2], LAT, -0.9 * w); });
-        turn(B.neck_base, LAT, 0.5 * w); turn(B.head, LAT, 0.25 * w);
-        tailOver(-1.3 * w, 0);
+        turn(B.jaw, LAT, (0.06 + 0.16 * snarl) * w);
+        tailOver(1.2 * w);
+      } else if (name === 'cower') {
+        // Angst (Quellen: Tufts, ASPCA, PetMD): klein machen, Gewicht hinten (aus dem Sitzen, Hinterhand am Boden),
+        // Rücken gekrümmt, Vorderbeine eingeknickt, Kopf nah am Boden, Rute eingezogen
+        turn(B.spine_1, LAT, 0.25 * w); turn(B.spine_2, LAT, 0.2 * w); turn(B.chest, LAT, 0.12 * w);
+        LEGS.forEach(function (l) { turn(l[0], LAT, -0.55 * w); turn(l[1], LAT, 1.1 * w); turn(l[2], LAT, 0.45 * w); });
+        turn(B.neck_base, LAT, 0.5 * w); turn(B.head, LAT, 0.3 * w);
+        tailOver(-1.4 * w);
+      } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
+        turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.45 * w);
       } else if (name === 'shakeoff') {   // Wasser abschütteln: Welle von Kopf bis Becken, schnell, klingt ab
         var k = Math.sin(t * 26) * w;
         turn(B.head, FWD, 0.55 * k); turn(B.neck_base, FWD, 0.35 * k); turn(B.chest, FWD, 0.25 * k);

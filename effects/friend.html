@@ -59,7 +59,7 @@
                   var q = c.params || {};
                   if (c.cmd === 'weather' && q.to) f.weather(q.to);
                   else if (c.cmd === 'strike') f.weather('strike');
-                  else if (c.cmd === 'spectacle' && q.type) f.weather(q.type);
+                  else if (c.cmd === 'spectacle' && q.type) f.weather(q.type, q);
                 });
                 wseq = d.seq;
               })

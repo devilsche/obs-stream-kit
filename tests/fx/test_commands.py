@@ -242,3 +242,8 @@ def test_weather_power_command():
     assert commands.parse("weather", {"cmd": "power", "state": "off"}) == {"cmd": "power", "params": {"state": "off"}}
     assert commands.parse("weather", {"cmd": "power", "state": "toggle"})["params"]["state"] == "toggle"
     assert commands.parse("weather", {"cmd": "power", "state": "kaputt"})["params"] == {}
+
+
+def test_spectacle_side_choice():
+    assert commands.parse("weather", {"cmd": "spectacle", "type": "tsunami", "side": "left"})["params"] == {"type": "tsunami", "side": "left"}
+    assert "side" not in commands.parse("weather", {"cmd": "spectacle", "type": "tsunami", "side": "oben"})["params"]

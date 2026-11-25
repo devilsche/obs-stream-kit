@@ -548,7 +548,7 @@
           case 'spectacle':
             // Apokalypse: alle Spektakel auf einmal
             if (p.type === 'apocalypse') K.SPECTACLES.forEach(function (t) { kit.spectacle(t); });
-            else kit.spectacle(p.type || randomShow());
+            else kit.spectacle(p.type || randomShow(), { dir: p.side === 'left' ? 1 : p.side === 'right' ? -1 : 0 });
             break;
           // Follower: an alle Themen, jedes legt ihn in seiner Form an
           // (animiert nur das sichtbare); alte Einzelbefehle wirken gleich.

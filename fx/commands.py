@@ -372,7 +372,8 @@ EFFECTS = {
             # Wetter ganz an/aus (bleibt gespeichert, auch nach Neuladen der Quelle)
             "power": {"state": _choice("on", "off", "toggle")},
             "strike": {"dist": _choice("near", "far")},
-            "spectacle": {"type": _choice(*weather.SPECTACLES, "apocalypse")},
+            # side: Herkunft von Tsunami/Lawine (fehlt sie, legt der Server sie fest – Wetter und Hund sehen dieselbe)
+            "spectacle": {"type": _choice(*weather.SPECTACLES, "apocalypse"), "side": _choice("left", "right")},
             "scrape": {"name": _name},
             "warm": {"name": _name},
             "ornament": {"name": _name},

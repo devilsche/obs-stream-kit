@@ -954,17 +954,18 @@
       return l;
     }
 
-    function spectacle(type) {
+    // opts.dir: 1 = von links, -1 = von rechts (Tsunami, Lawine); fehlt es, entscheidet der Zufall
+    function spectacle(type, opts) {
       if (SPECTACLES.indexOf(type) < 0) return false;
       if (shows.length >= SHOW_MAX) {
         if (queued.length < SHOW_MAX) queued.push(type);
         return true;
       }
-      startShow(type);
+      startShow(type, opts);
       return true;
     }
 
-    function startShow(type) {
+    function startShow(type, opts) {
       var s;
       if (reduceMotion) {
         s = { type: 'tint', t: 0, dur: 1.2, color: TINT[type] };
@@ -972,7 +973,7 @@
         emit('spectacle', showInfo(s, type, true));
         return;
       }
-      s = SHOWS[type].init();
+      s = SHOWS[type].init(opts || {});
       s.type = type;
       s.t = 0;
       shows.push(s);
@@ -1004,10 +1005,10 @@
         // zurück, dann rollt eine steile, schäumende Flutwand von der Seite
         // heran und türmt sich auf, das Land steht unter Wasser, danach läuft
         // es wieder ab. Trübes Wasser mit Treibgut, keine Surferwelle.
-        init: function () {
+        init: function (o) {
           var debris = [];
           for (var i = 0; i < 40; i++) debris.push({ off: rand(0, W * 1.2), dy: rand(0.1, 0.9), r: rand(3, 9), ph: rand(0, 6.3) });
-          return { dur: 10, dir: Math.random() < 0.5 ? 1 : -1, spray: [], debris: debris };
+          return { dur: 10, dir: o.dir === 1 || o.dir === -1 ? o.dir : (Math.random() < 0.5 ? 1 : -1), spray: [], debris: debris };
         },
         draw: function (s, dt) {
           var t = s.t, dir = s.dir;
@@ -1586,8 +1587,8 @@
         // quellen bergseitig nach, Schattenseite unten), darunter dichter
         // Schnee mit springenden Brocken; Durchzug fast weiß, danach sinkt
         // feiner Schnee aus der übrigen Wolke
-        init: function () {
-          var dir = Math.random() < 0.5 ? 1 : -1;
+        init: function (o) {
+          var dir = o.dir === 1 || o.dir === -1 ? o.dir : (Math.random() < 0.5 ? 1 : -1);
           var crack = [];
           for (var i = 0; i <= 12; i++) {
             var k = i / 12;
