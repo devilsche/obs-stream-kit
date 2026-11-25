@@ -10,7 +10,7 @@
        Tiefe: dieselbe URL dreimal mit layer=back | frame | front, in OBS von unten nach oben:
        back → Kamera (aufs Fenster zugeschnitten) → frame → Kamera-Kopie freigestellt (NVIDIA, weniger zugeschnitten) → front.
        Alle Ebenen rechnen mit der Serverzeit und denselben Befehlen und zeigen so dasselbe Bild.
-       URL: layer (all|back|frame|front|under = back+frame), x, y, width, height, radius, border, comet (1|0), emotes (1|0), max, stack,
+       URL: layer (all|back|frame|front|under = back+frame), frame (1|0 = ohne Rahmen, Emotes landen am Bildboden), x, y, width, height, radius, border, comet (1|0), emotes (1|0), max, stack,
        alerts (1|0), speed, demo (1 = Emotes zum Ausprobieren). Befehle: /s/<token>/api/fx/frame (emotes mit urls/ids/emoji, shake, flash). -->
   <link rel="stylesheet" href="_theme.css">
   <style>
@@ -32,6 +32,8 @@
       function on(l) { return LAYER === 'all' || LAYER === l || (LAYER === 'under' && l !== 'front'); }
       var SPEED = num('speed', 1, 0.2, 3), MAXE = num('max', 40, 5, 80), STACK = num('stack', 14, 0, 60);
       var USE_EMOTES = P.get('emotes') !== '0', USE_COMET = P.get('comet') !== '0', DEMO = P.get('demo') === '1';
+      // frame=0: kein Rahmen (z. B. Kamera „am Boden“): Komet kreist um die Kamera, Emotes landen auf dem Bildboden
+      var SHOW_FRAME = P.get('frame') !== '0';
       var AT = parseFloat(P.get('at'));
       var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -67,7 +69,7 @@
         var es = rr(CW + 8, CH + 8, RAD + 3); es.holes.push(rr(CW, CH, RAD));
         var edge = new THREE.Mesh(new THREE.ExtrudeGeometry(es, { depth: FB * 0.6 + bev + 2, bevelEnabled: false, curveSegments: 12 }), edgeMat);
         edge.position.z = -1; frameRig.add(edge);
-        frameRig.visible = on('frame');
+        frameRig.visible = on('frame') && SHOW_FRAME;
       }
       function resize() {
         W = window.innerWidth || 1920; H = window.innerHeight || 1080;
@@ -136,7 +138,11 @@
         var h = function (j) { return hash(item.seq * 97 + k * 13 + j); };
         var side = h(1) < 0.5 ? -1 : 1, T = 0.55 + h(2) * 0.35;
         var hx = CW / 2 + FB, hy = CH / 2 + FB, tgt;
-        if (H / 2 - (CY + hy) > R * 4) tgt = new THREE.Vector2(CX + (h(4) - 0.5) * 2 * (hx - R), CY + hy + R + 2);   // Oberkante
+        if (!SHOW_FRAME) {   // Boden: neben der Kamera auf den unteren Bildrand
+          var off = (h(4) < 0.5 ? -1 : 1) * (CW / 2 + R * 2 + h(8) * W * 0.18);
+          tgt = new THREE.Vector2(Math.max(-W / 2 + R * 2, Math.min(W / 2 - R * 2, CX + off)), -H / 2 + R + 2);
+          side = tgt.x < CX ? -1 : 1; if (h(6) < 0.3) side = -side;
+        } else if (H / 2 - (CY + hy) > R * 4) tgt = new THREE.Vector2(CX + (h(4) - 0.5) * 2 * (hx - R), CY + hy + R + 2);   // Oberkante
         else {
           // oben kein Platz (Kamera reicht bis an den Bildrand): seitlich an den Rahmen, dann fallen sie herunter
           var roomL = CX - hx + W / 2, roomR = W / 2 - (CX + hx);
@@ -161,11 +167,13 @@
         // Grenzen: zu viele → die ältesten fallen weg, zu hoher Stapel → das älteste liegende rutscht ab
         while (E.length > MAXE) E.shift();
         var hx = CW / 2 + FB, hy = CH / 2 + FB, top = CY + hy;
-        var resting = E.filter(function (e) { return e.p.y > top && e.p.y < top + R * 3 && e.v.lengthSq() < 900; });
+        var restY = SHOW_FRAME ? top : -H / 2;
+        var resting = E.filter(function (e) { return e.p.y > restY && e.p.y < restY + R * 3 && e.v.lengthSq() < 900; });
         if (resting.length > STACK) { var o = resting[0]; o.v.set(Math.sign(o.p.x - CX || 1) * 420, 380); }
         E.forEach(function (e) {
           e.v.y += GRAV * DT; e.p.addScaledVector(e.v, DT); e.a += e.w * DT;
           var qx = Math.max(CX - hx, Math.min(CX + hx, e.p.x)), qy = Math.max(CY - hy, Math.min(CY + hy, e.p.y));
+          if (!SHOW_FRAME) { qx = e.p.x; qy = Math.min(e.p.y, -H / 2); }   // Bildboden als Fläche
           var dx = e.p.x - qx, dy = e.p.y - qy, d = Math.hypot(dx, dy);
           if (d < R && d > 1e-4) {
             var nx = dx / d, ny = dy / d, vn = e.v.x * nx + e.v.y * ny;
@@ -188,6 +196,7 @@
           }
         }
         E = E.filter(function (e) { return e.p.y > -H / 2 - 150 && Math.abs(e.p.x) < W / 2 + 220; });
+        if (!SHOW_FRAME) E.forEach(function (e) { if (e.p.x < -W / 2 + R) { e.p.x = -W / 2 + R; e.v.x = Math.abs(e.v.x) * 0.4; } if (e.p.x > W / 2 - R) { e.p.x = W / 2 - R; e.v.x = -Math.abs(e.v.x) * 0.4; } });
         hits = hits.filter(function (h) { return t - h.t < 0.7; });
       }
       function advance(t) {

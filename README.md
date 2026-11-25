@@ -174,7 +174,7 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 
 **Befehle** (`/s/<token>/api/fx/frame`): `cmd=emotes&urls=<Bild-URLs>` (oder `ids=<Twitch-Emote-IDs>`; höchstens 5 je Nachricht, nur Twitch/7TV/FFZ – BTTV erlaubt kein CORS) und/oder `emoji=<Text mit Emojis>` (Windows-Emojis aus der Nachricht; ZWJ-Folgen, Hautton und Flaggen bleiben zusammen, gezeichnet mit der Emoji-Systemschrift), `cmd=shake`, `cmd=flash`. Streamer.bot: Aktion auf **Chat Message** mit „Execute C# Code“ (Code auf der Dashboard-Karte, setzt `%emoteUrls%` und `%emojiText%`, Nachrichten ohne beides brechen ab) und danach **Fetch URL** `…/api/fx/frame?cmd=emotes&urls=%emoteUrls%&emoji=%emojiText%`.
 
-Parameter: `layer`, `x`, `y`, `width`, `height`, `border` (26), `radius` (14), `comet` (1|0), `emotes` (1|0), `max` (40), `stack` (14), `alerts` (1|0), `speed`, `demo=1` (Emotes zum Ausprobieren). Emotes und Komet blenden am Bildrand weich aus. Ist über der Kamera kein Platz (Kamera reicht bis an den oberen Bildrand), knallen die Emotes seitlich an den Rahmen und fallen herunter.
+Parameter: `layer`, `frame` (1|0 – ohne Rahmen: Komet kreist um die Kamera, Emotes landen auf dem Bildboden, z. B. für eine Kamera „am Boden“), `x`, `y`, `width`, `height`, `border` (26), `radius` (14), `comet` (1|0), `emotes` (1|0), `max` (40), `stack` (14), `alerts` (1|0), `speed`, `demo=1` (Emotes zum Ausprobieren). Emotes und Komet blenden am Bildrand weich aus. Ist über der Kamera kein Platz (Kamera reicht bis an den oberen Bildrand), knallen die Emotes seitlich an den Rahmen und fallen herunter.
 ### Welcome-Widget
 
 | | |
