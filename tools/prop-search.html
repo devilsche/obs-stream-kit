@@ -87,8 +87,8 @@
   if (SET === 'pubg') {
     document.title = 'PUBG vehicle search';
     document.getElementById('title').textContent = 'PUBG vehicle search';
-    document.getElementById('lead').textContent = 'Free Sketchfab models for every PUBG vehicle: fan-made PUBG versions (red tag) and models of the real car each one is based on (green tag). ' +
-      'Click “3D” to load the model here, tick Want for the ones worth using. Models marked as PUBG versions are usually ripped from the game, so their CC licence is doubtful; the real cars are safe.';
+    document.getElementById('lead').textContent = 'Sketchfab models for every PUBG vehicle. ' +
+      'Top: the official PUBG models (view only). Below: the best free models of the real vehicle behind each PUBG car, most liked first. Click “3D” to load a model here, tick Want for the ones worth using.';
   }
   fetch(API, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
     (d.picks || []).forEach(function (u) { picks[u] = true; });
