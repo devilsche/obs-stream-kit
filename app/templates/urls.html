@@ -744,7 +744,18 @@ G1R_STEAM_NAME=</code></pre>
   }
 
   // ── Alert-Töne: Liste, Vorhören, Löschen, Hochladen, Lautstärke ──
-  let soundPreview = null;
+  let soundPreview = null, soundBtn = null;
+  // Vorhören: derselbe Knopf startet und stoppt (Symbol und Beschriftung wechseln mit)
+  function setPlayBtn(btn, playing) {
+    if (!btn) return;
+    btn.querySelector(".material-symbols-outlined").textContent = playing ? "stop" : "play_arrow";
+    btn.setAttribute("aria-label", (playing ? "Stop " : "Play ") + (btn.dataset.name || "sound"));
+    btn.setAttribute("aria-pressed", playing ? "true" : "false");
+  }
+  function stopPreview() {
+    if (soundPreview) { soundPreview.pause(); soundPreview = null; }
+    setPlayBtn(soundBtn, false); soundBtn = null;
+  }
   function wireAlertSound(alert, srcBase) {
     const list = document.getElementById("urlSoundList");
     const vol = document.getElementById("urlSoundVol");
@@ -772,17 +783,18 @@ G1R_STEAM_NAME=</code></pre>
           <span class="material-symbols-outlined" aria-hidden="true">music_note</span>
           <span class="url-sound__name">${escapeHtml(f.name)}</span>
           <span class="url-sound__dur">${Number(f.dur).toFixed(1)} s</span>
-          <button type="button" class="url-act ghost" data-play="${escapeAttr(f.id)}" aria-label="Play ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
+          <button type="button" class="url-act ghost" data-play="${escapeAttr(f.id)}" data-name="${escapeAttr(f.name)}" aria-pressed="false" aria-label="Play ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
           <button type="button" class="url-act ghost" data-del="${escapeAttr(f.id)}" aria-label="Delete ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
         </li>`).join("")}</ul>` : (data.defaults && data.defaults[alert] ? `<ul class="url-sound__items">
         <li class="url-sound__item">
           <span class="material-symbols-outlined" aria-hidden="true">library_music</span>
           <span class="url-sound__name">Built-in: ${escapeHtml(data.defaults[alert])}</span>
           <span class="url-sound__dur">until you add your own</span>
-          <button type="button" class="url-act ghost" data-play="__default" aria-label="Play built-in sound"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
+          <button type="button" class="url-act ghost" data-play="__default" data-name="built-in sound" aria-pressed="false" aria-label="Play built-in sound"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
         </li></ul>` : `<p class="url-sound__note">No sound yet — the alert stays silent.</p>`);
     }
     function reload() {
+      stopPreview();   // Liste wird neu gezeichnet – laufendes Vorhören beenden
       return fetch("/app/api/alert-sounds", { credentials: "same-origin" })
         .then(r => r.ok ? r.json() : Promise.reject(r.status)).then(render)
         .catch(() => { list.innerHTML = `<p class="url-sound__note">Could not load the sounds.</p>`; });
@@ -790,12 +802,16 @@ G1R_STEAM_NAME=</code></pre>
     list.addEventListener("click", e => {
       const p = e.target.closest("[data-play]"), d = e.target.closest("[data-del]");
       if (p) {
-        if (soundPreview) soundPreview.pause();
+        const same = soundBtn === p;
+        stopPreview();
+        if (same) return;                          // zweiter Klick auf denselben Knopf = Stop
         soundPreview = new Audio(p.dataset.play === "__default"
           ? srcBase.replace(/\/alerts\/[^/]+$/, "/assets/alert-sounds/" + encodeURIComponent(alert) + ".mp3")
           : api + "/" + p.dataset.play + ".mp3");
         soundPreview.volume = parseFloat(vol.value) || 0.3;
-        soundPreview.play().catch(() => say("Playback blocked by the browser.", true));
+        soundBtn = p; setPlayBtn(p, true);
+        soundPreview.addEventListener("ended", () => { if (soundBtn === p) stopPreview(); });
+        soundPreview.play().catch(() => { stopPreview(); say("Playback blocked by the browser.", true); });
       } else if (d) {
         fetch(api + "/" + d.dataset.del, { method: "DELETE", credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
           .then(r => r.json()).then(res => { say(res.ok ? "Deleted." : (res.error || "Could not delete."), !res.ok); return reload(); });
