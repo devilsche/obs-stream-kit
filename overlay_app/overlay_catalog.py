@@ -1177,6 +1177,36 @@ TRANSITIONS = [
         "chrome_preview": True,
         "switches": _GL_STINGER_SWITCHES,
     },
+    {
+        "key": "stinger-cubes",
+        "label": "Stinger Cubes",
+        "file": "stinger-cubes.html",
+        "size": "1920×1080",
+        "desc": "WebGL stinger: a wall of cubes flips in as a diagonal wave, then tumbles away towards the camera.",
+        "params": [],
+        "chrome_preview": True,
+        "switches": _GL_STINGER_SWITCHES,
+    },
+    {
+        "key": "stinger-hex",
+        "label": "Stinger Hex",
+        "file": "stinger-hex.html",
+        "size": "1920×1080",
+        "desc": "WebGL stinger: an energy shield of hexagons builds up ring by ring, then flickers and drops away.",
+        "params": [],
+        "chrome_preview": True,
+        "switches": _GL_STINGER_SWITCHES,
+    },
+    {
+        "key": "stinger-slam",
+        "label": "Stinger Slam",
+        "file": "stinger-slam.html",
+        "size": "1920×1080",
+        "desc": "WebGL stinger: two heavy metal plates slam together with sparks and camera shake, then slide apart.",
+        "params": [],
+        "chrome_preview": True,
+        "switches": _GL_STINGER_SWITCHES,
+    },
 ]
 
 

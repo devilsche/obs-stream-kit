@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Stinger Cubes</title>
+  <!-- WebGL-Stinger „Cubes“: 16 × 9 Würfel klappen in einer schrägen Welle (oben links zuerst) aus dem Nichts nach vorne
+       und bilden eine Wand mit Name oder Logo, kurz vor dem Schnitt leuchten die Fugen, danach kippen die Würfel in
+       derselben Welle weiter und fallen zur Kamera hin weg. three.js r128, ein Instanced-Mesh, Bewegung im Shader.
+       URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none). Bis cut − 0,1 s ist die Wand zu. -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&family=Metamorphous&family=MedievalSharp&family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+    #fallback { position: absolute; inset: 0; opacity: 0; background: var(--theme-bg, #08040f); }
+    .stinger-no-gl #fallback { animation: st-cover 2s linear forwards; }
+    @keyframes st-cover { 0% { opacity: 0; } 35%, 55% { opacity: 1; } 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
+  <div id="fallback" aria-hidden="true"></div>
+  <script src="../js/stinger-gl.js"></script>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var st = S.threeStage(document.getElementById('gl'));
+      if (!st) { S.fallback(); return; }
+      var NX = 16, NY = 9, CS = 120;   // 16 × 120 = 1920, 9 × 120 = 1080: Würfel stoßen exakt aneinander
+
+      var box = new THREE.BoxGeometry(1, 1, 1);
+      var geo = new THREE.InstancedBufferGeometry();
+      geo.index = box.index;
+      geo.setAttribute('position', box.getAttribute('position'));
+      geo.setAttribute('normal', box.getAttribute('normal'));
+      var cell = [], rr = [], seed = 77;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      for (var j = 0; j < NY; j++) for (var i = 0; i < NX; i++) {
+        cell.push(-960 + (i + 0.5) * CS, 540 - (j + 0.5) * CS);
+        rr.push(rnd(), rnd(), rnd(), rnd());
+      }
+      geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(new Float32Array(cell), 2));
+      geo.setAttribute('aRnd', new THREE.InstancedBufferAttribute(new Float32Array(rr), 4));
+      geo.instanceCount = NX * NY;
+
+      var U = S.threeUniforms(T, C);
+      var mat = new THREE.ShaderMaterial({
+        uniforms: U, transparent: true,
+        vertexShader: S.GLSL + '\n' + [
+          'attribute vec2 aCell; attribute vec4 aRnd;',
+          'uniform float uT, uCut, uDur, uCalm;',
+          'varying vec3 vN, vObj; varying vec2 vUv; varying float vA, vMove, vCrack;',
+          'void main(){',
+          // Welle: oben links zuerst
+          '  float w = clamp((aCell.x + 960.0) / 1920.0 * 0.62 + (540.0 - aCell.y) / 1080.0 * 0.38, 0.0, 1.0);',
+          '  float win = uCut - 0.1;',
+          '  float pIn = clamp((uT - (w*0.6 + aRnd.x*0.06)*win) / (0.34*win), 0.0, 1.0);',
+          '  float eIn = 1.0 - pow(1.0 - pIn, 3.0);',
+          '  float pOut = clamp((uT - uCut - w*0.3 - aRnd.y*0.05) / max(0.3, uDur - uCut - 0.38), 0.0, 1.0);',
+          '  float spin = 1.0 - uCalm*0.7;',
+          '  float ang = (-(1.0 - eIn)*1.5708 + pOut*pOut*(2.4 + aRnd.z*1.2)) * spin;',
+          '  mat3 R = rot(vec3(1.0, (aRnd.w - 0.5)*0.4*pOut, 0.0), ang);',
+          '  float sc = mix(0.2, 1.0, eIn) * mix(1.0, 0.7, pOut);',
+          '  vec3 p = position * 120.0 * sc;',
+          '  vec3 world = vec3(aCell, -60.0) + R * p;',
+          '  world += vec3((aRnd.z - 0.5)*300.0*pOut, -750.0*pOut*pOut, 450.0*pOut);',
+          '  world.z += -400.0 * (1.0 - eIn);',
+          // liegt der Würfel, sitzt die Vorderseite exakt auf dem Raster
+          '  if (pIn >= 1.0 && pOut <= 0.0) world = vec3(aCell, -60.0) + position * 120.0;',
+          '  vN = R * normal; vObj = position;',
+          '  vUv = (aCell + position.xy * 120.0) / vec2(1920.0, 1080.0) + 0.5;',
+          '  vA = smoothstep(0.0, 0.25, pIn) * (1.0 - smoothstep(0.55, 1.0, pOut));',
+          '  vMove = clamp((1.0 - eIn)*1.5 + pOut*2.0, 0.0, 1.0);',
+          '  vCrack = smoothstep(uCut - 0.2 + w*0.1, uCut + w*0.1, uT) * (1.0 - pOut);',
+          '  gl_Position = projectionMatrix * modelViewMatrix * vec4(world, 1.0);',
+          '}'
+        ].join('\n'),
+        fragmentShader: S.GLSL + '\n' + [
+          'uniform float uT, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+          'varying vec3 vN, vObj; varying vec2 vUv; varying float vA, vMove, vCrack;',
+          'void main(){',
+          '  if (vA <= 0.001) discard;',
+          '  vec3 N = normalize(vN);',
+          '  bool front = vObj.z > 0.499;',
+          '  vec2 q = (vUv - 0.5) * vec2(1.778, 1.0);',
+          '  float mar = n2(vUv*vec2(7.0, 4.0) + uT*0.3)*0.6 + n2(vUv*vec2(19.0, 11.0))*0.4;',
+          '  vec3 c = mix(uBg, uP, 0.3 + 0.55*smoothstep(-0.2, 1.1, vUv.y + mar*0.3));',
+          '  c = mix(c, uA2, smoothstep(0.55, 0.9, mar)*0.35);',
+          '  c += mix(uA, vec3(1.0), 0.3) * exp(-length(q)*3.2) * 0.3;',
+          '  if (front && uHasText > 0.5) { vec2 tp = artUv(vUv); vec4 t = artAt(uTex, tp);',
+          '    c += uA * glowAt(uTex, tp) * 0.45; c = mix(c, t.rgb, t.a); }',
+          '  if (!front) c = mix(uBg, uP, 0.45) * 0.8;',
+          '  vec3 L = normalize(vec3(-0.4, 0.6, 0.7));',
+          '  c *= 0.55 + 0.45*max(dot(N, L), 0.0) + 0.2*max(N.z, 0.0);',
+          '  c += mix(uA, vec3(1.0), 0.6) * pow(max(dot(reflect(-L, N), vec3(0.0, 0.0, 1.0)), 0.0), 18.0) * 0.6;',
+          // Kanten: Würfelkante der jeweiligen Fläche
+          // Abstand zur Kante der eigenen Fläche: die Flächenachse ist 0.5, Kante = größte der beiden anderen
+          '  vec3 a = abs(vObj); float e = 1.0 - (a.x + a.y + a.z - min(a.x, min(a.y, a.z)));',
+          '  float line = 1.0 - smoothstep(0.0, 0.03, e);',
+          '  c += mix(uA, vec3(1.0), 0.45) * line * clamp(vMove*0.9 + vCrack*1.4, 0.0, 1.4);',
+          '  gl_FragColor = vec4(c, vA);',
+          '}'
+        ].join('\n')
+      });
+      var mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
+      st.scene.add(mesh);
+      S.run(st, U, T);
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Stinger Hex</title>
+  <!-- WebGL-Stinger „Hex“: Ein Energieschild aus Sechsecken baut sich Ring für Ring von der Mitte aus auf (jedes Feld
+       klappt mit leuchtender Kante herein), darauf Name oder Logo, ein Lichtpuls läuft durchs Gitter, nach dem Schnitt
+       flackern die Felder von der Mitte aus und fallen nach hinten weg. three.js r128, ein Instanced-Mesh.
+       URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none). Bis cut − 0,1 s ist der Schild zu. -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&family=Metamorphous&family=MedievalSharp&family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+    #fallback { position: absolute; inset: 0; opacity: 0; background: var(--theme-bg, #08040f); }
+    .stinger-no-gl #fallback { animation: st-cover 2s linear forwards; }
+    @keyframes st-cover { 0% { opacity: 0; } 35%, 55% { opacity: 1; } 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
+  <div id="fallback" aria-hidden="true"></div>
+  <script src="../js/stinger-gl.js"></script>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var st = S.threeStage(document.getElementById('gl'));
+      if (!st) { S.fallback(); return; }
+      var R = 66, DX = 1.5 * R, DY = Math.sqrt(3) * R;   // flache Sechsecke (Spitze links/rechts)
+
+      var hex = new THREE.CircleGeometry(1, 6);
+      var geo = new THREE.InstancedBufferGeometry();
+      geo.index = hex.index;
+      geo.setAttribute('position', hex.getAttribute('position'));
+      var cell = [], rr = [], seed = 31;
+      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      for (var i = -12; i <= 12; i++) for (var j = -6; j <= 6; j++) {
+        var x = i * DX, y = j * DY + (Math.abs(i) % 2 ? DY / 2 : 0);
+        if (Math.abs(x) > 960 + R || Math.abs(y) > 540 + R) continue;
+        cell.push(x, y); rr.push(rnd(), rnd(), rnd(), rnd());
+      }
+      geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(new Float32Array(cell), 2));
+      geo.setAttribute('aRnd', new THREE.InstancedBufferAttribute(new Float32Array(rr), 4));
+      geo.instanceCount = cell.length / 2;
+
+      var U = S.threeUniforms(T, C);
+      U.uR = { value: R };
+      var mat = new THREE.ShaderMaterial({
+        uniforms: U, transparent: true, side: THREE.DoubleSide,
+        vertexShader: S.GLSL + '\n' + [
+          'attribute vec2 aCell; attribute vec4 aRnd;',
+          'uniform float uT, uCut, uDur, uCalm, uR;',
+          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove;',
+          'void main(){',
+          '  float d = clamp(length(aCell / vec2(960.0, 540.0)) / 1.414, 0.0, 1.0);',
+          '  float win = uCut - 0.1;',
+          '  float t0 = (d*0.62 + aRnd.x*0.05)*win, pIn = clamp((uT - t0) / (0.3*win), 0.0, 1.0);',
+          // leichtes Überschwingen beim Hereinklappen
+          '  float eIn = 1.0 + 2.2*pow(pIn - 1.0, 3.0) + 1.2*pow(pIn - 1.0, 2.0);',
+          '  float tO = uCut + d*0.32 + aRnd.y*0.06, pOut = clamp((uT - tO) / max(0.3, uDur - uCut - 0.45), 0.0, 1.0);',
+          '  float spin = 1.0 - uCalm*0.8;',
+          '  mat3 Rm = rot(vec3(aRnd.z - 0.5, 1.0, 0.0), ((1.0 - pIn)*1.6 + pOut*(1.2 + aRnd.w)) * spin);',
+          '  float sc = uR * 1.004 * clamp(eIn, 0.0, 1.3) * mix(1.0, 0.45, pOut);',
+          '  vec3 world = vec3(aCell, 0.0) + Rm * vec3(position.xy * sc, 0.0);',
+          '  world.z += -700.0*pOut*pOut - 250.0*(1.0 - pIn);',
+          '  if (pIn >= 1.0 && pOut <= 0.0) world = vec3(aCell + position.xy * uR * 1.004, 0.0);',
+          '  vN = Rm * vec3(0.0, 0.0, 1.0); vObj = position.xy;',
+          '  vUv = (aCell + position.xy * uR) / vec2(1920.0, 1080.0) + 0.5;',
+          // nach dem Schnitt flackern, dann ausblenden
+          '  float flick = pOut > 0.0 ? step(0.35, fract(sin((uT + aRnd.z)*61.0)*43.7)) : 1.0;',
+          '  vA = step(0.0001, pIn) * smoothstep(0.0, 0.3, pIn) * (1.0 - smoothstep(0.35, 1.0, pOut)) * mix(1.0, flick, step(pOut, 0.4) * step(0.0001, pOut));',
+          '  vHot = exp(-max(uT - t0 - 0.3*win, 0.0)*7.0) * step(0.0001, pIn) + pOut*1.5;',
+          '  vMove = d;',
+          '  gl_Position = projectionMatrix * modelViewMatrix * vec4(world, 1.0);',
+          '}'
+        ].join('\n'),
+        fragmentShader: S.GLSL + '\n' + [
+          'uniform float uT, uCut, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove;',
+          'void main(){',
+          '  if (vA <= 0.001) discard;',
+          '  vec2 q = (vUv - 0.5) * vec2(1.778, 1.0);',
+          '  float mar = n2(vUv*vec2(7.0, 4.0) + uT*0.3)*0.6 + n2(vUv*vec2(19.0, 11.0))*0.4;',
+          '  vec3 c = mix(uBg, uP, 0.25 + 0.5*smoothstep(-0.2, 1.1, vUv.y + mar*0.3));',
+          '  c = mix(c, uA2, smoothstep(0.55, 0.9, mar)*0.4);',
+          '  c += mix(uA2, vec3(1.0), 0.3) * exp(-length(q)*3.0) * 0.3;',
+          '  if (uHasText > 0.5) { vec2 tp = artUv(vUv); vec4 t = artAt(uTex, tp);',
+          '    c += uA * glowAt(uTex, tp) * 0.45; c = mix(c, t.rgb, t.a); }',
+          '  vec3 N = normalize(gl_FrontFacing ? vN : -vN);',
+          '  c *= 0.65 + 0.35*max(N.z, 0.0);',
+          // Sechseck-Kante (Abstand zum Rand, 1 = Kante) + Schild-Puls kurz vor dem Schnitt
+          '  vec2 a = abs(vObj); float e = max(a.y, a.x*0.866 + a.y*0.5) / 0.866;',
+          '  float line = smoothstep(0.86, 0.97, e);',
+          '  float pulse = exp(-abs(vMove - (uT - (uCut - 0.35))*2.2)*14.0) * step(uT, uCut + 0.2);',
+          '  c += mix(uA2, vec3(1.0), 0.35) * line * (0.18 + vHot*1.2 + pulse*1.6);',
+          '  c += mix(uA2, vec3(1.0), 0.5) * pulse * 0.25;',
+          '  gl_FragColor = vec4(c, vA);',
+          '}'
+        ].join('\n')
+      });
+      var mesh = new THREE.Mesh(geo, mat); mesh.frustumCulled = false;
+      st.scene.add(mesh);
+      S.run(st, U, T);
+    })();
+  </script>
+</body>
+</html>

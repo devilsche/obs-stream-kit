@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Stinger Slam</title>
+  <!-- WebGL-Stinger „Slam“: Zwei schwere Metallplatten mit Zickzack-Naht schlagen von links und rechts zusammen
+       (beschleunigt, kurzer Rückprall), das Bild wackelt, an der Naht sprühen Funken, Name oder Logo setzt sich aus
+       beiden Hälften zusammen; kurz vor dem Ende glüht die Naht und die Platten fahren wieder auseinander.
+       three.js r128. URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none).
+       Einschlag bei cut − 0,2 s, ab da ist das Bild zu. -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&family=Metamorphous&family=MedievalSharp&family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+    #fallback { position: absolute; inset: 0; opacity: 0; background: var(--theme-bg, #08040f); }
+    .stinger-no-gl #fallback { animation: st-cover 2s linear forwards; }
+    @keyframes st-cover { 0% { opacity: 0; } 35%, 55% { opacity: 1; } 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
+  <div id="fallback" aria-hidden="true"></div>
+  <script src="../js/stinger-gl.js"></script>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var st = S.threeStage(document.getElementById('gl'));
+      if (!st) { S.fallback(); return; }
+      var HIT = T.cut - 0.2;
+      var U = S.threeUniforms(T, C);
+      U.uHit = { value: HIT };
+
+      // gemeinsam: Naht (Zickzack, ±70 px) und Plattenversatz zur Zeit t
+      var COMMON = [
+        'uniform float uT, uCut, uDur, uHit, uCalm;',
+        'float seam(float y){ return 70.0 * (abs(fract(y / 180.0 + 0.25) - 0.5) * 4.0 - 1.0); }',
+        'float slide(float t){',
+        '  float pIn = clamp((t - 0.05) / max(0.1, uHit - 0.05), 0.0, 1.0);',
+        '  float x = 2100.0 * (1.0 - pow(pIn, 2.6));',
+        '  float bt = max(t - uHit, 0.0); x -= 18.0 * abs(sin(bt * 38.0)) * exp(-bt * 11.0) * step(uHit, t);   /* Rückprall nur ineinander, nie ein Spalt */',
+        '  float pOut = clamp((t - uCut - 0.08) / max(0.2, uDur - uCut - 0.2), 0.0, 1.0);',
+        '  return x + 2300.0 * pow(pOut, 2.2); }'
+      ].join('\n');
+
+      function panel(sideSign) {
+        var mat = new THREE.ShaderMaterial({
+          uniforms: Object.assign({ uSide: { value: sideSign } }, U),
+          transparent: true,
+          vertexShader: COMMON + '\n' + [
+            'uniform float uSide; varying vec2 vRest;',
+            'void main(){',
+            '  vec3 p = position + vec3(uSide * 1100.0, 0.0, 0.0);',
+            '  vRest = p.xy;',
+            '  p.x += uSide * slide(uT);',
+            '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);',
+            '}'
+          ].join('\n'),
+          fragmentShader: S.GLSL + '\n' + COMMON + '\n' + [
+            'uniform float uSide, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+            'varying vec2 vRest;',
+            'void main(){',
+            '  float sx = seam(vRest.y);',
+            '  float ds = (vRest.x - sx) * uSide;',          // Abstand zur eigenen Nahtkante (innen positiv)
+            '  if (ds < 0.0) discard;',
+            '  vec2 uv = vRest / vec2(1920.0, 1080.0) + 0.5;',
+            // gebürstetes Metall in Theme-Farben
+            '  float br = n2(vec2(vRest.x / 260.0, vRest.y / 2.2)) * 0.6 + n2(vec2(vRest.x / 90.0, vRest.y / 0.9)) * 0.4;',
+            '  vec3 c = mix(uBg, uP, 0.42 + 0.25*uv.y) * (0.85 + 0.3*br);',
+            '  c += mix(uA2, vec3(1.0), 0.5) * 0.08 * smoothstep(0.3, 1.0, uv.y);',
+            // Kante an der Naht: dunkle Fuge + heller Grat
+            '  c *= mix(0.25, 1.0, smoothstep(0.0, 3.0, ds));',
+            '  c += vec3(0.9) * exp(-abs(ds - 6.0) / 2.0) * 0.35;',
+            // Nieten entlang der Naht
+            '  float ry = mod(vRest.y + 45.0, 135.0) - 67.5;',
+            '  float rv = length(vec2(ds - 58.0, ry));',
+            '  c = mix(c, mix(uBg, uP, 0.7) * 1.3, 1.0 - smoothstep(7.0, 8.5, rv));',
+            '  c += vec3(1.0) * 0.5 * (1.0 - smoothstep(0.0, 3.5, length(vec2(ds - 56.0, ry - 2.5))));',
+            // Name/Logo, in Ruhe-Koordinaten: setzt sich beim Einschlag aus beiden Hälften zusammen
+            '  if (uHasText > 0.5) { vec2 tp = artUv(uv); vec4 t = artAt(uTex, tp);',
+            '    c += uA * glowAt(uTex, tp) * 0.4; c = mix(c, t.rgb, t.a); }',
+            // Hitze an der Naht: nach dem Einschlag und kurz vor dem Auseinanderfahren
+            '  float heat = exp(-max(uT - uHit, 0.0) * 5.0) * step(uHit, uT) + smoothstep(uCut - 0.1, uCut + 0.05, uT) * 0.8;',
+            '  c += mix(uA, vec3(1.0), 0.4) * exp(-ds / 14.0) * heat * 1.3;',
+            '  gl_FragColor = vec4(c, 1.0);',
+            '}'
+          ].join('\n')
+        });
+        var m = new THREE.Mesh(new THREE.PlaneGeometry(2400, 1500), mat);
+        m.frustumCulled = false;
+        st.scene.add(m);
+      }
+      panel(-1); panel(1);
+
+      // Funken beim Einschlag entlang der Naht (nach vorne, mit Schwerkraft, weich ausblendend)
+      var N = 240, seeds = new Float32Array(N * 4), sp = new Float32Array(N * 3);
+      for (var i = 0; i < N * 4; i++) seeds[i] = Math.random();
+      var sg = new THREE.BufferGeometry();
+      sg.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+      sg.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 4));
+      var sm = new THREE.ShaderMaterial({
+        uniforms: U, transparent: true, depthTest: false, blending: THREE.AdditiveBlending,
+        vertexShader: COMMON + '\n' + [
+          'attribute vec4 aSeed; varying float vL; varying vec2 vScr;',
+          'void main(){',
+          '  float tt = uT - uHit - aSeed.w * 0.06;',
+          '  float y0 = (aSeed.x - 0.5) * 1000.0;',
+          '  vec3 p = vec3(seam(y0), y0, 20.0);',
+          '  vec3 v = vec3((aSeed.y - 0.5) * 1500.0, 150.0 + aSeed.z * 650.0, 300.0 + aSeed.z * 500.0);',
+          '  p += v * tt + vec3(0.0, -1800.0, 0.0) * tt * tt;',
+          '  vL = tt < 0.0 ? 0.0 : clamp(1.0 - tt / (0.35 + aSeed.z * 0.4), 0.0, 1.0);',
+          '  vec4 cp = projectionMatrix * modelViewMatrix * vec4(p, 1.0);',
+          '  vScr = cp.xy / cp.w;',
+          '  gl_PointSize = (3.0 + aSeed.y * 5.0) * vL * (1.0 - uCalm * 0.6);',
+          '  gl_Position = cp;',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'uniform vec3 uA; varying float vL; varying vec2 vScr;',
+          'void main(){',
+          '  float r = length(gl_PointCoord - 0.5); if (r > 0.5 || vL <= 0.0) discard;',
+          // nie hart über die Bildkante: Rand-Fade
+          '  float edge = smoothstep(1.0, 0.85, max(abs(vScr.x), abs(vScr.y)));',
+          '  vec3 c = mix(uA, vec3(1.0), vL*0.7) * (1.0 - r*2.0) * vL * edge * 1.6;',
+          '  gl_FragColor = vec4(c, 1.0);',
+          '}'
+        ].join('\n')
+      });
+      var sparks = new THREE.Points(sg, sm); sparks.frustumCulled = false;
+      st.scene.add(sparks);
+
+      // Kamerawackeln nach dem Einschlag
+      var calm = S.reduced() ? 0.2 : 1;
+      S.run(st, U, T, function (t) {
+        var k = t > HIT ? 30 * Math.exp(-(t - HIT) * 9) * calm : 0;
+        st.cam.position.x = (Math.random() - 0.5) * k;
+        st.cam.position.y = (Math.random() - 0.5) * k;
+      });
+    })();
+  </script>
+</body>
+</html>
