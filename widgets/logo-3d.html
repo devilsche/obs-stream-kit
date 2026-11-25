@@ -30,8 +30,7 @@
       var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
       function safeFile(f) { return /^[\w.-]+\.(png|webp|jpg)$/i.test(f) ? f : null; }
 
-      var cs = getComputedStyle(document.documentElement);
-      function col(n, fb) { var v = (cs.getPropertyValue(n) || '').trim(); var c = new THREE.Color(fb); try { if (v) c.set(v); } catch (e) {} return c; }
+      function col(n, fb, into) { var v = (getComputedStyle(document.documentElement).getPropertyValue(n) || '').trim(), c = into || new THREE.Color(); c.set(fb); try { if (v) c.set(v); } catch (e) {} return c; }
       var ACC = col('--theme-accent', '#f2b705'), PRI = col('--theme-primary', '#5e2a79');
       var glowP = (P.get('glow') || 'theme').replace(/^#?([0-9a-f]{6})$/i, '#$1');
       var GLOW_A = glowP === 'gold' ? new THREE.Color('#f2b705') : glowP === 'purple' ? new THREE.Color('#5e2a79') : /^#/.test(glowP) ? new THREE.Color(glowP) : PRI;
@@ -227,6 +226,11 @@
           halo.position.z = -40; halo.renderOrder = 0; root.add(halo);
         }
         resize(); window.addEventListener('resize', resize);
+        // Theme-Wechsel ohne Neuladen: Akzent und Schein nachziehen (die Logo-Bilder selbst bleiben)
+        new MutationObserver(function () {
+          col('--theme-accent', '#f2b705', ACC); col('--theme-primary', '#5e2a79', PRI);
+          if (glowP === 'theme') { GLOW_A.copy(PRI); GLOW_B.copy(ACC); }
+        }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
         start(0);
         if (!isNaN(AT)) frame();   // ?at=: ein Standbild
       });

@@ -1,0 +1,21 @@
+html[data-theme="graphite"] {
+  /* Graphit + Messing: dezent. Neutrales Anthrazit, ein einziger warmer, gedämpfter Messington,
+     feine Linien statt Flächen, kaum Schatten, kein Glow-Spektakel. */
+  --theme-primary:#c2a46a; --theme-accent:#c2a46a; --theme-accent-2:#8c7a5a; --theme-on-primary:#111111;
+  --theme-bg:#111111; --theme-surface:#1a1a1a; --theme-surface-2:#151515; --theme-border:#2a2a2a;
+  --theme-text:#ececec; --theme-text-dim:#9a9a9a; --theme-text-faint:#8a8a8a;
+  --theme-ok:#8fae7e; --theme-warn:#c9a24a; --theme-danger:#c46a5a;
+  --theme-font-display:"Manrope",sans-serif; --theme-font-body:"Inter",sans-serif; --theme-font-mono:"JetBrains Mono",monospace;
+  --theme-stinger-font:"Rajdhani",sans-serif;
+  --theme-radius:6px; --theme-border-width:1px; --theme-shadow:0 6px 18px rgba(0,0,0,.35);
+  /* Text-Varianten (WCAG 1.4.3 auf allen Flächen dieses Themes) */
+  --theme-accent-text:#c9ad76;
+  --theme-accent-2-text:#a8957a;
+  --theme-primary-text:#c9ad76;
+  --theme-hot-icon:"star";
+  --theme-page-bg:linear-gradient(180deg,#161616 0%,#0e0e0e 100%);
+}
+
+/* — Graphit: im Dock nur ein Hauch Messing oben — */
+html[data-theme="graphite"] body.dock::before{content:"";position:fixed;inset:0;z-index:-1;
+  background:radial-gradient(900px 480px at 50% -10%,rgba(194,164,106,.06),transparent 60%)}

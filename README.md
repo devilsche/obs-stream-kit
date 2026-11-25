@@ -1330,6 +1330,8 @@ Default in `themes/_alias.css` auf den Basiswert zurück; dort gibt es keinen
 Unterschied zu pflegen. Eigene Werte haben nur `barrier`, `editorial`,
 `oldcamp`, `sect` und `swiss`, zusammen 20 Definitionen.
 
+**Graphite** (`themes/graphite.css`, seit 2026-11-26): dezentes Theme – neutrales Anthrazit (`#111/#1a1a1a`), ein einziger gedämpfter Messington (`#c2a46a`), Manrope/Inter, Radius 6 px, feine 1-px-Linien, kaum Schatten. Im Dashboard unter Settings → Theme „Graphite“.
+
 **Regel für neuen Code:** `color:` nimmt die `-text`-Form, alles andere den
 Basiswert. `scripts/check_contrast.py` meldet jeden Verstoß, auch wenn der
 Kontrast im aktuellen Theme zufällig reicht — sonst kippt es beim nächsten

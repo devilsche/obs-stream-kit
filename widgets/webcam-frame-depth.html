@@ -37,8 +37,8 @@
       var AT = parseFloat(P.get('at'));
       var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-      var cs = getComputedStyle(document.documentElement);
-      function col(n, fb) { var v = (cs.getPropertyValue(n) || '').trim(), c = new THREE.Color(fb); try { if (v) c.set(v); } catch (e) {} return c; }
+      // Theme-Farben; bei Theme-Wechsel ohne Neuladen (data-theme am <html>) in place nachgezogen (themeColors unten)
+      function col(n, fb, into) { var v = (getComputedStyle(document.documentElement).getPropertyValue(n) || '').trim(), c = into || new THREE.Color(); c.set(fb); try { if (v) c.set(v); } catch (e) {} return c; }
       var PRI = col('--theme-primary', '#5e2a79'), ACC = col('--theme-accent', '#f2b705'), AC2 = col('--theme-accent-2', '#c985ff');
 
       var canvas = document.getElementById('gl'), r;
@@ -303,6 +303,14 @@
         if (isNaN(AT)) requestAnimationFrame(frame);
       }
 
+      function themeColors() {
+        col('--theme-primary', '#5e2a79', PRI); col('--theme-accent', '#f2b705', ACC); col('--theme-accent-2', '#c985ff', AC2);
+        frameMat.color.copy(PRI); edgeMat.color.copy(ACC);
+        trail.forEach(function (m, i) { m.material.uniforms.c.value.copy(i ? AC2 : ACC); });
+        hitMeshes.forEach(function (m) { m.material.uniforms.c.value.copy(ACC); });
+        aura.material.uniforms.c.value.copy(ACC);
+      }
+      new MutationObserver(themeColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
       resize(); window.addEventListener('resize', resize);
       if (!isNaN(AT)) {   // ?at=: Standbild (Demo-Emotes ab 0)
         simT = 0; demoSlot = 0;

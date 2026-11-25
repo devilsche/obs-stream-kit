@@ -15,7 +15,8 @@ html[data-theme="swiss"],
 html[data-theme="azure"],
 html[data-theme="oldcamp"],
 html[data-theme="barrier"],
-html[data-theme="sect"] {
+html[data-theme="sect"],
+html[data-theme="graphite"] {
   --brand-purple:        var(--theme-primary);
   --brand-purple-bright: var(--theme-accent-2);
   --brand-ink:           var(--theme-accent);

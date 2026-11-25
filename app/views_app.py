@@ -266,7 +266,7 @@ def settings():
             theme = request.form.get("theme")
             if theme in ("entry", "terminal", "aurora", "midnight",
                          "editorial", "swiss", "azure",
-                         "oldcamp", "barrier", "sect"):
+                         "oldcamp", "barrier", "sect", "graphite"):
                 set_setting(conn, g.tenant_id, "theme", theme)
             # Stinger-Font (Whitelist; "" = Theme-Default)
             sfont = request.form.get("stinger_font", "")
