@@ -3,69 +3,87 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Car overview</title>
+  <title>Model gallery</title>
   <style>
-    /* Übersicht der Autos im Regen (Katalog /api/fx/cars/catalog.json, aufbereitet von scripts/build_car_rain.py):
-       eine WebGL-Fläche hinter dem Raster, jede Kachel per Scissor; Modelle laden erst, wenn sichtbar */
-    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --ok: #9be59b; }
+    /* Alle 3D-Modelle (Autos, Kulissen, Notizen) zum Aussortieren: GET /app/api/models (fx/model_sort.py).
+       Jede Kachel zeigt ein gemerktes Vorschaubild; fehlt es, rendert die Seite das Modell einmal (volle Auflösung),
+       lädt das Bild hoch und gibt das Modell wieder frei. Großansicht lädt das Original mit Maus-Drehung. */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705;
+      --btn: #5e2a79; --btn-hi: #8a4dad; --ok: #9be59b; --bad: #ff8a80; }
     html { background: var(--bg); }
-    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; padding-bottom: 96px; }
     .skip { position: absolute; left: -9999px; }
-    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 3; }
-    #gl { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; }
-    header { padding: 18px 20px 4px; max-width: 1400px; margin: 0 auto; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 5; }
+    header, .filters, main, .credits { max-width: 1500px; margin: 0 auto; padding-left: 20px; padding-right: 20px; }
+    header { padding-top: 18px; }
     h1 { font-size: 22px; margin: 0; }
-    .lead { color: var(--muted); margin: 4px 0 0; }
-    .lead a { color: var(--text); }
-    .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 20px; max-width: 1400px; margin: 0 auto; }
+    .lead { color: var(--muted); margin: 4px 0 0; max-width: 90ch; }
+    .lead a, .credits a { color: var(--text); }
+    .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 12px; padding-bottom: 12px; }
+    .seg { display: flex; flex-wrap: wrap; gap: 4px; }
     button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; min-height: 34px; }
     button:hover { background: var(--btn-hi); }
     button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button.danger { background: #7a1f2b; border-color: var(--bad); }
+    button.danger:hover { background: #9a2a38; }
     button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
     label { color: var(--muted); }
     input[type=search] { background: var(--panel); color: var(--text); border: 1px solid var(--btn-hi); border-radius: 6px; padding: 6px 10px; font: inherit; min-height: 34px; }
     .count { color: var(--muted); margin-left: auto; }
-    main { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
-    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
-    .tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+    main { padding-bottom: 30px; }
+    .grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+    .tile { background: var(--panel); border: 2px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+    .tile.kept { border-color: var(--ok); }
     .tile[hidden] { display: none; }
-    .stage { aspect-ratio: 4 / 3; width: 100%; }
-    .meta { padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 2px; }
-    .meta h2 { font-size: 15px; margin: 0; }
-    .sub { color: var(--muted); font-size: 13px; }
-    .param { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--accent); }
-    .tag { font-size: 12px; color: var(--ok); }
-    .tag.off { color: var(--muted); }
-    .tag.rework { color: #ffcf70; }
-    .links { display: flex; flex-wrap: wrap; gap: 4px 12px; }
-    .meta a { color: var(--text); font-size: 13px; padding: 3px 0; min-height: 24px; display: inline-block; }
-    .swatches { display: flex; gap: 4px; flex-wrap: wrap; }
-    .sw { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--line); }
-    .swo { background: conic-gradient(#c33, #3c3, #33c, #c33); }
-    /* Quellen der Strecken-Kulissen (CC BY: Namensnennung), Katalog /api/fx/track-props/catalog.json */
-    .credits { max-width: 1400px; margin: 0 auto; padding: 0 20px 40px; }
-    .credits h2 { font-size: 18px; margin: 0 0 4px; }
+    .shot { aspect-ratio: 4 / 3; width: 100%; display: grid; place-items: center; background: #0f141e; color: var(--muted); font-size: 13px; border: 0; padding: 0; border-radius: 0; min-height: 0; }
+    .shot:hover { background: #18202e; }
+    .shot img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .meta { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 3px; }
+    .meta h2 { font-size: 14px; margin: 0; overflow-wrap: anywhere; }
+    .sub { color: var(--muted); font-size: 12px; }
+    .use { font-size: 12px; color: var(--ok); }
+    .use.no { color: var(--muted); }
+    .note { font-size: 12px; color: #ffcf70; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+    .row a { color: var(--text); font-size: 12px; }
+    label.keep { display: flex; align-items: center; gap: 6px; color: var(--text); font-weight: 600; min-height: 30px; cursor: pointer; }
+    label.keep input { width: 22px; height: 22px; accent-color: var(--ok); margin: 0; }
+    .bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(20, 26, 38, 0.97); border-top: 2px solid var(--btn); z-index: 4; }
+    .bar-in { max-width: 1500px; margin: 0 auto; padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .bar b { color: var(--accent); }
+    .confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; color: var(--bad); }
+    .confirm[hidden] { display: none; }
+    #status { color: var(--muted); }
+    dialog { width: min(1200px, 96vw); height: min(820px, 92vh); padding: 0; border: 2px solid var(--btn); border-radius: 12px; background: #0f141e; color: var(--text); }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+    .dlg { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+    .dlg-head { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    .dlg-head h2 { font-size: 16px; margin: 0; flex: 1; overflow-wrap: anywhere; }
+    #big { width: 100%; height: 100%; display: block; }
+    .credits h2 { font-size: 18px; margin: 20px 0 4px; }
     .credits ul { margin: 8px 0 0; padding-left: 20px; columns: 2 320px; }
     .credits li { margin: 0 0 4px; break-inside: avoid; }
-    .credits a { color: var(--text); }
   </style>
 </head>
 <body>
-  <a class="skip" href="#cars">Skip to the cars</a>
-  <canvas id="gl" aria-hidden="true"></canvas>
+  <a class="skip" href="#models">Skip to the models</a>
   <header>
-    <h1>Car overview</h1>
-    <p class="lead">Every car of the car rain (<code>effects/item-rain.html?kind=car</code>), real 3D models chosen in the <a href="car-picker">Car picker</a>. Each rain loads 6 random cars from the mix; <code>&amp;model=&lt;name&gt;</code> picks one. Paints and rim colour in the <a href="car-editor">Car editor</a>.</p>
+    <h1>Model gallery</h1>
+    <p class="lead">Every 3D model on the server: cars of the rain and the race, track scenery, downloaded candidates and the models from your
+      <a href="/admin/sketchfab">Sketchfab notes</a>. Tick <b>Keep</b> on everything you want. <b>Delete all not kept</b> moves the rest to
+      <code>data/model-trash/</code> (restorable) and takes it out of the car rain, the race and the tracks. Click a picture for the full-resolution model.
+      Paints and rims stay in the <a href="car-editor">Car editor</a>.</p>
   </header>
-  <div class="filters" role="group" aria-label="Filter cars">
-    <span id="brands"></span>
+  <div class="filters">
+    <div class="seg" id="groups" role="group" aria-label="Category"></div>
+    <div class="seg" id="keepf" role="group" aria-label="Keep status"></div>
     <label for="q">Search</label>
     <input type="search" id="q" autocomplete="off">
     <span class="count" id="count" aria-live="polite"></span>
   </div>
   <main>
     <p id="status" role="status" aria-live="polite">Loading …</p>
-    <ul class="grid" id="cars"></ul>
+    <ul class="grid" id="models"></ul>
   </main>
   <section class="credits" aria-labelledby="track-credits-h">
     <h2 id="track-credits-h">Track credits</h2>
@@ -79,66 +97,225 @@
     <p class="sub" id="sound-credits-status" role="status" aria-live="polite">Loading …</p>
     <ul id="sound-credits"></ul>
   </section>
+  <div class="bar" role="region" aria-label="Delete">
+    <div class="bar-in">
+      <span id="sum" aria-live="polite"></span>
+      <button type="button" class="danger" id="del">Delete all not kept …</button>
+      <span class="confirm" id="confirm" hidden>
+        <span id="confirmText"></span>
+        <button type="button" class="danger" id="delYes">Yes, delete</button>
+        <button type="button" id="delNo">Cancel</button>
+      </span>
+    </div>
+  </div>
+  <dialog id="dlg" aria-labelledby="dlgTitle">
+    <div class="dlg">
+      <div class="dlg-head">
+        <h2 id="dlgTitle">Model</h2>
+        <span class="sub" id="dlgInfo" aria-live="polite"></span>
+        <button type="button" id="dlgClose" aria-label="Close">Close</button>
+      </div>
+      <canvas id="big" aria-label="Full-resolution 3D model; drag to rotate, scroll to zoom"></canvas>
+    </div>
+  </dialog>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-OrbitControls.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-RoomEnvironment.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/js/glb-fix.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/js/car-stage.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/js/toy-cars.js"></script>
-  <script src="/s/__WIDGET_TOKEN__/api/fx/cars/custom.js"></script>
   <script>
     (function () {
       'use strict';
-      var THREE = window.THREE, TC = window.ToyCars, $ = function (id) { return document.getElementById(id); };
-      var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+      var THREE = window.THREE, $ = function (id) { return document.getElementById(id); };
+      var API = '/app/api/models';
+      var GROUPS = [['all', 'All'], ['car', 'Cars in use'], ['car-candidate', 'Car candidates'], ['prop', 'Track models'],
+        ['prop-candidate', 'Track candidates'], ['note', 'From notes'], ['other', 'Other downloads']];
+      var KEEPF = [['all', 'All'], ['keep', 'Kept'], ['drop', 'Not kept']];
+      var group = 'all', keepf = 'all', tiles = [];
       function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-      function hex(c) { return '#' + ('000000' + (c >>> 0).toString(16)).slice(-6); }
-      var tiles = [], brand = 'all', css = '', ncss = 0;
-
-      TC.loadCatalog().then(function (list) {
-        $('status').textContent = list.length ? '' : 'No cars yet – pick some in the Car picker.';
-        var brands = ['all'];
-        list.forEach(function (e) {
-          if (brands.indexOf(e.brand) < 0) brands.push(e.brand);
-          var v = TC.vehicle(e.key), li = el('li', 'tile'), st = el('div', 'stage'), meta = el('div', 'meta');
-          st.setAttribute('role', 'img'); st.setAttribute('aria-label', (v.label || e.name) + ', 3D model');
-          meta.append(el('h2', null, v.label || e.name), el('span', 'sub', e.brand + ' · by ' + e.author + ' · ' + e.license));
-          if (v.rework) meta.appendChild(el('span', 'tag rework', 'Needs rework' + (v.issues && v.issues.length ? ': ' + v.issues.join(', ') : '') + (v.note ? ' – ' + v.note : '')));
-          meta.appendChild(el('span', 'tag' + (v.mix === false ? ' off' : ''), (v.mix === false ? 'Not in the mix' : 'In the mix') + (e.interior ? ' · interior' : '') + (e.wheels >= 4 ? ' · steerable wheels' : '')));
-          if (Array.isArray(v.paints) && v.paints.length) {
-            var sw = el('div', 'swatches'); sw.setAttribute('aria-label', 'Paints');
-            v.paints.forEach(function (p) {
-              var d = el('span', 'sw'); d.title = (p.n ? p.n + ': ' : '') + (p.c == null ? 'Original colour' : hex(p.c));
-              if (p.c == null) d.classList.add('swo'); else { d.classList.add('swc' + ncss); css += '.swc' + ncss + '{background:' + hex(p.c) + '}'; ncss++; }
-              sw.appendChild(d);
-            });
-            meta.appendChild(sw);
-          }
-          meta.appendChild(el('code', 'param', 'model=' + e.key));
-          var links = el('div', 'links'), a1 = el('a', null, 'Edit'), a2 = el('a', null, 'View large'), a3 = el('a', null, 'Sketchfab');
-          a1.href = 'car-editor?car=' + encodeURIComponent(e.key); a2.href = 'car-viewer?model=' + encodeURIComponent(e.uid);
-          a3.href = e.url; a3.target = '_blank'; a3.rel = 'noopener';
-          links.append(a1, a2, a3); meta.appendChild(links);
-          li.append(st, meta); $('cars').appendChild(li);
-          var t = { rework: !!v.rework, e: e, li: li, stage: st, obj: null, loading: false, yaw: -0.7 + (tiles.length % 5) * 0.12, hover: false, text: (e.name + ' ' + e.key + ' ' + e.brand + ' ' + (v.label || '')).toLowerCase() };
-          li.addEventListener('pointerenter', function () { t.hover = true; }); li.addEventListener('pointerleave', function () { t.hover = false; });
-          li.addEventListener('focusin', function () { t.hover = true; }); li.addEventListener('focusout', function () { t.hover = false; });
-          tiles.push(t);
+      function mb(b) { return b >= 1e9 ? (b / 1e9).toFixed(2) + ' GB' : (b / 1e6).toFixed(1) + ' MB'; }
+      function seg(host, list, cur, set) {
+        list.forEach(function (g) {
+          var b = el('button', null, g[1]); b.type = 'button'; b.setAttribute('aria-pressed', String(g[0] === cur));
+          b.addEventListener('click', function () { Array.prototype.forEach.call(host.children, function (x) { x.setAttribute('aria-pressed', String(x === b)); }); set(g[0]); apply(); });
+          host.appendChild(b);
         });
-        // Farbtupfer als Klassen in einem <style>, keine Inline-Styles
-        if (css) { var stl = document.createElement('style'); stl.textContent = css; document.head.appendChild(stl); }
-        brands.push('rework');
-        brands.forEach(function (b) {
-          var btn = el('button', null, b === 'all' ? 'All' : b === 'rework' ? 'Needs rework' : b); btn.type = 'button'; btn.setAttribute('aria-pressed', String(b === brand));
-          btn.addEventListener('click', function () { brand = b; Array.prototype.forEach.call($('brands').children, function (x) { x.setAttribute('aria-pressed', String(x === btn)); }); apply(); });
-          $('brands').append(btn, document.createTextNode(' '));
+      }
+      seg($('groups'), GROUPS, group, function (v) { group = v; });
+      seg($('keepf'), KEEPF, keepf, function (v) { keepf = v; });
+      $('q').addEventListener('input', apply);
+
+      function apply() {
+        var s = $('q').value.trim().toLowerCase(), n = 0;
+        tiles.forEach(function (t) {
+          var show = (group === 'all' || t.it.groups.indexOf(group) >= 0) && (keepf === 'all' || (keepf === 'keep') === t.it.keep) && (!s || t.text.indexOf(s) >= 0);
+          t.li.hidden = !show; if (show) n++;
+        });
+        $('count').textContent = n + ' of ' + tiles.length + ' models';
+        summary();
+      }
+      function summary() {
+        var k = 0, d = 0, bytes = 0;
+        tiles.forEach(function (t) { if (t.it.keep) k++; else if (t.it.have) { d++; bytes += t.it.bytes; } });
+        $('sum').innerHTML = '';
+        $('sum').append('Keep: ', el('b', null, String(k)), ' · will be deleted: ', el('b', null, String(d)), ' (' + mb(bytes) + ')');
+        $('del').disabled = d === 0;
+        return { d: d, bytes: bytes };
+      }
+      function setKeep(t, keep, cb) {
+        fetch(API + '/keep', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: t.it.uid, keep: keep }) })
+          .then(function (r) { return r.json(); }).then(function (j) {
+            if (!j.ok) throw new Error(j.error || 'save failed');
+            t.it.keep = keep; t.li.classList.toggle('kept', keep); summary();
+          }).catch(function (e) { cb.checked = !keep; $('status').textContent = 'Could not save ' + t.it.name + ': ' + e.message; });
+      }
+
+      fetch(API, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (j) {
+        var items = j.items || [];
+        $('status').textContent = items.length ? '' : 'No models on the server.';
+        items.forEach(function (it) {
+          var li = el('li', 'tile' + (it.keep ? ' kept' : '')), shot = el('button', 'shot', it.have ? 'Waiting …' : 'Not downloaded');
+          shot.type = 'button'; shot.setAttribute('aria-label', 'Show ' + it.name + ' in full resolution');
+          shot.disabled = !it.have;
+          var meta = el('div', 'meta');
+          meta.append(el('h2', null, it.name), el('span', 'sub', [it.author && 'by ' + it.author, it.license, mb(it.bytes)].filter(Boolean).join(' · ')));
+          meta.appendChild(el('span', 'use' + (it.inUse ? '' : ' no'), it.inUse ? 'In use: ' + it.uses.join(', ') : 'Not in use'));
+          (it.notes || []).forEach(function (n) { if (n) meta.appendChild(el('span', 'note', 'Note: ' + n)); });
+          var row = el('div', 'row'), lab = el('label', 'keep'), cb = el('input');
+          cb.type = 'checkbox'; cb.checked = !!it.keep; cb.setAttribute('aria-label', 'Keep ' + it.name);
+          lab.append(cb, document.createTextNode('Keep'));
+          var a = el('a', null, 'Sketchfab'); a.href = it.url || ('https://sketchfab.com/3d-models/' + it.uid); a.target = '_blank'; a.rel = 'noopener';
+          row.append(lab, a); meta.appendChild(row);
+          li.append(shot, meta); $('models').appendChild(li);
+          var t = { it: it, li: li, shot: shot, text: (it.name + ' ' + it.author + ' ' + it.uses.join(' ') + ' ' + (it.notes || []).join(' ')).toLowerCase() };
+          cb.addEventListener('change', function () { setKeep(t, cb.checked, cb); });
+          shot.addEventListener('click', function () { openBig(t); });
+          tiles.push(t);
+          if (it.thumb) showImg(t, API + '/' + it.uid + '/thumb');
+          else if (it.have) io.observe(shot);
         });
         apply();
-      }).catch(function () { $('status').textContent = 'Could not load the car list.'; });
-      $('q').addEventListener('input', apply);
-      // Quellen der Strecken-Kulissen (Sketchfab, scripts/build_track_props.py)
-      fetch(TC.base() + 'api/fx/track-props/catalog.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (c) {
+      }).catch(function () { $('status').textContent = 'Could not load the model list (signed in as admin?).'; });
+
+      function showImg(t, src) {
+        var img = el('img'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.src = src;
+        t.shot.textContent = ''; t.shot.appendChild(img);
+      }
+
+      // ── Vorschaubilder: nur sichtbare Kacheln ohne Bild, eins nach dem anderen ──
+      var queue = [], busy = false;
+      var io = new IntersectionObserver(function (ents) {
+        ents.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          io.unobserve(e.target);
+          var t = tiles.find(function (x) { return x.shot === e.target; });
+          if (t) { queue.push(t); pump(); }
+        });
+      }, { rootMargin: '200px' });
+
+      var thumbR = null, thumbScene, thumbCam;
+      function initThumb() {
+        var c = document.createElement('canvas'); c.width = 480; c.height = 360;
+        thumbR = new THREE.WebGLRenderer({ canvas: c, antialias: true, preserveDrawingBuffer: true, alpha: false });
+        thumbR.outputEncoding = THREE.sRGBEncoding; thumbR.toneMapping = THREE.ACESFilmicToneMapping; thumbR.setSize(480, 360, false);
+        thumbScene = new THREE.Scene(); thumbScene.background = new THREE.Color(0x0f141e);
+        light(thumbR, thumbScene);
+        thumbCam = new THREE.PerspectiveCamera(30, 4 / 3, 0.01, 5000);
+      }
+      function light(r, sc) {
+        if (THREE.RoomEnvironment) sc.environment = new THREE.PMREMGenerator(r).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+        sc.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.6));
+        var d = new THREE.DirectionalLight(0xffffff, 1.2); d.position.set(3, 5, 4); sc.add(d);
+      }
+      function fit(obj, cam, yaw) {
+        var box = new THREE.Box3().setFromObject(obj), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+        obj.position.sub(c);
+        var r = Math.max(size.x, size.y, size.z) || 1, dist = r * 2.1;
+        cam.near = r / 100; cam.far = r * 50;
+        cam.position.set(Math.sin(yaw) * dist, r * 0.45, Math.cos(yaw) * dist); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
+        return r;
+      }
+      function dispose(o) {
+        o.traverse(function (m) {
+          if (m.geometry) m.geometry.dispose();
+          (Array.isArray(m.material) ? m.material : [m.material]).forEach(function (mt) {
+            if (!mt) return;
+            Object.keys(mt).forEach(function (k) { if (mt[k] && mt[k].isTexture) mt[k].dispose(); });
+            mt.dispose();
+          });
+        });
+      }
+      function pump() {
+        if (busy || !queue.length) return;
+        var t = queue.shift();
+        if (t.it.thumb) return pump();
+        busy = true; t.shot.textContent = 'Rendering …';
+        if (!thumbR) initThumb();
+        new THREE.GLTFLoader().load(API + '/' + t.it.uid + '.glb', function (g) {
+          var holder = new THREE.Group(); holder.add(g.scene); thumbScene.add(holder);
+          fit(g.scene, thumbCam, 0.8);
+          thumbR.render(thumbScene, thumbCam);
+          thumbR.domElement.toBlob(function (blob) {
+            thumbScene.remove(holder); dispose(g.scene);
+            if (blob) {
+              showImg(t, URL.createObjectURL(blob)); t.it.thumb = true;
+              fetch(API + '/' + t.it.uid + '/thumb', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'image/webp' }, body: blob }).catch(function () {});
+            }
+            busy = false; pump();
+          }, 'image/webp', 0.85);
+        }, null, function () { t.shot.textContent = 'Could not load'; busy = false; pump(); });
+      }
+
+      // ── Großansicht: Original mit Maus-Drehung ──
+      var big = null, bigScene, bigCam, ctl, bigObj = null, raf = 0;
+      function openBig(t) {
+        var dlg = $('dlg'); $('dlgTitle').textContent = t.it.name; $('dlgInfo').textContent = 'Loading ' + mb(t.it.bytes) + ' …';
+        dlg.showModal();
+        if (!big) {
+          big = new THREE.WebGLRenderer({ canvas: $('big'), antialias: true });
+          big.outputEncoding = THREE.sRGBEncoding; big.toneMapping = THREE.ACESFilmicToneMapping;
+          big.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+          bigScene = new THREE.Scene(); bigScene.background = new THREE.Color(0x0f141e); light(big, bigScene);
+          bigCam = new THREE.PerspectiveCamera(35, 1, 0.01, 5000); ctl = new THREE.OrbitControls(bigCam, $('big')); ctl.enableDamping = true;
+        }
+        if (bigObj) { bigScene.remove(bigObj); dispose(bigObj); bigObj = null; }
+        new THREE.GLTFLoader().load(API + '/' + t.it.uid + '.glb', function (g) {
+          if (!dlg.open) { dispose(g.scene); return; }
+          bigObj = g.scene; bigScene.add(bigObj);
+          var r = fit(bigObj, bigCam, 0.8); ctl.target.set(0, 0, 0); ctl.minDistance = r * 0.2; ctl.maxDistance = r * 10; ctl.update();
+          var tris = 0; bigObj.traverse(function (m) { if (m.isMesh && m.geometry) tris += (m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3; });
+          $('dlgInfo').textContent = mb(t.it.bytes) + ' · ' + Math.round(tris / 1000) + 'k triangles';
+        }, null, function () { $('dlgInfo').textContent = 'Could not load the model.'; });
+        cancelAnimationFrame(raf);
+        (function loop() {
+          if (!dlg.open) return;
+          var c = $('big'), w = c.clientWidth, h = c.clientHeight;
+          if (c.width !== Math.round(w * big.getPixelRatio()) || c.height !== Math.round(h * big.getPixelRatio())) { big.setSize(w, h, false); bigCam.aspect = w / h; bigCam.updateProjectionMatrix(); }
+          ctl.update(); big.render(bigScene, bigCam); raf = requestAnimationFrame(loop);
+        })();
+      }
+      $('dlgClose').addEventListener('click', function () { $('dlg').close(); });
+      $('dlg').addEventListener('close', function () { if (bigObj) { bigScene.remove(bigObj); dispose(bigObj); bigObj = null; } });
+
+      // ── Löschen mit Bestätigung auf der Seite ──
+      $('del').addEventListener('click', function () {
+        var s = summary();
+        $('confirmText').textContent = 'Move ' + s.d + ' models (' + mb(s.bytes) + ') to the trash and take them out of the game?';
+        $('confirm').hidden = false; $('delYes').focus();
+      });
+      $('delNo').addEventListener('click', function () { $('confirm').hidden = true; $('del').focus(); });
+      $('delYes').addEventListener('click', function () {
+        var s = summary(); $('delYes').disabled = true;
+        fetch(API + '/purge', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expect: s.d }) })
+          .then(function (r) { return r.json(); }).then(function (j) {
+            if (!j.ok) throw new Error(j.error || 'failed');
+            $('status').textContent = 'Moved ' + j.moved + ' models (' + mb(j.bytes) + ') to ' + j.trash + '. Reloading …';
+            setTimeout(function () { location.reload(); }, 1500);
+          }).catch(function (e) { $('status').textContent = 'Delete failed: ' + e.message; $('delYes').disabled = false; });
+        $('confirm').hidden = true;
+      });
+
+      // Quellen der Strecken-Kulissen (CC BY: Namensnennung)
+      fetch('/s/__WIDGET_TOKEN__/api/fx/track-props/catalog.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (c) {
         var list = (c && Array.isArray(c.credits)) ? c.credits : [];
         $('track-credits-status').textContent = list.length ? '' : 'No track models yet.';
         list.forEach(function (e) {
@@ -149,12 +326,12 @@
         });
       }).catch(function () { $('track-credits-status').textContent = 'Could not load the track credits.'; });
       // Quellen der Motorklänge (Freesound, scripts/build_engine_sounds.py → assets/sounds/engines/bank.json)
-      fetch(TC.base() + 'assets/sounds/engines/bank.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (b) {
+      fetch('/s/__WIDGET_TOKEN__/assets/sounds/engines/bank.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (b) {
         var src = (b && b.sources) || {}, use = {};
-        Object.keys((b && b.types) || {}).forEach(function (t) {
-          var e = b.types[t];
-          ['loops', 'on', 'off', 'start', 'rev', 'pass', 'pop', 'turbo'].forEach(function (k) {   // on/off = Hochlauf/Abfall
-            (e[k] || []).forEach(function (o) { var u = use[o.src] || (use[o.src] = []); if (u.indexOf(e.label) < 0) u.push(e.label); });
+        Object.keys((b && b.types) || {}).forEach(function (k) {
+          var e = b.types[k];
+          ['loops', 'on', 'off', 'start', 'rev', 'pass', 'pop', 'turbo'].forEach(function (x) {
+            (e[x] || []).forEach(function (o) { var u = use[o.src] || (use[o.src] = []); if (u.indexOf(e.label) < 0) u.push(e.label); });
           });
         });
         var ids = Object.keys(src).filter(function (id) { return use[id]; }).sort(function (a, b) { return src[a].user.localeCompare(src[b].user); });
@@ -166,52 +343,6 @@
           $('sound-credits').appendChild(li);
         });
       }).catch(function () { $('sound-credits-status').textContent = 'Could not load the sound credits.'; });
-      function apply() {
-        var s = $('q').value.trim().toLowerCase(), n = 0;
-        tiles.forEach(function (t) { var show = (brand === 'all' || t.e.brand === brand || (brand === 'rework' && t.rework)) && (!s || t.text.indexOf(s) >= 0); t.li.hidden = !show; if (show) n++; });
-        $('count').textContent = n + ' of ' + tiles.length + ' cars';
-      }
-
-      // ── WebGL: eine Fläche, je Kachel ein Ausschnitt ──
-      var canvas = $('gl'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
-      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-      renderer.setScissorTest(true);
-      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
-      CarStage.setup(renderer, scene);
-      var holder = new THREE.Group(); scene.add(holder);
-      function resize() { renderer.setSize(window.innerWidth, window.innerHeight, false); }
-      window.addEventListener('resize', resize); resize();
-      var last = null, busy = 0;
-      function frame(ts) {
-        var dt = last === null ? 0 : Math.min(0.05, (ts - last) / 1000); last = ts;
-        var H = window.innerHeight, W = window.innerWidth;
-        renderer.setScissor(0, 0, W, H); renderer.clear();
-        tiles.forEach(function (t) {
-          if (t.li.hidden) return;
-          var r = t.stage.getBoundingClientRect();
-          if (r.bottom < 0 || r.top > H || r.right < 0 || r.left > W) return;
-          // höchstens zwei Modelle gleichzeitig laden
-          if (!t.obj && !t.loading && busy < 2) {
-            t.loading = true; busy++;
-            TC.loadModel(t.e).then(function (tpl) {
-              var p = TC.pickPaint(t.e.key); t.obj = TC.paintTemplate(tpl, p.c, p.r, { zones: p.z });
-            }).catch(function () {}).then(function () { busy--; });
-          }
-          if (!t.obj) return;
-          if (!reduce) t.yaw += dt * (t.hover ? 1.2 : 0.3);
-          t.obj.rotation.set(0, t.yaw, 0);
-          var d = t.obj.userData.dims || { L: 4.4 }, dist = Math.max(8.5, d.L * 2.1);
-          cam.position.set(0, dist * 0.23, dist); cam.lookAt(0, -0.1, 0);
-          if (holder.children[0]) holder.remove(holder.children[0]);
-          holder.add(t.obj);
-          var y = H - r.bottom;
-          renderer.setViewport(r.left, y, r.width, r.height); renderer.setScissor(r.left, y, r.width, r.height);
-          cam.aspect = r.width / r.height; cam.updateProjectionMatrix();
-          renderer.render(scene, cam);
-        });
-        requestAnimationFrame(frame);
-      }
-      requestAnimationFrame(frame);
     })();
   </script>
 </body>

@@ -92,8 +92,8 @@ TOOLS = [
      "admin_only": True,
      "domain": "ducks"},
     {"key": "car-gallery",
-     "label": "Toy cars",
-     "desc": "All cars of the BMW rain with their paints and all rims, with their URL parameter.",
+     "label": "Model gallery",
+     "desc": "Every 3D model on the server (cars, track scenery, candidates, notes): tick what to keep, delete the rest.",
      "path": "tools/car-gallery.html",
      "admin_only": True,
      "domain": "race"},
@@ -797,6 +797,70 @@ def car_preview_glb(uid):
     except sketchfab.FetchError as e:
         return jsonify({"ok": False, "error": str(e)}), e.status
     return send_from_directory(os.path.dirname(path), os.path.basename(path), mimetype="model/gltf-binary", max_age=86400)
+
+
+@bp_app.route("/app/api/models", methods=["GET"])
+@require_admin
+def models_list():
+    """Model gallery: alle 3D-Modelle (Autos, Kulissen, Notizen) mit Haken „Keep“ (fx/model_sort.py)."""
+    from fx import model_sort
+    return jsonify({"ok": True, "items": model_sort.inventory(_duck_root())})
+
+
+@bp_app.route("/app/api/models/<uid>.glb")
+@require_admin
+def models_glb(uid):
+    """Höchste Auflösung eines Modells (Original-Download, sonst aufbereitete Fassung)."""
+    from fx import model_sort
+    path = model_sort.glb_path(_duck_root(), uid)
+    if not path:
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path), mimetype="model/gltf-binary", max_age=86400)
+
+
+@bp_app.route("/app/api/models/<uid>/thumb", methods=["GET", "POST"])
+@require_admin
+def models_thumb(uid):
+    """Vorschaubild: GET liefert es, POST (image/webp) speichert das von der Seite gerenderte."""
+    from fx import model_sort
+    path = model_sort.thumb_path(_duck_root(), uid)
+    if not path:
+        abort(404)
+    if request.method == "POST":
+        if request.mimetype != "image/webp":
+            return jsonify({"ok": False, "error": "image/webp expected"}), 400
+        ok = model_sort.save_thumb(_duck_root(), uid, request.get_data(cache=False))
+        return (jsonify({"ok": True}), 200) if ok else (jsonify({"ok": False, "error": "invalid image"}), 400)
+    if not os.path.exists(path):
+        abort(404)
+    return send_from_directory(os.path.dirname(path), os.path.basename(path), mimetype="image/webp", max_age=3600)
+
+
+@bp_app.route("/app/api/models/keep", methods=["POST"])
+@require_admin
+def models_keep():
+    """Haken „Keep“ setzen. Nur JSON — ein fremdes Formular kann so keinen Request unterschieben."""
+    from fx import model_sort
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict) or not model_sort.set_keep(_duck_root(), body.get("uid"), bool(body.get("keep"))):
+        return jsonify({"ok": False, "error": "invalid uid"}), 400
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/models/purge", methods=["POST"])
+@require_admin
+def models_purge():
+    """Alle nicht behaltenen Modelle in den Papierkorb (data/model-trash/<Zeit>/). Die Seite schickt die erwartete
+    Anzahl mit; stimmt sie nicht mehr (anderer Tab hat geändert), passiert nichts."""
+    from fx import model_sort
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "JSON body expected"}), 400
+    root = _duck_root()
+    n = sum(1 for i in model_sort.inventory(root) if not i["keep"] and i["have"])
+    if body.get("expect") != n:
+        return jsonify({"ok": False, "error": "selection changed, reload the page", "count": n}), 409
+    return jsonify({"ok": True, **model_sort.purge(root)})
 
 
 @bp_app.route("/app/api/cars/<kind>", methods=["GET"])
