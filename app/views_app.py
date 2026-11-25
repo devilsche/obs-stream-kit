@@ -651,6 +651,10 @@ def urls():
     from overlay_app.overlay_catalog import OVERLAYS, ALERTS, DECOR, TRANSITIONS, STINGER_META, EFFECT_META, list_dir_sources
     stingers = list_dir_sources(project_root, "stingers", desc="Stinger-Transition mit Meme-Effekt.",
                                 switches_map=STINGER_META)
+    from overlay_app.overlay_catalog import MEME_TIMING_SWITCHES, has_meme_sound
+    for st_ in stingers:   # Ton-Timing für alle Memes mit Tondatei
+        if has_meme_sound(project_root, st_["file"]):
+            st_["switches"] = st_["switches"] + MEME_TIMING_SWITCHES
     effects  = list_dir_sources(project_root, "effects",  desc="Visual effect overlay.",
                                 switches_map=EFFECT_META)
     # Schalter mit "feature" nur zeigen, wenn der Tenant die Freischaltung hat (core/features.py)

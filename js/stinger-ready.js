@@ -20,6 +20,7 @@
       <audio data-stinger-autoplay data-delay="1600" preload="auto" src="..."></audio>
 
       <!-- Lautstärke je Datei (0–1); ?volume= in der URL wirkt als Faktor obendrauf: -->
+      <!-- ?snd=<ms> verschiebt den Ton gegenüber der Animation, ?trim=<ms> schneidet den Tonanfang ab (Dashboard). -->
       <audio data-stinger-autoplay data-volume="0.5" preload="auto" src="..."></audio>
     </body>
 
@@ -62,6 +63,15 @@
 
   var started = false;
 
+  /* Timing aus der URL (Dashboard „Sound timing“):
+     ?snd=<ms>  Ton gegenüber der Animation verschieben: + = Ton später, − = Ton früher (dann startet die Animation
+                entsprechend später). Gilt für alle <audio>; Videos gehören zum Bild und laufen mit der Animation.
+     ?trim=<ms> so viel vom Anfang der Tondatei überspringen (Stille oder Vorlauf abschneiden). */
+  var Q = new URLSearchParams(window.location.search);
+  function msParam(k, lo, hi) { var v = parseInt(Q.get(k), 10); return isNaN(v) ? 0 : Math.max(lo, Math.min(hi, v)); }
+  var sndShift = msParam('snd', -3000, 3000), sndTrim = msParam('trim', 0, 10000);
+  var animDelay = Math.max(0, -sndShift);
+
   function startAnimations() {
     if (started) return;
     started = true;
@@ -74,6 +84,12 @@
     var immediatePromises = [];
     Array.prototype.forEach.call(medias, function (m) {
       var delay = parseInt(m.getAttribute('data-delay'), 10) || 0;
+      if (m.tagName === 'AUDIO') {
+        delay += Math.max(0, sndShift);
+        if (sndTrim) { try { m.currentTime = sndTrim / 1000; } catch (e) {} }
+      } else {
+        delay += animDelay;   // Video = Bild, läuft mit der Animation
+      }
       if (delay > 0) {
         // Delayed → nicht auf Start warten
         setTimeout(function () { tryPlay(m); }, delay);
@@ -84,7 +100,9 @@
     });
 
     var release = function () { html.classList.remove('stinger-loading'); };
-    if (immediatePromises.length === 0) {
+    if (animDelay > 0) {
+      setTimeout(release, animDelay);   // Ton soll früher kommen: Animation wartet
+    } else if (immediatePromises.length === 0) {
       release();
     } else {
       Promise.all(immediatePromises).then(release);

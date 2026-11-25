@@ -198,6 +198,26 @@ STINGER_META = {
     ]},
 }
 
+# Ton-Timing für Meme-Stinger mit Tondatei (<audio data-stinger-autoplay>, js/stinger-ready.js)
+MEME_TIMING_SWITCHES = [
+    {"key": "snd", "label": "Sound offset (ms)", "type": "number", "default": "0", "min": -3000, "max": 3000,
+     "presets": ["-500", "-250", "0", "250", "500"],
+     "tooltip": "Shift the sound against the animation: positive = sound later, negative = sound earlier (the animation waits). Check it with Preview."},
+    {"key": "trim", "label": "Skip sound start (ms)", "type": "number", "default": "0", "min": 0, "max": 10000,
+     "presets": ["0", "100", "250", "500"],
+     "tooltip": "Cut this much off the beginning of the sound file, e.g. silence before the punchline"},
+]
+
+
+def has_meme_sound(root, fn):
+    """Stinger mit eigener Tondatei (dann wirkt das Ton-Timing)."""
+    try:
+        with open(os.path.join(root, "stingers", fn), encoding="utf-8") as f:
+            return "<audio" in f.read()
+    except OSError:
+        return False
+
+
 _PET_FONTS = [
     ["", "Auto (DM Sans)"], ["Pacifico", "Pacifico"], ["Dancing Script", "Dancing Script"],
     ["Great Vibes", "Great Vibes"], ["Satisfy", "Satisfy"], ["Sacramento", "Sacramento"],
