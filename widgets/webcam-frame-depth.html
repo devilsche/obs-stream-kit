@@ -106,7 +106,7 @@
       var R = 0, texCache = {}, ETEX_DEMO = [];
       function emoteTex(url) {
         if (texCache[url]) return texCache[url];
-        var t = new THREE.TextureLoader().setCrossOrigin('anonymous').load(url, null, null, function () { console.error('webcam-frame-depth: emote not loaded', url); t._bad = true; });
+        var t = new THREE.TextureLoader().setCrossOrigin('anonymous').load(url, undefined, undefined, function () { console.error('webcam-frame-depth: emote not loaded', url); t._bad = true; });
         t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
         texCache[url] = t; return t;
       }
