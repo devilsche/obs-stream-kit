@@ -38,3 +38,13 @@ def test_upload_list_volume_delete(pg_conn_test_setup_non_admin, tmp_path):
     assert c.delete(f"/app/api/alert-sounds/follow/{fid}", headers=H).get_json()["ok"]
     assert c.get(f"/app/api/alert-sounds/follow/{fid}.mp3").status_code == 404
     assert (tmp_path / "data" / "alert-sounds" / str(tid) / "follow").is_dir()
+
+
+def test_options_endpoint(pg_conn_test_setup_non_admin, tmp_path):
+    conn, tid, _, sid = pg_conn_test_setup_non_admin
+    c = _client(conn, sid, tmp_path)
+    assert c.post("/app/api/alert-sounds/raid/options", json={"duration": 12, "full": False}).get_json()["ok"]
+    a = c.get("/app/api/alert-sounds").get_json()["alerts"]["raid"]
+    assert (a["duration"], a["full"], a["stay"]) == (12, False, True)
+    assert c.post("/app/api/alert-sounds/raid/options", json={"duration": "x"}).status_code == 400
+    assert c.post("/app/api/alert-sounds/nope/options", json={"stay": True}).status_code == 404

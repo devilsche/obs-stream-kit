@@ -111,3 +111,13 @@ def test_sound_level_injected_per_group(app):
         assert "window.__SOUND_LEVEL__ = 0.3;" in c.get("/s/tok/stingers/gg.html").get_data(as_text=True)
         assert "window.__SOUND_LEVEL__ = 0.7;" in c.get("/s/tok/alerts/raid.html").get_data(as_text=True)
         assert "__SOUND_LEVEL__" not in c.get("/s/tok/overlays/starting-soon.html").get_data(as_text=True)
+
+
+def test_live_alert_host_gets_config_and_json(app):
+    c = app.test_client()
+    with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
+         mock.patch("pubg.db_pg.get_setting", side_effect=lambda c, t, k, d=None: d):
+        body = c.get("/s/tok/alerts/live.html").get_data(as_text=True)
+        js = c.get("/s/tok/alert-config.json").get_json()
+    assert "window.__ALERT_CFG__ = " in body and '"raid": {"duration": 6' in body
+    assert js["alerts"]["follow"]["default"]["src"] == "/s/tok/assets/alert-sounds/follow.mp3"

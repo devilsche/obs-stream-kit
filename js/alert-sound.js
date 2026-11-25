@@ -4,6 +4,8 @@
  * Beim Erscheinen des Alerts spielt zufällig einer der Töne (nicht zweimal hintereinander derselbe),
  * zum Ende des Alerts (?duration=, Standard 6 s) blendet er weich aus.
  * URL: sound=0 schaltet stumm, volume=0–1 wirkt als Faktor auf die Dashboard-Lautstärke.
+ * Wartemodus (alerts/live.html) setzt soundfile=<id>|default|none (der Host wählt aus und kennt die Länge)
+ * und full=1 (Ton nicht mit dem Alert ausblenden, der Host hält die Seite offen, bis er zu Ende ist).
  * In OBS „Audio über OBS steuern“ aktivieren, dann erscheint der Ton im Mixer. */
 (function () {
   'use strict';
@@ -16,8 +18,11 @@
   if (vol <= 0) return;
   var key = 'alert-sound-last:' + cfg.base, last = null;
   try { last = localStorage.getItem(key); } catch (e) { /* ohne Speicher eben zufällig */ }
-  var src;
-  if (files.length) {
+  var src, pick = q.get('soundfile');
+  if (pick === 'none') return;
+  if (pick === 'default' && cfg['default']) src = cfg['default'];
+  else if (pick && files.indexOf(pick) >= 0) src = cfg.base + pick + '.mp3';
+  else if (files.length) {
     var pool = files.length > 1 ? files.filter(function (id) { return id !== last; }) : files;
     var id = pool[Math.floor(Math.random() * pool.length)];
     try { localStorage.setItem(key, id); } catch (e) { /* egal */ }
@@ -35,6 +40,7 @@
     });
   }
   play();
+  if (q.get('full') === '1') return;   // Host hält die Seite offen, bis der Ton zu Ende ist
   // zum Ende des Alerts ausblenden
   var dur = parseFloat(q.get('duration')) || 6, fade = 0.6;
   setTimeout(function () {

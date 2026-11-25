@@ -107,6 +107,18 @@ def _name(v):
     return v or None
 
 
+_CTRL_RE = re.compile(r"[\x00-\x1f\x7f<>]")
+
+
+def _text(limit):
+    """Freitext für Alerts (Name, Nachricht, Betrag „5,00 €“): Steuerzeichen und <> raus, Leerraum
+    zusammengezogen, höchstens `limit` Zeichen. Angezeigt wird er per textContent, nie als HTML."""
+    def conv(v):
+        v = " ".join(_CTRL_RE.sub("", v).split())[:limit].strip()
+        return v or None
+    return conv
+
+
 _PLACE_DROP_RE = re.compile(r"[^\w .,'\-]")
 
 
@@ -199,6 +211,15 @@ EFFECTS = {
             "fire": {"kind": _choice("explosion", "fireball", "comic", "pixel", "random"), "at": _at,
                      "size": _float_range(0.2, 3), "count": _int_range(1, 12), "name": _name},
         },
+    },
+    # Alerts im Wartemodus (alerts/live.html): Streamer.bot schickt nur das Ereignis, die Quelle bleibt sichtbar
+    "alert": {
+        "commands": ("follow", "sub", "resub", "giftsub", "bits", "raid", "donation", "welcome"),
+        "settings": {},
+        "args": {c: {"username": _text(40), "name": _text(40), "message": _text(240), "tier": _text(12),
+                     "amount": _text(24), "months": _int_range(1, 1000), "total": _int_range(1, 100000),
+                     "viewers": _int_range(1, 1000000)}
+                 for c in ("follow", "sub", "resub", "giftsub", "bits", "raid", "donation", "welcome")},
     },
     "swirl": {
         "commands": ("play",),

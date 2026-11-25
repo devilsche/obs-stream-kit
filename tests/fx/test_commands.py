@@ -202,3 +202,10 @@ def test_swirl_play_args():
     out = commands.parse("swirl", {"cmd": "play", "preset": "Follow", "duration": "99"})
     assert out == {"cmd": "play", "params": {"preset": "follow", "duration": 15.0}}
     assert commands.parse("swirl", {"cmd": "play", "preset": "raid", "duration": "x"}) == {"cmd": "play", "params": {}}
+
+
+def test_alert_args_text_and_numbers():
+    out = commands.parse("alert", {"cmd": "donation", "username": "Hat3 <script>", "amount": "5,00 €",
+                                   "message": "danke\x07  dir", "viewers": "x"})
+    assert out == {"cmd": "donation", "params": {"username": "Hat3 script", "amount": "5,00 €", "message": "danke dir"}}
+    assert commands.parse("alert", {"cmd": "raid", "viewers": "42"})["params"] == {"viewers": 42}

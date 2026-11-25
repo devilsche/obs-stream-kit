@@ -1153,6 +1153,25 @@ def alert_sounds_volume(alert):
     return jsonify({"ok": True})
 
 
+@bp_app.route("/app/api/alert-sounds/<alert>/options", methods=["POST"])
+@require_session
+def alert_sounds_options(alert):
+    """Dauer (s), Ton ganz ausspielen, Alert bis zum Tonende stehen lassen – gilt für den Wartemodus (alerts/live.html)."""
+    from overlay_app import alert_sounds
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "Bad request."}), 400
+    try:
+        dur = int(body["duration"]) if body.get("duration") is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Invalid duration."}), 400
+    full = bool(body["full"]) if "full" in body else None
+    stay = bool(body["stay"]) if "stay" in body else None
+    if not _sound_conn(lambda c: alert_sounds.set_options(c, g.tenant_id, alert, dur, full, stay)):
+        return jsonify({"ok": False, "error": "Unknown alert."}), 404
+    return jsonify({"ok": True})
+
+
 @bp_app.route("/app/api/alert-sounds/<alert>/<file_id>", methods=["DELETE"])
 @require_session
 def alert_sounds_delete(alert, file_id):

@@ -31,7 +31,24 @@ OVERLAYS = [
 _TIER = {"key": "tier", "label": "Tier", "type": "select", "default": "1000",
          "options": [["1000", "Tier 1"], ["2000", "Tier 2"], ["3000", "Tier 3"]]}
 
+_ALERT_CMDS = [
+    {"q": "cmd=follow&username=%user%", "label": "New follower (Follow trigger)"},
+    {"q": "cmd=sub&username=%user%&tier=%tier%", "label": "New sub"},
+    {"q": "cmd=resub&username=%user%&months=%cumulative%&tier=%tier%", "label": "Resub"},
+    {"q": "cmd=giftsub&username=%user%&amount=%subBombCount%&total=%totalSubsGifted%&tier=%tier%", "label": "Gift sub(s)"},
+    {"q": "cmd=bits&username=%user%&amount=%bits%&message=%message%", "label": "Bits / cheer"},
+    {"q": "cmd=raid&username=%user%&viewers=%viewers%", "label": "Raid"},
+    {"q": "cmd=donation&username=%donationFrom%&amount=%donationFormattedAmount%&message=%donationMessage%", "label": "Donation / tip"},
+]
+
 ALERTS = [
+    # Wartemodus: EINE dauerhaft sichtbare Quelle für alle Alerts (alerts/live.html); host = kein eigener Alert-Typ
+    {"key": "live", "host": True, "label": "All alerts (live)", "file": "live.html", "size": "1920×1080", "preview_size": (800, 500),
+     "desc": "One source for all alerts, always visible in OBS. Streamer.bot only sends the event; alerts play one after another, with duration and sound from each alert's settings.",
+     "params": [], "commands": _ALERT_CMDS,
+     "switches": [
+         {"key": "demo", "label": "Demo", "type": "select", "default": "0", "options": [["0", "Off"], ["1", "On (example alert every 8 s)"]]},
+     ]},
     {"key": "follow", "label": "New Follower", "file": "follow.html", "size": "1920×1080", "preview_size": (800, 500),
      "desc": "One-shot animation on new follower.", "params": [],
      "switches": [

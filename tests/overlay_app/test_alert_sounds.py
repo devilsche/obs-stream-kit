@@ -62,3 +62,16 @@ def test_builtin_default_only_without_own_files(store):
     assert alert_sounds.load(None, 3)["follow"]["volume"] == 0.15
     store[(3, "alert_sounds")] = json.dumps({"follow": {"volume": 0.2, "files": [{"id": "ab12cd34ef56", "name": "x.mp3"}]}})
     assert "default" not in alert_sounds.for_overlay(alert_sounds.load(None, 3), "follow")
+
+
+def test_options_and_live_config(store):
+    cfg = alert_sounds.load(None, 4)
+    assert cfg["sub"]["duration"] == 6 and cfg["sub"]["full"] is True and cfg["sub"]["stay"] is True
+    assert alert_sounds.set_options(None, 4, "sub", duration=99, full=False, stay=False)
+    assert not alert_sounds.set_options(None, 4, "live")          # Host ist kein Alert-Typ
+    cfg = alert_sounds.load(None, 4)
+    assert (cfg["sub"]["duration"], cfg["sub"]["full"], cfg["sub"]["stay"]) == (60, False, False)
+    live = alert_sounds.for_live(cfg, ".", "tok")
+    assert "live" not in live and live["sub"]["duration"] == 60
+    assert live["follow"]["default"]["src"] == "/s/tok/assets/alert-sounds/follow.mp3"
+    assert live["follow"]["default"]["dur"] > 8

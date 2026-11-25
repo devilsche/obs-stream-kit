@@ -99,7 +99,8 @@ G1R_STEAM_NAME=</code></pre>
         {{ src_card('overlay','Alert',a.label,
                     base_url~'/s/'~token~'/alerts/'~a.file,'alerts/'~a.file,
                     a.size,a.desc,a.switches or [],a.params or [],False,'','stream',
-                    a.preview_size|default(None)) }}
+                    a.preview_size|default(None),
+                    a.commands or [],base_url~'/s/'~token~'/api/fx/alert') }}
         {% endfor %}
         {% for s in stingers %}
         {{ src_card('overlay','Meme',s.label,
@@ -639,10 +640,10 @@ G1R_STEAM_NAME=</code></pre>
         <span class="url-copied" id="urlCtlStatus" role="status" aria-live="polite"></span>
       </div>` : "";
     // Alerts: eigene Töne (bis zu 3 MP3, zufällig abgespielt) – Inhalt lädt wireAlertSound()
-    const alertKey = card.dataset.cat === "Alert" ? (card.dataset.path || "").replace(/^alerts\//, "").replace(/\.html$/, "") : "";
+    const alertKey = card.dataset.cat === "Alert" && !/live\.html$/.test(card.dataset.path || "") ? (card.dataset.path || "").replace(/^alerts\//, "").replace(/\.html$/, "") : "";
     const soundHtml = alertKey ? `
       <div class="url-dbox url-soundbox" id="urlSoundBox" data-alert="${escapeAttr(alertKey)}">
-        <h2>Sound <span class="url-dbox__tag">plays with the alert</span></h2>
+        <h2>Sound &amp; timing <span class="url-dbox__tag">plays with the alert</span></h2>
         <p class="url-dbox__desc">Upload up to 3 short MP3 files. Each alert plays one of them at random (never the same one twice in a row) and fades it out when the alert disappears. In OBS enable <b>Control audio via OBS</b> for this source.</p>
         <div class="url-sound__list" id="urlSoundList"><p class="url-sound__note">Loading…</p></div>
         <div class="url-sound__row">
@@ -656,6 +657,23 @@ G1R_STEAM_NAME=</code></pre>
           <input type="file" id="urlSoundFile" class="url-sound__file" accept="audio/mpeg,.mp3" aria-describedby="urlSoundRules">
         </div>
         <p class="url-sound__rules" id="urlSoundRules"></p>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundDur">Duration</label>
+          <select id="urlSoundDur" class="url-sound__sel">
+            ${[3,4,5,6,8,10,12,15,20,30].map(v => `<option value="${v}">${v} s</option>`).join("")}
+          </select>
+        </div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundFull">Sound</label>
+          <select id="urlSoundFull" class="url-sound__sel">
+            <option value="1">Play the whole sound</option>
+            <option value="0">Fade out with the alert</option>
+          </select>
+        </div>
+        <div class="url-sound__row">
+          <label class="url-sound__chk"><input type="checkbox" id="urlSoundStay"> Keep the alert on screen until the sound ends</label>
+        </div>
+        <p class="url-sound__rules">Duration and sound settings apply to the live alert source (<code>alerts/live.html</code>), which Streamer.bot only sends events to. Changes reach a running source within 20 seconds.</p>
         <span class="url-copied" id="urlSoundStatus" role="status" aria-live="polite"></span>
       </div>` : "";
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${soundHtml}${chromeHtml}`;
@@ -746,6 +764,9 @@ G1R_STEAM_NAME=</code></pre>
       rules.textContent = `MP3 only, at most ${data.maxSeconds} s and ${Math.round(data.maxBytes / 1048576)} MB, up to ${data.maxFiles} files.`;
       vol.value = String([0, 0.1, 0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
       file.disabled = e.files.length >= data.maxFiles;
+      document.getElementById("urlSoundDur").value = String([3,4,5,6,8,10,12,15,20,30].reduce((a, b) => Math.abs(b - e.duration) < Math.abs(a - e.duration) ? b : a));
+      document.getElementById("urlSoundFull").value = e.full === false ? "0" : "1";
+      document.getElementById("urlSoundStay").checked = e.stay !== false;
       file.setAttribute("aria-disabled", file.disabled ? "true" : "false");
       list.innerHTML = e.files.length ? `<ul class="url-sound__items">${e.files.map(f => `
         <li class="url-sound__item">
@@ -781,6 +802,15 @@ G1R_STEAM_NAME=</code></pre>
           .then(r => r.json()).then(res => { say(res.ok ? "Deleted." : (res.error || "Could not delete."), !res.ok); return reload(); });
       }
     });
+    function saveOptions(body) {
+      fetch(api + "/options", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" }, body: JSON.stringify(body) })
+        .then(r => r.json()).then(res => say(res.ok ? "Saved." : (res.error || "Could not save."), !res.ok))
+        .catch(() => say("Could not save.", true));
+    }
+    document.getElementById("urlSoundDur").addEventListener("change", e => saveOptions({ duration: parseInt(e.target.value, 10) }));
+    document.getElementById("urlSoundFull").addEventListener("change", e => saveOptions({ full: e.target.value === "1" }));
+    document.getElementById("urlSoundStay").addEventListener("change", e => saveOptions({ stay: e.target.checked }));
     vol.addEventListener("change", () => {
       fetch(api + "/volume", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },

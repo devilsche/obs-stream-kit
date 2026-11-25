@@ -40,6 +40,7 @@ def _serve_tenant_source(token, subdir, filepath):
     stinger_font = ""
     feats = []
     alert_sound = None
+    alert_cfg = None
     sound_level = None
     conn = _get_conn()
     try:
@@ -56,6 +57,8 @@ def _serve_tenant_source(token, subdir, filepath):
         if subdir == "alerts":   # eigene Alert-Töne aus dem Dashboard (js/alert-sound.js)
             from overlay_app import alert_sounds
             key = filepath[:-5] if filepath.endswith(".html") else ""
+            if key == "live":   # Wartemodus: alle Alerts nacheinander (alerts/live.html)
+                alert_cfg = alert_sounds.for_live(alert_sounds.load(conn, g.tenant_id), _root(), token)
             if key in alert_sounds.ALERT_KEYS:
                 alert_sound = alert_sounds.for_overlay(alert_sounds.load(conn, g.tenant_id), key)
                 alert_sound["base"] = f"/s/{token}/alert-sounds/{key}/"
@@ -78,6 +81,8 @@ def _serve_tenant_source(token, subdir, filepath):
     }
     if alert_sound is not None:
         variables["__ALERT_SOUND__"] = alert_sound
+    if alert_cfg is not None:
+        variables["__ALERT_CFG__"] = alert_cfg
     if sound_level is not None:
         variables["__SOUND_LEVEL__"] = sound_level
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
@@ -110,6 +115,21 @@ def theme_json(token):
             theme = "entry"
         _THEME_CACHE[g.tenant_id] = (now, theme)
     return {"theme": theme}, 200, {"Cache-Control": "no-store"}
+
+
+@bp_overlays.route("/s/<token>/alert-config.json")
+def alert_config_json(token):
+    """Einstellungen aller Alerts für den Wartemodus (alerts/live.html lädt sie alle 20 s neu)."""
+    from overlay_app import alert_sounds
+    if g.tenant_id is None:
+        abort(404)
+    conn = _get_conn()
+    try:
+        cfg = alert_sounds.load(conn, g.tenant_id)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+    return {"alerts": alert_sounds.for_live(cfg, _root(), token)}, 200, {"Cache-Control": "no-store"}
 
 
 @bp_overlays.route("/s/<token>/overlays/<path:filepath>")

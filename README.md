@@ -240,6 +240,17 @@ Alerts sind **1920×1080 Fullscreen-Overlays** mit einmaliger Animation.
 
 > **Ton je Alert (Dashboard):** Unter Stream → Alert-Karte → **Sound** lassen sich bis zu **3 MP3** je Alert hochladen (höchstens 20 s und 2 MB, die Länge prüft der Server selbst, `overlay_app/alert_sounds.py`). Der Alert spielt beim Erscheinen zufällig einen davon, nie zweimal hintereinander denselben, und blendet ihn zum Ende (`duration`) aus (`js/alert-sound.js`). Lautstärke je Alert im Dashboard, `?volume=` in der URL wirkt als Faktor, `?sound=0` schaltet stumm. Ablage: `data/alert-sounds/<tenant>/<alert>/<id>.mp3`, Verzeichnis in `settings['alert_sounds']`, Auslieferung nur über die Token-URL (`/s/<token>/alert-sounds/<alert>/<id>.mp3`). In OBS **Audio über OBS steuern** aktivieren. Streamer.bot braucht dann kein „Play Sound“ mehr. **Eingebauter Ton:** Der Follow-Alert hat einen Standard-Ton im Projekt (`assets/alert-sounds/follow.mp3`, „followalit“), der spielt, solange kein eigener hochgeladen ist; Lautstärke „Off“ schaltet ihn ab.
 
+### Alerts im Wartemodus (empfohlen)
+
+**Eine** Quelle für alle Alerts: `alerts/live.html` (1920×1080), in OBS **dauerhaft sichtbar**, im Leerlauf durchsichtig. Streamer.bot setzt keine URLs mehr und blendet nichts ein oder aus, es schickt nur das Ereignis per **Fetch URL**:
+
+`/s/<token>/api/fx/alert?cmd=follow&username=%user%` (`cmd`: `follow`, `sub`, `resub`, `giftsub`, `bits`, `raid`, `donation`, `welcome`; Parameter wie bei den einzelnen Alert-Seiten: `username`, `name`, `message`, `tier`, `amount`, `months`, `total`, `viewers`; Freitext wird bereinigt, `fx/commands.py`).
+
+- **Warteschlange:** Mehrere Ereignisse laufen nacheinander (höchstens 25, bei einer Flut fällt das älteste raus), keins überschreibt das vorige.
+- **Dauer und Ton je Alert im Dashboard** (Stream → Alert → *Sound & timing*): Dauer, „Play the whole sound“ oder „Fade out with the alert“, „Keep the alert on screen until the sound ends“ (Standard: ganzer Ton, Alert bleibt so lange stehen). Der Host wählt den Ton aus und kennt dessen Länge (`overlay_app/alert_sounds.py`, `window.__ALERT_CFG__`), zeigt den Alert (`alerts/<typ>.html`) in einem Rahmen und hält ihn offen, bis der Ton zu Ende ist. OBS schließt nichts mehr, also wird nichts abgeschnitten.
+- Dashboard-Änderungen erreicht eine laufende Quelle innerhalb von 20 s (`/s/<token>/alert-config.json`), ohne Neuladen.
+- `?demo=1` spielt alle 8 s einen Beispiel-Alert.
+
 ### Alerts mit Streamer.bot einrichten
 
 Die Alert-Dateien sind statisches HTML — sie brauchen **Streamer.bot** als Brücke zwischen Twitch-Events und OBS.

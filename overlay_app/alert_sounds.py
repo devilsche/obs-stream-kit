@@ -12,7 +12,7 @@ import secrets
 
 from overlay_app.overlay_catalog import ALERTS
 
-ALERT_KEYS = tuple(a["key"] for a in ALERTS)
+ALERT_KEYS = tuple(a["key"] for a in ALERTS if not a.get("host"))
 MAX_FILES = 3
 MAX_SECONDS = 20.0
 MAX_BYTES = 2 * 1024 * 1024
@@ -23,6 +23,10 @@ SETTING = "alert_sounds"
 DEFAULTS = {"follow": "followalit.mp3"}
 # Standard-Lautstärke, solange der Tenant nichts eingestellt hat (die Follower-Musik ist laut abgemischt)
 DEFAULT_VOLUMES = {"follow": 0.15}
+# Anzeige je Alert (Dashboard): Dauer in s, Ton ganz ausspielen (sonst mit dem Alert ausblenden),
+# Alert bleibt stehen, bis der Ton zu Ende ist.
+OPTIONS = {"duration": 6, "full": True, "stay": True}
+MIN_DURATION, MAX_DURATION = 2, 60
 _ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
 # ── MP3-Länge ohne Fremdbibliothek: alle Frames ablaufen (klappt für CBR und VBR) ──
@@ -104,6 +108,12 @@ def load(conn, tenant_id):
         except (TypeError, ValueError):
             vol = dv
         out[key] = {"volume": vol, "files": files[:MAX_FILES]}
+        try:
+            out[key]["duration"] = max(MIN_DURATION, min(MAX_DURATION, int(e.get("duration", OPTIONS["duration"]))))
+        except (TypeError, ValueError):
+            out[key]["duration"] = OPTIONS["duration"]
+        out[key]["full"] = bool(e.get("full", OPTIONS["full"]))
+        out[key]["stay"] = bool(e.get("stay", OPTIONS["stay"]))
     return out
 
 
@@ -175,6 +185,48 @@ def set_volume(conn, tenant_id, alert, volume):
     cfg[alert]["volume"] = max(0.0, min(1.0, float(volume)))
     _save(conn, tenant_id, cfg)
     return True
+
+
+def set_options(conn, tenant_id, alert, duration=None, full=None, stay=None):
+    if alert not in ALERT_KEYS:
+        return False
+    cfg = load(conn, tenant_id)
+    if duration is not None:
+        cfg[alert]["duration"] = max(MIN_DURATION, min(MAX_DURATION, int(duration)))
+    if full is not None:
+        cfg[alert]["full"] = bool(full)
+    if stay is not None:
+        cfg[alert]["stay"] = bool(stay)
+    _save(conn, tenant_id, cfg)
+    return True
+
+
+_default_dur = {}
+
+
+def default_duration(root, alert):
+    """Länge des eingebauten Tons (einmal gelesen)."""
+    if alert not in _default_dur:
+        try:
+            with open(os.path.join(root, "assets", "alert-sounds", alert + ".mp3"), "rb") as f:
+                _default_dur[alert] = mp3_duration(f.read())
+        except OSError:
+            _default_dur[alert] = None
+    return _default_dur[alert]
+
+
+def for_live(cfg, root, token):
+    """Alles, was alerts/live.html je Alert braucht (window.__ALERT_CFG__): Dauer, Ton-Modus, Töne mit Länge."""
+    out = {}
+    for key in ALERT_KEYS:
+        e = cfg.get(key) or {}
+        files = [{"id": f["id"], "dur": f.get("dur") or 0} for f in e.get("files", [])]
+        d = None
+        if not files and key in DEFAULTS:
+            d = {"src": "/s/%s/assets/alert-sounds/%s.mp3" % (token, key), "dur": default_duration(root, key) or 0}
+        out[key] = {"duration": e.get("duration", OPTIONS["duration"]), "full": e.get("full", True),
+                    "stay": e.get("stay", True), "volume": e.get("volume", DEFAULT_VOLUME), "files": files, "default": d}
+    return out
 
 
 def for_overlay(cfg, alert):
