@@ -403,9 +403,16 @@ def admin_prop_search():
         return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
 
 
+# Suchlisten der Auswahlseite: ?set=props (Kulissen) oder ?set=pubg (PUBG-Fahrzeuge und ihre echten Vorbilder)
+SEARCH_SETS = {
+    "props": {"files": "assets/track-props/search-*.json", "picks": None},
+    "pubg": {"files": "assets/cars/search-pubg.json", "picks": "data/pubg-vehicle-picks.json"},
+}
+
+
 @bp_admin.route("/admin/api/prop-search", methods=["GET", "POST"])
 def admin_prop_search_api():
-    """GET: Kandidaten (assets/track-props/search-*.json) + angehakte uids. POST {uid, on}: Haken setzen."""
+    """GET: Kandidaten der Suchliste + angehakte uids. POST {uid, on}: Haken setzen. ?set= wählt die Liste."""
     err, status = _admin_json_guard()
     if err:
         return err, status
@@ -413,19 +420,23 @@ def admin_prop_search_api():
     import json
     from fx import track_props
     root = _project_root()
+    cfg = SEARCH_SETS.get(request.args.get("set") or "props")
+    if cfg is None:
+        return jsonify({"ok": False, "error": "unknown set"}), 404
+    pick_path = os.path.join(root, cfg["picks"]) if cfg["picks"] else None
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
-        if not track_props.set_pick(root, body.get("uid"), bool(body.get("on"))):
+        if not track_props.set_pick(root, body.get("uid"), bool(body.get("on")), pick_path):
             return jsonify({"ok": False, "error": "invalid uid"}), 400
         return jsonify({"ok": True})
     items = []
-    for fn in sorted(glob.glob(os.path.join(root, "assets", "track-props", "search-*.json"))):
+    for fn in sorted(glob.glob(os.path.join(root, cfg["files"]))):
         try:
             with open(fn, encoding="utf-8") as f:
                 items += [x for x in json.load(f) if isinstance(x, dict)]
         except (OSError, ValueError):
             pass
-    return jsonify({"items": items, "picks": sorted(track_props.picks(root))})
+    return jsonify({"items": items, "picks": sorted(track_props.picks(root, pick_path))})
 
 
 @bp_admin.route("/admin/car-list")

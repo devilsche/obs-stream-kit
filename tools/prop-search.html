@@ -7,7 +7,9 @@
 <!-- Auswahlseite (Admin): Sketchfab-Treffer für neue Kulissen-Modelle (Berge, Felsen …) mit Vorschaubild, Urheber,
      Lizenz, Dreiecken und Link; Haken „Want“ merkt das Modell vor (data/track-props/picks.json). Danach baut Claude
      die angehakten mit scripts/build_track_props.py ein. Kandidaten: assets/track-props/search-*.json.
-     Daten: GET/POST /admin/api/prop-search (app/views_admin.py, fx/track_props.py). Route: /admin/prop-search. -->
+     Daten: GET/POST /admin/api/prop-search (app/views_admin.py, fx/track_props.py). Route: /admin/prop-search.
+     ?set=pubg: PUBG-Fahrzeuge und ihre echten Vorbilder (assets/cars/search-pubg.json, Merkliste data/pubg-vehicle-picks.json).
+     „3D“ lädt das Modell über /app/api/cars/preview/<uid>.glb (beim ersten Mal von Sketchfab, dann aus data/car-cache). -->
 <style>
   :root { --ps-bg: #0d0912; --ps-card: #1d1128; --ps-text: #fff; --ps-dim: #c9bdd6; --ps-accent: #f2b705; --ps-border: #5e2a79; --ps-nc: #ffcf6e; }
   html, body { margin: 0; background: var(--ps-bg); color: var(--ps-text); font: 15px/1.45 'DM Sans', system-ui, sans-serif; }
@@ -34,41 +36,75 @@
   a:focus-visible, input:focus-visible { outline: 3px solid var(--ps-accent); outline-offset: 2px; }
   .status { min-height: 22px; color: var(--ps-dim); }
   .status.err { color: #ff8a80; }
+  .tag { font-size: 12px; font-weight: 700; color: #ff8a80; }
+  .tag.real { color: #9be59b; }
+  .acts { display: flex; gap: 10px; align-items: center; }
+  button.v3d { background: #5e2a79; color: #fff; border: 1px solid #8a4dad; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; min-height: 28px; }
+  button.v3d:focus-visible, dialog button:focus-visible { outline: 3px solid var(--ps-accent); outline-offset: 2px; }
+  dialog { width: min(1100px, 96vw); height: min(780px, 90vh); padding: 0; border: 2px solid var(--ps-border); border-radius: 12px; background: #0f141e; color: var(--ps-text); }
+  dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+  .dlg { display: grid; grid-template-rows: auto 1fr; height: 100%; }
+  .dlg-head { display: flex; gap: 10px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--ps-border); }
+  .dlg-head h2 { margin: 0; flex: 1; color: var(--ps-text); text-transform: none; letter-spacing: 0; font-size: 16px; }
+  .dlg-head button { background: #5e2a79; color: #fff; border: 1px solid #8a4dad; border-radius: 6px; padding: 6px 12px; font: inherit; cursor: pointer; }
+  #big { width: 100%; height: 100%; display: block; }
 </style>
 </head>
 <body>
 <a class="skip" href="#groups">Skip to the models</a>
 <main>
-  <h1>Prop search</h1>
-  <p>Free Sketchfab models found for the track scenery. Tick <strong>Want</strong> for the ones worth trying – they get built in
+  <h1 id="title">Prop search</h1>
+  <p id="lead">Free Sketchfab models found for the track scenery. Tick <strong>Want</strong> for the ones worth trying – they get built in
     and placed afterwards. Open “3D view” to look at a model on Sketchfab.</p>
   <div class="bar"><span><span class="count" id="nOn">0</span> picked</span></div>
   <p class="status" id="status" role="status" aria-live="polite">Loading…</p>
   <div id="groups"></div>
 </main>
+<dialog id="dlg" aria-labelledby="dlgTitle">
+  <div class="dlg">
+    <div class="dlg-head"><h2 id="dlgTitle">Model</h2><span class="meta" id="dlgInfo" aria-live="polite"></span>
+      <button type="button" id="dlgClose">Close</button></div>
+    <canvas id="big" aria-label="3D model; drag to rotate, scroll to zoom"></canvas>
+  </div>
+</dialog>
+<script src="/drive/a/js/vendor/three-r128.min.js"></script>
+<script src="/drive/a/js/vendor/three-r128-GLTFLoader.js"></script>
+<script src="/drive/a/js/vendor/three-r128-OrbitControls.js"></script>
+<script src="/drive/a/js/vendor/three-r128-RoomEnvironment.js"></script>
 <script>
 (function () {
   'use strict';
-  var API = '/admin/api/prop-search', TITLES = { mountain: 'Mountains', rock: 'Rocks and cliffs', shrub: 'Shrubs and bushes', fern: 'Ferns and foliage', flower: 'Flowers, mushrooms and small things' };
+  var SET = new URLSearchParams(location.search).get('set') === 'pubg' ? 'pubg' : 'props';
+  var API = '/admin/api/prop-search?set=' + SET, TITLES = { mountain: 'Mountains', rock: 'Rocks and cliffs', shrub: 'Shrubs and bushes', fern: 'Ferns and foliage', flower: 'Flowers, mushrooms and small things' };
   var groups = document.getElementById('groups'), statusEl = document.getElementById('status'), picks = {};
   function setStatus(t, err) { statusEl.textContent = t; statusEl.classList.toggle('err', !!err); }
   function count() { document.getElementById('nOn').textContent = Object.keys(picks).filter(function (k) { return picks[k]; }).length; }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  if (SET === 'pubg') {
+    document.title = 'PUBG vehicle search';
+    document.getElementById('title').textContent = 'PUBG vehicle search';
+    document.getElementById('lead').textContent = 'Free Sketchfab models for every PUBG vehicle: fan-made PUBG versions (red tag) and models of the real car each one is based on (green tag). ' +
+      'Click “3D” to load the model here, tick Want for the ones worth using. Models marked as PUBG versions are usually ripped from the game, so their CC licence is doubtful; the real cars are safe.';
+  }
   fetch(API, { credentials: 'same-origin' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
     (d.picks || []).forEach(function (u) { picks[u] = true; });
     var lists = {};
     (d.items || []).forEach(function (it) {
       var g = it.group || 'other';
-      if (!lists[g]) { groups.appendChild(el('h2', null, TITLES[g] || g)); lists[g] = groups.appendChild(el('ul')); }
+      if (!lists[g]) { groups.appendChild(el('h2', null, it.groupTitle || TITLES[g] || g)); lists[g] = groups.appendChild(el('ul')); }
       var li = el('li'); if (picks[it.uid]) li.classList.add('on');
       var img = el('img'); img.src = it.thumb; img.alt = 'Preview of ' + it.name; img.loading = 'lazy'; li.appendChild(img);
       var b = el('div', 'body');
       b.appendChild(el('span', 'name', it.name));
+      if (SET === 'pubg') b.appendChild(el('span', 'tag' + (it.rip ? '' : ' real'), it.rip ? 'PUBG version' : 'Real car / generic'));
       var nc = /NonCommercial|NoDeriv/.test(it.license || '');
       b.appendChild(el('span', 'meta', it.author + ' · ' + Math.round((it.tris || 0) / 1000) + 'k triangles'));
       b.appendChild(el('span', 'meta' + (nc ? ' nc' : ''), it.license + (nc ? ' (restricted)' : '')));
       var row = el('div', 'row');
-      var a = el('a', null, '3D view'); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; row.appendChild(a);
+      var acts = el('span', 'acts');
+      var v = el('button', 'v3d', '3D'); v.type = 'button'; v.setAttribute('aria-label', 'Show ' + it.name + ' in 3D');
+      v.addEventListener('click', function () { openBig(it); }); acts.appendChild(v);
+      var a = el('a', null, 'Sketchfab'); a.href = it.url; a.target = '_blank'; a.rel = 'noopener'; acts.appendChild(a); row.appendChild(acts);
       var lab = el('label', 'want'), cb = el('input'); cb.type = 'checkbox'; cb.checked = !!picks[it.uid];
       cb.setAttribute('aria-label', 'Want ' + it.name);
       cb.addEventListener('change', function () {
@@ -83,6 +119,51 @@
     });
     count(); setStatus((d.items || []).length + ' models.');
   }).catch(function () { setStatus('Could not load (signed in as admin?).', true); });
+
+  // ── 3D-Ansicht: Modell über den Server (Sketchfab-Download, danach Cache) ──
+  var big = null, sc, cam, ctl, obj = null, raf = 0, dlg = document.getElementById('dlg');
+  function dispose(o) {
+    o.traverse(function (m) {
+      if (m.geometry) m.geometry.dispose();
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(function (mt) {
+        if (!mt) return; Object.keys(mt).forEach(function (k) { if (mt[k] && mt[k].isTexture) mt[k].dispose(); }); mt.dispose();
+      });
+    });
+  }
+  function openBig(it) {
+    var info = document.getElementById('dlgInfo');
+    document.getElementById('dlgTitle').textContent = it.name; info.textContent = 'Downloading from Sketchfab …';
+    dlg.showModal();
+    if (!big) {
+      big = new THREE.WebGLRenderer({ canvas: document.getElementById('big'), antialias: true });
+      big.outputEncoding = THREE.sRGBEncoding; big.toneMapping = THREE.ACESFilmicToneMapping; big.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      sc = new THREE.Scene(); sc.background = new THREE.Color(0x0f141e);
+      if (THREE.RoomEnvironment) sc.environment = new THREE.PMREMGenerator(big).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+      sc.add(new THREE.HemisphereLight(0xffffff, 0x445566, 0.6));
+      var d = new THREE.DirectionalLight(0xffffff, 1.2); d.position.set(3, 5, 4); sc.add(d);
+      cam = new THREE.PerspectiveCamera(35, 1, 0.01, 5000); ctl = new THREE.OrbitControls(cam, big.domElement); ctl.enableDamping = true;
+    }
+    if (obj) { sc.remove(obj); dispose(obj); obj = null; }
+    new THREE.GLTFLoader().load('/app/api/cars/preview/' + it.uid + '.glb', function (g) {
+      if (!dlg.open) { dispose(g.scene); return; }
+      obj = g.scene; sc.add(obj);
+      var box = new THREE.Box3().setFromObject(obj), size = box.getSize(new THREE.Vector3()), c = box.getCenter(new THREE.Vector3());
+      obj.position.sub(c);
+      var r = Math.max(size.x, size.y, size.z) || 1;
+      cam.near = r / 100; cam.far = r * 50; cam.position.set(r * 1.5, r * 0.6, r * 1.6); cam.updateProjectionMatrix();
+      ctl.target.set(0, 0, 0); ctl.update();
+      info.textContent = Math.round((it.tris || 0) / 1000) + 'k triangles · ' + it.license + ' · by ' + it.author;
+    }, null, function () { info.textContent = 'Could not load (Sketchfab refused the download or it is too big).'; });
+    cancelAnimationFrame(raf);
+    (function loop() {
+      if (!dlg.open) return;
+      var c = big.domElement, w = c.clientWidth, h = c.clientHeight;
+      if (c.width !== Math.round(w * big.getPixelRatio()) || c.height !== Math.round(h * big.getPixelRatio())) { big.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+      ctl.update(); big.render(sc, cam); raf = requestAnimationFrame(loop);
+    })();
+  }
+  document.getElementById('dlgClose').addEventListener('click', function () { dlg.close(); });
+  dlg.addEventListener('close', function () { if (obj) { sc.remove(obj); dispose(obj); obj = null; } });
 })();
 </script>
 </body>

@@ -53,10 +53,11 @@ def set_off(root, key, off):
     return True
 
 
-def picks(root):
-    """Im Admin angehakte Such-Kandidaten (tools/prop-search.html, data/track-props/picks.json) als Menge von uids."""
+def picks(root, path=None):
+    """Im Admin angehakte Such-Kandidaten (tools/prop-search.html, data/track-props/picks.json) als Menge von uids.
+    path: andere Merkliste (z. B. data/pubg-vehicle-picks.json für die Suche nach PUBG-Fahrzeugen)."""
     try:
-        with open(os.path.join(folder(root), "picks.json"), encoding="utf-8") as f:
+        with open(path or os.path.join(folder(root), "picks.json"), encoding="utf-8") as f:
             d = json.load(f)
     except (OSError, ValueError):
         return set()
@@ -64,18 +65,18 @@ def picks(root):
     return {u for u in p if isinstance(u, str)} if isinstance(p, list) else set()
 
 
-def set_pick(root, uid, on):
+def set_pick(root, uid, on, path=None):
     """Such-Kandidat an-/abhaken. Nur gültige Sketchfab-uids (32 Hex) → True."""
     if not isinstance(uid, str) or not re.match(r"^[0-9a-f]{32}$", uid):
         return False
     with _lock:
-        cur = picks(root)
+        cur = picks(root, path)
         if on:
             cur.add(uid)
         else:
             cur.discard(uid)
-        os.makedirs(folder(root), exist_ok=True)
-        p = os.path.join(folder(root), "picks.json")
+        p = path or os.path.join(folder(root), "picks.json")
+        os.makedirs(os.path.dirname(p), exist_ok=True)
         with open(p + ".tmp", "w", encoding="utf-8") as f:
             json.dump({"picks": sorted(cur)}, f, indent=1)
         os.replace(p + ".tmp", p)
