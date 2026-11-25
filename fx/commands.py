@@ -200,6 +200,13 @@ EFFECTS = {
                      "size": _float_range(0.2, 3), "count": _int_range(1, 12), "name": _name},
         },
     },
+    "swirl": {
+        "commands": ("play",),
+        "settings": {},
+        "args": {
+            "play": {"preset": _choice("follow"), "duration": _float_range(2, 15)},
+        },
+    },
     "weather": {
         "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset",
                      "scrape", "warm", "frostclear", "frostreset", "leaders",

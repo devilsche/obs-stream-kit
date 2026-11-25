@@ -196,3 +196,9 @@ def test_burst_fire_args():
     assert out == {"cmd": "fire", "params": {"kind": "comic", "at": "0.250,1.000", "size": 3.0, "count": 12, "name": "Hat3 b"}}
     assert commands.parse("burst", {"cmd": "fire", "kind": "nuke", "at": "x"}) == {"cmd": "fire", "params": {}}
     assert commands.parse("burst", {"cmd": "fire", "at": "TopLeft"})["params"] == {"at": "topleft"}
+
+
+def test_swirl_play_args():
+    out = commands.parse("swirl", {"cmd": "play", "preset": "Follow", "duration": "99"})
+    assert out == {"cmd": "play", "params": {"preset": "follow", "duration": 15.0}}
+    assert commands.parse("swirl", {"cmd": "play", "preset": "raid", "duration": "x"}) == {"cmd": "play", "params": {}}
