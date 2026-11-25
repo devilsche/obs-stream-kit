@@ -644,7 +644,7 @@ G1R_STEAM_NAME=</code></pre>
       <div class="url-dbox url-soundbox" id="urlSoundBox" data-alert="${escapeAttr(alertKey)}">
         <h2>Sound <span class="url-dbox__tag">plays with the alert</span></h2>
         <p class="url-dbox__desc">Upload up to 3 short MP3 files. Each alert plays one of them at random (never the same one twice in a row) and fades it out when the alert disappears. In OBS enable <b>Control audio via OBS</b> for this source.</p>
-        <div class="url-sound__list" id="urlSoundList"><p class="url-dbox__desc">Loading…</p></div>
+        <div class="url-sound__list" id="urlSoundList"><p class="url-sound__note">Loading…</p></div>
         <div class="url-sound__row">
           <label class="url-sound__lbl" for="urlSoundVol">Volume</label>
           <select id="urlSoundVol" class="url-sound__sel">
@@ -760,12 +760,12 @@ G1R_STEAM_NAME=</code></pre>
           <span class="url-sound__name">Built-in: ${escapeHtml(data.defaults[alert])}</span>
           <span class="url-sound__dur">until you add your own</span>
           <button type="button" class="url-act ghost" data-play="__default" aria-label="Play built-in sound"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
-        </li></ul>` : `<p class="url-dbox__desc">No sound yet — the alert stays silent.</p>`);
+        </li></ul>` : `<p class="url-sound__note">No sound yet — the alert stays silent.</p>`);
     }
     function reload() {
       return fetch("/app/api/alert-sounds", { credentials: "same-origin" })
         .then(r => r.ok ? r.json() : Promise.reject(r.status)).then(render)
-        .catch(() => { list.innerHTML = `<p class="url-dbox__desc">Could not load the sounds.</p>`; });
+        .catch(() => { list.innerHTML = `<p class="url-sound__note">Could not load the sounds.</p>`; });
     }
     list.addEventListener("click", e => {
       const p = e.target.closest("[data-play]"), d = e.target.closest("[data-del]");
