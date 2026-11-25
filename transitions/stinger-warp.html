@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920, height=1080" />
+  <title>Stinger Warp</title>
+  <!-- WebGL-Stinger „Warp“: Ein Lichtwirbel (Sternstreifen + Plasma in Theme-Farben) wächst von der Mitte über das Bild,
+       der Name schlägt mit Farbversatz ein, nach dem Schnitt reißt ein Loch von der Mitte auf und gibt die neue Szene frei.
+       Ein Shader, keine Bibliothek. URL: dur (ms, Standard 2000), cut (ms, Standard 900) = OBS „Duration“ / „Transition Point“,
+       name, font. Bis cut × 0,85 ist das Bild voll abgedeckt. -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Russo+One&family=Black+Ops+One&family=Audiowide&family=Teko:wght@700&family=Saira+Stencil+One&family=Wallpoet&family=Bungee&family=Chakra+Petch:wght@700&family=Oxanium:wght@800&family=Rajdhani:wght@700&family=Syncopate:wght@700&family=Metamorphous&family=MedievalSharp&family=Cinzel+Decorative:wght@700;900&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; }
+    #gl { position: absolute; inset: 0; width: 1920px; height: 1080px; display: block; }
+    #fallback { position: absolute; inset: 0; opacity: 0; background: var(--theme-bg, #08040f); }
+    .stinger-no-gl #fallback { animation: st-cover 2s linear forwards; }
+    @keyframes st-cover { 0% { opacity: 0; } 35%, 55% { opacity: 1; } 100% { opacity: 0; } }
+  </style>
+</head>
+<body>
+  <canvas id="gl" width="1920" height="1080" aria-hidden="true"></canvas>
+  <div id="fallback" aria-hidden="true"></div>
+  <script src="../js/stinger-gl.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var cv = document.getElementById('gl');
+      var gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true, antialias: false });
+      if (!gl) { S.fallback(); return; }
+
+      var VS = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
+      var FS = [
+        'precision highp float;',
+        'uniform vec2 uRes; uniform float uT, uCut, uDur, uCalm, uHasText;',
+        'uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+        'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+        'float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);',
+        '  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }',
+        'float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ s += a*n(p); p *= 2.03; a *= 0.5; } return s; }',
+        'vec3 txt(vec2 uv){ return texture2D(uTex, uv).rgb; }',
+        'void main(){',
+        '  vec2 fc = gl_FragCoord.xy, uv = fc / uRes;',
+        '  vec2 p = (fc - 0.5*uRes) / uRes.y;',
+        '  float r = length(p), a = atan(p.y, p.x);',
+        '  float R = length(vec2(0.5*uRes.x/uRes.y, 0.5)) + 0.12;',
+        // Rein: Abdeckung wächst bis cut*0.85 über die Ecken hinaus (beschleunigt), Raus: Loch ab cut
+        '  float tin = clamp(uT / (uCut*0.85), 0.0, 1.0);',
+        '  float tout = clamp((uT - uCut) / max(0.2, uDur - uCut - 0.04), 0.0, 1.0);',
+        '  vec2 ang = vec2(cos(a), sin(a));',
+        '  float edge = (fbm(ang*2.2 + vec2(uT*3.0, 0.0)) - 0.5) * 0.10;',
+        '  float cover = tin*tin*(3.0-2.0*tin) * (R + 0.08) + edge*(1.0-tin);',
+        '  float hole = (1.0 - pow(1.0 - tout, 3.0)) * (R + 0.2) + edge*tout - 0.02;',
+        '  float mIn = 1.0 - smoothstep(cover - 0.012, cover, r);',
+        '  float mOut = uT > uCut ? smoothstep(hole - 0.012, hole, r) : 1.0;',
+        '  float m = mIn * mOut;',
+        // Warp-Tunnel: Tiefe 1/r, Sternstreifen in Winkel-Spalten, Plasma-Drall
+        '  float z = 0.35 / max(r, 0.02);',
+        '  float spd = mix(9.0, 2.5, uCalm) * (1.0 + 2.5*tout);',
+        '  float col = floor((a / 6.2831853 + 0.5) * 240.0);',
+        '  float st = fract(z*0.6 - uT*spd*0.35 + h(vec2(col, 1.0)));',
+        '  float streak = smoothstep(0.86, 1.0, st) * step(0.55, h(vec2(col, 7.0))) * smoothstep(0.05, 0.35, r);',
+        '  vec2 sw = vec2(cos(a + z*0.35 + uT*0.8), sin(a + z*0.35 + uT*0.8));',
+        '  float pl = fbm(sw*1.4 + vec2(z*0.9 - uT*spd*0.25, z*0.4));',
+        '  vec3 c = mix(uBg, uP, smoothstep(0.25, 0.75, pl));',
+        '  c = mix(c, uA2, smoothstep(0.62, 0.95, pl) * 0.65);',
+        '  c += uA * streak * 1.2;',
+        '  c += mix(uA, vec3(1.0), 0.5) * exp(-r*5.0) * 0.9;',
+        '  c *= 0.75 + 0.25*smoothstep(1.1, 0.2, r);',
+        // Name: schlägt ab cut-0.42 ein (Skalierungs-Punch + Farbversatz), fliegt beim Aufreißen nach vorne weg
+        '  float ti = uT - (uCut - 0.42);',
+        '  float tA = smoothstep(0.0, 0.12, ti) * (1.0 - smoothstep(0.08, 0.38, uT - uCut));',
+        '  float sc = 1.0 + 0.55*exp(-max(ti, 0.0)*9.0) + 0.9*smoothstep(0.0, 0.5, uT - uCut);',
+        '  float ab = (0.012*exp(-max(ti, 0.0)*7.0) + 0.006*smoothstep(0.0, 0.3, uT - uCut)) * (1.0 - uCalm);',
+        '  vec2 tp = (fc - 0.5*uRes) / vec2(1500.0, 375.0) / sc; tp.y = -tp.y; tp += 0.5;',
+        '  if (uHasText > 0.5 && tA > 0.0 && tp.x > 0.0 && tp.x < 1.0 && tp.y > 0.0 && tp.y < 1.0) {',
+        '    float tr = txt(tp + vec2(ab, 0.0)).r, tg = txt(tp).r, tb = txt(tp - vec2(ab, 0.0)).r, gw = txt(tp).g;',
+        '    c += uA * gw * 0.9 * tA;',
+        '    vec3 fill = mix(vec3(1.0), uA, 0.28);',
+        '    c = c * (1.0 - max(max(tr, tg), tb) * tA) + fill * vec3(tr, tg, tb) * tA;',
+        '  }',
+        // leuchtende Ränder an der wachsenden Abdeckung und am aufreißenden Loch (Licht auch außerhalb)
+        '  float rimIn = exp(-abs(r - cover) * 70.0) * (1.0 - tin*tin) * step(0.001, cover);',
+        '  float rimOut = uT > uCut ? exp(-abs(r - hole) * 55.0) * (1.0 - tout) : 0.0;',
+        '  float rim = clamp(rimIn + rimOut, 0.0, 1.0);',
+        '  vec3 rc = mix(uA, vec3(1.0), 0.45) * rim * (0.8 + 0.4*n(ang*9.0 + uT*10.0));',
+        '  float alpha = clamp(m + rim*0.9, 0.0, 1.0);',
+        '  gl_FragColor = vec4(c*m + rc, alpha);',
+        '}'
+      ].join('\n');
+
+      function sh(type, src) {
+        var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error('stinger-warp', gl.getShaderInfoLog(s)); return null; }
+        return s;
+      }
+      var vs = sh(gl.VERTEX_SHADER, VS), fs = sh(gl.FRAGMENT_SHADER, FS);
+      if (!vs || !fs) { S.fallback(); return; }
+      var pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr);
+      if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) { console.error('stinger-warp', gl.getProgramInfoLog(pr)); S.fallback(); return; }
+      gl.useProgram(pr);
+      var buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      var loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+      function U(n) { return gl.getUniformLocation(pr, n); }
+      gl.uniform2f(U('uRes'), cv.width, cv.height);
+      gl.uniform1f(U('uCut'), T.cut); gl.uniform1f(U('uDur'), T.dur);
+      gl.uniform1f(U('uCalm'), S.reduced() ? 1 : 0);
+      gl.uniform3fv(U('uP'), C.primary); gl.uniform3fv(U('uA'), C.accent);
+      gl.uniform3fv(U('uA2'), C.accent2); gl.uniform3fv(U('uBg'), C.bg);
+      gl.uniform1f(U('uHasText'), 0);
+      var tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.uniform1i(U('uTex'), 0);
+      if (S.name()) S.nameTexture(function (canvas) {
+        gl.bindTexture(gl.TEXTURE_2D, tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
+        gl.uniform1f(U('uHasText'), 1);
+      });
+      var uT = U('uT');
+      (function frame() {
+        var t = S.now();
+        gl.uniform1f(uT, t);
+        gl.drawArrays(gl.TRIANGLES, 0, 3);
+        if (t < T.dur + 0.1) requestAnimationFrame(frame);
+        else { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); }
+      })();
+    })();
+  </script>
+</body>
+</html>

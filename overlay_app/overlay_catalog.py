@@ -1078,6 +1078,38 @@ def _group_weather_switches():
 
 _group_weather_switches()
 
+_STINGER_FONTS = [
+    ["", "Auto"],
+    ["Orbitron", "Orbitron"],
+    ["Russo One", "Russo One"],
+    ["Black Ops One", "Black Ops One"],
+    ["Audiowide", "Audiowide"],
+    ["Teko", "Teko"],
+    ["Saira Stencil One", "Saira Stencil"],
+    ["Wallpoet", "Wallpoet"],
+    ["Bungee", "Bungee"],
+    ["Chakra Petch", "Chakra Petch"],
+    ["Oxanium", "Oxanium"],
+    ["Rajdhani", "Rajdhani"],
+    ["Syncopate", "Syncopate"],
+    ["Metamorphous", "Metamorphous"],
+    ["MedievalSharp", "MedievalSharp"],
+    ["Cinzel Decorative", "Cinzel Decorative"],
+]
+
+
+# WebGL-Stinger: Zeiten müssen zu Duration / Transition Point des OBS-Übergangs passen
+_GL_STINGER_SWITCHES = [
+    {"key": "name", "label": "Name", "type": "text", "default": "", "placeholder": "e.g. LUCKOR_HD",
+     "tooltip": "Twitch channel name (overrides server default)"},
+    {"key": "font", "label": "Font", "type": "select", "default": "", "options": _STINGER_FONTS},
+    {"key": "dur", "label": "Duration (ms)", "type": "number", "default": "2000", "min": 600,
+     "tooltip": "Same value as Duration in the OBS transition"},
+    {"key": "cut", "label": "Cut point (ms)", "type": "number", "default": "900", "min": 300,
+     "tooltip": "Same value as Transition Point in the OBS transition"},
+]
+
+
 TRANSITIONS = [
     {
         "key": "pet",
@@ -1113,26 +1145,29 @@ TRANSITIONS = [
             },
             {
                 "key": "font", "label": "Font", "type": "select", "default": "",
-                "options": [
-                    ["", "Auto"],
-                    ["Orbitron", "Orbitron"],
-                    ["Russo One", "Russo One"],
-                    ["Black Ops One", "Black Ops One"],
-                    ["Audiowide", "Audiowide"],
-                    ["Teko", "Teko"],
-                    ["Saira Stencil One", "Saira Stencil"],
-                    ["Wallpoet", "Wallpoet"],
-                    ["Bungee", "Bungee"],
-                    ["Chakra Petch", "Chakra Petch"],
-                    ["Oxanium", "Oxanium"],
-                    ["Rajdhani", "Rajdhani"],
-                    ["Syncopate", "Syncopate"],
-                    ["Metamorphous", "Metamorphous"],
-                    ["MedievalSharp", "MedievalSharp"],
-                    ["Cinzel Decorative", "Cinzel Decorative"],
-                ],
+                "options": _STINGER_FONTS,
             },
         ],
+    },
+    {
+        "key": "stinger-warp",
+        "label": "Stinger Warp",
+        "file": "stinger-warp.html",
+        "size": "1920×1080",
+        "desc": "WebGL stinger: a light vortex grows from the centre, your name punches in, then a hole tears open to the new scene.",
+        "params": [],
+        "chrome_preview": True,
+        "switches": _GL_STINGER_SWITCHES,
+    },
+    {
+        "key": "stinger-shards",
+        "label": "Stinger Shards",
+        "file": "stinger-shards.html",
+        "size": "1920×1080",
+        "desc": "WebGL stinger: glass shards fly in and form a wall with your name, crack and shatter towards the camera.",
+        "params": [],
+        "chrome_preview": True,
+        "switches": _GL_STINGER_SWITCHES,
     },
 ]
 

@@ -732,8 +732,12 @@ Die Verzögerung zwischen Blitz und Donner steckt schon in der WAV (Stille am An
 
 | Datei | Beschreibung | OBS-Setup |
 |-------|-------------|-----------|
-| `transitions/stinger.html` | Partikel/Geometrie (1s) | Browser Transition Plugin, Duration: 1000ms, Transition Point: 350ms |
+| `transitions/stinger.html` | Partikel/Geometrie mit Name (3 s) | Browser Transition Plugin, Duration: 3000ms, Transition Point: 2000ms |
+| `transitions/stinger-warp.html` | **WebGL-Entwurf „Warp“** (2 s): Ein Lichtwirbel aus Sternstreifen und Plasma in Theme-Farben wächst von der Mitte über das Bild, der Name schlägt mit Farbversatz ein, nach dem Schnitt reißt ein leuchtendes Loch auf und gibt die neue Szene frei. Ein Shader ohne Bibliothek. URL: `name`, `font` (wie beim Stinger), `dur` und `cut` in ms (Standard 2000 / 900, müssen zu OBS passen). Ab `cut` × 0,85 ist das Bild ganz abgedeckt. `at=1.2` hält die Zeit zum Prüfen an. | Browser Transition Plugin, Duration: 2000ms, Transition Point: 900ms |
+| `transitions/stinger-shards.html` | **WebGL-Entwurf „Shards“** (2 s): rund 290 Glassplitter fliegen aus der Tiefe heran und setzen sich von der Mitte aus zur Wand mit dem Namen zusammen, ein Lichtstreif läuft drüber, die Fugen reißen glühend auf, nach dem Schnitt zerspringt die Wand zur Kamera hin. three.js r128, ein Mesh, Bewegung im Vertex-Shader. Parameter wie Warp; alle Splitter liegen ab `cut` − 0,1 s. | Browser Transition Plugin, Duration: 2000ms, Transition Point: 900ms |
 | `transitions/pet.html` | Haustier-Stinger (4 s): Name, Spitzname, Schrift, Emojis über URL-Parameter. **Bild und Ton** lädt man im Dashboard auf der Karte hoch („Image & sound“: ein Bild PNG/JPG/WebP/GIF bis 6 MB, bis zu 3 MP3 bis 15 s, zufällig gespielt, Lautstärke × Settings → Sound). Der Server gibt sie der Seite als `window.__PET_MEDIA__` mit (`overlay_app/pet_media.py`, Ablage `data/pet-media/<tenant>/`, Verzeichnis `settings['pet_media']`); keine URL nötig, ein `img=` in alten OBS-URLs hat Vorrang. Der Ton startet mit dem Bild (0,3 s), die Seite blendet erst aus, wenn er zu Ende ist – die Move-Action-Dauer der OBS-Quelle muss so lang sein wie 0,3 s + Tonlänge + 0,5 s. | Browser-Source 1920×1080, Ton über OBS |
+
+> **WebGL-Stinger** (`js/stinger-gl.js`): Die Uhr läuft ab Skriptstart, nicht ab dem Laden der Schrift, damit die Abdeckung pünktlich zum Schnitt steht. Ohne WebGL deckt ein einfacher Fade in der Theme-Hintergrundfarbe ab. Bei „Bewegung reduzieren“ drehen sich die Splitter nicht und der Wirbel läuft langsamer.
 
 ---
 
