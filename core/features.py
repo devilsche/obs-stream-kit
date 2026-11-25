@@ -13,13 +13,14 @@ FEATURES = {
     "sushi-eater": "Eater duck in the sushi rain (needs ducks)",
     "bmw-driver": "Driver duck in the BMW rain (needs ducks)",
     "duck-vacuum": "Vacuum duck cleans up after every rain (needs ducks)",
+    "friend": "Friend (animated dog that roams the stream and reacts to alerts and chat)",
 }
 KEY = "features"
 
 # Sonderpunkte im Dashboard (Hauptpunkte Stream und Steam hat jeder): eigene goldene Reiter in dieser
 # Reihenfolge, ohne Freischaltung unsichtbar
-EXTRAS = ("pubg", "g1r", "race", "ducks", "weather")
-EXTRA_LABELS = {"pubg": "PUBG", "g1r": "Gothic 1", "race": "Race", "ducks": "Ducks", "weather": "Weather"}
+EXTRAS = ("pubg", "g1r", "race", "ducks", "weather", "friend")
+EXTRA_LABELS = {"pubg": "PUBG", "g1r": "Gothic 1", "race": "Race", "ducks": "Ducks", "weather": "Weather", "friend": "Friend"}
 # Werkzeuge dieser Sonderpunkte stehen zusätzlich als Karten in ihrem Reiter
 TOOL_CARD_EXTRAS = ("race", "ducks", "weather")
 
@@ -33,12 +34,14 @@ SOURCE_FEATURE = {
     **{f: "race" for f in ("car-race.html", "car-burnout.html", "item-rain.html")},
     **{f: "ducks" for f in ("knife-duck.html", "duck-greet.html", "duck-parade.html", "duck-assembly.html",
                             "duck-court.html")},
+    "friend.html": "friend",
 }
 
 # Erstes Pfadstück hinter /api/fx/ → nötige Freischaltung (Enten prüft fx/endpoints.py selbst)
 API_FEATURE = {
     **{k: "weather" for k in ("weather", "rain", "xmas", "autumn", "winter", "spring", "summer")},
     **{k: "race" for k in ("car-race", "car-drive", "cars", "track-props", "track-ads", "track-ads.json")},
+    "friend": "friend",
 }
 
 

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Friend</title>
+  <!-- Friend: animierter Hund (js/friend-dog.js) am unteren Bildrand, 1920×1080, durchsichtig, dauerhaft sichtbar.
+       Läuft von sich aus herum, sitzt, schläft; reagiert auf jeden Alert (der Server reicht Alert-Ereignisse automatisch
+       weiter), auf den Burnout und auf Befehle:
+         /s/<token>/api/fx/friend?cmd=react&event=follow|sub|resub|giftsub|bits|raid|donation|welcome|burnout|pet
+         /s/<token>/api/fx/friend?cmd=act&action=walk|run|stand|sit|lie|sleep|paw|roll|bark|wag|turn|come&face=1–12
+       URL: size (Höhe in px, Standard 170), fur (pinscher|red|dark|natural), body (pinscher|jack), area (full|left|right|center),
+       roam (1/0), sound (1/0, Standard 1), volume (0–1), on_<event>=happy|roll|zoomies|paw|bark|sit|pet|none, demo=1. -->
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
+    #friend { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="friend" width="1920" height="1080" aria-hidden="true"></canvas>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="../js/friend-dog.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var p = new URLSearchParams(location.search);
+      function num(k, d, lo, hi) { var v = parseFloat(p.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
+      var reactions = {};
+      FriendDog.REACTIONS.forEach(function (ev) { if (p.get('on_' + ev)) reactions[ev] = p.get('on_' + ev); });
+      var f = FriendDog.create({
+        canvas: document.getElementById('friend'), model: '../assets/friend/dog.glb',
+        sizePx: num('size', 170, 60, 500), fur: p.get('fur') || 'pinscher', body: p.get('body') || 'pinscher',
+        area: p.get('area') || 'full', roam: p.get('roam') !== '0', sound: p.get('sound') !== '0', volume: num('volume', 0.5, 0, 1),
+        reactions: reactions
+      });
+      f.ready.then(function () {
+        if (p.get('demo') === '1') {
+          var evs = ['follow', 'sub', 'raid', 'bits', 'welcome', 'pet'], i = 0;
+          setInterval(function () { f.react(evs[i++ % evs.length]); }, 14000);
+        }
+        // Befehle von Streamer.bot / Dashboard / Server (Alerts): nur über die Token-URL
+        var m = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+        if (!m) return;
+        var url = '/s/' + m[1] + '/api/fx/friend/poll', seq = null, epoch = null;
+        (function poll() {
+          var delay = 600;
+          fetch(url + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (d) {
+              if (epoch !== null && d.epoch !== epoch) { epoch = d.epoch; seq = 0; delay = 0; return; }   // Server neu gestartet
+              epoch = d.epoch;
+              if (seq !== null) (d.commands || []).forEach(function (c) {
+                var q = c.params || {};
+                if (c.cmd === 'react') f.react(q.event, q);
+                else if (c.cmd === 'act') f.act(q.action, q);
+              });
+              seq = d.seq;
+            })
+            .catch(function () { delay = 3000; })
+            .then(function () { setTimeout(poll, delay); });
+        })();
+      });
+    })();
+  </script>
+</body>
+</html>

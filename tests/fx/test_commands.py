@@ -209,3 +209,9 @@ def test_alert_args_text_and_numbers():
                                    "message": "danke\x07  dir", "viewers": "x"})
     assert out == {"cmd": "donation", "params": {"username": "Hat3 script", "amount": "5,00 €", "message": "danke dir"}}
     assert commands.parse("alert", {"cmd": "raid", "viewers": "42"})["params"] == {"viewers": 42}
+
+
+def test_friend_commands():
+    assert commands.parse("friend", {"cmd": "react", "event": "Raid"}) == {"cmd": "react", "params": {"event": "raid"}}
+    assert commands.parse("friend", {"cmd": "act", "action": "sit", "face": "30"}) == {"cmd": "act", "params": {"action": "sit", "face": 12.0}}
+    assert commands.parse("friend", {"cmd": "act", "action": "fly"}) == {"cmd": "act", "params": {}}

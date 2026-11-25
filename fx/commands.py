@@ -221,6 +221,19 @@ EFFECTS = {
                      "viewers": _int_range(1, 1000000)}
                  for c in ("follow", "sub", "resub", "giftsub", "bits", "raid", "donation", "welcome")},
     },
+    # Friend (animierter Hund, effects/friend.html): Reaktionen auf Ereignisse und direkte Befehle
+    "friend": {
+        "commands": ("react", "act"),
+        "settings": {},
+        "args": {
+            "react": {"event": _choice("follow", "sub", "resub", "giftsub", "bits", "raid", "donation", "welcome",
+                                       "burnout", "pet"),
+                      "name": _name},
+            "act": {"action": _choice("walk", "run", "stand", "sit", "lie", "paw", "roll", "bark", "wag", "turn", "come",
+                                      "sleep"),
+                    "face": _float_range(1, 12)},
+        },
+    },
     "swirl": {
         "commands": ("play",),
         "settings": {},

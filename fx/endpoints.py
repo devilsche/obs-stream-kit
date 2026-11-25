@@ -311,6 +311,9 @@ def push(token, effect):
     out = _dispatch(effect, cmd)
     if out.get("duplicate"):
         return _no_store(jsonify(out))
+    if effect == "alert" and "friend" in _feats():
+        # Der Friend reagiert auf jeden Alert, ohne eigenen Streamer.bot-Aufruf
+        commands.push(g.tenant_id, "friend", {"cmd": "react", "params": {"event": cmd["cmd"]}})
     if effect == "weather" and cmd["cmd"] == "build" and before is not None:
         try:
             after = _with_conn(lambda conn: _project_stage(conn, g.tenant_id))

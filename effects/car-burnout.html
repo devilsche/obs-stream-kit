@@ -31,6 +31,8 @@
     (function () {
       'use strict';
       var params = new URLSearchParams(location.search);
+      // Friend: steht auf, schaut zum Auto und bellt es an (nur über die Token-URL; ohne Freischaltung egal)
+      if (/^\/s\/[A-Za-z0-9_]+\//.test(location.pathname)) fetch('../api/fx/friend?cmd=react&event=burnout', { cache: 'no-store' }).catch(function () {});
       CarBurnout.start({
         canvas: document.getElementById('gl'),
         model: params.get('model') || 'mix',

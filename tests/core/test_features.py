@@ -44,7 +44,7 @@ def test_other_tenant_only_what_admin_enabled():
 
 
 def test_extras_map_sources_and_api():
-    assert features.EXTRAS == ("pubg", "g1r", "race", "ducks", "weather")
+    assert features.EXTRAS == ("pubg", "g1r", "race", "ducks", "weather", "friend")
     assert features.DEFAULT_ON == ("pubg",)
     assert features.source_feature("winter.html") == "weather"
     assert features.source_feature("item-rain.html") == "race"
@@ -56,6 +56,7 @@ def test_extras_map_sources_and_api():
     assert features.api_feature("cars/model/x.glb") == "race"
     assert features.api_feature("track-ads.json") == "race"
     assert features.api_feature("ducks/parade") is None
+    assert features.source_feature("friend.html") == "friend" and features.api_feature("friend/poll") == "friend"
 
 
 def test_effective_cached_remembers_ten_seconds():

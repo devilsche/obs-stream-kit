@@ -207,7 +207,7 @@ _WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["dr
 
 # Dashboard-Domain je Effect (Tab in /app/urls, ?d=…): "domain" in EFFECT_META, sonst die Freischaltung
 # aus core/features.py (SOURCE_FEATURE: Weather/Race/Ducks), sonst "stream". Gültige Werte: EFFECT_DOMAINS.
-EFFECT_DOMAINS = ("stream", "weather", "race", "ducks")
+EFFECT_DOMAINS = ("stream", "weather", "race", "ducks", "friend")
 DEFAULT_EFFECT_DOMAIN = "stream"
 
 EFFECT_META = {
@@ -266,6 +266,51 @@ EFFECT_META = {
         {"q": "cmd=play&preset=follow", "label": "Follow swirl (fire together with the follow alert)"},
         {"q": "cmd=play&preset=follow&duration=8", "label": "Follow swirl, 8 seconds"},
         {"q": "cmd=play&preset=follow&flare=0", "label": "Follow swirl without lens flare"},
+    ]},
+    # Friend: animierter Hund (js/friend-dog.js), reagiert auf Alerts (Server reicht sie weiter), Burnout und Chat
+    "friend.html": {"domain": "friend", "preview_query": "demo=1", "switches": [
+        {"key": "size", "label": "Size", "type": "select", "default": "170", "group": "Look",
+         "options": [["120", "Small"], ["170", "Medium"], ["230", "Large"], ["300", "Huge"]], "tooltip": "Height of the dog in pixels"},
+        {"key": "fur", "label": "Coat", "type": "select", "default": "pinscher", "group": "Look",
+         "options": [["pinscher", "Black & tan"], ["red", "Red-brown"], ["dark", "Dark brown"], ["natural", "Shiba (original)"]]},
+        {"key": "body", "label": "Build", "type": "select", "default": "pinscher", "group": "Look",
+         "options": [["pinscher", "Slim pinscher"], ["jack", "Big Jack Russell"]]},
+        {"key": "area", "label": "Where it roams", "type": "select", "default": "full", "group": "Behaviour",
+         "options": [["full", "Whole width"], ["left", "Left side"], ["right", "Right side"], ["center", "Middle"]]},
+        {"key": "roam", "label": "Roams on its own", "type": "select", "default": "1", "group": "Behaviour",
+         "options": [["1", "Yes (walks, sits, naps)"], ["0", "No (stays put)"]]},
+        {"key": "sound", "label": "Bark sound", "type": "select", "default": "1", "group": "Behaviour",
+         "options": [["1", "On"], ["0", "Off"]], "tooltip": "Volume follows Settings → Sound (memes & effects)"},
+        {"key": "on_follow", "label": "On follow", "type": "select", "default": "happy", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_sub", "label": "On sub", "type": "select", "default": "roll", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_resub", "label": "On resub", "type": "select", "default": "roll", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_giftsub", "label": "On gift sub", "type": "select", "default": "roll", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_raid", "label": "On raid", "type": "select", "default": "zoomies", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_bits", "label": "On bits", "type": "select", "default": "paw", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_donation", "label": "On donation", "type": "select", "default": "paw", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_welcome", "label": "On welcome (first chat)", "type": "select", "default": "paw", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+        {"key": "on_burnout", "label": "On !burnout", "type": "select", "default": "bark", "options": [["happy", "Happy (bark, zoom, sit)"], ["roll", "Roll over"], ["zoomies", "Zoomies across the screen"], ["paw", "Give paw"], ["bark", "Bark"], ["sit", "Sit"], ["pet", "Sit and wag"], ["none", "Nothing"]], "group": "Reactions"},
+    ],
+    "controls": [
+        {"q": "cmd=react&event=follow", "label": "Follow", "icon": "favorite", "group": "Test a reaction"},
+        {"q": "cmd=react&event=sub", "label": "Sub", "icon": "star", "group": "Test a reaction"},
+        {"q": "cmd=react&event=raid", "label": "Raid", "icon": "groups", "group": "Test a reaction"},
+        {"q": "cmd=react&event=bits", "label": "Bits", "icon": "diamond", "group": "Test a reaction"},
+        {"q": "cmd=react&event=burnout", "label": "Burnout", "icon": "local_fire_department", "group": "Test a reaction"},
+        {"q": "cmd=act&action=sit&face=6", "label": "Sit", "icon": "chair", "group": "Commands"},
+        {"q": "cmd=act&action=paw", "label": "Paw", "icon": "front_hand", "group": "Commands"},
+        {"q": "cmd=act&action=bark", "label": "Bark", "icon": "campaign", "group": "Commands"},
+        {"q": "cmd=act&action=come", "label": "Come here", "icon": "near_me", "group": "Commands"},
+        {"q": "cmd=act&action=run", "label": "Run", "icon": "directions_run", "group": "Commands"},
+        {"q": "cmd=act&action=sleep", "label": "Sleep", "icon": "bedtime", "group": "Commands"},
+    ],
+    "commands": [
+        {"q": "cmd=react&event=pet", "label": "!pet: sits and wags"},
+        {"q": "cmd=act&action=sit&face=6", "label": "!sitz: sits facing the viewers"},
+        {"q": "cmd=act&action=paw", "label": "!pfote: gives paw"},
+        {"q": "cmd=act&action=come", "label": "!komm: comes to the middle and sits"},
+        {"q": "cmd=act&action=bark", "label": "!bell: barks"},
+        {"q": "cmd=act&action=sit&face=7", "label": "Face direction as a clock: face=12 away, 3 right, 6 towards viewers, 9 left", "who": "mods"},
     ]},
     "duck-greet.html": {"domain": "ducks"},
     "duck-parade.html": {"domain": "ducks"},
