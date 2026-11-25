@@ -711,7 +711,7 @@
     // Ente oben drauf
     var DS = 0.85, d = RD.build({ outfit: E.outfit }); d.position.set(0.12, 0.46 + 0.55 * DS, 0); d.scale.setScalar(DS); g.add(d);
     // Kehrroboter-Modell („Autonomous Robot Sweeper“ von Zeps3D, Sketchfab, CC BY 4.0, assets/vacuum/sweeper.glb)
-    // ersetzt den Rundroboter, sobald geladen; Ente sitzt auf dem Dach wie im Mockup (tools/vacuum-mockup.html)
+    // ersetzt den Rundroboter, sobald geladen; Ente sitzt auf dem Dach
     if (THREE.GLTFLoader) new THREE.GLTFLoader().load('../assets/vacuum/sweeper.glb', function (gl) {
       var m = root.GlbFix ? root.GlbFix.prepare(gl.scene) : gl.scene, k = 1.2;
       var sw = new THREE.Group(), turn = new THREE.Group(); turn.add(m); turn.rotation.y = Math.PI / 2; sw.add(turn); sw.scale.setScalar(k);

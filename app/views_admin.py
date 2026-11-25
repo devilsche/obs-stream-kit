@@ -364,17 +364,6 @@ def admin_sketchfab_edit(entry_id):
     return redirect("/admin/sketchfab#e-" + entry_id)
 
 
-@bp_admin.route("/admin/grass-preview")
-@require_admin
-def admin_grass_preview():
-    """Vergleichsseite für Gras-Modelle (tools/grass-preview.html): Skripte und Modelle kommen über /drive/a/ (öffentlich)."""
-    src = os.path.join(_project_root(), "tools", "grass-preview.html")
-    if not os.path.exists(src):
-        abort(404)
-    with open(src, encoding="utf-8") as f:
-        return f.read(), 200, {"Content-Type": "text/html; charset=utf-8"}
-
-
 @bp_admin.route("/admin/tree-picker")
 @require_admin
 def admin_tree_picker():

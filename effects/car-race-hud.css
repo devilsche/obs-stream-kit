@@ -2,8 +2,7 @@
    Car Race – Rangliste (Zeitenturm) als HTML + CSS
    -----------------------------------------------------------------------------------------------------
    Diese Datei enthält NUR das Aussehen der Rangliste. js/car-race.js baut das Markup und setzt nur
-   Attribute (keine Inline-Styles). Zum Ausprobieren: tools/car-race-hud-preview.html im Browser öffnen,
-   hier ändern, neu laden.
+   Attribute (keine Inline-Styles).
 
    Markup (von js/car-race.js erzeugt):
      <ol class="race-rank" data-layout="stage|window" data-cols="1|2" data-count="n">

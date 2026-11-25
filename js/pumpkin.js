@@ -1,5 +1,5 @@
 /* Kürbis als Körper aus 10 Wülsten rund um die Stielachse, für das Herbst-
- * Thema und die Testseite tools/pumpkin-turn.html.
+ * Thema.
  *
  * Dreht er sich um die Achse (Winkel theta, 0 = Gesicht vorn), wandern die
  * Wülste: mittig breit und hell, zum Rand schmal und dunkler, hinten
