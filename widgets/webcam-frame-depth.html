@@ -92,7 +92,7 @@
       }
 
       // ── Uhr: Serverzeit (alle Ebenen gleich) ──
-      var clockOff = 0;
+      var clockOff = 0, bestRtt = 9, bestAt = 0;   // Uhrabgleich mit dem Server (alle Ebenen gleich)
       function now() { return isNaN(AT) ? Date.now() / 1000 + clockOff : AT; }
 
       // ── Komet: hinter dir (z < 0 → Ebene back), vor dir (z ≥ 0 → Ebene front) ──
@@ -266,11 +266,15 @@
         aura.position.set(CX, CY, -20); aura.scale.set((CW + 2 * FB) * 1.6, (CH + 2 * FB) * 1.9, 1); aura.material.uniforms.k.value = flash * 1.2;
         // Komet
         trail.forEach(function (m, i) {
-          var p = cometPos(t - i * 0.022), front = p.z >= 0, sc = (1 + p.z / 1600) * Math.max(H * 0.06, Math.min(90, Math.min(CW, CH) * 0.17)) * m.userData.s;
-          m.visible = front ? on('front') : on('back'); m.position.copy(p); m.scale.set(sc, sc, 1);
+          var p = cometPos(t - i * 0.022), sc = (1 + p.z / 1600) * Math.max(H * 0.06, Math.min(90, Math.min(CW, CH) * 0.17)) * m.userData.s;
+          // Wechsel hinten ↔ vorn weich über ein z-Band: weichen die Uhren zweier Ebenen minimal ab, überlappt der Komet
+          // kurz statt zu verschwinden
+          var band = CW * 0.12, wf = Math.min(1, Math.max(0, (p.z + band) / (2 * band)));
+          var wl = (LAYER === 'all') ? 1 : (LAYER === 'front' ? wf : (on('back') ? 1 - wf : 0));
+          m.visible = wl > 0.01; m.position.copy(p); m.scale.set(sc, sc, 1);
           // Rand-Fade: nie hart über die Bildkante
           var ef = Math.min(1, Math.max(0, (W / 2 - Math.abs(p.x) - sc * 0.2) / 90)) * Math.min(1, Math.max(0, (H / 2 - Math.abs(p.y) - sc * 0.2) / 90));
-          m.material.uniforms.k.value = m.userData.k * ef;
+          m.material.uniforms.k.value = m.userData.k * ef * wl;
         });
         // Emotes
         var showFront = on('front'), sp = 0;
@@ -312,11 +316,14 @@
       function poller(effect, handle) {
         var url = '/s/' + m[1] + '/api/fx/' + effect + '/poll', seq = null, epoch = null;
         (function poll() {
-          var delay = 1000;
+          var delay = 1000, sent = Date.now() / 1000;
           fetch(url + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
             .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
             .then(function (d) {
-              if (typeof d.now === 'number') clockOff = d.now - Date.now() / 1000;
+              if (typeof d.now === 'number') {
+                var got = Date.now() / 1000, rtt = got - sent;
+                if (rtt < bestRtt || got - bestAt > 60) { bestRtt = rtt; bestAt = got; clockOff = d.now - (sent + got) / 2; }
+              }
               if (epoch !== null && d.epoch !== epoch) { epoch = d.epoch; seq = 0; delay = 0; return; }
               epoch = d.epoch;
               if (seq !== null) (d.commands || []).forEach(handle);
