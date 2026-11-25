@@ -64,9 +64,10 @@
     var LABEL = {};
     var S = { resume: null, face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0,
               pose: null, poseW: 0, growlLeft: 0, growlNext: 0, growlT: 9, fly: null };
-    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1 };
+    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1 };
     // Zusatzhaltungen am Skelett (über dem Steh- bzw. Sitz-Clip), weich ein- und ausgeblendet
-    var POSES = { beg: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1 };
+    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1 };
+    var SIT_POSES = { beg: 1, hide: 1 };   // bauen auf der gemerkten Sitzhaltung auf
     var fxg = null;   // Gruppe für Wirbeln (Tornado) zwischen holder und Körper
     var FUR_KEY = opt.fur || 'pinscher', BODY_KEY = opt.body || 'pinscher';
 
@@ -309,7 +310,7 @@
       S.mode = m;
       if (POSES[m]) S.pose = m;
       if (m === 'walk' || m === 'run' || m === 'idle' || m === 'stance' || m === 'cower' || m === 'shakeoff' || m === 'flail') play('standing');
-      if (m === 'sit' || m === 'beg') play('sitting');
+      if (m === 'sit' || SIT_POSES[m]) play('sitting');
       if (m === 'shake') play('shake', { once: true });
       if (m === 'roll') play('rollover', { once: true });
       if (m === 'lie') play('play_dead', { once: true });
@@ -444,6 +445,8 @@
         lie: [{ do: 'mode', m: 'lie', face: face, dur: 20 }], sleep: [{ do: 'wag', v: 0, dur: 0 }, { do: 'mode', m: 'lie', face: face, dur: 40 }],
         paw: PRESETS.paw(), roll: PRESETS.roll(), bark: PRESETS.bark({ n: 3 }), wag: [{ do: 'wag', v: 1, dur: 4 }, { do: 'wag', v: 0.4, dur: 0 }],
         playdead: [{ do: 'face', hour: 6, dur: 0.5 }, { do: 'wag', v: 0, dur: 0 }, { do: 'mode', m: 'lie', dur: 8 }, { do: 'mode', m: 'idle', dur: 1 }, { do: 'wag', v: 0.4, dur: 0 }],
+        hide: [{ do: 'face', hour: face == null ? 6 : face, dur: 0.3 }, { do: 'mode', m: 'sit', face: face == null ? 6 : face, dur: 0.7 },
+          { do: 'mode', m: 'hide', face: face == null ? 6 : face, dur: 6 }, { do: 'mode', m: 'idle', dur: 0.6 }],
         beg: PRESETS.beg(face), growl: PRESETS.growl(face), shakeoff: PRESETS.shakeoff(face),
         turn: [{ do: 'goto', x: clamp(S.x - S.dir * 1.2), gait: 'walk' }],
         come: [{ do: 'goto', x: (area[0] + area[1]) / 2, gait: 'walk' }, { do: 'mode', m: 'sit', face: 6, dur: 6 }]
@@ -456,7 +459,9 @@
     function weather(kind) {
       var edge = S.x > 0 ? area[1] : area[0], seq = null;
       if (kind === 'rain' || kind === 'drizzle' || kind === 'storm' || kind === 'sleet') seq = [{ do: 'wait', dur: 2.5 }].concat(PRESETS.shakeoff(), [{ do: 'wait', dur: 4 }], PRESETS.shakeoff());
-      else if (kind === 'strike' || kind === 'megabolt' || kind === 'ballbolt') seq = [{ do: 'mode', m: 'cower', dur: 3 }, { do: 'mode', m: 'idle', dur: 0.8 }];
+      else if (kind === 'strike') seq = [{ do: 'mode', m: 'cower', dur: 2 }, { do: 'mode', m: 'idle', dur: 0.8 }];
+      else if (kind === 'megabolt' || kind === 'ballbolt') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'sit', face: 6, dur: 0.7 },
+        { do: 'mode', m: 'hide', face: 6, dur: 6 }, { do: 'mode', m: 'sit', face: 6, dur: 1 }, { do: 'mode', m: 'idle', dur: 0.6 }];
       else if (kind === 'hail') seq = [{ do: 'goto', x: edge, gait: 'run' }, { do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 5 }, { do: 'mode', m: 'idle', dur: 1 }];
       else if (kind === 'tornado') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 1.4 }, { do: 'fly', kind: 'tornado', dur: 3.6 },
         { do: 'mode', m: 'shakeoff', dur: 1.4 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'mode', m: 'idle', dur: 0.5 }];
@@ -517,7 +522,7 @@
         unSnout();   // Schnauzen-Versatz vom letzten Bild zurücknehmen (Knochen ohne Positionsspur würden sonst aufaddieren)
         // Haltungen im Stand (Kampfstellung, Ducken, Schütteln, Strampeln) wie das Laufen: alle Knochen aus der Grundstellung,
         // sonst addieren sich die Drehungen Bild für Bild auf (gemessen: Vorderbein nach 1 s senkrecht nach oben)
-        var standPose = POSES[S.mode] && S.mode !== 'beg' || (S.poseW > 0.01 && S.pose !== 'beg' && !CLIPS[S.mode]);
+        var standPose = POSES[S.mode] && !SIT_POSES[S.mode] || (S.poseW > 0.01 && !SIT_POSES[S.pose] && !CLIPS[S.mode]);
         var locomotion = (moving > 0.02 || standPose) && cur === actions.standing;
         if (locomotion) {
           for (var bi = 0; bi < BIND.length; bi++) { BIND[bi][0].quaternion.copy(BIND[bi][1]); BIND[bi][0].position.copy(BIND[bi][2]); }
@@ -532,7 +537,7 @@
           mixer.update(dt);
           // Männchen baut auf der Sitzhaltung auf; der Sitz-Clip ist ein Standbild (Länge 0) und wird nicht jedes Bild neu
           // geschrieben – deshalb die Sitzhaltung einmal merken und jedes Bild wiederherstellen (sonst addiert sich die Pose auf)
-          if (S.mode === 'beg' || (S.pose === 'beg' && S.poseW > 0.01)) {
+          if (SIT_POSES[S.mode] || (SIT_POSES[S.pose] && S.poseW > 0.01)) {
             if (!S.begSnap) S.begSnap = BIND.map(function (b) { return [b[0].quaternion.clone(), b[0].position.clone()]; });
             else for (var bs = 0; bs < BIND.length; bs++) { BIND[bs][0].quaternion.copy(S.begSnap[bs][0]); BIND[bs][0].position.copy(S.begSnap[bs][1]); }
           } else S.begSnap = null;
@@ -644,6 +649,11 @@
         turn(B.spine_1, LAT, -(0.2 + bob) * w); turn(B.spine_2, LAT, -0.14 * w); turn(B.chest, LAT, -0.1 * w);
         LEGS.forEach(function (l) { turn(l[0], LAT, -0.55 * w); turn(l[1], LAT, 1.2 * w); turn(l[2], LAT, 0.7 * w); });
         turn(B.neck_base, LAT, 0.3 * w); turn(B.head, LAT, 0.15 * w);
+      } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen
+        turn(B.spine_1, LAT, 0.4 * w); turn(B.spine_2, LAT, 0.25 * w); turn(B.chest, LAT, 0.15 * w);
+        LEGS.forEach(function (l) { turn(l[0], LAT, -1.7 * w); turn(l[1], LAT, 2.3 * w); turn(l[2], LAT, 1.1 * w); });
+        turn(B.neck_base, LAT, 0.6 * w); turn(B.head, LAT, 0.45 * w);
+        tailOver(-0.9 * w);
       } else if (name === 'stance') {   // Kampfstellung: vorne tief, Kopf gesenkt nach vorn, Rute steif hoch, knurrt
         var tr = Math.sin(t * 38) * 0.012 * w;
         turn(B.COG, LAT, 0.22 * w + tr); turn(B.chest, LAT, 0.06 * w);
@@ -660,7 +670,6 @@
         HIND.forEach(function (l) { turn(l[0], LAT, -0.5 * w); turn(l[1], LAT, 1.1 * w); turn(l[2], LAT, -0.9 * w); });
         turn(B.neck_base, LAT, 0.5 * w); turn(B.head, LAT, 0.25 * w);
         tailOver(-1.3 * w, 0);
-        turn(B.COG, FWD, Math.sin(t * 22) * 0.015 * w);   // zittert
       } else if (name === 'shakeoff') {   // Wasser abschütteln: Welle von Kopf bis Becken, schnell, klingt ab
         var k = Math.sin(t * 26) * w;
         turn(B.head, FWD, 0.55 * k); turn(B.neck_base, FWD, 0.35 * k); turn(B.chest, FWD, 0.25 * k);
