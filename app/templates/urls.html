@@ -48,6 +48,7 @@
       </div>
 
 
+      <script type="application/json" id="alertTypesData">{{ alerts|tojson }}</script>
       {# ── Ein Grid — alle Karten mit data-tab ── #}
       <div class="url-grid" id="urlGrid">
         {% if not pubg_ready %}<div class="url-credhint" data-tab="pubg" hidden><span class="material-symbols-outlined" aria-hidden="true">key_off</span> PUBG API key missing — add it under <a href="/app/settings">Settings</a> so the PUBG widgets show data. The URLs work either way but stay empty/offline.</div>{% endif %}
@@ -95,7 +96,7 @@ G1R_STEAM_NAME=</code></pre>
                     d.size,d.desc,d.switches or [],d.params or [],False,'','decor',
                     d.preview_size|default(None)) }}
         {% endfor %}
-        {% for a in alerts %}
+        {% for a in alerts if a.host %}
         {{ src_card('overlay','Alert',a.label,
                     base_url~'/s/'~token~'/alerts/'~a.file,'alerts/'~a.file,
                     a.size,a.desc,a.switches or [],a.params or [],False,'','stream',
@@ -639,39 +640,16 @@ G1R_STEAM_NAME=</code></pre>
 
         <span class="url-copied" id="urlCtlStatus" role="status" aria-live="polite"></span>
       </div>` : "";
-    // Alerts: eigene Töne (bis zu 3 MP3, zufällig abgespielt) – Inhalt lädt wireAlertSound()
-    const alertKey = card.dataset.cat === "Alert" && !/live\.html$/.test(card.dataset.path || "") ? (card.dataset.path || "").replace(/^alerts\//, "").replace(/\.html$/, "") : "";
-    const soundHtml = alertKey ? `
-      <div class="url-dbox url-soundbox" id="urlSoundBox" data-alert="${escapeAttr(alertKey)}">
-        <h2>Sound &amp; timing <span class="url-dbox__tag">plays with the alert</span></h2>
-        <p class="url-dbox__desc">Upload up to 3 short MP3 files. Each alert plays one of them at random (never the same one twice in a row) and fades it out when the alert disappears. In OBS enable <b>Control audio via OBS</b> for this source.</p>
-        <div class="url-sound__list" id="urlSoundList"><p class="url-sound__note">Loading…</p></div>
-        <div class="url-sound__row">
-          <label class="url-sound__lbl" for="urlSoundVol">Volume</label>
-          <select id="urlSoundVol" class="url-sound__sel">
-            ${[[0,"Off"],[0.1,"10%"],[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
-          </select>
-        </div>
-        <div class="url-sound__row">
-          <label class="url-sound__lbl" for="urlSoundFile">Add MP3</label>
-          <input type="file" id="urlSoundFile" class="url-sound__file" accept="audio/mpeg,.mp3" aria-describedby="urlSoundRules">
-        </div>
-        <p class="url-sound__rules" id="urlSoundRules"></p>
-        <div class="url-sound__row">
-          <label class="url-sound__lbl" for="urlSoundDur">Duration</label>
-          <select id="urlSoundDur" class="url-sound__sel">
-            ${[3,4,5,6,8,10,12,15,20,30].map(v => `<option value="${v}">${v} s</option>`).join("")}
-          </select>
-        </div>
-        <div class="url-sound__row">
-          <label class="url-sound__chk"><input type="checkbox" id="urlSoundStay"> If the sound is longer: keep the alert on screen until the sound ends</label>
-        </div>
-        <p class="url-sound__rules">Duration counts from the moment the alert appears. With the box ticked, a longer sound extends the alert to the sound's length; unticked, the sound fades out when the alert ends. Sound and animation always start together.</p>
-        <fieldset class="url-sound__extras" id="urlSoundExtras" hidden><legend class="url-sound__lbl">Show</legend><div id="urlSoundExtrasList" class="url-sound__row"></div></fieldset>
-        <p class="url-sound__rules">Applies to the preview, the single alert source and the live alert source (<code>alerts/live.html</code>). A running live source picks up changes within 20 seconds.</p>
-        <span class="url-copied" id="urlSoundStatus" role="status" aria-live="polite"></span>
+    // Alerts: EINE OBS-Quelle (alerts/live.html), Einstellungen je Alert als Reiter (wireAlertTabs)
+    const isLiveAlerts = /(^|\/)alerts\/live\.html$/.test(card.dataset.path || "");
+    const alertTabsHtml = isLiveAlerts ? `
+      <div class="url-dbox url-soundbox" id="urlSoundBox">
+        <h2>Alerts <span class="url-dbox__tag">settings per alert</span></h2>
+        <p class="url-dbox__desc"><b>Only this one source goes into OBS</b> (1920×1080, always visible). Streamer.bot just sends the event (see Chat commands); alerts play one after another, never overlapping. Memes run in their own sources and Streamer.bot queue, so they never hold up an alert. Pick an alert below to set its sound and timing, preview it, or send a test to your running OBS.</p>
+        <div class="url-atabs" role="tablist" aria-label="Alert type" id="urlAlertTabs"></div>
+        <div class="url-apanel" id="urlAlertPanel" role="tabpanel"></div>
       </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${soundHtml}${chromeHtml}`;
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${chromeHtml}`;
 
     const infoBits = [];
     const pw = parseInt(card.dataset.previewW || "0");
@@ -726,7 +704,7 @@ G1R_STEAM_NAME=</code></pre>
       ${commandsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-chat" role="tabpanel" aria-labelledby="dtab-chat" hidden>${commandsHtml}</div>` : ""}`;
     if (hasTabs) wireDetailTabs();
     wireThemeSections();
-    if (alertKey) wireAlertSound(alertKey, base);
+    if (isLiveAlerts) wireAlertTabs(base, card.dataset.fx || "");
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -741,6 +719,87 @@ G1R_STEAM_NAME=</code></pre>
     document.getElementById("urlBack").focus();
     window.scrollTo(0, 0);
     try { history.replaceState(null, "", "#src=" + encodeURIComponent(card.dataset.path)); } catch (_) {}
+  }
+
+  // ── Alerts als Reiter: je Alert Ton & Dauer, Vorschau, Test an die laufende OBS-Quelle ──
+  const ALERT_TYPES = (() => { try { return JSON.parse(document.getElementById("alertTypesData").textContent); } catch (_) { return []; } })();
+  const ALERT_SAMPLE = {
+    follow: "username=Hat3", sub: "username=Hat3&tier=1000", resub: "username=Hat3&months=12&tier=1000",
+    giftsub: "username=Hat3&amount=5&total=20&tier=1000", bits: "username=Hat3&amount=500&message=GG",
+    raid: "username=Hat3&viewers=42", donation: "username=Hat3&amount=" + encodeURIComponent("5,00 €") + "&message=Danke",
+    welcome: "name=Hat3"
+  };
+  function soundBoxInner() {
+    return `
+        <p class="url-dbox__desc">Upload up to 3 short MP3 files. Each alert plays one of them at random (never the same one twice in a row). In OBS enable <b>Control audio via OBS</b> for the alert source.</p>
+        <div class="url-sound__list" id="urlSoundList"><p class="url-sound__note">Loading…</p></div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundVol">Volume</label>
+          <select id="urlSoundVol" class="url-sound__sel">
+            ${[[0,"Off"],[0.1,"10%"],[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
+          </select>
+        </div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundFile">Add MP3</label>
+          <input type="file" id="urlSoundFile" class="url-sound__file" accept="audio/mpeg,.mp3" aria-describedby="urlSoundRules">
+        </div>
+        <p class="url-sound__rules" id="urlSoundRules"></p>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundDur">Duration</label>
+          <select id="urlSoundDur" class="url-sound__sel">
+            ${[3,4,5,6,8,10,12,15,20,30].map(v => `<option value="${v}">${v} s</option>`).join("")}
+          </select>
+        </div>
+        <div class="url-sound__row">
+          <label class="url-sound__chk"><input type="checkbox" id="urlSoundStay"> If the sound is longer: keep the alert on screen until the sound ends</label>
+        </div>
+        <p class="url-sound__rules">Duration counts from the moment the alert appears. With the box ticked, a longer sound extends the alert to the sound's length; unticked, the sound fades out when the alert ends. Sound and animation always start together.</p>
+        <fieldset class="url-sound__extras" id="urlSoundExtras" hidden><legend class="url-sound__lbl">Show</legend><div id="urlSoundExtrasList" class="url-sound__row"></div></fieldset>
+        <p class="url-sound__rules">Applies to the preview, the single alert source and the live alert source (<code>alerts/live.html</code>). A running live source picks up changes within 20 seconds.</p>
+        <span class="url-copied" id="urlSoundStatus" role="status" aria-live="polite"></span>
+`;
+  }
+  function wireAlertTabs(base, fx) {
+    const tabs = document.getElementById("urlAlertTabs"), panel = document.getElementById("urlAlertPanel");
+    if (!tabs || !panel) return;
+    const types = ALERT_TYPES.filter(a => !a.host);
+    tabs.innerHTML = types.map((a, i) => `<button type="button" role="tab" class="url-atab" id="atab-${escapeAttr(a.key)}"
+        aria-controls="urlAlertPanel" aria-selected="false" tabindex="-1" data-key="${escapeAttr(a.key)}">${escapeHtml(a.label)}</button>`).join("");
+    const btns = [...tabs.querySelectorAll(".url-atab")];
+    function show(key, focus) {
+      stopPreview();
+      btns.forEach(b => { const on = b.dataset.key === key; b.setAttribute("aria-selected", on ? "true" : "false"); b.tabIndex = on ? 0 : -1; if (on && focus) b.focus(); });
+      panel.setAttribute("aria-labelledby", "atab-" + key);
+      const a = types.find(x => x.key === key) || {};
+      const prev = base.replace(/live\.html$/, encodeURIComponent(a.file || key + ".html")) + "?" + (ALERT_SAMPLE[key] || "");
+      panel.innerHTML = `
+        <div class="url-sound__row url-atest">
+          <a class="url-act ghost" href="${escapeAttr(prev)}" target="_blank" rel="noopener"><span class="material-symbols-outlined" aria-hidden="true">visibility</span>Preview ${escapeHtml(a.label || key)}</a>
+          ${fx ? `<button type="button" class="url-act" id="urlAlertTest"><span class="material-symbols-outlined" aria-hidden="true">send</span>Send test to OBS</button>` : ""}
+          <span class="url-copied" id="urlAlertTestStatus" role="status" aria-live="polite"></span>
+        </div>` + soundBoxInner();
+      const tb = document.getElementById("urlAlertTest");
+      if (tb) tb.addEventListener("click", () => {
+        const st = document.getElementById("urlAlertTestStatus");
+        fetch(fx + "?cmd=" + encodeURIComponent(key) + "&" + (ALERT_SAMPLE[key] || ""), { cache: "no-store" })
+          .then(r => r.json()).then(res => { st.textContent = res.ok ? "Sent – it shows in OBS within a second." : (res.error || "Could not send."); st.classList.toggle("is-error", !res.ok); })
+          .catch(() => { st.textContent = "Could not send."; st.classList.add("is-error"); });
+      });
+      wireAlertSound(key, base);
+      try { localStorage.setItem("urlAlertTab", key); } catch (_) {}
+    }
+    btns.forEach((b, i) => {
+      b.addEventListener("click", () => show(b.dataset.key, false));
+      b.addEventListener("keydown", e => {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        e.preventDefault();
+        const n = btns[(i + (e.key === "ArrowRight" ? 1 : btns.length - 1)) % btns.length];
+        show(n.dataset.key, true);
+      });
+    });
+    let start = types.length ? types[0].key : "";
+    try { const k = localStorage.getItem("urlAlertTab"); if (types.some(t => t.key === k)) start = k; } catch (_) {}
+    if (start) show(start, false);
   }
 
   // ── Alert-Töne: Liste, Vorhören, Löschen, Hochladen, Lautstärke ──

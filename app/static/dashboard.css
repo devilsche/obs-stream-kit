@@ -1427,3 +1427,11 @@ a.url-card{text-decoration:none}
 .url-sound__extras .url-sound__row{margin-left:0;margin-right:0;gap:16px}
 .url-sound__chk input{width:18px;height:18px}
 .url-sound__chk input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+
+/* ── Alerts als Reiter (eine OBS-Quelle, Einstellungen je Alert) ── */
+.url-atabs{display:flex;flex-wrap:wrap;gap:6px;margin:14px 20px 0}
+.url-atab{min-height:34px;padding:6px 12px;border:1px solid var(--border);border-radius:var(--r-ctrl);background:var(--bg-deeper);color:var(--text);font-family:inherit;font-size:13px;cursor:pointer}
+.url-atab[aria-selected="true"]{border-color:var(--brand-gold);color:var(--brand-gold);font-weight:600}
+.url-atab:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.url-apanel{margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
+.url-atest .url-copied{margin-left:0}

@@ -43,7 +43,7 @@ _ALERT_CMDS = [
 
 ALERTS = [
     # Wartemodus: EINE dauerhaft sichtbare Quelle für alle Alerts (alerts/live.html); host = kein eigener Alert-Typ
-    {"key": "live", "host": True, "label": "All alerts (live)", "file": "live.html", "size": "1920×1080", "preview_size": (800, 500),
+    {"key": "live", "host": True, "label": "All alerts (live)", "file": "live.html", "size": "1920×1080", "preview_size": (1920, 1080),
      "desc": "One source for all alerts, always visible in OBS. Streamer.bot only sends the event; alerts play one after another, with duration and sound from each alert's settings.",
      "params": [], "commands": _ALERT_CMDS,
      "switches": [
