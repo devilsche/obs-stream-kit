@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <title>Indeed Stinger</title>
   <style>
     @font-face {
@@ -24,6 +25,10 @@
     }
 
     :root {
+      --c-gold:       var(--theme-accent, #f2b705);
+      --c-gold-light: color-mix(in srgb, var(--c-gold) 70%, white);
+      --c-purple:     var(--theme-primary, #5e2a79);
+      --c-lilac:      var(--theme-accent-2, #c9a0dc);
       --audio-delay: 0.60s;
       --glyph-in:    0.20s;
       --indeed-in:   0.50s;
@@ -45,8 +50,8 @@
     }
 
     @keyframes glyphPulse {
-      0%, 100% { filter: drop-shadow(0 0 20px rgba(255, 190, 60, 0.65)) drop-shadow(0 0 50px rgba(242, 183, 5, 0.4)); }
-      50%      { filter: drop-shadow(0 0 40px rgba(255, 210, 80, 1))    drop-shadow(0 0 90px rgba(242, 183, 5, 0.75)); }
+      0%, 100% { filter: drop-shadow(0 0 20px color-mix(in srgb, var(--c-gold-light) 65%, transparent)) drop-shadow(0 0 50px color-mix(in srgb, var(--c-gold) 40%, transparent)); }
+      50%      { filter: drop-shadow(0 0 40px color-mix(in srgb, var(--c-gold-light) 100%, transparent))    drop-shadow(0 0 90px color-mix(in srgb, var(--c-gold) 75%, transparent)); }
     }
 
     @keyframes indeedIn {
@@ -97,7 +102,7 @@
       transform: translateX(-50%) translateY(40px);
       font-size: 160px;
       font-weight: 900;
-      color: #f2c96b;
+      color: var(--c-gold-light);
       letter-spacing: 20px;
       line-height: 1;
       white-space: nowrap;
@@ -113,7 +118,7 @@
 
     .indeed-dot {
       display: inline-block;
-      color: #f2b705;
+      color: var(--c-gold);
       margin-left: 4px;
     }
 

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <title>Smort Stinger</title>
   <style>
     @font-face {
@@ -24,6 +25,10 @@
     }
 
     :root {
+      --c-gold:       var(--theme-accent, #f2b705);
+      --c-gold-light: color-mix(in srgb, var(--c-gold) 70%, white);
+      --c-purple:     var(--theme-primary, #5e2a79);
+      --c-lilac:      var(--theme-accent-2, #c9a0dc);
       --audio-delay: 0.00s;
       --stripe-in:   0.00s;
       --smort-in:    0.50s;
@@ -73,10 +78,10 @@
       width: 2400px;
       height: 420px;
       background: linear-gradient(90deg,
-        rgba(242, 183, 5, 0.95) 0%,
-        rgba(242, 183, 5, 0.95) 45%,
-        rgba(94, 42, 121, 0.95) 55%,
-        rgba(94, 42, 121, 0.95) 100%
+        color-mix(in srgb, var(--c-gold) 95%, transparent) 0%,
+        color-mix(in srgb, var(--c-gold) 95%, transparent) 45%,
+        color-mix(in srgb, var(--c-purple) 95%, transparent) 55%,
+        color-mix(in srgb, var(--c-purple) 95%, transparent) 100%
       );
       box-shadow:
         0 0 40px rgba(0, 0, 0, 0.5),
@@ -109,7 +114,7 @@
         8px 8px 0 #0d0d0d,
         0 0 22px rgba(201, 160, 220, 0.95),
         0 0 45px rgba(155, 85, 192, 0.8),
-        0 0 90px rgba(94, 42, 121, 0.6);
+        0 0 90px color-mix(in srgb, var(--c-purple) 60%, transparent);
       position: absolute;
       top: 50%; left: 50%;
       transform: translate(-50%, 200%) scale(0.85);
@@ -121,7 +126,7 @@
 
     .smort-dot {
       display: inline-block;
-      color: #c9a0dc;
+      color: var(--c-lilac);
       transform: scale(0);
       opacity: 0;
       font-style: normal;

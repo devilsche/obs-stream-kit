@@ -2,7 +2,7 @@
 import os
 from flask import (Blueprint, send_from_directory, current_app, g, request,
                    abort, redirect)
-from webcore.serving import (inject_window_vars, inject_theme,
+from webcore.serving import (inject_window_vars, inject_theme, inject_theme_live,
                              inject_impersonation_banner)
 
 
@@ -92,7 +92,8 @@ def widget_file(token, filepath):
             badge=True)
         # no-cache: die HTML wird pro Request mit Token + Theme injiziert und darf
         # nicht veraltet im Browser/OBS haengenbleiben (sonst altes/kein data-theme).
-        return (inject_window_vars(html, variables), 200,
+        # Theme-Wechsel ohne Neuladen (nach den Window-Vars, das Skript liest __SERVE_BASE__)
+        return (inject_theme_live(inject_window_vars(html, variables)), 200,
                 {"Content-Type": "text/html; charset=utf-8",
                  "Cache-Control": "no-cache, must-revalidate"})
 

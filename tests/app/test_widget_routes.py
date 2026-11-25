@@ -27,6 +27,8 @@ def test_widget_html_injects_serve_base(pg_conn_test_setup, tmp_path):
     body = resp.get_data(as_text=True)
     assert "window.__SERVE_BASE__" in body
     assert token in body
+    # Theme-Wechsel ohne Neuladen, nach den Window-Vars
+    assert body.index("window.__SERVE_BASE__") < body.index("__THEME_LIVE__")
 
 
 def test_widget_static_no_token_needed(pg_conn_test_setup, tmp_path):

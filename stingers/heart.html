@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <title>Heart Stinger</title>
   <style>
     @font-face {
@@ -24,6 +25,10 @@
     }
 
     :root {
+      --c-gold:       var(--theme-accent, #f2b705);
+      --c-gold-light: color-mix(in srgb, var(--c-gold) 70%, white);
+      --c-purple:     var(--theme-primary, #5e2a79);
+      --c-lilac:      var(--theme-accent-2, #c9a0dc);
       --audio-delay:   0.00s;
       --heart-in:      0.30s;
       --name-in:       1.30s;
@@ -139,7 +144,7 @@
       color: #ffe080;
       text-shadow:
         0 0 12px rgba(255, 220, 120, 0.95),
-        0 0 26px rgba(242, 183, 5, 0.85),
+        0 0 26px color-mix(in srgb, var(--c-gold) 85%, transparent),
         0 0 48px rgba(255, 150, 30, 0.55);
     }
 

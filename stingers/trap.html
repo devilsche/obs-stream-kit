@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <script src="../js/stinger-ready.js"></script>
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <title>Trap Stinger</title>
   <style>
     @font-face {
@@ -25,6 +26,10 @@
 
     /* Default-Timings als CSS-Vars (via JS ueberschreibbar im ?tune=1 Modus) */
     :root {
+      --c-gold:       var(--theme-accent, #f2b705);
+      --c-gold-light: color-mix(in srgb, var(--c-gold) 70%, white);
+      --c-purple:     var(--theme-primary, #5e2a79);
+      --c-lilac:      var(--theme-accent-2, #c9a0dc);
       --ohno-in:   1.0s;
       --ohno-out:  1.6s;
       --trap-in:   1.8s;
@@ -132,7 +137,7 @@
       height: 72px;
       background: repeating-linear-gradient(
         45deg,
-        #f2b705 0 40px,
+        var(--c-gold) 0 40px,
         #0d0d0d 40px 80px
       );
       z-index: 2;
@@ -184,7 +189,7 @@
       transform: translate(-50%, -50%) scale(0);
       font-size: 240px;
       font-weight: 900;
-      color: #f2b705;
+      color: var(--c-gold);
       letter-spacing: -4px;
       white-space: nowrap;
       text-transform: uppercase;
@@ -193,7 +198,7 @@
          6px -6px 0 #0d0d0d,
         -6px  6px 0 #0d0d0d,
          6px  6px 0 #0d0d0d,
-         0 0 40px rgba(242, 183, 5, 0.9),
+         0 0 40px color-mix(in srgb, var(--c-gold) 90%, transparent),
          0 0 80px rgba(200, 20, 20, 0.8);
       opacity: 0;
       animation:
