@@ -6,7 +6,7 @@
   <title>Stinger Slam</title>
   <!-- WebGL-Stinger „Slam“: Zwei schwere Metallplatten mit Zickzack-Naht schwingen wie Türen aus Richtung Kamera
        zu und schlagen zusammen (beschleunigt, kurzer Rückprall, Plattenkante sichtbar), das Bild wackelt, an der Naht sprühen Funken, Name oder Logo setzt sich aus
-       beiden Hälften zusammen; nach dem Schnitt glüht die Naht und die Platten schwingen nach hinten auf.
+       beiden Hälften zusammen; nach dem Schnitt glüht die Naht, die Platten schwingen ganz nach hinten auf und blenden zum Ende aus.
        three.js r128. URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none).
        Einschlag bei cut − 0,2 s, ab da ist das Bild zu. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
@@ -44,13 +44,16 @@
         /* Tür: Drehung um die Hochachse an der Bildkante (x = side·960). Rein: schwingt aus Richtung Kamera zu
            (beschleunigt), Rückprall nur als leichtes Ineinanderschieben (nie ein Spalt), raus: schwingt nach hinten auf
            und fährt dabei auseinander. */
+        'float outP(float t){ return clamp((t - uCut - 0.04) / max(0.2, (uDur - uCut) * 0.75), 0.0, 1.0); }',
+        // am Ende ausblenden, damit garantiert nichts stehen bleibt
+        'float outFade(float t){ return 1.0 - smoothstep(0.55, 1.0, outP(t)); }',
         'vec3 door(vec3 p, float side, float t){',
         '  float pIn = clamp((t - 0.05) / max(0.1, uHit - 0.05), 0.0, 1.0);',
-        '  float pOut = clamp((t - uCut - 0.04) / max(0.2, (uDur - uCut) * 0.75), 0.0, 1.0);',
-        '  float ang = side * 1.3 * (1.0 - pow(pIn, 2.4)) - side * 1.55 * (1.0 - pow(1.0 - pOut, 2.0));',
+        '  float pOut = outP(t);',
+        '  float ang = side * 1.3 * (1.0 - pow(pIn, 2.4)) - side * 1.75 * (1.0 - pow(1.0 - pOut, 2.0));',
         '  float bt = max(t - uHit, 0.0);',
         '  p.x -= side * 18.0 * abs(sin(bt * 38.0)) * exp(-bt * 11.0) * step(uHit, t);',
-        '  p.x += side * 400.0 * pow(pOut, 2.0);',
+        '  p.x += side * 1100.0 * pow(pOut, 1.6);',
         '  if (ang == 0.0) return p;',
         '  float px = side * 960.0; vec2 r = vec2(p.x - px, p.z);',
         '  float c = cos(ang), s = sin(ang);',
@@ -99,7 +102,7 @@
             // Hitze an der Naht: nach dem Einschlag und kurz vor dem Aufschwingen
             '  float heat = exp(-max(uT - uHit, 0.0) * 5.0) * step(uHit, uT) + smoothstep(uCut - 0.1, uCut + 0.05, uT) * 0.8;',
             '  c += mix(uA, vec3(1.0), 0.4) * exp(-ds / 14.0) * heat * 1.3;',
-            '  gl_FragColor = vec4(c, 1.0);',
+            '  gl_FragColor = vec4(c, outFade(uT));',
             '}'
           ].join('\n')
         });
@@ -122,7 +125,7 @@
         eg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
         eg.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
         var em = new THREE.ShaderMaterial({
-          uniforms: Object.assign({ uSide: { value: sideSign } }, U), side: THREE.DoubleSide,
+          uniforms: Object.assign({ uSide: { value: sideSign } }, U), side: THREE.DoubleSide, transparent: true,
           vertexShader: COMMON + '\n' + [
             'uniform float uSide; varying vec3 vN; varying float vZ;',
             'void main(){',
@@ -139,7 +142,7 @@
             '  c += vec3(0.8) * exp(-vZ*40.0) * 0.5;',      // heller Grat an der Vorderkante
             '  float heat = exp(-max(uT - uHit, 0.0) * 5.0) * step(uHit, uT) + smoothstep(uCut - 0.1, uCut + 0.05, uT) * 0.8;',
             '  c += mix(uA, vec3(1.0), 0.4) * heat * 0.9;',
-            '  gl_FragColor = vec4(c, 1.0);',
+            '  gl_FragColor = vec4(c, outFade(uT));',
             '}'
           ].join('\n')
         });
