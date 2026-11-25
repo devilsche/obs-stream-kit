@@ -35,7 +35,7 @@
     var holder = new THREE.Group(); scene.add(holder);
     var BIND = [], TRACKED = [], B = {}, mixer = null, actions = {}, cur = null;
     var UP = new THREE.Vector3(0, 1, 0), LAT = new THREE.Vector3(), FWD = new THREE.Vector3();
-    var SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5;
+    var TAIL_SCALE = null, SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5;
     // Körperbau-Vorlagen (Shiba-Modell umgeformt). Jack Russell: kompakt, etwas länger als hoch, kürzeres Bein,
     // Rute aufrecht. Pinscher: schlank, hochbeinig, hochgezogener Bauch, Rute schräg.
     var BODIES = {
@@ -217,8 +217,8 @@
         if (tc) {
           var lp = tc.position, ax = Math.abs(lp.x) >= Math.abs(lp.y) && Math.abs(lp.x) >= Math.abs(lp.z) ? 'x' : Math.abs(lp.y) >= Math.abs(lp.z) ? 'y' : 'z';
           var sc = { x: TAIL_THIN, y: TAIL_THIN, z: TAIL_THIN }; sc[ax] = 1;
-          B.tail_1.scale.set(sc.x, sc.y, sc.z);
-        
+          TAIL_SCALE = new THREE.Vector3(sc.x, sc.y, sc.z);
+          B.tail_1.scale.copy(TAIL_SCALE);
         }
       }
     }
@@ -434,6 +434,12 @@
         }
         // Pinscher-Rute: die 7 Schwanzglieder nacheinander auf eine gerade Linie ausrichten (nach hinten, leicht
         // nach oben), statt des eingerollten Shiba-Ringels. Das Wedeln kommt danach obendrauf.
+        // Die Clips (Stehen, Rollen, Totstellen) haben eigene Skalierungsspuren für alle Schwanzglieder und machen
+        // die Rute sonst nach dem ersten Bild wieder buschig: jedes Bild nach dem Mixer dünn setzen, Glieder 2–7 auf 1.
+        if (TAIL_SCALE) {
+          B.tail_1.scale.copy(TAIL_SCALE);
+          for (var tsi = 2; tsi <= 7; tsi++) if (B['tail_' + tsi]) B['tail_' + tsi].scale.set(1, 1, 1);
+        }
         if (TAIL_STRAIGHT) {
           holder.updateMatrixWorld(true);
           var tdir = new THREE.Vector3().copy(FWD).multiplyScalar(-Math.cos(TAIL_UP)).addScaledVector(UP, Math.sin(TAIL_UP)).normalize();
