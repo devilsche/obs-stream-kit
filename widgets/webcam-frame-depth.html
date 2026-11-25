@@ -78,7 +78,7 @@
         var x = num('x', W - CW - 48, -W, 2 * W), y = num('y', H - CH - 48, -H, 2 * H);
         CX = x + CW / 2 - W / 2; CY = H / 2 - (y + CH / 2);
         frameRig.position.set(CX, CY, 0);
-        R = Math.max(H * 0.018, Math.min(25, CW * 0.0315));   // Emote-Radius: auch bei kleiner Kamera sichtbar (≈ 20 px bei 1080p)
+        R = Math.max(H * 0.015, Math.min(21, CW * 0.027));   // Emote-Radius: auch bei kleiner Kamera sichtbar (≈ 16 px bei 1080p)
         buildFrame();
       }
 
