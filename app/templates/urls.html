@@ -648,7 +648,7 @@ G1R_STEAM_NAME=</code></pre>
         <div class="url-sound__row">
           <label class="url-sound__lbl" for="urlSoundVol">Volume</label>
           <select id="urlSoundVol" class="url-sound__sel">
-            ${[[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
+            ${[[0.1,"10%"],[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
           </select>
         </div>
         <div class="url-sound__row">
@@ -744,7 +744,7 @@ G1R_STEAM_NAME=</code></pre>
     function render(data) {
       const e = data.alerts[alert] || { files: [], volume: 0.6 };
       rules.textContent = `MP3 only, at most ${data.maxSeconds} s and ${Math.round(data.maxBytes / 1048576)} MB, up to ${data.maxFiles} files.`;
-      vol.value = String([0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
+      vol.value = String([0.1, 0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
       file.disabled = e.files.length >= data.maxFiles;
       file.setAttribute("aria-disabled", file.disabled ? "true" : "false");
       list.innerHTML = e.files.length ? `<ul class="url-sound__items">${e.files.map(f => `
