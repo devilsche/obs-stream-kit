@@ -170,7 +170,36 @@ def _kd_test(v):
     return _float_range(0, 20)(v)
 
 
+_AT_WORDS = ("center", "random", "left", "right", "top", "bottom", "topleft", "topright", "bottomleft", "bottomright")
+
+
+def _at(v):
+    """Ort einer Explosion: Wort (center, random, Ecken/Seiten) oder „x,y“ als Anteil 0–1 der Bildfläche."""
+    v = v.strip().lower()
+    if v in _AT_WORDS:
+        return v
+    parts = v.split(",")
+    if len(parts) != 2:
+        return None
+    try:
+        x, y = float(parts[0]), float(parts[1])
+    except ValueError:
+        return None
+    if x != x or y != y:   # NaN
+        return None
+    return "%.3f,%.3f" % (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)))
+
+
 EFFECTS = {
+    # Burst: WebGL-Explosion (effects/burst.html, js/burst.js). Streamer.bot: /api/fx/burst?cmd=fire&kind=…
+    "burst": {
+        "commands": ("fire",),
+        "settings": {},
+        "args": {
+            "fire": {"kind": _choice("explosion", "fireball", "comic", "pixel", "random"), "at": _at,
+                     "size": _float_range(0.2, 3), "count": _int_range(1, 12), "name": _name},
+        },
+    },
     "weather": {
         "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset",
                      "scrape", "warm", "frostclear", "frostreset", "leaders",

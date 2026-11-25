@@ -189,3 +189,10 @@ def test_poll_commands_carry_server_time():
     commands.push(1, "xmas", {"cmd": "shake", "params": {}})
     c = commands.poll(1, "xmas", 0)["commands"][0]
     assert isinstance(c["ts"], float) and c["ts"] > 1.7e9
+
+
+def test_burst_fire_args():
+    out = commands.parse("burst", {"cmd": "fire", "kind": "Comic", "at": "0.25,1.7", "size": "9", "count": "40", "name": "Hat3 <b>"})
+    assert out == {"cmd": "fire", "params": {"kind": "comic", "at": "0.250,1.000", "size": 3.0, "count": 12, "name": "Hat3 b"}}
+    assert commands.parse("burst", {"cmd": "fire", "kind": "nuke", "at": "x"}) == {"cmd": "fire", "params": {}}
+    assert commands.parse("burst", {"cmd": "fire", "at": "TopLeft"})["params"] == {"at": "topleft"}

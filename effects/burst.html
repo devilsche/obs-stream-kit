@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Burst</title>
+  <!-- Burst: WebGL-Explosionen (js/burst.js), 1920×1080, durchsichtig. Ausgelöst über Streamer.bot:
+       /s/<token>/api/fx/burst?cmd=fire&kind=explosion|fireball|comic|pixel|random&at=center|random|topleft|…|x,y&size=1&count=1&name=…
+       URL-Parameter: kind, size, sound (1/0), volume (0–1), flash, ring, sparks, smoke (1/0), demo=1 (feuert alle 3 s, Dashboard-Vorschau). -->
+  <link rel="stylesheet" href="../widgets/_theme.css">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
+    #burst { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="burst" aria-hidden="true"></canvas>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/burst.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var p = new URLSearchParams(location.search);
+      function flag(k, d) { var v = p.get(k); return v == null ? d : v !== '0' && v !== 'false'; }
+      function num(k, d, lo, hi) { var v = parseFloat(p.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
+      var css = getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim();
+      var base = '../';   // relativ zu /s/<token>/effects/ bzw. /effects/
+      var b = Burst.create({
+        canvas: document.getElementById('burst'), base: base,
+        kind: p.get('kind') || 'explosion', size: num('size', 1, 0.2, 3),
+        sound: flag('sound', true), volume: num('volume', 0.7, 0, 1),
+        flash: flag('flash', true), ring: flag('ring', true), sparks: flag('sparks', true), smoke: flag('smoke', true),
+        accent: css || '#f2b705'
+      });
+      b.ready.then(function () {
+        if (p.get('demo') === '1') {
+          var kinds = Burst.KINDS, i = 0;
+          setTimeout(function demo() { b.fire({ kind: p.get('kind') || kinds[i++ % kinds.length], at: 'random' }); setTimeout(demo, 3000); }, 400);
+        }
+        // Befehle von Streamer.bot / Dashboard: nur über die Token-URL
+        var m = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+        if (!m) return;
+        var url = '/s/' + m[1] + '/api/fx/burst/poll', seq = null, epoch = null;
+        (function poll() {
+          var delay = 700;
+          fetch(url + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (d) {
+              if (epoch !== null && d.epoch !== epoch) { epoch = d.epoch; seq = 0; delay = 0; return; }   // Server neu gestartet
+              epoch = d.epoch;
+              if (seq !== null) (d.commands || []).forEach(function (c) { if (c.cmd === 'fire') b.fire(c.params || {}); });
+              seq = d.seq;
+            })
+            .catch(function () { delay = 3000; })
+            .then(function () { setTimeout(poll, delay); });
+        })();
+      });
+    })();
+  </script>
+</body>
+</html>

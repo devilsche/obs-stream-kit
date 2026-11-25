@@ -195,6 +195,38 @@ DEFAULT_EFFECT_DOMAIN = "stream"
 
 EFFECT_META = {
     "snow.html": {"hidden": True},
+    # Burst: WebGL-Explosion (js/burst.js), Befehle über /s/<token>/api/fx/burst
+    "burst.html": {"preview_query": "demo=1", "switches": [
+        {"key": "kind", "label": "Default kind", "type": "select", "default": "explosion",
+         "options": [["explosion", "Explosion"], ["fireball", "Fireball"], ["comic", "Comic (KABOOM)"], ["pixel", "Pixel"],
+                     ["random", "Random"]],
+         "tooltip": "Used when a command does not name a kind"},
+        {"key": "size", "label": "Size", "type": "select", "default": "1",
+         "options": [["0.5", "Small"], ["0.75", "Medium"], ["1", "Large"], ["1.5", "Huge"]],
+         "tooltip": "Default size (commands can pass size=0.2–3)"},
+        {"key": "sound", "label": "Sound", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]],
+         "tooltip": "Synthesized boom. In OBS enable 'Control audio via OBS' to see it in the mixer."},
+        {"key": "volume", "label": "Volume", "type": "select", "default": "0.7",
+         "options": [["0.3", "30%"], ["0.5", "50%"], ["0.7", "70%"], ["1", "100%"]]},
+        {"key": "flash", "label": "Light flash", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
+        {"key": "ring", "label": "Shockwave ring", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
+        {"key": "sparks", "label": "Sparks and embers", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
+        {"key": "smoke", "label": "Lingering smoke", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
+    ],
+    "controls": [
+        {"q": "cmd=fire&kind=explosion&at=center", "label": "Explosion", "icon": "local_fire_department"},
+        {"q": "cmd=fire&kind=fireball&at=random", "label": "Fireball", "icon": "whatshot"},
+        {"q": "cmd=fire&kind=comic&at=random", "label": "KABOOM", "icon": "bolt"},
+        {"q": "cmd=fire&kind=pixel&at=random", "label": "Pixel", "icon": "grid_on"},
+        {"q": "cmd=fire&kind=random&at=random&count=5", "label": "Salvo", "icon": "celebration"},
+    ],
+    "commands": [
+        {"q": "cmd=fire", "label": "Default explosion"},
+        {"q": "cmd=fire&kind=explosion&at=center&size=1.5&name=%user%", "label": "Big explosion with a name (e.g. raid)"},
+        {"q": "cmd=fire&kind=random&at=random&count=6", "label": "Salvo of 6 at random spots"},
+        {"q": "cmd=fire&kind=comic&at=0.5,0.3&size=0.8", "label": "KABOOM at a fixed spot (x,y as 0–1)"},
+        {"q": "cmd=fire&kind=fireball&at=bottomright&size=0.6", "label": "Small fireball in the bottom-right corner"},
+    ]},
     "duck-greet.html": {"domain": "ducks"},
     "duck-parade.html": {"domain": "ducks"},
     "duck-assembly.html": {"domain": "ducks"},
