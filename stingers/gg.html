@@ -24,7 +24,7 @@
     }
 
     :root {
-      --audio-delay: 0.00s;
+      --audio-delay: 0.50s;
       --gg-pop:      0.20s;
       --sub-in:      0.75s;
       --stage-out:   4.60s;
@@ -241,7 +241,7 @@
     <div class="gg-sub">Good Game</div>
   </div>
 
-  <audio id="audio" data-stinger-autoplay preload="auto" src="../assets/stingers/fanfare.mp3"></audio>
+  <audio id="audio" data-stinger-autoplay data-volume="0.5" preload="auto" src="../assets/stingers/fanfare.mp3"></audio>
 
   <div class="tune-panel" id="tunePanel">
     <h2>GG Tune Mode</h2>
@@ -277,7 +277,7 @@
     (function () {
       'use strict';
       var DEFAULTS = {
-        'audio-delay': 0.00,
+        'audio-delay': 0.50,
         'gg-pop':      0.20,
         'sub-in':      0.75,
         'stage-out':   4.60

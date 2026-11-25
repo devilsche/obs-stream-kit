@@ -18,6 +18,9 @@
 
       <!-- Audio mit Delay nach Ready abspielen: -->
       <audio data-stinger-autoplay data-delay="1600" preload="auto" src="..."></audio>
+
+      <!-- Lautstärke je Datei (0–1); ?volume= in der URL wirkt als Faktor obendrauf: -->
+      <audio data-stinger-autoplay data-volume="0.5" preload="auto" src="..."></audio>
     </body>
 
   Safety: Falls Assets nie laden → Start nach max. 2s.
@@ -168,7 +171,18 @@
   // Videos gehen direkt den erprobten stummen Weg, Audios bleiben still.
   var soundOff = new URLSearchParams(window.location.search).get('sound') === '0';
 
+  // Lautstärke je Tondatei: data-volume="0.5" (0–1), dazu ?volume= in der URL als Faktor
+  // (Dashboard/OBS-URL). So passt jedes Meme ohne Fader-Gefummel in OBS.
+  var urlVolume = parseFloat(new URLSearchParams(window.location.search).get('volume'));
+  function applyVolume(m) {
+    var v = parseFloat(m.getAttribute('data-volume'));
+    v = isNaN(v) ? 1 : v;
+    if (!isNaN(urlVolume)) v *= urlVolume;
+    try { m.volume = Math.max(0, Math.min(1, v)); } catch (e) {}
+  }
+
   function tryPlay(m) {
+    applyVolume(m);
     if (soundOff) {
       if (m.tagName === 'VIDEO') reloadMuted(m, Date.now());
       return null;

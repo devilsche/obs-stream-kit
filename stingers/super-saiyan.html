@@ -30,7 +30,7 @@
     }
 
     :root {
-      --audio-delay: 0.00s;
+      --audio-delay: 0.80s;
       --scream-in:   0.45s;
       --stage-out:   9.30s;
       --time-offset: 0s;
@@ -219,7 +219,8 @@
     </div>
   </div>
 
-  <audio id="audio" data-stinger-autoplay preload="auto" src="../assets/stingers/goku_transforming.mp3"></audio>
+  <audio data-stinger-autoplay data-volume="0.5" preload="auto" src="../assets/stingers/super_saiyan.mp3"></audio>
+  <audio id="audio" data-stinger-autoplay data-volume="0.4" preload="auto" src="../assets/stingers/goku_transforming.mp3"></audio>
 
   <div class="tune-panel" id="tunePanel">
     <h2>Super Saiyan Tune Mode</h2>
@@ -255,7 +256,7 @@
     (function () {
       'use strict';
       var DEFAULTS = {
-        'audio-delay': 0.00,
+        'audio-delay': 0.80,
         'scream-in':   0.45,
         'stage-out':   9.30
       };

@@ -340,7 +340,7 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
    - **OBS Set Source Visibility** → Source unsichtbar
 3. Action per **Hotkey** oder **Chat-Command** (`!trap`, `!crash`, etc.) triggern
 
-> **Tipp:** Für Sound-Effekte lege entsprechende Audio-Files in `assets/stingers/` (z.B. `trap.mp3`) und spiele sie per Streamer.bot parallel zum Stinger ab. Die HTML-Dateien enthalten bewusst keine Audio-Tags — so kannst du Sound frei tauschen.
+> **Ton kommt aus dem Meme selbst** (seit 25.11.2026, die Tonprobleme von OBS-Browser-Sources sind behoben): Jedes Meme spielt seine Datei per `<audio data-stinger-autoplay>` synchron zur Animation (`js/stinger-ready.js`). Zeitpunkt über `data-delay` (ms), Lautstärke je Datei über `data-volume` (0–1); `?volume=` in der URL wirkt als Faktor obendrauf. In OBS steht die Quelle auf Lautstärke 100 %, **Audio über OBS steuern** an, Abhören „Monitor und Ausgabe“. Streamer.bot blendet nur noch ein und aus, ohne „Play Sound“.
 
 ---
 
