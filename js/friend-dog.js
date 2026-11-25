@@ -35,12 +35,14 @@
     var holder = new THREE.Group(); scene.add(holder);
     var BIND = [], TRACKED = [], B = {}, mixer = null, actions = {}, cur = null;
     var UP = new THREE.Vector3(0, 1, 0), LAT = new THREE.Vector3(), FWD = new THREE.Vector3();
+    var EAR_FOLD = 0, ehp = new THREE.Vector3(), etp = new THREE.Vector3(), eep = new THREE.Vector3(), edir = new THREE.Vector3(),
+        etgt = new THREE.Vector3(), eax = new THREE.Vector3();
     var TAIL_SCALE = null, SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5;
     // Körperbau-Vorlagen (Shiba-Modell umgeformt). Jack Russell: kompakt, etwas länger als hoch, kürzeres Bein,
     // Rute aufrecht. Pinscher: schlank, hochbeinig, hochgezogener Bauch, Rute schräg.
     var BODIES = {
-      pinscher: { build: { len: 1.02, height: 1.04, width: 0.86 }, slim: { belly: 0.78, chest: 0.86, neck: 0.72 }, tailUp: 0.45, tailThin: 0.28, muzzle: 1.4, headW: 0.8, upperLeg: 0.72 },
-      jack: { build: { len: 1.08, height: 0.95, width: 0.9 }, slim: { belly: 0.82, chest: 0.88, neck: 0.78 }, tailUp: 1.0, tailThin: 0.6, muzzle: 1.15, headW: 0.9, upperLeg: 0.85 }
+      pinscher: { build: { len: 1.02, height: 1.04, width: 0.86 }, slim: { belly: 0.78, chest: 0.86, neck: 0.72 }, tailUp: 0.45, tailThin: 0.28, muzzle: 1.4, headW: 0.8, upperLeg: 0.72, earFold: 0.85 },
+      jack: { build: { len: 1.08, height: 0.95, width: 0.9 }, slim: { belly: 0.82, chest: 0.88, neck: 0.78 }, tailUp: 1.0, tailThin: 0.6, muzzle: 1.15, headW: 0.9, upperLeg: 0.85, earFold: 0.85 }
     };
     var BUILD = BODIES.pinscher.build, SLIM = BODIES.pinscher.slim, MUZZLE = 1, HEADW = 1, UPLEG = 1, buildGroup = null, slimMeshes = [];
 
@@ -144,7 +146,7 @@
     // Körperbau anwenden: Rumpf quer zur Körperachse verschlanken (aus den Original-Positionen, Bind-Pose –
     // die Beine hängen an eigenen Knochen und bleiben lang), Gesamtproportionen, Rute (Winkel + Dicke)
     function applyBody(key) {
-      var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1;
+      var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1; EAR_FOLD = bd.earFold || 0;
       if (buildGroup) buildGroup.scale.set(BUILD.len, BUILD.height, BUILD.width);
       slimMeshes.forEach(function (m) {
         var o = m.o; o.geometry.attributes.position.array.set(m.orig);
@@ -436,6 +438,23 @@
         // nach oben), statt des eingerollten Shiba-Ringels. Das Wedeln kommt danach obendrauf.
         // Die Clips (Stehen, Rollen, Totstellen) haben eigene Skalierungsspuren für alle Schwanzglieder und machen
         // die Rute sonst nach dem ersten Bild wieder buschig: jedes Bild nach dem Mixer dünn setzen, Glieder 2–7 auf 1.
+        // Kippohren (Pinscher): obere Ohrhälfte (Glied ear_tip) nach vorne-unten abknicken, leicht nach außen.
+        // Jedes Bild nach dem Mixer, weil alle Clips eigene Ohrspuren haben; die Bewegung der Clips bleibt erhalten.
+        if (EAR_FOLD > 0) {
+          holder.updateMatrixWorld(true);
+          B.head.getWorldPosition(ehp);
+          ['L', 'R'].forEach(function (sd) {
+            var tip = B[sd + '_ear_tip'], end = tip && tip.children[0];
+            if (!end) return;
+            tip.getWorldPosition(etp); end.getWorldPosition(eep);
+            edir.subVectors(eep, etp).normalize();
+            var out = etp.clone().sub(ehp).dot(LAT) >= 0 ? 1 : -1;
+            etgt.copy(FWD).multiplyScalar(0.55).addScaledVector(UP, -0.75).addScaledVector(LAT, 0.3 * out).normalize();
+            eax.crossVectors(edir, etgt); var sn = eax.length();
+            if (sn < 1e-4) return;
+            turn(tip, eax.normalize(), Math.atan2(sn, edir.dot(etgt)) * EAR_FOLD);
+          });
+        }
         if (TAIL_SCALE) {
           B.tail_1.scale.copy(TAIL_SCALE);
           for (var tsi = 2; tsi <= 7; tsi++) if (B['tail_' + tsi]) B['tail_' + tsi].scale.set(1, 1, 1);
