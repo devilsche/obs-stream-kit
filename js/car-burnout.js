@@ -25,13 +25,13 @@
     var cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 200);
     cam.position.set(0, 5.2, 18); cam.lookAt(0, 2.3, 0);
 
-    // Theme: Rauchtöne (Primär-/Akzentfarbe, zur Hälfte mit Weiß gemischt, damit es Qualm bleibt) und Unterbodenlicht
+    // Theme: Rauchtöne (Primär-/Akzentfarbe, mit etwas Weiß gemischt, damit es Qualm bleibt; ein Fünftel bleibt weiß) und Unterbodenlicht
     var TC = root.ThemeColors, tintOn = opts.tint !== false && !!TC, glowOn = opts.glow !== false && !!TC;
     var smokeTints = [new THREE.Color(1, 1, 1)], glowCol = new THREE.Color('#f2b705');
     function readTheme() {
       if (!TC) return;
       var p = TC.palette(), w = new THREE.Color(1, 1, 1);
-      smokeTints = [w, new THREE.Color(p.primary).lerp(w, 0.45), new THREE.Color(p.accent).lerp(w, 0.5), new THREE.Color(p.accent2).lerp(w, 0.5)];
+      smokeTints = [w, new THREE.Color(p.primary).lerp(w, 0.25), new THREE.Color(p.accent).lerp(w, 0.3), new THREE.Color(p.accent2).lerp(w, 0.3), new THREE.Color(p.primary).lerp(w, 0.25)];
       glowCol.set(p.accent);
       if (glow) glow.material.color.copy(glowCol);
     }
