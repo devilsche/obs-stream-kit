@@ -56,3 +56,13 @@ def test_thumb_only_webp_and_small(tmp_path):
     assert not ms.save_thumb(root, CAR, b"<svg>")
     assert ms.save_thumb(root, CAR, b"RIFF....WEBP")
     assert not ms.save_thumb(root, "../../x", b"RIFF")
+
+
+def test_pubg_picks_get_their_own_group(tmp_path):
+    root = str(tmp_path); _setup(root)
+    new = "6hiH0iyDqXqtdD9wbqSbyLLhKmz"
+    _w(os.path.join(root, "data", "car-cache", new + ".glb"), b"glTF")
+    _w(os.path.join(root, "data", "pubg-vehicle-picks.json"), json.dumps({"picks": [new]}))
+    _w(os.path.join(root, "assets", "cars", "search-pubg.json"), json.dumps([{"uid": new, "name": "VW T1", "groupTitle": "Van → VW T1"}]))
+    it = {i["uid"]: i for i in ms.inventory(root)}[new]
+    assert it["group"] == "pubg" and it["name"] == "Van: VW T1" and it["have"]

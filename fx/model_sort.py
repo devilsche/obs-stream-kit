@@ -21,7 +21,7 @@ import time
 
 from fx.sketchfab import UID_RE, base_uid  # noqa: E402  (alt 32 Hex, neu 27 Zeichen)
 MAX_THUMB = 400 * 1024
-GROUPS = ("car", "car-candidate", "prop", "prop-candidate", "note", "other")
+GROUPS = ("car", "pubg", "car-candidate", "prop", "prop-candidate", "note", "other")
 _lock = threading.Lock()
 
 
@@ -137,6 +137,11 @@ def inventory(root):
     for c in _load(os.path.join(proj, "assets", "cars", "candidates.json"), []):
         if isinstance(c, dict):
             put(c.get("uid"), "car-candidate", c)
+    # Vorbilder der PUBG-Fahrzeuge, im Admin angehakt (/admin/prop-search?set=pubg)
+    pubg_picks = (_load(_d(root, "pubg-vehicle-picks.json"), {}) or {}).get("picks") or []
+    for c in _load(os.path.join(proj, "assets", "cars", "search-pubg.json"), []):
+        if isinstance(c, dict) and c.get("uid") in pubg_picks:
+            put(c["uid"], "pubg", dict(c, name=(c.get("groupTitle", "").split(" →")[0] + ": " + c.get("name", "")).strip(": ")))
     for c in _load(os.path.join(proj, "assets", "track-props", "candidates.json"), []):
         if isinstance(c, dict):
             put(c.get("uid"), "prop-candidate", c)
