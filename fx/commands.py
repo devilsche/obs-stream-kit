@@ -202,6 +202,30 @@ def _at(v):
     return "%.3f,%.3f" % (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)))
 
 
+# Emote-Bilder für den Depth Frame: nur CDNs, die CORS erlauben (WebGL-Textur), höchstens 5 je Nachricht
+_EMOTE_HOSTS = ("static-cdn.jtvnw.net", "cdn.7tv.app", "cdn.frankerfacez.com")
+_EMOTE_URL_RE = re.compile(r"^https://([a-z0-9.-]+)/[A-Za-z0-9_./-]{1,160}$")
+_EMOTE_ID_RE = re.compile(r"^(\d{1,12}|emotesv2_[0-9a-f]{32})$")
+
+
+def _emote_urls(v):
+    out = []
+    for part in re.split(r"[\s,|]+", v):
+        m = _EMOTE_URL_RE.match(part)
+        if m and m.group(1) in _EMOTE_HOSTS and part not in out:
+            out.append(part)
+        if len(out) == 5:
+            break
+    return out or None
+
+
+def _emote_ids(v):
+    """Twitch-Emote-IDs → Bild-URLs (falls Streamer.bot nur IDs schickt)."""
+    urls = ["https://static-cdn.jtvnw.net/emoticons/v2/%s/default/dark/3.0" % i
+            for i in re.split(r"[\s,|]+", v) if _EMOTE_ID_RE.match(i)]
+    return urls[:5] or None
+
+
 EFFECTS = {
     # Burst: WebGL-Explosion (effects/burst.html, js/burst.js). Streamer.bot: /api/fx/burst?cmd=fire&kind=…
     "burst": {
@@ -210,6 +234,16 @@ EFFECTS = {
         "args": {
             "fire": {"kind": _choice("explosion", "fireball", "comic", "pixel", "random"), "at": _at,
                      "size": _float_range(0.2, 3), "count": _int_range(1, 12), "name": _name},
+        },
+    },
+    # Depth Frame (widgets/webcam-frame-depth.html): Emotes aus dem Chat knallen an den Rahmen, !shake wirft sie ab
+    "frame": {
+        "commands": ("emotes", "shake", "flash"),
+        "settings": {},
+        "args": {
+            "emotes": {"urls": _emote_urls, "ids": _emote_ids, "name": _name},
+            "shake": {"name": _name},
+            "flash": {},
         },
     },
     # Alerts im Wartemodus (alerts/live.html): Streamer.bot schickt nur das Ereignis, die Quelle bleibt sichtbar

@@ -3,6 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <title>Webcam Frame</title>
+  <script>
+    // Eine Karte, mehrere Styles: ?style=energy|depth leitet auf die eigene Datei weiter (Parameter bleiben),
+    // classic (Standard) ist diese Seite.
+    (function () {
+      var st = new URLSearchParams(location.search).get('style');
+      if (st === 'energy' || st === 'depth') location.replace(location.pathname.replace(/webcam-frame\.html$/, 'webcam-frame-' + st + '.html') + location.search);
+    })();
+  </script>
   <link rel="stylesheet" href="_theme.css">
   <link rel="stylesheet" href="_blocks.css">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">

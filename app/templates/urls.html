@@ -93,8 +93,9 @@ G1R_STEAM_NAME=</code></pre>
         {% for d in decor %}
         {{ src_card('overlay','Decor',d.label,
                     base_url~'/s/'~token~'/widgets/'~d.file,d.file,
-                    d.size,d.desc,d.switches or [],d.params or [],False,'','stream',
-                    d.preview_size|default(None)) }}
+                    d.size,d.desc,d.switches or [],d.params or [],False,d.hint or '','stream',
+                    d.preview_size|default(None),d.commands or [],
+                    (base_url~'/s/'~token~'/api/fx/'~d.fx) if d.fx else '') }}
         {% endfor %}
         {% for a in alerts if a.host %}
         {{ src_card('overlay','Alert',a.label,
@@ -501,6 +502,42 @@ G1R_STEAM_NAME=</code></pre>
     return ["pubg", "steam", "g1r", "stream", "race", "ducks", "weather", "friend"].indexOf(d) >= 0 ? d : "stream";
   })();
 
+  // Streamer.bot (Depth Frame): Emote-Bilder einer Chatnachricht als Argument emoteUrls (nur mscorlib/System, Reflection
+  // statt Streamer.bot-Typen); ohne Emotes bricht die Aktion ab, dann geht kein Fetch raus
+  const FRAME_EMOTE_CS = `using System;
+using System.Collections;
+
+public class CPHInline
+{
+    public bool Execute()
+    {
+        object raw;
+        if (!args.TryGetValue("emotes", out raw) || raw == null) return false;
+        var list = raw as IEnumerable;
+        if (list == null) return false;
+        string urls = "";
+        int n = 0;
+        foreach (object e in list)
+        {
+            if (e == null || n >= 5) continue;
+            var p = e.GetType().GetProperty("ImageUrl");
+            string u = p == null ? null : p.GetValue(e, null) as string;
+            if (string.IsNullOrEmpty(u))
+            {
+                var pi = e.GetType().GetProperty("Id");
+                string id = pi == null ? null : Convert.ToString(pi.GetValue(e, null));
+                if (string.IsNullOrEmpty(id)) continue;
+                u = "https://static-cdn.jtvnw.net/emoticons/v2/" + id + "/default/dark/3.0";
+            }
+            urls += (urls.Length > 0 ? "," : "") + Uri.EscapeDataString(u);
+            n++;
+        }
+        if (n == 0) return false;
+        CPH.SetArgument("emoteUrls", urls);
+        return true;
+    }
+}`;
+
   function openDetail(card) {
     const base = card.dataset.base;
     const switches = parseJSON(card.dataset.switches, []);
@@ -590,6 +627,12 @@ G1R_STEAM_NAME=</code></pre>
             ${subMsg ? `<p class="url-follow-msg" role="status">${subMsg}</p>` : ""}
           </div>`;
         })() : ""}
+        ${/\/frame$/.test(card.dataset.fx || "") ? `<div class="url-cheat">
+          <div class="url-cheat__head"><b>Emotes from chat</b>
+            <button type="button" class="url-act ghost url-cmd__copy" data-what="C# code" data-url="${escapeAttr(FRAME_EMOTE_CS)}" aria-label="Copy C# code"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy</button></div>
+          <p class="url-dbox__desc">Streamer.bot: new action with the trigger <b>Twitch → Chat → Chat Message</b>. Sub-action 1: <b>Core → C# → Execute C# Code</b> with this code (it collects the emote images and skips messages without emotes). Sub-action 2: <b>Fetch URL</b> with the copied <i>Emotes</i> URL below. Twitch, 7TV and FFZ emotes work; BTTV images are blocked by their server.</p>
+          <pre class="url-cheat__text">${escapeHtml(FRAME_EMOTE_CS)}</pre>
+        </div>` : ""}
         ${cheat ? `<div class="url-cheat">
           <div class="url-cheat__head"><b>Cheat sheet for viewers</b>
             <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(cheat)}" aria-label="Copy cheat sheet"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy</button></div>
@@ -1710,7 +1753,8 @@ G1R_STEAM_NAME=</code></pre>
     document.querySelectorAll(".url-cmd__copy").forEach(btn => btn.addEventListener("click", async () => {
       const st = document.getElementById("urlCmdStatus");
       const done = () => {
-        st.textContent = "Copied: " + btn.closest(".url-cmd").querySelector(".url-cmd__label").textContent;
+        const row = btn.closest(".url-cmd");
+        st.textContent = "Copied: " + (row ? row.querySelector(".url-cmd__label").textContent : (btn.dataset.what || "text"));
         btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">check</span>';
         setTimeout(() => {
           btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">content_copy</span>';

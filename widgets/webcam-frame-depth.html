@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Webcam Frame Depth</title>
+  <!-- Depth Frame (WebGL, three.js r128): 3D-Rahmen um die Kamera, ein Lichtkomet kreist mal hinter, mal vor dir,
+       Emotes aus dem Chat knallen an den Rahmen (Physik), bleiben oben liegen, !shake wirft sie ab, Alerts lassen ihn
+       aufleuchten. Vollbild-Quelle (Größe der Szene, z. B. 1920×1080); die Kamera liegt bei x/y/width/height.
+       Tiefe: dieselbe URL dreimal mit layer=back | frame | front, in OBS von unten nach oben:
+       back → Kamera (aufs Fenster zugeschnitten) → frame → Kamera-Kopie freigestellt (NVIDIA, weniger zugeschnitten) → front.
+       Alle Ebenen rechnen mit der Serverzeit und denselben Befehlen und zeigen so dasselbe Bild.
+       URL: layer (all|back|frame|front), x, y, width, height, radius, border, comet (1|0), emotes (1|0), max, stack,
+       alerts (1|0), speed, demo (1 = Emotes zum Ausprobieren). Befehle: /s/<token>/api/fx/frame (emotes, shake, flash). -->
+  <link rel="stylesheet" href="_theme.css">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+    #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="gl" aria-hidden="true"></canvas>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/vendor/three-r128-RoomEnvironment.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var P = new URLSearchParams(location.search);
+      function num(k, d, lo, hi) { var v = parseFloat(P.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
+      var LAYER = ({ back: 'back', frame: 'frame', front: 'front' })[P.get('layer')] || 'all';
+      function on(l) { return LAYER === 'all' || LAYER === l; }
+      var SPEED = num('speed', 1, 0.2, 3), MAXE = num('max', 40, 5, 80), STACK = num('stack', 14, 0, 60);
+      var USE_EMOTES = P.get('emotes') !== '0', USE_COMET = P.get('comet') !== '0', DEMO = P.get('demo') === '1';
+      var AT = parseFloat(P.get('at'));
+      var REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      var cs = getComputedStyle(document.documentElement);
+      function col(n, fb) { var v = (cs.getPropertyValue(n) || '').trim(), c = new THREE.Color(fb); try { if (v) c.set(v); } catch (e) {} return c; }
+      var PRI = col('--theme-primary', '#5e2a79'), ACC = col('--theme-accent', '#f2b705'), AC2 = col('--theme-accent-2', '#c985ff');
+
+      var canvas = document.getElementById('gl'), r;
+      try { r = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, preserveDrawingBuffer: !isNaN(AT) }); }
+      catch (e) { console.error('webcam-frame-depth: no WebGL'); return; }
+      r.setPixelRatio(1); r.setClearColor(0x000000, 0); r.outputEncoding = THREE.sRGBEncoding;
+      var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 10, 20000);
+      scene.environment = new THREE.PMREMGenerator(r).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.3));
+      var key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(-300, 500, 700); scene.add(key);
+
+      // ── Maße: Quelle = Szene, Kamera-Rechteck in Quell-Pixeln ──
+      var W = 0, H = 0, CW, CH, CX, CY, FB = num('border', 26, 6, 80), RAD = num('radius', 14, 0, 80);
+      var frameRig = new THREE.Group(); scene.add(frameRig);
+      var frameMat = new THREE.MeshStandardMaterial({ color: PRI, metalness: 0.85, roughness: 0.28, envMapIntensity: 0.9, emissive: new THREE.Color(0) });
+      var edgeMat = new THREE.MeshBasicMaterial({ color: ACC });
+      function rr(w, h, rad) {
+        var s = new THREE.Shape(), a = -w / 2, b = -h / 2; rad = Math.min(rad, w / 2 - 1, h / 2 - 1);
+        s.moveTo(a + rad, b); s.lineTo(a + w - rad, b); s.quadraticCurveTo(a + w, b, a + w, b + rad); s.lineTo(a + w, b + h - rad);
+        s.quadraticCurveTo(a + w, b + h, a + w - rad, b + h); s.lineTo(a + rad, b + h); s.quadraticCurveTo(a, b + h, a, b + h - rad);
+        s.lineTo(a, b + rad); s.quadraticCurveTo(a, b, a + rad, b); return s;
+      }
+      function buildFrame() {
+        while (frameRig.children.length) { var c = frameRig.children.pop(); c.geometry.dispose(); }
+        var sh = rr(CW + 2 * FB, CH + 2 * FB, RAD + FB * 0.7); sh.holes.push(rr(CW, CH, RAD));
+        var bev = Math.min(6, FB * 0.25);
+        frameRig.add(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: FB * 0.6, bevelEnabled: true, bevelThickness: bev, bevelSize: bev * 0.8, bevelSegments: 4, curveSegments: 12 }), frameMat));
+        var es = rr(CW + 8, CH + 8, RAD + 3); es.holes.push(rr(CW, CH, RAD));
+        var edge = new THREE.Mesh(new THREE.ExtrudeGeometry(es, { depth: FB * 0.6 + bev + 2, bevelEnabled: false, curveSegments: 12 }), edgeMat);
+        edge.position.z = -1; frameRig.add(edge);
+        frameRig.visible = on('frame');
+      }
+      function resize() {
+        W = window.innerWidth || 1920; H = window.innerHeight || 1080;
+        r.setSize(W, H, false); cam.aspect = W / H; cam.position.z = (H / 2) / Math.tan(15 * Math.PI / 180); cam.updateProjectionMatrix();
+        CW = num('width', Math.round(W * 0.29), 40, W); CH = num('height', Math.round(CW * 9 / 16), 30, H);
+        var x = num('x', W - CW - 48, -W, 2 * W), y = num('y', H - CH - 48, -H, 2 * H);
+        CX = x + CW / 2 - W / 2; CY = H / 2 - (y + CH / 2);
+        frameRig.position.set(CX, CY, 0);
+        R = Math.max(14, Math.min(34, CW * 0.045));   // Emote-Radius
+        buildFrame();
+      }
+
+      // ── Leuchtpunkte (additiv) ──
+      function glowMat(c, k) {
+        return new THREE.ShaderMaterial({ transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending,
+          uniforms: { c: { value: c.clone() }, k: { value: k } },
+          vertexShader: 'varying vec2 v; void main(){ v = uv - 0.5; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+          fragmentShader: 'uniform vec3 c; uniform float k; varying vec2 v; void main(){ float d = length(v); float a = exp(-d*10.0) * k; gl_FragColor = vec4(c + vec3(exp(-d*40.0)), min(a, 1.0)); }' });
+      }
+
+      // ── Uhr: Serverzeit (alle Ebenen gleich) ──
+      var clockOff = 0;
+      function now() { return isNaN(AT) ? Date.now() / 1000 + clockOff : AT; }
+
+      // ── Komet: hinter dir (z < 0 → Ebene back), vor dir (z ≥ 0 → Ebene front) ──
+      var TRAIL = 22, trail = [];
+      if (USE_COMET) for (var i = 0; i < TRAIL; i++) {
+        var s = 1 - i / TRAIL, m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMat(i ? AC2 : ACC, 1.3 * s));
+        m.userData.s = 0.85 * s + 0.15; m.userData.k = 1.3 * s; m.renderOrder = 5; scene.add(m); trail.push(m);
+      }
+      function cometPos(t) {
+        var a = t * 1.3 * SPEED * (REDUCED ? 0.4 : 1);
+        return new THREE.Vector3(CX + Math.cos(a) * (CW / 2 + FB + CW * 0.14), CY + CH * 0.08 + Math.sin(a) * CH * 0.18, Math.sin(a) * CW * 0.45);
+      }
+
+      // ── Emotes ──
+      var R = 0, texCache = {}, ETEX_DEMO = [];
+      function emoteTex(url) {
+        if (texCache[url]) return texCache[url];
+        var t = new THREE.TextureLoader().setCrossOrigin('anonymous').load(url, null, null, function () { console.error('webcam-frame-depth: emote not loaded', url); t._bad = true; });
+        t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+        texCache[url] = t; return t;
+      }
+      function demoTex(k) {
+        if (ETEX_DEMO[k]) return ETEX_DEMO[k];
+        var c = document.createElement('canvas'); c.width = c.height = 128; var x = c.getContext('2d');
+        x.fillStyle = ['#ffcc33', '#ff6b6b', '#7bd389', '#6ec1ff', '#c38bff'][k]; x.beginPath(); x.arc(64, 64, 58, 0, 7); x.fill();
+        x.fillStyle = '#222'; x.beginPath(); x.arc(44, 54, 9, 0, 7); x.arc(84, 54, 9, 0, 7); x.fill();
+        x.lineWidth = 7; x.strokeStyle = '#222'; x.beginPath(); x.arc(64, 72, 26, 0.25 + k * 0.1, Math.PI - 0.25 - k * 0.1); x.stroke();
+        var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; ETEX_DEMO[k] = t; return t;
+      }
+      // deterministischer Zufall je Befehl (alle Ebenen gleich)
+      function hash(n) { n = (n ^ 61) ^ (n >>> 16); n = n + (n << 3); n = n ^ (n >>> 4); n = Math.imul(n, 0x27d4eb2d); n = n ^ (n >>> 15); return (n >>> 0) / 4294967296; }
+
+      var DT = 1 / 120, GRAV = -1500, LAG = 1.3;   // Befehle starten LAG s nach Serverzeit: alle Ebenen haben sie dann sicher
+      var simT = null, E = [], hits = [], queue = [], shakeAt = -99;
+      function spawn(item, k, t) {
+        var h = function (j) { return hash(item.seq * 97 + k * 13 + j); };
+        var side = h(1) < 0.5 ? -1 : 1, T = 0.55 + h(2) * 0.35;
+        var p = new THREE.Vector2(side * (W / 2 + 70), -H * 0.3 + h(3) * H * 0.7);
+        var hx = CW / 2 + FB, hy = CH / 2 + FB;
+        var tgt = new THREE.Vector2(CX + (h(4) - 0.5) * 2 * (hx - R), CY + hy + R + 2);
+        var v = tgt.clone().sub(p).sub(new THREE.Vector2(0, 0.5 * GRAV * T * T)).divideScalar(T);
+        E.push({ p: p, v: v, a: 0, w: (h(5) - 0.5) * 14, tex: item.tex[k], born: t, id: item.seq * 10 + k });
+      }
+      function step(t) {
+        // fällige Befehle
+        for (var qi = 0; qi < queue.length; qi++) {
+          var it = queue[qi]; if (it.done || it.at > t) continue; it.done = true;
+          if (it.cmd === 'emotes') it.tex.forEach(function (tx, k) { spawn(it, k, t); });
+          if (it.cmd === 'shake') { shakeAt = t; E.forEach(function (e, j) { var g = hash(it.seq * 31 + j); e.v.set(Math.sign(e.p.x - CX || 1) * (350 + g * 450), 500 + hash(it.seq * 37 + j) * 500); e.w = (g - 0.5) * 30; }); }
+        }
+        queue = queue.filter(function (it) { return !it.done || t - it.at < 2; });
+        // Grenzen: zu viele → die ältesten fallen weg, zu hoher Stapel → das älteste liegende rutscht ab
+        while (E.length > MAXE) E.shift();
+        var hx = CW / 2 + FB, hy = CH / 2 + FB, top = CY + hy;
+        var resting = E.filter(function (e) { return e.p.y > top && e.p.y < top + R * 3 && e.v.lengthSq() < 900; });
+        if (resting.length > STACK) { var o = resting[0]; o.v.set(Math.sign(o.p.x - CX || 1) * 420, 380); }
+        E.forEach(function (e) {
+          e.v.y += GRAV * DT; e.p.addScaledVector(e.v, DT); e.a += e.w * DT;
+          var qx = Math.max(CX - hx, Math.min(CX + hx, e.p.x)), qy = Math.max(CY - hy, Math.min(CY + hy, e.p.y));
+          var dx = e.p.x - qx, dy = e.p.y - qy, d = Math.hypot(dx, dy);
+          if (d < R && d > 1e-4) {
+            var nx = dx / d, ny = dy / d, vn = e.v.x * nx + e.v.y * ny;
+            e.p.x = qx + nx * R; e.p.y = qy + ny * R;
+            if (vn < 0) {
+              if (-vn > 380) hits.push({ t: t, x: qx, y: qy, k: Math.min(1, -vn / 1400), nx: nx, ny: ny });
+              var tx = -ny, ty = nx, vt = e.v.x * tx + e.v.y * ty;
+              e.v.set(-vn * 0.42 * nx + vt * 0.86 * tx, -vn * 0.42 * ny + vt * 0.86 * ty);
+              e.w = e.w * 0.6 - vt / R * 0.4;
+            }
+          }
+        });
+        for (var i = 0; i < E.length; i++) for (var j = i + 1; j < E.length; j++) {
+          var A = E[i], B = E[j], ddx = B.p.x - A.p.x, ddy = B.p.y - A.p.y, dd = Math.hypot(ddx, ddy);
+          if (dd < 2 * R && dd > 1e-4) {
+            var ux = ddx / dd, uy = ddy / dd, ov = (2 * R - dd) / 2;
+            A.p.x -= ux * ov; A.p.y -= uy * ov; B.p.x += ux * ov; B.p.y += uy * ov;
+            var rv = (B.v.x - A.v.x) * ux + (B.v.y - A.v.y) * uy;
+            if (rv < 0) { var im = -rv * 0.7; A.v.x -= ux * im; A.v.y -= uy * im; B.v.x += ux * im; B.v.y += uy * im; }
+          }
+        }
+        E = E.filter(function (e) { return e.p.y > -H / 2 - 150 && Math.abs(e.p.x) < W / 2 + 220; });
+        hits = hits.filter(function (h) { return t - h.t < 0.7; });
+      }
+      function advance(t) {
+        if (simT === null || t - simT > 3 || t < simT) simT = Math.floor(t / DT) * DT;
+        while (simT + DT <= t) { simT += DT; step(simT); }
+      }
+      function enqueue(c) {
+        if (!USE_EMOTES && c.cmd === 'emotes') return;
+        var it = { seq: c.seq, cmd: c.cmd, at: c.ts + LAG, tex: [] };
+        if (c.cmd === 'emotes') it.tex = (c.params.urls || c.params.ids || []).map(emoteTex);
+        if (c.cmd === 'flash') { flashAt = c.ts + LAG; return; }
+        queue.push(it);
+      }
+      // Demo: Emotes nach Zeitplan (Serverzeit), damit auch mehrere Ebenen gleich sind
+      var demoSlot = null;
+      function demo(t) {
+        var slot = Math.floor(t / 0.45);
+        if (demoSlot === null) demoSlot = slot;
+        while (demoSlot < slot) {
+          demoSlot++;
+          if (demoSlot % 30 === 0) { queue.push({ seq: demoSlot, cmd: 'shake', at: demoSlot * 0.45, tex: [] }); continue; }
+          queue.push({ seq: demoSlot, cmd: 'emotes', at: demoSlot * 0.45, tex: [demoTex(demoSlot % 5)] });
+        }
+      }
+
+      // Meshes für Emotes, Treffer-Blitze, Funken (Ebene front)
+      var emoteMeshes = [], hitMeshes = [], SPK = 16 * 14;
+      for (i = 0; i < 80; i++) {
+        var em = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ transparent: true, depthTest: false }));
+        em.visible = false; em.renderOrder = 8; scene.add(em); emoteMeshes.push(em);
+      }
+      for (i = 0; i < 16; i++) { var hm = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMat(ACC, 1)); hm.visible = false; hm.renderOrder = 9; scene.add(hm); hitMeshes.push(hm); }
+      var sparkG = new THREE.BufferGeometry(), spPos = new Float32Array(SPK * 3), spA = new Float32Array(SPK);
+      sparkG.setAttribute('position', new THREE.BufferAttribute(spPos, 3)); sparkG.setAttribute('a', new THREE.BufferAttribute(spA, 1));
+      var sparks = new THREE.Points(sparkG, new THREE.ShaderMaterial({ transparent: true, depthTest: false, blending: THREE.AdditiveBlending, uniforms: { c: { value: ACC } },
+        vertexShader: 'attribute float a; varying float va; void main(){ va = a; gl_PointSize = 6.0 * a + 1.0; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+        fragmentShader: 'uniform vec3 c; varying float va; void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; gl_FragColor = vec4(c + 0.4, va * (1.0 - r*2.0)); }' }));
+      sparks.frustumCulled = false; sparks.renderOrder = 9; scene.add(sparks);
+      // Alert-Schein um den Rahmen
+      var aura = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), glowMat(ACC, 0)); aura.renderOrder = 1; scene.add(aura);
+      var flashAt = -99;
+
+      function frame() {
+        var t = now();
+        if (DEMO) demo(t);
+        advance(t);
+        // Rahmen federt bei Treffern, kräftig bei !shake (nur der Rahmen; die Kamera ist eine eigene OBS-Quelle)
+        var wob = 0, kick = 0;
+        hits.forEach(function (h) { var a = t - h.t; if (a >= 0 && a < 0.6) { wob += h.k * Math.sin(a * 40) * Math.exp(-a * 8) * (h.nx >= 0 ? 1 : -1); kick += h.k * Math.exp(-a * 10); } });
+        var sa = t - shakeAt; if (sa >= 0 && sa < 1.2) wob += Math.sin(sa * 34) * Math.exp(-sa * 3) * 2;
+        if (REDUCED) wob *= 0.2;
+        frameRig.rotation.z = wob * 0.006; frameRig.position.set(CX + wob * 2, CY - Math.min(kick, 1.5) * 2, 0);
+        var fl = t - flashAt, flash = fl >= 0 && fl < 1.6 ? Math.exp(-fl * 2.2) : 0;
+        frameMat.emissive.copy(ACC).multiplyScalar(Math.min(0.7, kick * 0.5 + flash * 0.6));
+        // Aura (Ebene back): Alert-Schein hinter dem Rahmen
+        aura.visible = on('back') && flash > 0.01;
+        aura.position.set(CX, CY, -20); aura.scale.set((CW + 2 * FB) * 1.6, (CH + 2 * FB) * 1.9, 1); aura.material.uniforms.k.value = flash * 1.2;
+        // Komet
+        trail.forEach(function (m, i) {
+          var p = cometPos(t - i * 0.022), front = p.z >= 0, sc = (1 + p.z / 1600) * Math.max(24, CW * 0.17) * m.userData.s;
+          m.visible = front ? on('front') : on('back'); m.position.copy(p); m.scale.set(sc, sc, 1);
+          // Rand-Fade: nie hart über die Bildkante
+          var ef = Math.min(1, Math.max(0, (W / 2 - Math.abs(p.x) - sc * 0.2) / 90)) * Math.min(1, Math.max(0, (H / 2 - Math.abs(p.y) - sc * 0.2) / 90));
+          m.material.uniforms.k.value = m.userData.k * ef;
+        });
+        // Emotes
+        var showFront = on('front'), sp = 0;
+        emoteMeshes.forEach(function (m, i) {
+          var e = E[i]; m.visible = !!e && showFront && !!e.tex && !e.tex._bad && !!e.tex.image; if (!m.visible) return;
+          m.material.map = e.tex; m.material.needsUpdate = m.material.userData.t !== e.tex; m.material.userData.t = e.tex;
+          m.position.set(e.p.x, e.p.y, 30); m.rotation.z = e.a;
+          var age = t - e.born; m.scale.setScalar((2 * R + 4) * (0.4 + 0.6 * Math.min(1, age * 6)));
+          // Rand-Fade statt hartem Verschwinden an der Bildkante
+          m.material.opacity = Math.min(1, Math.max(0, (W / 2 + 40 - Math.abs(e.p.x)) / 80)) * Math.min(1, Math.max(0, (e.p.y + H / 2 + 40) / 80));
+        });
+        var hs = hits.filter(function (h) { return t - h.t < 0.35; }).slice(-16);
+        hitMeshes.forEach(function (m, i) {
+          var h = hs[i]; m.visible = !!h && showFront; if (!m.visible) return; var a = (t - h.t) / 0.35;
+          m.position.set(h.x, h.y, 40); var sc = R * 6 * (0.5 + a * 1.2 * (0.5 + h.k)); m.scale.set(sc, sc, 1);
+          m.material.uniforms.k.value = (1 - a) * 1.6 * (0.4 + h.k);
+          for (var q = 0; q < 14; q++) {
+            var ang = Math.atan2(h.ny, h.nx) + (q / 13 - 0.5) * 2.4, sd = (220 + (q * 37 % 9) * 40) * (t - h.t);
+            spPos[sp * 3] = h.x + Math.cos(ang) * sd; spPos[sp * 3 + 1] = h.y + Math.sin(ang) * sd - 900 * (t - h.t) * (t - h.t); spPos[sp * 3 + 2] = 40; spA[sp++] = 1 - a;
+          }
+        });
+        for (; sp < SPK; sp++) spA[sp] = 0;
+        sparkG.attributes.position.needsUpdate = sparkG.attributes.a.needsUpdate = true;
+        sparks.visible = showFront;
+        r.render(scene, cam);
+        if (isNaN(AT)) requestAnimationFrame(frame);
+      }
+
+      resize(); window.addEventListener('resize', resize);
+      if (!isNaN(AT)) {   // ?at=: Standbild (Demo-Emotes ab 0)
+        simT = 0; demoSlot = 0;
+        while (simT + DT <= AT) { simT += DT; if (DEMO) demo(simT); step(simT); }
+        frame();
+      } else requestAnimationFrame(frame);
+
+      // ── Befehle (Emotes, Shake, Flash) und Alerts, nur über die Token-URL ──
+      var m = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+      if (!m || !isNaN(AT)) return;
+      function poller(effect, handle) {
+        var url = '/s/' + m[1] + '/api/fx/' + effect + '/poll', seq = null, epoch = null;
+        (function poll() {
+          var delay = 1000;
+          fetch(url + (seq === null ? '' : '?since=' + seq), { cache: 'no-store' })
+            .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+            .then(function (d) {
+              if (typeof d.now === 'number') clockOff = d.now - Date.now() / 1000;
+              if (epoch !== null && d.epoch !== epoch) { epoch = d.epoch; seq = 0; delay = 0; return; }
+              epoch = d.epoch;
+              if (seq !== null) (d.commands || []).forEach(handle);
+              seq = d.seq;
+            })
+            .catch(function () { delay = 4000; })
+            .then(function () { setTimeout(poll, delay); });
+        })();
+      }
+      poller('frame', enqueue);
+      if (P.get('alerts') !== '0') poller('alert', function (c) { flashAt = c.ts + LAG * 0.3; });
+    })();
+  </script>
+</body>
+</html>

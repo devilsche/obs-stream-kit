@@ -14,6 +14,20 @@ def _clean_store():
 
 # --- Validierung ---
 
+def test_frame_emotes_only_cors_hosts_and_capped():
+    tw = "https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/3.0"
+    sv = "https://cdn.7tv.app/emote/01F6MQ33FG000FFJ97ZB8MWV52/4x.webp"
+    bt = "https://cdn.betterttv.net/emote/5e4e7a1f08b4447d56a92967/3x"
+    c = commands.parse("frame", {"cmd": "emotes", "urls": " ".join([tw, sv, bt, "javascript:alert(1)", tw])})
+    assert c["params"]["urls"] == [tw, sv]          # BTTV ohne CORS, Unsinn und Doppelte raus
+    many = ",".join("https://static-cdn.jtvnw.net/emoticons/v2/%d/default/dark/3.0" % i for i in range(9))
+    assert len(commands.parse("frame", {"cmd": "emotes", "urls": many})["params"]["urls"]) == 5
+    ids = commands.parse("frame", {"cmd": "emotes", "ids": "25,emotesv2_" + "a" * 32 + ",../x"})
+    assert ids["params"]["ids"] == ["https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/3.0",
+                                    "https://static-cdn.jtvnw.net/emoticons/v2/emotesv2_" + "a" * 32 + "/default/dark/3.0"]
+    assert commands.parse("frame", {"cmd": "shake"}) == {"cmd": "shake", "params": {}}
+
+
 def test_parse_simple_commands():
     for cmd in ("strike", "gust", "stop", "start", "reset"):
         assert commands.parse("rain", {"cmd": cmd}) == {"cmd": cmd, "params": {}}

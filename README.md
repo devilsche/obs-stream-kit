@@ -163,6 +163,18 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 
 `widgets/webcam-frame-energy.html` – Energierand um die Kamera: fließendes Plasma in Theme-Farben, zwei Lichtkometen laufen um den Rahmen, die Kamera selbst bleibt frei. Bei jedem Alert (liest dieselben Befehle wie die Alert-Sources mit) flammt der Rand auf und eine Lichtwelle läuft von oben Mitte einmal herum; Raid, Giftsub, Bits und Tips stärker. Theme-Wechsel ohne Neuladen. Browser-Source = Kamera + 2 × `pad` (Standard 50 px wie beim alten Rahmen), der Schein endet weich vor dem Rand. URL: `width`/`height` (Kamera, Standard: Quelle minus Rand), `pad`, `radius` (Ecken, Standard 10), `speed` (0.2–3), `alerts=0` (keine Reaktion), `demo=1` (alle 6 s ein Test-Alert). Bei „Bewegung reduzieren“ fließt es langsamer.
 
+
+### Webcam-Rahmen Depth (WebGL, 3D, Chat-Emotes)
+
+**Eine Karte für alle Rahmen:** Im Dashboard gibt es nur noch „Webcam Frame“ mit dem Schalter **Style** (Classic, Energy, Depth); die Schalter passen sich dem Style an. `widgets/webcam-frame.html?style=energy|depth` leitet auf `webcam-frame-energy.html` bzw. `webcam-frame-depth.html` weiter (Parameter bleiben), alte URLs funktionieren weiter.
+
+`widgets/webcam-frame-depth.html` – 3D-Rahmen (Metall in Theme-Farbe, Akzentkante) als **Vollbild-Quelle** in Szenengröße; die Kamera liegt bei `x`, `y`, `width`, `height` (leer = unten rechts, 29 % breit, 16:9). Ein Lichtkomet kreist um den Rahmen, mal hinter, mal vor dir. **Chat-Emotes** fliegen vom Bildrand heran, knallen an den Rahmen (Funken, Lichtblitz, der Rahmen federt), bleiben auf der Oberkante liegen; `stack` begrenzt den Stapel (das älteste rutscht ab), `max` die Zahl auf dem Bildschirm. `!shake` wirft alle ab, Alerts lassen den Rahmen aufleuchten.
+
+**Tiefe (du ragst aus dem Rahmen):** dieselbe URL dreimal mit `layer=back`, `layer=frame`, `layer=front`; in OBS von unten nach oben: Back → Kamera (aufs Fenster zugeschnitten) → Frame → Kopie der Kamera mit NVIDIA-Hintergrundentfernung (weniger zugeschnitten, damit der Kopf über den Rahmen ragt) → Front. Alle Ebenen rechnen mit der Serverzeit und denselben Befehlen (Start 1,3 s nach dem Befehl), deshalb passen Komet und Emotes zusammen. `layer=all` (Standard) zeigt alles in einer Quelle.
+
+**Befehle** (`/s/<token>/api/fx/frame`): `cmd=emotes&urls=<Bild-URLs>` (oder `ids=<Twitch-Emote-IDs>`; höchstens 5 je Nachricht, nur Twitch/7TV/FFZ – BTTV erlaubt kein CORS), `cmd=shake`, `cmd=flash`. Streamer.bot: Aktion auf **Chat Message** mit „Execute C# Code“ (Code auf der Dashboard-Karte, setzt `%emoteUrls%`, Nachrichten ohne Emotes brechen ab) und danach **Fetch URL** `…/api/fx/frame?cmd=emotes&urls=%emoteUrls%`.
+
+Parameter: `layer`, `x`, `y`, `width`, `height`, `border` (26), `radius` (14), `comet` (1|0), `emotes` (1|0), `max` (40), `stack` (14), `alerts` (1|0), `speed`, `demo=1` (Emotes zum Ausprobieren). Emotes und Komet blenden am Bildrand weich aus.
 ### Welcome-Widget
 
 | | |
