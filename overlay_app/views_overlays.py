@@ -39,6 +39,7 @@ def _serve_tenant_source(token, subdir, filepath):
     theme = "entry"
     stinger_font = ""
     feats = []
+    alert_sound = None
     conn = _get_conn()
     try:
         from pubg.db_pg import get_setting
@@ -47,6 +48,12 @@ def _serve_tenant_source(token, subdir, filepath):
         stinger_font = get_setting(conn, g.tenant_id, "stinger_font", "") or ""
         # vom Admin freigeschaltete Extras (z. B. Fress-Ente beim Sushi-Regen); Admin-Tenant hat alle
         feats = features.effective(conn, g.tenant_id)
+        if subdir == "alerts":   # eigene Alert-Töne aus dem Dashboard (js/alert-sound.js)
+            from overlay_app import alert_sounds
+            key = filepath[:-5] if filepath.endswith(".html") else ""
+            if key in alert_sounds.ALERT_KEYS:
+                alert_sound = alert_sounds.for_overlay(alert_sounds.load(conn, g.tenant_id), key)
+                alert_sound["base"] = f"/s/{token}/alert-sounds/{key}/"
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
@@ -62,6 +69,8 @@ def _serve_tenant_source(token, subdir, filepath):
         "__STINGER_FONT__": stinger_font,
         "__FEATURES__": feats,
     }
+    if alert_sound is not None:
+        variables["__ALERT_SOUND__"] = alert_sound
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 
@@ -125,6 +134,19 @@ def effect_file(token, filepath):
 @bp_overlays.route("/widgets-static/<path:filepath>")
 def widgets_static_public(filepath):
     return serve_asset(_root(), "widgets", filepath)
+
+
+@bp_overlays.route("/s/<token>/alert-sounds/<alert>/<file_id>.mp3")
+def alert_sound_file(token, alert, file_id):
+    """Eigene Alert-Töne des Tenants (Upload im Dashboard), nur über dessen Token."""
+    from flask import send_file
+    from overlay_app import alert_sounds
+    if g.tenant_id is None:
+        abort(404)
+    p = alert_sounds.path_of(_root(), g.tenant_id, alert, file_id)
+    if not p:
+        abort(404)
+    return send_file(p, mimetype="audio/mpeg", max_age=86400)
 
 
 # Relative ../assets/ und ../js/ aus den Overlay-HTMLs token-scoped bedienen.

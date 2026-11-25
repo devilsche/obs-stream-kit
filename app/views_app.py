@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 
 from flask import (
     Blueprint, render_template, g, jsonify, request, redirect, current_app,
-    abort, send_from_directory,
+    abort, send_from_directory, send_file,
 )
 
 from webcore.middleware import require_admin, require_session, _get_conn
@@ -1085,3 +1085,84 @@ def tools_open(key):
     # fuer Widgets schon so, hier fehlte es.
     return html, 200, {"Content-Type": "text/html; charset=utf-8",
                        "Cache-Control": "no-cache, must-revalidate"}
+
+
+# ── Alert-Töne (bis zu 3 MP3 je Alert, Dashboard → Stream → Alert-Karte) ──
+
+def _sound_conn(fn):
+    conn = _get_conn()
+    try:
+        return fn(conn)
+    finally:
+        if "_PG_CONN_FACTORY" not in current_app.config:
+            conn.close()
+
+
+def _sound_root():
+    return current_app.config.get("_PROJECT_ROOT", ".")
+
+
+def _fetch_only():
+    """Schreibende Aufrufe nur per fetch() mit eigenem Header – ein fremdes Formular kann den nicht setzen."""
+    return request.headers.get("X-Requested-With") == "fetch"
+
+
+@bp_app.route("/app/api/alert-sounds")
+@require_session
+def alert_sounds_list():
+    from overlay_app import alert_sounds
+    cfg = _sound_conn(lambda c: alert_sounds.load(c, g.tenant_id))
+    return jsonify({"alerts": cfg, "maxFiles": alert_sounds.MAX_FILES,
+                    "maxSeconds": alert_sounds.MAX_SECONDS, "maxBytes": alert_sounds.MAX_BYTES})
+
+
+@bp_app.route("/app/api/alert-sounds/<alert>", methods=["POST"])
+@require_session
+def alert_sounds_upload(alert):
+    from overlay_app import alert_sounds
+    if not _fetch_only():
+        return jsonify({"ok": False, "error": "Bad request."}), 400
+    f = request.files.get("sound")
+    if not f:
+        return jsonify({"ok": False, "error": "No file received."}), 400
+    data = f.read(alert_sounds.MAX_BYTES + 1)
+    entry, err = _sound_conn(lambda c: alert_sounds.add(c, _sound_root(), g.tenant_id, alert, f.filename, data))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True, "file": entry})
+
+
+@bp_app.route("/app/api/alert-sounds/<alert>/volume", methods=["POST"])
+@require_session
+def alert_sounds_volume(alert):
+    from overlay_app import alert_sounds
+    body = request.get_json(silent=True) if request.is_json else None
+    try:
+        vol = float(body.get("volume"))
+    except (AttributeError, TypeError, ValueError):
+        return jsonify({"ok": False, "error": "Invalid volume."}), 400
+    if not _sound_conn(lambda c: alert_sounds.set_volume(c, g.tenant_id, alert, vol)):
+        return jsonify({"ok": False, "error": "Unknown alert."}), 404
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/alert-sounds/<alert>/<file_id>", methods=["DELETE"])
+@require_session
+def alert_sounds_delete(alert, file_id):
+    from overlay_app import alert_sounds
+    if not _fetch_only():
+        return jsonify({"ok": False, "error": "Bad request."}), 400
+    if not _sound_conn(lambda c: alert_sounds.delete(c, _sound_root(), g.tenant_id, alert, file_id)):
+        return jsonify({"ok": False, "error": "Not found."}), 404
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/alert-sounds/<alert>/<file_id>.mp3")
+@require_session
+def alert_sounds_file(alert, file_id):
+    """Vorhören im Dashboard (nur eigene Töne)."""
+    from overlay_app import alert_sounds
+    p = alert_sounds.path_of(_sound_root(), g.tenant_id, alert, file_id)
+    if not p:
+        abort(404)
+    return send_file(p, mimetype="audio/mpeg", max_age=3600)

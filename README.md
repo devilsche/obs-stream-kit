@@ -238,6 +238,8 @@ Alerts sind **1920×1080 Fullscreen-Overlays** mit einmaliger Animation.
 >
 > **`total`**: optionaler Parameter für kumulative Gesamt-Gifts des Users. Wenn gesetzt (> 0), wird unten „Insgesamt X Subs verschenkt" angezeigt. In Streamer.bot ggf. als `%totalSubsGifted%` oder ähnliche Variable verfügbar.
 
+> **Ton je Alert (Dashboard):** Unter Stream → Alert-Karte → **Sound** lassen sich bis zu **3 MP3** je Alert hochladen (höchstens 20 s und 2 MB, die Länge prüft der Server selbst, `overlay_app/alert_sounds.py`). Der Alert spielt beim Erscheinen zufällig einen davon, nie zweimal hintereinander denselben, und blendet ihn zum Ende (`duration`) aus (`js/alert-sound.js`). Lautstärke je Alert im Dashboard, `?volume=` in der URL wirkt als Faktor, `?sound=0` schaltet stumm. Ablage: `data/alert-sounds/<tenant>/<alert>/<id>.mp3`, Verzeichnis in `settings['alert_sounds']`, Auslieferung nur über die Token-URL (`/s/<token>/alert-sounds/<alert>/<id>.mp3`). In OBS **Audio über OBS steuern** aktivieren. Streamer.bot braucht dann kein „Play Sound“ mehr.
+
 ### Alerts mit Streamer.bot einrichten
 
 Die Alert-Dateien sind statisches HTML — sie brauchen **Streamer.bot** als Brücke zwischen Twitch-Events und OBS.

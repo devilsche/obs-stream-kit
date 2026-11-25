@@ -638,7 +638,27 @@ G1R_STEAM_NAME=</code></pre>
 
         <span class="url-copied" id="urlCtlStatus" role="status" aria-live="polite"></span>
       </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${chromeHtml}`;
+    // Alerts: eigene Töne (bis zu 3 MP3, zufällig abgespielt) – Inhalt lädt wireAlertSound()
+    const alertKey = card.dataset.cat === "Alert" ? (card.dataset.path || "").replace(/^alerts\//, "").replace(/\.html$/, "") : "";
+    const soundHtml = alertKey ? `
+      <div class="url-dbox url-soundbox" id="urlSoundBox" data-alert="${escapeAttr(alertKey)}">
+        <h2>Sound <span class="url-dbox__tag">plays with the alert</span></h2>
+        <p class="url-dbox__desc">Upload up to 3 short MP3 files. Each alert plays one of them at random (never the same one twice in a row) and fades it out when the alert disappears. In OBS enable <b>Control audio via OBS</b> for this source.</p>
+        <div class="url-sound__list" id="urlSoundList"><p class="url-dbox__desc">Loading…</p></div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundVol">Volume</label>
+          <select id="urlSoundVol" class="url-sound__sel">
+            ${[[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
+          </select>
+        </div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlSoundFile">Add MP3</label>
+          <input type="file" id="urlSoundFile" class="url-sound__file" accept="audio/mpeg,.mp3" aria-describedby="urlSoundRules">
+        </div>
+        <p class="url-sound__rules" id="urlSoundRules"></p>
+        <span class="url-copied" id="urlSoundStatus" role="status" aria-live="polite"></span>
+      </div>` : "";
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${soundHtml}${chromeHtml}`;
 
     const infoBits = [];
     const pw = parseInt(card.dataset.previewW || "0");
@@ -693,6 +713,7 @@ G1R_STEAM_NAME=</code></pre>
       ${commandsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-chat" role="tabpanel" aria-labelledby="dtab-chat" hidden>${commandsHtml}</div>` : ""}`;
     if (hasTabs) wireDetailTabs();
     wireThemeSections();
+    if (alertKey) wireAlertSound(alertKey);
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -707,6 +728,72 @@ G1R_STEAM_NAME=</code></pre>
     document.getElementById("urlBack").focus();
     window.scrollTo(0, 0);
     try { history.replaceState(null, "", "#src=" + encodeURIComponent(card.dataset.path)); } catch (_) {}
+  }
+
+  // ── Alert-Töne: Liste, Vorhören, Löschen, Hochladen, Lautstärke ──
+  let soundPreview = null;
+  function wireAlertSound(alert) {
+    const list = document.getElementById("urlSoundList");
+    const vol = document.getElementById("urlSoundVol");
+    const file = document.getElementById("urlSoundFile");
+    const rules = document.getElementById("urlSoundRules");
+    const status = document.getElementById("urlSoundStatus");
+    if (!list) return;
+    const api = "/app/api/alert-sounds/" + encodeURIComponent(alert);
+    const say = (msg, bad) => { status.textContent = msg; status.classList.toggle("is-error", !!bad); };
+    function render(data) {
+      const e = data.alerts[alert] || { files: [], volume: 0.6 };
+      rules.textContent = `MP3 only, at most ${data.maxSeconds} s and ${Math.round(data.maxBytes / 1048576)} MB, up to ${data.maxFiles} files.`;
+      vol.value = String([0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
+      file.disabled = e.files.length >= data.maxFiles;
+      file.setAttribute("aria-disabled", file.disabled ? "true" : "false");
+      list.innerHTML = e.files.length ? `<ul class="url-sound__items">${e.files.map(f => `
+        <li class="url-sound__item">
+          <span class="material-symbols-outlined" aria-hidden="true">music_note</span>
+          <span class="url-sound__name">${escapeHtml(f.name)}</span>
+          <span class="url-sound__dur">${Number(f.dur).toFixed(1)} s</span>
+          <button type="button" class="url-act ghost" data-play="${escapeAttr(f.id)}" aria-label="Play ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
+          <button type="button" class="url-act ghost" data-del="${escapeAttr(f.id)}" aria-label="Delete ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
+        </li>`).join("")}</ul>` : `<p class="url-dbox__desc">No sound yet — the alert stays silent.</p>`;
+    }
+    function reload() {
+      return fetch("/app/api/alert-sounds", { credentials: "same-origin" })
+        .then(r => r.ok ? r.json() : Promise.reject(r.status)).then(render)
+        .catch(() => { list.innerHTML = `<p class="url-dbox__desc">Could not load the sounds.</p>`; });
+    }
+    list.addEventListener("click", e => {
+      const p = e.target.closest("[data-play]"), d = e.target.closest("[data-del]");
+      if (p) {
+        if (soundPreview) soundPreview.pause();
+        soundPreview = new Audio(api + "/" + p.dataset.play + ".mp3");
+        soundPreview.volume = parseFloat(vol.value) || 0.6;
+        soundPreview.play().catch(() => say("Playback blocked by the browser.", true));
+      } else if (d) {
+        fetch(api + "/" + d.dataset.del, { method: "DELETE", credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+          .then(r => r.json()).then(res => { say(res.ok ? "Deleted." : (res.error || "Could not delete."), !res.ok); return reload(); });
+      }
+    });
+    vol.addEventListener("change", () => {
+      fetch(api + "/volume", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+        body: JSON.stringify({ volume: parseFloat(vol.value) }) })
+        .then(r => r.json()).then(res => say(res.ok ? "Volume saved." : (res.error || "Could not save."), !res.ok));
+    });
+    file.addEventListener("change", () => {
+      const f = file.files && file.files[0];
+      if (!f) return;
+      const fd = new FormData(); fd.append("sound", f);
+      say("Uploading…");
+      file.setAttribute("aria-invalid", "false");
+      fetch(api, { method: "POST", credentials: "same-origin", headers: { "X-Requested-With": "fetch" }, body: fd })
+        .then(r => r.json()).then(res => {
+          if (res.ok) say("Added " + res.file.name + ".");
+          else { say(res.error || "Upload failed.", true); file.setAttribute("aria-invalid", "true"); }
+          file.value = "";
+          return reload();
+        }).catch(() => say("Upload failed.", true));
+    });
+    reload();
   }
 
   // ── Events im frisch gerenderten Detail verdrahten ────────

@@ -1403,3 +1403,17 @@ a.url-card{text-decoration:none}
 .sk-item summary{cursor:pointer;white-space:pre-wrap;min-height:24px}
 .sk-item summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .sk-actions{margin-top:10px}
+
+/* ── Alert-Töne (Alert-Detail → Sound) ── */
+.url-soundbox .url-copied{margin-left:0;min-height:1.2em;display:block}
+.url-soundbox .url-copied.is-error{color:var(--danger)}
+.url-sound__items{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
+.url-sound__item{display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--r-ctrl)}
+.url-sound__name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.url-sound__dur{font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:12px;color:var(--text-muted)}
+.url-sound__item .url-act{min-width:32px;min-height:32px;justify-content:center}
+.url-sound__row{display:flex;align-items:center;gap:10px;margin:8px 0;flex-wrap:wrap}
+.url-sound__lbl{min-width:90px;font-weight:600}
+.url-sound__sel,.url-sound__file{min-height:32px}
+.url-sound__file:focus-visible,.url-sound__sel:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.url-sound__rules{font-size:12px;color:var(--text-muted);margin:4px 0 6px}
