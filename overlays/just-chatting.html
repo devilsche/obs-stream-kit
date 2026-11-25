@@ -535,6 +535,12 @@
     }
   </style>
   <link rel="stylesheet" href="../widgets/_theme.css">
+  <style>
+    /* Neuer Rahmen (?frame=depth): WebGL Depth Frame als Vollbild-Ebene über dem Hintergrund, unter dem Chat.
+       ?frame=none: gar kein Rahmen (z. B. wenn der Depth Frame als drei eigene Quellen mit layer läuft). */
+    .cam-depth { position: absolute; inset: 0; width: 1920px; height: 1080px; border: 0; z-index: 4; background: transparent; pointer-events: none; }
+    html.frame-depth .cam-frame, html.frame-none .cam-frame { display: none; }
+  </style>
 </head>
 <body>
 
@@ -601,6 +607,23 @@
     <!-- Sparkle container (clipped to cam area) -->
     <div id="cam-sparkles" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:7;"></div>
   </div>
+
+  <!-- Depth Frame (WebGL), nur mit ?frame=depth -->
+  <iframe class="cam-depth" id="camDepth" title="Camera frame" aria-hidden="true" tabindex="-1" hidden></iframe>
+  <script>
+    (function () {
+      var P = new URLSearchParams(location.search), f = P.get('frame');
+      if (f !== 'depth' && f !== 'none') return;
+      document.documentElement.classList.add('frame-' + f);
+      if (f !== 'depth') return;
+      // Kamerafenster dieser Szene: 58/54, 972×972 (siehe .cam-frame)
+      var q = new URLSearchParams({ x: '58', y: '54', width: '972', height: '972', border: '30', radius: '10' });
+      ['comet', 'emotes', 'alerts', 'max', 'stack', 'demo', 'speed'].forEach(function (k) { if (P.get(k) !== null) q.set(k, P.get(k)); });
+      var fr = document.getElementById('camDepth');
+      fr.src = '../widgets/webcam-frame-depth.html?' + q.toString();
+      fr.hidden = false;
+    })();
+  </script>
 
   <!-- Chat area -->
   <div class="chat-area">

@@ -39,7 +39,7 @@ Alle Szenen sind **1920×1080 Fullscreen-Overlays**. In OBS einfach als Browser-
 | `overlays/brb-pause.html` | Pause mit automatischem Twitch Clip-Player | 1920×1080 |
 | `overlays/stream-ending.html` | Animierte Abschlussszene | 1920×1080 |
 | `overlays/gameplay.html` | Gameplay Overlay (transparenter Hintergrund mit Sparkles) | 1920×1080 |
-| `overlays/just-chatting.html` | Fullscreen-Kamera mit Chat-Bereich, Blitz-Arcs und Sparkles | 1920×1080 |
+| `overlays/just-chatting.html` | Fullscreen-Kamera mit Chat-Bereich, Blitz-Arcs und Sparkles. `frame=depth`: statt des Blitz-Rahmens der Depth Frame (3D, Komet, Chat-Emotes; gleiche Befehle wie die Webcam-Frame-Karte, Emotes knallen hier seitlich an den Rahmen, weil oben kein Platz ist), dazu `comet`, `emotes`, `alerts`, `demo`. `frame=none`: kein Rahmen, z. B. für den Depth Frame als drei eigene Quellen (`x=58&y=54&width=972&height=972`) | 1920×1080 |
 
 ### Starting Soon
 
@@ -174,7 +174,7 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 
 **Befehle** (`/s/<token>/api/fx/frame`): `cmd=emotes&urls=<Bild-URLs>` (oder `ids=<Twitch-Emote-IDs>`; höchstens 5 je Nachricht, nur Twitch/7TV/FFZ – BTTV erlaubt kein CORS), `cmd=shake`, `cmd=flash`. Streamer.bot: Aktion auf **Chat Message** mit „Execute C# Code“ (Code auf der Dashboard-Karte, setzt `%emoteUrls%`, Nachrichten ohne Emotes brechen ab) und danach **Fetch URL** `…/api/fx/frame?cmd=emotes&urls=%emoteUrls%`.
 
-Parameter: `layer`, `x`, `y`, `width`, `height`, `border` (26), `radius` (14), `comet` (1|0), `emotes` (1|0), `max` (40), `stack` (14), `alerts` (1|0), `speed`, `demo=1` (Emotes zum Ausprobieren). Emotes und Komet blenden am Bildrand weich aus.
+Parameter: `layer`, `x`, `y`, `width`, `height`, `border` (26), `radius` (14), `comet` (1|0), `emotes` (1|0), `max` (40), `stack` (14), `alerts` (1|0), `speed`, `demo=1` (Emotes zum Ausprobieren). Emotes und Komet blenden am Bildrand weich aus. Ist über der Kamera kein Platz (Kamera reicht bis an den oberen Bildrand), knallen die Emotes seitlich an den Rahmen und fallen herunter.
 ### Welcome-Widget
 
 | | |
