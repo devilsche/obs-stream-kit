@@ -15,8 +15,9 @@ from overlay_app.pet_media import _img_ext
 SETTING = "stinger_logo"
 MAX_BYTES = 6 * 1024 * 1024
 _ID_RE = re.compile(r"^[0-9a-f]{12}$")
-_FILE_RE = re.compile(r"^([0-9a-f]{12})\.(png|jpg|webp|gif)$")
-MIME = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp", "gif": "image/gif"}
+_FILE_RE = re.compile(r"^([0-9a-f]{12})\.(png|jpg|webp)$")
+# kein GIF: der Stinger zeichnet das Bild einmal in eine Textur, eine Animation bliebe stehen
+MIME = {"png": "image/png", "jpg": "image/jpeg", "webp": "image/webp"}
 
 
 def _get(conn, tenant_id):
@@ -68,8 +69,10 @@ def set_image(conn, root, tenant_id, filename, data):
     if len(data) > MAX_BYTES:
         return None, "Image too large: at most %d MB." % (MAX_BYTES // (1024 * 1024))
     ext = _img_ext(data)
+    if ext == "gif":
+        return None, "GIFs would not move in the stinger – please use PNG or WebP."
     if not ext:
-        return None, "This is not a PNG, JPG, WebP or GIF image."
+        return None, "This is not a PNG, JPG or WebP image."
     old = load(conn, tenant_id)
     fid = secrets.token_hex(6)
     os.makedirs(folder(root, tenant_id), exist_ok=True)

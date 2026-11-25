@@ -38,3 +38,9 @@ def test_rejects_non_images_and_paths(tmp_path, monkeypatch):
     assert stinger_logo.set_image(c, str(tmp_path), 5, "x.svg", b"<svg></svg>")[1]
     assert stinger_logo.set_image(c, str(tmp_path), 5, "x.png", b"")[1]
     assert stinger_logo.path_of(str(tmp_path), 5, "../secrets.png") is None
+
+
+def test_gif_rejected(tmp_path, monkeypatch):
+    _patch(monkeypatch)
+    e, err = stinger_logo.set_image(FakeConn(), str(tmp_path), 5, "a.gif", b"GIF89a" + b"\x00" * 20)
+    assert e is None and "GIF" in err

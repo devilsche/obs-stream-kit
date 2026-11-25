@@ -156,6 +156,11 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 
 **Beispiel:** `widgets/webcam-frame.html?width=500&height=280` → Browser-Source auf **600×380** setzen
 
+
+### Webcam-Rahmen Energie (WebGL)
+
+`widgets/webcam-frame-energy.html` – Energierand um die Kamera: fließendes Plasma in Theme-Farben, zwei Lichtkometen laufen um den Rahmen, die Kamera selbst bleibt frei. Bei jedem Alert (liest dieselben Befehle wie die Alert-Sources mit) flammt der Rand auf und eine Lichtwelle läuft von oben Mitte einmal herum; Raid, Giftsub, Bits und Tips stärker. Theme-Wechsel ohne Neuladen. Browser-Source = Kamera + 2 × `pad` (Standard 50 px wie beim alten Rahmen), der Schein endet weich vor dem Rand. URL: `width`/`height` (Kamera, Standard: Quelle minus Rand), `pad`, `radius` (Ecken, Standard 10), `speed` (0.2–3), `alerts=0` (keine Reaktion), `demo=1` (alle 6 s ein Test-Alert). Bei „Bewegung reduzieren“ fließt es langsamer.
+
 ### Welcome-Widget
 
 | | |
@@ -737,7 +742,7 @@ Die Verzögerung zwischen Blitz und Donner steckt schon in der WAV (Stille am An
 | `transitions/stinger-shards.html` | **WebGL-Entwurf „Shards“** (2 s): rund 290 Glassplitter fliegen aus der Tiefe heran und setzen sich von der Mitte aus zur Wand mit dem Namen zusammen, ein Lichtstreif läuft drüber, die Fugen reißen glühend auf, nach dem Schnitt zerspringt die Wand zur Kamera hin. three.js r128, ein Mesh, Bewegung im Vertex-Shader. Parameter wie Warp; alle Splitter liegen ab `cut` − 0,1 s. | Browser Transition Plugin, Duration: 2000ms, Transition Point: 900ms |
 | `transitions/pet.html` | Haustier-Stinger (4 s): Name, Spitzname, Schrift, Emojis über URL-Parameter. **Bild und Ton** lädt man im Dashboard auf der Karte hoch („Image & sound“: ein Bild PNG/JPG/WebP/GIF bis 6 MB, bis zu 3 MP3 bis 15 s, zufällig gespielt, Lautstärke × Settings → Sound). Der Server gibt sie der Seite als `window.__PET_MEDIA__` mit (`overlay_app/pet_media.py`, Ablage `data/pet-media/<tenant>/`, Verzeichnis `settings['pet_media']`); keine URL nötig, ein `img=` in alten OBS-URLs hat Vorrang. Der Ton startet mit dem Bild (0,3 s), die Seite blendet erst aus, wenn er zu Ende ist – die Move-Action-Dauer der OBS-Quelle muss so lang sein wie 0,3 s + Tonlänge + 0,5 s. | Browser-Source 1920×1080, Ton über OBS |
 
-> **WebGL-Stinger** (`js/stinger-gl.js`): **Logo statt Name** – im Dashboard auf der Karte eines WebGL-Stingers ein Bild hochladen („Logo“, PNG/JPG/WebP/GIF bis 6 MB, am besten breit mit transparentem Hintergrund) und **Show** auf Logo stellen. Es gilt für alle WebGL-Stinger, der Server gibt es der Seite als `window.__STINGER_LOGO__` mit (`overlay_app/stinger_logo.py`, Ablage `data/stinger-logo/<tenant>/`, `settings['stinger_logo']`); ohne Upload erscheint der Name. Kein SVG, weil es unter der Overlay-Domain Skript ausführen könnte. Die Uhr läuft ab Skriptstart, nicht ab dem Laden der Schrift, damit die Abdeckung pünktlich zum Schnitt steht. Ohne WebGL deckt ein einfacher Fade in der Theme-Hintergrundfarbe ab. Bei „Bewegung reduzieren“ drehen sich die Splitter nicht und der Wirbel läuft langsamer.
+> **WebGL-Stinger** (`js/stinger-gl.js`): **Logo statt Name** – im Dashboard auf der Karte eines WebGL-Stingers ein Bild hochladen („Logo“, PNG/JPG/WebP bis 6 MB, kein GIF – der Stinger zeichnet das Bild einmal, es bliebe stehen; am besten breit mit transparentem Hintergrund) und **Show** auf Logo stellen. Es gilt für alle WebGL-Stinger, der Server gibt es der Seite als `window.__STINGER_LOGO__` mit (`overlay_app/stinger_logo.py`, Ablage `data/stinger-logo/<tenant>/`, `settings['stinger_logo']`); ohne Upload erscheint der Name. Kein SVG, weil es unter der Overlay-Domain Skript ausführen könnte. Die Uhr läuft ab Skriptstart, nicht ab dem Laden der Schrift, damit die Abdeckung pünktlich zum Schnitt steht. Ohne WebGL deckt ein einfacher Fade in der Theme-Hintergrundfarbe ab. Bei „Bewegung reduzieren“ drehen sich die Splitter nicht und der Wirbel läuft langsamer.
 
 ---
 

@@ -131,6 +131,20 @@ ALERTS = [
 DECOR = [
     {"key": "logo",           "label": "Logo",            "file": "logo.html",           "size": "1920×1080",
      "desc": "Logo overlay.",                          "params": [], "switches": []},
+    {"key": "webcam-frame-energy", "label": "Webcam Frame Energy", "file": "webcam-frame-energy.html", "size": "",
+     "desc": "WebGL energy border around the camera: flowing plasma in theme colours, light comets, flares up on every alert. Source size = camera + 2 × padding (default 50 px).",
+     "params": [], "switches": [
+         {"key": "width",  "label": "Camera width",  "type": "number", "default": "", "min": 20,
+          "tooltip": "Empty = source width minus padding"},
+         {"key": "height", "label": "Camera height", "type": "number", "default": "", "min": 20,
+          "tooltip": "Empty = source height minus padding"},
+         {"key": "pad",    "label": "Padding",       "type": "number", "default": "50", "min": 0},
+         {"key": "radius", "label": "Corner radius", "type": "number", "default": "10", "min": 0},
+         {"key": "speed",  "label": "Speed",         "type": "select", "default": "1",
+          "options": [["0.5", "Slow"], ["1", "Normal"], ["2", "Fast"]]},
+         {"key": "alerts", "label": "React to alerts", "type": "select", "default": "1",
+          "options": [["1", "On"], ["0", "Off"]]},
+     ]},
     {"key": "webcam-frame",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "",
      "desc": "Decorative frame around the camera. Canvas = camera size + 100px padding on each side.", "params": [], "switches": [
          {"key": "width",  "label": "Width",  "type": "number", "default": "400", "min": 100},
