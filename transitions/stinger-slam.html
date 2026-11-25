@@ -6,7 +6,7 @@
   <title>Stinger Slam</title>
   <!-- WebGL-Stinger „Slam“: Zwei schwere Metallplatten mit Zickzack-Naht schwingen wie Türen aus Richtung Kamera
        zu und schlagen zusammen (beschleunigt, kurzer Rückprall, Plattenkante sichtbar), das Bild wackelt, an der Naht sprühen Funken, Name oder Logo setzt sich aus
-       beiden Hälften zusammen; nach dem Schnitt glüht die Naht, die Platten schwingen ganz nach hinten auf und blenden zum Ende aus.
+       beiden Hälften zusammen; nach dem Schnitt glüht die Naht, die Platten schwingen ohne Abbremsen ganz nach hinten auf und verlassen das Bild, erst ganz am Ende blenden Reste aus.
        three.js r128. URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none).
        Einschlag bei cut − 0,2 s, ab da ist das Bild zu. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
@@ -44,16 +44,17 @@
         /* Tür: Drehung um die Hochachse an der Bildkante (x = side·960). Rein: schwingt aus Richtung Kamera zu
            (beschleunigt), Rückprall nur als leichtes Ineinanderschieben (nie ein Spalt), raus: schwingt nach hinten auf
            und fährt dabei auseinander. */
-        'float outP(float t){ return clamp((t - uCut - 0.04) / max(0.2, (uDur - uCut) * 0.75), 0.0, 1.0); }',
-        // am Ende ausblenden, damit garantiert nichts stehen bleibt
-        'float outFade(float t){ return 1.0 - smoothstep(0.55, 1.0, outP(t)); }',
+        'float outP(float t){ return clamp((t - uCut) / max(0.2, (uDur - uCut) * 0.92), 0.0, 1.0); }',
+        // erst ganz zum Schluss ausblenden, damit garantiert nichts stehen bleibt
+        'float outFade(float t){ return 1.0 - smoothstep(0.82, 1.0, outP(t)); }',
         'vec3 door(vec3 p, float side, float t){',
         '  float pIn = clamp((t - 0.05) / max(0.1, uHit - 0.05), 0.0, 1.0);',
         '  float pOut = outP(t);',
-        '  float ang = side * 1.3 * (1.0 - pow(pIn, 2.4)) - side * 1.75 * (1.0 - pow(1.0 - pOut, 2.0));',
+        '  float eo = pOut * pOut * (2.0 - pOut);',
+        '  float ang = side * 1.3 * (1.0 - pow(pIn, 2.4)) - side * 1.5 * eo;',
         '  float bt = max(t - uHit, 0.0);',
         '  p.x -= side * 18.0 * abs(sin(bt * 38.0)) * exp(-bt * 11.0) * step(uHit, t);',
-        '  p.x += side * 1100.0 * pow(pOut, 1.6);',
+        '  p.x += side * 1500.0 * eo;',
         '  if (ang == 0.0) return p;',
         '  float px = side * 960.0; vec2 r = vec2(p.x - px, p.z);',
         '  float c = cos(ang), s = sin(ang);',
