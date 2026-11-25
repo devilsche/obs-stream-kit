@@ -38,6 +38,9 @@
   .status.err { color: #ff8a80; }
   .tag { font-size: 12px; font-weight: 700; color: #ff8a80; }
   .tag.real { color: #9be59b; }
+  .tag.off { color: var(--ps-accent); }
+  #embed { width: 100%; height: 100%; border: 0; display: block; }
+  #embed[hidden], #big[hidden] { display: none; }
   .acts { display: flex; gap: 10px; align-items: center; }
   button.v3d { background: #5e2a79; color: #fff; border: 1px solid #8a4dad; border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; min-height: 28px; }
   button.v3d:focus-visible, dialog button:focus-visible { outline: 3px solid var(--ps-accent); outline-offset: 2px; }
@@ -65,6 +68,7 @@
     <div class="dlg-head"><h2 id="dlgTitle">Model</h2><span class="meta" id="dlgInfo" aria-live="polite"></span>
       <button type="button" id="dlgClose">Close</button></div>
     <canvas id="big" aria-label="3D model; drag to rotate, scroll to zoom"></canvas>
+    <iframe id="embed" title="Sketchfab 3D viewer" allow="autoplay; fullscreen; xr-spatial-tracking" hidden></iframe>
   </div>
 </dialog>
 <script src="/drive/a/js/vendor/three-r128.min.js"></script>
@@ -96,7 +100,7 @@
       var img = el('img'); img.src = it.thumb; img.alt = 'Preview of ' + it.name; img.loading = 'lazy'; li.appendChild(img);
       var b = el('div', 'body');
       b.appendChild(el('span', 'name', it.name));
-      if (SET === 'pubg') b.appendChild(el('span', 'tag' + (it.rip ? '' : ' real'), it.rip ? 'PUBG version' : 'Real car / generic'));
+      if (SET === 'pubg') b.appendChild(el('span', 'tag' + (it.official ? ' off' : it.rip ? '' : ' real'), it.official ? 'Official · view only, not downloadable' : it.rip ? 'PUBG version' : 'Real car / generic'));
       var nc = /NonCommercial|NoDeriv/.test(it.license || '');
       b.appendChild(el('span', 'meta', it.author + ' · ' + Math.round((it.tris || 0) / 1000) + 'k triangles'));
       b.appendChild(el('span', 'meta' + (nc ? ' nc' : ''), it.license + (nc ? ' (restricted)' : '')));
@@ -133,6 +137,14 @@
   function openBig(it) {
     var info = document.getElementById('dlgInfo');
     document.getElementById('dlgTitle').textContent = it.name; info.textContent = 'Downloading from Sketchfab …';
+    var fr = document.getElementById('embed'), cv = document.getElementById('big');
+    if (it.downloadable === false) {
+      // nicht herunterladbar (offizielle Modelle): Sketchfab-Viewer statt eigenem Laden
+      cv.hidden = true; fr.hidden = false; fr.src = 'https://sketchfab.com/models/' + it.uid + '/embed?autostart=1&ui_infos=0&ui_watermark=0';
+      info.textContent = Math.round((it.tris || 0) / 1000) + 'k triangles · ' + it.license + ' · by ' + it.author;
+      dlg.showModal(); return;
+    }
+    fr.hidden = true; fr.removeAttribute('src'); cv.hidden = false;
     dlg.showModal();
     if (!big) {
       big = new THREE.WebGLRenderer({ canvas: document.getElementById('big'), antialias: true });
@@ -163,7 +175,10 @@
     })();
   }
   document.getElementById('dlgClose').addEventListener('click', function () { dlg.close(); });
-  dlg.addEventListener('close', function () { if (obj) { sc.remove(obj); dispose(obj); obj = null; } });
+  dlg.addEventListener('close', function () {
+    var fr = document.getElementById('embed'); fr.removeAttribute('src');
+    if (obj) { sc.remove(obj); dispose(obj); obj = null; }
+  });
 })();
 </script>
 </body>
