@@ -2,7 +2,10 @@
  * 360°-Donut mit Reifenqualm und Gummispuren, heult auf, macht einen Burnout und schießt aus dem Bild.
  * three r128; Bühne aus js/car-stage.js; Räder drehen und lenken über die Gruppen „Wheel …“/„Spin“ (js/glb-fix.js).
  *
- *   CarBurnout.start({ canvas, model, reduceMotion, onDone })
+ *   CarBurnout.start({ canvas, model, reduceMotion, onDone, tint, glow })
+ *
+ * Theme (js/theme-colors.js, falls geladen): Reifenqualm leicht in Theme-Farben getönt wie Farbrauch bei Drift-Shows
+ * (tint, Standard an), Unterbodenbeleuchtung in der Akzentfarbe (glow, Standard an). Wechselt live mit dem Theme.
  *
  * Ablauf (s): 0–2,4 rein · 2,4–6,2 Donut · 6,2–7,4 aufheulen · 7,4–9,2 Burnout · 9,2–11 raus · bis 14 ausblenden
  */
@@ -22,6 +25,18 @@
     var cam = new THREE.PerspectiveCamera(30, W / H, 0.1, 200);
     cam.position.set(0, 5.2, 18); cam.lookAt(0, 2.3, 0);
 
+    // Theme: Rauchtöne (Primär-/Akzentfarbe, zur Hälfte mit Weiß gemischt, damit es Qualm bleibt) und Unterbodenlicht
+    var TC = root.ThemeColors, tintOn = opts.tint !== false && !!TC, glowOn = opts.glow !== false && !!TC;
+    var smokeTints = [new THREE.Color(1, 1, 1)], glowCol = new THREE.Color('#f2b705');
+    function readTheme() {
+      if (!TC) return;
+      var p = TC.palette(), w = new THREE.Color(1, 1, 1);
+      smokeTints = [w, new THREE.Color(p.primary).lerp(w, 0.45), new THREE.Color(p.accent).lerp(w, 0.5), new THREE.Color(p.accent2).lerp(w, 0.5)];
+      glowCol.set(p.accent);
+      if (glow) glow.material.color.copy(glowCol);
+    }
+    var glow = null;
+
     // Boden (unsichtbar) mit Gummispuren als Canvas-Textur; Schatten unter dem Auto
     var GX = 44, GZ = 16, gc = document.createElement('canvas'); gc.width = 2048; gc.height = 745;
     var gx = gc.getContext('2d'), gtex = new THREE.CanvasTexture(gc);
@@ -35,6 +50,18 @@
     })();
     var shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, depthWrite: false }));
     shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.02; scene.add(shadow);
+    // Unterbodenbeleuchtung: weicher Lichtfleck in der Akzentfarbe unter dem Auto (additiv, pulsiert leicht)
+    if (glowOn) {
+      var gt = (function () {
+        var c = document.createElement('canvas'); c.width = c.height = 128; var x = c.getContext('2d'), gr = x.createRadialGradient(64, 64, 4, 64, 64, 64);
+        gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.45, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+        x.fillStyle = gr; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c);
+      })();
+      glow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: gt, color: glowCol, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.85, toneMapped: false }));
+      glow.rotation.x = -Math.PI / 2; glow.position.y = 0.03; scene.add(glow);
+    }
+    readTheme();
+    if (TC) TC.onChange(readTheme);
 
     // Rauch: weiche Sprites, wachsen, steigen, verblassen (am Bildrand ausgeblendet, nichts poppt)
     var smokeTex = (function () {
@@ -52,6 +79,7 @@
       if (puffs.length >= MAXP) { var old = puffs.shift(); scene.remove(old.s); }
       var flame = o && o.flame;
       var s = new THREE.Sprite(new THREE.SpriteMaterial({ map: flame ? flameTex : smokeTex, transparent: true, depthWrite: false, blending: flame ? THREE.AdditiveBlending : THREE.NormalBlending, opacity: 0 }));
+      if (!flame && tintOn) s.material.color.copy(smokeTints[Math.floor(Math.random() * smokeTints.length)]);
       s.position.copy(p); scene.add(s);
       puffs.push({ s: s, age: 0, life: (o && o.life) || rand(1.6, 2.8), size0: (o && o.size) || rand(0.5, 0.9), grow: (o && o.grow) || rand(2.2, 3.6),
         vel: new THREE.Vector3(rand(-0.4, 0.4), rand(0.5, 1.1), rand(-0.3, 0.6)).add((o && o.push) || new THREE.Vector3()), a: (o && o.a) || 0.55 });
@@ -98,6 +126,7 @@
       var flagged = wheels.some(function (w) { return w.flag != null; });
       wheels.forEach(function (w) { w.front = flagged ? !!w.flag : w.x > 0 && w.x > maxX - dims.L * 0.08; });
       shadow.scale.set(dims.L * 1.15, dims.W * 1.4, 1);
+      if (glow) glow.scale.set(dims.L * 1.35, dims.W * 2.0, 1);
     }
     // weiche Übergänge: Lenkung mit begrenzter Geschwindigkeit und weichem Auslauf, Raddrehung mit Trägheit
     var cur = { steer: 0, rear: 0, front: 0 };
@@ -145,6 +174,7 @@
       if (shake) { car.rotation.x += rand(-shake, shake) * 0.4; car.rotation.z += rand(-shake, shake) * 0.6; }
       car.position.set(x, dims.H / 2 + (shake ? rand(0, shake * 0.25) : 0), z);
       shadow.position.set(x, 0.02, z); shadow.rotation.z = yaw;
+      if (glow) { glow.position.set(x, 0.03, z); glow.rotation.z = yaw; }
     }
 
     function frame(ts) {
@@ -180,7 +210,8 @@
           spinWheels(50 + 30 * g, 30 + 30 * g, 0, dt);
           if (g < 0.35) { skid(15, 0.25); if (!reduce) smokeAtRear(1, new THREE.Vector3(-2.5, 0.2, 0)); }
           else skidPrev = {};
-        } else if (car.parent) { scene.remove(car); shadow.visible = false; }
+        } else if (car.parent) { scene.remove(car); shadow.visible = false; if (glow) glow.visible = false; }
+        if (glow && car.parent) glow.material.opacity = 0.75 + 0.15 * Math.sin(t * 6);
         // Gummispuren ab 11 s ausblenden
         ground.material.opacity = t < 11 ? 1 : Math.max(0, 1 - (t - 11) / 3);
       }

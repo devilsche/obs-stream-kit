@@ -5,7 +5,10 @@
  * Modelle aus Grundformen, Oberflächen als gezeichnete Canvas-Texturen; jedes
  * Teil taumelt um alle drei Achsen. Alle teilen sich Geometrie und Material.
  *
- *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, driver, vacuum, owner, eat })
+ *   ItemRain3D.start({ kind, canvas, duration, count, size, reduceMotion, eater, driver, vacuum, owner, eat, tint, glitter })
+ * Theme (js/theme-colors.js, falls geladen): Ballons in den Theme-Farben und Streiflicht in der Akzentfarbe (tint),
+ * Glitzer in der Akzentfarbe, wenn etwas landet (glitter). Beides Standard an, wechselt live mit dem Theme.
+ * Sushi, Enten und Autos behalten ihre echten Farben.
  * vacuum: Saug-Ente räumt nach dem Regen alles Liegengebliebene weg (wie eater). kind=mix: Sushi, Enten, Autos gemischt.
  * Autos mit driver: eine Gummiente springt in ein gelandetes Auto und fährt damit weg (driver wie eater).
  * Sushi mit eater: eine Gummiente sammelt die gelandeten Sushi ein, frisst sich voll und platzt
@@ -259,7 +262,7 @@
   // ── Luftballons: Drehkörper (oben breit, unten zum Knoten schmal), Knoten,
   // Schnur; glänzendes Latex. Modell-Einheiten: Ballon ~1.9 hoch, 1.64 breit ──
   var BALLOON_COLORS = [0xe8202a, 0x1f6fe0, 0xffc81a, 0x22a85a, 0xff7a1a, 0xff5fa8, 0x8e4bd6, 0xd4a017];
-  function buildBalloonTemplate() {
+  function buildBalloonTemplate(theme) {
     var prof = [[0.0, -1.0], [0.06, -0.98], [0.2, -0.88], [0.42, -0.66], [0.62, -0.38], [0.76, -0.08],
                 [0.82, 0.2], [0.78, 0.48], [0.64, 0.74], [0.42, 0.92], [0.18, 1.0], [0.0, 1.02]];
     var body = new THREE.LatheGeometry(prof.map(function (p) { return new THREE.Vector2(p[0], p[1]); }), 48);
@@ -270,6 +273,13 @@
       m.color.convertSRGBToLinear();
       return m;
     });
+    // Theme: Akzent, zweiter Akzent, Primärfarbe (aufgehellt, damit dunkles Lila nicht absäuft) und Weiß
+    function themeBalloons(p) {
+      var w = new THREE.Color(1, 1, 1), cols = [new THREE.Color(p.accent), new THREE.Color(p.accent2),
+        new THREE.Color(p.primary).lerp(w, 0.25), new THREE.Color(0xf4f4f6)];
+      mats.forEach(function (m, i) { m.color.copy(cols[i % cols.length]).convertSRGBToLinear(); });
+    }
+    if (theme) { themeBalloons(theme.palette()); theme.onChange(themeBalloons); }
     var stringMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.7 });
     // Schnur: drei Glieder, jedes leicht geschwungen; sie hängen aneinander und
     // pendeln zeitversetzt (siehe start → swing)
@@ -847,6 +857,53 @@
     var rim = new THREE.DirectionalLight(0xfff2cc, 0.35);
     rim.position.set(1, -0.3, 0.6);
     scene.add(rim);
+    // Theme: Streiflicht in der Akzentfarbe, Glitzer beim Landen
+    var THEME = root.ThemeColors && opts.tint !== false ? root.ThemeColors : null;
+    var glitAcc = new THREE.Color('#f2b705');
+    function applyTheme(p) {
+      glitAcc.set(p.accent);
+      if (THEME) { rim.color.set(p.accent); rim.intensity = 0.55; }
+    }
+    if (root.ThemeColors) { applyTheme(root.ThemeColors.palette()); root.ThemeColors.onChange(applyTheme); }
+    var glit = opts.glitter === false || reduce ? null : (function () {
+      // Punkte in Bildschirm-Pixeln (Kamera gespiegelt: y negativ), additiv, Rand weich ausgeblendet
+      var N = 900, pos = new Float32Array(N * 3), life = new Float32Array(N), sz = new Float32Array(N), v = [], live = 0, next = 0;
+      for (var i = 0; i < N; i++) { pos[i * 3 + 2] = 600; v.push([0, 0, 0, 1]); }
+      var geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('life', new THREE.BufferAttribute(life, 1));
+      geo.setAttribute('sz', new THREE.BufferAttribute(sz, 1));
+      var mat = new THREE.ShaderMaterial({ transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+        uniforms: { col: { value: glitAcc }, W: { value: W }, H: { value: H } },
+        vertexShader: 'attribute float life; attribute float sz; varying float vL; varying vec2 vP; void main(){ vL = life; vP = position.xy; gl_PointSize = sz * (0.4 + 0.6 * life); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+        fragmentShader: 'uniform vec3 col; uniform float W, H; varying float vL; varying vec2 vP; void main(){ vec2 q = gl_PointCoord - 0.5; float d = length(q) * 2.0;' +
+          ' float star = max(0.0, 1.0 - d) + max(0.0, 1.0 - abs(q.x) * 14.0) * max(0.0, 1.0 - abs(q.y) * 2.2) * 0.6 + max(0.0, 1.0 - abs(q.y) * 14.0) * max(0.0, 1.0 - abs(q.x) * 2.2) * 0.6;' +
+          ' float e = smoothstep(0.0, 60.0, vP.x) * smoothstep(0.0, 60.0, W - vP.x) * smoothstep(0.0, 60.0, -vP.y) * smoothstep(0.0, 60.0, H + vP.y);' +
+          ' float k = min(1.0, star * vL * e * 1.5); if (k < 0.003) discard; vec3 c = mix(col, vec3(1.0), 0.35 * vL); gl_FragColor = vec4(c * k, k); }' });
+      var pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 10; scene.add(pts);
+      return {
+        burst: function (x, y, n) {
+          for (var k = 0; k < n; k++) {
+            var i = next; next = (next + 1) % N;
+            var a = rand(Math.PI * 1.05, Math.PI * 1.95), sp = rand(120, 420);
+            pos[i * 3] = x + rand(-10, 10); pos[i * 3 + 1] = -y;
+            v[i] = [Math.cos(a) * sp, -Math.sin(a) * sp, 0, rand(0.6, 1.1)];
+            life[i] = 1; sz[i] = rand(10, 24);
+          }
+          live = Math.max(live, 1.2);
+        },
+        step: function (dt) {
+          if (live <= 0) return; live -= dt;
+          for (var i = 0; i < N; i++) {
+            if (life[i] <= 0) continue;
+            var q = v[i]; q[1] -= 520 * dt; q[0] *= 1 - 1.5 * dt;
+            pos[i * 3] += q[0] * dt; pos[i * 3 + 1] += q[1] * dt;
+            life[i] = Math.max(0, life[i] - dt / q[3]);
+          }
+          geo.attributes.position.needsUpdate = true; geo.attributes.life.needsUpdate = true; geo.attributes.sz.needsUpdate = true;
+        }
+      };
+    })();
 
     // mix = gemischter Kram (Sushi, Enten; Autos nur, wenn js/toy-cars.js geladen ist), z. B. für !saugen
     var kind = opts.kind === 'sushi' || opts.kind === 'balloon' || (opts.kind === 'car' && root.ToyCars) ||
@@ -871,7 +928,7 @@
       var sp = TC.dims(m);
       return { g: TC.build(m, p.c, p.l), len: sp.L, car: { L: sp.L, W: sp.W, hh: sp.H / 2, belt: sp.belt - sp.H / 2 } };
     } } : null;
-    var tpl = kind === 'car' ? carTpl : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate() : buildDuckTemplate();
+    var tpl = kind === 'car' ? carTpl : kind === 'sushi' ? buildSushiTemplate() : rise ? buildBalloonTemplate(THEME) : buildDuckTemplate();
     var sushiTpl = kind === 'mix' ? buildSushiTemplate() : null;
     // neues Teil: { g, len } – len = größte Ausdehnung in Modell-Einheiten
     // Enten: neue Gummiente (js/rubber-duck.js) mit Outfit; je Outfit einmal gebaut,
@@ -1056,6 +1113,7 @@
             d.g.position.set(d.x, -d.y, d.z);
             return true;
           }
+          if (glit && !d.glit) { d.glit = true; glit.burst(d.x, FLOOR - 4, kind === 'car' ? 22 : 10); }
           if (hungry) d.hop = true; else d.bounced = true;
           d.y = FLOOR - d.h;
           d.vy = -d.vy * rand(0.25, 0.4); d.vx *= 0.6; d.wx *= 0.5; d.wy *= 0.5; d.wz *= 0.5;
@@ -1082,6 +1140,7 @@
       }
       // Saug-Ente startet, sobald die Fress-Ente geplatzt ist und die Fahrer-Ente kein Auto mehr sucht
       if (vacuum) { othersBusy = (!!eater && eater.hungry()) || (!!driver && driver.busy()); VE.items = ducks; eating = vacuum.step(dt, t / 1000) || eating; }
+      if (glit) glit.step(dt);
       renderer.render(scene, cam);
       if (t < duration || ducks.length || eating) requestAnimationFrame(frame);
       else renderer.clear();

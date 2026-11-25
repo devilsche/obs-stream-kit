@@ -258,6 +258,10 @@ EFFECT_META = {
     "car-burnout.html": {"domain": "race", "switches": [
         {"key": "model", "label": "Car", "type": "select", "default": "mix", "options": [["mix", "Random mix"]],
          "tooltip": "Random car from the mix, all cars of one brand, or exactly one car (list from the Car overview)"},
+        {"key": "tint", "label": "Theme smoke", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]],
+         "tooltip": "Tire smoke lightly tinted in your theme colors, like colored drift smoke"},
+        {"key": "glow", "label": "Underglow", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]],
+         "tooltip": "Soft neon light under the car in your theme's accent color"},
     ]},
     # Car Race (js/car-race.js): Fenster 16:9, Standard 640×360 (bis 960×540); Befehle/Knöpfe folgen mit dem Podest.
     # Nachlauf nach dem Sieger gibt der Server vor (fest 15 s); ?finish= wirkt nur in der Vorschau.
@@ -327,6 +331,10 @@ EFFECT_META = {
         {"key": "count", "label": "Amount", "type": "select", "default": "120",
          "options": [["40", "40"], ["60", "60"], ["120", "120"], ["200", "200"]],
          "tooltip": "How many items fall (balloons default to 60)"},
+        {"key": "tint", "label": "Theme colors", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]],
+         "tooltip": "Balloons in your theme colors and an accent-colored rim light. Sushi, ducks and cars keep their real colors."},
+        {"key": "glitter", "label": "Glitter on landing", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]],
+         "tooltip": "A small burst of sparkles in your accent color wherever something lands"},
         {"key": "duration", "label": "Duration", "type": "select", "default": "22000",
          "options": [["8000", "8 s"], ["15000", "15 s"], ["22000", "22 s"], ["30000", "30 s"]],
          "tooltip": "How long it rains, in milliseconds (at least 6000 via URL)"},

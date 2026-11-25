@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Item Rain</title>
+  <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
     /* Party-Regen in 3D (js/item-rain-3d.js, three.js r128): ?kind=sushi|duck|balloon|car, ?outfit= (Enten: none|thw|police|fire|batman|superman|mix|random), ?by= Chat-Name (sein !outfit regnet zu einem Drittel mit),
        ?model= (Autos: mix = je Regen 6 zufällige echte Modelle aus dem Mix, oder ein Modell-Schlüssel aus tools/car-gallery),
@@ -31,6 +32,7 @@
        Für die Saug-Ente wird der Kehrroboter weiter mit dem GLTFLoader geladen. -->
   <script src="../js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="../js/glb-fix.js"></script>
+  <script src="../js/theme-colors.js"></script>
   <script src="../js/item-rain-3d.js"></script>
   <script>
     (function () {
@@ -68,7 +70,9 @@
         vacuum: !hasFeat('ducks') || !hasFeat('duck-vacuum') || params.get('vacuum') === '0' ? false
           : (params.get('vacuum') && params.get('vacuum') !== '1' ? params.get('vacuum') : true),
         owner: window.__TWITCH_CHANNEL__ || '',
-        eat: parseInt(params.get('eat'), 10) || 25
+        eat: parseInt(params.get('eat'), 10) || 25,
+        // Theme: Ballonfarben + Streiflicht (tint=0 aus), Glitzer beim Landen (glitter=0 aus)
+        tint: params.get('tint') !== '0', glitter: params.get('glitter') !== '0'
       });
       }
     })();
