@@ -76,7 +76,7 @@ def admin_users():
         from core import features
         on = features.all_enabled(conn)
         for u in users:
-            u["features"] = on.get(u["tenant_id"], [])
+            u["features"] = on.get(u["tenant_id"], sorted(features.DEFAULT_ON))
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()

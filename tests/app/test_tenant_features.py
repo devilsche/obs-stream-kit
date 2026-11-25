@@ -31,7 +31,7 @@ def test_admin_tenant_shows_all(pg_conn_test_setup):
 def test_admin_sets_and_clears_features(pg_conn_test_setup):
     conn, _, _, admin_sid = pg_conn_test_setup
     tid = _other_tenant(conn)
-    assert features.effective(conn, tid) == []
+    assert features.effective(conn, tid) == ["pubg"]   # noch nichts gespeichert: PUBG ist für alle frei
     client = _make_app(conn).test_client()
     client.set_cookie("obskit_sid", admin_sid, domain="localhost")
     r = client.post(f"/admin/tenants/{tid}/features", data={"feature": ["sushi-eater", "unknown"]})

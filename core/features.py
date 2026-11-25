@@ -5,6 +5,8 @@ import json
 
 # Schlüssel → Bezeichnung im Admin (englisch, wie das übrige Frontend)
 FEATURES = {
+    "pubg": "PUBG (stats widgets, session report, PUBG tools)",
+    "g1r": "Gothic 1 Remake (live data widgets and tools)",
     "weather": "Weather (weather scene, seasonal decoration, weather commands, weather dock)",
     "race": "Race (Car Race, Car Drive, item rain, burnout)",
     "ducks": "Rubber ducks (all duck effects, !outfit)",
@@ -14,8 +16,15 @@ FEATURES = {
 }
 KEY = "features"
 
-# Private Extras: eigene Reiter im Dashboard, ohne Freischaltung unsichtbar und gesperrt
-EXTRAS = ("weather", "race", "ducks")
+# Sonderpunkte im Dashboard (Hauptpunkte Stream und Steam hat jeder): eigene goldene Reiter in dieser
+# Reihenfolge, ohne Freischaltung unsichtbar
+EXTRAS = ("pubg", "g1r", "race", "ducks", "weather")
+EXTRA_LABELS = {"pubg": "PUBG", "g1r": "Gothic 1", "race": "Race", "ducks": "Ducks", "weather": "Weather"}
+# Werkzeuge dieser Sonderpunkte stehen zusätzlich als Karten in ihrem Reiter
+TOOL_CARD_EXTRAS = ("race", "ducks", "weather")
+
+# Gilt, solange der Admin für einen Tenant noch nichts gespeichert hat (PUBG ist derzeit für alle frei)
+DEFAULT_ON = ("pubg",)
 
 # OBS-Quelle (effects/<datei>) → nötige Freischaltung; ohne sie liefert der Server eine leere Seite
 SOURCE_FEATURE = {
@@ -55,7 +64,8 @@ def parse(raw) -> list:
 
 def enabled(conn, tenant_id: int) -> list:
     from pubg.db_pg import get_setting
-    return parse(get_setting(conn, tenant_id, KEY, None))
+    raw = get_setting(conn, tenant_id, KEY, None)
+    return sorted(DEFAULT_ON) if raw is None else parse(raw)
 
 
 def set_enabled(conn, tenant_id: int, keys) -> list:

@@ -18,42 +18,50 @@ TOOLS = [
      "label": "Session Report",
      "desc": "Detailed report of a session: matches, kills, achievements, map play.",
      "path": "widgets/pubg/session-report.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "match-replay",
      "label": "Match Replay",
      "desc": "Time-lapse replay of a single match — landings, fights, kills, circle.",
      "path": "tools/match-replay.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "weapon-performance",
      "label": "Weapon Performance",
      "desc": "Accuracy, hit zones and damage per weapon or player over session, day, week or all time.",
      "path": "tools/weapon-performance.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "squad-playstyle",
      "label": "Squad Playstyle",
      "desc": "Who opens the fights, how they end, who hangs too far back and who goes down first.",
      "path": "tools/squad-playstyle.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "shot-quality",
      "label": "Shot Quality",
      "desc": "How well each bullet lands, when and how you die, and where that puts you against the lobby.",
      "path": "tools/shot-quality.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "match-analysis",
      "label": "Match Analysis",
      "desc": "Telemetry breakdown of one match: accuracy, hit zones, kill timeline and notable hit patterns.",
      "path": "tools/match-analysis.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "landing-spots",
      "label": "Landing Spot Analyzer",
      "desc": "Where you and your mates land, and what came of it: heatmap plus per-spot verdict against the whole lobby.",
      "path": "tools/landing-spots.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "milestones",
      "label": "Milestone Celebrations",
      "desc": "Which weapon and career milestones get celebrated, from which mark, and in which of the two overlay sources.",
      "path": "tools/milestones.html",
-     "admin_only": False},
+     "admin_only": False,
+     "domain": "pubg"},
     {"key": "achievement-browser",
      "label": "Achievement Browser",
      "desc": "Full-screen browser through all Steam + PUBG achievements. Click a tile to re-trigger the popup.",
@@ -123,12 +131,14 @@ TOOLS = [
      "label": "G1R Diagnostics",
      "desc": "Upload the UE4SS log and crash dump from the gaming PC (no copying files by hand).",
      "path": "tools/g1r-diag.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "g1r"},
     {"key": "g1r-database",
      "label": "G1R Database",
      "desc": "Complete item catalogue from the object dump — every weapon (melee and ranged), rune and scroll, searchable.",
      "path": "tools/g1r-database.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "g1r"},
 ]
 
 
@@ -638,7 +648,9 @@ def urls():
     effects  = list_dir_sources(project_root, "effects",  desc="Visual effect overlay.",
                                 switches_map=EFFECT_META)
     # Schalter mit "feature" nur zeigen, wenn der Tenant die Freischaltung hat (core/features.py)
-    from core.features import EXTRAS
+    from core.features import EXTRAS, TOOL_CARD_EXTRAS
+    # Sonderpunkte (PUBG, Gothic 1, Race, Ducks, Weather) nur mit Freischaltung
+    widgets_list = [w for w in widgets_list if _widget_domain(w[0]) not in EXTRAS or _widget_domain(w[0]) in feats]
     effects = [e for e in effects if e["domain"] not in EXTRAS or e["domain"] in feats]
     for e in effects:
         e["switches"] = [sw for sw in e["switches"] if not sw.get("feature") or sw["feature"] in feats]
@@ -646,7 +658,7 @@ def urls():
             e["switches"] = [_car_model_switch(project_root, sw) if sw["key"] == "model" else sw for sw in e["switches"]]
     transitions = TRANSITIONS
     visible = _visible_tools()
-    domain_tools = {d: _domain_tools(visible, d) for d in EXTRAS if d in feats}
+    domain_tools = {d: _domain_tools(visible, d) for d in TOOL_CARD_EXTRAS if d in feats}
     race_link = None
     if "race" in feats:
         try:
@@ -805,6 +817,11 @@ def car_model_delete(kind, key):
     if kind not in car_models.KINDS:
         abort(404)
     return jsonify({"ok": True, "deleted": car_models.delete(_duck_root(), kind, key)})
+
+
+def _widget_domain(cat: str) -> str:
+    """Dashboard-Reiter eines Widgets aus seiner Kategorie (wie in urls.html)."""
+    return "pubg" if cat.startswith("PUBG") else ("steam" if cat == "Steam" else ("g1r" if cat == "Gothic 1" else "stream"))
 
 
 def _domain_tools(tools, domain):

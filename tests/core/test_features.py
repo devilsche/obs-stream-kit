@@ -38,11 +38,14 @@ def test_other_tenant_only_what_admin_enabled():
     conn = _Conn({"admin": {"is_admin": False}, "setting": {"value": '["sushi-eater"]'}})
     assert features.effective(conn, 2) == ["sushi-eater"]
     conn = _Conn({"admin": None, "setting": None})
-    assert features.effective(conn, 3) == []
+    assert features.effective(conn, 3) == ["pubg"]          # nichts gespeichert → Standard
+    conn = _Conn({"admin": None, "setting": {"value": "[]"}})
+    assert features.effective(conn, 3) == []                # Admin hat alles abgehakt
 
 
 def test_extras_map_sources_and_api():
-    assert features.EXTRAS == ("weather", "race", "ducks")
+    assert features.EXTRAS == ("pubg", "g1r", "race", "ducks", "weather")
+    assert features.DEFAULT_ON == ("pubg",)
     assert features.source_feature("winter.html") == "weather"
     assert features.source_feature("item-rain.html") == "race"
     assert features.source_feature("duck-court.html") == "ducks"

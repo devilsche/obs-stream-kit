@@ -21,10 +21,13 @@ def test_others_see_no_extras(pg_conn_test_setup_non_admin):
     conn, tid, _, sid = pg_conn_test_setup_non_admin
     c = _client(conn, sid)
     body = c.get("/app/urls").get_data(as_text=True)
-    for needle in ("?d=weather", "?d=race", "?d=ducks", "What rains", 'data-path="effects/weather.html"',
-                   'data-path="effects/car-race.html"', 'data-path="effects/duck-parade.html"', "dn-extra"):
+    for needle in ("?d=weather", "?d=race", "?d=ducks", "?d=g1r", "What rains", 'data-path="effects/weather.html"',
+                   'data-path="effects/car-race.html"', 'data-path="effects/duck-parade.html"'):
         assert needle not in body, needle
     assert c.get("/app/dock/weather").status_code == 403
+    # Hauptpunkte Stream und Steam für alle, PUBG ist standardmäßig frei
+    assert "?d=stream" in body and "?d=steam" in body and 'class="dn-extra" href="/app/urls?d=pubg"' in body
+    assert 'href="/app/urls?d=stream" aria-current="page"' in body     # ohne ?d= startet Stream
 
 
 def test_car_model_options_from_catalog(tmp_path):

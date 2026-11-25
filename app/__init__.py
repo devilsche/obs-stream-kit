@@ -65,7 +65,7 @@ def create_app(testing: bool = False) -> Flask:
     def inject_extras():
         """{{ extras }}: freigeschaltete private Extras (Weather/Race/Ducks) für die Reiter in der Leiste."""
         from flask import g
-        from core.features import EXTRAS
+        from core.features import EXTRAS, EXTRA_LABELS
         if getattr(g, "tenant_id", None) is None or not getattr(g, "user", None):
             return {"extras": []}
         try:
@@ -73,7 +73,7 @@ def create_app(testing: bool = False) -> Flask:
             got = _unlocked_extras()
         except Exception:
             got = set()
-        return {"extras": [e for e in EXTRAS if e in got]}
+        return {"extras": [(e, EXTRA_LABELS[e]) for e in EXTRAS if e in got]}
 
     @app.route("/healthz")
     def healthz():

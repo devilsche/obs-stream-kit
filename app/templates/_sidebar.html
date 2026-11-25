@@ -5,17 +5,16 @@
   </a>
   {# Domain-first: die Spiel-/Anbindungs-Cluster führen direkt in /app/urls in den
      passenden Domain-Tab (?d=…). 'urls' als eigener Punkt entfällt. #}
-  {% set urld = request.args.get('d') or 'pubg' %}
+  {% set urld = request.args.get('d') or 'stream' %}
   {% set on_urls = request.path.startswith('/app/urls') %}
   <nav class="dn-links" aria-label="Hauptnavigation">
     <a href="/app/" {% if request.path == '/app/' %}aria-current="page"{% endif %}>dashboard</a>
-    <a href="/app/urls?d=pubg" {% if on_urls and urld == 'pubg' %}aria-current="page"{% endif %}>PUBG</a>
-    <a href="/app/urls?d=steam" {% if on_urls and urld == 'steam' %}aria-current="page"{% endif %}>Steam</a>
-    <a href="/app/urls?d=g1r" {% if on_urls and urld == 'g1r' %}aria-current="page"{% endif %}>Gothic&nbsp;1</a>
+    {# Hauptpunkte für alle #}
     <a href="/app/urls?d=stream" {% if on_urls and urld == 'stream' %}aria-current="page"{% endif %}>Stream</a>
-    {# Private Extras: nur mit Freischaltung (core/features.py), golden hinter einem Trenner #}
+    <a href="/app/urls?d=steam" {% if on_urls and urld == 'steam' %}aria-current="page"{% endif %}>Steam</a>
+    {# Sonderpunkte: nur mit Freischaltung (core/features.py), golden hinter einem Trenner #}
     {% if extras %}<span class="dn-sep" aria-hidden="true"></span>
-    {% for x in extras %}<a class="dn-extra" href="/app/urls?d={{ x }}" {% if on_urls and urld == x %}aria-current="page"{% endif %}>{{ x|capitalize }}</a>
+    {% for x, label in extras %}<a class="dn-extra" href="/app/urls?d={{ x }}" {% if on_urls and urld == x %}aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}<span class="dn-sep" aria-hidden="true"></span>{% endif %}
     <a href="/app/tools" {% if request.path.startswith('/app/tools') %}aria-current="page"{% endif %}>tools</a>
     <a href="/app/settings" {% if request.path.startswith('/app/settings') %}aria-current="page"{% endif %}>settings</a>
