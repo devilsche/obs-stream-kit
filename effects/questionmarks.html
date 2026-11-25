@@ -98,6 +98,7 @@
         if (music && t > DUR - 0.8 && !music.muted) {
           var base = parseFloat(music.getAttribute('data-volume')) || 1, f = parseFloat(p.get('volume'));
           base *= isNaN(f) ? 1 : f;
+          if (typeof window.__SOUND_LEVEL__ === 'number') base *= window.__SOUND_LEVEL__;
           try { music.volume = Math.max(0, base * Math.min(1, (DUR + FADE - t) / (0.8 + FADE))); } catch (e) { /* egal */ }
         }
         if (t < DUR + FADE + 0.1) requestAnimationFrame(frame);

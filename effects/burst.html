@@ -27,7 +27,7 @@
       var b = Burst.create({
         canvas: document.getElementById('burst'), base: base,
         kind: p.get('kind') || 'explosion', size: num('size', 1, 0.2, 3),
-        sound: flag('sound', true), volume: num('volume', 0.7, 0, 1),
+        sound: flag('sound', true), volume: num('volume', 0.7, 0, 1) * (typeof window.__SOUND_LEVEL__ === 'number' ? window.__SOUND_LEVEL__ : 1),
         flash: flag('flash', true), ring: flag('ring', true), sparks: flag('sparks', true), smoke: flag('smoke', true),
         accent: css || '#f2b705'
       });

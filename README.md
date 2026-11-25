@@ -342,6 +342,8 @@ Fullscreen-Overlays zum manuellen Auslösen (z.B. per Streamer.bot Hotkey oder C
    - **OBS Set Source Visibility** → Source unsichtbar
 3. Action per **Hotkey** oder **Chat-Command** (`!trap`, `!crash`, etc.) triggern
 
+> **Gesamtlautstärke (Dashboard → Settings → Sound):** zwei Regler, „Memes & effects“ und „Alerts“ (Standard 50 %, `core/sound_levels.py`). Der Server injiziert den Wert als `window.__SOUND_LEVEL__`, alle Abspielstellen multiplizieren ihn auf ihre eigene Lautstärke. Die OBS-Regler bleiben auf 100 %, es gibt nichts mehr einzeln in OBS einzustellen.
+
 > **Ton kommt aus dem Meme selbst** (seit 25.11.2026, die Tonprobleme von OBS-Browser-Sources sind behoben): Jedes Meme spielt seine Datei per `<audio data-stinger-autoplay>` synchron zur Animation (`js/stinger-ready.js`). Zeitpunkt über `data-delay` (ms), Lautstärke je Datei über `data-volume` (0–1); `?volume=` in der URL wirkt als Faktor obendrauf. In OBS steht die Quelle auf Lautstärke 100 %, **Audio über OBS steuern** an, Abhören „Monitor und Ausgabe“. Streamer.bot blendet nur noch ein und aus, ohne „Play Sound“.
 
 ---

@@ -75,7 +75,8 @@
     comp.connect(ctx.destination);
     var out = ctx.createGain();
     var vol = parseFloat(params.get('volume'));
-    out.gain.value = isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 0.8;
+    out.gain.value = (isFinite(vol) ? Math.max(0, Math.min(1, vol)) : 0.8) *
+      (typeof window.__SOUND_LEVEL__ === 'number' ? window.__SOUND_LEVEL__ : 1);   // Settings → Sound
     out.connect(comp);
     audioState = { ctx: ctx, out: out };
     return audioState;

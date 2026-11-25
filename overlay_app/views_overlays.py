@@ -40,6 +40,7 @@ def _serve_tenant_source(token, subdir, filepath):
     stinger_font = ""
     feats = []
     alert_sound = None
+    sound_level = None
     conn = _get_conn()
     try:
         from pubg.db_pg import get_setting
@@ -48,6 +49,10 @@ def _serve_tenant_source(token, subdir, filepath):
         stinger_font = get_setting(conn, g.tenant_id, "stinger_font", "") or ""
         # vom Admin freigeschaltete Extras (z. B. Fress-Ente beim Sushi-Regen); Admin-Tenant hat alle
         feats = features.effective(conn, g.tenant_id)
+        from core import sound_levels
+        grp = sound_levels.group_for(subdir)
+        if grp:   # Gesamtlautstärke aus Settings → Sound (OBS-Regler bleiben auf 100 %)
+            sound_level = sound_levels.load(conn, g.tenant_id)[grp]
         if subdir == "alerts":   # eigene Alert-Töne aus dem Dashboard (js/alert-sound.js)
             from overlay_app import alert_sounds
             key = filepath[:-5] if filepath.endswith(".html") else ""
@@ -73,6 +78,8 @@ def _serve_tenant_source(token, subdir, filepath):
     }
     if alert_sound is not None:
         variables["__ALERT_SOUND__"] = alert_sound
+    if sound_level is not None:
+        variables["__SOUND_LEVEL__"] = sound_level
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 

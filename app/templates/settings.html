@@ -147,6 +147,21 @@
       </div>
     </div>
 
+    <p class="sec">// Sound</p>
+    <div class="dn-fgrid">
+      {% for key, label, note in [("memes", "Memes & effects volume", "All memes (!gg, !crash …), the question marks, Burst and Swirl."), ("alerts", "Alerts volume", "Follow, sub, raid and the other alerts. Each alert's own level (Stream → alert → Sound) comes on top.")] %}
+      <div class="dn-field">
+        <label for="{{ key }}_volume">{{ label }}</label>
+        <select id="{{ key }}_volume" name="{{ key }}_volume">
+          {% for v in prefs.sound_steps %}
+          <option value="{{ v }}" {% if (prefs.sound[key] - v)|abs < 0.05 %}selected{% endif %}>{{ "Off" if v == 0 else (v * 100)|round|int ~ " %" }}</option>
+          {% endfor %}
+        </select>
+        <div class="dn-note">{{ note }} Leave the OBS sliders at 100 % — this is the one place to set it. Applies the next time a source starts.</div>
+      </div>
+      {% endfor %}
+    </div>
+
     <div class="dn-actions">
       <button class="dn-btn" type="submit">Save</button>
       <button class="dn-btn ghost" type="reset">Eingaben verwerfen</button>

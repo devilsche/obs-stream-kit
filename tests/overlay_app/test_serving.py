@@ -101,3 +101,13 @@ def test_follow_alert_has_builtin_default_without_uploads(app):
         body = c.get("/s/tok/alerts/follow.html").get_data(as_text=True)
     assert '"default": "/s/tok/assets/alert-sounds/follow.mp3"' in body
     assert c.get("/s/tok/assets/alert-sounds/follow.mp3").status_code == 200
+
+
+def test_sound_level_injected_per_group(app):
+    c = app.test_client()
+    lv = json.dumps({"memes": 0.3, "alerts": 0.7})
+    with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
+         mock.patch("pubg.db_pg.get_setting", side_effect=lambda c, t, k, d=None: lv if k == "sound_levels" else d):
+        assert "window.__SOUND_LEVEL__ = 0.3;" in c.get("/s/tok/stingers/gg.html").get_data(as_text=True)
+        assert "window.__SOUND_LEVEL__ = 0.7;" in c.get("/s/tok/alerts/raid.html").get_data(as_text=True)
+        assert "__SOUND_LEVEL__" not in c.get("/s/tok/overlays/starting-soon.html").get_data(as_text=True)

@@ -281,6 +281,10 @@ def settings():
                          "Chakra Petch", "Oxanium", "Rajdhani", "Syncopate",
                          "Metamorphous", "MedievalSharp", "Cinzel Decorative"):
                 set_setting(conn, g.tenant_id, "stinger_font", sfont)
+            # Gesamtlautstärke Memes/Effekte und Alerts (core/sound_levels.py)
+            from core import sound_levels
+            sound_levels.save(conn, g.tenant_id, {"memes": request.form.get("memes_volume"),
+                                                  "alerts": request.form.get("alerts_volume")})
             # Highlight-Quelle für die Szenen-Overlays (Clips vs Steam-Media)
             hsrc = request.form.get("highlight_source")
             if hsrc in ("clips", "steam_media"):
@@ -302,6 +306,9 @@ def settings():
             "highlight_source": get_setting(conn, g.tenant_id, "highlight_source",
                                             default="clips"),
         }
+        from core import sound_levels
+        prefs["sound"] = sound_levels.load(conn, g.tenant_id)
+        prefs["sound_steps"] = sound_levels.STEPS
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()

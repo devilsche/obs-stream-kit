@@ -31,7 +31,7 @@
         accent: themeColor('--theme-accent', '#f2b705'), primary: themeColor('--theme-primary', '#5e2a79'),
         flare: p.get('flare') !== '0',
         density: num('density', 1, 0.2, 2), duration: duration,
-        sound: p.get('sound') === '1', volume: num('volume', 0.6, 0, 1)
+        sound: p.get('sound') === '1', volume: num('volume', 0.6, 0, 1) * (typeof window.__SOUND_LEVEL__ === 'number' ? window.__SOUND_LEVEL__ : 1)
       });
       window.addEventListener('themechange', function () { s.setColors(themeColor('--theme-accent', '#f2b705'), themeColor('--theme-primary', '#5e2a79')); });
       if (p.get('demo') === '1') {

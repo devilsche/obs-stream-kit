@@ -178,6 +178,7 @@
     var v = parseFloat(m.getAttribute('data-volume'));
     v = isNaN(v) ? 1 : v;
     if (!isNaN(urlVolume)) v *= urlVolume;
+    if (typeof window.__SOUND_LEVEL__ === 'number') v *= window.__SOUND_LEVEL__;   // Settings → Sound
     try { m.volume = Math.max(0, Math.min(1, v)); } catch (e) {}
   }
 

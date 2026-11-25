@@ -12,6 +12,7 @@
   var files = cfg.files || [];
   if (!files.length && !cfg['default']) return;
   var f = parseFloat(q.get('volume')), vol = (cfg.volume == null ? 0.6 : cfg.volume) * (isNaN(f) ? 1 : Math.max(0, Math.min(1, f)));
+  if (typeof window.__SOUND_LEVEL__ === 'number') vol *= window.__SOUND_LEVEL__;   // Settings → Sound
   if (vol <= 0) return;
   var key = 'alert-sound-last:' + cfg.base, last = null;
   try { last = localStorage.getItem(key); } catch (e) { /* ohne Speicher eben zufällig */ }
