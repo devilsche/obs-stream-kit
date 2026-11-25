@@ -2112,6 +2112,18 @@ Feed wird ein **Rare**-Badge angezeigt.
 
 ## Deployment (Prod-Server)
 
+**Schutz gegen Speicher-Hänger und Scanner** (seit 2026-11-25, nur auf dem Server, nicht im Repo):
+- **Speichergrenzen** als systemd-Drop-ins `/etc/systemd/system/<dienst>.d/memory.conf`:
+  - Grafana und Prometheus: je 1 GB.
+  - `obs-api`, `obs-overlays`, `obs-drive`: je 1 GB.
+  - Lobby- und Ranked-Nachlader: je 512 MB.
+  - Exporter: je 200 MB.
+- **Notbremse `systemd-oomd`:** Bleibt der Speicherdruck 20 s über 60 % oder ist der Auslagerungsspeicher zu 80 % voll, wird der schuldige Dienst beendet, statt dass der ganze Server hängt.
+- **`atop`** zeichnet jede Minute pro Prozess auf (`/var/log/atop/`). Damit lässt sich nach einem Vorfall sehen, wer den Speicher belegt hat: `atop -r /var/log/atop/atop_<datum> -b <hh:mm>`.
+- **nginx:** Die Grafana-Adresse ist auf 10 Anfragen/s je IP gebremst (Stoßreserve 60).
+- **fail2ban:** Die Sperre `nginx-secretscan` blockt eine IP für 7 Tage, wenn sie dreimal in 10 Minuten nach `.env`, `wp-config`, `.git` oder AWS-Schlüsseln fragt. Prüfen mit `fail2ban-client status nginx-secretscan`.
+
+
 Der Dienst läuft auf `stats-overlay.info` und wird als zwei getrennte systemd-Services
 betrieben. Beide laufen unter dem Service-User `obskit`, lesen ihre Credentials aus
 `/etc/obs-stream-kit.env` und liegen unter `/opt/obs-stream-kit`.
