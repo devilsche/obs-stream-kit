@@ -27,7 +27,7 @@ DEFAULT_VOLUMES = {"follow": 0.15, "welcome": 0.2}
 # Alert bleibt stehen, bis der Ton zu Ende ist.
 OPTIONS = {"duration": 6, "full": True, "stay": True}
 # Abweichende Standards je Alert (Welcome lief früher 10 s, Ton wurde mit ausgeblendet)
-OPTION_DEFAULTS = {"welcome": {"duration": 10, "full": False, "stay": False}}
+OPTION_DEFAULTS = {"welcome": {"duration": 10, "full": True, "stay": False}}
 # Ein-/ausschaltbare Teile je Alert (Dashboard-Häkchen; der Host reicht sie als URL-Parameter durch)
 EXTRAS = {"welcome": {"disco": "Disco ball", "lights": "Disco lights", "confetti": "Confetti"}}
 MIN_DURATION, MAX_DURATION = 2, 60
@@ -247,7 +247,7 @@ def for_overlay(cfg, alert):
     default: eingebauter Ton (nur ohne eigene Dateien), relativ zur Token-Basis."""
     e = cfg.get(alert) or {}
     files = [f["id"] for f in e.get("files", [])]
-    out = {"volume": e.get("volume", DEFAULT_VOLUME), "files": files}
+    out = {"volume": e.get("volume", DEFAULT_VOLUME), "files": files, "full": e.get("full", True)}
     if not files and alert in DEFAULTS:
         out["default"] = "assets/alert-sounds/%s.mp3" % alert
     return out

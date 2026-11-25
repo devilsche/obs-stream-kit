@@ -40,7 +40,8 @@
     });
   }
   play();
-  if (q.get('full') === '1') return;   // Host hält die Seite offen, bis der Ton zu Ende ist
+  // ganzer Ton (Dashboard „Play the whole sound“ bzw. vom Host): nicht mit dem Alert ausblenden
+  if (q.get('full') === '1' || (cfg.full && q.get('full') !== '0')) return;
   // zum Ende des Alerts ausblenden
   var dur = parseFloat(q.get('duration')) || 6, fade = 0.6;
   setTimeout(function () {
