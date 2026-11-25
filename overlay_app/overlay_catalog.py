@@ -20,7 +20,7 @@ OVERLAYS = [
      "size": "1920×1080", "desc": "Animated stream-ending scene.", "params": [], "switches": [
          {"key": "hold", "label": "Hold (s)", "type": "number", "default": "20", "min": 5},
      ]},
-    {"key": "just-chatting",  "label": "Just Chatting",   "file": "just-chatting.html", "preview_size": (1920,1080),
+    {"key": "just-chatting", "summary": "Fullscreen camera with chat and frame.",  "label": "Just Chatting",   "file": "just-chatting.html", "preview_size": (1920,1080),
      "size": "1920×1080", "desc": "Fullscreen camera scene with subtle decoration. Frame: Classic (lightning border) or Depth (3D frame with comet and chat emotes, same commands as the Webcam Frame card).",
      "params": [], "switches": [
          {"key": "frame",  "label": "Frame", "type": "select", "default": "classic",
@@ -143,7 +143,7 @@ ALERTS = [
 DECOR = [
     {"key": "logo",           "label": "Logo",            "file": "logo.html",           "size": "1920×1080",
      "desc": "Logo overlay.",                          "params": [], "switches": []},
-    {"key": "logo-3d",        "label": "Logo 3D",         "file": "logo-3d.html",        "size": "800×304",
+    {"key": "logo-3d", "summary": "3D logo: stripes fly in, letters flip.",        "label": "Logo 3D",         "file": "logo-3d.html",        "size": "800×304",
      "desc": "Your logo in WebGL: the stripes fly in from behind one by one, the letters drop in with a flip, then a shine runs across. Every few seconds a wave, a hop or a shine; replays the intro on alerts. Splits stripes and letters automatically.",
      "params": [], "switches": [
          {"key": "pause",  "label": "Pause (s)", "type": "number", "default": "10", "min": 3,
@@ -159,7 +159,7 @@ DECOR = [
          {"key": "text",   "label": "Text image", "type": "text", "default": "", "placeholder": "logo_text_luckor_hd.png",
           "tooltip": "File in assets/ – split into letters by columns"},
      ]},
-    {"key": "webcam-frame",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "",
+    {"key": "webcam-frame", "summary": "Camera frame: Classic, Energy or Depth (3D, chat emotes).",   "label": "Webcam Frame",    "file": "webcam-frame.html",   "size": "",
      "desc": "Frame around your camera in three styles. Classic: lightning frame (source = camera + 100 px on each side). Energy: WebGL plasma border that flares up on alerts (source = camera + 2 × padding). Depth: 3D frame as a full-scene source – a light comet circles behind and in front of you, chat emotes slam into the frame and pile up on top, !shake throws them off.",
      "hint": "Depth with you leaning out of the frame: add this URL three times with Layer = Back, Frame, Front. In OBS from bottom to top: Back → camera (cropped to the window) → Frame → a copy of the camera with NVIDIA background removal (less cropped, so your head can rise above the frame) → Front.",
      "fx": "frame",

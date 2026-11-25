@@ -3,7 +3,7 @@
 
 {# Eine Source-Karte fuers Grid. switches/params als Listen → im Markup als
    HTML-sicheres JSON (tojson escaped < > & ' → sicher im single-quote-Attr). #}
-{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='', controls=[], live=[], preview_q='') %}
+{% macro src_card(kind, cat, label, base, path, size='', desc='', switches=[], params=[], chrome_preview=False, hint='', tab='', preview_size=None, commands=[], fx='', controls=[], live=[], preview_q='', summary='') %}
 <button type="button" class="url-card" hidden
         data-kind="{{ kind }}" data-label="{{ label }}" data-cat="{{ cat }}"
         data-path="{{ path }}" data-base="{{ base }}"
@@ -21,7 +21,8 @@
   <span class="url-card__top">
     <span class="url-card__cat">{{ cat }}</span>
     <span class="url-card__nm">{{ label }}</span>
-    {% if desc or size %}<span class="url-card__meta">{{ desc or size }}</span>{% endif %}
+    {# summary = kurze Zeile für die Übersicht; desc steht ausführlich in der Detailansicht #}
+    {% if summary or desc or size %}<span class="url-card__meta">{{ summary or desc or size }}</span>{% endif %}
   </span>
 </button>
 {% endmacro %}
@@ -82,7 +83,7 @@ G1R_STEAM_NAME=</code></pre>
         {{ src_card('overlay','Overlay',o.label,
                     overlay_base~'/s/'~token~'/overlays/'~o.file,'overlays/'~o.file,
                     o.size,o.desc,(o.switches or []),(o.params or []),False,'','stream',
-                    o.preview_size|default(None)) }}
+                    o.preview_size|default(None),summary=o.summary or '') }}
         {% endfor %}
         {% for cat,label,desc,path,switches,hint,preview_size in widgets %}
         {% set dom = 'pubg' if cat.startswith('PUBG') else ('steam' if cat == 'Steam' else ('g1r' if cat == 'Gothic 1' else 'stream')) %}
@@ -95,7 +96,7 @@ G1R_STEAM_NAME=</code></pre>
                     base_url~'/s/'~token~'/widgets/'~d.file,d.file,
                     d.size,d.desc,d.switches or [],d.params or [],False,d.hint or '','stream',
                     d.preview_size|default(None),d.commands or [],
-                    (base_url~'/s/'~token~'/api/fx/'~d.fx) if d.fx else '') }}
+                    (base_url~'/s/'~token~'/api/fx/'~d.fx) if d.fx else '',summary=d.summary or '') }}
         {% endfor %}
         {% for a in alerts if a.host %}
         {{ src_card('overlay','Alert',a.label,
