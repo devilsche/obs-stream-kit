@@ -71,6 +71,7 @@ WIDGET_PREVIEW_SIZES = {
     "latest-tip.html":              (500, 110),
     "subgoal.html":                 (500, 130),
     "tipgoal.html":                 (500, 130),
+    "tipgoal-banner.html":          (600, 180),
 }
 
 # Manuelle Switch-Definitionen fuer Widgets ohne buildFilter (z.B. reine JS-Widgets).
@@ -106,6 +107,14 @@ WIDGET_SWITCHES = {
         {"key": "current",  "label": "Current",  "type": "text", "default": "0",        "placeholder": "0"},
         {"key": "goal",     "label": "Goal",     "type": "text", "default": "100",      "placeholder": "100"},
         {"key": "currency", "label": "Currency", "type": "text", "default": "€",        "placeholder": "€"},
+    ],
+    "tipgoal-banner.html": [
+        {"key": "title",    "label": "Title",    "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
+        {"key": "current",  "label": "Current",  "type": "text",   "default": "0",        "placeholder": "0"},
+        {"key": "goal",     "label": "Goal",     "type": "text",   "default": "100",      "placeholder": "100"},
+        {"key": "currency", "label": "Currency", "type": "text",   "default": "€",        "placeholder": "€"},
+        {"key": "dock",     "label": "Background", "type": "select", "default": "0",
+         "options": [["0", "Transparent (OBS)"], ["1", "With background (Dock)"]]},
     ],
     "pubg/coplayer.html": [
         {"key": "player", "label": "Player", "type": "text", "default": "",
@@ -234,6 +243,7 @@ WIDGET_META = [
     ("Follower & Goals", "Latest Tip",      "Sidepanel: shows the latest tip/donation (always visible).",           "latest-tip.html"),
     ("Follower & Goals", "Sub Goal",        "Progress bar toward the sub goal.",                                    "subgoal.html"),
     ("Follower & Goals", "Tip Goal",        "Progress bar toward the tip goal.",                                    "tipgoal.html"),
+    ("Follower & Goals", "Tip Goal Banner", "Tip goal as a slim progress banner.",                                  "tipgoal-banner.html"),
 ]
 
 

@@ -1108,6 +1108,40 @@ def _fetch_only():
     return request.headers.get("X-Requested-With") == "fetch"
 
 
+@bp_app.route("/app/api/stinger-logo", methods=["GET", "POST", "DELETE"])
+@require_session
+def stinger_logo_api():
+    """Logo der WebGL-Stinger: GET = Eintrag, POST = hochladen (ersetzt), DELETE = entfernen."""
+    from overlay_app import stinger_logo
+    if request.method == "GET":
+        return jsonify({"ok": True, "logo": _sound_conn(lambda c: stinger_logo.load(c, g.tenant_id))})
+    if not _fetch_only():
+        return jsonify({"ok": False, "error": "Bad request."}), 400
+    if request.method == "DELETE":
+        _sound_conn(lambda c: stinger_logo.delete(c, _sound_root(), g.tenant_id))
+        return jsonify({"ok": True})
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No file received."}), 400
+    data = f.read(stinger_logo.MAX_BYTES + 1)
+    entry, err = _sound_conn(lambda c: stinger_logo.set_image(c, _sound_root(), g.tenant_id, f.filename, data))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True, "logo": entry})
+
+
+@bp_app.route("/app/api/stinger-logo/file/<filename>")
+@require_session
+def stinger_logo_preview(filename):
+    """Vorschau im Dashboard."""
+    from flask import send_file
+    from overlay_app import stinger_logo
+    p = stinger_logo.path_of(_sound_root(), g.tenant_id, filename)
+    if not p:
+        abort(404)
+    return send_file(p, mimetype=stinger_logo.MIME[filename.rsplit(".", 1)[1]], max_age=0)
+
+
 @bp_app.route("/app/api/pet-media")
 @require_session
 def pet_media_list():

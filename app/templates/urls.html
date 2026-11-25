@@ -690,7 +690,23 @@ G1R_STEAM_NAME=</code></pre>
         <p class="url-sound__rules" id="urlPetRules"></p>
         <span class="url-copied" id="urlPetStatus" role="status" aria-live="polite"></span>
       </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${petMediaHtml}${chromeHtml}`;
+    // WebGL-Stinger: Logo hochladen (Schalter Show → Logo), kommt vom Server in die Seite
+    const isGlStinger = /(^|\/)transitions\/stinger-[a-z]+\.html$/.test(card.dataset.path || "");
+    const stingerLogoHtml = isGlStinger ? `
+      <div class="url-dbox url-soundbox url-petmedia">
+        <h2>Logo <span class="url-dbox__tag">upload</span></h2>
+        <p class="url-dbox__desc">Shown instead of the name when <b>Show</b> is set to Logo. Use a PNG or WebP with a transparent background; wide logos work best. Applies to all WebGL stingers.</p>
+        <div class="url-petmedia__img">
+          <div class="url-petmedia__thumb url-petmedia__thumb--wide" id="urlStLogoThumb"></div>
+          <div class="url-petmedia__imgside">
+            <label class="url-sound__lbl" for="urlStLogoFile">Logo image (PNG, JPG, WebP or GIF, up to 6 MB)</label>
+            <input type="file" id="urlStLogoFile" class="url-sound__file" accept="image/png,image/jpeg,image/webp,image/gif">
+            <button type="button" class="url-act ghost" id="urlStLogoDel" hidden><span class="material-symbols-outlined" aria-hidden="true">delete</span>Remove logo</button>
+          </div>
+        </div>
+        <span class="url-copied" id="urlStLogoStatus" role="status" aria-live="polite"></span>
+      </div>` : "";
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${petMediaHtml}${stingerLogoHtml}${chromeHtml}`;
 
     const infoBits = [];
     const pw = parseInt(card.dataset.previewW || "0");
@@ -748,6 +764,7 @@ G1R_STEAM_NAME=</code></pre>
     if (isLiveAlerts) wireAlertTabs(base, card.dataset.fx || "");
     if (/\/friend$/.test(card.dataset.fx || "")) wireFriendAllow();
     if (isPet) wirePetMedia();
+    if (isGlStinger) wireStingerLogo();
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -907,6 +924,36 @@ G1R_STEAM_NAME=</code></pre>
     vol.addEventListener("change", () => fetch(api + "/volume", { method: "POST", credentials: "same-origin",
       headers: Object.assign({ "Content-Type": "application/json" }, H), body: JSON.stringify({ volume: Number(vol.value) }) })
       .then(r => r.json()).then(d => say(d.ok ? "Saved." : (d.error || "Could not save."), !d.ok)));
+    reload();
+  }
+
+  // ── WebGL-Stinger: Logo ──
+  function wireStingerLogo() {
+    const api = "/app/api/stinger-logo", H = { "X-Requested-With": "fetch" };
+    const thumb = document.getElementById("urlStLogoThumb"), file = document.getElementById("urlStLogoFile");
+    const del = document.getElementById("urlStLogoDel"), st = document.getElementById("urlStLogoStatus");
+    if (!thumb) return;
+    const say = (msg, bad) => { st.textContent = msg; st.classList.toggle("is-error", !!bad); };
+    function render(d) {
+      const l = d.logo;
+      thumb.innerHTML = l ? `<img src="${api}/file/${escapeAttr(l.id + "." + l.ext)}" alt="Current logo: ${escapeAttr(l.name)}">`
+                          : `<p class="url-sound__note">No logo yet – the name is shown.</p>`;
+      del.hidden = !l;
+    }
+    function reload() {
+      return fetch(api, { credentials: "same-origin", cache: "no-store" }).then(r => r.json()).then(render)
+        .catch(() => say("Could not load.", true));
+    }
+    file.addEventListener("change", () => {
+      const f = file.files[0]; if (!f) return;
+      const fd = new FormData(); fd.append("file", f);
+      say("Uploading…");
+      fetch(api, { method: "POST", credentials: "same-origin", headers: H, body: fd })
+        .then(r => r.json()).then(d => { say(d.ok ? "Saved." : (d.error || "Could not upload."), !d.ok); file.value = ""; return reload(); })
+        .catch(() => say("Could not upload.", true));
+    });
+    del.addEventListener("click", () => fetch(api, { method: "DELETE", credentials: "same-origin", headers: H })
+      .then(r => r.json()).then(d => { say(d.ok ? "Removed." : (d.error || "Could not remove."), !d.ok); return reload(); }));
     reload();
   }
 

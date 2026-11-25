@@ -39,3 +39,18 @@ def test_pet_media_api(pg_conn_test_setup_non_admin, tmp_path):
     assert c.get("/app/api/pet-media/file/%s.png" % img["id"]).status_code == 200
     assert c.delete("/app/api/pet-media/" + snd["id"], headers=H).get_json()["ok"]
     assert c.get("/app/api/pet-media").get_json()["sounds"] == []
+
+
+def test_stinger_logo_api(pg_conn_test_setup_non_admin, tmp_path):
+    import io
+    conn, tid, _, sid = pg_conn_test_setup_non_admin
+    c = _client(conn, sid, tmp_path)
+    H = {"X-Requested-With": "fetch"}
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    assert c.get("/app/api/stinger-logo").get_json()["logo"] is None
+    assert c.post("/app/api/stinger-logo", data={"file": (io.BytesIO(png), "a.png")}).status_code == 400   # ohne Header
+    e = c.post("/app/api/stinger-logo", headers=H, data={"file": (io.BytesIO(png), "Logo.png")}).get_json()["logo"]
+    assert c.get("/app/api/stinger-logo").get_json()["logo"]["id"] == e["id"]
+    assert c.get("/app/api/stinger-logo/file/%s.png" % e["id"]).status_code == 200
+    assert c.delete("/app/api/stinger-logo", headers=H).get_json()["ok"]
+    assert c.get("/app/api/stinger-logo").get_json()["logo"] is None

@@ -8,7 +8,7 @@
        Wand in Theme-Farben mit dem Namen zusammen, ein Lichtstreif läuft drüber, kurz vor dem Schnitt reißen die Fugen
        auf, danach zerspringt die Wand zur Kamera hin und gibt die neue Szene frei. three.js r128, ein Mesh, Bewegung im
        Vertex-Shader. URL: dur (ms, Standard 2000), cut (ms, Standard 900) = OBS „Duration“ / „Transition Point“,
-       name, font. Bis cut − 0,1 s liegen alle Splitter. -->
+       name, font, show (name|logo|none). Bis cut − 0,1 s liegen alle Splitter. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -69,7 +69,7 @@
       geo.setAttribute('aBary', new THREE.Float32BufferAttribute(bary, 3));
 
       function v3(c) { return new THREE.Vector3(c[0], c[1], c[2]); }
-      var tex = new THREE.Texture(); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+      var tex = new THREE.Texture(); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.flipY = false;
       var U = {
         uT: { value: 0 }, uCut: { value: T.cut }, uDur: { value: T.dur }, uCalm: { value: S.reduced() ? 1 : 0 },
         uP: { value: v3(C.primary) }, uA: { value: v3(C.accent) }, uA2: { value: v3(C.accent2) }, uBg: { value: v3(C.bg) },
@@ -111,7 +111,7 @@
           '  gl_Position = projectionMatrix * modelViewMatrix * vec4(position + (R*l - l) + off, 1.0);',
           '}'
         ].join('\n'),
-        fragmentShader: [
+        fragmentShader: S.GLSL + '\n' + [
           'uniform float uT, uCut, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
           'varying vec2 vUv; varying vec3 vN, vBary; varying float vA, vCrack, vMove;',
           'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
@@ -125,13 +125,9 @@
           '  c = mix(c, uA2, smoothstep(0.55, 0.9, mar)*0.35);',
           '  c += mix(uA, vec3(1.0), 0.3) * exp(-length(q)*3.2) * 0.3;',
           '  c *= 0.7 + 0.3*smoothstep(1.2, 0.3, length(q));',
-          // Name liegt auf den Splittern (setzt sich mit ihnen zusammen)
-          '  vec2 tp = ((vUv - 0.5) * vec2(1920.0, 1080.0)) / vec2(1500.0, 375.0) + 0.5;',
-          '  if (uHasText > 0.5 && tp.x > 0.0 && tp.x < 1.0 && tp.y > 0.0 && tp.y < 1.0) {',
-          '    vec4 t = texture2D(uTex, tp);',
-          '    c += uA * t.g * 0.45;',
-          '    c = mix(c, mix(vec3(1.0), uA, 0.28), t.r);',
-          '  }',
+          // Name oder Logo liegt auf den Splittern (setzt sich mit ihnen zusammen)
+          '  if (uHasText > 0.5) { vec2 tp = artUv(vUv); vec4 t = artAt(uTex, tp);',
+          '    c += uA * glowAt(uTex, tp) * 0.45; c = mix(c, t.rgb, t.a); }',
           // Glanz beim Drehen + Lichtstreif über die fertige Wand
           '  vec3 N = normalize(gl_FrontFacing ? vN : -vN), L = normalize(vec3(-0.45, 0.55, 0.75));',
           '  c *= 0.6 + 0.4*max(dot(N, L), 0.0) + 0.25*(N.z);',
@@ -149,7 +145,7 @@
       });
       scene.add(new THREE.Mesh(geo, mat));
 
-      if (S.name()) S.nameTexture(function (canvas) {
+      S.artTexture(C, function (canvas) {
         tex.image = canvas; tex.needsUpdate = true; U.uHasText.value = 1;
       });
       (function frame() {

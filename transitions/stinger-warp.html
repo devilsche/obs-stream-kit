@@ -7,7 +7,7 @@
   <!-- WebGL-Stinger „Warp“: Ein Lichtwirbel (Sternstreifen + Plasma in Theme-Farben) wächst von der Mitte über das Bild,
        der Name schlägt mit Farbversatz ein, nach dem Schnitt reißt ein Loch von der Mitte auf und gibt die neue Szene frei.
        Ein Shader, keine Bibliothek. URL: dur (ms, Standard 2000), cut (ms, Standard 900) = OBS „Duration“ / „Transition Point“,
-       name, font. Bis cut × 0,85 ist das Bild voll abgedeckt. -->
+       name, font, show (name|logo|none). Bis cut × 0,85 ist das Bild voll abgedeckt. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -37,12 +37,12 @@
         'precision highp float;',
         'uniform vec2 uRes; uniform float uT, uCut, uDur, uCalm, uHasText;',
         'uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+        window.StingerGL.GLSL,
         'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
         'float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);',
         '  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }',
         'float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ s += a*n(p); p *= 2.03; a *= 0.5; } return s; }',
-        'vec3 txt(vec2 uv){ return texture2D(uTex, uv).rgb; }',
-        'void main(){',
+                'void main(){',
         '  vec2 fc = gl_FragCoord.xy, uv = fc / uRes;',
         '  vec2 p = (fc - 0.5*uRes) / uRes.y;',
         '  float r = length(p), a = atan(p.y, p.x);',
@@ -75,12 +75,11 @@
         '  float tA = smoothstep(0.0, 0.12, ti) * (1.0 - smoothstep(0.08, 0.38, uT - uCut));',
         '  float sc = 1.0 + 0.55*exp(-max(ti, 0.0)*9.0) + 0.9*smoothstep(0.0, 0.5, uT - uCut);',
         '  float ab = (0.012*exp(-max(ti, 0.0)*7.0) + 0.006*smoothstep(0.0, 0.3, uT - uCut)) * (1.0 - uCalm);',
-        '  vec2 tp = (fc - 0.5*uRes) / vec2(1500.0, 375.0) / sc; tp.y = -tp.y; tp += 0.5;',
-        '  if (uHasText > 0.5 && tA > 0.0 && tp.x > 0.0 && tp.x < 1.0 && tp.y > 0.0 && tp.y < 1.0) {',
-        '    float tr = txt(tp + vec2(ab, 0.0)).r, tg = txt(tp).r, tb = txt(tp - vec2(ab, 0.0)).r, gw = txt(tp).g;',
-        '    c += uA * gw * 0.9 * tA;',
-        '    vec3 fill = mix(vec3(1.0), uA, 0.28);',
-        '    c = c * (1.0 - max(max(tr, tg), tb) * tA) + fill * vec3(tr, tg, tb) * tA;',
+        '  vec2 tp = (fc - 0.5*uRes) / vec2(1600.0, 800.0) / sc; tp.y = -tp.y; tp += 0.5;',
+        '  if (uHasText > 0.5 && tA > 0.0) {',
+        '    vec4 ar = artAt(uTex, tp + vec2(ab, 0.0)), ag = artAt(uTex, tp), ab4 = artAt(uTex, tp - vec2(ab, 0.0));',
+        '    c += uA * glowAt(uTex, tp) * 0.9 * tA;',
+        '    c = vec3(mix(c.r, ar.r, ar.a*tA), mix(c.g, ag.g, ag.a*tA), mix(c.b, ab4.b, ab4.a*tA));',
         '  }',
         // leuchtende Ränder an der wachsenden Abdeckung und am aufreißenden Loch (Licht auch außerhalb)
         '  float rimIn = exp(-abs(r - cover) * 70.0) * (1.0 - tin*tin) * step(0.001, cover);',
@@ -117,7 +116,7 @@
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
       gl.uniform1i(U('uTex'), 0);
-      if (S.name()) S.nameTexture(function (canvas) {
+      S.artTexture(C, function (canvas) {
         gl.bindTexture(gl.TEXTURE_2D, tex);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas);
         gl.uniform1f(U('uHasText'), 1);

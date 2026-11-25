@@ -136,15 +136,6 @@ DECOR = [
          {"key": "width",  "label": "Width",  "type": "number", "default": "400", "min": 100},
          {"key": "height", "label": "Height", "type": "number", "default": "225", "min": 50},
      ]},
-    {"key": "tipgoal-banner", "label": "Tip-Goal Banner", "file": "tipgoal-banner.html", "size": "600×180",
-     "desc": "Tip goal as a slim progress banner.",    "params": [], "switches": [
-         {"key": "title",    "label": "Title",    "type": "text",   "default": "Tip Goal", "placeholder": "Tip Goal"},
-         {"key": "current",  "label": "Current",  "type": "text",   "default": "0",        "placeholder": "0"},
-         {"key": "goal",     "label": "Goal",     "type": "text",   "default": "100",      "placeholder": "100"},
-         {"key": "currency", "label": "Currency", "type": "text",   "default": "€",        "placeholder": "€"},
-         {"key": "dock",     "label": "Background", "type": "select", "default": "0",
-          "options": [["0", "Transparent (OBS)"], ["1", "With background (Dock)"]]},
-     ]},
 ]
 
 
@@ -1102,6 +1093,9 @@ _STINGER_FONTS = [
 _GL_STINGER_SWITCHES = [
     {"key": "name", "label": "Name", "type": "text", "default": "", "placeholder": "e.g. LUCKOR_HD",
      "tooltip": "Twitch channel name (overrides server default)"},
+    {"key": "show", "label": "Show", "type": "select", "default": "name",
+     "options": [["name", "Name"], ["logo", "Logo (upload below)"], ["none", "Nothing"]],
+     "tooltip": "Logo needs an uploaded image; without one the name is shown"},
     {"key": "font", "label": "Font", "type": "select", "default": "", "options": _STINGER_FONTS},
     {"key": "dur", "label": "Duration (ms)", "type": "number", "default": "2000", "min": 600,
      "tooltip": "Same value as Duration in the OBS transition"},
