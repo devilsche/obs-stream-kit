@@ -92,3 +92,12 @@ def test_alert_sound_file_only_existing(app):
     c = app.test_client()
     assert c.get("/s/tok/alert-sounds/follow/ab12cd34ef56.mp3").status_code == 404
     assert c.get("/s/tok/alert-sounds/follow/..%2F..%2Fx.mp3").status_code == 404
+
+
+def test_follow_alert_has_builtin_default_without_uploads(app):
+    c = app.test_client()
+    with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
+         mock.patch("pubg.db_pg.get_setting", side_effect=lambda c, t, k, d=None: d):
+        body = c.get("/s/tok/alerts/follow.html").get_data(as_text=True)
+    assert '"default": "/s/tok/assets/alert-sounds/follow.mp3"' in body
+    assert c.get("/s/tok/assets/alert-sounds/follow.mp3").status_code == 200

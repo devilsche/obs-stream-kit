@@ -18,6 +18,9 @@ MAX_SECONDS = 20.0
 MAX_BYTES = 2 * 1024 * 1024
 DEFAULT_VOLUME = 0.6
 SETTING = "alert_sounds"
+# Eingebaute Töne im Repo (assets/alert-sounds/<alert>.mp3): spielen, solange der Tenant keinen eigenen hat.
+# Lautstärke 0 im Dashboard schaltet auch sie ab.
+DEFAULTS = {"follow": "followalit.mp3"}
 _ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
 # ── MP3-Länge ohne Fremdbibliothek: alle Frames ablaufen (klappt für CBR und VBR) ──
@@ -172,6 +175,11 @@ def set_volume(conn, tenant_id, alert, volume):
 
 
 def for_overlay(cfg, alert):
-    """Was der Alert im Browser braucht (wird als window.__ALERT_SOUND__ injiziert)."""
+    """Was der Alert im Browser braucht (wird als window.__ALERT_SOUND__ injiziert).
+    default: eingebauter Ton (nur ohne eigene Dateien), relativ zur Token-Basis."""
     e = cfg.get(alert) or {}
-    return {"volume": e.get("volume", DEFAULT_VOLUME), "files": [f["id"] for f in e.get("files", [])]}
+    files = [f["id"] for f in e.get("files", [])]
+    out = {"volume": e.get("volume", DEFAULT_VOLUME), "files": files}
+    if not files and alert in DEFAULTS:
+        out["default"] = "assets/alert-sounds/%s.mp3" % alert
+    return out

@@ -54,6 +54,8 @@ def _serve_tenant_source(token, subdir, filepath):
             if key in alert_sounds.ALERT_KEYS:
                 alert_sound = alert_sounds.for_overlay(alert_sounds.load(conn, g.tenant_id), key)
                 alert_sound["base"] = f"/s/{token}/alert-sounds/{key}/"
+                if alert_sound.get("default"):
+                    alert_sound["default"] = f"/s/{token}/" + alert_sound["default"]
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()

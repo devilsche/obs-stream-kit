@@ -1,5 +1,6 @@
 /* Alert-Ton aus dem Dashboard (Stream → Alert-Karte → Sound): bis zu 3 eigene MP3 je Alert.
- * Der Server injiziert window.__ALERT_SOUND__ = { volume, files: [ids], base: "/s/<token>/alert-sounds/<alert>/" }.
+ * Der Server injiziert window.__ALERT_SOUND__ = { volume, files: [ids], base: "/s/<token>/alert-sounds/<alert>/", default? }.
+ * default: eingebauter Ton aus assets/alert-sounds/ (z. B. Follow), nur wenn keine eigenen Dateien da sind.
  * Beim Erscheinen des Alerts spielt zufällig einer der Töne (nicht zweimal hintereinander derselbe),
  * zum Ende des Alerts (?duration=, Standard 6 s) blendet er weich aus.
  * URL: sound=0 schaltet stumm, volume=0–1 wirkt als Faktor auf die Dashboard-Lautstärke.
@@ -7,16 +8,22 @@
 (function () {
   'use strict';
   var cfg = window.__ALERT_SOUND__, q = new URLSearchParams(location.search);
-  if (!cfg || !cfg.files || !cfg.files.length || q.get('sound') === '0') return;
+  if (!cfg || q.get('sound') === '0') return;
+  var files = cfg.files || [];
+  if (!files.length && !cfg['default']) return;
   var f = parseFloat(q.get('volume')), vol = (cfg.volume == null ? 0.6 : cfg.volume) * (isNaN(f) ? 1 : Math.max(0, Math.min(1, f)));
   if (vol <= 0) return;
   var key = 'alert-sound-last:' + cfg.base, last = null;
   try { last = localStorage.getItem(key); } catch (e) { /* ohne Speicher eben zufällig */ }
-  var pool = cfg.files.length > 1 ? cfg.files.filter(function (id) { return id !== last; }) : cfg.files;
-  var id = pool[Math.floor(Math.random() * pool.length)];
-  try { localStorage.setItem(key, id); } catch (e) { /* egal */ }
+  var src;
+  if (files.length) {
+    var pool = files.length > 1 ? files.filter(function (id) { return id !== last; }) : files;
+    var id = pool[Math.floor(Math.random() * pool.length)];
+    try { localStorage.setItem(key, id); } catch (e) { /* egal */ }
+    src = cfg.base + id + '.mp3';
+  } else src = cfg['default'];
 
-  var a = new Audio(cfg.base + id + '.mp3');
+  var a = new Audio(src);
   a.preload = 'auto';
   a.volume = Math.min(1, vol);
   function play() {

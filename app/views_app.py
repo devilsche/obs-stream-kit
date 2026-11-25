@@ -1112,7 +1112,7 @@ def _fetch_only():
 def alert_sounds_list():
     from overlay_app import alert_sounds
     cfg = _sound_conn(lambda c: alert_sounds.load(c, g.tenant_id))
-    return jsonify({"alerts": cfg, "maxFiles": alert_sounds.MAX_FILES,
+    return jsonify({"alerts": cfg, "defaults": alert_sounds.DEFAULTS, "maxFiles": alert_sounds.MAX_FILES,
                     "maxSeconds": alert_sounds.MAX_SECONDS, "maxBytes": alert_sounds.MAX_BYTES})
 
 

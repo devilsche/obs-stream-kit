@@ -648,7 +648,7 @@ G1R_STEAM_NAME=</code></pre>
         <div class="url-sound__row">
           <label class="url-sound__lbl" for="urlSoundVol">Volume</label>
           <select id="urlSoundVol" class="url-sound__sel">
-            ${[[0.1,"10%"],[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
+            ${[[0,"Off"],[0.1,"10%"],[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
           </select>
         </div>
         <div class="url-sound__row">
@@ -713,7 +713,7 @@ G1R_STEAM_NAME=</code></pre>
       ${commandsHtml ? `<div class="url-dpanel url-dpanel--single" id="dpanel-chat" role="tabpanel" aria-labelledby="dtab-chat" hidden>${commandsHtml}</div>` : ""}`;
     if (hasTabs) wireDetailTabs();
     wireThemeSections();
-    if (alertKey) wireAlertSound(alertKey);
+    if (alertKey) wireAlertSound(alertKey, base);
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -732,7 +732,7 @@ G1R_STEAM_NAME=</code></pre>
 
   // ── Alert-Töne: Liste, Vorhören, Löschen, Hochladen, Lautstärke ──
   let soundPreview = null;
-  function wireAlertSound(alert) {
+  function wireAlertSound(alert, srcBase) {
     const list = document.getElementById("urlSoundList");
     const vol = document.getElementById("urlSoundVol");
     const file = document.getElementById("urlSoundFile");
@@ -744,7 +744,7 @@ G1R_STEAM_NAME=</code></pre>
     function render(data) {
       const e = data.alerts[alert] || { files: [], volume: 0.6 };
       rules.textContent = `MP3 only, at most ${data.maxSeconds} s and ${Math.round(data.maxBytes / 1048576)} MB, up to ${data.maxFiles} files.`;
-      vol.value = String([0.1, 0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
+      vol.value = String([0, 0.1, 0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
       file.disabled = e.files.length >= data.maxFiles;
       file.setAttribute("aria-disabled", file.disabled ? "true" : "false");
       list.innerHTML = e.files.length ? `<ul class="url-sound__items">${e.files.map(f => `
@@ -754,7 +754,13 @@ G1R_STEAM_NAME=</code></pre>
           <span class="url-sound__dur">${Number(f.dur).toFixed(1)} s</span>
           <button type="button" class="url-act ghost" data-play="${escapeAttr(f.id)}" aria-label="Play ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
           <button type="button" class="url-act ghost" data-del="${escapeAttr(f.id)}" aria-label="Delete ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
-        </li>`).join("")}</ul>` : `<p class="url-dbox__desc">No sound yet — the alert stays silent.</p>`;
+        </li>`).join("")}</ul>` : (data.defaults && data.defaults[alert] ? `<ul class="url-sound__items">
+        <li class="url-sound__item">
+          <span class="material-symbols-outlined" aria-hidden="true">library_music</span>
+          <span class="url-sound__name">Built-in: ${escapeHtml(data.defaults[alert])}</span>
+          <span class="url-sound__dur">until you add your own</span>
+          <button type="button" class="url-act ghost" data-play="__default" aria-label="Play built-in sound"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
+        </li></ul>` : `<p class="url-dbox__desc">No sound yet — the alert stays silent.</p>`);
     }
     function reload() {
       return fetch("/app/api/alert-sounds", { credentials: "same-origin" })
@@ -765,8 +771,10 @@ G1R_STEAM_NAME=</code></pre>
       const p = e.target.closest("[data-play]"), d = e.target.closest("[data-del]");
       if (p) {
         if (soundPreview) soundPreview.pause();
-        soundPreview = new Audio(api + "/" + p.dataset.play + ".mp3");
-        soundPreview.volume = parseFloat(vol.value) || 0.6;
+        soundPreview = new Audio(p.dataset.play === "__default"
+          ? srcBase.replace(/\/alerts\/[^/]+$/, "/assets/alert-sounds/" + encodeURIComponent(alert) + ".mp3")
+          : api + "/" + p.dataset.play + ".mp3");
+        soundPreview.volume = parseFloat(vol.value) || 0.3;
         soundPreview.play().catch(() => say("Playback blocked by the browser.", true));
       } else if (d) {
         fetch(api + "/" + d.dataset.del, { method: "DELETE", credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })

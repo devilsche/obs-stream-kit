@@ -54,3 +54,10 @@ def test_volume_and_overlay_view(store):
     assert alert_sounds.for_overlay(cfg, "raid") == {"volume": 1.0, "files": []}
     store[(2, "alert_sounds")] = "kaputt"
     assert alert_sounds.load(None, 2)["raid"]["volume"] == alert_sounds.DEFAULT_VOLUME
+
+
+def test_builtin_default_only_without_own_files(store):
+    assert alert_sounds.for_overlay(alert_sounds.load(None, 3), "follow")["default"] == "assets/alert-sounds/follow.mp3"
+    assert "default" not in alert_sounds.for_overlay(alert_sounds.load(None, 3), "raid")
+    store[(3, "alert_sounds")] = json.dumps({"follow": {"volume": 0.2, "files": [{"id": "ab12cd34ef56", "name": "x.mp3"}]}})
+    assert "default" not in alert_sounds.for_overlay(alert_sounds.load(None, 3), "follow")
