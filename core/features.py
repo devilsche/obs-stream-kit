@@ -5,12 +5,41 @@ import json
 
 # Schlüssel → Bezeichnung im Admin (englisch, wie das übrige Frontend)
 FEATURES = {
+    "weather": "Weather (weather scene, seasonal decoration, weather commands, weather dock)",
+    "race": "Race (Car Race, Car Drive, item rain, burnout)",
     "ducks": "Rubber ducks (all duck effects, !outfit)",
     "sushi-eater": "Eater duck in the sushi rain (needs ducks)",
     "bmw-driver": "Driver duck in the BMW rain (needs ducks)",
     "duck-vacuum": "Vacuum duck cleans up after every rain (needs ducks)",
 }
 KEY = "features"
+
+# Private Extras: eigene Reiter im Dashboard, ohne Freischaltung unsichtbar und gesperrt
+EXTRAS = ("weather", "race", "ducks")
+
+# OBS-Quelle (effects/<datei>) → nötige Freischaltung; ohne sie liefert der Server eine leere Seite
+SOURCE_FEATURE = {
+    **{f: "weather" for f in ("weather.html", "rain.html", "snow.html", "xmas.html", "autumn.html",
+                              "winter.html", "spring.html", "summer.html")},
+    **{f: "race" for f in ("car-race.html", "car-burnout.html", "item-rain.html")},
+    **{f: "ducks" for f in ("knife-duck.html", "duck-greet.html", "duck-parade.html", "duck-assembly.html",
+                            "duck-court.html")},
+}
+
+# Erstes Pfadstück hinter /api/fx/ → nötige Freischaltung (Enten prüft fx/endpoints.py selbst)
+API_FEATURE = {
+    **{k: "weather" for k in ("weather", "rain", "xmas", "autumn", "winter", "spring", "summer")},
+    **{k: "race" for k in ("car-race", "car-drive", "cars", "track-props", "track-ads", "track-ads.json")},
+}
+
+
+def source_feature(filename):
+    return SOURCE_FEATURE.get(filename)
+
+
+def api_feature(rest):
+    """rest = Pfad hinter /api/fx/, z. B. "weather/state" oder "car-race"."""
+    return API_FEATURE.get((rest or "").split("/", 1)[0])
 
 
 def parse(raw) -> list:
@@ -53,6 +82,23 @@ def is_admin_tenant(conn, tenant_id: int) -> bool:
         return bool(r and r.get("is_admin"))
     except Exception:
         return False   # im Zweifel nichts extra freischalten, Source läuft trotzdem
+
+
+_cache = {}
+CACHE_S = 10
+
+
+def effective_cached(load, tenant_id: int, now=None) -> list:
+    """Wie effective(), aber je Tenant 10 s gemerkt – für Endpunkte, die OBS sekündlich abfragt.
+    load() liefert die frische Liste (holt sich die DB-Verbindung selbst)."""
+    import time
+    now = time.time() if now is None else now
+    hit = _cache.get(tenant_id)
+    if hit and now - hit[0] < CACHE_S:
+        return hit[1]
+    val = load()
+    _cache[tenant_id] = (now, val)
+    return val
 
 
 def effective(conn, tenant_id: int) -> list:

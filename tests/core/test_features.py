@@ -39,3 +39,31 @@ def test_other_tenant_only_what_admin_enabled():
     assert features.effective(conn, 2) == ["sushi-eater"]
     conn = _Conn({"admin": None, "setting": None})
     assert features.effective(conn, 3) == []
+
+
+def test_extras_map_sources_and_api():
+    assert features.EXTRAS == ("weather", "race", "ducks")
+    assert features.source_feature("winter.html") == "weather"
+    assert features.source_feature("item-rain.html") == "race"
+    assert features.source_feature("duck-court.html") == "ducks"
+    assert features.source_feature("lens-flare.html") is None
+    assert features.api_feature("weather/state") == "weather"
+    assert features.api_feature("xmas/poll") == "weather"
+    assert features.api_feature("car-race") == "race"
+    assert features.api_feature("cars/model/x.glb") == "race"
+    assert features.api_feature("track-ads.json") == "race"
+    assert features.api_feature("ducks/parade") is None
+
+
+def test_effective_cached_remembers_ten_seconds():
+    features._cache.clear()
+    calls = []
+
+    def load():
+        calls.append(1)
+        return ["race"]
+    assert features.effective_cached(load, 9, now=100) == ["race"]
+    assert features.effective_cached(load, 9, now=105) == ["race"] and len(calls) == 1
+    features.effective_cached(load, 9, now=111)
+    assert len(calls) == 2
+    features._cache.clear()

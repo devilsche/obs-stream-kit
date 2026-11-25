@@ -188,9 +188,9 @@ _PET_FONTS = [
 
 _WEATHER_KINDS = [["clear", "Clear"], ["cloudy", "Cloudy"], ["fog", "Fog"], ["drizzle", "Drizzle"], ["rain", "Rain"], ["storm", "Thunderstorm"], ["sleet", "Sleet"], ["snow", "Snow"], ["blizzard", "Blizzard"], ["heat", "Heat"], ["night", "Clear night"], ["dawn", "Dawn"], ["dusk", "Dusk"]]
 
-# Dashboard-Domain je Effect (Tab in /app/urls, ?d=…): "domain" in EFFECT_META, Standard "stream".
-# Gültige Werte: EFFECT_DOMAINS. Item Rain und alle übrigen Effects bleiben in Stream.
-EFFECT_DOMAINS = ("stream", "race", "ducks")
+# Dashboard-Domain je Effect (Tab in /app/urls, ?d=…): "domain" in EFFECT_META, sonst die Freischaltung
+# aus core/features.py (SOURCE_FEATURE: Weather/Race/Ducks), sonst "stream". Gültige Werte: EFFECT_DOMAINS.
+EFFECT_DOMAINS = ("stream", "weather", "race", "ducks")
 DEFAULT_EFFECT_DOMAIN = "stream"
 
 EFFECT_META = {
@@ -1026,6 +1026,9 @@ def _live_keys(subdir: str, key: str, switches: list) -> list:
     return [sw["key"] for sw in switches if sw["key"] in settable]
 
 
+from core.features import SOURCE_FEATURE  # noqa: E402
+
+
 def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
                      desc: str = "", params: list = None, switches_map: dict = None):
     """All *.html in <root>/<subdir> as source dicts (label auto-derived from filename)."""
@@ -1043,6 +1046,7 @@ def list_dir_sources(root: str, subdir: str, size: str = "1920×1080",
                     "commands": meta.get("commands", []),
                     "controls": meta.get("controls", []),
                     "preview_query": meta.get("preview_query", ""),
-                    "domain": meta.get("domain", DEFAULT_EFFECT_DOMAIN),
+                    "domain": meta.get("domain") or (SOURCE_FEATURE.get(fn) if subdir == "effects" else None)
+                              or DEFAULT_EFFECT_DOMAIN,
                     "live": _live_keys(subdir, key, meta.get("switches", []))})
     return out

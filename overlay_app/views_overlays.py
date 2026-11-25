@@ -25,7 +25,6 @@ def _tenant_creds(tenant_id: int):
 
 
 # Enten-Sources: nur mit Freischaltung „ducks“ (core/features.py), sonst leer und durchsichtig
-DUCK_SOURCES = {"knife-duck.html", "duck-greet.html", "duck-parade.html", "duck-assembly.html", "duck-court.html"}
 BLANK_HTML = ('<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Not enabled</title>'
               '<style>html,body{margin:0;background:transparent}</style></head><body></body></html>')
 
@@ -51,7 +50,8 @@ def _serve_tenant_source(token, subdir, filepath):
     finally:
         if "_PG_CONN_FACTORY" not in current_app.config:
             conn.close()
-    if subdir == "effects" and filepath in DUCK_SOURCES and "ducks" not in feats:
+    need = features.source_feature(filepath) if subdir == "effects" else None
+    if need and need not in feats:
         return BLANK_HTML, 200, {"Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-cache, must-revalidate"}
     variables = {
         "__SERVE_BASE__": f"/s/{token}/",

@@ -13,8 +13,10 @@
     <a href="/app/urls?d=steam" {% if on_urls and urld == 'steam' %}aria-current="page"{% endif %}>Steam</a>
     <a href="/app/urls?d=g1r" {% if on_urls and urld == 'g1r' %}aria-current="page"{% endif %}>Gothic&nbsp;1</a>
     <a href="/app/urls?d=stream" {% if on_urls and urld == 'stream' %}aria-current="page"{% endif %}>Stream</a>
-    <a href="/app/urls?d=race" {% if on_urls and urld == 'race' %}aria-current="page"{% endif %}>Race</a>
-    <a href="/app/urls?d=ducks" {% if on_urls and urld == 'ducks' %}aria-current="page"{% endif %}>Ducks</a>
+    {# Private Extras: nur mit Freischaltung (core/features.py), golden hinter einem Trenner #}
+    {% if extras %}<span class="dn-sep" aria-hidden="true"></span>
+    {% for x in extras %}<a class="dn-extra" href="/app/urls?d={{ x }}" {% if on_urls and urld == x %}aria-current="page"{% endif %}>{{ x|capitalize }}</a>
+    {% endfor %}<span class="dn-sep" aria-hidden="true"></span>{% endif %}
     <a href="/app/tools" {% if request.path.startswith('/app/tools') %}aria-current="page"{% endif %}>tools</a>
     <a href="/app/settings" {% if request.path.startswith('/app/settings') %}aria-current="page"{% endif %}>settings</a>
     {% if user.is_admin %}<a href="/admin/" {% if request.path.startswith('/admin') %}aria-current="page"{% endif %}>admin</a>{% endif %}

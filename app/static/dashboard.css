@@ -856,6 +856,9 @@ th { color: var(--brand-gold); font-weight: 700; font-size: 0.85em;
 .dn-links a:hover{color:var(--theme-text)}
 .dn-links a[aria-current="page"]{color:var(--brand-ink);border-color:var(--theme-border);background:var(--theme-surface)}
 .dn-links a[aria-current="page"]::before{content:"\25b8 "}
+.dn-links .dn-sep{width:1px;align-self:stretch;margin:10px 4px;background:var(--theme-border)}
+.dn-links a.dn-extra{color:var(--brand-gold)}
+.dn-links a.dn-extra:hover,.dn-links a.dn-extra[aria-current="page"]{color:var(--brand-gold)}
 .dn-right{margin-left:auto;display:flex;align-items:center;gap:12px}
 .dn-chip{display:flex;align-items:center;gap:10px;padding:5px 15px 5px 5px;border:1px solid var(--theme-border);
   border-radius:999px;background:var(--theme-surface)}

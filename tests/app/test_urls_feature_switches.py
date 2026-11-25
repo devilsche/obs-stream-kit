@@ -16,11 +16,15 @@ def test_admin_sees_duck_switches(pg_conn_test_setup):
     assert "What rains" in body and "Eating duck (sushi)" in body and "Vacuum duck" in body
 
 
-def test_others_see_only_basic_switches(pg_conn_test_setup_non_admin):
+def test_others_see_no_extras(pg_conn_test_setup_non_admin):
+    """Ohne Freischaltung: keine Reiter Weather/Race/Ducks, keine ihrer Karten, Werkzeuge oder Dock."""
     conn, tid, _, sid = pg_conn_test_setup_non_admin
-    body = _client(conn, sid).get("/app/urls").get_data(as_text=True)
-    assert "What rains" in body
-    assert "Eating duck (sushi)" not in body and "Vacuum duck" not in body and "Duck outfit" not in body
+    c = _client(conn, sid)
+    body = c.get("/app/urls").get_data(as_text=True)
+    for needle in ("?d=weather", "?d=race", "?d=ducks", "What rains", 'data-path="effects/weather.html"',
+                   'data-path="effects/car-race.html"', 'data-path="effects/duck-parade.html"', "dn-extra"):
+        assert needle not in body, needle
+    assert c.get("/app/dock/weather").status_code == 403
 
 
 def test_car_model_options_from_catalog(tmp_path):
@@ -39,14 +43,15 @@ def test_race_and_ducks_domains(pg_conn_test_setup):
     conn, tid, _, sid = pg_conn_test_setup
     c = _client(conn, sid)
     body = c.get("/app/urls?d=race").get_data(as_text=True)
-    assert 'href="/app/urls?d=race" aria-current="page"' in body and "?d=ducks" in body
+    assert 'href="/app/urls?d=race" aria-current="page"' in body and "?d=ducks" in body and "?d=weather" in body
     for needle in ('data-path="effects/car-race.html"', 'data-path="effects/car-burnout.html"', 'href="/app/tools/car-drive"',
                    'href="/app/tools/car-editor"', "cmd=records"):
         assert needle in body, needle
     import re
     def tab_of(path):
         return re.search(r'data-path="%s"[^>]*?data-tab="(\w+)"|data-tab="(\w+)"[^>]*?data-path="%s"' % (path, path), body)
-    for path, dom in (("effects/car-race.html", "race"), ("effects/duck-parade.html", "ducks"), ("effects/item-rain.html", "stream")):
+    for path, dom in (("effects/car-race.html", "race"), ("effects/duck-parade.html", "ducks"), ("effects/item-rain.html", "race"),
+                      ("effects/weather.html", "weather"), ("effects/xmas.html", "weather"), ("effects/lens-flare.html", "stream")):
         m = re.search(r'<[^>]*data-path="%s"[^>]*>' % re.escape(path), body)
         assert m and 'data-tab="%s"' % dom in m.group(0), path
     assert 'href="/app/tools/duck-editor"' in body

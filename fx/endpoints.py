@@ -255,6 +255,36 @@ def _ducks_ok() -> bool:
 DUCK_EFFECTS = {"duckgreet"}
 
 
+def _feats() -> list:
+    from core import features
+
+    def load():
+        raw = _get_conn()
+        try:
+            return features.effective(raw, g.tenant_id)
+        finally:
+            if "_PG_CONN_FACTORY" not in current_app.config:
+                raw.close()
+    try:
+        return features.effective_cached(load, g.tenant_id)
+    except Exception:
+        log.exception("fx: feature lookup failed")
+        return []
+
+
+@bp_fx.before_request
+def _extras_gate():
+    """Weather und Race nur mit Freischaltung (core/features.py); Chat-Befehle bleiben ohne sie stumm."""
+    from core import features
+    if getattr(g, "tenant_id", None) is None:
+        return None
+    rest = request.path.split("/api/fx/", 1)[1] if "/api/fx/" in request.path else ""
+    need = features.api_feature(rest)
+    if need and need not in _feats():
+        abort(403)
+    return None
+
+
 @bp_fx.route("/s/<token>/api/fx/<effect>", methods=["GET", "POST"])
 def push(token, effect):
     if g.tenant_id is None or effect not in commands.EFFECTS:

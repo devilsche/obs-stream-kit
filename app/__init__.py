@@ -61,6 +61,20 @@ def create_app(testing: bool = False) -> Flask:
                 theme = "entry"
         return {"theme": theme}
 
+    @app.context_processor
+    def inject_extras():
+        """{{ extras }}: freigeschaltete private Extras (Weather/Race/Ducks) für die Reiter in der Leiste."""
+        from flask import g
+        from core.features import EXTRAS
+        if getattr(g, "tenant_id", None) is None or not getattr(g, "user", None):
+            return {"extras": []}
+        try:
+            from app.views_app import _unlocked_extras
+            got = _unlocked_extras()
+        except Exception:
+            got = set()
+        return {"extras": [e for e in EXTRAS if e in got]}
+
     @app.route("/healthz")
     def healthz():
         return jsonify({"status": "ok"})

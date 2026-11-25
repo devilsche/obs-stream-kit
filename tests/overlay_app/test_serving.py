@@ -27,12 +27,24 @@ def test_overlay_asset_served(app):
 def test_overlay_html_injects_features(app):
     c = app.test_client()
     with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()):
-        r = c.get("/s/tok/effects/item-rain.html")
+        r = c.get("/s/tok/effects/lens-flare.html")
     assert 'window.__FEATURES__ = [];' in r.get_data(as_text=True)
     with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
-         mock.patch("core.features.effective", return_value=["sushi-eater"]):
+         mock.patch("core.features.effective", return_value=["race", "sushi-eater"]):
         r = c.get("/s/tok/effects/item-rain.html")
-    assert 'window.__FEATURES__ = ["sushi-eater"];' in r.get_data(as_text=True)
+    assert 'window.__FEATURES__ = ["race", "sushi-eater"];' in r.get_data(as_text=True)
+
+
+def test_weather_and_race_sources_blank_without_feature(app):
+    c = app.test_client()
+    for src in ("weather.html", "xmas.html", "car-race.html", "item-rain.html"):
+        with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()):
+            body = c.get("/s/tok/effects/" + src).get_data(as_text=True)
+        assert "<title>Not enabled</title>" in body, src
+    with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
+         mock.patch("core.features.effective", return_value=["weather"]):
+        body = c.get("/s/tok/effects/weather.html").get_data(as_text=True)
+    assert "Not enabled" not in body
 
 
 def test_duck_sources_blank_without_feature(app):

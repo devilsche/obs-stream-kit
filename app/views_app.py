@@ -63,7 +63,8 @@ TOOLS = [
      "label": "Christmas ornaments preview",
      "desc": "Drafts for the followers' tree ornaments: nutcracker, pine cone, candy cane and more.",
      "path": "tools/xmas-ornaments.html",
-     "admin_only": True},
+     "admin_only": True,
+     "domain": "weather"},
     {"key": "duck-viewer",
      "label": "Rubber duck viewer",
      "desc": "The 3D rubber duck from the party rain, large and freely rotatable (drag, arrow keys, zoom).",
@@ -637,19 +638,22 @@ def urls():
     effects  = list_dir_sources(project_root, "effects",  desc="Visual effect overlay.",
                                 switches_map=EFFECT_META)
     # Schalter mit "feature" nur zeigen, wenn der Tenant die Freischaltung hat (core/features.py)
+    from core.features import EXTRAS
+    effects = [e for e in effects if e["domain"] not in EXTRAS or e["domain"] in feats]
     for e in effects:
         e["switches"] = [sw for sw in e["switches"] if not sw.get("feature") or sw["feature"] in feats]
         if e["file"] in ("item-rain.html", "car-burnout.html"):
             e["switches"] = [_car_model_switch(project_root, sw) if sw["key"] == "model" else sw for sw in e["switches"]]
     transitions = TRANSITIONS
     visible = _visible_tools()
-    domain_tools = {d: _domain_tools(visible, d) for d in ("race", "ducks")}
+    domain_tools = {d: _domain_tools(visible, d) for d in EXTRAS if d in feats}
     race_link = None
-    try:
-        from fx.endpoints import drive_link
-        race_link = drive_link(g.tenant_id)
-    except Exception:
-        current_app.logger.exception("urls: race drive link failed")
+    if "race" in feats:
+        try:
+            from fx.endpoints import drive_link
+            race_link = drive_link(g.tenant_id)
+        except Exception:
+            current_app.logger.exception("urls: race drive link failed")
     return render_template("urls.html", domain_tools=domain_tools, race_link=race_link,
                            user=g.user, token=token,
                            pubg_ready=pubg_ready, steam_ready=steam_ready,
@@ -679,6 +683,8 @@ def dock_weather():
     """Schmale Steuerseite für ein OBS-Dock (Docks → Benutzerdefinierte Browser-Docks):
     Statuszeile wie !weather und die Knöpfe der Weather-Source, ohne Menü.
     ?place= wie in der Overlay-URL, damit die Statuszeile das echte Wetter am Ort zeigt."""
+    if "weather" not in _unlocked_extras():
+        abort(403)
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -806,10 +812,35 @@ def _domain_tools(tools, domain):
     return [t for t in tools if t.get("domain") == domain]
 
 
+def _unlocked_extras() -> set:
+    """Freigeschaltete Extras (Weather/Race/Ducks) des aktuellen Tenants, 10 s gemerkt."""
+    from core import features
+
+    def load():
+        conn = _get_conn()
+        try:
+            return features.effective(conn, g.tenant_id)
+        finally:
+            if "_PG_CONN_FACTORY" not in current_app.config:
+                conn.close()
+    try:
+        return set(features.effective_cached(load, g.tenant_id)) & set(features.EXTRAS)
+    except Exception:
+        current_app.logger.exception("extras lookup failed")
+        return set()
+
+
+def _tool_allowed(t, extras) -> bool:
+    from core.features import EXTRAS
+    if t["admin_only"] and not g.user.get("is_admin"):
+        return False
+    return t.get("domain") not in EXTRAS or t.get("domain") in extras
+
+
 def _visible_tools():
     """Tools the current user is allowed to see."""
-    return [t for t in TOOLS
-            if not t["admin_only"] or g.user.get("is_admin")]
+    extras = _unlocked_extras()
+    return [t for t in TOOLS if _tool_allowed(t, extras)]
 
 
 @bp_app.route("/app/tools")
@@ -856,7 +887,7 @@ def tools_open(key):
     tool = next((t for t in TOOLS if t["key"] == key), None)
     if tool is None:
         abort(404)
-    if tool["admin_only"] and not g.user.get("is_admin"):
+    if not _tool_allowed(tool, _unlocked_extras()):
         abort(403)
     root = current_app.config.get("_PROJECT_ROOT") or os.path.dirname(
         os.path.dirname(os.path.abspath(__file__)))
