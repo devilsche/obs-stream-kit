@@ -37,8 +37,7 @@
     var UP = new THREE.Vector3(0, 1, 0), LAT = new THREE.Vector3(), FWD = new THREE.Vector3();
     var SNOUT = [];
     function unSnout() { for (var i = 0; i < SNOUT.length; i++) if (SNOUT[i][2]) { SNOUT[i][0].position.sub(SNOUT[i][1]); SNOUT[i][2] = false; } }
-    var EAR_FOLD = 0, ehp = new THREE.Vector3(), etp = new THREE.Vector3(), eep = new THREE.Vector3(), edir = new THREE.Vector3(),
-        etgt = new THREE.Vector3(), eax = new THREE.Vector3();
+    var EAR_FOLD = 0, EAR_BASE = 0.45, EAR_TIP = 1.9;   // Kippwinkel (rad) bei ears=100: Basis nach vorne, Spitze dazu
     var TAIL_SCALE = null, SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5;
     // Körperbau-Vorlagen (Shiba-Modell umgeformt). Jack Russell: kompakt, etwas länger als hoch, kürzeres Bein,
     // Rute aufrecht. Pinscher: schlank, hochbeinig, hochgezogener Bauch, Rute schräg.
@@ -205,7 +204,7 @@
           // so bleiben Clip-Bewegungen dieser Knochen erhalten.
           var newW = bindW.map(function (mx) { return mx.clone(); }), moved = {};
           bones.forEach(function (bn, k) {
-            if (!HEADSET[k] || bn === B.head) return;
+            if (!/^tongue_\d/.test(bn.name)) return;   // nur die Zunge: alles andere im Kopf passt, Stirn/Brauen verschieben gab Grafikfehler
             var bp = bindPos[k], nv = bp.clone();
             var sd = off.subVectors(nv, hp).dot(latAx);
             nv.addScaledVector(latAx, -sd * (1 - HEADW) * (EARS[k] ? 0 : 1));
@@ -492,18 +491,11 @@
         // Jedes Bild nach dem Mixer, weil alle Clips eigene Ohrspuren haben; die Bewegung der Clips bleibt erhalten.
         for (var sni = 0; sni < SNOUT.length; sni++) { SNOUT[sni][0].position.add(SNOUT[sni][1]); SNOUT[sni][2] = true; }
         if (EAR_FOLD > 0) {
-          holder.updateMatrixWorld(true);
-          B.head.getWorldPosition(ehp);
+          // Kippohr: ganzes Ohr an der Basis nach vorne kippen (um die Querachse, UP → FWD), Spitze weiter nach vorne-unten
+          // knicken. Das Spitzenglied allein bewegt nur das letzte Stück und lässt einen Zacken stehen.
           ['L', 'R'].forEach(function (sd) {
-            var tip = B[sd + '_ear_tip'], end = tip && tip.children[0];
-            if (!end) return;
-            tip.getWorldPosition(etp); end.getWorldPosition(eep);
-            edir.subVectors(eep, etp).normalize();
-            var out = etp.clone().sub(ehp).dot(LAT) >= 0 ? 1 : -1;
-            etgt.copy(FWD).multiplyScalar(0.55).addScaledVector(UP, -0.75).addScaledVector(LAT, 0.3 * out).normalize();
-            eax.crossVectors(edir, etgt); var sn = eax.length();
-            if (sn < 1e-4) return;
-            turn(tip, eax.normalize(), Math.atan2(sn, edir.dot(etgt)) * EAR_FOLD);
+            turn(B[sd + '_ear_base'], LAT, EAR_BASE * EAR_FOLD);
+            turn(B[sd + '_ear_tip'], LAT, EAR_TIP * EAR_FOLD);
           });
         }
         if (TAIL_SCALE) {
