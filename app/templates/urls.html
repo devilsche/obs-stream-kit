@@ -653,11 +653,13 @@ G1R_STEAM_NAME=</code></pre>
       <div class="url-dbox url-friend-allow">
           <h2>Who may command the dog <span class="url-dbox__tag">chat commands</span></h2>
           <p class="url-dbox__desc" id="urlFriendAllowHelp">Only these Twitch names can use the chat commands; everybody else is ignored without a reply. You (the channel owner) can always. Separate names with commas or new lines. Alerts and the test buttons here always work.</p>
+          <div class="url-friend-allow__body">
           <label for="urlFriendAllow">Allowed chatters</label>
           <textarea id="urlFriendAllow" rows="3" aria-describedby="urlFriendAllowHelp urlFriendAllowStatus" spellcheck="false" autocomplete="off"></textarea>
           <div class="url-sound__row">
             <button type="button" class="url-act" id="urlFriendAllowSave"><span class="material-symbols-outlined" aria-hidden="true">save</span>Save list</button>
             <span class="url-copied" id="urlFriendAllowStatus" role="status" aria-live="polite"></span>
+          </div>
           </div>
         </div>` : "";
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${chromeHtml}`;

@@ -35,6 +35,8 @@
     var holder = new THREE.Group(); scene.add(holder);
     var BIND = [], TRACKED = [], B = {}, mixer = null, actions = {}, cur = null;
     var UP = new THREE.Vector3(0, 1, 0), LAT = new THREE.Vector3(), FWD = new THREE.Vector3();
+    var SNOUT = [];
+    function unSnout() { for (var i = 0; i < SNOUT.length; i++) if (SNOUT[i][2]) { SNOUT[i][0].position.sub(SNOUT[i][1]); SNOUT[i][2] = false; } }
     var EAR_FOLD = 0, ehp = new THREE.Vector3(), etp = new THREE.Vector3(), eep = new THREE.Vector3(), edir = new THREE.Vector3(),
         etgt = new THREE.Vector3(), eax = new THREE.Vector3();
     var TAIL_SCALE = null, SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5;
@@ -148,11 +150,15 @@
     function applyBody(key) {
       var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1; EAR_FOLD = opt.ears != null ? opt.ears : (bd.earFold || 0);
       if (buildGroup) buildGroup.scale.set(BUILD.len, BUILD.height, BUILD.width);
+      unSnout(); SNOUT.length = 0;
       slimMeshes.forEach(function (m) {
         var o = m.o; o.geometry.attributes.position.array.set(m.orig);
         (function () {
         var geo = o.geometry, pos = geo.attributes.position, si = geo.attributes.skinIndex, sw = geo.attributes.skinWeight, bones = o.skeleton.bones;
-        var bindPos = bones.map(function (b, k) { return new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().copy(o.skeleton.boneInverses[k]).invert()); });
+        if (!m.inv0) m.inv0 = o.skeleton.boneInverses.map(function (mx) { return mx.clone(); });   // Original-Bind (setBody mehrfach)
+        o.skeleton.boneInverses.forEach(function (mx, k) { mx.copy(m.inv0[k]); });
+        var bindW = m.inv0.map(function (mx) { return mx.clone().invert(); });
+        var bindPos = bindW.map(function (mx) { return new THREE.Vector3().setFromMatrixPosition(mx); });
         var idx = function (n) { return bones.indexOf(B[n]); };
         var TORSO = {}; [['pelvis', SLIM.belly], ['COG', SLIM.belly], ['spine_1', SLIM.belly], ['spine_2', SLIM.belly], ['chest', SLIM.chest],
           ['neck_base', SLIM.neck], ['neck_mid', SLIM.neck], ['neck_fat', SLIM.neck], ['breathe', SLIM.belly]].forEach(function (e) { var k = idx(e[0]); if (k >= 0) TORSO[k] = e[1]; });
@@ -193,6 +199,29 @@
             if (pr > d0) v.addScaledVector(fa, (pr - d0) * (MUZZLE - 1) * Math.min(1, hw));
             pos.setXYZ(vh, v.x, v.y, v.z);
           }
+          // Knochen im Kopf genauso verschieben wie die Punkte (sonst drehen Zunge/Kiefer um Gelenke, die mitten in der
+          // verlängerten Schnauze liegen, und die Zunge hängt beim Hecheln durch den Unterkiefer): neue Ruhelage,
+          // neue Bind-Matrizen; der Versatz der lokalen Position kommt jedes Bild nach Mixer/Zurücksetzen dazu (SNOUT),
+          // so bleiben Clip-Bewegungen dieser Knochen erhalten.
+          var newW = bindW.map(function (mx) { return mx.clone(); }), moved = {};
+          bones.forEach(function (bn, k) {
+            if (!HEADSET[k] || bn === B.head) return;
+            var bp = bindPos[k], nv = bp.clone();
+            var sd = off.subVectors(nv, hp).dot(latAx);
+            nv.addScaledVector(latAx, -sd * (1 - HEADW) * (EARS[k] ? 0 : 1));
+            var pb = off.subVectors(nv, hp).dot(fa);
+            if (pb > d0) nv.addScaledVector(fa, (pb - d0) * (MUZZLE - 1));
+            if (nv.distanceToSquared(bp) < 1e-10) return;
+            newW[k].setPosition(nv); moved[k] = 1;
+          });
+          bones.forEach(function (bn, k) {
+            if (!moved[k]) return;
+            o.skeleton.boneInverses[k].copy(newW[k]).invert();
+            var pk = bones.indexOf(bn.parent);
+            if (pk < 0) return;
+            var lp = new THREE.Vector3().setFromMatrixPosition(newW[k]).applyMatrix4(newW[pk].clone().invert());
+            for (var bb = 0; bb < BIND.length; bb++) if (BIND[bb][0] === bn) SNOUT.push([bn, lp.sub(BIND[bb][2]), false]);   // Versatz zur Ruhelage
+          });
         }
         // Oberarme/Oberschenkel schmaler: Punkte an Schulter bzw. Hüfte zur Knochenlinie (Gelenk → nächstes Gelenk) ziehen
         if (UPLEG !== 1) [['L_shoulder', 'L_elbow'], ['R_shoulder', 'R_elbow'], ['L_hip', 'L_knee'], ['R_hip', 'R_knee']].forEach(function (pair) {
@@ -432,6 +461,7 @@
         // Laufen (Steh-Clip als Basis): Clip aus, jedes Bild ALLE Knochen aus der Grundstellung (erstes Bild des
         // Steh-Clips), dann nur die eigene Bewegung – sonst addieren sich Drehungen auf (gemessen: bis 2,4 rad nach einer Kehre).
         // Stehen und Clips: nur Knochen zurücksetzen, die der laufende Clip nicht selbst schreibt.
+        unSnout();   // Schnauzen-Versatz vom letzten Bild zurücknehmen (Knochen ohne Positionsspur würden sonst aufaddieren)
         var locomotion = moving > 0.02 && cur === actions.standing;
         if (locomotion) {
           for (var bi = 0; bi < BIND.length; bi++) { BIND[bi][0].quaternion.copy(BIND[bi][1]); BIND[bi][0].position.copy(BIND[bi][2]); }
@@ -460,6 +490,7 @@
         // die Rute sonst nach dem ersten Bild wieder buschig: jedes Bild nach dem Mixer alle Glieder auf Maßstab 1 (dünn ist das Mesh).
         // Kippohren (Pinscher): obere Ohrhälfte (Glied ear_tip) nach vorne-unten abknicken, leicht nach außen.
         // Jedes Bild nach dem Mixer, weil alle Clips eigene Ohrspuren haben; die Bewegung der Clips bleibt erhalten.
+        for (var sni = 0; sni < SNOUT.length; sni++) { SNOUT[sni][0].position.add(SNOUT[sni][1]); SNOUT[sni][2] = true; }
         if (EAR_FOLD > 0) {
           holder.updateMatrixWorld(true);
           B.head.getWorldPosition(ehp);

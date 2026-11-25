@@ -1437,6 +1437,7 @@ a.url-card{text-decoration:none}
 .url-atest .url-copied{margin-left:0}
 /* Friend: Erlaubnisliste */
 .url-friend-allow textarea{resize:vertical;font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:13px}
-.url-friend-allow .url-sound__row{margin-top:8px}
+.url-friend-allow__body{padding:12px 20px 16px}
+.url-friend-allow .url-sound__row{margin:8px 0 0}
 .url-friend-allow .url-copied{margin-left:0}
 .url-friend-allow .url-copied.is-error{color:var(--danger,#e5484d)}
