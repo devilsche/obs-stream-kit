@@ -258,8 +258,18 @@
 
     // ── Ton: kurzes „Wuff“ (WebAudio), Lautstärke × Settings → Sound ──
     var actx = null, vol = (opt.volume == null ? 0.5 : opt.volume) * (typeof root.__SOUND_LEVEL__ === 'number' ? root.__SOUND_LEVEL__ : 1);
+    // Echtes Bellen (opt.barkSound, assets/friend/bark.mp3), leicht variierte Tonhöhe, damit Serien nicht gleich klingen;
+    // ohne Datei oder bei Ladefehler das synthetische „Wuff“.
+    var barkSrc = opt.barkSound || null, barkOk = !!barkSrc;
     function woof() {
       if (!opt.sound || vol <= 0) return;
+      if (barkOk) {
+        var a = new Audio(barkSrc); a.volume = Math.min(1, vol);
+        a.preservesPitch = false; a.mozPreservesPitch = false; a.playbackRate = 0.94 + Math.random() * 0.14;
+        a.onerror = function () { barkOk = false; };
+        var pr = a.play(); if (pr && pr.catch) pr.catch(function () { /* Browser ohne Klick: stumm */ });
+        return;
+      }
       var C = root.AudioContext || root.webkitAudioContext; if (!C) return;
       actx = actx || new C(); if (actx.state === 'suspended') actx.resume();
       var t0 = actx.currentTime, o = actx.createOscillator(), gn = actx.createGain(), fl = actx.createBiquadFilter();
