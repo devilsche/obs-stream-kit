@@ -76,7 +76,7 @@
         var x = num('x', W - CW - 48, -W, 2 * W), y = num('y', H - CH - 48, -H, 2 * H);
         CX = x + CW / 2 - W / 2; CY = H / 2 - (y + CH / 2);
         frameRig.position.set(CX, CY, 0);
-        R = Math.max(14, Math.min(34, CW * 0.045));   // Emote-Radius
+        R = Math.max(H * 0.026, Math.min(36, CW * 0.045));   // Emote-Radius: auch bei kleiner Kamera gut sichtbar (≈ 28 px bei 1080p)
         buildFrame();
       }
 
@@ -237,7 +237,7 @@
         aura.position.set(CX, CY, -20); aura.scale.set((CW + 2 * FB) * 1.6, (CH + 2 * FB) * 1.9, 1); aura.material.uniforms.k.value = flash * 1.2;
         // Komet
         trail.forEach(function (m, i) {
-          var p = cometPos(t - i * 0.022), front = p.z >= 0, sc = (1 + p.z / 1600) * Math.max(24, Math.min(90, Math.min(CW, CH) * 0.17)) * m.userData.s;
+          var p = cometPos(t - i * 0.022), front = p.z >= 0, sc = (1 + p.z / 1600) * Math.max(H * 0.06, Math.min(90, Math.min(CW, CH) * 0.17)) * m.userData.s;
           m.visible = front ? on('front') : on('back'); m.position.copy(p); m.scale.set(sc, sc, 1);
           // Rand-Fade: nie hart über die Bildkante
           var ef = Math.min(1, Math.max(0, (W / 2 - Math.abs(p.x) - sc * 0.2) / 90)) * Math.min(1, Math.max(0, (H / 2 - Math.abs(p.y) - sc * 0.2) / 90));
