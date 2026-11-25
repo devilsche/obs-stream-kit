@@ -27,7 +27,7 @@ DEFAULT_VOLUMES = {"follow": 0.15, "welcome": 0.2}
 # Alert bleibt stehen, bis der Ton zu Ende ist.
 OPTIONS = {"duration": 6, "full": True, "stay": True}
 # Abweichende Standards je Alert (Welcome lief früher 10 s, Ton wurde mit ausgeblendet)
-OPTION_DEFAULTS = {"welcome": {"duration": 10, "full": True, "stay": False}}
+OPTION_DEFAULTS = {"welcome": {"duration": 10, "full": True, "stay": True}}
 # Ein-/ausschaltbare Teile je Alert (Dashboard-Häkchen; der Host reicht sie als URL-Parameter durch)
 EXTRAS = {"welcome": {"disco": "Disco ball", "lights": "Disco lights", "confetti": "Confetti"}}
 MIN_DURATION, MAX_DURATION = 2, 60
@@ -117,8 +117,8 @@ def load(conn, tenant_id):
             out[key]["duration"] = max(MIN_DURATION, min(MAX_DURATION, int(e.get("duration", od["duration"]))))
         except (TypeError, ValueError):
             out[key]["duration"] = od["duration"]
-        out[key]["full"] = bool(e.get("full", od["full"]))
         out[key]["stay"] = bool(e.get("stay", od["stay"]))
+        out[key]["full"] = out[key]["stay"]   # ganzer Ton nur, wenn der Alert so lange stehen bleibt (sonst läuft Ton ohne Bild)
         if key in EXTRAS:
             ex = e.get("extras") if isinstance(e.get("extras"), dict) else {}
             out[key]["extras"] = {k: bool(ex.get(k, True)) for k in EXTRAS[key]}
@@ -205,6 +205,7 @@ def set_options(conn, tenant_id, alert, duration=None, full=None, stay=None, ext
         cfg[alert]["full"] = bool(full)
     if stay is not None:
         cfg[alert]["stay"] = bool(stay)
+        cfg[alert]["full"] = bool(stay)   # eine Regel: entweder bleibt der Alert bis zum Tonende, oder der Ton blendet mit aus
     if extras and alert in EXTRAS:
         for k, v in extras.items():
             if k in EXTRAS[alert]:
@@ -242,12 +243,15 @@ def for_live(cfg, root, token):
     return out
 
 
-def for_overlay(cfg, alert):
-    """Was der Alert im Browser braucht (wird als window.__ALERT_SOUND__ injiziert).
-    default: eingebauter Ton (nur ohne eigene Dateien), relativ zur Token-Basis."""
+def for_overlay(cfg, alert, root=None):
+    """Was die einzelne Alert-Seite braucht (window.__ALERT_SOUND__, js/alert-sound.js).
+    duration/stay aus dem Dashboard, Tonlängen je Datei (lens), default = eingebauter Ton (nur ohne eigene Dateien)."""
     e = cfg.get(alert) or {}
     files = [f["id"] for f in e.get("files", [])]
-    out = {"volume": e.get("volume", DEFAULT_VOLUME), "files": files, "full": e.get("full", True)}
+    out = {"volume": e.get("volume", DEFAULT_VOLUME), "files": files, "full": e.get("full", True),
+           "duration": e.get("duration", OPTIONS["duration"]), "stay": e.get("stay", True),
+           "lens": {f["id"]: f.get("dur") or 0 for f in e.get("files", [])}}
     if not files and alert in DEFAULTS:
         out["default"] = "assets/alert-sounds/%s.mp3" % alert
+        out["default_len"] = (default_duration(root, alert) if root else None) or 0
     return out

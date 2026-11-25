@@ -51,7 +51,10 @@ def test_volume_and_overlay_view(store):
     assert alert_sounds.set_volume(None, 2, "raid", 7)
     cfg = alert_sounds.load(None, 2)
     assert cfg["raid"]["volume"] == 1.0
-    assert alert_sounds.for_overlay(cfg, "raid") == {"volume": 1.0, "files": [], "full": True}
+    ov = alert_sounds.for_overlay(cfg, "raid")
+    assert (ov["volume"], ov["files"], ov["duration"], ov["stay"]) == (1.0, [], 6, True)
+    fo = alert_sounds.for_overlay(cfg, "follow", ".")
+    assert fo["default"] == "assets/alert-sounds/follow.mp3" and fo["default_len"] > 8
     store[(2, "alert_sounds")] = "kaputt"
     assert alert_sounds.load(None, 2)["raid"]["volume"] == alert_sounds.DEFAULT_VOLUME
 
@@ -71,6 +74,8 @@ def test_options_and_live_config(store):
     assert not alert_sounds.set_options(None, 4, "live")          # Host ist kein Alert-Typ
     cfg = alert_sounds.load(None, 4)
     assert (cfg["sub"]["duration"], cfg["sub"]["full"], cfg["sub"]["stay"]) == (60, False, False)
+    assert alert_sounds.set_options(None, 4, "sub", stay=True)
+    assert alert_sounds.load(None, 4)["sub"]["full"] is True      # ganzer Ton folgt „bleibt stehen“
     live = alert_sounds.for_live(cfg, ".", "tok")
     assert "live" not in live and live["sub"]["duration"] == 60
     assert live["follow"]["default"]["src"] == "/s/tok/assets/alert-sounds/follow.mp3"
@@ -80,7 +85,7 @@ def test_options_and_live_config(store):
 def test_welcome_defaults_and_extras(store):
     cfg = alert_sounds.load(None, 5)
     w = cfg["welcome"]
-    assert (w["duration"], w["full"], w["stay"], w["volume"]) == (10, True, False, 0.2)
+    assert (w["duration"], w["full"], w["stay"], w["volume"]) == (10, True, True, 0.2)
     assert w["extras"] == {"disco": True, "lights": True, "confetti": True}
     assert "extras" not in cfg["follow"]
     assert alert_sounds.set_options(None, 5, "welcome", extras={"confetti": False, "bogus": True})

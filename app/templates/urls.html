@@ -664,17 +664,11 @@ G1R_STEAM_NAME=</code></pre>
           </select>
         </div>
         <div class="url-sound__row">
-          <label class="url-sound__lbl" for="urlSoundFull">Sound</label>
-          <select id="urlSoundFull" class="url-sound__sel">
-            <option value="1">Play the whole sound</option>
-            <option value="0">Fade out with the alert</option>
-          </select>
+          <label class="url-sound__chk"><input type="checkbox" id="urlSoundStay"> If the sound is longer: keep the alert on screen until the sound ends</label>
         </div>
-        <div class="url-sound__row">
-          <label class="url-sound__chk"><input type="checkbox" id="urlSoundStay"> Keep the alert on screen until the sound ends</label>
-        </div>
+        <p class="url-sound__rules">Duration counts from the moment the alert appears. With the box ticked, a longer sound extends the alert to the sound's length; unticked, the sound fades out when the alert ends. Sound and animation always start together.</p>
         <fieldset class="url-sound__extras" id="urlSoundExtras" hidden><legend class="url-sound__lbl">Show</legend><div id="urlSoundExtrasList" class="url-sound__row"></div></fieldset>
-        <p class="url-sound__rules">Duration and sound settings apply to the live alert source (<code>alerts/live.html</code>), which Streamer.bot only sends events to. Changes reach a running source within 20 seconds.</p>
+        <p class="url-sound__rules">Applies to the preview, the single alert source and the live alert source (<code>alerts/live.html</code>). A running live source picks up changes within 20 seconds.</p>
         <span class="url-copied" id="urlSoundStatus" role="status" aria-live="polite"></span>
       </div>` : "";
     const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${soundHtml}${chromeHtml}`;
@@ -766,7 +760,6 @@ G1R_STEAM_NAME=</code></pre>
       vol.value = String([0, 0.1, 0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - e.volume) < Math.abs(a - e.volume) ? b : a));
       file.disabled = e.files.length >= data.maxFiles;
       document.getElementById("urlSoundDur").value = String([3,4,5,6,8,10,12,15,20,30].reduce((a, b) => Math.abs(b - e.duration) < Math.abs(a - e.duration) ? b : a));
-      document.getElementById("urlSoundFull").value = e.full === false ? "0" : "1";
       document.getElementById("urlSoundStay").checked = e.stay !== false;
       // schaltbare Teile (z. B. Welcome: Disco-Kugel, Lichter, Konfetti)
       const ex = (data.extras || {})[alert], exBox = document.getElementById("urlSoundExtras");
@@ -815,7 +808,6 @@ G1R_STEAM_NAME=</code></pre>
         .catch(() => say("Could not save.", true));
     }
     document.getElementById("urlSoundDur").addEventListener("change", e => saveOptions({ duration: parseInt(e.target.value, 10) }));
-    document.getElementById("urlSoundFull").addEventListener("change", e => saveOptions({ full: e.target.value === "1" }));
     document.getElementById("urlSoundStay").addEventListener("change", e => saveOptions({ stay: e.target.checked }));
     document.getElementById("urlSoundExtras").addEventListener("change", e => {
       const k = e.target.dataset && e.target.dataset.extra;

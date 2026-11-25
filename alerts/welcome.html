@@ -145,6 +145,8 @@
   <link rel="stylesheet" href="../widgets/_blocks.css">
 </head>
 <body>
+  <!-- zuerst: legt Ton und Anzeigedauer fest, bevor die Seite ?duration= liest -->
+  <script src="../js/alert-sound.js"></script>
 
   <canvas id="discoFx" class="disco-fx" width="1920" height="1080" aria-hidden="true"></canvas>
   <canvas id="discoBall" class="disco-ball" width="1920" height="1080" aria-hidden="true"></canvas>
@@ -326,6 +328,5 @@
       requestAnimationFrame(frame);
     })();
   </script>
-  <script src="../js/alert-sound.js"></script>
 </body>
 </html>

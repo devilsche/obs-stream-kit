@@ -60,7 +60,7 @@ def _serve_tenant_source(token, subdir, filepath):
             if key == "live":   # Wartemodus: alle Alerts nacheinander (alerts/live.html)
                 alert_cfg = alert_sounds.for_live(alert_sounds.load(conn, g.tenant_id), _root(), token)
             if key in alert_sounds.ALERT_KEYS:
-                alert_sound = alert_sounds.for_overlay(alert_sounds.load(conn, g.tenant_id), key)
+                alert_sound = alert_sounds.for_overlay(alert_sounds.load(conn, g.tenant_id), key, _root())
                 alert_sound["base"] = f"/s/{token}/alert-sounds/{key}/"
                 if alert_sound.get("default"):
                     alert_sound["default"] = f"/s/{token}/" + alert_sound["default"]
