@@ -454,6 +454,8 @@ Die Freischaltungen werden je Tenant 10 s gemerkt. Nach einer Änderung im Admin
 
 ### Wetter (`weather.html`)
 
+**Wetter an/aus:** `/api/fx/weather?cmd=power&state=off|on|toggle` blendet das ganze Wetter-Overlay weich aus bzw. ein (Ton aus); der Stand wird je Tenant gespeichert (`settings["weather_power"]`) und kommt beim Neuladen mit dem ersten Poll zurück. Im Dashboard „Weather off/on“ unter Live, für Mods `!weatheroff` (toggle).
+
 Drei Schichten, die oberste gewinnt:
 
 1. **Echtes Wetter** am Ort aus `place` (Open-Meteo, ohne Key, alle 10 min, Ortssuche 24 h im Cache). Der Server schickt den Ort nie ans Overlay zurück — er steht aber in der OBS-URL, wer die Source-Einstellungen sieht, sieht ihn also auch. Ein größerer Nachbarort reicht. Ohne Ort oder wenn der Dienst nicht antwortet, gilt die **Fallback-Lage**; die letzte gute Antwort gilt bis zu 60 min weiter.

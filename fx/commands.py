@@ -306,7 +306,7 @@ EFFECTS = {
         },
     },
     "weather": {
-        "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset",
+        "commands": ("weather", "auto", "strike", "gust", "spectacle", "set", "reset", "power",
                      "scrape", "warm", "frostclear", "frostreset", "leaders",
                      # Winter-Thema
                      "ornament", "gift", "mini", "build", "snowmanreset", "shovel", "shake",
@@ -369,6 +369,8 @@ EFFECTS = {
         },
         "args": {
             "weather": {"to": _choice(*weather.KINDS), "hold": _int_range(0, 3600), "name": _name},
+            # Wetter ganz an/aus (bleibt gespeichert, auch nach Neuladen der Quelle)
+            "power": {"state": _choice("on", "off", "toggle")},
             "strike": {"dist": _choice("near", "far")},
             "spectacle": {"type": _choice(*weather.SPECTACLES, "apocalypse")},
             "scrape": {"name": _name},

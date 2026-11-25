@@ -91,6 +91,9 @@
     }
     .wk-sound-unlock:focus-visible { outline: 3px solid #f2b705; outline-offset: 2px; }
     .wk-sound-unlock[hidden] { display: none; }
+    /* Wetter aus (cmd=power): alles weich ausblenden */
+    body { transition: opacity 1.2s ease; }
+    html[data-power="off"] body { opacity: 0; }
 
     /* Grauschleier über das ganze Bild bei mieser Stimmung (Schalter veil) */
     .wk-veil {
@@ -205,6 +208,7 @@
       });
       setInterval(function () { audio.update(kit.state()); }, 250);
       var rootEl = document.documentElement;
+      var powerOn = true;   // Wetter an/aus (cmd=power)
 
       // ── Streamer.bot: Ereignisse als Action-Aufruf über den lokalen Websocket-
       //    Server von Streamer.bot (DoAction, Argument event = fire/fireOut/
@@ -425,7 +429,7 @@
 
       function applyVeil() {
         rootEl.dataset.veil = flag(settings.veil) ? 'on' : 'off';
-        audio.set({ on: flag(settings.sound),
+        audio.set({ on: flag(settings.sound) && powerOn,
                     volume: settings.volume !== undefined ? parseFloat(settings.volume) : 0.6,
                     thunder: settings.thunder !== undefined ? parseFloat(settings.thunder) : 1,
                     ambient: settings.ambient !== undefined ? parseFloat(settings.ambient) : 0.3,
@@ -503,9 +507,18 @@
         fn(theme);
         Object.keys(seasons).forEach(function (n) { fn(seasons[n]); });
       }
+      // Wetter ganz an/aus (Befehl power, Stand kommt auch mit dem ersten Poll): blendet alles weich aus, Ton aus
+      function setPower(on) {
+        powerOn = on;
+        rootEl.dataset.power = on ? 'on' : 'off';
+        applyVeil();
+      }
       function applyCommand(c) {
         var p = c.params || {};
         switch (c.cmd) {
+          case 'power':
+            setPower(p.state !== 'off');
+            break;
           case 'weather':
           case 'auto':
             fetchState();
@@ -699,6 +712,7 @@
       fetchState();
       if (apiBase) {
         listen('weather', applyCommand, function (st) {
+          if (st.power === 'off') setPower(false);
           theme.load(st);
           Object.keys(seasons).forEach(function (n) { seasons[n].load(st); });
         });

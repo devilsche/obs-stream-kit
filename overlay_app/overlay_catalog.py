@@ -944,6 +944,8 @@ EFFECT_META = {
     # Knöpfe im Dashboard und im OBS-Dock: Wetter für 2,5 min wie ein Chat-Befehl (dauerhaft:
     # Fixed weather); short = kürzere Beschriftung für das schmale Dock
     "controls": [
+        {"q": "cmd=power&state=off", "label": "Weather off", "short": "Off", "group": "Weather on/off", "icon": "visibility_off"},
+        {"q": "cmd=power&state=on", "label": "Weather on", "short": "On", "group": "Weather on/off", "icon": "visibility"},
         {"q": "cmd=auto", "label": "Auto (live weather)", "short": "Live weather", "group": "Weather for 2.5 min", "icon": "auto_mode"},
         {"q": "cmd=weather&to=clear", "label": "Clear", "group": "Weather for 2.5 min", "icon": "sunny"},
         {"q": "cmd=weather&to=rain", "label": "Rain", "group": "Weather for 2.5 min", "icon": "rainy"},
@@ -1016,6 +1018,7 @@ EFFECT_META = {
     # group = Abschnitt im Reiter "Chat commands", who = viewers|mods|tech,
     # chat = Vorschlag für den Chat-Befehl
     "commands": [
+        {"q": "cmd=power&state=toggle", "label": "!weatheroff: switch the whole weather overlay off and on again", "group": "Mods", "who": "mods"},
         {"q": "cmd=weather&to=storm&name=%user%", "chat": "!thunderstorm", "label": "Thunderstorm for 2.5 min, then back to live weather", "group": "Weather (2.5 min)", "who": "viewers"},
         {"q": "cmd=weather&to=blizzard&name=%user%", "chat": "!blizzard", "label": "Blizzard for 2.5 min", "group": "Weather (2.5 min)", "who": "viewers"},
         {"q": "cmd=weather&to=snow&name=%user%", "chat": "!snow", "label": "Snow for 2.5 min", "group": "Weather (2.5 min)", "who": "viewers"},

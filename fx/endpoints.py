@@ -50,6 +50,15 @@ def _remember_order(tenant_id, slot, p, now):
 def _weather_persist(conn, tenant_id, cmd):
     """Übersteuerung speichern; der Befehl geht trotzdem in die Warteschlange,
     damit das Overlay den Zustand sofort neu holt."""
+    if cmd["cmd"] == "power":
+        # Wetter an/aus: gespeichert je Tenant; toggle wird hier aufgelöst, damit alle Quellen dasselbe zeigen
+        from pubg.db_pg import get_setting, set_setting
+        cur = get_setting(conn, tenant_id, "weather_power", "on") or "on"
+        want = cmd["params"].get("state", "toggle")
+        new = ("off" if cur == "on" else "on") if want == "toggle" else want
+        set_setting(conn, tenant_id, "weather_power", new)
+        cmd["params"]["state"] = new
+        return True
     if cmd["cmd"] == "weather":
         _remember_order(tenant_id, "tod" if cmd["params"]["to"] in weather_theme.TIMES_OF_DAY else "weather",
                         cmd["params"], time.time())
@@ -178,7 +187,13 @@ def _weather_state(conn, tenant_id):
             "flowers": flowers, "flower_total": total,
             "castles": newest(24), "castle_total": total,
             # Sub-Projekt aller Jahreszeiten (Schneemann, Vogelscheuche, Sonnenblume, Palast)
-            "snowman": stage, "project": stage}
+            "snowman": stage, "project": stage,
+            "power": _weather_power(conn, tenant_id)}
+
+
+def _weather_power(conn, tenant_id):
+    from pubg.db_pg import get_setting
+    return get_setting(conn, tenant_id, "weather_power", "on") or "on"
 
 
 _PERSISTENT["weather"] = (_weather_persist, _weather_state)

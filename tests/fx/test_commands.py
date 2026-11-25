@@ -236,3 +236,9 @@ def test_friend_commands():
     assert commands.parse("friend", {"cmd": "react", "event": "Raid"}) == {"cmd": "react", "params": {"event": "raid"}}
     assert commands.parse("friend", {"cmd": "act", "action": "sit", "face": "30"}) == {"cmd": "act", "params": {"action": "sit", "face": 12.0}}
     assert commands.parse("friend", {"cmd": "act", "action": "fly"}) == {"cmd": "act", "params": {}}
+
+
+def test_weather_power_command():
+    assert commands.parse("weather", {"cmd": "power", "state": "off"}) == {"cmd": "power", "params": {"state": "off"}}
+    assert commands.parse("weather", {"cmd": "power", "state": "toggle"})["params"]["state"] == "toggle"
+    assert commands.parse("weather", {"cmd": "power", "state": "kaputt"})["params"] == {}
