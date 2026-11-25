@@ -39,7 +39,7 @@ Alle Szenen sind **1920×1080 Fullscreen-Overlays**. In OBS einfach als Browser-
 | `overlays/brb-pause.html` | Pause mit automatischem Twitch Clip-Player | 1920×1080 |
 | `overlays/stream-ending.html` | Animierte Abschlussszene | 1920×1080 |
 | `overlays/gameplay.html` | Gameplay Overlay (transparenter Hintergrund mit Sparkles) | 1920×1080 |
-| `overlays/just-chatting.html` | Fullscreen-Kamera mit Chat-Bereich, Blitz-Arcs und Sparkles. `frame=depth`: statt des Blitz-Rahmens der Depth Frame (3D, Komet, Chat-Emotes; gleiche Befehle wie die Webcam-Frame-Karte, Emotes knallen hier seitlich an den Rahmen, weil oben kein Platz ist), dazu `comet`, `emotes`, `alerts`, `demo`. `frame=none`: kein Rahmen, z. B. für den Depth Frame als drei eigene Quellen (`x=58&y=54&width=972&height=972`) | 1920×1080 |
+| `overlays/just-chatting.html` | Fullscreen-Kamera mit Chat-Bereich, Blitz-Arcs und Sparkles. `frame=depth`: statt des Blitz-Rahmens der Depth Frame (3D, Komet, Chat-Emotes; gleiche Befehle wie die Webcam-Frame-Karte, Emotes knallen hier seitlich an den Rahmen, weil oben kein Platz ist), dazu `comet`, `emotes`, `alerts`, `demo`, `border`, `layer` (`under` = nur Hinteres + Rahmen; dann die Seite unter die Kamera legen und eine zweite Quelle `widgets/webcam-frame-depth.html?x=58&y=54&width=972&height=972&layer=front` deckungsgleich darüber – so fliegt der Komet hinter dir). `frame=none`: kein Rahmen, z. B. für den Depth Frame als drei eigene Quellen (`x=58&y=54&width=972&height=972`) | 1920×1080 |
 
 ### Starting Soon
 
