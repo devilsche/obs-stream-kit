@@ -164,7 +164,7 @@ DECOR = [
      "hint": "Depth with you leaning out of the frame: add this URL three times with Layer = Back, Frame, Front. In OBS from bottom to top: Back → camera (cropped to the window) → Frame → a copy of the camera with NVIDIA background removal (less cropped, so your head can rise above the frame) → Front.",
      "fx": "frame",
      "commands": [
-         {"q": "cmd=emotes&urls=%emoteUrls%", "label": "Emotes: chat emotes slam into the frame (see the C# code above)", "group": "Depth frame"},
+         {"q": "cmd=emotes&urls=%emoteUrls%&emoji=%emojiText%", "label": "Emotes: chat emotes and emojis slam into the frame (see the C# code above)", "group": "Depth frame"},
          {"q": "cmd=shake", "label": "!shake: shake the emotes off the frame", "group": "Depth frame"},
          {"q": "cmd=flash", "label": "Flash the frame", "group": "Depth frame"},
      ],

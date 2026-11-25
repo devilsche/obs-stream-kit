@@ -11,7 +11,7 @@
        back → Kamera (aufs Fenster zugeschnitten) → frame → Kamera-Kopie freigestellt (NVIDIA, weniger zugeschnitten) → front.
        Alle Ebenen rechnen mit der Serverzeit und denselben Befehlen und zeigen so dasselbe Bild.
        URL: layer (all|back|frame|front|under = back+frame), x, y, width, height, radius, border, comet (1|0), emotes (1|0), max, stack,
-       alerts (1|0), speed, demo (1 = Emotes zum Ausprobieren). Befehle: /s/<token>/api/fx/frame (emotes, shake, flash). -->
+       alerts (1|0), speed, demo (1 = Emotes zum Ausprobieren). Befehle: /s/<token>/api/fx/frame (emotes mit urls/ids/emoji, shake, flash). -->
   <link rel="stylesheet" href="_theme.css">
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
@@ -111,6 +111,14 @@
         t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
         texCache[url] = t; return t;
       }
+      // Unicode-Emoji (Windows-Emoji-Leiste) als Textur: Systemschrift für Farb-Emojis
+      function emojiTex(e) {
+        var k = 'emoji:' + e; if (texCache[k]) return texCache[k];
+        var c = document.createElement('canvas'); c.width = c.height = 128; var x = c.getContext('2d');
+        x.font = '100px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+        x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(e, 64, 70);
+        var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; texCache[k] = t; return t;
+      }
       function demoTex(k) {
         if (ETEX_DEMO[k]) return ETEX_DEMO[k];
         var c = document.createElement('canvas'); c.width = c.height = 128; var x = c.getContext('2d');
@@ -187,7 +195,7 @@
       function enqueue(c) {
         if (!USE_EMOTES && c.cmd === 'emotes') return;
         var it = { seq: c.seq, cmd: c.cmd, at: c.ts + LAG, tex: [] };
-        if (c.cmd === 'emotes') it.tex = (c.params.urls || c.params.ids || []).map(emoteTex);
+        if (c.cmd === 'emotes') it.tex = (c.params.urls || c.params.ids || []).map(emoteTex).concat((c.params.emoji || []).map(emojiTex)).slice(0, 5);
         if (c.cmd === 'flash') { flashAt = c.ts + LAG; return; }
         queue.push(it);
       }

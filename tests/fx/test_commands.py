@@ -28,6 +28,13 @@ def test_frame_emotes_only_cors_hosts_and_capped():
     assert commands.parse("frame", {"cmd": "shake"}) == {"cmd": "shake", "params": {}}
 
 
+def test_frame_emoji_from_windows_picker():
+    c = commands.parse("frame", {"cmd": "emotes", "emoji": "hi 😂👍🏽 ❤️ 👨‍👩‍👧 🇩🇪 abc 123"})
+    assert c["params"]["emoji"] == ["😂", "👍🏽", "❤️", "👨‍👩‍👧", "🇩🇪"]
+    assert len(commands.parse("frame", {"cmd": "emotes", "emoji": "😀" * 9})["params"]["emoji"]) == 5
+    assert "emoji" not in commands.parse("frame", {"cmd": "emotes", "emoji": "nur text"})["params"]
+
+
 def test_parse_simple_commands():
     for cmd in ("strike", "gust", "stop", "start", "reset"):
         assert commands.parse("rain", {"cmd": cmd}) == {"cmd": cmd, "params": {}}

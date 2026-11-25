@@ -506,34 +506,49 @@ G1R_STEAM_NAME=</code></pre>
   // statt Streamer.bot-Typen); ohne Emotes bricht die Aktion ab, dann geht kein Fetch raus
   const FRAME_EMOTE_CS = `using System;
 using System.Collections;
+using System.Text;
 
 public class CPHInline
 {
+    // Depth Frame: Twitch/7TV/FFZ-Emotes (Bild-URLs) und Windows-Emojis einer Chatnachricht
+    // als %emoteUrls% und %emojiText%; ohne beides bricht die Aktion ab (kein Fetch)
     public bool Execute()
     {
-        object raw;
-        if (!args.TryGetValue("emotes", out raw) || raw == null) return false;
-        var list = raw as IEnumerable;
-        if (list == null) return false;
         string urls = "";
         int n = 0;
-        foreach (object e in list)
+        object raw;
+        if (args.TryGetValue("emotes", out raw) && raw is IEnumerable)
         {
-            if (e == null || n >= 5) continue;
-            var p = e.GetType().GetProperty("ImageUrl");
-            string u = p == null ? null : p.GetValue(e, null) as string;
-            if (string.IsNullOrEmpty(u))
+            foreach (object e in (IEnumerable)raw)
             {
-                var pi = e.GetType().GetProperty("Id");
-                string id = pi == null ? null : Convert.ToString(pi.GetValue(e, null));
-                if (string.IsNullOrEmpty(id)) continue;
-                u = "https://static-cdn.jtvnw.net/emoticons/v2/" + id + "/default/dark/3.0";
+                if (e == null || n >= 5) continue;
+                var p = e.GetType().GetProperty("ImageUrl");
+                string u = p == null ? null : p.GetValue(e, null) as string;
+                if (string.IsNullOrEmpty(u))
+                {
+                    var pi = e.GetType().GetProperty("Id");
+                    string id = pi == null ? null : Convert.ToString(pi.GetValue(e, null));
+                    if (string.IsNullOrEmpty(id)) continue;
+                    u = "https://static-cdn.jtvnw.net/emoticons/v2/" + id + "/default/dark/3.0";
+                }
+                urls += (urls.Length > 0 ? "," : "") + Uri.EscapeDataString(u);
+                n++;
             }
-            urls += (urls.Length > 0 ? "," : "") + Uri.EscapeDataString(u);
-            n++;
         }
-        if (n == 0) return false;
+        // Emojis: Surrogatpaare und Symbolzeichen samt Verbindern (ZWJ, Variante, Hautton) behalten
+        string msg = args.ContainsKey("message") && args["message"] != null ? args["message"].ToString() : "";
+        var em = new StringBuilder();
+        for (int i = 0; i < msg.Length && em.Length < 120; i++)
+        {
+            char c = msg[i];
+            if (char.IsHighSurrogate(c) && i + 1 < msg.Length) { em.Append(c).Append(msg[i + 1]); i++; continue; }
+            if ((c >= 0x2600 && c <= 0x27BF) || (c >= 0x2B00 && c <= 0x2BFF) || c == 0x200D || c == 0xFE0F || c == 0x20E3) { em.Append(c); continue; }
+            if (em.Length > 0 && em[em.Length - 1] != ' ') em.Append(' ');
+        }
+        string emoji = em.ToString().Trim();
+        if (n == 0 && emoji.Length == 0) return false;
         CPH.SetArgument("emoteUrls", urls);
+        CPH.SetArgument("emojiText", Uri.EscapeDataString(emoji));
         return true;
     }
 }`;
@@ -630,7 +645,7 @@ public class CPHInline
         ${/\/frame$/.test(card.dataset.fx || "") ? `<div class="url-cheat">
           <div class="url-cheat__head"><b>Emotes from chat</b>
             <button type="button" class="url-act ghost url-cmd__copy" data-what="C# code" data-url="${escapeAttr(FRAME_EMOTE_CS)}" aria-label="Copy C# code"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy</button></div>
-          <p class="url-dbox__desc">Streamer.bot: new action with the trigger <b>Twitch → Chat → Chat Message</b>. Sub-action 1: <b>Core → C# → Execute C# Code</b> with this code (it collects the emote images and skips messages without emotes). Sub-action 2: <b>Fetch URL</b> with the copied <i>Emotes</i> URL below. Twitch, 7TV and FFZ emotes work; BTTV images are blocked by their server.</p>
+          <p class="url-dbox__desc">Streamer.bot: new action with the trigger <b>Twitch → Chat → Chat Message</b>. Sub-action 1: <b>Core → C# → Execute C# Code</b> with this code (it collects the emote images and Windows emojis and skips messages without either). Sub-action 2: <b>Fetch URL</b> with the copied <i>Emotes</i> URL below. Twitch, 7TV and FFZ emotes and emojis work; BTTV images are blocked by their server.</p>
           <pre class="url-cheat__text">${escapeHtml(FRAME_EMOTE_CS)}</pre>
         </div>` : ""}
         ${cheat ? `<div class="url-cheat">

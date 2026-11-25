@@ -219,6 +219,36 @@ def _emote_urls(v):
     return out or None
 
 
+def _is_emoji_start(cp):
+    return (0x1F000 <= cp <= 0x1FAFF or 0x2600 <= cp <= 0x27BF or 0x2B00 <= cp <= 0x2BFF
+            or 0x2190 <= cp <= 0x21FF or cp in (0x00A9, 0x00AE, 0x203C, 0x2049, 0x2122, 0x2139, 0x3030, 0x303D))
+
+
+def _emoji(v):
+    """Unicode-Emojis (Windows-Emoji-Leiste) → höchstens 5 Zeichenfolgen; ZWJ, Hautton, Variante, Flaggen bleiben
+    zusammen. Alles andere (Text, Zahlen) fällt weg."""
+    out, cur, prev_join = [], "", False
+    for ch in v[:200]:
+        cp = ord(ch)
+        joiner = cp in (0x200D, 0xFE0F, 0x20E3) or 0x1F3FB <= cp <= 0x1F3FF or 0xE0020 <= cp <= 0xE007F
+        flag = 0x1F1E6 <= cp <= 0x1F1FF
+        if cur and (joiner or prev_join or (flag and len(cur) == 1 and 0x1F1E6 <= ord(cur[0]) <= 0x1F1FF)):
+            cur += ch
+        elif _is_emoji_start(cp):
+            if cur:
+                out.append(cur)
+            cur = ch
+        else:
+            if cur:
+                out.append(cur)
+            cur = ""
+        prev_join = cp == 0x200D
+    if cur:
+        out.append(cur)
+    out = [e for e in out if len(e) <= 16][:5]
+    return out or None
+
+
 def _emote_ids(v):
     """Twitch-Emote-IDs → Bild-URLs (falls Streamer.bot nur IDs schickt)."""
     urls = ["https://static-cdn.jtvnw.net/emoticons/v2/%s/default/dark/3.0" % i
@@ -241,7 +271,7 @@ EFFECTS = {
         "commands": ("emotes", "shake", "flash"),
         "settings": {},
         "args": {
-            "emotes": {"urls": _emote_urls, "ids": _emote_ids, "name": _name},
+            "emotes": {"urls": _emote_urls, "ids": _emote_ids, "emoji": _emoji, "name": _name},
             "shake": {"name": _name},
             "flash": {},
         },
