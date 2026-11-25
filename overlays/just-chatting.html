@@ -617,7 +617,7 @@
       document.documentElement.classList.add('frame-' + f);
       if (f !== 'depth') return;
       // Kamerafenster dieser Szene: 58/54, 972×972 (siehe .cam-frame)
-      var q = new URLSearchParams({ x: '58', y: '54', width: '972', height: '972', border: '10', radius: '10' });
+      var q = new URLSearchParams({ x: '58', y: '54', width: '972', height: '972', border: '3', radius: '10' });
       ['comet', 'emotes', 'alerts', 'max', 'stack', 'demo', 'speed', 'border', 'radius', 'layer'].forEach(function (k) { if (P.get(k) !== null) q.set(k, P.get(k)); });
       var fr = document.getElementById('camDepth');
       fr.src = '../widgets/webcam-frame-depth.html?' + q.toString();

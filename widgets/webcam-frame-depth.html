@@ -51,7 +51,7 @@
       var key = new THREE.DirectionalLight(0xffffff, 1.1); key.position.set(-300, 500, 700); scene.add(key);
 
       // ── Maße: Quelle = Szene, Kamera-Rechteck in Quell-Pixeln ──
-      var W = 0, H = 0, CW, CH, CX, CY, FB = num('border', 26, 6, 80), RAD = num('radius', 14, 0, 80);
+      var W = 0, H = 0, CW, CH, CX, CY, FB = num('border', 26, 2, 80), RAD = num('radius', 14, 0, 80);
       var frameRig = new THREE.Group(); scene.add(frameRig);
       var frameMat = new THREE.MeshStandardMaterial({ color: PRI, metalness: 0.8, roughness: 0.32, envMapIntensity: 0.55, emissive: new THREE.Color(0) });
       var edgeMat = new THREE.MeshBasicMaterial({ color: ACC });
@@ -66,7 +66,8 @@
         var sh = rr(CW + 2 * FB, CH + 2 * FB, RAD + FB * 0.7); sh.holes.push(rr(CW, CH, RAD));
         var bev = Math.min(6, FB * 0.25);
         frameRig.add(new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: FB * 0.6, bevelEnabled: true, bevelThickness: bev, bevelSize: bev * 0.8, bevelSegments: 4, curveSegments: 12 }), frameMat));
-        var es = rr(CW + 8, CH + 8, RAD + 3); es.holes.push(rr(CW, CH, RAD));
+        var ew = Math.max(1, Math.min(4, FB * 0.5));   // Akzentkante innen: bei filigranen Rahmen schmaler
+        var es = rr(CW + 2 * ew, CH + 2 * ew, RAD + ew * 0.75); es.holes.push(rr(CW, CH, RAD));
         var edge = new THREE.Mesh(new THREE.ExtrudeGeometry(es, { depth: FB * 0.6 + bev + 2, bevelEnabled: false, curveSegments: 12 }), edgeMat);
         edge.position.z = -1; frameRig.add(edge);
         frameRig.visible = on('frame') && SHOW_FRAME;

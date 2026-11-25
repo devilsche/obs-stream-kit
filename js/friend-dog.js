@@ -656,9 +656,10 @@
       var HIND = [[B.L_hip, B.L_knee, B.L_ankle], [B.R_hip, B.R_knee, B.R_ankle]];
       if (name === 'beg') {   // Männchen: aus dem Sitzen Oberkörper aufrichten, Vorderpfoten angewinkelt hoch, leicht wippen
         var bob = Math.sin(t * 3.2) * 0.05;
-        turn(B.spine_1, LAT, -(0.26 + bob) * w); turn(B.spine_2, LAT, -0.16 * w); turn(B.chest, LAT, -0.12 * w);
-        LEGS.forEach(function (l) { turn(l[0], LAT, -1.6 * w); turn(l[1], LAT, 1.0 * w); turn(l[2], LAT, 1.0 * w); });   // Pfoten hoch vor der Brust
-        turn(B.neck_base, LAT, 0.3 * w); turn(B.head, LAT, 0.15 * w);
+        // Oberkörper senkrecht über dem Becken (wie stehend), Kopf schaut nach vorn
+        turn(B.spine_1, LAT, -(0.5 + bob) * w); turn(B.spine_2, LAT, -0.32 * w); turn(B.chest, LAT, -0.2 * w);
+        LEGS.forEach(function (l) { turn(l[0], LAT, -0.95 * w); turn(l[1], LAT, 1.25 * w); turn(l[2], LAT, 0.9 * w); });   // Pfoten angewinkelt vor der Brust
+        turn(B.neck_base, LAT, 0.8 * w); turn(B.head, LAT, 0.05 * w);
       } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen
         turn(B.spine_1, LAT, 0.4 * w); turn(B.spine_2, LAT, 0.25 * w); turn(B.chest, LAT, 0.15 * w);
         LEGS.forEach(function (l) { turn(l[0], LAT, -1.7 * w); turn(l[1], LAT, 2.3 * w); turn(l[2], LAT, 1.1 * w); });
