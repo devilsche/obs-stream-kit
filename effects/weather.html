@@ -153,7 +153,7 @@
         tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
         sky: function () { return kit.state(); },
         blizzard: function () { return kit.blizzard(); },
-        event: function (name, args) { sbEvent(name, args); } });
+        event: function (name, args) { sbEvent(name, args); friendFire(name, args); } });
       // Herbst, Frühling, Sommer: je ein Baustein, sichtbar nur im eigenen Thema
       var seasonOpts = { tags: document.getElementById('tags'), hud: document.querySelector('.hud'),
                          sky: function () { return kit.state(); },
@@ -166,7 +166,7 @@
                            if (apiBase) fetch(apiBase + 'weather?cmd=ignite' + (wet ? '&wet=1' : ''), { cache: 'no-store' }).catch(function () {});
                          },
                          // Ereignisse (Feuer, ausgebrannt, gelöscht) an Streamer.bot
-                         event: function (name, args) { sbEvent(name, args); } };
+                         event: function (name, args) { sbEvent(name, args); friendFire(name, args); } };
       var seasons = {
         autumn: window.ThemeAutumn.create(document.getElementById('stage'), seasonOpts),
         spring: window.ThemeSpring.create(document.getElementById('stage'), seasonOpts),
@@ -218,6 +218,14 @@
       // Verbindung bleibt dauerhaft offen und wird nach einem Abbruch (Streamer.bot
       // neu gestartet) immer wieder aufgebaut; ein hängender Aufbau wird verworfen
       var sb = { ws: null, url: null, queue: [], retry: 0, timer: null, n: 0, since: 0 };
+      // Neues Feuer → der Hund (effects/friend.html) rennt hin und löscht es. Nur in OBS (keine Doppelung aus Vorschauen),
+      // höchstens alle 8 s; ohne Freischaltung „friend“ lehnt der Server ab.
+      var lastFriendFire = 0;
+      function friendFire(name, args) {
+        if (name !== 'fire' || args.x == null || !apiBase || !window.obsstudio || Date.now() - lastFriendFire < 8000) return;
+        lastFriendFire = Date.now();
+        fetch(apiBase + 'friend?cmd=react&event=fire&x=' + args.x, { cache: 'no-store' }).catch(function () {});
+      }
       function sbEvent(name, args) {
         if (!settings.sbaction || !window.obsstudio) return;
         var a = { event: name, theme: lastTheme };

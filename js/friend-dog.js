@@ -18,7 +18,7 @@
   var THREE = root.THREE;
 
   var DEFAULT_REACTIONS = { follow: 'happy', sub: 'roll', resub: 'roll', giftsub: 'roll', raid: 'zoomies', bits: 'paw',
-    donation: 'paw', welcome: 'paw', burnout: 'bark', pet: 'pet' };
+    donation: 'paw', welcome: 'paw', burnout: 'bark', pet: 'pet', fire: 'pee' };
 
   function create(opt) {
     var canvas = opt.canvas, W = canvas.width || 1920, H = canvas.height || 1080;
@@ -64,11 +64,19 @@
     var LABEL = {};
     var S = { resume: null, face: null, z: 0, rise: 0, yawRate: 0, mode: 'idle', dir: 1, x: (area[0] + area[1]) / 2, gait: 0, phase: 0, wag: 0.4, bark: 0, barkT: 0,
               pose: null, poseW: 0, growlLeft: 0, growlNext: 0, growlT: 9, fly: null };
-    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1, cower: 1, lookup: 1 };
+    var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1, lookup: 1 };
     // Zusatzhaltungen am Skelett (über dem Steh- bzw. Sitz-Clip), weich ein- und ausgeblendet
-    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1, lookup: 1 };
-    var SIT_POSES = { beg: 1, hide: 1, cower: 1, lookup: 1 };   // bauen auf der gemerkten Sitzhaltung auf
+    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1, lookup: 1, test: 1, pee: 1 };
+    var SIT_POSES = { beg: 1, hide: 1, lookup: 1 };   // bauen auf der gemerkten Sitzhaltung auf
     var fxg = null;   // Gruppe für Wirbeln (Tornado) zwischen holder und Körper
+    // Pinkelstrahl (Feuer löschen): Tropfen auf einer Wurfparabel vom Becken zum Feuer
+    var PEE_N = 46, peePos = new Float32Array(PEE_N * 3), peeA = new Float32Array(PEE_N), peeGeo = new THREE.BufferGeometry();
+    peeGeo.setAttribute('position', new THREE.BufferAttribute(peePos, 3)); peeGeo.setAttribute('a', new THREE.BufferAttribute(peeA, 1));
+    var peeMesh = new THREE.Points(peeGeo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false,
+      uniforms: { s: { value: Math.max(3, (opt.sizePx || 170) / 40) } },
+      vertexShader: 'attribute float a; varying float va; uniform float s; void main(){ va = a; gl_PointSize = s * (0.6 + a); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: 'varying float va; void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; gl_FragColor = vec4(1.0, 0.86, 0.25, va * (1.0 - r * 1.6)); }' }));
+    peeMesh.frustumCulled = false; peeMesh.visible = false; scene.add(peeMesh);
     var FUR_KEY = opt.fur || 'pinscher', BODY_KEY = opt.body || 'pinscher';
 
     var ready = new Promise(function (resolve, reject) {
@@ -309,7 +317,7 @@
       if ((m === 'walk' || m === 'run') && CLIPS[S.mode]) S.rise = S.mode === 'lie' || S.mode === 'roll' ? 0.8 : 0.5;
       S.mode = m;
       if (POSES[m]) S.pose = m;
-      if (m === 'walk' || m === 'run' || m === 'idle' || m === 'stance' || m === 'shakeoff' || m === 'flail') play('standing');
+      if (m === 'walk' || m === 'run' || m === 'idle' || m === 'stance' || m === 'cower' || m === 'shakeoff' || m === 'flail' || m === 'test' || m === 'pee') play('standing');
       if (m === 'sit' || SIT_POSES[m]) play('sitting');
       if (m === 'shake') play('shake', { once: true });
       if (m === 'roll') play('rollover', { once: true });
@@ -359,6 +367,7 @@
       step = s; stepT = 0;
       if (s.do === 'goto') { S.dir = s.x > S.x ? 1 : -1; S.face = null; setMode(s.gait || 'walk'); }
       else if (s.do === 'mode') { if (s.face != null) S.face = s.face; setMode(s.m); if (s.growl) { S.growlLeft = s.growl; S.growlNext = 0.2; } }
+      else if (s.do === 'call') { try { s.fn(); } catch (e) { console.error('[friend]', e); } }
       else if (s.do === 'fly') {
         var dir = s.dir || (S.x > 0 ? -1 : 1);
         S.fly = { kind: s.kind, t0: t, dur: s.dur || 3, x0: S.x, dir: dir,
@@ -423,6 +432,16 @@
         { do: 'mode', m: 'beg', face: f, dur: 5 }, { do: 'mode', m: 'sit', face: f, dur: 1.5 }, { do: 'wag', v: 0.4, dur: 0 }]; },
       growl: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.5 }, { do: 'wag', v: 0, dur: 0 }, { do: 'mode', m: 'stance', dur: 4.5, growl: 4 },
         { do: 'bark', n: 2, gap: 0.35 }, { do: 'mode', m: 'idle', dur: 1 }, { do: 'wag', v: 0.4, dur: 0 }]; },
+      // Heldentat: zum Feuer rennen, Hinterteil hin, Bein heben, löschen, stolz bellen
+      pee: function (p) {
+        if (!p || p.x == null) return [];
+        var fx = (parseFloat(p.x) - W / 2) / pxPerUnit, right = fx > S.x;
+        var stand = Math.max(-RANGE, Math.min(RANGE, fx + (right ? -0.75 : 0.75)));
+        return [{ do: 'wag', v: 1, dur: 0 }, { do: 'bark', n: 1, gap: 0.3 }, { do: 'goto', x: stand, gait: 'run' },
+          { do: 'face', hour: right ? 9 : 3, dur: 0.5 }, { do: 'call', fn: function () { S.peeX = fx; } },
+          { do: 'mode', m: 'pee', dur: 3.2 }, { do: 'call', fn: function () { S.peeX = null; if (opt.onExtinguish) opt.onExtinguish(); } },
+          { do: 'mode', m: 'idle', face: 6, dur: 0.5 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'wag', v: 1, dur: 2 }, { do: 'wag', v: 0.4, dur: 0 }];
+      },
       shakeoff: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.5 }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }]; },
       none: function () { return []; }
     };
@@ -449,7 +468,8 @@
           { do: 'mode', m: 'hide', face: face == null ? 6 : face, dur: 6 }, { do: 'mode', m: 'idle', dur: 0.6 }],
         beg: PRESETS.beg(face), growl: PRESETS.growl(face), shakeoff: PRESETS.shakeoff(face),
         turn: [{ do: 'goto', x: clamp(S.x - S.dir * 1.2), gait: 'walk' }],
-        come: [{ do: 'goto', x: (area[0] + area[1]) / 2, gait: 'walk' }, { do: 'mode', m: 'sit', face: 6, dur: 6 }]
+        come: [{ do: 'goto', x: (area[0] + area[1]) / 2, gait: 'walk' }, { do: 'mode', m: 'sit', face: 6, dur: 6 }],
+        test: [{ do: 'mode', m: 'test', face: face == null ? 3 : face, dur: 60 }]
       };
       plan = (map[action] || []).slice();
       if (face != null && action !== 'sit' && action !== 'stand' && action !== 'lie' && action !== 'sleep') plan.push({ do: 'face', hour: face, dur: 6 });
@@ -465,7 +485,7 @@
         { do: 'mode', m: 'hide', face: 6, dur: 6 }, { do: 'mode', m: 'sit', face: 6, dur: 1 }, { do: 'mode', m: 'idle', dur: 0.6 }];
       else if (kind === 'hail') seq = [{ do: 'goto', x: edge, gait: 'run' }, { do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 5 }, { do: 'mode', m: 'idle', dur: 1 }];
       else if (kind === 'tornado') seq = [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'mode', m: 'cower', dur: 1.4 }, { do: 'fly', kind: 'tornado', dur: 3.6 },
-        { do: 'mode', m: 'shakeoff', dur: 1.4 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'mode', m: 'idle', dur: 0.5 }];
+        { do: 'mode', m: 'shakeoff', dur: 1.4 }, { do: 'mode', m: 'idle', face: 6, dur: 0.4 }, { do: 'bark', n: 2, gap: 0.45 }, { do: 'wait', dur: 0.6 }];
       else if (kind === 'tsunami' || kind === 'avalanche') {
         // Herkunft der Welle (vom Server, gleich wie im Wetter): weggespült wird er von ihr weg; die Front erreicht ihn
         // je nach Abstand zur Herkunftsseite (Tsunami: 1,8 s Rückzug, dann 4,6 s Lauf über das Bild)
@@ -618,11 +638,28 @@
         if (S.poseW > 0.01 && S.pose) pose(S.pose, S.poseW);
         if (S.growlLeft > 0) { S.growlNext -= dt; if (S.growlNext <= 0) { growl(); S.growlLeft--; S.growlNext = 0.9 + Math.random() * 0.3; } }
         S.growlT += dt;
+        // Strahl: vom Becken (etwas hinter der Mitte, Höhe der Hüfte) im Bogen zum Feuer am Boden
+        peeMesh.visible = S.mode === 'pee' && S.poseW > 0.6 && S.peeX != null;
+        if (peeMesh.visible) {
+          var p0 = new THREE.Vector3(); B.pelvis.getWorldPosition(p0); p0.addScaledVector(FWD, -0.05); p0.y -= 0.05;
+          var p1 = new THREE.Vector3(S.peeX, 0.04, S.z), hgt = 0.22 + Math.abs(p1.x - p0.x) * 0.35;
+          for (var pi = 0; pi < PEE_N; pi++) {
+            var u = (pi / PEE_N + t * 1.7) % 1;
+            peePos[pi * 3] = p0.x + (p1.x - p0.x) * u; peePos[pi * 3 + 1] = p0.y + (p1.y - p0.y) * u + 4 * hgt * u * (1 - u) * 0.6; peePos[pi * 3 + 2] = p0.z + (p1.z - p0.z) * u;
+            peeA[pi] = 0.75 * Math.min(1, u * 6) * Math.min(1, (1 - u) * 8 + 0.3);
+          }
+          peeGeo.attributes.position.needsUpdate = peeGeo.attributes.a.needsUpdate = true;
+        }
+        // gebeugte Steh-Haltungen: Rumpf so kippen, dass Vorder- und Hinterpfoten gleich hoch stehen (Beine beugen allein
+        // hebt nur Pfoten an – gemessen: Hinterpfoten 15 cm in der Luft, Vorderpfoten am Boden)
+        if (S.poseW > 0.05 && S.pose && POSES[S.pose] && !SIT_POSES[S.pose] && S.pose !== 'flail' && S.pose !== 'shakeoff' && S.pose !== 'pee' && !S.fly) levelFeet();
         // Boden: keine Pfote unter dem Boden (der Sitz-Clip drückt ein Hinterbein durch)
         holder.updateMatrixWorld(true);
         var minY = Infinity, wp = new THREE.Vector3();
         FEET.forEach(function (n) { if (B[n]) { B[n].getWorldPosition(wp); if (wp.y < minY) minY = wp.y; } });
         if (minY < 0.01 && moving < 0.05) holder.position.y += 0.01 - minY;   // nur im Stand/bei Clips (in Bewegung wippt der Gang selbst)
+        // gebeugte Haltungen im Stand (Ducken): Körper sinkt, bis die Pfoten am Boden stehen (sonst schwebt er mit angezogenen Beinen)
+        else if (minY > 0.01 && moving < 0.05 && S.poseW > 0.05 && S.pose && !SIT_POSES[S.pose] && !S.fly) holder.position.y -= (minY - 0.01) * Math.min(1, S.poseW * 1.5);
       }
       // Tornado: hochgewirbelt (dreht sich, kippt), fällt zurück · Tsunami: auf der Welle seitlich weggetragen, wippt
       if (S.fly && fxg) {
@@ -677,12 +714,18 @@
         turn(B.jaw, LAT, (0.06 + 0.16 * snarl) * w);
         tailOver(1.2 * w);
       } else if (name === 'cower') {
-        // Angst (Quellen: Tufts, ASPCA, PetMD): klein machen, Gewicht hinten (aus dem Sitzen, Hinterhand am Boden),
-        // Rücken gekrümmt, Vorderbeine eingeknickt, Kopf nah am Boden, Rute eingezogen
-        turn(B.spine_1, LAT, 0.25 * w); turn(B.spine_2, LAT, 0.2 * w); turn(B.chest, LAT, 0.12 * w);
-        LEGS.forEach(function (l) { turn(l[0], LAT, -0.55 * w); turn(l[1], LAT, 1.1 * w); turn(l[2], LAT, 0.45 * w); });
-        turn(B.neck_base, LAT, 0.5 * w); turn(B.head, LAT, 0.3 * w);
-        tailOver(-1.4 * w);
+        // Angst (Tufts, ASPCA, PetMD): klein machen – Hinterhand tief eingeknickt (Gewicht hinten), Vorderbeine gebeugt,
+        // Rücken rund, Kopf tief, Rute eingezogen. Werte gemessen (Gelenk-Testraster): Hüfte − = Oberschenkel vor,
+        // Knie + = Unterschenkel zurück, Schulter + = Oberarm zurück, Ellbogen + = Unterarm vor. Der Rumpf wird danach
+        // ausgeglichen (levelFeet), damit alle Pfoten am Boden stehen.
+        HIND.forEach(function (l) { turn(l[0], LAT, -0.9 * w); turn(l[1], LAT, 1.5 * w); turn(l[2], LAT, -0.6 * w); });
+        LEGS.forEach(function (l) { turn(l[0], LAT, 0.5 * w); turn(l[1], LAT, 0.85 * w); turn(l[2], LAT, -0.2 * w); });
+        turn(B.spine_2, LAT, 0.15 * w);
+        turn(B.neck_base, LAT, 1.0 * w); turn(B.head, LAT, 0.35 * w);
+        tailOver(-1.5 * w);
+      } else if (name === 'pee') {   // Bein heben: linkes Hinterbein seitlich hoch (Längsachse), leicht weg gelehnt
+        turn(B.L_hip, FWD, 0.95 * w); turn(B.L_knee, LAT, 0.45 * w);
+        turn(B.COG, FWD, -0.06 * w); tailOver(0.4 * w);
       } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
         turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.45 * w);
       } else if (name === 'shakeoff') {   // Wasser abschütteln: Welle von Kopf bis Becken, schnell, klingt ab
@@ -694,6 +737,18 @@
         LEGS.forEach(function (l, i) { turn(l[0], LAT, (i ? f : -f) * 0.7); turn(l[1], LAT, 0.4 * w); });
         HIND.forEach(function (l, i) { turn(l[0], LAT, (i ? -f : f) * 0.6); });
         turn(B.head, LAT, -0.3 * w);
+      }
+    }
+    var FRONT_FEET = ['LF_toes', 'RF_toes', 'L_hand', 'R_hand'], HIND_FEET = ['LB_toes', 'RB_toes', 'L_foot', 'R_foot'];
+    function levelFeet() {
+      var wv = new THREE.Vector3();
+      function low(list) { var m = { y: Infinity, x: 0 }; list.forEach(function (n) { if (!B[n]) return; B[n].getWorldPosition(wv); if (wv.y < m.y) { m.y = wv.y; m.x = wv.dot(FWD); } }); return m; }
+      for (var k = 0; k < 3; k++) {
+        holder.updateMatrixWorld(true);
+        var f = low(FRONT_FEET), h = low(HIND_FEET), len = Math.max(0.2, f.x - h.x);
+        var ang = Math.max(-0.25, Math.min(0.25, Math.atan2(h.y - f.y, len)));   // > 0: hinten höher → hinten absenken (Nase hoch = −); begrenzt, sonst kippt er über
+        if (Math.abs(ang) < 0.002) break;
+        turn(B.COG, LAT, -ang);
       }
     }
     // Rute zusätzlich heben/senken (nach dem Ausrichten): oben + , unten − (gemessen: + LAT hebt die Rute)
@@ -751,6 +806,7 @@
     }
 
     ready.then(function () { setMode('idle'); requestAnimationFrame(frame); });
+    if (opt.testPose && opt.testPose.length) root.__friendDbg = { S: S, holder: holder, B: B, FEET: FEET };   // nur Vorschau mit ?pt=
     return { ready: ready, react: react, act: act, weather: weather, setFur: function (k) { FUR_KEY = k; applyFur(k); }, setBody: function (k) { BODY_KEY = k; applyBody(k); } };
   }
 

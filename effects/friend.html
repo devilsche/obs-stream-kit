@@ -28,6 +28,9 @@
       var reactions = {};
       FriendDog.REACTIONS.forEach(function (ev) { if (p.get('on_' + ev)) reactions[ev] = p.get('on_' + ev); });
       var f = FriendDog.create({
+        // Heldentat: nach dem Pinkeln das Feuer wirklich löschen (zählt in der Feuerwehr-Rangliste als „Friend“)
+        onExtinguish: function () { var mm = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//); if (mm) fetch('/s/' + mm[1] + '/api/fx/weather?cmd=extinguish&name=Friend', { cache: 'no-store' }).catch(function () {}); },
+        testPose: (p.get('pt') || '').split(',').filter(Boolean).map(function (e) { var q = e.split(':'); return [q[0], parseFloat(q[1]) || 0, q[2] || 'lat']; }),
         canvas: document.getElementById('friend'), model: '../assets/friend/dog.glb', barkSound: '../assets/friend/bark.mp3', growlSound: '../assets/friend/growl.mp3',
         sizePx: num('size', 170, 60, 500), fur: p.get('fur') || 'pinscher', body: p.get('body') || 'pinscher', ears: p.has('ears') ? num('ears', 85, 0, 100) / 100 : null,
         area: p.get('area') || 'full', roam: p.get('roam') !== '0', sound: p.get('sound') !== '0', volume: num('volume', 0.5, 0, 1),
@@ -36,7 +39,7 @@
       f.ready.then(function () {
         // ?try=beg|growl|shakeoff|roll|playdead … bzw. ?try=weather:tornado – zum Ausprobieren in der Vorschau
         var tr = p.get('try');
-        if (tr) setTimeout(function () { if (/^weather:/.test(tr)) f.weather(tr.slice(8)); else f.act(tr, { face: p.has('tryface') ? +p.get('tryface') : 6 }); }, 1500);
+        if (tr) setTimeout(function () { if (/^weather:/.test(tr)) f.weather(tr.slice(8)); else if (/^fire:/.test(tr)) f.react('fire', { x: +tr.slice(5) }); else f.act(tr, { face: p.has('tryface') ? +p.get('tryface') : 6 }); }, 1500);
         if (p.get('demo') === '1') {
           var evs = ['follow', 'sub', 'raid', 'bits', 'welcome', 'pet'], i = 0;
           setInterval(function () { f.react(evs[i++ % evs.length]); }, 14000);

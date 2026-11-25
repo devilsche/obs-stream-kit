@@ -1157,7 +1157,7 @@
         for (var j = 0; j < 5; j++) B.smoke(x + rand(-30, 30), y - 10, { o: 0.45 });
       }
       if (opts.ignite) opts.ignite(wet);
-      emit('fire', { cause: cause, wet: wet, fires: burning().length, side: x < W / 2 ? 'left' : 'right' });
+      emit('fire', { cause: cause, wet: wet, fires: burning().length, side: x < W / 2 ? 'left' : 'right', x: Math.round(x) });
     }
     // Funkenflug: Nachbarstelle im Haufen (mit dem Wind eher in seine Richtung)
     function spread(f) {

@@ -291,8 +291,8 @@ EFFECTS = {
         "settings": {},
         "args": {
             "react": {"event": _choice("follow", "sub", "resub", "giftsub", "bits", "raid", "donation", "welcome",
-                                       "burnout", "pet"),
-                      "name": _name},
+                                       "burnout", "pet", "fire"),
+                      "name": _name, "x": _int_range(0, 4000)},
             "act": {"action": _choice("walk", "run", "stand", "sit", "lie", "paw", "roll", "bark", "wag", "turn", "come",
                                       "sleep", "playdead", "beg", "growl", "shakeoff"),
                     "face": _float_range(1, 12)},

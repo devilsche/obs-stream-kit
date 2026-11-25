@@ -247,3 +247,8 @@ def test_weather_power_command():
 def test_spectacle_side_choice():
     assert commands.parse("weather", {"cmd": "spectacle", "type": "tsunami", "side": "left"})["params"] == {"type": "tsunami", "side": "left"}
     assert "side" not in commands.parse("weather", {"cmd": "spectacle", "type": "tsunami", "side": "oben"})["params"]
+
+
+def test_friend_fire_reaction_with_position():
+    c = commands.parse("friend", {"cmd": "react", "event": "fire", "x": "1400"})
+    assert c["params"] == {"event": "fire", "x": 1400}
