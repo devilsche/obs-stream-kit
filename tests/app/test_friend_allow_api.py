@@ -21,3 +21,21 @@ def test_save_and_load(pg_conn_test_setup_non_admin, tmp_path):
     assert r.get_json()["names"] == ["hat3", "moonwave_xd"]
     assert c.get("/app/api/friend-allow").get_json()["names"] == ["hat3", "moonwave_xd"]
     assert friend_allow.load(conn, tid) == ["hat3", "moonwave_xd"]
+
+
+def test_pet_media_api(pg_conn_test_setup_non_admin, tmp_path):
+    import io
+    conn, tid, _, sid = pg_conn_test_setup_non_admin
+    c = _client(conn, sid, tmp_path)
+    H = {"X-Requested-With": "fetch"}
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+    mp3 = (b"\xff\xfb\x90\x00" + b"\x00" * 413) * 40
+    assert c.post("/app/api/pet-media/image", data={"file": (io.BytesIO(png), "a.png")}).status_code == 400   # ohne Header
+    img = c.post("/app/api/pet-media/image", headers=H, data={"file": (io.BytesIO(png), "Luke.png")}).get_json()["file"]
+    snd = c.post("/app/api/pet-media/sound", headers=H, data={"file": (io.BytesIO(mp3), "wuff.mp3")}).get_json()["file"]
+    assert c.post("/app/api/pet-media/volume", headers=H, json={"volume": 0.3}).get_json()["ok"]
+    d = c.get("/app/api/pet-media").get_json()
+    assert d["img"]["id"] == img["id"] and [s["id"] for s in d["sounds"]] == [snd["id"]] and d["volume"] == 0.3
+    assert c.get("/app/api/pet-media/file/%s.png" % img["id"]).status_code == 200
+    assert c.delete("/app/api/pet-media/" + snd["id"], headers=H).get_json()["ok"]
+    assert c.get("/app/api/pet-media").get_json()["sounds"] == []

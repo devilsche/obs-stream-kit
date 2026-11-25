@@ -41,6 +41,7 @@ def _serve_tenant_source(token, subdir, filepath):
     feats = []
     alert_sound = None
     alert_cfg = None
+    pet_media_cfg = None
     sound_level = None
     conn = _get_conn()
     try:
@@ -54,6 +55,9 @@ def _serve_tenant_source(token, subdir, filepath):
         grp = sound_levels.group_for(subdir)
         if grp:   # Gesamtlautstärke aus Settings → Sound (OBS-Regler bleiben auf 100 %)
             sound_level = sound_levels.load(conn, g.tenant_id)[grp]
+        if subdir == "transitions" and filepath == "pet.html":   # Bild + Töne aus dem Dashboard
+            from overlay_app import pet_media
+            pet_media_cfg = pet_media.for_page(pet_media.load(conn, g.tenant_id), f"/s/{token}/")
         if subdir == "alerts":   # eigene Alert-Töne aus dem Dashboard (js/alert-sound.js)
             from overlay_app import alert_sounds
             key = filepath[:-5] if filepath.endswith(".html") else ""
@@ -85,6 +89,8 @@ def _serve_tenant_source(token, subdir, filepath):
         variables["__ALERT_CFG__"] = alert_cfg
     if sound_level is not None:
         variables["__SOUND_LEVEL__"] = sound_level
+    if pet_media_cfg is not None:
+        variables["__PET_MEDIA__"] = pet_media_cfg
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 
@@ -176,6 +182,19 @@ def alert_sound_file(token, alert, file_id):
     if not p:
         abort(404)
     return send_file(p, mimetype="audio/mpeg", max_age=86400)
+
+
+@bp_overlays.route("/s/<token>/pet-media/<filename>")
+def pet_media_file(token, filename):
+    """Bild/Töne des Pet-Stingers (Upload im Dashboard), nur über den Token des Tenants."""
+    from flask import send_file
+    from overlay_app import pet_media
+    if g.tenant_id is None:
+        abort(404)
+    p = pet_media.path_of(_root(), g.tenant_id, filename)
+    if not p:
+        abort(404)
+    return send_file(p, mimetype=pet_media.MIME[filename.rsplit(".", 1)[1]], max_age=86400)
 
 
 # Relative ../assets/ und ../js/ aus den Overlay-HTMLs token-scoped bedienen.

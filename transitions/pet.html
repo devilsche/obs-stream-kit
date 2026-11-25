@@ -286,6 +286,21 @@
         document.getElementById('nameEl').style.fontFamily = "'" + fontParam + "', 'DM Sans', sans-serif";
       }
 
+      /* Bild und Ton aus dem Dashboard (window.__PET_MEDIA__); ein img= in der URL hat Vorrang */
+      var MEDIA = window.__PET_MEDIA__ || {};
+      if (!imgUrl && MEDIA.img) imgUrl = MEDIA.img;
+      (function () {
+        var list = MEDIA.sounds || [];
+        if (!list.length || params.get('sound') === '0') return;
+        var vol = (MEDIA.volume == null ? 0.6 : MEDIA.volume) * (typeof window.__SOUND_LEVEL__ === 'number' ? window.__SOUND_LEVEL__ : 1);
+        if (vol <= 0) return;
+        var a = new Audio(list[Math.floor(Math.random() * list.length)]);
+        a.preload = 'auto'; a.volume = Math.min(1, vol);
+        setTimeout(function () {   // passend zum Einblenden des Bildes (vorher in Streamer.bot: 0,8 s Pause)
+          var pr = a.play(); if (pr && pr.catch) pr.catch(function () { /* Browser ohne Klick: stumm */ });
+        }, 800);
+      })();
+
       /* Bild setzen */
       if (imgUrl) {
         document.documentElement.style.setProperty(

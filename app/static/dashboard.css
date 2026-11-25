@@ -1441,3 +1441,10 @@ a.url-card{text-decoration:none}
 .url-friend-allow .url-sound__row{margin:8px 0 0}
 .url-friend-allow .url-copied{margin-left:0}
 .url-friend-allow .url-copied.is-error{color:var(--danger,#e5484d)}
+/* Pet-Stinger: Bild + Töne */
+.url-petmedia__img{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;padding:14px 20px 4px}
+.url-petmedia__thumb{width:120px;height:120px;flex:0 0 120px;border:1px solid var(--border);border-radius:var(--r-ctrl);background:var(--bg-deeper);display:flex;align-items:center;justify-content:center;overflow:hidden}
+.url-petmedia__thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.url-petmedia__thumb .url-sound__note{margin:0;padding:8px;font-size:12px;text-align:center}
+.url-petmedia__imgside{flex:1 1 200px;min-width:0;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.url-petmedia .url-copied{min-height:1.2em;display:block}

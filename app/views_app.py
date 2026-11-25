@@ -1108,6 +1108,67 @@ def _fetch_only():
     return request.headers.get("X-Requested-With") == "fetch"
 
 
+@bp_app.route("/app/api/pet-media")
+@require_session
+def pet_media_list():
+    from overlay_app import pet_media
+    cfg = _sound_conn(lambda c: pet_media.load(c, g.tenant_id))
+    return jsonify({"ok": True, "img": cfg["img"], "sounds": cfg["sounds"], "volume": cfg["volume"],
+                    "maxSounds": pet_media.MAX_SOUNDS, "maxSeconds": pet_media.MAX_SECONDS})
+
+
+@bp_app.route("/app/api/pet-media/<kind>", methods=["POST"])
+@require_session
+def pet_media_upload(kind):
+    """kind=image (ersetzt) | sound (bis zu 3) | volume (JSON)."""
+    from overlay_app import pet_media
+    if not _fetch_only():
+        return jsonify({"ok": False, "error": "Bad request."}), 400
+    if kind == "volume":
+        body = request.get_json(silent=True) if request.is_json else None
+        try:
+            vol = float(body.get("volume"))
+        except (AttributeError, TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Invalid volume."}), 400
+        _sound_conn(lambda c: pet_media.set_volume(c, g.tenant_id, vol))
+        return jsonify({"ok": True})
+    if kind not in ("image", "sound"):
+        abort(404)
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"ok": False, "error": "No file received."}), 400
+    limit = pet_media.MAX_IMG_BYTES if kind == "image" else pet_media.MAX_SOUND_BYTES
+    data = f.read(limit + 1)
+    fn = pet_media.set_image if kind == "image" else pet_media.add_sound
+    entry, err = _sound_conn(lambda c: fn(c, _sound_root(), g.tenant_id, f.filename, data))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True, "file": entry})
+
+
+@bp_app.route("/app/api/pet-media/<file_id>", methods=["DELETE"])
+@require_session
+def pet_media_delete(file_id):
+    from overlay_app import pet_media
+    if not _fetch_only():
+        return jsonify({"ok": False, "error": "Bad request."}), 400
+    if not _sound_conn(lambda c: pet_media.delete(c, _sound_root(), g.tenant_id, file_id)):
+        return jsonify({"ok": False, "error": "Not found."}), 404
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/pet-media/file/<filename>")
+@require_session
+def pet_media_preview(filename):
+    """Vorschau/Vorhören im Dashboard."""
+    from flask import send_file
+    from overlay_app import pet_media
+    p = pet_media.path_of(_sound_root(), g.tenant_id, filename)
+    if not p:
+        abort(404)
+    return send_file(p, mimetype=pet_media.MIME[filename.rsplit(".", 1)[1]], max_age=0)
+
+
 @bp_app.route("/app/api/friend-allow", methods=["GET", "POST"])
 @require_session
 def friend_allow_api():

@@ -662,7 +662,35 @@ G1R_STEAM_NAME=</code></pre>
           </div>
           </div>
         </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${chromeHtml}`;
+    // Pet-Stinger: Bild und Töne hochladen (kommen vom Server in die Seite, keine URL nötig)
+    const isPet = /(^|\/)transitions\/pet\.html$/.test(card.dataset.path || "");
+    const petMediaHtml = isPet ? `
+      <div class="url-dbox url-soundbox url-petmedia">
+        <h2>Image &amp; sound <span class="url-dbox__tag">upload</span></h2>
+        <p class="url-dbox__desc">Upload the picture and the sound here – nothing to paste into OBS. The running source picks them up the next time it plays.</p>
+        <div class="url-petmedia__img">
+          <div class="url-petmedia__thumb" id="urlPetThumb"></div>
+          <div class="url-petmedia__imgside">
+            <label class="url-sound__lbl" for="urlPetImgFile">Image (PNG, JPG, WebP or GIF, square works best)</label>
+            <input type="file" id="urlPetImgFile" class="url-sound__file" accept="image/png,image/jpeg,image/webp,image/gif">
+            <button type="button" class="url-act ghost" id="urlPetImgDel" hidden><span class="material-symbols-outlined" aria-hidden="true">delete</span>Remove image</button>
+          </div>
+        </div>
+        <div class="url-sound__list" id="urlPetSoundList"><p class="url-sound__note">Loading…</p></div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlPetVol">Volume</label>
+          <select id="urlPetVol" class="url-sound__sel">
+            ${[[0,"Off"],[0.1,"10%"],[0.2,"20%"],[0.4,"40%"],[0.6,"60%"],[0.8,"80%"],[1,"100%"]].map(v => `<option value="${v[0]}">${v[1]}</option>`).join("")}
+          </select>
+        </div>
+        <div class="url-sound__row">
+          <label class="url-sound__lbl" for="urlPetSoundFile">Add MP3</label>
+          <input type="file" id="urlPetSoundFile" class="url-sound__file" accept="audio/mpeg,.mp3" aria-describedby="urlPetRules">
+        </div>
+        <p class="url-sound__rules" id="urlPetRules"></p>
+        <span class="url-copied" id="urlPetStatus" role="status" aria-live="polite"></span>
+      </div>` : "";
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${petMediaHtml}${chromeHtml}`;
 
     const infoBits = [];
     const pw = parseInt(card.dataset.previewW || "0");
@@ -719,6 +747,7 @@ G1R_STEAM_NAME=</code></pre>
     wireThemeSections();
     if (isLiveAlerts) wireAlertTabs(base, card.dataset.fx || "");
     if (/\/friend$/.test(card.dataset.fx || "")) wireFriendAllow();
+    if (isPet) wirePetMedia();
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -816,6 +845,69 @@ G1R_STEAM_NAME=</code></pre>
     try { const k = localStorage.getItem("urlAlertTab"); if (types.some(t => t.key === k)) start = k; } catch (_) {}
     if (pendingAlertTab && types.some(t => t.key === pendingAlertTab)) start = pendingAlertTab;
     if (start) show(start, false);
+  }
+
+  // ── Pet-Stinger: Bild + Töne (overlay_app/pet_media.py) ──
+  function wirePetMedia() {
+    const api = "/app/api/pet-media", H = { "X-Requested-With": "fetch" };
+    const thumb = document.getElementById("urlPetThumb"), imgFile = document.getElementById("urlPetImgFile");
+    const imgDel = document.getElementById("urlPetImgDel"), list = document.getElementById("urlPetSoundList");
+    const vol = document.getElementById("urlPetVol"), file = document.getElementById("urlPetSoundFile");
+    const rules = document.getElementById("urlPetRules"), st = document.getElementById("urlPetStatus");
+    if (!thumb) return;
+    const say = (msg, bad) => { st.textContent = msg; st.classList.toggle("is-error", !!bad); };
+    let imgId = null;
+    function render(d) {
+      rules.textContent = `MP3 only, at most ${d.maxSeconds} s, up to ${d.maxSounds} files – one plays at random each time.`;
+      vol.value = String([0, 0.1, 0.2, 0.4, 0.6, 0.8, 1].reduce((a, b) => Math.abs(b - d.volume) < Math.abs(a - d.volume) ? b : a));
+      imgId = d.img ? d.img.id : null;
+      thumb.innerHTML = d.img ? `<img src="${api}/file/${escapeAttr(d.img.id + "." + d.img.ext)}" alt="Current pet image: ${escapeAttr(d.img.name)}">`
+                              : `<p class="url-sound__note">Built-in picture until you upload one.</p>`;
+      imgDel.hidden = !d.img;
+      file.disabled = d.sounds.length >= d.maxSounds;
+      file.setAttribute("aria-disabled", file.disabled ? "true" : "false");
+      list.innerHTML = d.sounds.length ? `<ul class="url-sound__items">${d.sounds.map(f => `
+        <li class="url-sound__item">
+          <span class="material-symbols-outlined" aria-hidden="true">music_note</span>
+          <span class="url-sound__name">${escapeHtml(f.name)}</span>
+          <span class="url-sound__dur">${Number(f.dur).toFixed(1)} s</span>
+          <button type="button" class="url-act ghost" data-play="${escapeAttr(f.id)}" data-name="${escapeAttr(f.name)}" aria-pressed="false" aria-label="Play ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">play_arrow</span></button>
+          <button type="button" class="url-act ghost" data-del="${escapeAttr(f.id)}" aria-label="Delete ${escapeAttr(f.name)}"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
+        </li>`).join("")}</ul>` : `<p class="url-sound__note">No sound yet – the stinger stays silent.</p>`;
+      list.querySelectorAll("[data-play]").forEach(b => b.addEventListener("click", () => {
+        if (soundBtn === b) { stopPreview(); return; }
+        stopPreview();
+        soundPreview = new Audio(api + "/file/" + b.dataset.play + ".mp3"); soundBtn = b;
+        soundPreview.volume = Math.min(1, Number(vol.value) || 0.6);
+        soundPreview.addEventListener("ended", stopPreview);
+        soundPreview.play().then(() => setPlayBtn(b, true)).catch(() => { stopPreview(); say("Could not play.", true); });
+      }));
+      list.querySelectorAll("[data-del]").forEach(b => b.addEventListener("click", () => del(b.dataset.del)));
+    }
+    function reload() {
+      stopPreview();
+      return fetch(api, { credentials: "same-origin", cache: "no-store" }).then(r => r.json()).then(render)
+        .catch(() => say("Could not load.", true));
+    }
+    function del(id) {
+      fetch(api + "/" + encodeURIComponent(id), { method: "DELETE", credentials: "same-origin", headers: H })
+        .then(r => r.json()).then(d => { say(d.ok ? "Deleted." : (d.error || "Could not delete."), !d.ok); return reload(); });
+    }
+    function upload(kind, input) {
+      const f = input.files[0]; if (!f) return;
+      const fd = new FormData(); fd.append("file", f);
+      say("Uploading…");
+      fetch(api + "/" + kind, { method: "POST", credentials: "same-origin", headers: H, body: fd })
+        .then(r => r.json()).then(d => { say(d.ok ? "Saved." : (d.error || "Could not upload."), !d.ok); input.value = ""; return reload(); })
+        .catch(() => say("Could not upload.", true));
+    }
+    imgFile.addEventListener("change", () => upload("image", imgFile));
+    file.addEventListener("change", () => upload("sound", file));
+    imgDel.addEventListener("click", () => { if (imgId) del(imgId); });
+    vol.addEventListener("change", () => fetch(api + "/volume", { method: "POST", credentials: "same-origin",
+      headers: Object.assign({ "Content-Type": "application/json" }, H), body: JSON.stringify({ volume: Number(vol.value) }) })
+      .then(r => r.json()).then(d => say(d.ok ? "Saved." : (d.error || "Could not save."), !d.ok)));
+    reload();
   }
 
   // ── Friend: Erlaubnisliste für Chat-Befehle ──
