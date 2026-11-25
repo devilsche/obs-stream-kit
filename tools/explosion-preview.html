@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Explosion preview</title>
+<!-- Vorschau (Admin) für die neue WebGL-Explosion „Burst“: fertige Flipbooks (assets/effects/flipbooks/manifest.json,
+     Unity Labs CC0 + Pixel-Packs CC0) per Klick an der Klickstelle auslösen, alle nebeneinander in Schleife ansehen und
+     die WebGL-Extras (Lichtblitz, Druckwelle, Funken, Rauch, Wackeln) zu- und abschalten. Route: /app/tools/explosion-preview. -->
+<style>
+  :root { --bg: #0d0912; --panel: rgba(20, 12, 30, 0.94); --text: #f0eaf5; --dim: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --line: #2a1f3a; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; overflow: hidden; }
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 12px; top: 12px; z-index: 10; background: var(--accent); color: #1b1300; padding: 8px 12px; }
+  main { position: fixed; inset: 0; }
+  #stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; cursor: crosshair; }
+  main[data-bg="dark"] { background: radial-gradient(ellipse at 50% 60%, #2a2238 0%, #0d0912 70%); }
+  main[data-bg="game"] { background: linear-gradient(#7fa6c9 0%, #b9cbd8 45%, #6b7b4a 46%, #4e5a33 100%); }
+  main[data-bg="light"] { background: #e9e4ee; }
+  main[data-bg="check"] { background: repeating-conic-gradient(#3a3344 0% 25%, #2a2433 0% 50%) 0 0 / 40px 40px; }
+  .panel { position: absolute; left: 12px; top: 12px; bottom: 12px; width: 320px; max-width: calc(100% - 24px); overflow-y: auto; background: var(--panel);
+    border: 2px solid var(--btn); border-radius: 10px; padding: 12px 14px; box-sizing: border-box; z-index: 2; }
+  h1 { font-size: 17px; margin: 0 0 4px; }
+  h2 { font-size: 12px; margin: 14px 0 6px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+  p { margin: 0 0 8px; color: var(--dim); }
+  .list { display: flex; flex-wrap: wrap; gap: 4px; }
+  button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 5px 9px; font: inherit; font-size: 13px; cursor: pointer; min-height: 30px; }
+  button:hover { background: var(--btn-hi); }
+  button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .row { display: grid; grid-template-columns: 90px 1fr 44px; gap: 8px; align-items: center; margin: 4px 0; }
+  .row output { color: var(--accent); text-align: right; font-variant-numeric: tabular-nums; }
+  label.chk { display: flex; gap: 8px; align-items: center; margin: 4px 0; min-height: 26px; cursor: pointer; }
+  label.chk input { width: 18px; height: 18px; accent-color: var(--accent); margin: 0; }
+  select { background: #1d1128; color: var(--text); border: 1px solid var(--btn-hi); border-radius: 6px; padding: 4px 8px; font: inherit; min-height: 30px; }
+  .credits { font-size: 12px; color: var(--dim); }
+  .credits a { color: var(--text); }
+  #status { min-height: 20px; color: var(--dim); font-size: 13px; }
+  /* Rastermodus: Namensschilder über den Zellen (Positionen liefert das Raster selbst, keine Inline-Styles) */
+  .grid { position: absolute; inset: 0 0 0 346px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); grid-auto-rows: 220px;
+    gap: 0; padding: 8px; overflow-y: auto; z-index: 1; pointer-events: none; }
+  .grid[hidden] { display: none; }
+  .cell { border: 1px dashed rgba(255, 255, 255, 0.12); display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; }
+  .cell span { background: rgba(13, 9, 18, 0.75); color: var(--text); font-size: 12px; padding: 1px 8px; border-radius: 10px; }
+  @media (max-width: 700px) { .panel { bottom: auto; max-height: 45%; } .grid { inset: 46% 0 0 0; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#effects">Skip to the effect list</a>
+<main id="main" data-bg="dark">
+  <canvas id="stage" aria-label="Preview stage: click anywhere to set off the selected effect"></canvas>
+  <div class="grid" id="grid" hidden aria-hidden="true"></div>
+  <section class="panel" aria-labelledby="t">
+    <h1 id="t">Explosion preview</h1>
+    <p>Pick an effect and click the stage to set it off there (Space = centre). “Play all” loops every effect side by side.
+      The extras are what WebGL adds on top of the ready-made animation.</p>
+    <div class="list" role="group" aria-label="Mode">
+      <button type="button" id="modeOne" aria-pressed="true">Click to fire</button>
+      <button type="button" id="modeAll" aria-pressed="false">Play all</button>
+    </div>
+    <h2>Realistic</h2>
+    <div class="list" id="effects" role="group" aria-label="Realistic effects"></div>
+    <h2>Pixel art</h2>
+    <div class="list" id="effectsPx" role="group" aria-label="Pixel effects"></div>
+    <h2>Settings</h2>
+    <div class="row"><label for="size">Size</label><input type="range" id="size" min="80" max="900" step="10" value="420"><output id="sizeOut" for="size">420</output></div>
+    <div class="row"><label for="speed">Speed</label><input type="range" id="speed" min="0.3" max="2" step="0.05" value="1"><output id="speedOut" for="speed">1.0×</output></div>
+    <div class="row"><label for="bg">Background</label><select id="bg">
+      <option value="dark">Dark</option><option value="game">Game scene</option><option value="light">Light</option><option value="check">Checkerboard</option></select><span></span></div>
+    <h2>WebGL extras</h2>
+    <label class="chk"><input type="checkbox" id="xFlash" checked> Light flash</label>
+    <label class="chk"><input type="checkbox" id="xRing" checked> Shockwave ring</label>
+    <label class="chk"><input type="checkbox" id="xSparks" checked> Sparks and debris</label>
+    <label class="chk"><input type="checkbox" id="xSmoke" checked> Lingering smoke</label>
+    <label class="chk"><input type="checkbox" id="xShake" checked> Screen shake</label>
+    <p id="status" role="status" aria-live="polite">Loading …</p>
+    <h2>Credits</h2>
+    <div class="credits" id="credits"></div>
+  </section>
+</main>
+<script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var THREE = window.THREE, $ = function (id) { return document.getElementById(id); };
+  var BASE = '/s/__WIDGET_TOKEN__/assets/effects/flipbooks/';
+  var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var list = [], tex = {}, cur = null, mode = 'one';
+
+  // ── Bühne: Pixel-Koordinaten, Ursprung oben links ──
+  var canvas = $('stage'), renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  var scene = new THREE.Scene(), cam = new THREE.OrthographicCamera(0, 1, 0, 1, -10, 10);
+  function resize() {
+    var w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false); cam.left = 0; cam.right = w; cam.top = 0; cam.bottom = h; cam.updateProjectionMatrix();
+    if (mode === 'all') layoutAll();
+  }
+  window.addEventListener('resize', resize);
+
+  // Flipbook: Bild n und n+1 weich überblenden (nicht bei Pixel-Art)
+  var VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }';
+  var FS = [
+    'uniform sampler2D map; uniform float cols, rows, frame, frames, fade, blendFrames, addMode; varying vec2 vUv;',
+    'vec4 cell(float f){ f = clamp(f, 0.0, frames - 1.0); float c = mod(f, cols), r = floor(f / cols);',
+    '  vec2 uv = vec2((c + vUv.x) / cols, 1.0 - (r + 1.0 - vUv.y) / rows); return texture2D(map, uv); }',
+    'void main(){ float f0 = floor(frame); vec4 a = cell(f0); vec4 b = cell(f0 + 1.0);',
+    '  vec4 c = blendFrames > 0.5 ? mix(a, b, fract(frame)) : a;',
+    '  // vormultipliert: leuchtende Flipbooks (RGB ohne Alpha) bekommen ihre Helligkeit als Deckkraft, auch auf durchsichtigem Grund (OBS)',
+    '  if (addMode > 0.5) { gl_FragColor = vec4(c.rgb * fade, max(c.r, max(c.g, c.b)) * fade); }',
+    '  else { float al = c.a * fade; if (al < 0.004) discard; gl_FragColor = vec4(c.rgb * al, al); } }'
+  ].join('\n');
+  var quad = new THREE.PlaneGeometry(1, 1);
+
+  function makeFlip(e) {
+    var m = new THREE.ShaderMaterial({
+      vertexShader: VS, fragmentShader: FS, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+      uniforms: { map: { value: tex[e.id] }, cols: { value: e.cols }, rows: { value: e.rows }, frame: { value: 0 }, frames: { value: e.frames },
+        fade: { value: 1 }, blendFrames: { value: e.pixel ? 0 : 1 }, addMode: { value: e.blend === 'add' ? 1 : 0 } }
+    });
+    return new THREE.Mesh(quad, m);
+  }
+  function aspect(e) { var im = tex[e.id].image; return (im.width / e.cols) / (im.height / e.rows); }
+
+  // ── Extras: Blitz, Ring, Funken als einfache Shader ──
+  var FLASH_FS = 'uniform float a; varying vec2 vUv; void main(){ float d = length(vUv - 0.5) * 2.0; float g = pow(max(0.0, 1.0 - d), 2.2); gl_FragColor = vec4(vec3(1.0, 0.82, 0.55) * g * a, g * a); }';
+  var RING_FS = 'uniform float a, w; varying vec2 vUv; void main(){ float d = length(vUv - 0.5) * 2.0; float g = smoothstep(1.0 - w, 1.0 - w * 0.5, d) * (1.0 - smoothstep(1.0 - w * 0.5, 1.0, d)); gl_FragColor = vec4(vec3(1.0, 0.9, 0.75) * g * a, g * a); }';
+  function glow(fs) {
+    return new THREE.Mesh(quad, new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: fs, transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, uniforms: { a: { value: 1 }, w: { value: 0.25 } } }));
+  }
+  var SPARK_VS = 'attribute float life; attribute float sz; varying float vL; void main(){ vL = life; gl_PointSize = sz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  var SPARK_FS = 'varying float vL; void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float g = max(0.0, 1.0 - d); vec3 c = mix(vec3(1.0, 0.35, 0.05), vec3(1.0, 0.92, 0.6), vL); gl_FragColor = vec4(c * g * vL, g * vL); }';
+
+  var live = [], shake = 0;
+  function fire(e, x, y, opts) {
+    opts = opts || {};
+    var size = +$('size').value, speed = +$('speed').value, h = size, w = size * aspect(e), loop = !!opts.loop;
+    var m = makeFlip(e); m.scale.set(w, -h, 1); m.position.set(x, y - (e.id.indexOf('flame') >= 0 ? h * 0.35 : 0), 0.5); scene.add(m);
+    live.push({ kind: 'flip', mesh: m, e: e, t: 0, dur: e.frames / e.fps / speed, loop: loop });
+    if (loop) return;
+    var big = e.group === 'real' && /explosion|fireball/.test(e.id);
+    if ($('xFlash').checked) { var f = glow(FLASH_FS); f.position.set(x, y, 0.9); scene.add(f); live.push({ kind: 'flash', mesh: f, t: 0, dur: 0.35 / speed, s: size * 2.2 }); }
+    if ($('xRing').checked) { var r = glow(RING_FS); r.position.set(x, y, 0.8); scene.add(r); live.push({ kind: 'ring', mesh: r, t: 0, dur: 0.55 / speed, s: size * 2.4 }); }
+    if ($('xSparks').checked) sparks(x, y, size, speed, big ? 90 : 40);
+    if ($('xSmoke').checked && big) {
+      var sm = list.find(function (z) { return z.id === 'unity-wispysmoke01'; });
+      if (sm && tex[sm.id]) setTimeout(function () {
+        var s = makeFlip(sm); s.scale.set(size * 1.3 * aspect(sm), -size * 1.3, 1); s.position.set(x, y - size * 0.25, 0.3); s.renderOrder = -1; scene.add(s);
+        live.push({ kind: 'smoke', mesh: s, e: sm, t: 0, dur: sm.frames / sm.fps / speed * 1.6 });
+      }, 250 / speed);
+    }
+    if ($('xShake').checked && !reduce) shake = Math.min(1, shake + (big ? 0.9 : 0.4));
+  }
+  function sparks(x, y, size, speed, n) {
+    var g = new THREE.BufferGeometry(), pos = new Float32Array(n * 3), life = new Float32Array(n), sz = new Float32Array(n), vel = [];
+    for (var i = 0; i < n; i++) {
+      var a = Math.random() * Math.PI * 2, v = size * (0.9 + Math.random() * 2.2);
+      vel.push([Math.cos(a) * v, Math.sin(a) * v - size * 0.6]); pos[i * 3] = x; pos[i * 3 + 1] = y; life[i] = 1; sz[i] = (2 + Math.random() * 5) * renderer.getPixelRatio();
+    }
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('life', new THREE.BufferAttribute(life, 1)); g.setAttribute('sz', new THREE.BufferAttribute(sz, 1));
+    var p = new THREE.Points(g, new THREE.ShaderMaterial({ vertexShader: SPARK_VS, fragmentShader: SPARK_FS, transparent: true, depthTest: false, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor }));
+    p.position.z = 1; scene.add(p);
+    live.push({ kind: 'sparks', mesh: p, vel: vel, t: 0, dur: (0.9 + Math.random() * 0.4) / speed, size: size, speed: speed });
+  }
+
+  function step(dt) {
+    for (var i = live.length - 1; i >= 0; i--) {
+      var o = live[i]; o.t += dt; var k = o.t / o.dur;
+      if (o.kind === 'flip' || o.kind === 'smoke') {
+        if (o.loop) k = k % 1;
+        var u = o.mesh.material.uniforms; u.frame.value = Math.min(o.e.frames - 1.001, k * o.e.frames);
+        u.fade.value = o.kind === 'smoke' ? Math.min(1, k * 4) * (1 - Math.max(0, (k - 0.5) / 0.5)) * 0.8 : (k > 0.85 && !o.loop ? (1 - k) / 0.15 : 1);
+      } else if (o.kind === 'flash') {
+        var s = o.s * (0.6 + k * 0.6); o.mesh.scale.set(s, s, 1); o.mesh.material.uniforms.a.value = Math.pow(1 - Math.min(1, k), 2) * 1.4;
+      } else if (o.kind === 'ring') {
+        var rs = o.s * (0.15 + Math.sqrt(k)); o.mesh.scale.set(rs, rs, 1); o.mesh.material.uniforms.a.value = Math.pow(1 - k, 1.5) * 0.55; o.mesh.material.uniforms.w.value = 0.16 - k * 0.1;
+      } else if (o.kind === 'sparks') {
+        var pa = o.mesh.geometry.attributes.position, la = o.mesh.geometry.attributes.life;
+        for (var j = 0; j < o.vel.length; j++) {
+          o.vel[j][1] += o.size * 2.6 * o.speed * dt; o.vel[j][0] *= 1 - 1.2 * dt; o.vel[j][1] *= 1 - 0.8 * dt;
+          pa.array[j * 3] += o.vel[j][0] * dt * o.speed; pa.array[j * 3 + 1] += o.vel[j][1] * dt * o.speed; la.array[j] = Math.max(0, 1 - k * (0.7 + (j % 5) * 0.08));
+        }
+        pa.needsUpdate = true; la.needsUpdate = true;
+      }
+      if (k >= 1 && !o.loop) { scene.remove(o.mesh); o.mesh.material.dispose(); if (o.kind === 'sparks') o.mesh.geometry.dispose(); live.splice(i, 1); }
+    }
+    if (shake > 0) {
+      shake = Math.max(0, shake - dt * 2.2);
+      var a = shake * shake * 14; cam.position.set((Math.random() - 0.5) * a, (Math.random() - 0.5) * a, 0);
+    } else cam.position.set(0, 0, 0);
+  }
+
+  // ── Modus „Play all“: jede Zelle des Rasters spielt ihr Effekt in Schleife ──
+  function clearAll() { live.slice().forEach(function (o) { scene.remove(o.mesh); o.mesh.material.dispose(); }); live = []; }
+  function layoutAll() {
+    clearAll();
+    var cells = $('grid').children, cr = canvas.getBoundingClientRect();
+    list.forEach(function (e, i) {
+      if (!tex[e.id] || !cells[i]) return;
+      var r = cells[i].getBoundingClientRect(), size = Math.min(r.width, r.height) * 0.82, hold = $('size').value;
+      $('size').value = size; fire(e, r.left - cr.left + r.width / 2, r.top - cr.top + r.height / 2 - 8, { loop: true }); $('size').value = hold;
+    });
+  }
+  $('grid').addEventListener('scroll', function () { if (mode === 'all') layoutAll(); });
+  function setMode(m) {
+    mode = m; $('modeOne').setAttribute('aria-pressed', String(m === 'one')); $('modeAll').setAttribute('aria-pressed', String(m === 'all'));
+    $('grid').hidden = m !== 'all'; clearAll();
+    if (m === 'all') layoutAll();
+  }
+  $('modeOne').addEventListener('click', function () { setMode('one'); });
+  $('modeAll').addEventListener('click', function () { setMode('all'); });
+
+  // ── Bedienung ──
+  canvas.addEventListener('pointerdown', function (ev) {
+    if (mode !== 'one' || !cur) return;
+    var r = canvas.getBoundingClientRect(); fire(cur, ev.clientX - r.left, ev.clientY - r.top);
+  });
+  window.addEventListener('keydown', function (ev) {
+    if (ev.code !== 'Space' || mode !== 'one' || !cur || /INPUT|SELECT|BUTTON/.test(document.activeElement.tagName)) return;
+    ev.preventDefault(); var r = canvas.getBoundingClientRect(), off = window.innerWidth > 700 ? 346 : 0;
+    fire(cur, off + (r.width - off) / 2, r.height / 2);
+  });
+  $('size').addEventListener('input', function () { $('sizeOut').textContent = $('size').value; });
+  $('speed').addEventListener('input', function () { $('speedOut').textContent = (+$('speed').value).toFixed(1) + '×'; if (mode === 'all') layoutAll(); });
+  $('bg').addEventListener('change', function () { $('main').dataset.bg = $('bg').value; });
+
+  function select(e, btn) {
+    cur = e; document.querySelectorAll('#effects button, #effectsPx button').forEach(function (b) { b.setAttribute('aria-pressed', String(b === btn)); });
+    $('status').textContent = e.name + ' – ' + e.frames + ' frames, ' + (e.frames / e.fps).toFixed(1) + ' s. Click the stage.';
+  }
+
+  fetch(BASE + 'manifest.json', { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (m) {
+    list = m; var loader = new THREE.TextureLoader(), left = m.length, credits = {};
+    m.forEach(function (e, i) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = e.name; b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', function () { select(e, b); if (mode === 'all') setMode('one'); });
+      $(e.group === 'pixel' ? 'effectsPx' : 'effects').appendChild(b);
+      var c = document.createElement('div'); c.className = 'cell'; var s = document.createElement('span'); s.textContent = e.name; c.appendChild(s); $('grid').appendChild(c);
+      credits[e.credit] = e;
+      loader.load(BASE + e.src, function (t) {
+        t.generateMipmaps = false; t.minFilter = e.pixel ? THREE.NearestFilter : THREE.LinearFilter; t.magFilter = e.pixel ? THREE.NearestFilter : THREE.LinearFilter;
+        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; tex[e.id] = t;
+        if (--left === 0) { $('status').textContent = 'Ready – pick an effect.'; if (!cur) select(m[0], $('effects').firstChild); }
+      }, null, function () { left--; $('status').textContent = 'Could not load ' + e.name; });
+    });
+    Object.keys(credits).forEach(function (k) {
+      var e = credits[k], p = document.createElement('p'), a = document.createElement('a');
+      a.href = e.url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = k; p.append(a, document.createTextNode(' · ' + e.license)); $('credits').appendChild(p);
+    });
+  }).catch(function () { $('status').textContent = 'Could not load the effect list.'; });
+
+  resize();
+  var last = performance.now();
+  (function loop(now) { var dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); renderer.render(scene, cam); requestAnimationFrame(loop); })(last);
+})();
+</script>
+</body>
+</html>
