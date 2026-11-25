@@ -58,3 +58,16 @@ def test_rate_limit_is_reported(tmp_path, monkeypatch):
     with pytest.raises(sketchfab.RateLimited) as e:
         sketchfab.fetch(str(tmp_path), UID)
     assert e.value.status == 429
+
+
+def test_new_27_char_uids():
+    from fx import sketchfab
+    from app import sketchfab_notes as sn
+    new = "6hiH0iyDqXqtdD9wbqSbyLLhKmz"
+    assert sketchfab.UID_RE.match(new) and sketchfab.UID_RE.match("a" * 32)
+    assert not sketchfab.UID_RE.match("../" + new[3:]) and not sketchfab.UID_RE.match("x" * 26)
+    assert sketchfab.base_uid(new + "-tree") == new and sketchfab.base_uid("b" * 32 + ".glb") == "b" * 32
+    assert sn.uid_of("https://sketchfab.com/3d-models/free-gmc-motorhome-reimagined-low-poly-" + new) == new
+    assert sn.uid_of("https://sketchfab.com/3d-models/lighthouse-dab98033118949728804bfc5f4076b8f?x=1") == "dab98033118949728804bfc5f4076b8f"
+    assert sn.uid_of("https://sketchfab.com/models/" + new + "/embed") == new
+    assert sn.uid_of("https://sketchfab.com/3d-models/some-car") is None

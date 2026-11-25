@@ -12,7 +12,16 @@ import tempfile
 import threading
 import urllib.request
 
-UID_RE = re.compile(r"^[0-9a-f]{32}$")
+# Modell-IDs: alt 32 Hex-Zeichen, neu (seit 2025) 27 Zeichen aus Buchstaben und Ziffern, z. B. 6hiH0iyDqXqtdD9wbqSbyLLhKmz
+UID_PAT = r"(?:[0-9a-f]{32}|[0-9A-Za-z]{27})"
+UID_RE = re.compile(r"^" + UID_PAT + r"$")
+_BASE_RE = re.compile(r"^(" + UID_PAT + r")(?=[-.]|$)")
+
+
+def base_uid(s):
+    """Modell-ID am Anfang eines Namens („<uid>-tree“, „<uid>.glb“), sonst None."""
+    m = _BASE_RE.match(s or "") if isinstance(s, str) else None
+    return m.group(1) if m else None
 API = "https://api.sketchfab.com/v3/models/{uid}/download"
 MAX_BYTES = 150 * 1024 * 1024
 _locks = {}

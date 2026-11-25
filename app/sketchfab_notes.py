@@ -15,7 +15,7 @@ FILE = os.path.join("data", "sketchfab-notes.json")
 MAX_URLS = 20
 MAX_NOTE = 4000
 _URL = re.compile(r"https?://[^\s<>\"']+")
-_UID = re.compile(r"([0-9a-f]{32})(?:[/?#]|$)")
+_UID = re.compile(r"(?:^|[-/])((?:[0-9a-f]{32}|[0-9A-Za-z]{27}))/")   # alt 32 Hex, neu 27 Zeichen (fx/sketchfab.py)
 _lock = threading.Lock()
 
 
@@ -30,7 +30,7 @@ def parse_urls(text):
 
 
 def uid_of(url):
-    """Sketchfab-Modell-UID (32 hex am Ende des Pfads), sonst None."""
+    """Sketchfab-Modell-UID am Ende des Pfads (32 Hex oder neu 27 Zeichen), sonst None."""
     if "sketchfab.com" not in url:
         return None
     m = _UID.search(url.split("?")[0].split("#")[0] + "/")
@@ -47,7 +47,13 @@ def load(root):
             data = json.load(f)
     except (OSError, ValueError):
         return []
-    return data if isinstance(data, list) else []
+    if not isinstance(data, list):
+        return []
+    # IDs immer frisch aus den Links lesen: ältere Einträge kannten das neue 27-Zeichen-Format noch nicht
+    for e in data:
+        if isinstance(e, dict) and isinstance(e.get("urls"), list):
+            e["uids"] = [uid_of(u) if isinstance(u, str) else None for u in e["urls"]]
+    return data
 
 
 def _save(root, items):

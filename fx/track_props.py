@@ -14,7 +14,8 @@ import os
 import re
 import threading
 
-UID_RE = re.compile(r"^[0-9a-f]{32}(-[a-z0-9]{1,16})?(-lod)?$")   # Paket-Teil: <uid>-<part>, Fern-Fassung: …-lod
+from fx.sketchfab import UID_PAT, UID_RE as _MODEL_RE  # noqa: E402
+UID_RE = re.compile(r"^" + UID_PAT + r"(-[a-z0-9]{1,16})?(-lod)?$")   # Paket-Teil: <uid>-<part>, Fern-Fassung: …-lod
 
 
 def folder(root):
@@ -67,7 +68,7 @@ def picks(root, path=None):
 
 def set_pick(root, uid, on, path=None):
     """Such-Kandidat an-/abhaken. Nur gültige Sketchfab-uids (32 Hex) → True."""
-    if not isinstance(uid, str) or not re.match(r"^[0-9a-f]{32}$", uid):
+    if not isinstance(uid, str) or not _MODEL_RE.match(uid):
         return False
     with _lock:
         cur = picks(root, path)

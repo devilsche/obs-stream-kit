@@ -19,7 +19,7 @@ import shutil
 import threading
 import time
 
-UID_RE = re.compile(r"^[0-9a-f]{32}$")
+from fx.sketchfab import UID_RE, base_uid  # noqa: E402  (alt 32 Hex, neu 27 Zeichen)
 MAX_THUMB = 400 * 1024
 GROUPS = ("car", "car-candidate", "prop", "prop-candidate", "note", "other")
 _lock = threading.Lock()
@@ -105,8 +105,8 @@ def inventory(root):
         kw = kw or {}
         if not isinstance(uid, str):
             return
-        uid = uid[:32]
-        if not UID_RE.match(uid):
+        uid = base_uid(uid)
+        if not uid:
             return
         it = items.setdefault(uid, {"uid": uid, "group": group, "groups": [], "name": "", "author": "",
                                     "license": "", "url": "", "inUse": False, "uses": [], "notes": []})
@@ -128,7 +128,7 @@ def inventory(root):
     for p in props:
         if isinstance(p, dict) and isinstance(p.get("uid"), str):
             put(p["uid"], "prop", p)
-            u = p["uid"][:32]
+            u = base_uid(p["uid"])
             if u in items:
                 items[u]["inUse"] = True
                 use = "Track: " + (p.get("kind") or "?") + (" · " + p["theme"] if p.get("theme") else "")
@@ -148,7 +148,7 @@ def inventory(root):
             if isinstance(u, str) and u in items:
                 items[u]["notes"].append((n.get("note") or "")[:120])
     for p in glob.glob(_d(root, "car-cache", "*.glb")):
-        put(os.path.basename(p)[:32], "other")
+        put(base_uid(os.path.basename(p)), "other")
 
     keep = keep_set(root)
     out = []
@@ -195,7 +195,7 @@ def purge(root, now=None):
         tp_p = _d(root, "track-props", "catalog.json")
         tp = _load(tp_p, None)
         if isinstance(tp, dict) and isinstance(tp.get("props"), list):
-            gone = [p for p in tp["props"] if isinstance(p, dict) and str(p.get("uid", ""))[:32] in dropped]
+            gone = [p for p in tp["props"] if isinstance(p, dict) and base_uid(str(p.get("uid", ""))) in dropped]
             tp["props"] = [p for p in tp["props"] if p not in gone]
             _save(tp_p, tp)
             off_p = _d(root, "track-props", "off.json")

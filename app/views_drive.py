@@ -43,7 +43,7 @@ from webcore.serving import inject_theme, serve_asset
 bp_drive = Blueprint("drive", __name__)
 
 _CODE = re.compile(r"^[A-Za-z2-9]{6}$")
-_UID = re.compile(r"^[0-9a-f]{32}$")
+from fx.sketchfab import UID_RE as _UID  # noqa: E402  (alt 32 Hex, neu 27 Zeichen)
 
 
 def _root():

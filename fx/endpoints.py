@@ -595,7 +595,7 @@ def car_catalog(token):
     return _no_store(jsonify(cat))
 
 
-_UID_RE = re.compile(r"^[0-9a-f]{32}$")
+from fx.sketchfab import UID_RE as _UID_RE  # noqa: E402  (alt 32 Hex, neu 27 Zeichen)
 
 
 @bp_fx.route("/s/<token>/api/fx/cars/model/<uid>.glb", defaults={"race": False})

@@ -12,7 +12,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def add(ref, brand="Other"):
-    m = re.search(r"([0-9a-f]{32})", ref)
+    m = re.search(r"(?:^|[-/])([0-9a-f]{32}|[0-9A-Za-z]{27})(?:[/?#]|$)", ref)
     if not m:
         return "no model id in " + ref
     uid = m.group(1)
@@ -44,6 +44,6 @@ def add(ref, brand="Other"):
 if __name__ == "__main__":
     args = sys.argv[1:]
     for i, a in enumerate(args):
-        if re.search(r"[0-9a-f]{32}", a):
-            nxt = args[i + 1] if i + 1 < len(args) and not re.search(r"[0-9a-f]{32}", args[i + 1]) else "Other"
+        if re.search(r"[0-9a-f]{32}|[0-9A-Za-z]{27}", a):
+            nxt = args[i + 1] if i + 1 < len(args) and not re.search(r"[0-9a-f]{32}|[0-9A-Za-z]{27}", args[i + 1]) else "Other"
             print(add(a, nxt))
