@@ -146,7 +146,7 @@
     // Körperbau anwenden: Rumpf quer zur Körperachse verschlanken (aus den Original-Positionen, Bind-Pose –
     // die Beine hängen an eigenen Knochen und bleiben lang), Gesamtproportionen, Rute (Winkel + Dicke)
     function applyBody(key) {
-      var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1; EAR_FOLD = bd.earFold || 0;
+      var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1; EAR_FOLD = opt.ears != null ? opt.ears : (bd.earFold || 0);
       if (buildGroup) buildGroup.scale.set(BUILD.len, BUILD.height, BUILD.width);
       slimMeshes.forEach(function (m) {
         var o = m.o; o.geometry.attributes.position.array.set(m.orig);
@@ -210,19 +210,39 @@
             v.copy(c).add(off); pos.setXYZ(vu, v.x, v.y, v.z);
           }
         });
+        // Pinscher-Rute: dünn und rund. Punkte der Schwanzglieder zur Knochenlinie (tail_1 → … → tail_7, verlängert)
+        // ziehen, zur Spitze hin etwas mehr. Bewusst im Mesh statt per Knochen-Skalierung: ungleich skalierte Eltern
+        // scheren die gedrehten Glieder dahinter platt.
+        if (TAIL_THIN !== 1) {
+          var tk = [], TAILK = {};
+          for (var tn = 1; tn <= 7; tn++) { var kk = idx('tail_' + tn); if (kk >= 0) { tk.push(bindPos[kk]); TAILK[kk] = 1; } }
+          if (tk.length >= 2) {
+            var lastSeg = new THREE.Vector3().subVectors(tk[tk.length - 1], tk[tk.length - 2]);
+            tk.push(tk[tk.length - 1].clone().add(lastSeg));
+            var cum = [0]; for (var ci = 1; ci < tk.length; ci++) cum.push(cum[ci - 1] + tk[ci].distanceTo(tk[ci - 1]));
+            var total = cum[cum.length - 1], seg = new THREE.Vector3(), best = new THREE.Vector3();
+            for (var vt = 0; vt < pos.count; vt++) {
+              var tw = 0;
+              for (var jt = 0; jt < 4; jt++) if (TAILK[si[GET[jt]](vt)]) tw += sw[GET[jt]](vt);
+              if (tw < 0.05) continue;
+              v.fromBufferAttribute(pos, vt);
+              var bd2 = Infinity, bt = 0;
+              for (var sgi = 0; sgi < tk.length - 1; sgi++) {
+                seg.subVectors(tk[sgi + 1], tk[sgi]); var sl2 = seg.lengthSq();
+                var tt = sl2 > 0 ? Math.max(0, Math.min(1, off.subVectors(v, tk[sgi]).dot(seg) / sl2)) : 0;
+                c.copy(tk[sgi]).addScaledVector(seg, tt); var dd = c.distanceToSquared(v);
+                if (dd < bd2) { bd2 = dd; best.copy(c); bt = (cum[sgi] + tt * Math.sqrt(sl2)) / total; }
+              }
+              var thin = TAIL_THIN * (1 - 0.35 * bt);                // zur Spitze hin schlanker
+              off.subVectors(v, best).multiplyScalar(1 - (1 - thin) * Math.min(1, tw));
+              v.copy(best).add(off); pos.setXYZ(vt, v.x, v.y, v.z);
+            }
+          }
+        }
         pos.needsUpdate = true; geo.computeVertexNormals();
         })();
       });
-      // Pinscher-Rute: dünner (nur im Querschnitt). Längsachse = Richtung zum nächsten Glied in lokalen Koordinaten.
-      if (TAIL_STRAIGHT && B.tail_1) {
-        var tc = B.tail_1.children.filter(function (c) { return c.isBone; })[0];
-        if (tc) {
-          var lp = tc.position, ax = Math.abs(lp.x) >= Math.abs(lp.y) && Math.abs(lp.x) >= Math.abs(lp.z) ? 'x' : Math.abs(lp.y) >= Math.abs(lp.z) ? 'y' : 'z';
-          var sc = { x: TAIL_THIN, y: TAIL_THIN, z: TAIL_THIN }; sc[ax] = 1;
-          TAIL_SCALE = new THREE.Vector3(sc.x, sc.y, sc.z);
-          B.tail_1.scale.copy(TAIL_SCALE);
-        }
-      }
+      TAIL_SCALE = !!B.tail_1;   // Schwanzglieder jedes Bild auf Maßstab 1 (Clips haben eigene Skalierungsspuren)
     }
 
     function play(name, opts) {
@@ -437,7 +457,7 @@
         // Pinscher-Rute: die 7 Schwanzglieder nacheinander auf eine gerade Linie ausrichten (nach hinten, leicht
         // nach oben), statt des eingerollten Shiba-Ringels. Das Wedeln kommt danach obendrauf.
         // Die Clips (Stehen, Rollen, Totstellen) haben eigene Skalierungsspuren für alle Schwanzglieder und machen
-        // die Rute sonst nach dem ersten Bild wieder buschig: jedes Bild nach dem Mixer dünn setzen, Glieder 2–7 auf 1.
+        // die Rute sonst nach dem ersten Bild wieder buschig: jedes Bild nach dem Mixer alle Glieder auf Maßstab 1 (dünn ist das Mesh).
         // Kippohren (Pinscher): obere Ohrhälfte (Glied ear_tip) nach vorne-unten abknicken, leicht nach außen.
         // Jedes Bild nach dem Mixer, weil alle Clips eigene Ohrspuren haben; die Bewegung der Clips bleibt erhalten.
         if (EAR_FOLD > 0) {
@@ -456,8 +476,7 @@
           });
         }
         if (TAIL_SCALE) {
-          B.tail_1.scale.copy(TAIL_SCALE);
-          for (var tsi = 2; tsi <= 7; tsi++) if (B['tail_' + tsi]) B['tail_' + tsi].scale.set(1, 1, 1);
+          for (var tsi = 1; tsi <= 7; tsi++) if (B['tail_' + tsi]) B['tail_' + tsi].scale.set(1, 1, 1);
         }
         if (TAIL_STRAIGHT) {
           holder.updateMatrixWorld(true);

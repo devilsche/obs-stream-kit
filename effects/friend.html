@@ -29,7 +29,7 @@
       FriendDog.REACTIONS.forEach(function (ev) { if (p.get('on_' + ev)) reactions[ev] = p.get('on_' + ev); });
       var f = FriendDog.create({
         canvas: document.getElementById('friend'), model: '../assets/friend/dog.glb', barkSound: '../assets/friend/bark.mp3',
-        sizePx: num('size', 170, 60, 500), fur: p.get('fur') || 'pinscher', body: p.get('body') || 'pinscher',
+        sizePx: num('size', 170, 60, 500), fur: p.get('fur') || 'pinscher', body: p.get('body') || 'pinscher', ears: p.has('ears') ? num('ears', 85, 0, 100) / 100 : null,
         area: p.get('area') || 'full', roam: p.get('roam') !== '0', sound: p.get('sound') !== '0', volume: num('volume', 0.5, 0, 1),
         reactions: reactions
       });
