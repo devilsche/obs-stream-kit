@@ -104,12 +104,15 @@
       function cometPos(t) {
         var a = t * 1.3 * SPEED * (REDUCED ? 0.4 : 1);
         // ohne Rahmen (Kamera am Boden): enger um dich herum statt um den Rahmen
-        if (!SHOW_FRAME) return new THREE.Vector3(CX + Math.cos(a) * CW * 0.36, CY - CH * 0.22 + Math.sin(a) * CH * 0.1, Math.sin(a) * CW * 0.3);
+        if (!SHOW_FRAME) return new THREE.Vector3(CX + Math.cos(a) * CW * 0.36, CY - CH * 0.22 - Math.sin(a) * CH * 0.14, Math.sin(a) * CW * 0.3);
         // Bahnbreite: gewünscht etwas außerhalb des Rahmens; reicht der Platz zum Bildrand nicht (Kamera am Rand),
         // läuft er enger, notfalls auf dem Rahmen, statt halb aus dem Bild zu fliegen
         var room = Math.min(CX + W / 2, W / 2 - CX) - 40;
         var rx = Math.min(CW / 2 + FB + CW * 0.14, Math.max(CW / 2 + FB * 0.5, room));
-        return new THREE.Vector3(CX + Math.cos(a) * rx, CY + CH * 0.08 + Math.sin(a) * CH * 0.18, Math.sin(a) * CW * 0.45);
+        // gekippter Ring: hinten (z < 0) oben hinter dem Kopf entlang, vorne (z > 0) unten an der Unterkante – so kreist er
+        // um dich herum statt quer durchs Gesicht
+        var ry = CH / 2 + FB * 0.5;
+        return new THREE.Vector3(CX + Math.cos(a) * rx, CY - Math.sin(a) * ry * 0.92, Math.sin(a) * CW * 0.45);
       }
 
       // ── Emotes ──

@@ -659,6 +659,7 @@
         // Oberkörper senkrecht über dem Becken (wie stehend), Kopf schaut nach vorn
         turn(B.spine_1, LAT, -(0.5 + bob) * w); turn(B.spine_2, LAT, -0.32 * w); turn(B.chest, LAT, -0.2 * w);
         LEGS.forEach(function (l) { turn(l[0], LAT, -0.95 * w); turn(l[1], LAT, 1.25 * w); turn(l[2], LAT, 0.9 * w); });   // Pfoten angewinkelt vor der Brust
+        LEGS.forEach(function (l, i) { turn(l[0], FWD, (i ? -1 : 1) * 0.28 * w); });   // etwas auseinander (kein Händchenhalten)
         turn(B.neck_base, LAT, 0.8 * w); turn(B.head, LAT, 0.05 * w);
       } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen
         turn(B.spine_1, LAT, 0.4 * w); turn(B.spine_2, LAT, 0.25 * w); turn(B.chest, LAT, 0.15 * w);
