@@ -65,7 +65,7 @@ def test_merge_marks_pubg_error(pg_conn_test_setup):
               "reachable": True}
     row = so.merge_status(so.tenant_overview(conn), status)[0]
     assert row["pubg_state"] == "error"
-    assert "401" in row["pubg_detail"]
+    assert "key invalid or expired" in row["pubg_detail"]
     assert row["steam_state"] == "error"
     assert "403" in row["steam_detail"]
 
@@ -110,7 +110,7 @@ def test_admin_page_shows_tenant_table(pg_conn_test_setup, fake_poller):
         "steam": {}, "reachable": True}
     body = _client(conn, sid).get("/admin/").get_data(as_text=True)
     assert 'class="dn-table dn-table--status"' in body
-    assert "HTTP 401" in body
+    assert "key invalid or expired" in body
     assert "TestTenant" in body
 
 
@@ -128,7 +128,7 @@ def test_tenant_dashboard_shows_real_poller_error(pg_conn_test_setup, fake_polle
         "polling": "error", "errors": ["players: HTTP 401: Unauthorized"]}}},
         "steam": {}, "reachable": True}
     body = _client(conn, sid).get("/app/").get_data(as_text=True)
-    assert "HTTP 401" in body
+    assert "key invalid or expired" in body
     assert "12 min ago" in body
 
 

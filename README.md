@@ -736,6 +736,8 @@ Die Verzögerung zwischen Blitz und Donner steckt schon in der WAV (Stille am An
 
 ## PUBG Session Stats
 
+**Zustand des PUBG-Keys** (`pubg/key_health.py`): Der Poller ordnet nach jedem Durchlauf seine Fehler ein und merkt sich den Zustand in `settings['pubg_key_health']`. Bei **401** ist der Key ungültig oder abgelaufen. Dashboard und Admin-Status sagen dann klar, dass ein neuer Key auf developer.pubg.com nötig ist, und der Session-Report zeigt für Zeiträume nach dem Ausfall (auch die laufende Session) nur diesen Hinweis. Ältere Reports, die vorher endeten, bleiben lesbar. Fremde Keys springen nicht ein. Bei **429** ist der Key gültig, aber das Kontingent von 10 Abfragen pro Minute ist leer. Dann heißt es nur, dass Matches verzögert kommen können. Funktionierende Keys arbeiten weiter auch für andere (Lobby-K/D-Nachladen).
+
 Modulares PUBG-Stats-Set mit lokaler SQLite-Persistenz und Live-Polling der offiziellen
 PUBG-Developer-API. Always-on-Backend (`serve.py` + `pubg/`-Modul) liefert JSON-Endpoints,
 HTML-Widgets als Browser-Sources rendern.

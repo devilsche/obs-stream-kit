@@ -1488,6 +1488,15 @@ def _list_tenant_ids(conn) -> list[int]:
         return [r["id"] for r in cur.fetchall()]
 
 
+def _note_key_health(conn, tenant_id, errors) -> None:
+    """Zustand des eigenen Keys merken (pubg/key_health.py); darf den Durchlauf nie abbrechen."""
+    try:
+        from pubg import key_health
+        key_health.record(conn, tenant_id, key_health.classify(errors))
+    except Exception:
+        pass
+
+
 def poll_tenant(conn, tenant_id: int, client_factory,
                 match_max: int = 5,
                 lifetime_min: int = 5,
@@ -1513,6 +1522,7 @@ def poll_tenant(conn, tenant_id: int, client_factory,
     m_stats = run_single_tick_multi(conn, tenant_id, client, match_max)
     own_ids = m_stats.get("own_account_ids") or []
     if not own_ids:
+        _note_key_health(conn, tenant_id, m_stats["errors"])
         return {"polling": "error", "tenantId": tenant_id,
                 "errors": m_stats["errors"] or ["account-id-unknown"]}
     # Primaerer Account bleibt der Bezugspunkt fuer alles, was (noch) mit
@@ -1581,6 +1591,7 @@ def poll_tenant(conn, tenant_id: int, client_factory,
 
     all_errors = (m_stats["errors"] + l_stats["errors"] + s_stats["errors"]
                   + b_stats["errors"] + t_stats["errors"] + detect_errors)
+    _note_key_health(conn, tenant_id, all_errors)
     return {
         "polling": "ok" if not all_errors else "degraded",
         "tenantId": tenant_id,

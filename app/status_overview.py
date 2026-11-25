@@ -126,7 +126,14 @@ def merge_status(rows: list, status: dict) -> list:
             r["pubg_state"] = {"ok": "ok", "degraded": "warn"}.get(state, state)
             if r["pubg_state"] not in ("ok", "warn", "error"):
                 r["pubg_state"] = "unknown"
-            r["pubg_detail"] = "; ".join(errs[:2])
+            from pubg import key_health
+            ks = key_health.classify(errs)
+            if ks == "invalid":
+                r["pubg_state"], r["pubg_detail"] = "error", key_health.MESSAGES["invalid"]
+            elif ks == "limit":
+                r["pubg_detail"] = key_health.MESSAGES["limit"]
+            else:
+                r["pubg_detail"] = "; ".join(errs[:2])
         s = steam.get(str(r["id"]))
         if not r["steam_key"]:
             r["steam_state"], r["steam_detail"] = "skip", "no key"

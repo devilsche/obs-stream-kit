@@ -5423,6 +5423,14 @@
     // abgeschnitten — die Seite blieb dann stumm am Platzhalter stehen.
     let _reportShown = false;
     const startReportPoll = () => PubgUI.poll(reportUrl, 60000, (d) => {
+      if (d && d.blocked) {
+        // Eigener PUBG-Key ungültig: keine neuen Reports (ältere Zeiträume über from/to bleiben offen)
+        document.getElementById("report").innerHTML = `<div class="empty report-error" role="alert">
+            <p><span class="material-symbols-outlined" aria-hidden="true">key_off</span>
+            ${PubgUI.esc(d.message || "PUBG API key invalid.")}</p>
+            <p><a href="/app/settings">Open settings</a></p></div>`;
+        return;
+      }
       _reportShown = true;
       render(d);
     }, (err) => {

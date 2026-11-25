@@ -3409,6 +3409,15 @@ class EndpointRegistry:
         rt = qs.get("to")
         stand = _kd_stand(qs)
         key = f"session-report:{rf or 'auto'}:{rt or 'now'}:{stand}"
+        # Eigener Key ungültig: keine neuen Reports, ältere Zeiträume bleiben lesbar (pubg/key_health.py)
+        from pubg import key_health
+        try:
+            health = key_health.get(getattr(conn, "raw", conn), self.tenant_id)
+        except Exception:
+            health = {"state": "ok"}
+        if key_health.blocks_report(health, rt):
+            return _ok({"blocked": "pubg-key-invalid", "since": health.get("since"),
+                        "message": key_health.MESSAGES["invalid"]})
 
         def _build():
             data = compute_session_report(conn, self.tenant_id,
