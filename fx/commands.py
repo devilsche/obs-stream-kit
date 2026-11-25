@@ -204,7 +204,7 @@ EFFECTS = {
         "commands": ("play",),
         "settings": {},
         "args": {
-            "play": {"preset": _choice("follow"), "duration": _float_range(2, 15)},
+            "play": {"preset": _choice("follow"), "duration": _float_range(2, 15), "flare": _flag},
         },
     },
     "weather": {

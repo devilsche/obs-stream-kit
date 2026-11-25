@@ -147,3 +147,24 @@ def test_js_and_css_are_revalidated(tmp_path):
             resp = fn()
             assert "no-cache" in resp.headers["Cache-Control"]
             resp.close()
+
+
+def test_serve_html_with_theme_adds_live_switch_after_window_vars(tmp_path):
+    base = tmp_path / "alerts"
+    base.mkdir()
+    (base / "x.html").write_text("<html>\n<head></head><body></body></html>", encoding="utf-8")
+    with _ctx():
+        body, _, _ = serve_html_or_asset(str(tmp_path), "alerts", "x.html", {"__SERVE_BASE__": "/s/t/"}, theme="azure")
+    assert 'data-theme="azure"' in body
+    assert "__THEME_LIVE__" in body and "theme.json" in body and "themechange" in body
+    # das Live-Skript liest __SERVE_BASE__ beim Start, muss also danach stehen
+    assert body.index("window.__SERVE_BASE__") < body.index("__THEME_LIVE__") < body.index("</head>")
+
+
+def test_serve_html_without_theme_has_no_live_switch(tmp_path):
+    base = tmp_path / "alerts"
+    base.mkdir()
+    (base / "x.html").write_text("<head></head>", encoding="utf-8")
+    with _ctx():
+        body, _, _ = serve_html_or_asset(str(tmp_path), "alerts", "x.html", {"__SERVE_BASE__": "/s/t/"})
+    assert "__THEME_LIVE__" not in body

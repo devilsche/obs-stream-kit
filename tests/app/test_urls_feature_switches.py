@@ -54,7 +54,7 @@ def test_race_and_ducks_domains(pg_conn_test_setup):
     def tab_of(path):
         return re.search(r'data-path="%s"[^>]*?data-tab="(\w+)"|data-tab="(\w+)"[^>]*?data-path="%s"' % (path, path), body)
     for path, dom in (("effects/car-race.html", "race"), ("effects/duck-parade.html", "ducks"), ("effects/item-rain.html", "race"),
-                      ("effects/weather.html", "weather"), ("effects/xmas.html", "weather"), ("effects/lens-flare.html", "stream")):
+                      ("effects/weather.html", "weather"), ("effects/xmas.html", "weather"), ("effects/swirl.html", "stream")):
         m = re.search(r'<[^>]*data-path="%s"[^>]*>' % re.escape(path), body)
         assert m and 'data-tab="%s"' % dom in m.group(0), path
     assert 'href="/app/tools/duck-editor"' in body

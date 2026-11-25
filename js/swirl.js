@@ -7,7 +7,10 @@
  * aus Startwerten und Zeit, JS bewegt nur Zeit, Kometenkopf und Ton.
  *
  *   var s = Swirl.create({ canvas, accent, primary, density, sound, volume });
- *   s.play({ preset: 'follow', duration: 6 });
+ *   s.play({ preset: 'follow', duration: 6, flare: true });
+ *   s.setColors(accent, primary);   // Theme-Wechsel ohne Neuladen (Event „themechange“)
+ *
+ * Flare: anamorphotischer Lichtstreif hinter der Alert-Box, wenn sie aufpoppt (ersetzt die Lens-Flare-Videos).
  *
  * Presets sind für die spätere Vereinheitlichung aller Alerts vorbereitet (zunächst nur follow).
  * Mehrere Aufrufe kurz hintereinander laufen nacheinander ab (Warteschlange, höchstens 4).
@@ -18,7 +21,7 @@
 
   // turns: Umläufe bis zur Innenbahn; fly: Anteil der Dauer bis zur Innenbahn; dust/smoke: Partikel bei density 1
   var PRESETS = {
-    follow: { turns: 1.5, fly: 0.58, dust: 16000, smoke: 3200, strands: 3, head: 1 }
+    follow: { turns: 1.5, fly: 0.58, dust: 16000, smoke: 3200, strands: 3, head: 1, flare: 1 }
   };
   var PRESET_NAMES = Object.keys(PRESETS);
   var QUEUE_MAX = 4;
@@ -86,6 +89,19 @@
     '}'].join('\n');
 
   var QUAD_VS = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  // Flare: waagerechter Streif + Kern + Schein + Reflexe auf der Linie durch die Bildmitte (Gerätepixel, y nach oben)
+  var FLARE_FS = ['uniform vec2 uO; uniform float uI; uniform vec3 uAcc, uPri;', EDGE,
+    'float disc(vec2 p, vec2 c, float r){ float d = length(p - c); return smoothstep(r, r * 0.55, d) * 0.6 + smoothstep(r * 1.04, r, d) * smoothstep(r * 0.86, r, d) * 0.5; }',
+    'void main(){ vec2 q = (gl_FragCoord.xy - uO) / res.y; float ax = abs(q.x), ay = abs(q.y);',
+    '  float streak = exp(-ay * 85.0) * exp(-ax * 1.3) * 0.9 + exp(-ay * 420.0) * exp(-ax * 0.8) * 0.8;',
+    '  float core = exp(-length(q) * 26.0) * 1.3, halo = exp(-length(q * vec2(0.55, 1.0)) * 5.5) * 0.32;',
+    '  vec2 c = res * 0.5, p = gl_FragCoord.xy; vec3 g = vec3(0.0);',
+    '  g += uPri * disc(p, c + (c - uO) * 0.6, res.y * 0.035) * 0.35;',
+    '  g += uAcc * disc(p, c + (c - uO) * 1.3, res.y * 0.06) * 0.22;',
+    '  g += uPri * disc(p, c + (c - uO) * 2.2, res.y * 0.022) * 0.4;',
+    '  g += uAcc * disc(p, c - (c - uO) * 0.45, res.y * 0.014) * 0.45;',
+    '  vec3 col = mix(uAcc, vec3(1.0), 0.35) * streak + vec3(1.0, 0.98, 0.95) * core + uAcc * halo + g;',
+    '  col *= uI * edgeFade(); gl_FragColor = vec4(col, clamp(max(col.r, max(col.g, col.b)), 0.0, 1.0)); }'].join('\n');
   var HEAD_FS = ['uniform float uA, uPulse; uniform vec3 uAcc;', EDGE, 'varying vec2 vUv;',
     'void main(){ float d = length(vUv - 0.5) * 2.0;',
     '  float core = pow(max(0.0, 1.0 - d * 4.5), 1.5), halo = pow(max(0.0, 1.0 - d), 2.6) * (0.55 + 0.15 * uPulse);',
@@ -149,6 +165,7 @@
     var scene = new THREE.Scene(), cam = new THREE.OrthographicCamera(0, 1, 0, 1, -10, 10);
     var W = 1, H = 1, res = new THREE.Vector2(1, 1);
     var acc = glowColor(opt.accent, '#f2b705'), pri = glowColor(opt.primary, '#b25cff');
+    var flareOn = opt.flare !== false;
     var density = Math.max(0.2, Math.min(2, opt.density || 1));
     var sound = opt.sound ? Sound(opt.volume == null ? 0.6 : opt.volume) : null;
     var defDur = opt.duration || 6;
@@ -163,7 +180,7 @@
     };
     function mat(vs, fs) { return new THREE.ShaderMaterial(blendAdd({ vertexShader: vs, fragmentShader: fs, uniforms: U })); }
 
-    var dust = null, trail = null, head = null, built = null;
+    var dust = null, trail = null, head = null, flare = null, built = null;
     function build(p) {
       if (built === p) return;
       [dust, trail].forEach(function (m) { if (m) { scene.remove(m); m.geometry.dispose(); } });
@@ -194,7 +211,12 @@
         head.frustumCulled = false; head.renderOrder = 2;
       }
       trail.renderOrder = 1;
-      scene.add(dust); scene.add(trail); scene.add(head);
+      if (!flare) {
+        flare = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial(blendAdd({ vertexShader: QUAD_VS, fragmentShader: FLARE_FS,
+          uniforms: { uO: { value: new THREE.Vector2() }, uI: { value: 0 }, uAcc: U.uAcc, uPri: U.uPri, res: U.res }, side: THREE.DoubleSide })));
+        flare.frustumCulled = false; flare.renderOrder = 3; flare.visible = false;
+      }
+      scene.add(dust); scene.add(trail); scene.add(head); scene.add(flare);
       built = p;
     }
 
@@ -210,6 +232,7 @@
     function pathJS(s) {
       var k = Math.min(1, Math.max(0, s)), r = U.uR0.value + (U.uR1.value - U.uR0.value) * (1 - (1 - k) * (1 - k));
       var th = U.uTh0.value + U.uDir.value * s * U.uTurns.value * Math.PI * 2;
+      r *= 1 + 0.07 * Math.sin(th * 2 + U.uTh0.value * 3) + 0.04 * Math.sin(th * 3 - 1.3);   // wie path() im Shader
       return [U.uC.value.x + Math.cos(th) * U.uE.value.x * r, U.uC.value.y + Math.sin(th) * U.uE.value.y * r];
     }
 
@@ -238,6 +261,9 @@
       a.needsUpdate = true;
       head.scale.set(190 * sc, 190 * sc, 1);
       cur = { t: 0, D: D, sc: sc, last: pathJS(0) };
+      cur.flare = params.flare == null ? (flareOn && !!p.flare) : !!params.flare && params.flare !== '0';
+      cur.flareDir = Math.random() < 0.5 ? -1 : 1;
+      flare.scale.set(W, H, 1); flare.position.set(W / 2, H / 2, 0); flare.visible = false;
       if (sound) sound.start(D);
     }
 
@@ -250,12 +276,20 @@
       var hp = pathJS(s); head.position.set(hp[0], hp[1], 0);
       head.material.uniforms.uA.value = U.uFade.value * Math.min(1, t / 0.25);
       head.material.uniforms.uPulse.value = Math.sin(t * 11);
+      if (cur.flare) {   // Flare: setzt ein, wenn die Alert-Box aufpoppt, wandert leicht seitwärts und verglimmt
+        var tf = t - 0.2, fi = tf < 0 ? 0 : tf < 0.22 ? tf / 0.22 : Math.exp(-(tf - 0.22) * 2.1);
+        fi *= 1 + 0.06 * Math.sin(t * 37);
+        var pr = renderer.getPixelRatio(), fx = W * (0.5 - cur.flareDir * (0.07 - 0.12 * Math.min(1, Math.max(0, tf) / 1.8)));
+        flare.visible = fi > 0.003;
+        flare.material.uniforms.uI.value = fi;
+        flare.material.uniforms.uO.value.set(fx * pr, (H - H * 0.5) * pr);
+      }
       if (sound) {
         var v = Math.hypot(hp[0] - cur.last[0], hp[1] - cur.last[1]) / Math.max(dt, 0.001) / (900 * cur.sc);
         sound.follow(Math.min(1, v), (hp[0] / W) * 2 - 1);
       }
       cur.last = hp;
-      if (t >= D) { U.uFade.value = 0; head.material.uniforms.uA.value = 0; next(); }
+      if (t >= D) { U.uFade.value = 0; head.material.uniforms.uA.value = 0; flare.visible = false; next(); }
       return true;
     }
 
@@ -268,7 +302,14 @@
       requestAnimationFrame(loop);
     })(last);
 
-    return { play: play, resize: resize, ready: Promise.resolve(), busy: function () { return !!cur; },
+    // Theme-Wechsel ohne Neuladen: Farben in die geteilten Uniforms schreiben
+    function setColors(accent, primary) {
+      if (accent) U.uAcc.value.copy(glowColor(accent, '#f2b705'));
+      if (primary) U.uPri.value.copy(glowColor(primary, '#b25cff'));
+      idleFrames = 0;
+    }
+
+    return { play: play, resize: resize, setColors: setColors, ready: Promise.resolve(), busy: function () { return !!cur; },
       unlockSound: function () { if (sound) sound.unlock(); } };
   }
 

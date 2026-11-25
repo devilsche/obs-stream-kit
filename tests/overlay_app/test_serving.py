@@ -27,7 +27,7 @@ def test_overlay_asset_served(app):
 def test_overlay_html_injects_features(app):
     c = app.test_client()
     with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()):
-        r = c.get("/s/tok/effects/lens-flare.html")
+        r = c.get("/s/tok/effects/burst.html")
     assert 'window.__FEATURES__ = ["pubg"];' in r.get_data(as_text=True)   # nichts gespeichert: Standard
     with mock.patch("overlay_app.views_overlays._tenant_creds", return_value=_Creds()), \
          mock.patch("core.features.effective", return_value=["race", "sushi-eater"]):
@@ -57,3 +57,19 @@ def test_duck_sources_blank_without_feature(app):
          mock.patch("core.features.effective", return_value=["ducks"]):
         r = c.get("/s/tok/effects/knife-duck.html")
     assert "knife-duck.js" in r.get_data(as_text=True)
+
+
+def test_theme_json_returns_tenant_theme_and_caches(app):
+    from overlay_app import views_overlays
+    views_overlays._THEME_CACHE.clear()
+    c = app.test_client()
+    with mock.patch("pubg.db_pg.get_setting", return_value="aurora") as gs:
+        r1 = c.get("/s/tok/theme.json")
+        r2 = c.get("/s/tok/theme.json")
+    assert r1.get_json() == {"theme": "aurora"} and r2.get_json() == {"theme": "aurora"}
+    assert r1.headers["Cache-Control"] == "no-store"
+    assert gs.call_count == 1   # zweite Abfrage aus dem Zwischenspeicher
+    views_overlays._THEME_CACHE.clear()
+    with mock.patch("pubg.db_pg.get_setting", return_value="kaputt"):
+        assert c.get("/s/tok/theme.json").get_json() == {"theme": "entry"}
+    views_overlays._THEME_CACHE.clear()

@@ -233,6 +233,8 @@ EFFECT_META = {
         {"key": "duration", "label": "Duration", "type": "select", "default": "6",
          "options": [["4", "4 s"], ["6", "6 s"], ["8", "8 s"], ["10", "10 s"]],
          "tooltip": "Match the alert's duration (follow alert: 6 s)"},
+        {"key": "flare", "label": "Lens flare", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]],
+         "tooltip": "Light streak behind the alert box when it pops up"},
         {"key": "density", "label": "Particles", "type": "select", "default": "1",
          "options": [["0.5", "Fewer"], ["1", "Normal"], ["1.5", "More"]]},
         {"key": "sound", "label": "Sound", "type": "select", "default": "0", "options": [["0", "Off"], ["1", "On"]],
@@ -246,6 +248,7 @@ EFFECT_META = {
     "commands": [
         {"q": "cmd=play&preset=follow", "label": "Follow swirl (fire together with the follow alert)"},
         {"q": "cmd=play&preset=follow&duration=8", "label": "Follow swirl, 8 seconds"},
+        {"q": "cmd=play&preset=follow&flare=0", "label": "Follow swirl without lens flare"},
     ]},
     "duck-greet.html": {"domain": "ducks"},
     "duck-parade.html": {"domain": "ducks"},
@@ -663,11 +666,6 @@ EFFECT_META = {
         {"q": "cmd=clear&kind=heat", "label": "Remove heat and ranking (permanent)"},
         {"q": "cmd=clear&kind=castles", "label": "Remove all sandcastles (permanent)"},
         {"q": "cmd=reset", "label": "Back to URL settings"},
-    ]},
-    "lens-flare.html": {"switches": [
-        {"key": "n", "label": "Variant", "type": "select", "default": "1",
-         "options": [["1","1"],["2","2"],["3","3"],["4","4"],["5","5"],["6","6"],["7","7"]],
-         "tooltip": "Seven different lens flare videos"},
     ]},
     "weather.html": {"switches": [
         {"key": "place", "label": "Location", "type": "text", "default": "",

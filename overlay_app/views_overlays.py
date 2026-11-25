@@ -65,6 +65,35 @@ def _serve_tenant_source(token, subdir, filepath):
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 
+_THEME_CACHE = {}   # tenant_id → (Zeitpunkt, Theme); jede OBS-Quelle fragt alle ~10 s nach
+_THEME_TTL = 8.0
+
+
+@bp_overlays.route("/s/<token>/theme.json")
+def theme_json(token):
+    """Aktuelles Tenant-Theme für den Live-Wechsel ohne Neuladen (THEME_LIVE_JS in webcore/serving.py)."""
+    import time
+    from webcore.serving import ALLOWED_THEMES
+    if g.tenant_id is None:
+        abort(404)
+    now = time.time()
+    hit = _THEME_CACHE.get(g.tenant_id)
+    if hit and now - hit[0] < _THEME_TTL:
+        theme = hit[1]
+    else:
+        conn = _get_conn()
+        try:
+            from pubg.db_pg import get_setting
+            theme = get_setting(conn, g.tenant_id, "theme", "entry") or "entry"
+        finally:
+            if "_PG_CONN_FACTORY" not in current_app.config:
+                conn.close()
+        if theme not in ALLOWED_THEMES:
+            theme = "entry"
+        _THEME_CACHE[g.tenant_id] = (now, theme)
+    return {"theme": theme}, 200, {"Cache-Control": "no-store"}
+
+
 @bp_overlays.route("/s/<token>/overlays/<path:filepath>")
 def overlay_file(token, filepath):
     return _serve_tenant_source(token, "overlays", filepath)

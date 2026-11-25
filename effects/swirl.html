@@ -7,7 +7,8 @@
        Die Bildmitte bleibt frei (dort steht die Alert-Box). Ausgelöst über Streamer.bot, zeitgleich mit dem Alert:
        /s/<token>/api/fx/swirl?cmd=play&preset=follow&duration=6
        URL-Parameter: preset (follow), duration (2–15 s, Standard 6 wie der Follow-Alert), density (0.5–2),
-       sound (Standard 0 = aus), volume (0–1), demo=1 (spielt dauernd, Dashboard-Vorschau). -->
+       flare (1/0, Lichtstreif hinter der Alert-Box), sound (Standard 0 = aus), volume (0–1), demo=1 (spielt dauernd, Dashboard-Vorschau).
+       Theme-Wechsel greift ohne Neuladen (Event „themechange“ aus der Server-Injektion). -->
   <link rel="stylesheet" href="../widgets/_theme.css">
   <style>
     html, body { margin: 0; width: 100%; height: 100%; background: transparent; overflow: hidden; }
@@ -23,15 +24,16 @@
       'use strict';
       var p = new URLSearchParams(location.search);
       function num(k, d, lo, hi) { var v = parseFloat(p.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
-      var cs = getComputedStyle(document.documentElement);
+      function themeColor(k, d) { return getComputedStyle(document.documentElement).getPropertyValue(k).trim() || d; }
       var duration = num('duration', 6, 2, 15), preset = p.get('preset') || 'follow';
       var s = Swirl.create({
         canvas: document.getElementById('swirl'),
-        accent: cs.getPropertyValue('--theme-accent').trim() || '#f2b705',
-        primary: cs.getPropertyValue('--theme-primary').trim() || '#5e2a79',
+        accent: themeColor('--theme-accent', '#f2b705'), primary: themeColor('--theme-primary', '#5e2a79'),
+        flare: p.get('flare') !== '0',
         density: num('density', 1, 0.2, 2), duration: duration,
         sound: p.get('sound') === '1', volume: num('volume', 0.6, 0, 1)
       });
+      window.addEventListener('themechange', function () { s.setColors(themeColor('--theme-accent', '#f2b705'), themeColor('--theme-primary', '#5e2a79')); });
       if (p.get('demo') === '1') {
         (function demo() { if (!s.busy()) s.play({ preset: preset }); setTimeout(demo, 1000); })();
       }
@@ -47,7 +49,7 @@
             if (epoch !== null && d.epoch !== epoch) { epoch = d.epoch; seq = 0; delay = 0; return; }   // Server neu gestartet
             epoch = d.epoch;
             if (seq !== null) (d.commands || []).forEach(function (c) {
-              if (c.cmd === 'play') { var q = c.params || {}; s.play({ preset: q.preset || preset, duration: q.duration || duration }); }
+              if (c.cmd === 'play') { var q = c.params || {}; s.play({ preset: q.preset || preset, duration: q.duration || duration, flare: q.flare }); }
             });
             seq = d.seq;
           })

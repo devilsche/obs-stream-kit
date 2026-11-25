@@ -31,6 +31,9 @@
         flash: flag('flash', true), ring: flag('ring', true), sparks: flag('sparks', true), smoke: flag('smoke', true),
         accent: css || '#f2b705'
       });
+      window.addEventListener('themechange', function () {
+        b.setAccent(getComputedStyle(document.documentElement).getPropertyValue('--theme-accent').trim());
+      });
       b.ready.then(function () {
         if (p.get('demo') === '1') {
           var kinds = Burst.KINDS, i = 0;

@@ -235,6 +235,31 @@ def serve_asset(root: str, subdir: str, filepath: str):
     return send_from_directory(os.path.dirname(full), os.path.basename(full))
 
 
+# Theme ohne Neuladen: fragt alle ~10 s /s/<token>/theme.json ab, setzt bei Wechsel data-theme neu und
+# meldet das Event „themechange“ (für Seiten, die Farben per JS lesen, z. B. WebGL-Effekte).
+# Nur unter /s/<token>/ und nicht, wenn die URL ein festes ?theme= vorgibt. ES5, ohne Abhängigkeiten.
+THEME_LIVE_JS = (
+    "<script>(function(){var b=window.__SERVE_BASE__;"
+    "if(!b||!/^\\/s\\/[A-Za-z0-9_]+\\/$/.test(b)||/[?&]theme=/.test(location.search))return;"
+    "var h=document.documentElement,cur=h.getAttribute('data-theme');"
+    "function tick(){fetch(b+'theme.json',{cache:'no-store'}).then(function(r){return r.ok?r.json():null})"
+    ".then(function(d){if(d&&d.theme&&d.theme!==cur){cur=d.theme;h.setAttribute('data-theme',cur);window.__THEME__=cur;"
+    "var e;try{e=new CustomEvent('themechange',{detail:{theme:cur}})}catch(x){e=document.createEvent('Event');e.initEvent('themechange',false,false)}"
+    "window.dispatchEvent(e)}}).catch(function(){}).then(function(){setTimeout(tick,9000+Math.random()*3000)})}"
+    "setTimeout(tick,9000+Math.random()*3000)})();</script>"
+)
+
+
+def inject_theme_live(html: str) -> str:
+    """Hängt THEME_LIVE_JS vor </head> an (idempotent)."""
+    if "__THEME_LIVE__" in html:
+        return html
+    script = THEME_LIVE_JS.replace("<script>", "<script>/*__THEME_LIVE__*/", 1)
+    if "</head>" in html:
+        return html.replace("</head>", script + "\n</head>", 1)
+    return script + "\n" + html
+
+
 def serve_html_or_asset(root: str, subdir: str, filepath: str, variables: dict,
                         theme: str = None):
     """HTML-Dateien mit Inject ausliefern, alles andere als statisches Asset.
@@ -248,7 +273,10 @@ def serve_html_or_asset(root: str, subdir: str, filepath: str, variables: dict,
             html = f.read()
         if theme:
             html = inject_theme(html, theme)
-        return (inject_window_vars(html, variables), 200,
+        html = inject_window_vars(html, variables)
+        if theme:   # nach den Window-Vars, damit __SERVE_BASE__ beim Start schon gesetzt ist
+            html = inject_theme_live(html)
+        return (html, 200,
                 {"Content-Type": "text/html; charset=utf-8",
                  "Cache-Control": "no-cache, must-revalidate"})
     return send_from_directory(os.path.dirname(full), os.path.basename(full))

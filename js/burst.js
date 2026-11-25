@@ -257,7 +257,10 @@
     var last = performance.now();
     (function loop(now) { var dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); renderer.render(scene, cam); requestAnimationFrame(loop); })(last);
 
-    return { fire: fire, ready: ready, resize: resize, unlockSound: function () { if (sound) sound.unlock(); } };
+    // Theme-Wechsel ohne Neuladen: die Farbe steckt als geteiltes Objekt in allen Funken-Uniforms
+    function setAccent(css) { try { if (css) accent.set(css); } catch (e) { /* ungültige Farbe → alte bleibt */ } }
+
+    return { fire: fire, ready: ready, resize: resize, setAccent: setAccent, unlockSound: function () { if (sound) sound.unlock(); } };
   }
 
   root.Burst = { create: create, KINDS: KIND_NAMES };

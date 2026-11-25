@@ -49,7 +49,7 @@ def test_extras_map_sources_and_api():
     assert features.source_feature("winter.html") == "weather"
     assert features.source_feature("item-rain.html") == "race"
     assert features.source_feature("duck-court.html") == "ducks"
-    assert features.source_feature("lens-flare.html") is None
+    assert features.source_feature("swirl.html") is None
     assert features.api_feature("weather/state") == "weather"
     assert features.api_feature("xmas/poll") == "weather"
     assert features.api_feature("car-race") == "race"
