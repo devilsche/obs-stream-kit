@@ -24,7 +24,10 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 600px; height: 180px; overflow: hidden; background: transparent;
       font-family: var(--theme-font-body, 'DM Sans', sans-serif); color: var(--tg-text); }
-    body.dock { background: var(--tg-page); }
+    /* Dock: füllt das ganze Dock-Fenster (wie die anderen Widgets), Theme-Hintergrund über deckender Grundfarbe */
+    html.dock, html.dock body { width: 100vw; height: 100vh; }
+    body.dock { background: var(--tg-page); background-color: var(--theme-bg, #0d0816); background-attachment: fixed; }
+    html.dock .tg-card { width: min(540px, calc(100vw - 24px)); }
     .tg { position: absolute; inset: 0; display: grid; place-items: center; }
     .tg-card { width: 540px; height: 112px; display: grid; grid-template-columns: 64px 1fr; gap: 16px; align-items: center;
       padding: 16px 20px 16px 16px; border-radius: var(--tg-radius);
@@ -40,7 +43,8 @@
       box-shadow: 0 4px 14px color-mix(in srgb, var(--tg-accent) 35%, transparent), inset 0 -3px 6px rgba(0, 0, 0, 0.25); }
     .tg-icon .material-symbols-outlined { font-size: 36px; }
     .tg-body { min-width: 0; display: grid; gap: 10px; }
-    .tg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .tg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+    .tg-title { min-width: 0; }
     .tg-title { font-family: var(--theme-font-display, 'DM Sans', sans-serif); font-weight: 800; font-size: 15px; letter-spacing: 0.14em;
       text-transform: uppercase; color: var(--tg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .tg-amount { font-family: var(--theme-font-display, 'DM Sans', sans-serif); font-weight: 800; font-size: 26px; white-space: nowrap;
@@ -72,7 +76,7 @@
       'use strict';
       var P = new URLSearchParams(location.search);
       function num(k, d) { var v = parseFloat((P.get(k) || '').replace(',', '.')); return isNaN(v) ? d : v; }
-      if (P.get('dock') === '1') document.body.classList.add('dock');
+      if (P.get('dock') === '1') { document.documentElement.classList.add('dock'); document.body.classList.add('dock'); }
       var title = P.get('title') || 'Tip Goal', cur = Math.max(0, num('current', 0)), goal = Math.max(0.01, num('goal', 100));
       var currency = P.get('currency') || '€', target = Math.min(1, cur / goal);
       var dec = (cur % 1 || goal % 1) ? 2 : 0;
