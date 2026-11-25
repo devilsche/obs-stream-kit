@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Stinger Slam</title>
-  <!-- WebGL-Stinger „Slam“: Zwei schwere Metallplatten mit Zickzack-Naht schlagen von links und rechts zusammen
-       (beschleunigt, kurzer Rückprall), das Bild wackelt, an der Naht sprühen Funken, Name oder Logo setzt sich aus
-       beiden Hälften zusammen; kurz vor dem Ende glüht die Naht und die Platten fahren wieder auseinander.
+  <!-- WebGL-Stinger „Slam“: Zwei schwere Metallplatten mit Zickzack-Naht schwingen wie Türen aus Richtung Kamera
+       zu und schlagen zusammen (beschleunigt, kurzer Rückprall, Plattenkante sichtbar), das Bild wackelt, an der Naht sprühen Funken, Name oder Logo setzt sich aus
+       beiden Hälften zusammen; nach dem Schnitt glüht die Naht und die Platten schwingen nach hinten auf.
        three.js r128. URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none).
        Einschlag bei cut − 0,2 s, ab da ist das Bild zu. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
@@ -37,15 +37,25 @@
       U.uHit = { value: HIT };
 
       // gemeinsam: Naht (Zickzack, ±70 px) und Plattenversatz zur Zeit t
+      var TH = 60;   // Plattendicke, an der Naht als Kante sichtbar
       var COMMON = [
         'uniform float uT, uCut, uDur, uHit, uCalm;',
         'float seam(float y){ return 70.0 * (abs(fract(y / 180.0 + 0.25) - 0.5) * 4.0 - 1.0); }',
-        'float slide(float t){',
+        /* Tür: Drehung um die Hochachse an der Bildkante (x = side·960). Rein: schwingt aus Richtung Kamera zu
+           (beschleunigt), Rückprall nur als leichtes Ineinanderschieben (nie ein Spalt), raus: schwingt nach hinten auf
+           und fährt dabei auseinander. */
+        'vec3 door(vec3 p, float side, float t){',
         '  float pIn = clamp((t - 0.05) / max(0.1, uHit - 0.05), 0.0, 1.0);',
-        '  float x = 2100.0 * (1.0 - pow(pIn, 2.6));',
-        '  float bt = max(t - uHit, 0.0); x -= 18.0 * abs(sin(bt * 38.0)) * exp(-bt * 11.0) * step(uHit, t);   /* Rückprall nur ineinander, nie ein Spalt */',
-        '  float pOut = clamp((t - uCut - 0.08) / max(0.2, uDur - uCut - 0.2), 0.0, 1.0);',
-        '  return x + 2300.0 * pow(pOut, 2.2); }'
+        '  float pOut = clamp((t - uCut - 0.04) / max(0.2, (uDur - uCut) * 0.75), 0.0, 1.0);',
+        '  float ang = side * 1.3 * (1.0 - pow(pIn, 2.4)) - side * 1.55 * (1.0 - pow(1.0 - pOut, 2.0));',
+        '  float bt = max(t - uHit, 0.0);',
+        '  p.x -= side * 18.0 * abs(sin(bt * 38.0)) * exp(-bt * 11.0) * step(uHit, t);',
+        '  p.x += side * 400.0 * pow(pOut, 2.0);',
+        '  if (ang == 0.0) return p;',
+        '  float px = side * 960.0; vec2 r = vec2(p.x - px, p.z);',
+        '  float c = cos(ang), s = sin(ang);',
+        '  return vec3(px + r.x*c + r.y*s, p.y, -r.x*s + r.y*c); }',
+        'vec3 doorN(vec3 n, float side, float t){ vec3 o = door(vec3(0.0), side, t); return normalize(door(n * 100.0, side, t) - o); }'
       ].join('\n');
 
       function panel(sideSign) {
@@ -53,17 +63,18 @@
           uniforms: Object.assign({ uSide: { value: sideSign } }, U),
           transparent: true,
           vertexShader: COMMON + '\n' + [
-            'uniform float uSide; varying vec2 vRest;',
+            'uniform float uSide; varying vec2 vRest; varying float vLit;',
             'void main(){',
             '  vec3 p = position + vec3(uSide * 1100.0, 0.0, 0.0);',
             '  vRest = p.xy;',
-            '  p.x += uSide * slide(uT);',
-            '  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);',
+            '  vec3 N = doorN(vec3(0.0, 0.0, 1.0), uSide, uT);',
+            '  vLit = 0.65 + 0.35*max(dot(N, normalize(vec3(-0.4*uSide, 0.3, 0.85))), 0.0);',
+            '  gl_Position = projectionMatrix * modelViewMatrix * vec4(door(p, uSide, uT), 1.0);',
             '}'
           ].join('\n'),
           fragmentShader: S.GLSL + '\n' + COMMON + '\n' + [
             'uniform float uSide, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
-            'varying vec2 vRest;',
+            'varying vec2 vRest; varying float vLit;',
             'void main(){',
             '  float sx = seam(vRest.y);',
             '  float ds = (vRest.x - sx) * uSide;',          // Abstand zur eigenen Nahtkante (innen positiv)
@@ -84,16 +95,56 @@
             // Name/Logo, in Ruhe-Koordinaten: setzt sich beim Einschlag aus beiden Hälften zusammen
             '  if (uHasText > 0.5) { vec2 tp = artUv(uv); vec4 t = artAt(uTex, tp);',
             '    c += uA * glowAt(uTex, tp) * 0.4; c = mix(c, t.rgb, t.a); }',
-            // Hitze an der Naht: nach dem Einschlag und kurz vor dem Auseinanderfahren
+            '  c *= vLit;',
+            // Hitze an der Naht: nach dem Einschlag und kurz vor dem Aufschwingen
             '  float heat = exp(-max(uT - uHit, 0.0) * 5.0) * step(uHit, uT) + smoothstep(uCut - 0.1, uCut + 0.05, uT) * 0.8;',
             '  c += mix(uA, vec3(1.0), 0.4) * exp(-ds / 14.0) * heat * 1.3;',
             '  gl_FragColor = vec4(c, 1.0);',
             '}'
           ].join('\n')
         });
-        var m = new THREE.Mesh(new THREE.PlaneGeometry(2400, 1500), mat);
+        var m = new THREE.Mesh(new THREE.PlaneGeometry(2400, 1500, 24, 1), mat);
         m.frustumCulled = false;
         st.scene.add(m);
+
+        // Plattenkante entlang der Zickzack-Naht (Tiefe TH nach hinten), sichtbar solange die Tür schräg steht
+        var pos = [], nrm = [];
+        for (var k = -10; k < 10; k++) {
+          var y0 = 45 + 90 * k, y1 = y0 + 90;
+          var x0 = 70 * ((k % 2 === 0) ? -1 : 1), x1 = -x0;   // = seam(y0) im Shader
+          var nx = (y1 - y0), ny = -(x1 - x0), l = Math.hypot(nx, ny); nx /= l; ny /= l;
+          if (nx * -sideSign < 0) { nx = -nx; ny = -ny; }   // zeigt zur anderen Platte
+          [[x0, y0, 0], [x1, y1, 0], [x1, y1, -TH], [x0, y0, 0], [x1, y1, -TH], [x0, y0, -TH]].forEach(function (v) {
+            pos.push(v[0], v[1], v[2]); nrm.push(nx, ny, 0);
+          });
+        }
+        var eg = new THREE.BufferGeometry();
+        eg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        eg.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+        var em = new THREE.ShaderMaterial({
+          uniforms: Object.assign({ uSide: { value: sideSign } }, U), side: THREE.DoubleSide,
+          vertexShader: COMMON + '\n' + [
+            'uniform float uSide; varying vec3 vN; varying float vZ;',
+            'void main(){',
+            '  vN = doorN(normal, uSide, uT); vZ = -position.z / ' + TH.toFixed(1) + ';',
+            '  gl_Position = projectionMatrix * modelViewMatrix * vec4(door(position, uSide, uT), 1.0);',
+            '}'
+          ].join('\n'),
+          fragmentShader: COMMON + '\n' + [
+            'uniform vec3 uP, uA, uBg; varying vec3 vN; varying float vZ;',
+            'void main(){',
+            '  vec3 L = normalize(vec3(-0.3, 0.5, 0.8)), N = normalize(vN);',
+            '  vec3 c = mix(uBg, uP, 0.35) * (0.35 + 0.65*abs(dot(N, L)));',
+            '  c += vec3(1.0) * pow(abs(dot(reflect(-L, N), vec3(0.0, 0.0, 1.0))), 16.0) * 0.6;',
+            '  c += vec3(0.8) * exp(-vZ*40.0) * 0.5;',      // heller Grat an der Vorderkante
+            '  float heat = exp(-max(uT - uHit, 0.0) * 5.0) * step(uHit, uT) + smoothstep(uCut - 0.1, uCut + 0.05, uT) * 0.8;',
+            '  c += mix(uA, vec3(1.0), 0.4) * heat * 0.9;',
+            '  gl_FragColor = vec4(c, 1.0);',
+            '}'
+          ].join('\n')
+        });
+        var edge = new THREE.Mesh(eg, em); edge.frustumCulled = false;
+        st.scene.add(edge);
       }
       panel(-1); panel(1);
 

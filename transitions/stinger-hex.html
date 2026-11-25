@@ -6,7 +6,7 @@
   <title>Stinger Hex</title>
   <!-- WebGL-Stinger „Hex“: Ein Energieschild aus Sechsecken baut sich Ring für Ring von der Mitte aus auf (jedes Feld
        klappt mit leuchtender Kante herein), darauf Name oder Logo, ein Lichtpuls läuft durchs Gitter, nach dem Schnitt
-       flackern die Felder von der Mitte aus und fallen nach hinten weg. three.js r128, ein Instanced-Mesh.
+       flackern die Waben (Prismen mit Glaskante) von der Mitte aus und taumeln teils zur Kamera, teils in die Tiefe. three.js r128, ein Instanced-Mesh.
        URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none). Bis cut − 0,1 s ist der Schild zu. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,10 +33,13 @@
       if (!st) { S.fallback(); return; }
       var R = 66, DX = 1.5 * R, DY = Math.sqrt(3) * R;   // flache Sechsecke (Spitze links/rechts)
 
-      var hex = new THREE.CircleGeometry(1, 6);
+      // Wabe = sechseckiges Prisma: Vorderseite bei z = 0 (Spitze links/rechts), Tiefe 1 nach hinten (im Shader × TH)
+      var hex = new THREE.CylinderGeometry(1, 1, 1, 6, 1);
+      hex.rotateX(Math.PI / 2); hex.rotateZ(Math.PI / 2); hex.translate(0, 0, -0.5);
       var geo = new THREE.InstancedBufferGeometry();
       geo.index = hex.index;
       geo.setAttribute('position', hex.getAttribute('position'));
+      geo.setAttribute('normal', hex.getAttribute('normal'));
       var cell = [], rr = [], seed = 31;
       function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
       for (var i = -12; i <= 12; i++) for (var j = -6; j <= 6; j++) {
@@ -51,11 +54,11 @@
       var U = S.threeUniforms(T, C);
       U.uR = { value: R };
       var mat = new THREE.ShaderMaterial({
-        uniforms: U, transparent: true, side: THREE.DoubleSide,
+        uniforms: U, transparent: true, side: THREE.FrontSide,
         vertexShader: S.GLSL + '\n' + [
           'attribute vec2 aCell; attribute vec4 aRnd;',
           'uniform float uT, uCut, uDur, uCalm, uR;',
-          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove;',
+          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide;',
           'void main(){',
           '  float d = clamp(length(aCell / vec2(960.0, 540.0)) / 1.414, 0.0, 1.0);',
           '  float win = uCut - 0.1;',
@@ -64,12 +67,18 @@
           '  float eIn = 1.0 + 2.2*pow(pIn - 1.0, 3.0) + 1.2*pow(pIn - 1.0, 2.0);',
           '  float tO = uCut + d*0.32 + aRnd.y*0.06, pOut = clamp((uT - tO) / max(0.3, uDur - uCut - 0.45), 0.0, 1.0);',
           '  float spin = 1.0 - uCalm*0.8;',
-          '  mat3 Rm = rot(vec3(aRnd.z - 0.5, 1.0, 0.0), ((1.0 - pIn)*1.6 + pOut*(1.2 + aRnd.w)) * spin);',
-          '  float sc = uR * 1.004 * clamp(eIn, 0.0, 1.3) * mix(1.0, 0.45, pOut);',
-          '  vec3 world = vec3(aCell, 0.0) + Rm * vec3(position.xy * sc, 0.0);',
-          '  world.z += -700.0*pOut*pOut - 250.0*(1.0 - pIn);',
-          '  if (pIn >= 1.0 && pOut <= 0.0) world = vec3(aCell + position.xy * uR * 1.004, 0.0);',
-          '  vN = Rm * vec3(0.0, 0.0, 1.0); vObj = position.xy;',
+          // rein: klappt um die Hochachse herein; raus: taumelt um zufällige Achsen, teils zur Kamera, teils in die Tiefe
+          '  mat3 Rm = rot(vec3(aRnd.z - 0.5, 1.0, 0.0), (1.0 - pIn)*1.6 * spin);',
+          '  Rm = rot(normalize(vec3(aRnd.z - 0.5, aRnd.w - 0.5, aRnd.x - 0.5) + vec3(0.0, 0.3, 0.0)), pOut*(4.0 + aRnd.w*7.0) * spin) * Rm;',
+          '  float sc = uR * 1.004 * clamp(eIn, 0.0, 1.3) * mix(1.0, 0.75, pOut);',
+          '  vec3 world = vec3(aCell, 0.0) + Rm * vec3(position.xy * sc, position.z * 34.0);',
+          '  float eo = 1.0 - (1.0 - pOut)*(1.0 - pOut);',
+          '  vec2 dir = normalize(aCell + vec2(0.01, 0.013));',
+          '  world += vec3(dir*(200.0 + aRnd.z*700.0)*eo, mix(-1800.0, 1300.0, aRnd.y)*eo);',
+          '  world.y -= 700.0*pOut*pOut;',
+          '  world.z += -250.0*(1.0 - pIn);',
+          '  if (pIn >= 1.0 && pOut <= 0.0) world = vec3(aCell + position.xy * uR * 1.004, position.z * 34.0);',
+          '  vN = Rm * normal; vObj = position.xy; vSide = normal.z > 0.5 ? 0.0 : 1.0;',
           '  vUv = (aCell + position.xy * uR) / vec2(1920.0, 1080.0) + 0.5;',
           // nach dem Schnitt flackern, dann ausblenden
           '  float flick = pOut > 0.0 ? step(0.35, fract(sin((uT + aRnd.z)*61.0)*43.7)) : 1.0;',
@@ -81,9 +90,14 @@
         ].join('\n'),
         fragmentShader: S.GLSL + '\n' + [
           'uniform float uT, uCut, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
-          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove;',
+          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide;',
           'void main(){',
           '  if (vA <= 0.001) discard;',
+          // Seiten und Rückseite der Wabe: dunkles Glas mit Glanz und leuchtender Kante
+          '  if (vSide > 0.5) { vec3 Ns = normalize(vN), L = normalize(vec3(-0.45, 0.55, 0.75));',
+          '    vec3 g = mix(uBg, uA2, 0.5) * (0.4 + 0.6*max(dot(Ns, L), 0.0)) + mix(uA2, vec3(1.0), 0.5) * vHot * 0.5;',
+          '    g += vec3(1.0) * pow(max(dot(reflect(-L, Ns), vec3(0.0, 0.0, 1.0)), 0.0), 14.0) * 0.8;',
+          '    gl_FragColor = vec4(g, vA); return; }',
           '  vec2 q = (vUv - 0.5) * vec2(1.778, 1.0);',
           '  float mar = n2(vUv*vec2(7.0, 4.0) + uT*0.3)*0.6 + n2(vUv*vec2(19.0, 11.0))*0.4;',
           '  vec3 c = mix(uBg, uP, 0.25 + 0.5*smoothstep(-0.2, 1.1, vUv.y + mar*0.3));',
@@ -91,8 +105,9 @@
           '  c += mix(uA2, vec3(1.0), 0.3) * exp(-length(q)*3.0) * 0.3;',
           '  if (uHasText > 0.5) { vec2 tp = artUv(vUv); vec4 t = artAt(uTex, tp);',
           '    c += uA * glowAt(uTex, tp) * 0.45; c = mix(c, t.rgb, t.a); }',
-          '  vec3 N = normalize(gl_FrontFacing ? vN : -vN);',
-          '  c *= 0.65 + 0.35*max(N.z, 0.0);',
+          '  vec3 N = normalize(vN), L0 = normalize(vec3(-0.45, 0.55, 0.75));',
+          '  c *= 0.6 + 0.3*max(dot(N, L0), 0.0) + 0.2*max(N.z, 0.0);',
+          '  c += mix(uA2, vec3(1.0), 0.6) * pow(max(dot(reflect(-L0, N), vec3(0.0, 0.0, 1.0)), 0.0), 20.0) * 0.7;',
           // Sechseck-Kante (Abstand zum Rand, 1 = Kante) + Schild-Puls kurz vor dem Schnitt
           '  vec2 a = abs(vObj); float e = max(a.y, a.x*0.866 + a.y*0.5) / 0.866;',
           '  float line = smoothstep(0.86, 0.97, e);',

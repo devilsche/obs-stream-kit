@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Stinger Cubes</title>
-  <!-- WebGL-Stinger „Cubes“: 16 × 9 Würfel klappen in einer schrägen Welle (oben links zuerst) aus dem Nichts nach vorne
-       und bilden eine Wand mit Name oder Logo, kurz vor dem Schnitt leuchten die Fugen, danach kippen die Würfel in
-       derselben Welle weiter und fallen zur Kamera hin weg. three.js r128, ein Instanced-Mesh, Bewegung im Shader.
+  <!-- WebGL-Stinger „Cubes“: 16 × 9 Würfel fliegen in einer schrägen Welle (oben links zuerst) taumelnd aus der Tiefe heran, klappen nach vorne
+       und bilden eine Wand mit Name oder Logo, kurz vor dem Schnitt leuchten die Fugen, danach wirbeln die Würfel in
+       derselben Welle um alle Achsen davon, teils zur Kamera, teils in die Tiefe. three.js r128, ein Instanced-Mesh, Bewegung im Shader.
        URL: dur (ms, Standard 2000), cut (ms, Standard 900), name, font, show (name|logo|none). Bis cut − 0,1 s ist die Wand zu. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -63,13 +63,20 @@
           '  float eIn = 1.0 - pow(1.0 - pIn, 3.0);',
           '  float pOut = clamp((uT - uCut - w*0.3 - aRnd.y*0.05) / max(0.3, uDur - uCut - 0.38), 0.0, 1.0);',
           '  float spin = 1.0 - uCalm*0.7;',
-          '  float ang = (-(1.0 - eIn)*1.5708 + pOut*pOut*(2.4 + aRnd.z*1.2)) * spin;',
-          '  mat3 R = rot(vec3(1.0, (aRnd.w - 0.5)*0.4*pOut, 0.0), ang);',
-          '  float sc = mix(0.2, 1.0, eIn) * mix(1.0, 0.7, pOut);',
+          // rein: aus der Tiefe, taumelnd um eine schräge Achse, die letzte Vierteldrehung klappt nach vorne
+          '  vec3 axIn = normalize(vec3(1.0, (aRnd.w - 0.5)*1.2, (aRnd.z - 0.5)*0.8));',
+          '  mat3 Rin = rot(axIn, -(1.0 - eIn)*(1.5708 + aRnd.y*3.0) * spin);',
+          // raus: kräftig um zufällige Achsen, teils zur Kamera, teils in die Tiefe
+          '  vec3 axOut = normalize(vec3(aRnd.z - 0.5, aRnd.w - 0.5, aRnd.x - 0.5) + vec3(0.6, 0.0, 0.0));',
+          '  mat3 R = rot(axOut, pOut*(4.0 + aRnd.z*7.0) * spin) * Rin;',
+          '  float sc = mix(0.35, 1.0, eIn) * mix(1.0, 0.8, pOut);',
           '  vec3 p = position * 120.0 * sc;',
           '  vec3 world = vec3(aCell, -60.0) + R * p;',
-          '  world += vec3((aRnd.z - 0.5)*300.0*pOut, -750.0*pOut*pOut, 450.0*pOut);',
-          '  world.z += -400.0 * (1.0 - eIn);',
+          '  float eo = 1.0 - (1.0 - pOut)*(1.0 - pOut);',
+          '  vec2 dir = normalize(aCell + vec2(0.01, 0.013));',
+          '  world += vec3(dir*(250.0 + aRnd.z*600.0)*eo, mix(-1700.0, 1350.0, aRnd.w)*eo);',
+          '  world.y -= 800.0*pOut*pOut;',
+          '  world += vec3(dir*(300.0 + aRnd.x*500.0), -1800.0 - aRnd.y*1500.0) * (1.0 - eIn);',
           // liegt der Würfel, sitzt die Vorderseite exakt auf dem Raster
           '  if (pIn >= 1.0 && pOut <= 0.0) world = vec3(aCell, -60.0) + position * 120.0;',
           '  vN = R * normal; vObj = position;',

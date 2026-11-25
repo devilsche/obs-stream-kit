@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=1920, height=1080" />
   <title>Stinger Warp</title>
   <!-- WebGL-Stinger „Warp“: Ein Lichtwirbel (Sternstreifen + Plasma in Theme-Farben) wächst von der Mitte über das Bild,
-       der Name schlägt mit Farbversatz ein, nach dem Schnitt reißt ein Loch von der Mitte auf und gibt die neue Szene frei.
+       der Name (oder das Logo) kommt als gekippte Tafel aus der Tiefe, dreht sich gerade und schlägt mit Farbversatz ein, Tunnelringe ziehen heran, nach dem Schnitt reißt ein Loch von der Mitte auf und gibt die neue Szene frei.
        Ein Shader, keine Bibliothek. URL: dur (ms, Standard 2000), cut (ms, Standard 900) = OBS „Duration“ / „Transition Point“,
        name, font, show (name|logo|none). Bis cut × 0,85 ist das Bild voll abgedeckt. -->
   <link rel="stylesheet" href="../widgets/_theme.css">
@@ -68,14 +68,26 @@
         '  vec3 c = mix(uBg, uP, smoothstep(0.25, 0.75, pl));',
         '  c = mix(c, uA2, smoothstep(0.62, 0.95, pl) * 0.65);',
         '  c += uA * streak * 1.2;',
+        // Tunnelringe ziehen auf den Betrachter zu (Tiefe)
+        '  float rg = fract(z*0.55 - uT*spd*0.22);',
+        '  c += mix(uA2, vec3(1.0), 0.3) * smoothstep(0.9, 1.0, rg) * (1.0 - smoothstep(0.98, 1.0, rg)) * 0.45 * smoothstep(0.06, 0.4, r);',
         '  c += mix(uA, vec3(1.0), 0.5) * exp(-r*5.0) * 0.9;',
         '  c *= 0.75 + 0.25*smoothstep(1.1, 0.2, r);',
         // Name: schlägt ab cut-0.42 ein (Skalierungs-Punch + Farbversatz), fliegt beim Aufreißen nach vorne weg
         '  float ti = uT - (uCut - 0.42);',
         '  float tA = smoothstep(0.0, 0.12, ti) * (1.0 - smoothstep(0.08, 0.38, uT - uCut));',
-        '  float sc = 1.0 + 0.55*exp(-max(ti, 0.0)*9.0) + 0.9*smoothstep(0.0, 0.5, uT - uCut);',
+        // Name/Logo als Tafel im Raum: kommt gekippt aus der Tiefe, dreht sich gerade, fliegt beim Aufreißen an der Kamera vorbei
         '  float ab = (0.012*exp(-max(ti, 0.0)*7.0) + 0.006*smoothstep(0.0, 0.3, uT - uCut)) * (1.0 - uCalm);',
-        '  vec2 tp = (fc - 0.5*uRes) / vec2(1600.0, 800.0) / sc; tp.y = -tp.y; tp += 0.5;',
+        '  float ein = 1.0 - exp(-max(ti, 0.0)*7.5), eo = smoothstep(0.0, 0.42, uT - uCut);',
+        '  float F = 1600.0, Zp = F * mix(5.0, 1.0, ein) * mix(1.0, 0.22, eo);',
+        '  float th = (1.15*(1.0 - ein) - 0.12*sin(ein*3.1416) - 0.7*eo) * (1.0 - uCalm*0.7);',
+        '  float ph = (0.35*(1.0 - ein) + 0.25*eo) * (1.0 - uCalm*0.7);',
+        '  vec3 Uu = vec3(cos(th), 0.0, -sin(th)), Vv = vec3(sin(th)*sin(ph), cos(ph), cos(th)*sin(ph));',
+        '  vec3 Nn = cross(Uu, Vv), Cc = vec3(0.0, 0.0, Zp), dir = vec3(fc - 0.5*uRes, F);',
+        '  float dn = dot(dir, Nn), tt = dot(Cc, Nn) / (abs(dn) < 1e-4 ? 1e-4 : dn);',
+        '  vec3 Hh = dir * tt - Cc;',
+        '  vec2 tp = vec2(dot(Hh, Uu) / 1600.0, -dot(Hh, Vv) / 800.0) + 0.5;',
+        '  if (tt <= 0.0) tp = vec2(-1.0);',
         '  if (uHasText > 0.5 && tA > 0.0) {',
         '    vec4 ar = artAt(uTex, tp + vec2(ab, 0.0)), ag = artAt(uTex, tp), ab4 = artAt(uTex, tp - vec2(ab, 0.0));',
         '    c += uA * glowAt(uTex, tp) * 0.9 * tA;',
