@@ -722,6 +722,7 @@ G1R_STEAM_NAME=</code></pre>
   }
 
   // ── Alerts als Reiter: je Alert Ton & Dauer, Vorschau, Test an die laufende OBS-Quelle ──
+  let pendingAlertTab = null;
   const ALERT_TYPES = (() => { try { return JSON.parse(document.getElementById("alertTypesData").textContent); } catch (_) { return []; } })();
   const ALERT_SAMPLE = {
     follow: "username=Hat3", sub: "username=Hat3&tier=1000", resub: "username=Hat3&months=12&tier=1000",
@@ -799,6 +800,7 @@ G1R_STEAM_NAME=</code></pre>
     });
     let start = types.length ? types[0].key : "";
     try { const k = localStorage.getItem("urlAlertTab"); if (types.some(t => t.key === k)) start = k; } catch (_) {}
+    if (pendingAlertTab && types.some(t => t.key === pendingAlertTab)) start = pendingAlertTab;
     if (start) show(start, false);
   }
 
@@ -1715,12 +1717,17 @@ G1R_STEAM_NAME=</code></pre>
   // ── Filter ────────────────────────────────────────────────
   function applyFilter() {
     const q = (filter.value || "").toLowerCase().trim();
+    // Suche nach einem Alert-Namen → die Alerts-Karte öffnet gleich diesen Reiter
+    const hit = q.length >= 3 && ALERT_TYPES.find(a => !a.host && (a.key.indexOf(q) === 0 || a.label.toLowerCase().indexOf(q) >= 0));
+    pendingAlertTab = hit ? hit.key : null;
     if (q.length < 3) { selectTab(currentTab); return; }
 
     clearHeaders();   // Suche zeigt Treffer domain-übergreifend → keine Sektions-Header
     document.querySelectorAll(".url-credhint, .url-g1r-setup").forEach(h => h.hidden = true);
     const hits = allCards.filter(c => {
-      const hay = ((c.dataset.label||"")+" "+(c.dataset.cat||"")+" "+(c.dataset.desc||"")+" "+(c.dataset.path||"")).toLowerCase();
+      let hay = ((c.dataset.label||"")+" "+(c.dataset.cat||"")+" "+(c.dataset.desc||"")+" "+(c.dataset.path||"")).toLowerCase();
+      // Die Alerts-Karte enthält alle Alerts als Reiter → auch über deren Namen finden (welcome, follow, raid …)
+      if (/alerts\/live\.html$/.test(c.dataset.path || "")) hay += " " + ALERT_TYPES.map(a => a.key + " " + a.label).join(" ").toLowerCase();
       return hay.includes(q);
     });
 
