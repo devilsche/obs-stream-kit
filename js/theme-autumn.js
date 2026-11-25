@@ -282,8 +282,8 @@
       var lit = el('g', { 'class': 'ta-lit ta-lit--branch', mask: 'url(#ta-branch-light)' }, branchSvg);
       el('use', { href: '#ta-sway-g' }, lit);
     })();
-    // ── Erntedeko: Strohballen rechts (gestapelt), ein Ballen und eine
-    // Maisgarbe links neben der Vogelscheuche; die Maisblätter rascheln im Wind ──
+    // ── Erntedeko: alles am rechten Bildrand (links sitzt die Kamera): Strohballen gestapelt, ein Ballen und
+    // eine Maisgarbe neben der Vogelscheuche; die Maisblätter rascheln im Wind ──
     var cornLeaves = [];
     function bale(x, y, w, h) {
       var g = el('g', { transform: 'translate(' + f1(x) + ' ' + f1(y) + ')' }, gDeco);
@@ -303,7 +303,7 @@
       }
     }
     bale(W - 610, H - 2, 92, 46); bale(W - 512, H - 2, 92, 46); bale(W - 560, H - 46, 88, 44);
-    bale(470, H - 2, 84, 42);
+    bale(W - 720, H - 2, 84, 42);
     (function cornSheaf(x, y) {
       var g = el('g', { 'class': 'ta-corn', transform: 'translate(' + x + ' ' + y + ')' }, gDeco);
       var n = 11;
@@ -330,7 +330,7 @@
         el('path', { 'class': 'ta-cob-rows', d: 'M-3 -30 L-3 -2 M0 -32 L0 0 M3 -30 L3 -2' }, cg);
         el('path', { 'class': 'ta-husk', d: 'M0 0 Q-14 -12 -10 -34 Q-5 -14 0 -4 Q5 -14 10 -34 Q14 -12 0 0 Z' }, cg);
       });
-    })(395, H - 4);
+    })(W - 420, H - 4);
     function stepCorn(w, dir) {
       cornLeaves.forEach(function (L) {
         var a = (Math.sin(aWindT * L.f * 6.283 + L.ph) * (2 + 9 * w) + dir * w * 6) * (1 - 0.5 * W8.wet);
@@ -759,7 +759,7 @@
 
     // ── Vogelscheuche: gemeinsames Sub-Projekt, 8 Teile ──
     var scare = B.project(gScare, {
-      x: 250, k: 0.85,
+      x: W - 250, k: 0.85,   // rechts am Rand (links sitzt die Kamera)
       y: function () { return H + 4; },
       top: function (n) { return n >= 5 ? 450 : 420; },
       done: 'The scarecrow is finished!',
@@ -1020,7 +1020,7 @@
     // Vogelscheuche: biegt sich bei Sturm, schwankt bei Böen; naht die
     // Windhose, wird sie durchgeschüttelt, Hut und Krähe fliegen davon und
     // kommen danach zurück
-    var SC_X = 250, scHatBack = 0, scStraw = 0, scSway = B.sway(), scDrawn = '';
+    var SC_X = W - 250, scHatBack = 0, scStraw = 0, scSway = B.sway(), scDrawn = '';
     function scSet(k, v) { if (gScare.dataset[k] !== v) gScare.dataset[k] = v; }
     function stepScare(dt, tn) {
       var near = !!tn && Math.abs(tn.x - SC_X) < 330;
