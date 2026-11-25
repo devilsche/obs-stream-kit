@@ -255,6 +255,16 @@ def _ducks_ok() -> bool:
 DUCK_EFFECTS = {"duckgreet"}
 
 
+def _friend_allowed():
+    """(Erlaubnisliste, Kanalinhaber) für Friend-Chatbefehle."""
+    from fx import friend_allow
+    try:
+        return _with_conn(lambda conn: (friend_allow.load(conn, g.tenant_id), _channel(conn, g.tenant_id)))
+    except Exception:
+        log.exception("fx friend: allow list failed")
+        return [], ""
+
+
 def _feats() -> list:
     from core import features
 
@@ -299,6 +309,12 @@ def push(token, effect):
     except ValueError as e:
         return _no_store(jsonify({"ok": False, "error": str(e)})), 400
     extra = {}
+    if effect == "friend" and request.args.get("user") is not None:
+        # Chat-Befehle nur für Namen auf der Erlaubnisliste (Dashboard) und den Kanalinhaber
+        from fx import friend_allow
+        names, owner = _friend_allowed()
+        if not friend_allow.allowed(names, owner, request.args.get("user")):
+            return _no_store(jsonify({"ok": False, "denied": True}))
     if effect == "weather" and cmd["cmd"] == "build":
         # Antwort mit Projektstand, damit Streamer.bot den Fortschritt melden kann
         try:

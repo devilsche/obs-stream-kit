@@ -572,6 +572,16 @@ G1R_STEAM_NAME=</code></pre>
             ${subMsg ? `<p class="url-follow-msg" role="status">${subMsg}</p>` : ""}
           </div>`;
         })() : ""}
+        ${/\/friend$/.test(card.dataset.fx || "") ? `<div class="url-cheat url-friend-allow">
+          <div class="url-cheat__head"><b>Who may command the dog</b></div>
+          <p class="url-dbox__desc" id="urlFriendAllowHelp">Only these Twitch names can use the chat commands; everybody else is ignored without a reply. You (the channel owner) can always. Separate names with commas or new lines. Alerts and the test buttons here always work.</p>
+          <label for="urlFriendAllow">Allowed chatters</label>
+          <textarea id="urlFriendAllow" rows="3" aria-describedby="urlFriendAllowHelp urlFriendAllowStatus" spellcheck="false" autocomplete="off"></textarea>
+          <div class="url-sound__row">
+            <button type="button" class="url-act" id="urlFriendAllowSave"><span class="material-symbols-outlined" aria-hidden="true">save</span>Save list</button>
+            <span class="url-copied" id="urlFriendAllowStatus" role="status" aria-live="polite"></span>
+          </div>
+        </div>` : ""}
         ${cheat ? `<div class="url-cheat">
           <div class="url-cheat__head"><b>Cheat sheet for viewers</b>
             <button type="button" class="url-act ghost url-cmd__copy" data-url="${escapeAttr(cheat)}" aria-label="Copy cheat sheet"><span class="material-symbols-outlined" aria-hidden="true">content_copy</span>Copy</button></div>
@@ -705,6 +715,7 @@ G1R_STEAM_NAME=</code></pre>
     if (hasTabs) wireDetailTabs();
     wireThemeSections();
     if (isLiveAlerts) wireAlertTabs(base, card.dataset.fx || "");
+    if (/\/friend$/.test(card.dataset.fx || "")) wireFriendAllow();
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -802,6 +813,27 @@ G1R_STEAM_NAME=</code></pre>
     try { const k = localStorage.getItem("urlAlertTab"); if (types.some(t => t.key === k)) start = k; } catch (_) {}
     if (pendingAlertTab && types.some(t => t.key === pendingAlertTab)) start = pendingAlertTab;
     if (start) show(start, false);
+  }
+
+  // ── Friend: Erlaubnisliste für Chat-Befehle ──
+  function wireFriendAllow() {
+    const ta = document.getElementById("urlFriendAllow"), btn = document.getElementById("urlFriendAllowSave");
+    const st = document.getElementById("urlFriendAllowStatus");
+    if (!ta || !btn) return;
+    const say = (msg, bad) => { st.textContent = msg; st.classList.toggle("is-error", !!bad); ta.setAttribute("aria-invalid", bad ? "true" : "false"); };
+    fetch("/app/api/friend-allow", { credentials: "same-origin", cache: "no-store" })
+      .then(r => r.json()).then(d => { if (d.ok) ta.value = d.names.join(", "); })
+      .catch(() => say("Could not load the list.", true));
+    btn.addEventListener("click", () => {
+      fetch("/app/api/friend-allow", { method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" }, body: JSON.stringify({ names: ta.value }) })
+        .then(r => r.json()).then(d => {
+          if (!d.ok) return say(d.error || "Could not save.", true);
+          ta.value = d.names.join(", ");
+          say(d.names.length ? "Saved – " + d.names.length + (d.names.length === 1 ? " name." : " names.") : "Saved – only you can command the dog.");
+        })
+        .catch(() => say("Could not save.", true));
+    });
   }
 
   // ── Alert-Töne: Liste, Vorhören, Löschen, Hochladen, Lautstärke ──

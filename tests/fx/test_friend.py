@@ -33,3 +33,26 @@ def test_alert_is_forwarded_to_friend_only_with_feature(tmp_path, monkeypatch):
     c.get("/s/t/api/fx/alert?cmd=raid&username=Hat3&viewers=5")
     got = c.get("/s/t/api/fx/friend/poll?since=%d" % before).get_json()["commands"]
     assert [(x["cmd"], x["params"]) for x in got] == [("react", {"event": "raid"})]
+
+
+def test_allow_list_normalizes_names():
+    from fx import friend_allow
+    assert friend_allow.clean("@Hat3, luckor_hd\nHat3  bad name! x" ) == ["hat3", "luckor_hd", "bad", "x"]
+
+
+def test_chat_commands_only_for_allowed_users(tmp_path, monkeypatch):
+    from fx import friend_allow
+    monkeypatch.setattr(endpoints, "_feats", lambda: ["friend"])
+    monkeypatch.setattr(endpoints, "_friend_allowed", lambda: (["hat3"], "luckor_hd"))
+    c = _client(str(tmp_path), tenant_id=9)
+    before = c.get("/s/t/api/fx/friend/poll").get_json()["seq"]
+    # nicht auf der Liste: stumm ignoriert (200, kein Befehl)
+    r = c.get("/s/t/api/fx/friend?cmd=act&action=bark&user=Stranger").get_json()
+    assert r["ok"] is False and r["denied"] is True
+    # auf der Liste (Groß-/Kleinschreibung egal), Kanalinhaber immer, ohne user (Dashboard-Test) auch
+    assert c.get("/s/t/api/fx/friend?cmd=act&action=bark&user=HAT3").get_json()["ok"] is True
+    assert c.get("/s/t/api/fx/friend?cmd=act&action=sit&user=LuCKoR_HD").get_json()["ok"] is True
+    assert c.get("/s/t/api/fx/friend?cmd=act&action=paw").get_json()["ok"] is True
+    got = c.get("/s/t/api/fx/friend/poll?since=%d" % before).get_json()["commands"]
+    assert [x["params"]["action"] for x in got] == ["bark", "sit", "paw"]
+    assert friend_allow.allowed(["hat3"], "luckor_hd", "") is True

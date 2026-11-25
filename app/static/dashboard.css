@@ -1435,3 +1435,8 @@ a.url-card{text-decoration:none}
 .url-atab:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .url-apanel{margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
 .url-atest .url-copied{margin-left:0}
+/* Friend: Erlaubnisliste */
+.url-friend-allow textarea{resize:vertical;font-family:var(--theme-font-mono,ui-monospace,monospace);font-size:13px}
+.url-friend-allow .url-sound__row{margin-top:8px}
+.url-friend-allow .url-copied{margin-left:0}
+.url-friend-allow .url-copied.is-error{color:var(--danger,#e5484d)}

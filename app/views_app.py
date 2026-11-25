@@ -1108,6 +1108,20 @@ def _fetch_only():
     return request.headers.get("X-Requested-With") == "fetch"
 
 
+@bp_app.route("/app/api/friend-allow", methods=["GET", "POST"])
+@require_session
+def friend_allow_api():
+    """Friend: Erlaubnisliste für Chat-Befehle lesen/speichern (Text mit Namen, getrennt durch Komma/Zeile)."""
+    from fx import friend_allow
+    if request.method == "POST":
+        if not _fetch_only():
+            return jsonify({"ok": False, "error": "Bad request."}), 400
+        body = request.get_json(silent=True) if request.is_json else None
+        names = _sound_conn(lambda c: friend_allow.save(c, g.tenant_id, (body or {}).get("names", "")))
+        return jsonify({"ok": True, "names": names})
+    return jsonify({"ok": True, "names": _sound_conn(lambda c: friend_allow.load(c, g.tenant_id))})
+
+
 @bp_app.route("/app/api/alert-sounds")
 @require_session
 def alert_sounds_list():
