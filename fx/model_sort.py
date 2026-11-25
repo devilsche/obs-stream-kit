@@ -140,7 +140,7 @@ def inventory(root):
     # Vorbilder der PUBG-Fahrzeuge, im Admin angehakt (/admin/prop-search?set=pubg)
     pubg_picks = (_load(_d(root, "pubg-vehicle-picks.json"), {}) or {}).get("picks") or []
     for c in _load(os.path.join(proj, "assets", "cars", "search-pubg.json"), []):
-        if isinstance(c, dict) and c.get("uid") in pubg_picks:
+        if isinstance(c, dict) and c.get("uid") in pubg_picks and c.get("downloadable") is not False:   # offizielle: nur ansehbar
             put(c["uid"], "pubg", dict(c, name=(c.get("groupTitle", "").split(" →")[0] + ": " + c.get("name", "")).strip(": ")))
     for c in _load(os.path.join(proj, "assets", "track-props", "candidates.json"), []):
         if isinstance(c, dict):
