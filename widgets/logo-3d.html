@@ -131,6 +131,21 @@
           return { c: c, x0: cuts[i], y0: top };
         });
       }
+      /* Weicher Schlagschatten im Textbild (reines Schwarz, halbdeckend) gehört nicht zu den Buchstaben: er käme beim
+         Zerschneiden in harten Streifen mit und würde sich mitdrehen. Er wird herausgelöst und liegt als eine Fläche
+         still auf den Streifen; die Buchstaben behalten Schrift und Kontur. */
+      function separateShadow(px) {
+        var w = px.d.width, h = px.d.height, a = px.d.data;
+        var sc = document.createElement('canvas'); sc.width = w; sc.height = h;
+        var sx = sc.getContext('2d'), sd = sx.createImageData(w, h), fd = new ImageData(new Uint8ClampedArray(a), w, h), f = fd.data, n = 0;
+        for (var i = 0; i < w * h * 4; i += 4) {
+          if (f[i + 3] > 0 && f[i + 3] < 230 && f[i] + f[i + 1] + f[i + 2] < 45) { sd.data[i + 3] = f[i + 3]; f[i + 3] = 0; n++; }
+        }
+        if (n < w * h * 0.002) return { face: px, shadow: null };
+        sx.putImageData(sd, 0, 0);
+        var fc = document.createElement('canvas'); fc.width = w; fc.height = h; fc.getContext('2d').putImageData(fd, 0, 0);
+        return { face: { c: fc, d: fd }, shadow: { c: sc, d: sd } };
+      }
       function whole(px) {
         var w = px.d.width, h = px.d.height, a = px.d.data, x0 = w, y0 = h, x1 = 0, y1 = 0;
         for (var i = 0; i < w * h; i++) if (a[i * 4 + 3]) { var x = i % w, y = (i - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -152,7 +167,7 @@
             'uniform sampler2D uTex; uniform float uShine, uFlash, uFade, uBold; uniform vec3 uAcc; uniform vec2 uOff, uSize; varying vec2 vUv;',
             'void main(){',
             '  vec4 c = texture2D(uTex, vUv); if (c.a < 0.004) discard;',
-            '  if (!gl_FrontFacing) c.rgb *= 0.28;',
+            '  if (!gl_FrontFacing) c.rgb *= 0.62;',
             // Glanzband in Logo-Koordinaten (0..1), läuft schräg von links nach rechts
             '  vec2 g = uOff + vec2(vUv.x, 1.0 - vUv.y) * uSize;',
             '  float band = exp(-pow(g.x + g.y * 0.35 - uShine, 2.0) * 160.0);',
@@ -164,12 +179,12 @@
       function addPart(p, s, kind, i) {
         var tex = new THREE.CanvasTexture(p.c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
         var g = new THREE.Group(), front = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frontMat(tex));
-        front.renderOrder = kind * 10 + 2; g.add(front);
+        front.renderOrder = [2, 22, 12][kind]; g.add(front);
         var sides = [];
-        for (var k = 1; k <= LAYERS; k++) {
+        for (var k = 1; k <= (kind === 2 ? 0 : LAYERS); k++) {
           var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.45,
-            side: THREE.DoubleSide, color: new THREE.Color().setScalar(0.55 - k * 0.03), depthWrite: false }));
-          m.renderOrder = kind * 10 + 1; g.add(m); sides.push(m);
+            side: THREE.DoubleSide, color: new THREE.Color().setScalar(0.78 - k * 0.03), depthWrite: false }));
+          m.renderOrder = [1, 21, 11][kind]; g.add(m); sides.push(m);
         }
         root.add(g);
         parts.push({ g: g, front: front, sides: sides, kind: kind, i: i, x0: p.x0 / s, y0: p.y0 / s, w: p.c.width / s, h: p.c.height / s });
@@ -180,11 +195,11 @@
         SC = Math.min(W * 0.86 / bw, H * 0.7 / bh);
         var th = Math.max(2, bh * SC * 0.018);   // Dicke ≈ 2 % der Logohöhe
         parts.forEach(function (p) {
-          p.home = new THREE.Vector3((p.x0 + p.w / 2 - (box.x0 + box.x1) / 2) * SC, ((box.y0 + box.y1) / 2 - (p.y0 + p.h / 2)) * SC, p.kind ? th * 1.5 : 0);
+          p.home = new THREE.Vector3((p.x0 + p.w / 2 - (box.x0 + box.x1) / 2) * SC, ((box.y0 + box.y1) / 2 - (p.y0 + p.h / 2)) * SC, [0, th * 1.6, th * 0.4][p.kind]);
           p.front.scale.set(p.w * SC, p.h * SC, 1);
           p.sides.forEach(function (m, k) { m.scale.copy(p.front.scale); m.position.z = -(k + 1) * th / LAYERS; });
           var u = p.front.material.uniforms; u.uOff.value.set((p.x0 - box.x0) / bw, (p.y0 - box.y0) / bh); u.uSize.value.set(p.w / bw, p.h / bh);
-          u.uBold.value = p.kind ? 0.85 : 0.45;
+          u.uBold.value = [0.45, 0.85, 0][p.kind];
         });
         if (halo) halo.scale.set(bw * SC * 1.25, bh * SC * 1.6, 1);
       }
@@ -195,12 +210,14 @@
           var im = ims[kind]; if (!im) return;
           var px = pixels(im, Math.min(1, 2048 / Math.max(im.naturalWidth, im.naturalHeight)));
           var ks = px.c.width / ref.naturalWidth;   // Teile in Koordinaten des ersten Bilds
-          var list = (kind ? splitColumns(px, im.naturalWidth > px.c.width ? pixels(im, 1) : px) : splitBlobs(px)) || whole(px);
+          var sep = kind ? separateShadow(px) : { face: px, shadow: null };
+          var list = (kind ? splitColumns(sep.face, im.naturalWidth > px.c.width ? pixels(im, 1) : px) : splitBlobs(px)) || whole(sep.face);
           list.forEach(function (p, i) { addPart(p, ks, kind, i); });
+          if (sep.shadow) whole(sep.shadow).forEach(function (p) { addPart(p, ks, 2, 0); });
         });
         if (!parts.length) return;
         box = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
-        parts.forEach(function (p) { box.x0 = Math.min(box.x0, p.x0); box.y0 = Math.min(box.y0, p.y0); box.x1 = Math.max(box.x1, p.x0 + p.w); box.y1 = Math.max(box.y1, p.y0 + p.h); });
+        parts.forEach(function (p) { if (p.kind === 2) return; box.x0 = Math.min(box.x0, p.x0); box.y0 = Math.min(box.y0, p.y0); box.x1 = Math.max(box.x1, p.x0 + p.w); box.y1 = Math.max(box.y1, p.y0 + p.h); });
         // weicher Schein hinter dem Logo, pulsiert zwischen zwei Farben
         if (glowP !== 'off') {
           halo = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
@@ -228,7 +245,9 @@
         g.position.copy(h); g.rotation.set(0, 0, 0); g.scale.setScalar(1);
         var fade = 1, flash = 0, a = t - tIntro, bw = (box.x1 - box.x0) * SC;
         var stripesEnd = 0.15 + sS * nS + 0.35;
-        if (p.kind === 0) {
+        if (p.kind === 2) {   // Schatten: liegt still, kommt mit den Buchstaben
+          fade = Math.min(1, Math.max(0, (a - stripesEnd - sT * nT - 0.35) / 0.6));
+        } else if (p.kind === 0) {
           var pr = (a - 0.15 - p.i * sS) / 0.7;
           if (pr < 1) {
             if (REDUCED) { fade = ease(pr); }
@@ -258,7 +277,7 @@
           var doWave = IDLE === 'wave' || (IDLE === 'both' && cyc % 2 === 0);
           if (doWave) {
             if (p.kind === 0) { var wv = c - p.i * 0.07; if (wv > 0 && wv < 0.6) g.rotation.y += Math.sin(wv / 0.6 * Math.PI) * 0.9; }
-            else { var hp = c - 0.4 - p.i * 0.11; if (hp > 0 && hp < 0.7) { var s = hp / 0.7; g.position.y += Math.sin(s * Math.PI) * p.h * SC * 0.25; g.rotation.y = s * Math.PI * 2; } }
+            else if (p.kind === 1) { var hp = c - 0.4 - p.i * 0.11; if (hp > 0 && hp < 0.7) { var s = hp / 0.7; g.position.y += Math.sin(s * Math.PI) * p.h * SC * 0.25; g.rotation.y = s * Math.PI * 2; } }
           }
         }
         p.front.material.uniforms.uFade.value = fade;
@@ -278,7 +297,7 @@
       }
       function frame() {
         var t = now();
-        nS = 0; nT = 0; parts.forEach(function (p) { if (p.kind) nT++; else nS++; });
+        nS = 0; nT = 0; parts.forEach(function (p) { if (p.kind === 1) nT++; else if (p.kind === 0) nS++; });
         var sh = shineAt(t);
         parts.forEach(function (p) { pose(p, t); p.front.material.uniforms.uShine.value = sh; });
         if (halo) {
