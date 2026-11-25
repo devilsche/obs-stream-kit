@@ -218,7 +218,7 @@ Kompakte Browser-Sources, die frei in OBS positioniert werden können. Die Widge
 | tipgoal | `current` | `0` | Aktueller Betrag (Komma oder Punkt als Dezimaltrenner) |
 | tipgoal | `goal` | `100` | Ziel-Betrag |
 | tipgoal | `currency` | `€` | Währungssymbol |
-| tipgoal-banner | `title` / `current` / `goal` / `currency` | wie oben | Wie tipgoal, aber 600×180 (inner 480×80 + 60px Glow-Rand) mit Shine-Animation |
+| tipgoal-banner | `title` / `current` / `goal` / `currency` / `dock` | wie oben | 600×180: Karte in Theme-Farben mit Spardose, Betrag und Prozent, darunter eine Glasröhre mit Flüssigkeit (WebGL: wackelnde Front, Bläschen, Glanz). Beim Laden zählt der Betrag hoch; ab 100 % schimmert die Röhre und die Spardose wird zum Konfetti-Symbol. Ohne WebGL bleiben Karte und Zahlen. |
 
 ---
 

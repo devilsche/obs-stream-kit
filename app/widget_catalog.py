@@ -243,7 +243,7 @@ WIDGET_META = [
     ("Follower & Goals", "Latest Tip",      "Sidepanel: shows the latest tip/donation (always visible).",           "latest-tip.html"),
     ("Follower & Goals", "Sub Goal",        "Progress bar toward the sub goal.",                                    "subgoal.html"),
     ("Follower & Goals", "Tip Goal",        "Progress bar toward the tip goal.",                                    "tipgoal.html"),
-    ("Follower & Goals", "Tip Goal Banner", "Tip goal as a slim progress banner.",                                  "tipgoal-banner.html"),
+    ("Follower & Goals", "Tip Goal Banner", "Tip goal card with a glass tube that fills with liquid (WebGL), counts up on load.","tipgoal-banner.html"),
 ]
 
 

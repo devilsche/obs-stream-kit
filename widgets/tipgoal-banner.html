@@ -2,220 +2,170 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=600, height=180" />
   <title>Tip Goal Banner</title>
+  <!-- Tip-Goal-Banner 600×180: Karte in Theme-Farben mit Spardose, Titel, Betrag und einer Glasröhre, in der Flüssigkeit
+       steht (WebGL: Welle an der Front, Bläschen, Glanz). Beim Laden läuft sie hoch und der Betrag zählt mit; ab 100 %
+       schimmert sie und das Symbol wechselt. URL: title, current, goal, currency, dock (1 = mit Hintergrund für Docks). -->
   <link rel="stylesheet" href="_theme.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,1,0">
   <style>
-    @font-face {
-      font-family: 'DM Sans';
-      src: url('../assets/DM-Sans.woff2') format('woff2');
-      font-weight: 100 900;
-      font-display: block;
-    }
-
-    /* Default: Entry purple/gold */
+    @font-face { font-family: 'DM Sans'; src: url('../assets/DM-Sans.woff2') format('woff2'); font-weight: 100 900; font-display: block; }
     :root {
-      --banner-primary:  #5e2a79;
-      --banner-accent:   #f2b705;
-      --banner-accent2:  #ffe074;
-      --banner-bg:       linear-gradient(135deg, rgba(26,13,46,0.95) 0%, rgba(13,13,26,0.97) 100%);
-      --banner-dock-bg:  linear-gradient(180deg, #1a0d2a 0%, #0a0510 100%);
+      --tg-accent:  var(--theme-accent, #f2b705);
+      --tg-primary: var(--theme-primary, #5e2a79);
+      --tg-surface: var(--theme-surface, #1f1430);
+      --tg-surface2: var(--theme-surface-2, #160e24);
+      --tg-border:  var(--theme-border, #3a2a52);
+      --tg-text:    var(--theme-text, #ffffff);
+      --tg-dim:     var(--theme-text-dim, #b9a9cc);
+      --tg-radius:  var(--theme-radius, 14px);
+      --tg-page:    var(--theme-page-bg, #0d0816);
     }
-    html.use-theme {
-      --banner-primary:  var(--theme-primary,  #5e2a79);
-      --banner-accent:   var(--theme-accent,   #f2b705);
-      --banner-accent2:  var(--theme-accent-2, #ffe074);
-      --banner-bg:       linear-gradient(135deg,
-                           color-mix(in srgb, var(--theme-primary) 90%, var(--theme-bg, #000)) 0%,
-                           color-mix(in srgb, var(--theme-bg, #08040f) 97%, transparent) 100%);
-      --banner-dock-bg:  linear-gradient(180deg,
-                           color-mix(in srgb, var(--theme-primary) 30%, var(--theme-bg, #000)) 0%,
-                           var(--theme-bg, #08040f) 100%);
-    }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      width: 600px;
-      height: 180px;
-      overflow: hidden;
-      background: transparent;
-      font-family: var(--theme-font-body, 'DM Sans', sans-serif);
-    }
-    body.dock { background: var(--banner-dock-bg) !important; }
-
-    @keyframes bannerGlow {
-      0%,100% { box-shadow:
-        0 0 14px color-mix(in srgb, var(--banner-accent) 35%, transparent),
-        0 0 32px color-mix(in srgb, var(--banner-accent) 20%, transparent),
-        0 0 0 1px color-mix(in srgb, var(--banner-accent) 30%, transparent) inset; }
-      50%     { box-shadow:
-        0 0 22px color-mix(in srgb, var(--banner-accent) 70%, transparent),
-        0 0 55px color-mix(in srgb, var(--banner-accent) 40%, transparent),
-        0 0 0 1px color-mix(in srgb, var(--banner-accent) 50%, transparent) inset; }
-    }
-    @keyframes fillGradient {
-      0%   { background-position: 0% 0%; }
-      100% { background-position: 200% 0%; }
-    }
-    @keyframes shineSweep {
-      0%   { transform: translateX(-100%); }
-      100% { transform: translateX(200%); }
-    }
-
-    .banner {
-      position: absolute;
-      top: 50%; left: calc(50% - 240px);
-      width: 480px; height: 80px;
-      transform: translateY(-50%);
-      background: var(--banner-bg);
-      border: 1.5px solid color-mix(in srgb, var(--banner-accent) 50%, transparent);
-      border-radius: 10px;
-      padding: 10px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      animation: bannerGlow 3.5s ease-in-out infinite;
-      overflow: hidden;
-    }
-
-    .banner-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
-    }
-
-    .title {
-      font-size: 14px;
-      font-weight: 900;
-      color: var(--banner-accent);
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      flex: 1;
-      text-shadow:
-        0 0 10px color-mix(in srgb, var(--banner-accent) 70%, transparent),
-        2px 2px 0 rgba(0,0,0,0.6);
-    }
-
-    .count {
-      font-size: 16px;
-      font-weight: 900;
-      color: var(--theme-text, #fff);
-      white-space: nowrap;
-      flex-shrink: 0;
-      text-shadow:
-        0 0 10px color-mix(in srgb, var(--banner-accent) 80%, transparent),
-        1px 1px 0 rgba(0,0,0,0.6);
-    }
-    .count .current { color: var(--banner-accent); }
-    .count .sep     { color: var(--theme-text-faint, rgba(255,255,255,0.5)); margin: 0 4px; font-size: 14px; }
-    .count .goal    { color: var(--theme-text, #fff); }
-    .count .currency { margin-left: 4px; }
-
-    .progress-track {
-      position: relative;
-      height: 14px;
-      background: color-mix(in srgb, var(--banner-primary) 35%, transparent);
-      border: 1px solid color-mix(in srgb, var(--banner-accent) 25%, transparent);
-      border-radius: 7px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(90deg,
-        var(--banner-primary) 0%,
-        color-mix(in srgb, var(--banner-primary) 60%, var(--banner-accent)) 30%,
-        var(--banner-accent) 70%,
-        var(--banner-accent2) 100%);
-      background-size: 200% 100%;
-      border-radius: 7px;
-      box-shadow:
-        0 0 10px color-mix(in srgb, var(--banner-accent) 70%, transparent),
-        inset 0 0 6px rgba(255,255,255,0.2);
-      transition: width 1.2s cubic-bezier(0.4,0,0.2,1) 400ms;
-      animation: fillGradient 4s linear infinite;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .progress-fill::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.4) 50%, transparent 100%);
-      transform: translateX(-100%);
-      animation: shineSweep 3s ease-in-out 1.2s infinite;
-    }
-
-    .progress-percent {
-      position: absolute;
-      top: 50%; left: 50%;
-      transform: translate(-50%,-50%);
-      font-size: 10px;
-      font-weight: 900;
-      color: var(--theme-on-primary, #fff);
-      letter-spacing: 1px;
-      text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
-      z-index: 2;
-    }
+    html, body { width: 600px; height: 180px; overflow: hidden; background: transparent;
+      font-family: var(--theme-font-body, 'DM Sans', sans-serif); color: var(--tg-text); }
+    body.dock { background: var(--tg-page); }
+    .tg { position: absolute; inset: 0; display: grid; place-items: center; }
+    .tg-card { width: 540px; height: 112px; display: grid; grid-template-columns: 64px 1fr; gap: 16px; align-items: center;
+      padding: 16px 20px 16px 16px; border-radius: var(--tg-radius);
+      background: linear-gradient(160deg, color-mix(in srgb, var(--tg-surface) 94%, var(--tg-primary)) 0%, var(--tg-surface2) 100%);
+      border: 1px solid color-mix(in srgb, var(--tg-border) 80%, transparent);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      transition: border-color 0.6s ease, box-shadow 0.6s ease; }
+    .tg.is-done .tg-card { border-color: color-mix(in srgb, var(--tg-accent) 60%, transparent);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 22px color-mix(in srgb, var(--tg-accent) 22%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+    .tg-icon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+      background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--tg-accent) 85%, #fff) 0%, var(--tg-accent) 45%, color-mix(in srgb, var(--tg-accent) 55%, #000) 100%);
+      color: color-mix(in srgb, var(--tg-accent) 25%, #000);
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--tg-accent) 35%, transparent), inset 0 -3px 6px rgba(0, 0, 0, 0.25); }
+    .tg-icon .material-symbols-outlined { font-size: 36px; }
+    .tg-body { min-width: 0; display: grid; gap: 10px; }
+    .tg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+    .tg-title { font-family: var(--theme-font-display, 'DM Sans', sans-serif); font-weight: 800; font-size: 15px; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--tg-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tg-amount { font-family: var(--theme-font-display, 'DM Sans', sans-serif); font-weight: 800; font-size: 26px; white-space: nowrap;
+      font-variant-numeric: tabular-nums; line-height: 1; }
+    .tg-cur { color: var(--tg-accent); }
+    .tg-sep { color: var(--tg-dim); font-weight: 500; margin: 0 4px; }
+    .tg-goal { color: var(--tg-text); }
+    .tg-pct { font-size: 13px; font-weight: 700; color: var(--tg-dim); margin-left: 10px; font-variant-numeric: tabular-nums; }
+    .tg-tube { position: relative; height: 22px; }
+    .tg-tube canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
   </style>
 </head>
 <body>
-  <div class="banner">
-    <div class="banner-header">
-      <div class="title" id="title">Tip Goal</div>
-      <div class="count">
-        <span class="current" id="current">0</span>
-        <span class="sep">/</span>
-        <span class="goal" id="goal">100</span>
-        <span class="currency" id="currency">€</span>
+  <main class="tg" id="tg">
+    <div class="tg-card">
+      <div class="tg-icon" aria-hidden="true"><span class="material-symbols-outlined" id="tgIcon">savings</span></div>
+      <div class="tg-body">
+        <div class="tg-head">
+          <span class="tg-title" id="tgTitle"></span>
+          <span class="tg-amount"><span class="tg-cur" id="tgCur"></span><span class="tg-sep">/</span><span class="tg-goal" id="tgGoal"></span><span class="tg-pct" id="tgPct"></span></span>
+        </div>
+        <div class="tg-tube"><canvas id="tgLiquid" width="884" height="44" aria-hidden="true"></canvas></div>
       </div>
     </div>
-    <div class="progress-track">
-      <div class="progress-fill" id="fill"></div>
-      <div class="progress-percent" id="percent">0%</div>
-    </div>
-  </div>
-
-  <div id="sparkle-wrap" style="position:absolute;top:0;left:0;width:600px;height:180px;overflow:visible;pointer-events:none;"></div>
-  <script src="../js/sparkles.js"></script>
+  </main>
+  <script src="../js/stinger-gl.js"></script>
   <script>
     (function () {
-      var params   = new URLSearchParams(window.location.search);
-      if (params.get('dock') === '1') document.body.classList.add('dock');
-      document.documentElement.classList.add('use-theme');
+      'use strict';
+      var P = new URLSearchParams(location.search);
+      function num(k, d) { var v = parseFloat((P.get(k) || '').replace(',', '.')); return isNaN(v) ? d : v; }
+      if (P.get('dock') === '1') document.body.classList.add('dock');
+      var title = P.get('title') || 'Tip Goal', cur = Math.max(0, num('current', 0)), goal = Math.max(0.01, num('goal', 100));
+      var currency = P.get('currency') || '€', target = Math.min(1, cur / goal);
+      var dec = (cur % 1 || goal % 1) ? 2 : 0;
+      function fmt(v) { return v.toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+      document.getElementById('tgTitle').textContent = title;
+      document.getElementById('tgGoal').textContent = fmt(goal) + ' ' + currency;
+      document.getElementById('tg').setAttribute('aria-label', title + ': ' + fmt(cur) + ' of ' + fmt(goal) + ' ' + currency);
+      var elCur = document.getElementById('tgCur'), elPct = document.getElementById('tgPct');
+      var reduce = window.StingerGL && window.StingerGL.reduced();
 
-      var title    = params.get('title')    || 'Tip Goal';
-      var current  = parseFloat((params.get('current') || '0').replace(',', '.'))   || 0;
-      var goal     = parseFloat((params.get('goal')    || '100').replace(',', '.')) || 100;
-      var currency = params.get('currency') || '€';
-
-      function fmt(n) {
-        return n.toLocaleString('de-DE', {
-          minimumFractionDigits: (n % 1 === 0) ? 0 : 2,
-          maximumFractionDigits: 2
-        });
+      // Flüssigkeit in der Glasröhre (WebGL); ohne WebGL bleibt nur die Zahl
+      var cv = document.getElementById('tgLiquid'), gl = cv.getContext('webgl', { premultipliedAlpha: true, alpha: true });
+      var draw = function () {};
+      if (gl && window.StingerGL) {
+        var FS = [
+          'precision highp float;',
+          'uniform vec2 uRes; uniform float uT, uFill, uDone, uCalm; uniform vec3 uP, uA, uA2, uBg;',
+          'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
+          'float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);',
+          '  return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }',
+          'void main(){',
+          '  vec2 px = gl_FragCoord.xy, half_ = uRes*0.5; float R = half_.y - 1.0;',
+          // Kapsel (Röhre) als Abstandsfeld
+          '  vec2 q = abs(px - half_) - vec2(half_.x - R - 1.0, 0.0);',
+          '  float d = length(max(q, 0.0)) - R;',
+          '  float inside = 1.0 - smoothstep(-1.0, 0.5, d);',
+          '  if (inside <= 0.0) { gl_FragColor = vec4(0.0); return; }',
+          '  float y = px.y / uRes.y, x = px.x / uRes.x;',
+          // leere Röhre: dunkles Glas mit Innenschatten
+          '  vec3 c = mix(uBg, uP, 0.18) * (0.75 + 0.35*y);',
+          '  float a = 0.9;',
+          // Flüssigkeit: Front wackelt, Strömung und Bläschen
+          '  float sp = 1.0 - uCalm*0.8;',
+          '  float front = uFill*uRes.x + (sin(px.y*0.35 + uT*5.0*sp)*3.0 + sin(px.y*0.11 - uT*3.0*sp)*2.0) * (1.0 - uDone) * step(0.001, uFill);',
+          '  float liq = 1.0 - smoothstep(front - 1.5, front + 1.5, px.x);',
+          '  if (liq > 0.0) {',
+          '    float fl = n(vec2(px.x*0.025 - uT*1.6*sp, px.y*0.08)) * 0.6 + n(vec2((px.x - px.y*0.8)*0.06 - uT*3.0*sp, 0.0)) * 0.4;',
+          '    vec3 lc = mix(uP, uA, smoothstep(0.0, 1.0, x / max(uFill, 0.05)));',
+          '    lc = mix(lc, mix(uA, vec3(1.0), 0.35), smoothstep(0.55, 0.95, fl) * 0.45);',
+          '    lc *= 0.75 + 0.45*y;',
+          // Bläschen: in Zellen, steigen leicht und treiben nach rechts
+          '    vec2 bc = vec2(px.x*0.06 - uT*1.2*sp, px.y*0.06 - uT*0.9*sp); vec2 bi = floor(bc), bf = fract(bc) - 0.5;',
+          '    float br = h(bi) > 0.72 ? 1.0 - smoothstep(0.12, 0.2, length(bf + (vec2(h(bi+3.1), h(bi+7.7)) - 0.5)*0.4)) : 0.0;',
+          '    lc += vec3(1.0) * br * 0.35;',
+          // heller Saum an der Front
+          '    lc += mix(uA, vec3(1.0), 0.6) * exp(-abs(px.x - front) * 0.35) * 0.9 * step(0.001, uFill);',
+          // Ziel erreicht: Schimmer läuft durch
+          '    float sh = fract(uT*0.45) * 1.6 - 0.3;',
+          '    lc += vec3(1.0) * exp(-abs(x - sh - (y - 0.5)*0.15) * 18.0) * 0.45 * uDone;',
+          '    c = mix(c, lc, liq); a = mix(a, 1.0, liq);',
+          '  }',
+          // Glas: Glanzstreifen oben, dunkler Rand
+          '  c += vec3(1.0) * smoothstep(0.62, 0.72, y) * (1.0 - smoothstep(0.78, 0.9, y)) * 0.16;',
+          '  float rim = smoothstep(-2.5, -0.5, d);',
+          '  c = mix(c, mix(uBg, uA2, 0.35), rim * 0.8);',
+          '  a *= inside;',
+          '  gl_FragColor = vec4(c * a, a);',
+          '}'
+        ].join('\n');
+        var sh = function (t, src) { var s = gl.createShader(t); gl.shaderSource(s, src); gl.compileShader(s);
+          if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error('tipgoal', gl.getShaderInfoLog(s)); return null; } return s; };
+        var vs = sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }'), fs = sh(gl.FRAGMENT_SHADER, FS);
+        if (vs && fs) {
+          var pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr); gl.useProgram(pr);
+          gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
+          gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+          var loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+          var U = function (k) { return gl.getUniformLocation(pr, k); };
+          gl.uniform2f(U('uRes'), cv.width, cv.height); gl.uniform1f(U('uCalm'), reduce ? 1 : 0);
+          var setColors = function () { var C = window.StingerGL.colors();
+            gl.uniform3fv(U('uP'), C.primary); gl.uniform3fv(U('uA'), C.accent); gl.uniform3fv(U('uA2'), C.accent2); gl.uniform3fv(U('uBg'), C.bg); };
+          setColors();
+          new MutationObserver(setColors).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+          var uT = U('uT'), uFill = U('uFill'), uDone = U('uDone');
+          draw = function (t, f, done) {
+            gl.uniform1f(uT, t); gl.uniform1f(uFill, f); gl.uniform1f(uDone, done);
+            gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); gl.drawArrays(gl.TRIANGLES, 0, 3);
+          };
+        }
       }
 
-      var percentage = Math.min(100, Math.round((current / goal) * 100));
-      document.getElementById('title').textContent   = title;
-      document.getElementById('current').textContent = fmt(current);
-      document.getElementById('goal').textContent    = fmt(goal);
-      document.getElementById('currency').textContent = currency;
-      document.getElementById('fill').style.width    = percentage + '%';
-      document.getElementById('percent').textContent = percentage + '%';
-
-      new SparkleEngine(document.getElementById('sparkle-wrap'), {
-        count: 4, speed: 0.2, maxOpacity: 0.75,
-        colors: { gold: 0.7, purple: 0.2, white: 0.1 },
-        sizeWeights: { big: 0, normal: 0.2, small: 0.5, tiny: 0.3 }
-      }).start();
+      // Hochzählen beim Laden (1,6 s), danach läuft nur noch die Flüssigkeit
+      var t0 = performance.now(), RISE = reduce ? 0.01 : 1.6, doneSet = false;
+      (function frame() {
+        var t = (performance.now() - t0) / 1000, k = Math.min(1, t / RISE), e = 1 - Math.pow(1 - k, 3);
+        var shown = cur * e;
+        elCur.textContent = fmt(shown);
+        elPct.textContent = Math.floor(cur / goal * e * 100) + ' %';   // über 100 % zeigt den echten Wert
+        var done = k >= 1 && cur >= goal ? 1 : 0;
+        if (done && !doneSet) { doneSet = true; document.getElementById('tg').classList.add('is-done'); document.getElementById('tgIcon').textContent = 'celebration'; }
+        draw(t, target * e, done);
+        requestAnimationFrame(frame);
+      })();
     })();
   </script>
 </body>
