@@ -48,6 +48,8 @@
         var q = new URLSearchParams();
         PASS.forEach(function (k) { if (ev.params && ev.params[k] != null) q.set(k, ev.params[k]); });
         q.set('duration', String(display)); q.set('soundfile', snd.id); if (c.full) q.set('full', '1');
+        // schaltbare Teile (z. B. Welcome: Disco-Kugel, Lichter, Konfetti) aus dem Dashboard
+        Object.keys(c.extras || {}).forEach(function (k) { q.set(k, c.extras[k] ? '1' : '0'); });
         q.set('v', String(Date.now()));
         var fr = document.createElement('iframe');
         fr.className = 'slot'; fr.setAttribute('title', ev.cmd + ' alert'); fr.setAttribute('aria-hidden', 'true');

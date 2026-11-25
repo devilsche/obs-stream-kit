@@ -673,6 +673,7 @@ G1R_STEAM_NAME=</code></pre>
         <div class="url-sound__row">
           <label class="url-sound__chk"><input type="checkbox" id="urlSoundStay"> Keep the alert on screen until the sound ends</label>
         </div>
+        <fieldset class="url-sound__extras" id="urlSoundExtras" hidden><legend class="url-sound__lbl">Show</legend><div id="urlSoundExtrasList" class="url-sound__row"></div></fieldset>
         <p class="url-sound__rules">Duration and sound settings apply to the live alert source (<code>alerts/live.html</code>), which Streamer.bot only sends events to. Changes reach a running source within 20 seconds.</p>
         <span class="url-copied" id="urlSoundStatus" role="status" aria-live="polite"></span>
       </div>` : "";
@@ -767,6 +768,11 @@ G1R_STEAM_NAME=</code></pre>
       document.getElementById("urlSoundDur").value = String([3,4,5,6,8,10,12,15,20,30].reduce((a, b) => Math.abs(b - e.duration) < Math.abs(a - e.duration) ? b : a));
       document.getElementById("urlSoundFull").value = e.full === false ? "0" : "1";
       document.getElementById("urlSoundStay").checked = e.stay !== false;
+      // schaltbare Teile (z. B. Welcome: Disco-Kugel, Lichter, Konfetti)
+      const ex = (data.extras || {})[alert], exBox = document.getElementById("urlSoundExtras");
+      exBox.hidden = !ex;
+      if (ex) document.getElementById("urlSoundExtrasList").innerHTML = Object.keys(ex).map(k => `
+        <label class="url-sound__chk"><input type="checkbox" data-extra="${escapeAttr(k)}"${(e.extras || {})[k] !== false ? " checked" : ""}> ${escapeHtml(ex[k])}</label>`).join("");
       file.setAttribute("aria-disabled", file.disabled ? "true" : "false");
       list.innerHTML = e.files.length ? `<ul class="url-sound__items">${e.files.map(f => `
         <li class="url-sound__item">
@@ -811,6 +817,10 @@ G1R_STEAM_NAME=</code></pre>
     document.getElementById("urlSoundDur").addEventListener("change", e => saveOptions({ duration: parseInt(e.target.value, 10) }));
     document.getElementById("urlSoundFull").addEventListener("change", e => saveOptions({ full: e.target.value === "1" }));
     document.getElementById("urlSoundStay").addEventListener("change", e => saveOptions({ stay: e.target.checked }));
+    document.getElementById("urlSoundExtras").addEventListener("change", e => {
+      const k = e.target.dataset && e.target.dataset.extra;
+      if (k) saveOptions({ extras: { [k]: e.target.checked } });
+    });
     vol.addEventListener("change", () => {
       fetch(api + "/volume", { method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },

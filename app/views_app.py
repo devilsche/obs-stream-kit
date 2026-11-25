@@ -1119,7 +1119,7 @@ def _fetch_only():
 def alert_sounds_list():
     from overlay_app import alert_sounds
     cfg = _sound_conn(lambda c: alert_sounds.load(c, g.tenant_id))
-    return jsonify({"alerts": cfg, "defaults": alert_sounds.DEFAULTS, "maxFiles": alert_sounds.MAX_FILES,
+    return jsonify({"alerts": cfg, "defaults": alert_sounds.DEFAULTS, "extras": alert_sounds.EXTRAS, "maxFiles": alert_sounds.MAX_FILES,
                     "maxSeconds": alert_sounds.MAX_SECONDS, "maxBytes": alert_sounds.MAX_BYTES})
 
 
@@ -1167,7 +1167,8 @@ def alert_sounds_options(alert):
         return jsonify({"ok": False, "error": "Invalid duration."}), 400
     full = bool(body["full"]) if "full" in body else None
     stay = bool(body["stay"]) if "stay" in body else None
-    if not _sound_conn(lambda c: alert_sounds.set_options(c, g.tenant_id, alert, dur, full, stay)):
+    extras = body.get("extras") if isinstance(body.get("extras"), dict) else None
+    if not _sound_conn(lambda c: alert_sounds.set_options(c, g.tenant_id, alert, dur, full, stay, extras)):
         return jsonify({"ok": False, "error": "Unknown alert."}), 404
     return jsonify({"ok": True})
 

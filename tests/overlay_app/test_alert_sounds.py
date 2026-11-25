@@ -75,3 +75,16 @@ def test_options_and_live_config(store):
     assert "live" not in live and live["sub"]["duration"] == 60
     assert live["follow"]["default"]["src"] == "/s/tok/assets/alert-sounds/follow.mp3"
     assert live["follow"]["default"]["dur"] > 8
+
+
+def test_welcome_defaults_and_extras(store):
+    cfg = alert_sounds.load(None, 5)
+    w = cfg["welcome"]
+    assert (w["duration"], w["full"], w["stay"], w["volume"]) == (10, False, False, 0.2)
+    assert w["extras"] == {"disco": True, "lights": True, "confetti": True}
+    assert "extras" not in cfg["follow"]
+    assert alert_sounds.set_options(None, 5, "welcome", extras={"confetti": False, "bogus": True})
+    w = alert_sounds.load(None, 5)["welcome"]
+    assert w["extras"] == {"disco": True, "lights": True, "confetti": False}
+    live = alert_sounds.for_live(alert_sounds.load(None, 5), ".", "tok")["welcome"]
+    assert live["extras"]["confetti"] is False and live["default"]["dur"] > 18

@@ -161,7 +161,7 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 | | |
 |-|-|
 | **Datei** | `alerts/welcome.html` |
-| **Beschreibung** | Fullscreen-Alert für Erstbesucher im Chat — Name-Box mittig, Sparkles über den gesamten Canvas, Pop-Burst beim Einblenden |
+| **Beschreibung** | Fullscreen-Alert für Erstbesucher im Chat — Name-Box mittig, Sparkles, Pop-Burst; dazu die **Disco**: Spiegelkugel in WebGL (`js/disco-ball.js`, Kacheln mit Studio-Spiegelung, farbige Lichter in den Theme-Farben, Funkeln; fährt an der Schnur herein und am Ende wieder hoch), Lichtpunkte über das Bild und glänzendes Konfetti in Theme-Farben (Rand weich ausgeblendet). Ersetzt die früheren OBS-Quellen „Discokugel“ (GIF), „Konfetti“ (1-GB-Video mit Chroma-Key) und „Magic Beat“. |
 | **Interner Canvas** | 1920×1080 |
 | **OBS Browser-Source** | 1920×1080 (Fullscreen) |
 
@@ -170,13 +170,12 @@ Die Browser-Source muss ca. **100px breiter** und **100px höher** als die Cam-G
 | Parameter | Default | Beschreibung |
 |-----------|---------|--------------|
 | `name` | `NewViewer42` | Angezeigter Username |
+| `duration` | `10` | Sekunden bis zum Ausblenden (Kugel fährt hoch, alles blendet aus) |
+| `disco` / `lights` / `confetti` | `1` | Disco-Kugel, Lichtpunkte, Konfetti einzeln abschalten (`0`); im Wartemodus als Häkchen im Dashboard (Stream → Welcome → *Show*) |
 
-**OBS-Setup:**
-1. Browser-Source hinzufügen → Größe **1920×1080** (Fullscreen-Overlay)
-2. Source auf **unsichtbar** stellen (Auge-Icon aus)
-3. **Show Transition** einstellen: Rechtsklick → Show Transition → *Slide* oder *Fade*
-4. Per Streamer.bot bei First-Chat-Event die URL setzen (`?name=%user%`) und die Source einblenden
-5. Nach X Sekunden Source wieder ausblenden (OBS übernimmt die Animation)
+**Ton:** eingebaut „Magic Beat“ (`assets/alert-sounds/welcome.mp3`, 20 %, blendet mit dem Alert aus), eigene MP3 wie bei allen Alerts im Dashboard.
+
+**Streamer.bot:** „Welcome - Effect“ schickt nur `…/api/fx/alert?cmd=welcome&name=%user%` an den Wartemodus (`alerts/live.html`); kein Ein-/Ausblenden einzelner Quellen mehr.
 
 **Beispiel:** `alerts/welcome.html?name=NeuerChatter`
 

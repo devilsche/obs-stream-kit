@@ -20,12 +20,16 @@ DEFAULT_VOLUME = 0.6
 SETTING = "alert_sounds"
 # Eingebaute Töne im Repo (assets/alert-sounds/<alert>.mp3): spielen, solange der Tenant keinen eigenen hat.
 # Lautstärke 0 im Dashboard schaltet auch sie ab.
-DEFAULTS = {"follow": "followalit.mp3"}
+DEFAULTS = {"follow": "followalit.mp3", "welcome": "magic-beat.mp3"}
 # Standard-Lautstärke, solange der Tenant nichts eingestellt hat (die Follower-Musik ist laut abgemischt)
-DEFAULT_VOLUMES = {"follow": 0.15}
+DEFAULT_VOLUMES = {"follow": 0.15, "welcome": 0.2}
 # Anzeige je Alert (Dashboard): Dauer in s, Ton ganz ausspielen (sonst mit dem Alert ausblenden),
 # Alert bleibt stehen, bis der Ton zu Ende ist.
 OPTIONS = {"duration": 6, "full": True, "stay": True}
+# Abweichende Standards je Alert (Welcome lief früher 10 s, Ton wurde mit ausgeblendet)
+OPTION_DEFAULTS = {"welcome": {"duration": 10, "full": False, "stay": False}}
+# Ein-/ausschaltbare Teile je Alert (Dashboard-Häkchen; der Host reicht sie als URL-Parameter durch)
+EXTRAS = {"welcome": {"disco": "Disco ball", "lights": "Disco lights", "confetti": "Confetti"}}
 MIN_DURATION, MAX_DURATION = 2, 60
 _ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
@@ -108,12 +112,16 @@ def load(conn, tenant_id):
         except (TypeError, ValueError):
             vol = dv
         out[key] = {"volume": vol, "files": files[:MAX_FILES]}
+        od = dict(OPTIONS, **OPTION_DEFAULTS.get(key, {}))
         try:
-            out[key]["duration"] = max(MIN_DURATION, min(MAX_DURATION, int(e.get("duration", OPTIONS["duration"]))))
+            out[key]["duration"] = max(MIN_DURATION, min(MAX_DURATION, int(e.get("duration", od["duration"]))))
         except (TypeError, ValueError):
-            out[key]["duration"] = OPTIONS["duration"]
-        out[key]["full"] = bool(e.get("full", OPTIONS["full"]))
-        out[key]["stay"] = bool(e.get("stay", OPTIONS["stay"]))
+            out[key]["duration"] = od["duration"]
+        out[key]["full"] = bool(e.get("full", od["full"]))
+        out[key]["stay"] = bool(e.get("stay", od["stay"]))
+        if key in EXTRAS:
+            ex = e.get("extras") if isinstance(e.get("extras"), dict) else {}
+            out[key]["extras"] = {k: bool(ex.get(k, True)) for k in EXTRAS[key]}
     return out
 
 
@@ -187,7 +195,7 @@ def set_volume(conn, tenant_id, alert, volume):
     return True
 
 
-def set_options(conn, tenant_id, alert, duration=None, full=None, stay=None):
+def set_options(conn, tenant_id, alert, duration=None, full=None, stay=None, extras=None):
     if alert not in ALERT_KEYS:
         return False
     cfg = load(conn, tenant_id)
@@ -197,6 +205,10 @@ def set_options(conn, tenant_id, alert, duration=None, full=None, stay=None):
         cfg[alert]["full"] = bool(full)
     if stay is not None:
         cfg[alert]["stay"] = bool(stay)
+    if extras and alert in EXTRAS:
+        for k, v in extras.items():
+            if k in EXTRAS[alert]:
+                cfg[alert]["extras"][k] = bool(v)
     _save(conn, tenant_id, cfg)
     return True
 
@@ -225,7 +237,8 @@ def for_live(cfg, root, token):
         if not files and key in DEFAULTS:
             d = {"src": "/s/%s/assets/alert-sounds/%s.mp3" % (token, key), "dur": default_duration(root, key) or 0}
         out[key] = {"duration": e.get("duration", OPTIONS["duration"]), "full": e.get("full", True),
-                    "stay": e.get("stay", True), "volume": e.get("volume", DEFAULT_VOLUME), "files": files, "default": d}
+                    "stay": e.get("stay", True), "volume": e.get("volume", DEFAULT_VOLUME), "files": files, "default": d,
+                    "extras": e.get("extras", {})}
     return out
 
 

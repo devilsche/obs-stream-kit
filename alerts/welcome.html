@@ -131,11 +131,23 @@
     .fx-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
     .fx-layer.sparkle { z-index: 4; }
     .fx-layer.burst   { z-index: 1; }
+
+    /* ── Disco (früher drei einzelne OBS-Quellen): Kugel, Lichter, Konfetti – je per URL abschaltbar ──
+       disco=0, lights=0, confetti=0; im Wartemodus aus dem Dashboard (alerts/live.html reicht sie durch). */
+    /* Disco-Kugel in WebGL (js/disco-ball.js): eigene Canvas über die ganze Fläche, fährt selbst rein und raus */
+    .disco-ball { position: absolute; inset: 0; width: 1920px; height: 1080px; z-index: 3; pointer-events: none; }
+    .disco-ball[hidden] { display: none; }
+    .disco-fx { position: absolute; inset: 0; width: 1920px; height: 1080px; z-index: 0; pointer-events: none; transition: opacity 0.8s ease-in; }
+    .leaving .disco-fx { opacity: 0; }
+    .leaving .content, .leaving .fx-layer { transition: opacity 0.6s ease-in; opacity: 0; }
   </style>
   <link rel="stylesheet" href="../widgets/_theme.css">
   <link rel="stylesheet" href="../widgets/_blocks.css">
 </head>
 <body>
+
+  <canvas id="discoFx" class="disco-fx" width="1920" height="1080" aria-hidden="true"></canvas>
+  <canvas id="discoBall" class="disco-ball" width="1920" height="1080" aria-hidden="true"></canvas>
 
   <div id="sparkle-container" class="fx-layer sparkle"></div>
 
@@ -233,6 +245,87 @@
     })();
   </script>
 
+  <script src="../js/theme-colors.js"></script>
+  <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/vendor/three-r128-RoomEnvironment.js"></script>
+  <script src="../js/disco-ball.js"></script>
+  <script>
+    /* ── Disco: Lichtpunkte aus der Kugel (Theme-Farben) und glänzendes Konfetti von oben ─────
+       Alles auf einer Canvas; Konfetti blendet zum Rand hin weich aus. Ende nach ?duration= (Standard 10 s). */
+    (function () {
+      'use strict';
+      var q = new URLSearchParams(location.search);
+      function on(k) { return q.get(k) !== '0'; }
+      var DUR = Math.max(2, parseFloat(q.get('duration')) || 10);
+      var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      var ball = document.getElementById('discoBall'), disco = null;
+      var cv = document.getElementById('discoFx'), g = cv.getContext('2d'), W = 1920, H = 1080;
+      var useLights = on('lights') && !reduce, useConf = on('confetti');
+      var pal = [];
+      function readTheme() {
+        var p = window.ThemeColors ? ThemeColors.palette() : { accent: '#f2b705', accent2: '#c9a0dc', primary: '#5e2a79' };
+        pal = [p.accent, p.accent2, p.primary, '#ffffff', '#ff6b9d', '#4ea9ff', '#7ee081', '#ffd84d'];
+      }
+      readTheme(); if (window.ThemeColors) ThemeColors.onChange(readTheme);
+      if (!on('disco') || !window.DiscoBall) ball.hidden = true;
+      else {
+        disco = DiscoBall.create({ canvas: ball, colors: pal.slice(0, 3).concat(['#ffffff']) });
+        if (window.ThemeColors) ThemeColors.onChange(function () { disco.setColors(pal.slice(0, 3).concat(['#ffffff'])); });
+      }
+
+      // Lichtpunkte: wandern von der Kugel (oben Mitte) über Wände und Boden, wie Spiegelreflexe
+      var spots = [];
+      for (var i = 0; i < 26; i++) spots.push({ a: Math.random() * 6.28, r: 300 + Math.random() * 900, s: 0.15 + Math.random() * 0.35,
+        size: 30 + Math.random() * 60, ci: i % 4, ph: Math.random() * 6.28 });
+      // Konfetti: Rechtecke, drehen und kippen (Breite = cos der Kippung → Glanz beim Umdrehen)
+      var conf = [], spawned = 0, MAXC = reduce ? 90 : 260;
+      function addConf() {
+        conf.push({ x: Math.random() * W, y: -20 - Math.random() * 120, vx: (Math.random() - 0.5) * 40, vy: 90 + Math.random() * 120,
+          w: 9 + Math.random() * 9, h: 14 + Math.random() * 12, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 5,
+          flip: Math.random() * 6.28, vf: 4 + Math.random() * 6, sway: Math.random() * 6.28, c: pal[Math.floor(Math.random() * pal.length)] });
+      }
+      var t0 = null, leaving = false;
+      function frame(ts) {
+        if (t0 === null) t0 = ts;
+        var t = (ts - t0) / 1000, dt = 1 / 60;
+        if (!leaving && t >= DUR) { leaving = true; document.body.classList.add('leaving'); if (disco) disco.leave(); }
+        g.clearRect(0, 0, W, H);
+        if (useLights) {
+          g.globalCompositeOperation = 'lighter';
+          var fadeIn = Math.min(1, t / 1.2);
+          spots.forEach(function (s) {
+            var a = s.a + t * s.s, x = W / 2 + Math.cos(a) * s.r * 1.4, y = 260 + Math.sin(a) * s.r * 0.55 + s.r * 0.25;
+            var flick = 0.55 + 0.45 * Math.sin(t * 6 + s.ph);
+            var grd = g.createRadialGradient(x, y, 0, x, y, s.size);
+            grd.addColorStop(0, pal[s.ci]); grd.addColorStop(1, 'rgba(0,0,0,0)');
+            g.globalAlpha = 0.35 * flick * fadeIn; g.fillStyle = grd;
+            g.beginPath(); g.arc(x, y, s.size, 0, 6.29); g.fill();
+          });
+          g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+        }
+        if (useConf) {
+          var want = Math.min(MAXC, Math.floor(MAXC * Math.min(1, t / (DUR * 0.6))));
+          while (!leaving && spawned < want) { addConf(); spawned++; }
+          for (var j = conf.length - 1; j >= 0; j--) {
+            var c = conf[j];
+            c.sway += dt * 2; c.x += (c.vx + Math.sin(c.sway) * 30) * dt; c.y += c.vy * dt; c.rot += c.vr * dt; c.flip += c.vf * dt;
+            if (c.y > H + 30) { conf.splice(j, 1); continue; }
+            // Rand-Fade: unten und an den Seiten weich ausblenden (nichts poppt am Rand)
+            var edge = Math.min(1, (H - c.y) / 140, c.x / 80, (W - c.x) / 80);
+            if (edge <= 0) continue;
+            var k = Math.cos(c.flip);
+            g.save(); g.translate(c.x, c.y); g.rotate(c.rot); g.scale(1, Math.max(0.08, Math.abs(k)));
+            g.globalAlpha = edge; g.fillStyle = c.c; g.fillRect(-c.w / 2, -c.h / 2, c.w, c.h);
+            if (k > 0.75) { g.globalAlpha = edge * (k - 0.75) * 3; g.fillStyle = '#ffffff'; g.fillRect(-c.w / 2, -c.h / 2, c.w, c.h); }   // Glanz
+            g.restore();
+          }
+          g.globalAlpha = 1;
+        }
+        if (t < DUR + 1.5) requestAnimationFrame(frame); else g.clearRect(0, 0, W, H);
+      }
+      requestAnimationFrame(frame);
+    })();
+  </script>
   <script src="../js/alert-sound.js"></script>
 </body>
 </html>
