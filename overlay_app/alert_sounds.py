@@ -21,6 +21,8 @@ SETTING = "alert_sounds"
 # Eingebaute Töne im Repo (assets/alert-sounds/<alert>.mp3): spielen, solange der Tenant keinen eigenen hat.
 # Lautstärke 0 im Dashboard schaltet auch sie ab.
 DEFAULTS = {"follow": "followalit.mp3"}
+# Standard-Lautstärke, solange der Tenant nichts eingestellt hat (die Follower-Musik ist laut abgemischt)
+DEFAULT_VOLUMES = {"follow": 0.15}
 _ID_RE = re.compile(r"^[0-9a-f]{12}$")
 
 # ── MP3-Länge ohne Fremdbibliothek: alle Frames ablaufen (klappt für CBR und VBR) ──
@@ -96,10 +98,11 @@ def load(conn, tenant_id):
     for key in ALERT_KEYS:
         e = raw.get(key) if isinstance(raw.get(key), dict) else {}
         files = [f for f in e.get("files", []) if isinstance(f, dict) and _ID_RE.match(str(f.get("id", "")))]
+        dv = DEFAULT_VOLUMES.get(key, DEFAULT_VOLUME)
         try:
-            vol = max(0.0, min(1.0, float(e.get("volume", DEFAULT_VOLUME))))
+            vol = max(0.0, min(1.0, float(e.get("volume", dv))))
         except (TypeError, ValueError):
-            vol = DEFAULT_VOLUME
+            vol = dv
         out[key] = {"volume": vol, "files": files[:MAX_FILES]}
     return out
 
