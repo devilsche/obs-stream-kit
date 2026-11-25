@@ -18,13 +18,13 @@
     var S = DS.create({ canvas: opts.canvas, volume: 0 });
     S.renderer.shadowMap.enabled = false;
     var cam = new THREE.OrthographicCamera(0, W, H, 0, -50, 50); cam.position.set(0, 0, 20);
-    var size = Math.max(80, Math.min(260, opts.size || 170)), k = size / U / 2.15;
+    var size = Math.max(60, Math.min(260, opts.size || 110)), k = size / U / 2.15;
     var GAP = size * 1.55 / U, GROUND = 0.1;
     var list = RD.OUTFITS.filter(function (o) { return o !== 'none' && o.indexOf('court-') !== 0; });
     var order = opts.loop ? shuffle(list.slice()) : list.slice(), next = 0;
     // Tempo: einmal → alle Outfits plus Schild in t Sekunden über den ganzen Bildschirm
     var total = (order.length + 1) * GAP + W + 2 * GAP;
-    var speed = opts.loop ? (opts.speed || 110) / U : total / Math.max(10, (opts.t || 60) - 0.5);
+    var speed = opts.loop ? (opts.speed || 70) / U : total / Math.max(10, (opts.t || 60) - 0.5);
     var TPL = {}, TAGS = {}, items = [], head = W + GAP;   // head = x der nächsten Ente
 
     // Schild: Anzeigename groß, darunter „!outfit <name>“ in Gold

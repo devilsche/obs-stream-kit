@@ -8,8 +8,8 @@
     /* Outfit-Parade (js/duck-parade.js, three.js r128): alle Gummienten-Outfits watscheln als Laufband
        von rechts nach links, jede mit Schild „Name · !outfit <name>“. Leinwand 1920×400.
        ohne ?loop: einmal alle Outfits in ?t= Sekunden (60), danach leer (Chat-Befehl !outfits);
-       ?loop=1: endlos gemischt (BRB, Starting Soon), ?speed= px/s (110).
-       ?size= Höhe der Enten in px (170), ?at= hält bei Sekunde at an (zum Prüfen).
+       ?loop=1: endlos gemischt, ?speed= px/s (70).
+       ?size= Höhe der Enten in px (110; kleiner = auch langsamer, weil die Strecke kürzer ist), ?at= hält bei Sekunde at an.
        An den Rändern weich ausgeblendet. */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 1920px; height: 400px; overflow: hidden; background: transparent; }
@@ -36,7 +36,7 @@
       window.DuckParade.start({
         canvas: document.getElementById('gl'),
         loop: q.get('loop') === '1',
-        t: num('t', 60), size: num('size', 170), speed: num('speed', 110),
+        t: num('t', 60), size: num('size', 110), speed: num('speed', 70),
         reduceMotion: !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches),
         freeze: q.get('at') !== null ? num('at', 0) : null,
         ping: location.protocol === 'file:' ? null : '../api/fx/ducks/parade'
