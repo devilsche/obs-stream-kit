@@ -26,6 +26,8 @@ OVERLAYS = [
          {"key": "frame",  "label": "Frame", "type": "select", "default": "classic",
           "options": [["classic", "Classic"], ["depth", "Depth (3D, emotes)"], ["none", "None"]],
           "tooltip": "None: no frame, e.g. when you run the Depth frame as three separate sources (Webcam Frame card, x 58, y 54, 972 × 972) for the head-over-frame effect"},
+         {"key": "border", "label": "Frame width", "type": "number", "default": "10", "min": 4, "when": {"frame": "depth"},
+          "presets": ["6", "10", "16", "24"]},
          {"key": "comet",  "label": "Comet", "type": "select", "default": "1", "when": {"frame": "depth"},
           "options": [["1", "On"], ["0", "Off"]]},
          {"key": "emotes", "label": "Chat emotes", "type": "select", "default": "1", "when": {"frame": "depth"},
