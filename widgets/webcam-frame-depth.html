@@ -10,7 +10,7 @@
        Tiefe: dieselbe URL dreimal mit layer=back | frame | front, in OBS von unten nach oben:
        back → Kamera (aufs Fenster zugeschnitten) → frame → Kamera-Kopie freigestellt (NVIDIA, weniger zugeschnitten) → front.
        Alle Ebenen rechnen mit der Serverzeit und denselben Befehlen und zeigen so dasselbe Bild.
-       URL: layer (all|back|frame|front), x, y, width, height, radius, border, comet (1|0), emotes (1|0), max, stack,
+       URL: layer (all|back|frame|front|under = back+frame), x, y, width, height, radius, border, comet (1|0), emotes (1|0), max, stack,
        alerts (1|0), speed, demo (1 = Emotes zum Ausprobieren). Befehle: /s/<token>/api/fx/frame (emotes, shake, flash). -->
   <link rel="stylesheet" href="_theme.css">
   <style>
@@ -27,8 +27,9 @@
       'use strict';
       var P = new URLSearchParams(location.search);
       function num(k, d, lo, hi) { var v = parseFloat(P.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
-      var LAYER = ({ back: 'back', frame: 'frame', front: 'front' })[P.get('layer')] || 'all';
-      function on(l) { return LAYER === 'all' || LAYER === l; }
+      // under = back + frame in einer Quelle (unter der Kamera), wenn nur zwei Quellen möglich sind (z. B. Kamera in einer OBS-Gruppe)
+      var LAYER = ({ back: 'back', frame: 'frame', front: 'front', under: 'under' })[P.get('layer')] || 'all';
+      function on(l) { return LAYER === 'all' || LAYER === l || (LAYER === 'under' && l !== 'front'); }
       var SPEED = num('speed', 1, 0.2, 3), MAXE = num('max', 40, 5, 80), STACK = num('stack', 14, 0, 60);
       var USE_EMOTES = P.get('emotes') !== '0', USE_COMET = P.get('comet') !== '0', DEMO = P.get('demo') === '1';
       var AT = parseFloat(P.get('at'));

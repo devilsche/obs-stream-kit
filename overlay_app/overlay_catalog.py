@@ -185,8 +185,8 @@ DECOR = [
           "options": [["0.5", "Slow"], ["1", "Normal"], ["2", "Fast"]]},
          # Depth
          {"key": "layer",  "label": "Layer", "type": "select", "default": "all", "when": {"style": "depth"},
-          "options": [["all", "All in one"], ["back", "Back"], ["frame", "Frame"], ["front", "Front"]],
-          "tooltip": "All in one = a single source. For the depth effect use the URL three times (Back, Frame, Front), see the hint above"},
+          "options": [["all", "All in one"], ["back", "Back"], ["frame", "Frame"], ["front", "Front"], ["under", "Back + Frame"]],
+          "tooltip": "All in one = a single source. For the depth effect use the URL three times (Back, Frame, Front), see the hint above – or twice: Back + Frame below the camera, Front above it"},
          {"key": "x",      "label": "Camera x",      "type": "number", "default": "", "min": 0, "when": {"style": "depth"},
           "tooltip": "Left edge of the camera in the scene (px). Empty = bottom right"},
          {"key": "y",      "label": "Camera y",      "type": "number", "default": "", "min": 0, "when": {"style": "depth"},
