@@ -8,10 +8,12 @@
 
   function num(k, d, lo, hi) { var v = parseFloat(P.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
 
-  // Dauer und Schnittpunkt in ms, müssen zu den OBS-Werten (Duration / Transition Point) passen
-  function timing(defDur, defCut) {
-    var dur = num('dur', defDur, 600, 8000), cut = num('cut', defCut, 300, dur - 300);
-    return { dur: dur / 1000, cut: cut / 1000 };
+  /* Zeiten in ms aus der URL: cut = Bild zu (Transition Point in OBS), hold = so lange bleibt es danach zu,
+     dur = Dauer des Öffnens danach. In OBS: Duration = cut + hold + dur, Transition Point = cut.
+     Ergebnis in s: cut, open (= cut + hold, ab da öffnet es), dur (= Gesamtdauer). */
+  function timing(defOpen, defCut) {
+    var cut = num('cut', defCut, 300, 5000), hold = num('hold', 0, 0, 5000), op = num('dur', defOpen, 300, 5000);
+    return { cut: cut / 1000, open: (cut + hold) / 1000, dur: (cut + hold + op) / 1000 };
   }
 
   // ?at=1.2 hält die Zeit an (Sekunden) – zum Prüfen einzelner Bilder
@@ -54,12 +56,29 @@
 
   /* Bild in der Mitte (Name, Logo oder nichts): 2048×2048-Textur, obere Hälfte = Bild in Farbe (RGBA),
      untere Hälfte = weicher Schein drumherum (Grauwert). Auf dem Schirm liegt es in einem 1600×800-Feld in der Mitte.
-     ?show=name|logo|none (Standard name); logo = window.__STINGER_LOGO__ (Upload im Dashboard), ohne Upload der Name.
+     ?show=name|logo|none (Standard name); logo = eines aus dem Logo-Pool window.__STINGER_LOGOS__ (bis zu 10 Uploads im
+     Dashboard), ?logos=<id>,<id> = Auswahl dieses Stingers (leer = alle): bei jedem Übergang per Zufall, nie zweimal
+     dasselbe hintereinander. Ohne Upload der Name.
      done(canvas) kommt, sobald Schrift oder Bild geladen sind (Schrift spätestens nach 700 ms mit Ersatz). */
   var AW = 2048, AH = 1024;
+  var _logo;
+  function logoUrl() {
+    if (_logo !== undefined) return _logo;
+    var all = (window.__STINGER_LOGOS__ || []).filter(function (e) { return e && e.url; });
+    var want = (P.get('logos') || '').split(',').filter(Boolean), last = null, i;
+    var L = all.filter(function (e) { return !want.length || want.indexOf(e.id) >= 0; });
+    if (!L.length) L = all;   // Auswahl leer oder gelöscht: ganzer Pool
+    L = L.map(function (e) { return e.url; });
+    if (!L.length) return (_logo = null);
+    try { last = localStorage.getItem('stinger-logo-last'); } catch (e) { /* ohne Speicher eben reiner Zufall */ }
+    i = Math.floor(Math.random() * L.length);
+    if (L.length > 1 && L[i] === last) i = (i + 1 + Math.floor(Math.random() * (L.length - 1))) % L.length;
+    try { localStorage.setItem('stinger-logo-last', L[i]); } catch (e) { /* egal */ }
+    return (_logo = L[i]);
+  }
   function show() {
     var s = P.get('show') || 'name';
-    if (s === 'logo' && !window.__STINGER_LOGO__) s = 'name';
+    if (s === 'logo' && !logoUrl()) s = 'name';
     if (s === 'name' && !name()) s = 'none';
     return s;
   }
@@ -88,7 +107,7 @@
         pack(art, done);
       };
       im.onerror = function () { console.error('stinger: logo not loaded'); };
-      im.src = window.__STINGER_LOGO__;
+      im.src = logoUrl();
       return;
     }
     var text = name(), fam = font();
@@ -127,12 +146,12 @@
     return { renderer: r, scene: new THREE.Scene(), cam: cam, W: W, H: H };
   }
 
-  // Theme-Farben + Name-Textur als three-Uniforms (uP, uA, uA2, uBg, uTex, uHasText, uT, uCut, uDur, uCalm)
+  // Theme-Farben + Name-Textur als three-Uniforms (uP, uA, uA2, uBg, uTex, uHasText, uT, uCut, uOpen, uDur, uCalm)
   function threeUniforms(T, C) {
     function v3(c) { return new THREE.Vector3(c[0], c[1], c[2]); }
     var tex = new THREE.Texture(); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.flipY = false;
     var U = {
-      uT: { value: 0 }, uCut: { value: T.cut }, uDur: { value: T.dur }, uCalm: { value: reduced() ? 1 : 0 },
+      uT: { value: 0 }, uCut: { value: T.cut }, uOpen: { value: T.open }, uDur: { value: T.dur }, uCalm: { value: reduced() ? 1 : 0 },
       uP: { value: v3(C.primary) }, uA: { value: v3(C.accent) }, uA2: { value: v3(C.accent2) }, uBg: { value: v3(C.bg) },
       uTex: { value: tex }, uHasText: { value: 0 }
     };

@@ -29,7 +29,7 @@
   <script>
     (function () {
       'use strict';
-      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var S = window.StingerGL, T = S.timing(1100, 900), C = S.colors();
       var W = 1920, H = 1080, NX = 16, NY = 9;
       var renderer;
       try {
@@ -87,7 +87,7 @@
       function v3(c) { return new THREE.Vector3(c[0], c[1], c[2]); }
       var tex = new THREE.Texture(); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false; tex.flipY = false;
       var U = {
-        uT: { value: 0 }, uCut: { value: T.cut }, uDur: { value: T.dur }, uCalm: { value: S.reduced() ? 1 : 0 },
+        uT: { value: 0 }, uCut: { value: T.cut }, uOpen: { value: T.open }, uDur: { value: T.dur }, uCalm: { value: S.reduced() ? 1 : 0 },
         uP: { value: v3(C.primary) }, uA: { value: v3(C.accent) }, uA2: { value: v3(C.accent2) }, uBg: { value: v3(C.bg) },
         uTex: { value: tex }, uHasText: { value: 0 }
       };
@@ -96,7 +96,7 @@
         extensions: { derivatives: true },
         vertexShader: [
           'attribute vec3 aCen, aNorm; attribute vec4 aRnd; attribute vec3 aBary; attribute float aSide;',
-          'uniform float uT, uCut, uDur, uCalm;',
+          'uniform float uT, uCut, uOpen, uDur, uCalm;',
           'varying vec2 vUv; varying vec3 vN, vBary; varying float vA, vCrack, vMove, vSide;',
           'mat3 rot(vec3 ax, float an){ ax = normalize(ax); float s = sin(an), c = cos(an), o = 1.0 - c;',
           '  return mat3(o*ax.x*ax.x + c, o*ax.x*ax.y + ax.z*s, o*ax.z*ax.x - ax.y*s,',
@@ -111,7 +111,7 @@
           '  float pIn = clamp((uT - (d*0.5 + aRnd.x*0.15)*win) / (0.35*win), 0.0, 1.0);',
           '  float eIn = 1.0 - pow(1.0 - pIn, 3.0);',
           // raus: Einschlag in der Mitte, Splitter fliegen nach außen, zur Kamera und fallen
-          '  float pOut = clamp((uT - uCut - d*0.22 - aRnd.y*0.06) / max(0.3, uDur - uCut - 0.32), 0.0, 1.0);',
+          '  float pOut = clamp((uT - uOpen - d*0.22 - aRnd.y*0.06) / max(0.3, uDur - uOpen - 0.32), 0.0, 1.0);',
           '  float spin = 1.0 - uCalm;',
           // im Flug kräftig um alle Achsen taumeln
           '  float ang = ((1.0 - eIn)*(3.0 + aRnd.y*4.0) + pOut*(6.0 + aRnd.z*9.0)) * spin;',
@@ -123,7 +123,7 @@
           '  off.y -= 900.0*pOut*pOut;',
           '  vN = R * aNorm; vSide = aSide;',
           '  vA = smoothstep(0.0, 0.18, pIn) * (1.0 - smoothstep(0.45, 1.0, pOut));',
-          '  vCrack = smoothstep(uCut - 0.2 + d*0.12, uCut + d*0.12, uT) * (1.0 - pOut);',
+          '  vCrack = smoothstep(uOpen - 0.2 + d*0.12, uOpen + d*0.12, uT) * (1.0 - pOut);',
           '  vMove = clamp((1.0 - eIn)*1.6 + pOut*2.0, 0.0, 1.0);',
           '  vec3 l = position - aCen;',
           // liegt der Splitter, bleibt die Ecke exakt auf dem Gitterpunkt (keine Haarlinien zwischen Nachbarn)
@@ -131,7 +131,7 @@
           '}'
         ].join('\n'),
         fragmentShader: S.GLSL + '\n' + [
-          'uniform float uT, uCut, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+          'uniform float uT, uCut, uOpen, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
           'varying vec2 vUv; varying vec3 vN, vBary; varying float vA, vCrack, vMove, vSide;',
           'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }',
           'float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f);',

@@ -28,7 +28,7 @@
   <script>
     (function () {
       'use strict';
-      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var S = window.StingerGL, T = S.timing(1100, 900), C = S.colors();
       var st = S.threeStage(document.getElementById('gl'));
       if (!st) { S.fallback(); return; }
       var NX = 16, NY = 9, CS = 120;   // 16 × 120 = 1920, 9 × 120 = 1080: Würfel stoßen exakt aneinander
@@ -53,7 +53,7 @@
         uniforms: U, transparent: true,
         vertexShader: S.GLSL + '\n' + [
           'attribute vec2 aCell; attribute vec4 aRnd;',
-          'uniform float uT, uCut, uDur, uCalm;',
+          'uniform float uT, uCut, uOpen, uDur, uCalm;',
           'varying vec3 vN, vObj; varying vec2 vUv; varying float vA, vMove, vCrack;',
           'void main(){',
           // Welle: oben links zuerst
@@ -61,7 +61,7 @@
           '  float win = uCut - 0.1;',
           '  float pIn = clamp((uT - (w*0.6 + aRnd.x*0.06)*win) / (0.34*win), 0.0, 1.0);',
           '  float eIn = 1.0 - pow(1.0 - pIn, 3.0);',
-          '  float pOut = clamp((uT - uCut - w*0.3 - aRnd.y*0.05) / max(0.3, uDur - uCut - 0.38), 0.0, 1.0);',
+          '  float pOut = clamp((uT - uOpen - w*0.3 - aRnd.y*0.05) / max(0.3, uDur - uOpen - 0.38), 0.0, 1.0);',
           '  float spin = 1.0 - uCalm*0.7;',
           // rein: aus der Tiefe, taumelnd um eine schräge Achse, die letzte Vierteldrehung klappt nach vorne
           '  vec3 axIn = normalize(vec3(1.0, (aRnd.w - 0.5)*1.2, (aRnd.z - 0.5)*0.8));',
@@ -83,7 +83,7 @@
           '  vUv = (aCell + position.xy * 120.0) / vec2(1920.0, 1080.0) + 0.5;',
           '  vA = smoothstep(0.0, 0.25, pIn) * (1.0 - smoothstep(0.55, 1.0, pOut));',
           '  vMove = clamp((1.0 - eIn)*1.5 + pOut*2.0, 0.0, 1.0);',
-          '  vCrack = smoothstep(uCut - 0.2 + w*0.1, uCut + w*0.1, uT) * (1.0 - pOut);',
+          '  vCrack = smoothstep(uOpen - 0.2 + w*0.1, uOpen + w*0.1, uT) * (1.0 - pOut);',
           '  gl_Position = projectionMatrix * modelViewMatrix * vec4(world, 1.0);',
           '}'
         ].join('\n'),

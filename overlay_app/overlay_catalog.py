@@ -1103,18 +1103,26 @@ _STINGER_FONTS = [
 ]
 
 
-# WebGL-Stinger: Zeiten müssen zu Duration / Transition Point des OBS-Übergangs passen
+# WebGL-Stinger. „when“: Schalter nur sichtbar (und nur in der URL), wenn der andere Schalter diesen Wert hat.
+# Zeiten: OBS-Duration = cut + hold + dur, Transition Point = cut (das Dashboard rechnet es vor).
 _GL_STINGER_SWITCHES = [
+    {"key": "show", "label": "Show", "type": "select", "default": "name", "group": "Content",
+     "options": [["name", "Name"], ["logo", "Logo"], ["none", "Nothing"]],
+     "tooltip": "Name: your channel name in a font. Logo: images from the logo pool. Nothing: just the effect"},
     {"key": "name", "label": "Name", "type": "text", "default": "", "placeholder": "e.g. LUCKOR_HD",
-     "tooltip": "Twitch channel name (overrides server default)"},
-    {"key": "show", "label": "Show", "type": "select", "default": "name",
-     "options": [["name", "Name"], ["logo", "Logo (upload below)"], ["none", "Nothing"]],
-     "tooltip": "Logo needs an uploaded image; without one the name is shown"},
-    {"key": "font", "label": "Font", "type": "select", "default": "", "options": _STINGER_FONTS},
-    {"key": "dur", "label": "Duration (ms)", "type": "number", "default": "2000", "min": 600,
-     "tooltip": "Same value as Duration in the OBS transition"},
-    {"key": "cut", "label": "Cut point (ms)", "type": "number", "default": "900", "min": 300,
-     "tooltip": "Same value as Transition Point in the OBS transition"},
+     "group": "Content", "when": {"show": "name"},
+     "tooltip": "Empty = your Twitch channel name"},
+    {"key": "font", "label": "Font", "type": "select", "default": "", "options": _STINGER_FONTS,
+     "group": "Content", "when": {"show": "name"}},
+    {"key": "logos", "label": "Logos", "type": "text", "default": "", "group": "Content", "when": {"show": "logo"},
+     "pool": "stinger-logo"},
+    {"key": "cut", "label": "Closed after (ms)", "type": "number", "default": "900", "min": 300, "group": "Timing",
+     "tooltip": "From the start until the screen is fully covered = Transition Point in OBS"},
+    {"key": "hold", "label": "Stay closed (ms)", "type": "number", "default": "0", "min": 0, "group": "Timing",
+     "presets": ["0", "200", "400", "800"],
+     "tooltip": "How long it stays closed after the cut point before it opens"},
+    {"key": "dur", "label": "Opening (ms)", "type": "number", "default": "1100", "min": 300, "group": "Timing",
+     "tooltip": "How long the opening takes after the hold"},
 ]
 
 

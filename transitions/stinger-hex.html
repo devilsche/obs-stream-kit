@@ -28,7 +28,7 @@
   <script>
     (function () {
       'use strict';
-      var S = window.StingerGL, T = S.timing(2000, 900), C = S.colors();
+      var S = window.StingerGL, T = S.timing(1100, 900), C = S.colors();
       var st = S.threeStage(document.getElementById('gl'));
       if (!st) { S.fallback(); return; }
       var R = 66, DX = 1.5 * R, DY = Math.sqrt(3) * R;   // flache Sechsecke (Spitze links/rechts)
@@ -57,7 +57,7 @@
         uniforms: U, transparent: true, side: THREE.FrontSide,
         vertexShader: S.GLSL + '\n' + [
           'attribute vec2 aCell; attribute vec4 aRnd;',
-          'uniform float uT, uCut, uDur, uCalm, uR;',
+          'uniform float uT, uCut, uOpen, uDur, uCalm, uR;',
           'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide;',
           'void main(){',
           '  float d = clamp(length(aCell / vec2(960.0, 540.0)) / 1.414, 0.0, 1.0);',
@@ -65,7 +65,7 @@
           '  float t0 = (d*0.62 + aRnd.x*0.05)*win, pIn = clamp((uT - t0) / (0.3*win), 0.0, 1.0);',
           // leichtes Überschwingen beim Hereinklappen
           '  float eIn = 1.0 + 2.2*pow(pIn - 1.0, 3.0) + 1.2*pow(pIn - 1.0, 2.0);',
-          '  float tO = uCut + d*0.32 + aRnd.y*0.06, pOut = clamp((uT - tO) / max(0.3, uDur - uCut - 0.45), 0.0, 1.0);',
+          '  float tO = uOpen + d*0.32 + aRnd.y*0.06, pOut = clamp((uT - tO) / max(0.3, uDur - uOpen - 0.45), 0.0, 1.0);',
           '  float spin = 1.0 - uCalm*0.8;',
           // rein: klappt um die Hochachse herein; raus: taumelt um zufällige Achsen, teils zur Kamera, teils in die Tiefe
           '  mat3 Rm = rot(vec3(aRnd.z - 0.5, 1.0, 0.0), (1.0 - pIn)*1.6 * spin);',
@@ -89,7 +89,7 @@
           '}'
         ].join('\n'),
         fragmentShader: S.GLSL + '\n' + [
-          'uniform float uT, uCut, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
+          'uniform float uT, uCut, uOpen, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
           'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide;',
           'void main(){',
           '  if (vA <= 0.001) discard;',

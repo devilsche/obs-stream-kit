@@ -1111,20 +1111,23 @@ def _fetch_only():
 @bp_app.route("/app/api/stinger-logo", methods=["GET", "POST", "DELETE"])
 @require_session
 def stinger_logo_api():
-    """Logo der WebGL-Stinger: GET = Eintrag, POST = hochladen (ersetzt), DELETE = entfernen."""
+    """Logos der WebGL-Stinger: GET = Liste, POST = hinzufügen (bis 10), DELETE ?id= = eines entfernen."""
     from overlay_app import stinger_logo
     if request.method == "GET":
-        return jsonify({"ok": True, "logo": _sound_conn(lambda c: stinger_logo.load(c, g.tenant_id))})
+        return jsonify({"ok": True, "logos": _sound_conn(lambda c: stinger_logo.load(c, g.tenant_id)),
+                        "max": stinger_logo.MAX_LOGOS})
     if not _fetch_only():
         return jsonify({"ok": False, "error": "Bad request."}), 400
     if request.method == "DELETE":
-        _sound_conn(lambda c: stinger_logo.delete(c, _sound_root(), g.tenant_id))
+        lid = request.args.get("id", "")
+        if not _sound_conn(lambda c: stinger_logo.delete(c, _sound_root(), g.tenant_id, lid)):
+            return jsonify({"ok": False, "error": "Logo not found."}), 404
         return jsonify({"ok": True})
     f = request.files.get("file")
     if not f:
         return jsonify({"ok": False, "error": "No file received."}), 400
     data = f.read(stinger_logo.MAX_BYTES + 1)
-    entry, err = _sound_conn(lambda c: stinger_logo.set_image(c, _sound_root(), g.tenant_id, f.filename, data))
+    entry, err = _sound_conn(lambda c: stinger_logo.add_image(c, _sound_root(), g.tenant_id, f.filename, data))
     if err:
         return jsonify({"ok": False, "error": err}), 400
     return jsonify({"ok": True, "logo": entry})

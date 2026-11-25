@@ -42,7 +42,7 @@ def _serve_tenant_source(token, subdir, filepath):
     alert_sound = None
     alert_cfg = None
     pet_media_cfg = None
-    stinger_logo_url = False   # False = nicht einspeisen (nur WebGL-Stinger), None = kein Logo hochgeladen
+    stinger_logos = None   # None = nicht einspeisen (nur WebGL-Stinger), [] = kein Logo hochgeladen
     sound_level = None
     conn = _get_conn()
     try:
@@ -59,9 +59,9 @@ def _serve_tenant_source(token, subdir, filepath):
         if subdir == "transitions" and filepath == "pet.html":   # Bild + Töne aus dem Dashboard
             from overlay_app import pet_media
             pet_media_cfg = pet_media.for_page(pet_media.load(conn, g.tenant_id), f"/s/{token}/")
-        if subdir == "transitions" and filepath.startswith("stinger-"):   # Logo aus dem Dashboard
+        if subdir == "transitions" and filepath.startswith("stinger-"):   # Logos aus dem Dashboard
             from overlay_app import stinger_logo
-            stinger_logo_url = stinger_logo.for_page(stinger_logo.load(conn, g.tenant_id), f"/s/{token}/")
+            stinger_logos = stinger_logo.for_page(stinger_logo.load(conn, g.tenant_id), f"/s/{token}/")
         if subdir == "alerts":   # eigene Alert-Töne aus dem Dashboard (js/alert-sound.js)
             from overlay_app import alert_sounds
             key = filepath[:-5] if filepath.endswith(".html") else ""
@@ -95,8 +95,8 @@ def _serve_tenant_source(token, subdir, filepath):
         variables["__SOUND_LEVEL__"] = sound_level
     if pet_media_cfg is not None:
         variables["__PET_MEDIA__"] = pet_media_cfg
-    if stinger_logo_url is not False:
-        variables["__STINGER_LOGO__"] = stinger_logo_url
+    if stinger_logos is not None:
+        variables["__STINGER_LOGOS__"] = stinger_logos
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 
@@ -192,7 +192,7 @@ def alert_sound_file(token, alert, file_id):
 
 @bp_overlays.route("/s/<token>/stinger-logo/<filename>")
 def stinger_logo_file(token, filename):
-    """Logo der WebGL-Stinger (Upload im Dashboard), nur über den Token des Tenants."""
+    """Logos der WebGL-Stinger (Upload im Dashboard), nur über den Token des Tenants."""
     from flask import send_file
     from overlay_app import stinger_logo
     if g.tenant_id is None:

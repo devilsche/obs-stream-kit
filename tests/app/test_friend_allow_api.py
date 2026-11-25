@@ -47,10 +47,13 @@ def test_stinger_logo_api(pg_conn_test_setup_non_admin, tmp_path):
     c = _client(conn, sid, tmp_path)
     H = {"X-Requested-With": "fetch"}
     png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
-    assert c.get("/app/api/stinger-logo").get_json()["logo"] is None
+    assert c.get("/app/api/stinger-logo").get_json()["logos"] == []
     assert c.post("/app/api/stinger-logo", data={"file": (io.BytesIO(png), "a.png")}).status_code == 400   # ohne Header
-    e = c.post("/app/api/stinger-logo", headers=H, data={"file": (io.BytesIO(png), "Logo.png")}).get_json()["logo"]
-    assert c.get("/app/api/stinger-logo").get_json()["logo"]["id"] == e["id"]
-    assert c.get("/app/api/stinger-logo/file/%s.png" % e["id"]).status_code == 200
-    assert c.delete("/app/api/stinger-logo", headers=H).get_json()["ok"]
-    assert c.get("/app/api/stinger-logo").get_json()["logo"] is None
+    e1 = c.post("/app/api/stinger-logo", headers=H, data={"file": (io.BytesIO(png), "Logo.png")}).get_json()["logo"]
+    e2 = c.post("/app/api/stinger-logo", headers=H, data={"file": (io.BytesIO(png), "Zwei.png")}).get_json()["logo"]
+    d = c.get("/app/api/stinger-logo").get_json()
+    assert [e["id"] for e in d["logos"]] == [e1["id"], e2["id"]] and d["max"] == 10
+    assert c.get("/app/api/stinger-logo/file/%s.png" % e1["id"]).status_code == 200
+    assert c.delete("/app/api/stinger-logo?id=" + e1["id"], headers=H).get_json()["ok"]
+    assert c.delete("/app/api/stinger-logo?id=" + e1["id"], headers=H).status_code == 404
+    assert [e["id"] for e in c.get("/app/api/stinger-logo").get_json()["logos"]] == [e2["id"]]

@@ -187,6 +187,7 @@ G1R_STEAM_NAME=</code></pre>
   function buildUrl(base, scope) {
     const params = [];
     scope.querySelectorAll(".sw-group").forEach(g => {
+      if (g.hidden) return;   // per „when“ ausgeblendet: gilt nicht
       const def = g.dataset.default;
       let value = null;
       if (g.dataset.type === "select") {
@@ -203,6 +204,19 @@ G1R_STEAM_NAME=</code></pre>
       }
     });
     return params.length ? base + "?" + params.join("&") : base;
+  }
+
+  // ── „when“: Schalter nur sichtbar, wenn ein anderer Schalter einen bestimmten Wert hat ──
+  function applyWhen(scope) {
+    scope.querySelectorAll(".sw-group[data-when]").forEach(g => {
+      const w = parseJSON(g.dataset.when, {});
+      g.hidden = !Object.keys(w).every(k => {
+        const o = scope.querySelector('.sw-group[data-param="' + k + '"]');
+        const a = o && o.querySelector(".sw-btn.active");
+        const v = a ? a.dataset.value : (o ? o.dataset.default : "");
+        return [].concat(w[k]).includes(v);
+      });
+    });
   }
 
   // ── Multiselect: Reihenfolge ──────────────────────────────
@@ -439,6 +453,10 @@ G1R_STEAM_NAME=</code></pre>
              </span>
            </span>`
         ).join("");
+      } else if (sw.pool) {
+        // Bilderpool: verstecktes Feld (Auswahl als IDs, leer = alle) + Pool-Oberfläche (wireStingerPool)
+        controls = `<input type="hidden" class="sw-input" value="${escapeAttr(sw.default || "")}">
+          <div class="url-stpool" data-pool="${escapeAttr(sw.pool)}"></div>`;
       } else if (sw.type === "text") {
         const isImg = sw.key === "img";
         controls = `<input type="text" class="sw-input sw-input--wide${isImg ? " sw-img-input" : ""}"
@@ -462,7 +480,7 @@ G1R_STEAM_NAME=</code></pre>
       const def = (sw.default !== undefined && sw.default !== "")
         ? `<span class="sw-def">default: ${escapeHtml(sw.default)}</span>` : "";
       return `
-        <div class="sw-group"
+        <div class="sw-group${sw.pool ? " sw-group--pool" : ""}"${sw.when ? ` data-when="${escapeAttr(JSON.stringify(sw.when))}"` : ""}
              data-param="${escapeAttr(sw.key)}"
              data-default="${escapeAttr(sw.default)}"
              data-type="${escapeAttr(sw.type)}">
@@ -690,23 +708,9 @@ G1R_STEAM_NAME=</code></pre>
         <p class="url-sound__rules" id="urlPetRules"></p>
         <span class="url-copied" id="urlPetStatus" role="status" aria-live="polite"></span>
       </div>` : "";
-    // WebGL-Stinger: Logo hochladen (Schalter Show → Logo), kommt vom Server in die Seite
+    // WebGL-Stinger: Logo-Pool sitzt im Schalter „Logos“ (wireStingerPool)
     const isGlStinger = /(^|\/)transitions\/stinger-[a-z]+\.html$/.test(card.dataset.path || "");
-    const stingerLogoHtml = isGlStinger ? `
-      <div class="url-dbox url-soundbox url-petmedia">
-        <h2>Logo <span class="url-dbox__tag">upload</span></h2>
-        <p class="url-dbox__desc">Shown instead of the name when <b>Show</b> is set to Logo. Use a PNG or WebP with a transparent background; wide logos work best. Applies to all WebGL stingers.</p>
-        <div class="url-petmedia__img">
-          <div class="url-petmedia__thumb url-petmedia__thumb--wide" id="urlStLogoThumb"></div>
-          <div class="url-petmedia__imgside">
-            <label class="url-sound__lbl" for="urlStLogoFile">Logo image (PNG, JPG or WebP, up to 6 MB)</label>
-            <input type="file" id="urlStLogoFile" class="url-sound__file" accept="image/png,image/jpeg,image/webp">
-            <button type="button" class="url-act ghost" id="urlStLogoDel" hidden><span class="material-symbols-outlined" aria-hidden="true">delete</span>Remove logo</button>
-          </div>
-        </div>
-        <span class="url-copied" id="urlStLogoStatus" role="status" aria-live="polite"></span>
-      </div>` : "";
-    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${petMediaHtml}${stingerLogoHtml}${chromeHtml}`;
+    const configCol = `<div class="url-dbox"><h2>${label} <span class="url-dbox__tag">${tag}</span></h2>${desc}${hint}${body}</div>${alertTabsHtml}${friendAllowHtml}${petMediaHtml}${chromeHtml}`;
 
     const infoBits = [];
     const pw = parseInt(card.dataset.previewW || "0");
@@ -764,7 +768,7 @@ G1R_STEAM_NAME=</code></pre>
     if (isLiveAlerts) wireAlertTabs(base, card.dataset.fx || "");
     if (/\/friend$/.test(card.dataset.fx || "")) wireFriendAllow();
     if (isPet) wirePetMedia();
-    if (isGlStinger) wireStingerLogo();
+    if (isGlStinger) wireStingerPool();
 
     wireDetail(base, { kind: card.dataset.kind, size: card.dataset.size,
                        shownUrl: hasParamHints ? shownUrl : null,
@@ -927,33 +931,94 @@ G1R_STEAM_NAME=</code></pre>
     reload();
   }
 
-  // ── WebGL-Stinger: Logo ──
-  function wireStingerLogo() {
+  // ── WebGL-Stinger: Logo-Pool (gemeinsam für alle Stinger, je Stinger angehakt) ──
+  // Die Auswahl steht im versteckten Feld des Schalters „Logos“ als IDs (leer = alle) und landet so in der URL.
+  function wireStingerPool() {
+    const box = document.querySelector('.url-stpool[data-pool="stinger-logo"]');
+    if (!box) return;
     const api = "/app/api/stinger-logo", H = { "X-Requested-With": "fetch" };
-    const thumb = document.getElementById("urlStLogoThumb"), file = document.getElementById("urlStLogoFile");
-    const del = document.getElementById("urlStLogoDel"), st = document.getElementById("urlStLogoStatus");
-    if (!thumb) return;
+    const inp = box.closest(".sw-group").querySelector(".sw-input");
+    box.innerHTML = `
+      <p class="url-stpool__desc">The pool is shared by all stingers (up to 10 images). Tick the logos <b>this</b> stinger uses: each transition shows one of them at random, never the same twice in a row.</p>
+      <ul class="url-stpool__list" aria-label="Logo pool"></ul>
+      <div class="url-stpool__add">
+        <label class="url-sound__lbl" for="urlStLogoFile">Add to pool (PNG, JPG or WebP, transparent background works best, up to 6 MB each)</label>
+        <input type="file" id="urlStLogoFile" class="url-sound__file" accept="image/png,image/jpeg,image/webp" multiple>
+      </div>
+      <span class="url-copied" id="urlStLogoStatus" role="status" aria-live="polite"></span>`;
+    const list = box.querySelector(".url-stpool__list"), file = box.querySelector("#urlStLogoFile");
+    const st = box.querySelector("#urlStLogoStatus");
     const say = (msg, bad) => { st.textContent = msg; st.classList.toggle("is-error", !!bad); };
-    function render(d) {
-      const l = d.logo;
-      thumb.innerHTML = l ? `<img src="${api}/file/${escapeAttr(l.id + "." + l.ext)}" alt="Current logo: ${escapeAttr(l.name)}">`
-                          : `<p class="url-sound__note">No logo yet – the name is shown.</p>`;
-      del.hidden = !l;
+    let pool = [], max = 10, own = false;
+    // gewählte IDs; leer oder nichts Gültiges mehr = alle (so macht es auch der Stinger)
+    function selected() {
+      const ids = pool.map(l => l.id), want = inp.value.split(",").filter(id => ids.includes(id));
+      return want.length ? want : ids;
+    }
+    function setSelected(ids) {
+      inp.value = ids.length === pool.length ? "" : ids.join(",");
+      own = true; inp.dispatchEvent(new Event("input", { bubbles: true })); own = false;
+    }
+    function render() {
+      const sel = selected();
+      list.innerHTML = pool.length ? pool.map((l, i) => `<li class="url-stpool__item">
+          <label class="url-stpool__pick">
+            <input type="checkbox" data-id="${escapeAttr(l.id)}"${sel.includes(l.id) ? " checked" : ""}>
+            <span class="url-petmedia__thumb url-petmedia__thumb--wide"><img src="${api}/file/${escapeAttr(l.id + "." + l.ext)}" alt=""></span>
+            <span class="url-stpool__name">${escapeHtml(l.name || "Logo " + (i + 1))}</span>
+          </label>
+          <button type="button" class="url-act ghost url-stpool__del" data-del="${escapeAttr(l.id)}" aria-label="Delete ${escapeAttr(l.name || "logo " + (i + 1))} from the pool"><span class="material-symbols-outlined" aria-hidden="true">delete</span></button>
+        </li>`).join("") : `<li class="url-sound__note">The pool is empty – add a logo below. Until then the name is shown.</li>`;
+      file.disabled = pool.length >= max;
+      if (pool.length >= max) say("Pool full (" + max + ") – delete one to add another.");
     }
     function reload() {
-      return fetch(api, { credentials: "same-origin", cache: "no-store" }).then(r => r.json()).then(render)
-        .catch(() => say("Could not load.", true));
+      return fetch(api, { credentials: "same-origin", cache: "no-store" }).then(r => r.json())
+        .then(d => { pool = d.logos || []; max = d.max || 10; render(); })
+        .catch(() => say("Could not load the pool.", true));
     }
-    file.addEventListener("change", () => {
-      const f = file.files[0]; if (!f) return;
-      const fd = new FormData(); fd.append("file", f);
-      say("Uploading…");
-      fetch(api, { method: "POST", credentials: "same-origin", headers: H, body: fd })
-        .then(r => r.json()).then(d => { say(d.ok ? "Saved." : (d.error || "Could not upload."), !d.ok); file.value = ""; return reload(); })
-        .catch(() => say("Could not upload.", true));
+    inp.addEventListener("input", () => { if (!own) render(); });   // von außen geändert, z. B. Zurücksetzen
+    list.addEventListener("change", e => {
+      const cb = e.target.closest("input[type=checkbox]"); if (!cb) return;
+      const ids = [...list.querySelectorAll("input[type=checkbox]:checked")].map(c => c.dataset.id);
+      if (!ids.length) { cb.checked = true; return say("Keep at least one logo ticked – or set Show to Name.", true); }
+      say("");
+      setSelected(ids);
     });
-    del.addEventListener("click", () => fetch(api, { method: "DELETE", credentials: "same-origin", headers: H })
-      .then(r => r.json()).then(d => { say(d.ok ? "Removed." : (d.error || "Could not remove."), !d.ok); return reload(); }));
+    list.addEventListener("click", e => {
+      const b = e.target.closest("[data-del]"); if (!b) return;
+      const used = "Delete this logo from the pool? It disappears from every stinger.";
+      if (b.dataset.armed !== "1") {   // zweimal klicken statt confirm()
+        b.dataset.armed = "1"; say(used + " Click again to delete.");
+        setTimeout(() => { delete b.dataset.armed; }, 4000);
+        return;
+      }
+      fetch(api + "?id=" + encodeURIComponent(b.dataset.del), { method: "DELETE", credentials: "same-origin", headers: H })
+        .then(r => r.json()).then(d => {
+          say(d.ok ? "Deleted from the pool." : (d.error || "Could not delete."), !d.ok);
+          const keep = selected().filter(id => id !== b.dataset.del);
+          return reload().then(() => setSelected(keep.filter(id => pool.some(l => l.id === id))));
+        })
+        .catch(() => say("Could not delete.", true));
+    });
+    file.addEventListener("change", async () => {
+      const files = Array.from(file.files); if (!files.length) return;
+      const before = selected(), wasAll = !inp.value;
+      let ok = 0, err = "", added = [];
+      for (const f of files) {
+        say("Uploading " + (ok + 1) + " of " + files.length + "…");
+        const fd = new FormData(); fd.append("file", f);
+        try {
+          const d = await fetch(api, { method: "POST", credentials: "same-origin", headers: H, body: fd }).then(r => r.json());
+          if (d.ok) { ok++; added.push(d.logo.id); } else { err = f.name + ": " + (d.error || "Could not upload."); break; }
+        } catch (e) { err = "Could not upload."; break; }
+      }
+      file.value = "";
+      await reload();
+      // neue Bilder sind in diesem Stinger gleich angehakt
+      if (!wasAll) setSelected(before.concat(added)); else render();
+      say(err ? (ok ? ok + " added. " : "") + err : (ok === 1 ? "Added to the pool." : ok + " logos added to the pool."), !!err);
+    });
     reload();
   }
 
@@ -1325,7 +1390,29 @@ G1R_STEAM_NAME=</code></pre>
 
     // _chromeUpdate wird ggf. unten belegt; refresh() ruft es immer nach dem URL-Update auf
     let _chromeUpdate = null;
+    // Schrift-Vorschau direkt unter den Font-Schalter, nur sichtbar wenn der es auch ist
+    const chromeBox = document.querySelector(".url-chrome-preview");
+    const fontGrpCp = scope.querySelector('.sw-group[data-param="font"]');
+    if (chromeBox && fontGrpCp) {
+      fontGrpCp.insertAdjacentElement("afterend", chromeBox);
+      chromeBox.classList.remove("url-dbox"); chromeBox.classList.add("url-chrome-preview--inline");
+    }
+    // Stinger-Zeiten: was in OBS einzutragen ist
+    const durGrp = scope.querySelector('.sw-group[data-param="dur"]'), holdGrp = scope.querySelector('.sw-group[data-param="hold"]');
+    let obsTiming = null;
+    if (durGrp && holdGrp) {
+      obsTiming = document.createElement("p");
+      obsTiming.className = "url-sttiming";
+      obsTiming.setAttribute("aria-live", "polite");
+      durGrp.insertAdjacentElement("afterend", obsTiming);
+    }
     function refresh() {
+      applyWhen(scope);
+      if (chromeBox && fontGrpCp) chromeBox.hidden = fontGrpCp.hidden;
+      if (obsTiming) {
+        const n = k => parseInt((scope.querySelector('.sw-group[data-param="' + k + '"] .sw-input') || {}).value, 10) || 0;
+        obsTiming.innerHTML = `<span class="material-symbols-outlined" aria-hidden="true">tune</span>In the OBS stinger transition set <b>Duration ${n("cut") + n("hold") + n("dur")} ms</b> and <b>Transition Point ${n("cut")} ms</b>.`;
+      }
       urlText.textContent = buildUrl(base, scope);
       lsSave();
       if (_chromeUpdate) _chromeUpdate();
