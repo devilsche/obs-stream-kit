@@ -131,6 +131,22 @@ ALERTS = [
 DECOR = [
     {"key": "logo",           "label": "Logo",            "file": "logo.html",           "size": "1920×1080",
      "desc": "Logo overlay.",                          "params": [], "switches": []},
+    {"key": "logo-3d",        "label": "Logo 3D",         "file": "logo-3d.html",        "size": "800×304",
+     "desc": "Your logo in WebGL: the stripes fly in from behind one by one, the letters drop in with a flip, then a shine runs across. Every few seconds a wave, a hop or a shine; replays the intro on alerts. Splits stripes and letters automatically.",
+     "params": [], "switches": [
+         {"key": "pause",  "label": "Pause (s)", "type": "number", "default": "10", "min": 3,
+          "tooltip": "Seconds between the idle effects"},
+         {"key": "idle",   "label": "Idle effect", "type": "select", "default": "both",
+          "options": [["both", "Wave and shine"], ["wave", "Wave"], ["shine", "Shine"], ["off", "Off"]]},
+         {"key": "intro",  "label": "Intro on load", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
+         {"key": "alerts", "label": "Replay on alerts", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
+         {"key": "glow",   "label": "Glow", "type": "select", "default": "theme",
+          "options": [["theme", "Theme colours"], ["purple", "Purple"], ["gold", "Gold"], ["off", "Off"]]},
+         {"key": "lines",  "label": "Stripes image", "type": "text", "default": "", "placeholder": "logo_lines_blue_t.png",
+          "tooltip": "File in assets/ – stripes are split into separate parts"},
+         {"key": "text",   "label": "Text image", "type": "text", "default": "", "placeholder": "logo_text_luckor_hd.png",
+          "tooltip": "File in assets/ – split into letters by columns"},
+     ]},
     {"key": "webcam-frame-energy", "label": "Webcam Frame Energy", "file": "webcam-frame-energy.html", "size": "",
      "desc": "WebGL energy border around the camera: flowing plasma in theme colours, light comets, flares up on every alert. Source size = camera + 2 × padding (default 50 px).",
      "params": [], "switches": [

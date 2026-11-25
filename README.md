@@ -124,6 +124,8 @@ Widgets sind kleinere Elemente, die unabhängig positioniert werden können. Die
 - `widgets/logo.html?glow=purple` → nur lila Glow
 - `widgets/logo.html?glow=#00ccff&lines=sponsor_lines.png&text=sponsor_text.png` → anderes Logo mit eigenem Glow
 
+**Logo 3D** (`widgets/logo-3d.html`, WebGL/three.js): dasselbe Logo in Teilen – das Streifenbild wird beim Laden in zusammenhängende Flächen zerlegt, das Textbild in Buchstaben (Spalten mit hellen, deckenden Pixeln in voller Auflösung), jedes Teil bekommt Dicke. Intro: Streifen fliegen einzeln von hinten heran und drehen sich um die Längsachse, Buchstaben fallen nacheinander mit Salto und blitzen bei der Landung, danach Glanz. Leerlauf alle `pause` s abwechselnd Welle (Streifen kippen, Buchstaben hüpfen mit Drehung) und Glanz; bei Alerts spielt das Intro neu. Parameter: `lines`, `text` (wie oben), `pause` (Standard 10), `idle` (`both`|`wave`|`shine`|`off`), `intro` (1|0), `alerts` (1|0), `glow` (`theme`|`purple`|`gold`|`off`|Hex). Größe = Browser-Source (z. B. 800×304), das Logo passt sich ein. Lässt sich ein Bild nicht zerlegen, wird es als Ganzes animiert; bei „Bewegung reduzieren“ nur Einblenden.
+
 ### Webcam-Rahmen
 
 | | |
