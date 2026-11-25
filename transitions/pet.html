@@ -289,16 +289,21 @@
       /* Bild und Ton aus dem Dashboard (window.__PET_MEDIA__); ein img= in der URL hat Vorrang */
       var MEDIA = window.__PET_MEDIA__ || {};
       if (!imgUrl && MEDIA.img) imgUrl = MEDIA.img;
+      // Ton startet mit dem Bild; die Seite blendet erst aus, wenn er zu Ende ist (OBS: Move-Action-Dauer lang genug lassen)
+      var SOUND_START = 0.3, soundEnd = 0;
       (function () {
         var list = MEDIA.sounds || [];
         if (!list.length || params.get('sound') === '0') return;
         var vol = (MEDIA.volume == null ? 0.6 : MEDIA.volume) * (typeof window.__SOUND_LEVEL__ === 'number' ? window.__SOUND_LEVEL__ : 1);
         if (vol <= 0) return;
-        var a = new Audio(list[Math.floor(Math.random() * list.length)]);
+        var pick = list[Math.floor(Math.random() * list.length)];
+        if (typeof pick === 'string') pick = { url: pick, dur: 0 };
+        var a = new Audio(pick.url);
         a.preload = 'auto'; a.volume = Math.min(1, vol);
-        setTimeout(function () {   // passend zum Einblenden des Bildes (vorher in Streamer.bot: 0,8 s Pause)
+        soundEnd = SOUND_START + (pick.dur || 0);
+        setTimeout(function () {
           var pr = a.play(); if (pr && pr.catch) pr.catch(function () { /* Browser ohne Klick: stumm */ });
-        }, 800);
+        }, SOUND_START * 1000);
       })();
 
       /* Bild setzen */
@@ -317,7 +322,11 @@
       function val(k) { return saved[k] !== undefined ? saved[k] : DEFAULTS[k]; }
       function applyToRoot() {
         var root = document.documentElement;
-        KEYS.forEach(function(k){ root.style.setProperty('--' + k, val(k) + 's'); });
+        KEYS.forEach(function(k){
+          var v = val(k);
+          if (k === 'stage-out') v = Math.max(v, soundEnd - 0.5);   // bis zum Tonende stehen bleiben (Ausblenden 0,5 s)
+          root.style.setProperty('--' + k, v + 's');
+        });
       }
       applyToRoot();
 

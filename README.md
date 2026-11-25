@@ -733,7 +733,7 @@ Die Verzögerung zwischen Blitz und Donner steckt schon in der WAV (Stille am An
 | Datei | Beschreibung | OBS-Setup |
 |-------|-------------|-----------|
 | `transitions/stinger.html` | Partikel/Geometrie (1s) | Browser Transition Plugin, Duration: 1000ms, Transition Point: 350ms |
-| `transitions/pet.html` | Haustier-Stinger (4 s): Name, Spitzname, Schrift, Emojis über URL-Parameter. **Bild und Ton** lädt man im Dashboard auf der Karte hoch („Image & sound“: ein Bild PNG/JPG/WebP/GIF bis 6 MB, bis zu 3 MP3 bis 15 s, zufällig gespielt, Lautstärke × Settings → Sound). Der Server gibt sie der Seite als `window.__PET_MEDIA__` mit (`overlay_app/pet_media.py`, Ablage `data/pet-media/<tenant>/`, Verzeichnis `settings['pet_media']`); keine URL nötig, ein `img=` in alten OBS-URLs hat Vorrang. Der Ton startet 0,8 s nach dem Einblenden. | Browser-Source 1920×1080, Ton über OBS |
+| `transitions/pet.html` | Haustier-Stinger (4 s): Name, Spitzname, Schrift, Emojis über URL-Parameter. **Bild und Ton** lädt man im Dashboard auf der Karte hoch („Image & sound“: ein Bild PNG/JPG/WebP/GIF bis 6 MB, bis zu 3 MP3 bis 15 s, zufällig gespielt, Lautstärke × Settings → Sound). Der Server gibt sie der Seite als `window.__PET_MEDIA__` mit (`overlay_app/pet_media.py`, Ablage `data/pet-media/<tenant>/`, Verzeichnis `settings['pet_media']`); keine URL nötig, ein `img=` in alten OBS-URLs hat Vorrang. Der Ton startet mit dem Bild (0,3 s), die Seite blendet erst aus, wenn er zu Ende ist – die Move-Action-Dauer der OBS-Quelle muss so lang sein wie 0,3 s + Tonlänge + 0,5 s. | Browser-Source 1920×1080, Ton über OBS |
 
 ---
 

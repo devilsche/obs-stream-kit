@@ -37,7 +37,7 @@ def test_image_replace_and_sounds(tmp_path, monkeypatch):
     assert len(cfg["sounds"]) == 3 and cfg["img"]["id"] == e2["id"]
     assert pet_media.delete(c, root, 3, cfg["sounds"][0]["id"])
     out = pet_media.for_page(pet_media.load(c, 3), "/s/tok/")
-    assert out["img"] == "/s/tok/pet-media/%s.jpg" % e2["id"] and len(out["sounds"]) == 2
+    assert out["img"] == "/s/tok/pet-media/%s.jpg" % e2["id"] and len(out["sounds"]) == 2 and out["sounds"][0]["dur"] > 0
     assert pet_media.delete(c, root, 3, e2["id"]) and pet_media.for_page(pet_media.load(c, 3), "/s/tok/")["img"] is None
 
 

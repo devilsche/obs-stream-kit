@@ -2,7 +2,8 @@
 
 Ablage: data/pet-media/<tenant_id>/<id>.<ext>, Verzeichnis in settings['pet_media']:
   {"img": {"id", "ext", "name", "bytes"} | null, "sounds": [{"id", "name", "dur", "bytes"}], "volume": 0.6}
-Die Seite bekommt window.__PET_MEDIA__ = {img, sounds, volume} und spielt einen zufälligen Ton beim Einblenden.
+Die Seite bekommt window.__PET_MEDIA__ = {img, sounds: [{url, dur}], volume}, spielt einen zufälligen Ton ab dem
+Einblenden des Bildes und bleibt stehen, bis er zu Ende ist.
 Ein img=-Parameter in der URL hat weiter Vorrang (alte OBS-Quellen).
 """
 import json
@@ -159,5 +160,5 @@ def for_page(cfg, base):
     """window.__PET_MEDIA__ für transitions/pet.html (base = /s/<token>/)."""
     img = cfg["img"]
     return {"img": (base + "pet-media/%s.%s" % (img["id"], img["ext"])) if img else None,
-            "sounds": [base + "pet-media/%s.mp3" % s["id"] for s in cfg["sounds"]],
+            "sounds": [{"url": base + "pet-media/%s.mp3" % s["id"], "dur": s.get("dur", 0)} for s in cfg["sounds"]],
             "volume": cfg["volume"]}
