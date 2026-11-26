@@ -6,9 +6,8 @@
   <title>Logo 3D</title>
   <!-- Logo in 3D (WebGL, three.js r128): Das Logo wird beim Laden automatisch in Teile zerlegt – Streifenbild nach
        zusammenhängenden Flächen, Textbild nach Buchstaben-Spalten – und jedes Teil bekommt Dicke.
-       Ablauf wie logo.html: Streifen wirbeln einzeln herein und stellen sich auf, Buchstaben fallen beim Start mit
-       Salto herein, wippen, Glanz; Streifen kippen einzeln weg, Lauflicht, springen wieder auf, Glanz, wieder weg,
-       Pause `pause` s, von vorn. Bei Alerts startet alles neu.
+       Ablauf: Streifen stellen sich einzeln von links nach rechts auf, Buchstaben fallen beim Start mit Salto herein,
+       wippen, Glanz; Streifen kippen einzeln von rechts nach links weg, Pause `pause` s, von vorn. Bei Alerts startet alles neu.
        URL: lines, text (Dateien in assets/, wie logo.html), pause (s, Standard 10), speed (ms je Streifen, Standard 200),
        idle (loop|off – off: nach dem ersten Aufbau stehen bleiben),
        intro (1|0), alerts (1|0), glow (off|theme|purple|gold|Hex, Standard off). Größe = Browser-Source, das Logo passt sich ein. -->
@@ -431,12 +430,11 @@
       });
 
       // ── Zeitplan ──
-      // Ablauf wie beim 2D-Logo (widgets/logo.html), in 3D: Streifen wirbeln einzeln von links herein und stellen sich auf
-      // → Buchstaben wippen, Glanz → halten → Streifen kippen einzeln weg → Lauflicht (ein Streifen läuft hin und her)
-      // → Streifen springen einzeln wieder auf, Glanz → halten → einzeln weg → Pause (nur Schrift) → von vorn.
+      // Ablauf: Streifen stellen sich einzeln von links nach rechts auf → Buchstaben wippen, Glanz → halten → Streifen
+      // kippen einzeln von rechts nach links nach hinten weg → Pause (nur Schrift) → von vorn.
       // Die Buchstaben fallen nur beim Start (und bei Alerts) mit Salto herein und bleiben dann stehen.
       var tIntro = INTRO ? 0 : -100, nS = 0, nT = 0, tLast = 0;
-      var STEP = Math.min(0.6, Math.max(0.05, (parseFloat(P.get('speed')) || 200) / 1000)), KR = 0.09, W_IN = 0.75, W_OUT = 0.55;
+      var STEP = Math.min(0.6, Math.max(0.05, (parseFloat(P.get('speed')) || 200) / 1000)), W_IN = 0.75, W_OUT = 0.55;
       function ease(x) { x = Math.min(1, Math.max(0, x)); return 1 - Math.pow(1 - x, 3); }
       function easeIn(x) { x = Math.min(1, Math.max(0, x)); return x * x * x; }
       function back(x) { x = Math.min(1, Math.max(0, x)); return 1 + 2.7 * Math.pow(x - 1, 3) + 1.7 * Math.pow(x - 1, 2); }
@@ -446,56 +444,38 @@
       function plan() {   // Zeitpunkte einer Runde (s ab Rundenbeginn)
         var n = Math.max(1, nS), run = (n - 1) * STEP, o = {};
         o.tA = 0.15; o.endA = o.tA + run + W_IN;
-        o.tH1 = Math.max(o.endA, lettersEnd()) + 2.0; o.endH1 = o.tH1 + run + W_OUT;
-        o.tK = o.endH1 + 0.2; o.kSteps = 3 * Math.max(1, 2 * n - 2) + 1; o.endK = o.tK + o.kSteps * KR;
-        o.tR = o.endK + 0.25; o.endR = o.tR + run + 0.35;
-        o.tH2 = o.endR + 2.2; o.endH2 = o.tH2 + run + W_OUT;
-        o.len = o.endH2 + PAUSE;
+        o.tH = Math.max(o.endA, lettersEnd()) + 3.0; o.endH = o.tH + run + W_OUT;
+        o.len = o.endH + PAUSE;
         return o;
       }
-      function krIndex(k, n) { if (n < 2) return 0; var per = 2 * n - 2, m = k % per; return m < n ? m : per - m; }
       var T0 = performance.now() / 1000;
       function now() { return isNaN(AT) ? performance.now() / 1000 - T0 : AT; }
       function start(t) { tIntro = INTRO || t > 0 ? t : -100; }
       function cycleTime(a) {   // Zeit in der aktuellen Runde; idle=off: nach dem ersten Aufbau stehen bleiben
         var o = plan(); if (a < 0) return a;
-        if (IDLE === 'off') return Math.min(a, o.tH1 - 0.01);
+        if (IDLE === 'off') return Math.min(a, o.tH - 0.01);
         return a % o.len;
       }
 
-      // Streifen i zur Rundenzeit c: null = unsichtbar
+      // Streifen i zur Rundenzeit c: null = unsichtbar. Rein von links nach rechts (aus dem Liegen aufstellen),
+      // raus rückwärts von rechts nach links (nach hinten wegkippen) – ohne Drehen um sich selbst
       function stripeState(i, c, o) {
-        var st = { fade: 1, glow: 0, y: 0, z: 0, rx: 0, ry: 0, sc: 1 };
+        var st = { fade: 1, glow: 0, y: 0, z: 0, rx: 0, sc: 1 };
         if (c < o.tA) return null;
-        if (c < o.tH1) {   // reinwirbeln und aufstellen
+        if (c < o.tH) {
           var pr = (c - o.tA - i * STEP) / W_IN; if (pr <= 0) return null;
-          if (pr < 1) { var e = ease(pr);
-            st.fade = Math.min(1, pr * 3); st.ry = (1 - e) * Math.PI * 2.5; st.rx = (1 - e) * -Math.PI * 0.5;
-            st.y = -(1 - e) * 0.6; st.z = -(1 - e) * 0.8; st.sc = 0.35 + 0.65 * back(pr); }
+          if (pr < 1) { var e = back(pr);
+            st.fade = Math.min(1, pr * 3); st.rx = (1 - e) * -Math.PI * 0.5; st.y = -(1 - ease(pr)) * 0.5; st.z = -(1 - ease(pr)) * 0.5; }
           st.glow = Math.max(0, 1 - Math.abs(pr - 1) * 5) * 0.6;
           return st;
         }
-        if (c < o.tK) return out(c - o.tH1);
-        if (c < o.tR) {   // Lauflicht
-          var k = Math.floor((c - o.tK) / KR); if (k >= o.kSteps || krIndex(k, nS) !== i) return null;
-          var f = (c - o.tK) / KR - k; st.fade = Math.min(1, f * 4, (1 - f) * 4 + 0.3); st.glow = 0.8; st.z = 0.15; return st;
-        }
-        if (c < o.tH2) {   // einzeln aufspringen
-          var q = (c - o.tR - i * STEP) / 0.35; if (q <= 0) return null;
-          if (q < 1) { st.sc = 0.2 + 0.8 * back(q); st.fade = Math.min(1, q * 3); }
-          st.glow = Math.max(0, 1 - Math.abs(q - 1) * 5) * 0.5;
-          return st;
-        }
-        return out(c - o.tH2);
-        function out(d) {   // nach hinten wegkippen, dabei drehen und ausblenden
-          var u = (d - i * STEP) / W_OUT; if (u >= 1) return null; if (u <= 0) return st;
-          var e = easeIn(u); st.rx = e * Math.PI * 0.5; st.ry = -e * Math.PI * 1.2; st.y = -e * 0.4; st.z = -e * 0.6; st.sc = 1 - 0.6 * e; st.fade = 1 - e;
-          return st;
-        }
+        var u = (c - o.tH - (nS - 1 - i) * STEP) / W_OUT; if (u >= 1) return null; if (u <= 0) return st;
+        var e2 = easeIn(u); st.rx = e2 * Math.PI * 0.5; st.y = -e2 * 0.4; st.z = -e2 * 0.6; st.sc = 1 - 0.4 * e2; st.fade = 1 - e2;
+        return st;
       }
       // Glanz: läuft nach jedem Aufbau einmal schräg durch (Logo-Koordinaten 0..1)
       function shineAt(c, o) {
-        var s1 = (c - (o.endA + 0.1)) / 0.9, s2 = (c - (o.endR + 0.1)) / 0.9, s = s1 >= 0 && s1 <= 1.2 ? s1 : s2 >= 0 && s2 <= 1.2 ? s2 : -9;
+        var s = (c - (o.endA + 0.1)) / 0.9; if (s < 0 || s > 1.2) s = -9;
         return s < -1 ? -9 : s * 1.8 - 0.3;
       }
 
@@ -511,7 +491,7 @@
           else if (REDUCED) { fade = st.fade; flash = st.glow; }
           else {
             fade = st.fade; flash = st.glow;
-            g.position.y += st.y * sz; g.position.z += st.z * sz; g.rotation.set(st.rx, st.ry, 0); g.scale.setScalar(st.sc);
+            g.position.y += st.y * sz; g.position.z += st.z * sz; g.rotation.set(st.rx, 0, 0); g.scale.setScalar(st.sc);
           }
         } else {
           var q = (a - 0.45 - p.i * sT()) / 0.55;
@@ -525,9 +505,7 @@
           }
           flash = Math.max(0, 1 - Math.abs(q - 1) * 5) * 0.8;
           // kurz wippen, wenn die Streifen stehen (wie beim 2D-Logo)
-          if (!REDUCED && a > lettersEnd()) [o.endA, o.endR].forEach(function (tw) {
-            var w = (c - tw - p.i * 0.03) / 0.5; if (w > 0 && w < 1) g.scale.multiplyScalar(1 + Math.sin(w * Math.PI * 3) * 0.06 * (1 - w));
-          });
+          if (!REDUCED && a > lettersEnd()) { var w = (c - o.endA - p.i * 0.03) / 0.5; if (w > 0 && w < 1) g.scale.multiplyScalar(1 + Math.sin(w * Math.PI * 3) * 0.06 * (1 - w)); }
           if (p.shadow) p.shadow.m.material.uniforms.uFade.value = Math.min(1, Math.max(0, (q - 0.8) / 0.5));
         }
         // Glanzband an der Teil-Mitte
