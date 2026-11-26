@@ -100,8 +100,8 @@ def _serve_tenant_source(token, subdir, filepath):
     return serve_html_or_asset(_root(), subdir, filepath, variables, theme=theme)
 
 
-_THEME_CACHE = {}   # tenant_id → (Zeitpunkt, Theme); jede OBS-Quelle fragt alle ~10 s nach
-_THEME_TTL = 8.0
+_THEME_CACHE = {}   # tenant_id → (Zeitpunkt, Theme); jede OBS-Quelle fragt alle 3–5 s nach
+_THEME_TTL = 2.0
 
 
 @bp_overlays.route("/s/<token>/theme.json")

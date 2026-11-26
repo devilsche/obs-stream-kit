@@ -284,6 +284,34 @@
             }
           }
         }
+        // Kippohr knickt bei ~20 % der Ohrlänge (nah am Kopf), nicht erst an der Spitze: das Spitzengelenk des Modells
+        // dorthin verlegen (neue Ruhelage + Bind) und die Gewichte am Ohr weich zwischen Basis und Spitze neu verteilen
+        ['L', 'R'].forEach(function (sd) {
+          var kb = idx(sd + '_ear_base'), kt = idx(sd + '_ear_tip');
+          if (kb < 0 || kt < 0) return;
+          var tipB = bones[kt], endB = tipB.children.filter(function (c) { return c.isBone; })[0];
+          var A = bindPos[kb], E = endB ? endB.position.clone().applyMatrix4(bindW[kt]) : bindPos[kt].clone().sub(A).multiplyScalar(1.6).add(A);
+          var ax = E.clone().sub(A), len = ax.length(); if (len < 1e-6) return; ax.normalize();
+          var Pn = A.clone().addScaledVector(ax, len * 0.2);
+          for (var ve = 0; ve < pos.count; ve++) {
+            var sb = -1, st = -1, wb2 = 0, wt2 = 0, low = -1, lowW = 9;
+            for (var je2 = 0; je2 < 4; je2++) {
+              var bi3 = si[GET[je2]](ve), ww3 = sw[GET[je2]](ve);
+              if (bi3 === kb) { sb = je2; wb2 += ww3; } else if (bi3 === kt) { st = je2; wt2 += ww3; } else if (ww3 < lowW) { lowW = ww3; low = je2; }
+            }
+            var sum = wb2 + wt2; if (sum < 0.02) continue;
+            v.fromBufferAttribute(pos, ve);
+            var fr = off.subVectors(v, A).dot(ax) / len, ft = Math.max(0, Math.min(1, (fr - 0.12) / 0.14)); ft = ft * ft * (3 - 2 * ft);
+            if (st < 0) { if (sb >= 0 && wb2 >= sum - 1e-6 && low >= 0 && lowW < 0.02) st = low; else continue; si['set' + 'XYZW'[st]](ve, kt); }
+            if (sb < 0) { sb = (low >= 0 && low !== st) ? low : -1; if (sb < 0) continue; si['set' + 'XYZW'[sb]](ve, kb); }
+            sw['set' + 'XYZW'[sb]](ve, sum * (1 - ft)); sw['set' + 'XYZW'[st]](ve, sum * ft);
+          }
+          si.needsUpdate = true; sw.needsUpdate = true;
+          var nw = bindW[kt].clone(); nw.setPosition(Pn); o.skeleton.boneInverses[kt].copy(nw).invert();
+          var lp = Pn.clone().applyMatrix4(bindW[kb].clone().invert());
+          if (SNOUT.some(function (e) { return e[0] === tipB; })) return;   // mehrere Meshes teilen das Skelett
+          for (var bb2 = 0; bb2 < BIND.length; bb2++) if (BIND[bb2][0] === tipB) SNOUT.push([tipB, lp.clone().sub(BIND[bb2][2]), false]);
+        });
         pos.needsUpdate = true; geo.computeVertexNormals();
         })();
       });
@@ -695,7 +723,7 @@
         var bob = Math.sin(t * 3.2) * 0.05;
         // Oberkörper senkrecht über dem Becken (wie stehend), Kopf schaut nach vorn
         turn(B.spine_1, LAT, -(0.5 + bob) * w); turn(B.spine_2, LAT, -0.32 * w); turn(B.chest, LAT, -0.2 * w);
-        LEGS.forEach(function (l) { turn(l[0], LAT, -0.95 * w); turn(l[1], LAT, 1.25 * w); turn(l[2], LAT, 0.9 * w); });   // Pfoten angewinkelt vor der Brust
+        LEGS.forEach(function (l) { turn(l[0], LAT, -0.2 * w); turn(l[1], LAT, -1.2 * w); turn(l[2], LAT, 1.35 * w); });   // Oberarm schräg vor-unten, Ellbogen vorn, Unterarm zur Brust, Pfoten hängen
         LEGS.forEach(function (l, i) { turn(l[0], FWD, (i ? -1 : 1) * 0.28 * w); });   // etwas auseinander (kein Händchenhalten)
         turn(B.neck_base, LAT, 0.8 * w); turn(B.head, LAT, 0.05 * w);
       } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen

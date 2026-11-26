@@ -20,6 +20,7 @@
 <body>
   <canvas id="gl" aria-hidden="true"></canvas>
   <script src="../js/vendor/three-r128.min.js"></script>
+  <script src="../js/vendor/three-r128-RoomEnvironment.js"></script>
   <script>
     (function () {
       'use strict';
@@ -40,6 +41,9 @@
       try { r = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, preserveDrawingBuffer: !isNaN(AT) }); } catch (e) { console.error('logo-3d: no WebGL'); return; }
       r.setPixelRatio(1); r.setClearColor(0x000000, 0);
       var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 10, 50000);
+      if (THREE.RoomEnvironment) scene.environment = new THREE.PMREMGenerator(r).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
+      scene.add(new THREE.AmbientLight(0xffffff, 0.35));
+      var keyL = new THREE.DirectionalLight(0xffffff, 1.2); keyL.position.set(-400, 600, 900); scene.add(keyL);
       var W = 0, H = 0;
       function resize() {
         W = window.innerWidth || 400; H = window.innerHeight || 152;
@@ -100,7 +104,27 @@
             var t = ((y - y0) * c.width + (x - x0)) * 4; im.data[t] = a[s * 4]; im.data[t + 1] = a[s * 4 + 1]; im.data[t + 2] = a[s * 4 + 2]; im.data[t + 3] = a[s * 4 + 3];
           }
           o.putImageData(im, 0, 0);
-          return { c: c, x0: x0, y0: y0 };
+          // Form selbst nachbauen: deckender Kern (Alpha > 200) – Ecken aus der obersten und untersten Kernzeile,
+          // Farbe = Mittel der Kernpixel (ohne Glanzlichter/Schatten)
+          // Kern: Deckkraft > 60 (gemessen: Streifenkörper 86–255, Glow-Saum darunter); Transparenz = Median des Körpers
+          var hist = new Array(256).fill(0), hn = 0;
+          for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) { var qa = y * w + x; if (lab[qa] === id && a[qa * 4 + 3] > 60) { hist[a[qa * 4 + 3]]++; hn++; } }
+          var med = 0, acc = 0; for (var hv = 0; hv < 256; hv++) { acc += hist[hv]; if (acc >= hn / 2) { med = hv; break; } }
+          var amax = med, thr = 60, ty = -1, by = -1, rs = 0, gs = 0, bs = 0, cn = 0, as = 0;
+          for (y = y0; y <= y1; y++) for (x = x0; x <= x1; x++) {
+            var q = y * w + x; if (lab[q] !== id || a[q * 4 + 3] < thr) continue;
+            as += a[q * 4 + 3];
+            if (ty < 0) ty = y; by = y;
+            var L = a[q * 4] + a[q * 4 + 1] + a[q * 4 + 2];
+            if (L > 60 && L < 660) { rs += a[q * 4]; gs += a[q * 4 + 1]; bs += a[q * 4 + 2]; cn++; }
+          }
+          function span(yy) { var mn = w, mx = -1; for (var xq = x0; xq <= x1; xq++) { var qq = yy * w + xq; if (lab[qq] === id && a[qq * 4 + 3] >= thr) { if (xq < mn) mn = xq; if (xq > mx) mx = xq; } } return [mn, mx]; }
+          var poly = null;
+          if (ty >= 0 && by - ty > 8) {
+            var t0 = span(ty + 2), b0 = span(by - 2);
+            if (t0[1] > t0[0] && b0[1] > b0[0]) poly = [[t0[0], ty], [t0[1], ty], [b0[1], by], [b0[0], by]];
+          }
+          return { c: c, x0: x0, y0: y0, poly: poly, col: cn ? [rs / cn / 255, gs / cn / 255, bs / cn / 255] : null, alpha: amax / 255 };
         }).sort(function (p, q) { return (p.x0 + p.c.width / 2) - (q.x0 + q.c.width / 2); });
       }
 
@@ -175,7 +199,23 @@
             '  gl_FragColor = vec4(c.rgb, c.a * uFade);',
             '}'].join('\n') });
       }
+      function addSolid(p, s, i) {
+        var cx = (p.x0 + p.c.width / 2), cy = (p.y0 + p.c.height / 2), sh = new THREE.Shape();
+        var pc = p.poly.map(function (v) { return [(v[0] - cx) / s, -(v[1] - cy) / s]; });
+        var mx = (pc[0][0] + pc[1][0] + pc[2][0] + pc[3][0]) / 4, my = (pc[0][1] + pc[1][1] + pc[2][1] + pc[3][1]) / 4;
+        var inset = 6 / s * (2048 / 4200) * 2;
+        pc.forEach(function (v, k) { var dx = v[0] - mx, dy = v[1] - my, L = Math.hypot(dx, dy) || 1, X = v[0] - dx / L * inset, Y = v[1] - dy / L * inset; if (k) sh.lineTo(X, Y); else sh.moveTo(X, Y); });
+        var bev = 6 / s * (2048 / 4200) * 2;   // feine Fase (≈ 6 px im Bild), wächst nicht mit dem schrägen Umriss
+        var geo = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: true, bevelThickness: 0.25, bevelSize: bev, bevelSegments: 3 });
+        geo.translate(0, 0, -0.5);
+        var colr = p.col ? new THREE.Color(p.col[0], p.col[1], p.col[2]).convertSRGBToLinear() : new THREE.Color(0x2f6fff);
+        var mat = new THREE.MeshStandardMaterial({ color: colr, metalness: 0.45, roughness: 0.3, envMapIntensity: 1.0, transparent: true, emissive: new THREE.Color(0) });
+        mat.userData.base = Math.max(0.35, p.alpha || 1);   // halbtransparente Streifen bleiben es
+        var mesh = new THREE.Mesh(geo, mat), g = new THREE.Group(); g.add(mesh); mesh.renderOrder = 2; root.add(g);
+        parts.push({ g: g, front: mesh, sides: [], kind: 0, i: i, solid: true, x0: p.x0 / s, y0: p.y0 / s, w: p.c.width / s, h: p.c.height / s });
+      }
       function addPart(p, s, kind, i) {
+        if (kind === 0 && p.poly) return addSolid(p, s, i);
         var tex = new THREE.CanvasTexture(p.c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
         var g = new THREE.Group(), front = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frontMat(tex));
         front.renderOrder = [2, 22, 12][kind]; g.add(front);
@@ -195,6 +235,7 @@
         var th = Math.max(2, bh * SC * 0.018);   // Dicke ≈ 2 % der Logohöhe
         parts.forEach(function (p) {
           p.home = new THREE.Vector3((p.x0 + p.w / 2 - (box.x0 + box.x1) / 2) * SC, ((box.y0 + box.y1) / 2 - (p.y0 + p.h / 2)) * SC, [0, th * 1.6, th * 0.4][p.kind]);
+          if (p.solid) { var dz = Math.max(3, bh * SC * 0.05); p.front.scale.set(SC, SC, dz); p.home.z = -dz * 0.8; return; }   // hinter der Schrift
           p.front.scale.set(p.w * SC, p.h * SC, 1);
           p.sides.forEach(function (m, k) { m.scale.copy(p.front.scale); m.position.z = -(k + 1) * th / LAYERS; });
           var u = p.front.material.uniforms; u.uOff.value.set((p.x0 - box.x0) / bw, (p.y0 - box.y0) / bh); u.uSize.value.set(p.w / bw, p.h / bh);
@@ -284,6 +325,11 @@
             else if (p.kind === 1) { var hp = c - 0.4 - p.i * 0.11; if (hp > 0 && hp < 0.7) { var s = hp / 0.7; g.position.y += Math.sin(s * Math.PI) * p.h * SC * 0.25; g.rotation.y = s * Math.PI * 2; } }
           }
         }
+        if (p.solid) {
+          p.front.material.opacity = fade * p.front.material.userData.base; p.front.visible = fade > 0.002;
+          p.front.material.emissive.copy(ACC).multiplyScalar(flash * 0.6);
+          return;
+        }
         p.front.material.uniforms.uFade.value = fade;
         p.front.material.uniforms.uFlash.value = flash;
         p.sides.forEach(function (m) { m.material.opacity = fade; m.visible = fade > 0.02; });
@@ -303,7 +349,7 @@
         var t = now();
         nS = 0; nT = 0; parts.forEach(function (p) { if (p.kind === 1) nT++; else if (p.kind === 0) nS++; });
         var sh = shineAt(t);
-        parts.forEach(function (p) { pose(p, t); p.front.material.uniforms.uShine.value = sh; });
+        parts.forEach(function (p) { pose(p, t); if (!p.solid) p.front.material.uniforms.uShine.value = sh; });
         if (halo) {
           var a = t - tIntro, on = ease((a - 0.3) / 1.2);
           halo.material.uniforms.uK.value = on * (0.35 + 0.15 * Math.sin(t * 2.5));

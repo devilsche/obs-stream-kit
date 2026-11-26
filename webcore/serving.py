@@ -235,7 +235,7 @@ def serve_asset(root: str, subdir: str, filepath: str):
     return send_from_directory(os.path.dirname(full), os.path.basename(full))
 
 
-# Theme ohne Neuladen: fragt alle ~10 s /s/<token>/theme.json ab, setzt bei Wechsel data-theme neu und
+# Theme ohne Neuladen: fragt alle 3–5 s /s/<token>/theme.json ab, setzt bei Wechsel data-theme neu und
 # meldet das Event „themechange“ (für Seiten, die Farben per JS lesen, z. B. WebGL-Effekte).
 # Nur unter /s/<token>/ und nicht, wenn die URL ein festes ?theme= vorgibt. ES5, ohne Abhängigkeiten.
 THEME_LIVE_JS = (
@@ -245,8 +245,8 @@ THEME_LIVE_JS = (
     "function tick(){fetch(b+'theme.json',{cache:'no-store'}).then(function(r){return r.ok?r.json():null})"
     ".then(function(d){if(d&&d.theme&&d.theme!==cur){cur=d.theme;h.setAttribute('data-theme',cur);window.__THEME__=cur;"
     "var e;try{e=new CustomEvent('themechange',{detail:{theme:cur}})}catch(x){e=document.createEvent('Event');e.initEvent('themechange',false,false)}"
-    "window.dispatchEvent(e)}}).catch(function(){}).then(function(){setTimeout(tick,9000+Math.random()*3000)})}"
-    "setTimeout(tick,9000+Math.random()*3000)})();</script>"
+    "window.dispatchEvent(e)}}).catch(function(){}).then(function(){setTimeout(tick,3000+Math.random()*2000)})}"
+    "setTimeout(tick,3000+Math.random()*2000)})();</script>"
 )
 
 
