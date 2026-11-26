@@ -150,7 +150,7 @@ DECOR = [
      "hint": "Letters or stripes cut wrong? Fix them by hand in Tools → Logo cut editor (admin).",
      "params": [], "switches": [
          {"key": "pause",  "label": "Pause (s)", "type": "number", "default": "10", "min": 3,
-          "tooltip": "Seconds with only the lettering before the stripes build up again"},
+          "tooltip": "Seconds the stripes stay up before they tip away and come straight back"},
          {"key": "speed",  "label": "Stripe step (ms)", "type": "number", "default": "200", "min": 50,
           "tooltip": "Delay between two stripes when they spin in or tip away"},
          {"key": "idle",   "label": "Animation", "type": "select", "default": "loop",

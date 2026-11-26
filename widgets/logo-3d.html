@@ -7,7 +7,7 @@
   <!-- Logo in 3D (WebGL, three.js r128): Das Logo wird beim Laden automatisch in Teile zerlegt – Streifenbild nach
        zusammenhängenden Flächen, Textbild nach Buchstaben-Spalten – und jedes Teil bekommt Dicke.
        Ablauf: Streifen stellen sich einzeln von links nach rechts auf, Buchstaben fallen beim Start mit Salto herein,
-       wippen, Glanz; Streifen kippen einzeln von rechts nach links weg, Pause `pause` s, von vorn. Bei Alerts startet alles neu.
+       wippen, Glanz; stehen `pause` s, kippen einzeln von rechts nach links weg und kommen gleich wieder. Bei Alerts startet alles neu.
        URL: lines, text (Dateien in assets/, wie logo.html), pause (s, Standard 10), speed (ms je Streifen, Standard 200),
        idle (loop|off – off: nach dem ersten Aufbau stehen bleiben),
        intro (1|0), alerts (1|0), glow (off|theme|purple|gold|Hex, Standard off). Größe = Browser-Source, das Logo passt sich ein. -->
@@ -258,7 +258,7 @@
 
       // ── Zeitplan ──
       // Ablauf: Streifen stellen sich einzeln von links nach rechts auf → Buchstaben wippen, Glanz → halten → Streifen
-      // kippen einzeln von rechts nach links nach hinten weg → Pause (nur Schrift) → von vorn.
+      // kippen einzeln von rechts nach links nach hinten weg → kurz nur Schrift → von vorn.
       // Die Buchstaben fallen nur beim Start (und bei Alerts) mit Salto herein und bleiben dann stehen.
       var tIntro = INTRO ? 0 : -100, nS = 0, nT = 0, tLast = 0;
       var STEP = Math.min(0.6, Math.max(0.05, (parseFloat(P.get('speed')) || 200) / 1000)), W_IN = 0.75, W_OUT = 0.55;
@@ -271,8 +271,8 @@
       function plan() {   // Zeitpunkte einer Runde (s ab Rundenbeginn)
         var n = Math.max(1, nS), run = (n - 1) * STEP, o = {};
         o.tA = 0.15; o.endA = o.tA + run + W_IN;
-        o.tH = Math.max(o.endA, lettersEnd()) + 3.0; o.endH = o.tH + run + W_OUT;
-        o.len = o.endH + PAUSE;
+        o.tH = Math.max(o.endA, lettersEnd()) + PAUSE; o.endH = o.tH + run + W_OUT;   // lange stehen, kurz weg
+        o.len = o.endH + 0.6;
         return o;
       }
       var T0 = performance.now() / 1000;
