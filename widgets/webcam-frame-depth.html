@@ -196,9 +196,9 @@
         var hx = CW / 2 + FB, hy = CH / 2 + FB, tgt;
         if (!SHOW_FRAME) {   // Boden: neben der Kamera auf den unteren Bildrand
           var off = (h(4) < 0.5 ? -1 : 1) * (CW / 2 + R * 2 + h(8) * W * 0.18);
-          tgt = new THREE.Vector2(Math.max(-W / 2 + R * 2, Math.min(W / 2 - R * 2, CX + off)), -H / 2 + R + 2);
+          tgt = new THREE.Vector2(Math.max(-W / 2 + R * 2, Math.min(W / 2 - R * 2, CX + off)), -H / 2 + R + 5);
           side = tgt.x < CX ? -1 : 1; if (h(6) < 0.3) side = -side;
-        } else if (H / 2 - (CY + hy) > R * 4) tgt = new THREE.Vector2(CX + (h(4) - 0.5) * 2 * (hx - R), CY + hy + R + 2);   // Oberkante
+        } else if (H / 2 - (CY + hy) > R * 4) tgt = new THREE.Vector2(CX + (h(4) - 0.5) * 2 * (hx - R), CY + hy + R + 5);   // Oberkante
         else {
           // oben kein Platz (Kamera reicht bis an den Bildrand): seitlich an den Rahmen, dann fallen sie herunter
           var roomL = CX - hx + W / 2, roomR = W / 2 - (CX + hx);
@@ -230,10 +230,12 @@
           e.v.y += GRAV * DT; e.p.addScaledVector(e.v, DT); e.a += e.w * DT;
           var qx = Math.max(CX - hx, Math.min(CX + hx, e.p.x)), qy = Math.max(CY - hy, Math.min(CY + hy, e.p.y));
           if (!SHOW_FRAME) { qx = e.p.x; qy = Math.min(e.p.y, -H / 2); }   // Bildboden als Fläche
-          var dx = e.p.x - qx, dy = e.p.y - qy, d = Math.hypot(dx, dy);
-          if (d < R && d > 1e-4) {
+          // Kontakt mit Rahmen/Boden etwas weiter außen: das Emote wird 2R+4 groß gezeichnet und soll sichtbar
+          // aufliegen statt 3–4 px einzusinken
+          var dx = e.p.x - qx, dy = e.p.y - qy, d = Math.hypot(dx, dy), RC = R + 3;
+          if (d < RC && d > 1e-4) {
             var nx = dx / d, ny = dy / d, vn = e.v.x * nx + e.v.y * ny;
-            e.p.x = qx + nx * R; e.p.y = qy + ny * R;
+            e.p.x = qx + nx * RC; e.p.y = qy + ny * RC;
             if (vn < 0) {
               if (-vn > 380) hits.push({ t: t, x: qx, y: qy, k: Math.min(1, -vn / 1400), nx: nx, ny: ny });
               var tx = -ny, ty = nx, vt = e.v.x * tx + e.v.y * ty, fr = ny > 0.7 ? 0.5 : 0.86;   // oben bremst es stärker
