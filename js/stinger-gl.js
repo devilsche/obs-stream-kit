@@ -8,8 +8,9 @@
   'use strict';
   var T0 = 0, running = false, restart = null;
   // DIAG (temporär): Lade-/Aktivierungszeitpunkte ins OBS-Log
-  if (window.obsstudio) {
-    console.error('stinger-diag load', location.pathname, 'now=' + Math.round(performance.now()));
+  {
+    console.error('stinger-diag load', location.pathname, 'obs=' + !!window.obsstudio, 'now=' + Math.round(performance.now()));
+    setTimeout(function () { console.error('stinger-diag +1s', 'now=' + Math.round(performance.now())); }, 1000);
     ['obsSourceActiveChanged', 'obsSourceVisibleChanged'].forEach(function (n) {
       window.addEventListener(n, function (e) { console.error('stinger-diag', n, JSON.stringify(e.detail), 'now=' + Math.round(performance.now())); });
     });
