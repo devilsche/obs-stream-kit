@@ -31,6 +31,12 @@
     .jt.sel { fill: var(--accent); stroke-width: 2.5; }
     .jt:focus-visible { outline: none; stroke: var(--accent); stroke-width: 4; }
     .jt.off { display: none; }
+    .jt.x, .bone.x { display: none; }
+    #ov.all .jt.x, #ov.all .bone.x { display: inline; }
+    #ov.all .jt.x.off { display: none; }
+    .jt.x { stroke-width: 1; }
+    .bone.x { stroke: rgba(255, 255, 255, 0.3); stroke-width: 1; }
+    .vchk { margin-left: auto; color: var(--muted); }
     .brush { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
     .tip { position: absolute; left: 10px; bottom: 8px; margin: 0; padding: 4px 8px; background: rgba(10, 14, 22, 0.75); border-radius: 6px; color: var(--muted); font-size: 12px; pointer-events: none; }
     .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; display: flex; flex-direction: column; }
@@ -82,6 +88,7 @@
         <button type="button" data-view="back">Back</button>
         <button type="button" data-view="top">Top</button>
         <button type="button" data-view="three">3/4</button>
+        <label class="chk vchk"><input type="checkbox" id="allJ"> All joints</label>
       </div>
       <div class="stage" id="stage">
         <canvas id="cv" width="1280" height="800" aria-hidden="true"></canvas>
@@ -278,7 +285,24 @@
           var p = b.parent; while (p && p.isBone && JOINTS.indexOf(shortName(p)) < 0) p = p.parent;
           if (p && p.isBone) { var l = document.createElementNS(NS, 'line'); l.setAttribute('class', 'bone'); gB.appendChild(l); LINES.push([l, n, shortName(p)]); }
         });
+        // weitere Knochen, die das Fell bewegen (Zehen, Schlüsselbein, Kiefer, Lefzen, Brauen, Halsglieder …): klein,
+        // nur mit „All joints“ sichtbar
+        var o = E.originals()[0], si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, used = {}, G = ['getX', 'getY', 'getZ', 'getW'];
+        for (var i = 0; i < si.count; i++) for (var c2 = 0; c2 < 4; c2++) if (sw[G[c2]](i) > 0.02) used[si[G[c2]](i)] = 1;
+        var bones = o.skeleton.bones, have = {}; JOINTS.forEach(function (n) { have[n] = 1; });
+        var extra = bones.filter(function (b, k) { var n = shortName(b); return used[k] && !have[n] && E.B[n] === b && !/_end|rootJoint|^root/.test(n); });
+        extra.forEach(function (b) { have[shortName(b)] = 1; });
+        extra.forEach(function (b) {
+          var n = shortName(b), c = document.createElementNS(NS, 'circle');
+          c.setAttribute('r', 4); c.setAttribute('class', 'jt x' + (/^L/.test(n) ? ' l' : /^R/.test(n) ? ' r' : ''));
+          c.setAttribute('tabindex', '0'); c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'Joint ' + n.replace(/_/g, ' '));
+          c.dataset.n = n; gJ.appendChild(c); HANDLES[n] = c;
+          c.addEventListener('pointerdown', startDrag); c.addEventListener('focus', function () { select(n); }); c.addEventListener('keydown', keyMove);
+          var p = b.parent; while (p && p.isBone && !have[shortName(p)]) p = p.parent;
+          if (p && p.isBone) { var l = document.createElementNS(NS, 'line'); l.setAttribute('class', 'bone x'); gB.insertBefore(l, gB.firstChild); LINES.push([l, n, shortName(p)]); }
+        });
       }
+      $('allJ').addEventListener('change', function () { OV.classList.toggle('all', $('allJ').checked); });
       function select(n) {
         sel = n; Object.keys(HANDLES).forEach(function (k) { HANDLES[k].classList.toggle('sel', k === n); });
         $('resetJt').disabled = !n;
@@ -694,7 +718,7 @@
           src.geometry.attributes.position.array.set(P); src.geometry.attributes.position.needsUpdate = true; src.geometry.computeVertexNormals();
           src.position.set(0, 0, 0); src.quaternion.identity(); A.mir = false; ['sc', 'ox', 'oy', 'oz'].forEach(function (id) { $(id).value = 0; }); applyAlign();
           E.liveRig(rig); applySkin(); jointsSinceBind = false; $('rebindHint').hidden = true;
-          src.userData.fromFile = false; src.visible = false; $('showSrc').checked = false;
+          src.userData.fromFile = false; src.visible = false; $('showSrc').checked = false; var cmv = E.custom(); if (cmv) cmv.visible = tab !== 'joints';
           $('bindInfo').textContent = n.toLocaleString('en') + ' points bound to ' + bones.length + ' bones.';
           status('Bound. Check the poses and paint the fur, then save.', 'ok'); mark();
         }, 400);
@@ -841,7 +865,10 @@
 
       // ── Schritte ──
       function setTab(k) {
+        // Gelenke nach dem Binden verschoben: beim Verlassen des Gelenke-Schritts automatisch neu binden
+        var leaving = tab === 'joints' && k !== 'joints';
         tab = k;
+        if (leaving && skinData && jointsSinceBind) setTimeout(function () { status('Joints changed: binding again...'); bind(); }, 50);
         document.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === k)); b.setAttribute('aria-pressed', String(b.dataset.tab === k)); });
         document.querySelectorAll('[data-pane]').forEach(function (s) { s.hidden = s.dataset.pane !== k; });
         controls.mouseButtons = k === 'paint' || k === 'shape' ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
@@ -849,6 +876,9 @@
         if (k === 'poses') setPose(poseKey);
         else if (k !== 'test') { E.EDIT.still = true; E.hold('idle', 3); }
         if (src) src.visible = $('showSrc').checked && (k === 'model' || k === 'joints' || k === 'bind');
+        // Gelenke setzen am unverformten Modell: das gebundene würde beim Ziehen mitgezerrt
+        var cm = E.custom(); if (cm) cm.visible = !(k === 'joints' && skinData);
+        if (k === 'joints' && skinData && src) src.visible = true;
         $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Drag the dots into your model. Shift + arrow keys move faster.',
           bind: 'Binding uses the standing pose.', shape: 'Left mouse sculpts, right mouse orbits, Ctrl+Z undoes.', poses: 'Drag a dot: the bone leading to it turns.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
       }
