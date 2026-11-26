@@ -619,9 +619,18 @@
         if (EAR_FOLD > 0) {
           // Kippohr: ganzes Ohr an der Basis nach vorne kippen (um die Querachse, UP → FWD), Spitze weiter nach vorne-unten
           // knicken. Das Spitzenglied allein bewegt nur das letzte Stück und lässt einen Zacken stehen.
+          // Nicht jeder Clip hat Ohrspuren (Totstellen nicht): dann schreibt der Mixer die Ohren nicht neu und der Knick
+          // addiert sich jedes Bild auf – die Ohren flattern. Steht noch unser Ergebnis vom letzten Bild drin, erst zurücksetzen.
+          if (!S.earQ) S.earQ = {};
           ['L', 'R'].forEach(function (sd) {
-            turn(B[sd + '_ear_base'], LAT, EAR_BASE * EAR_FOLD);
-            turn(B[sd + '_ear_tip'], LAT, EAR_TIP * EAR_FOLD);
+            ['_ear_base', '_ear_tip'].forEach(function (part, pi) {
+              var eb = B[sd + part]; if (!eb) return;
+              var mem = S.earQ[sd + part];
+              if (mem && eb.quaternion.equals(mem[1])) eb.quaternion.copy(mem[0]);
+              var pre = eb.quaternion.clone();
+              turn(eb, LAT, (pi ? EAR_TIP : EAR_BASE) * EAR_FOLD);
+              S.earQ[sd + part] = [pre, eb.quaternion.clone()];
+            });
           });
         }
         if (TAIL_SCALE) {
