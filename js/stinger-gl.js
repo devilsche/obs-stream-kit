@@ -7,6 +7,13 @@
 (function () {
   'use strict';
   var T0 = 0, running = false, restart = null;
+  // DIAG (temporär): Lade-/Aktivierungszeitpunkte ins OBS-Log
+  if (window.obsstudio) {
+    console.error('stinger-diag load', location.pathname, 'now=' + Math.round(performance.now()));
+    ['obsSourceActiveChanged', 'obsSourceVisibleChanged'].forEach(function (n) {
+      window.addEventListener(n, function (e) { console.error('stinger-diag', n, JSON.stringify(e.detail), 'now=' + Math.round(performance.now())); });
+    });
+  }
   window.addEventListener('obsSourceActiveChanged', function (e) {
     // nur wenn die Seite schon länger bereitliegt – frisch geladen zählt der Ladebeginn
     if (e && e.detail && e.detail.active && performance.now() > 1500) { T0 = performance.now(); if (restart) restart(); }

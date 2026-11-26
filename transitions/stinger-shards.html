@@ -173,13 +173,7 @@
       S.artTexture(C, function (canvas) {
         tex.image = canvas; tex.needsUpdate = true; U.uHasText.value = 1;
       });
-      (function frame() {
-        var t = S.now();
-        U.uT.value = t;
-        renderer.render(scene, cam);
-        if (t < T.dur + 0.1) requestAnimationFrame(frame);
-        else renderer.clear();
-      })();
+      S.run({ renderer: renderer, scene: scene, cam: cam }, U, T);   // gemeinsame Schleife (Neustart bei Aktivierung)
     })();
   </script>
 </body>

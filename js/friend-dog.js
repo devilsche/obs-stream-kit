@@ -464,18 +464,31 @@
       pee: function (p) {
         if (!p || p.x == null) return [];
         // Wie ein Rüde an einem Pfosten: mit der Flanke neben das Feuer, Bein auf der Feuerseite heben, Strahl aus der
-        // Leiste seitlich zum Feuer. Rücken schräg zum Zuschauer (11 bzw. 1 Uhr), damit man Bein und Strahl sieht.
-        // Mehrere Feuer: nur eine Seite nehmen, an der kein anderes brennt (sonst verbrennt er sich) – sind beide zu,
-        // bellt er nur. Gewählt wird bevorzugt die Seite, von der er kommt.
-        var fx = (parseFloat(p.x) - W / 2) / pxPerUnit, others = String(p.others || '').split(',').filter(Boolean)
-          .map(function (v) { return (parseFloat(v) - W / 2) / pxPerUnit; }).filter(function (v) { return !isNaN(v); });
-        var safe = function (x) { return x >= -RANGE && x <= RANGE && others.every(function (o) { return Math.abs(o - x) > 170 / pxPerUnit; }); };
-        var sides = (S.x < fx ? [-1, 1] : [1, -1]).filter(function (d) { return safe(fx + d * 0.8); });
-        if (!sides.length) return [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'bark', n: 3, gap: 0.3 }, { do: 'wag', v: 0.4, dur: 0 }];
-        var right = sides[0] < 0, stand = fx + sides[0] * 0.8;   // etwas Abstand: der Strahl geht im weiten Bogen hinüber
+        // Leiste im Bogen zum Feuer. Rücken schräg zum Zuschauer (11 bzw. 1 Uhr), damit man Bein und Strahl sieht.
+        // Mehrere Feuer: unter allen das nächste nehmen, das er erreicht, ohne an einem anderen vorbeizulaufen, und eine
+        // Seite, an der kein anderes brennt (sonst verbrennt er sich). Geht nichts davon, bellt er nur.
+        var toU = function (v) { return (parseFloat(v) - W / 2) / pxPerUnit; };
+        var all = [parseFloat(p.x)].concat(String(p.others || '').split(',').filter(Boolean).map(parseFloat)).filter(function (v) { return !isNaN(v); });
+        var near = 170 / pxPerUnit, pass = 140 / pxPerUnit, plan = null;
+        all.map(function (px) { return { px: px, x: toU(px) }; })
+          .sort(function (a, b) { return Math.abs(a.x - S.x) - Math.abs(b.x - S.x); })
+          .some(function (f) {
+            var others = all.filter(function (v) { return v !== f.px; }).map(toU);
+            var ok = function (x) {
+              var a = Math.min(S.x, x), b = Math.max(S.x, x);
+              return x >= -RANGE && x <= RANGE && others.every(function (o) { return Math.abs(o - x) > near && (o < a - pass || o > b + pass); });
+            };
+            var d = (S.x < f.x ? [-1, 1] : [1, -1]).filter(function (dd) { return ok(f.x + dd * 0.8); })[0];
+            if (d) plan = { fire: f, side: d };
+            return !!plan;
+          });
+        if (!plan) return [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'bark', n: 3, gap: 0.3 }, { do: 'wag', v: 0.4, dur: 0 }];
+        var fx = plan.fire.x, fpx = plan.fire.px, right = plan.side < 0, stand = fx + plan.side * 0.8;   // Abstand: Strahl im weiten Bogen
         return [{ do: 'wag', v: 1, dur: 0 }, { do: 'bark', n: 1, gap: 0.3 }, { do: 'goto', x: stand, gait: 'run' },
-          { do: 'face', hour: right ? 11.3 : 12.7, dur: 0.6 }, { do: 'call', fn: function () { S.peeX = fx; S.peeSide = right ? 'R' : 'L'; } },
-          { do: 'mode', m: 'pee', dur: 3.2 }, { do: 'call', fn: function () { S.peeX = null; if (opt.onExtinguish) opt.onExtinguish(parseFloat(p.x)); } },
+          // erst fertig umdrehen, sonst Bein und Strahl auf der falschen Seite
+          { do: 'face', hour: right ? 11.3 : 12.7, dur: 1.4 },
+          { do: 'call', fn: function () { S.peeX = fx; S.peeSide = right ? 'R' : 'L'; } },
+          { do: 'mode', m: 'pee', dur: 3.2 }, { do: 'call', fn: function () { S.peeX = null; if (opt.onExtinguish) opt.onExtinguish(fpx); } },
           { do: 'mode', m: 'idle', face: 6, dur: 0.5 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'wag', v: 1, dur: 2 }, { do: 'wag', v: 0.4, dur: 0 }];
       },
       shakeoff: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.5 }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }]; },
@@ -780,6 +793,9 @@
         var an = B[(S.peeSide || 'L') + '_ankle'];
         // Knie/Sprunggelenk um die mitgedrehte Scharnierachse beugen (das Bein steht seitlich, die Weltquerachse wäre falsch)
         var ab = sd * 2.25 * w, hinge = LAT.clone().applyAxisAngle(FWD, ab);
+        // Becken kippt mit hoch (Seite des gehobenen Beins steigt), das Standbein gleicht aus und bleibt senkrecht
+        var so = B[(S.peeSide === 'R' ? 'L' : 'R') + '_hip'];
+        turn(B.pelvis, FWD, sd * 0.3 * w); if (so) turn(so, FWD, -sd * 0.3 * w);
         turn(hp, LAT, -0.35 * w); turn(hp, FWD, ab); turn(kn, hinge, 1.2 * w); if (an) turn(an, hinge, -0.8 * w);
         turn(B.COG, FWD, -sd * 0.06 * w); tailOver(0.4 * w);
       } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
