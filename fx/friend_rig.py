@@ -5,6 +5,7 @@ Global, eine Datei data/friend-rig.json. Inhalt (alles optional außer version):
           Knochen-Nummer in bones und Gewicht 0–255), bones (Knochennamen), inv (Float32 4×4 je Knochen) – Arrays als Base64
   joints: {Knochen: [dx, dy, dz]} lokaler Versatz der Gelenke
   poses:  {all|stand|sit|down|lie|beg|paw: {Knochen: [x, y, z, w]}} lokale Drehung je Haltung (all = immer, z. B. Rute)
+  moves:  {Haltung: {Knochen: [dx, dy, dz]}} lokaler Versatz je Haltung (Becken, Rücken, Körpermitte verschieben)
   ears:   Kippohr 0–1, tailUp: Rutenwinkel (rad), tailCurl: Rute einrollen (rad je Glied ÷ 0,3)
 Gibt es eine Datei, nimmt der Hund dieses Modell statt des eingebauten.
 """
@@ -131,6 +132,24 @@ def clean(rig):
             op[pk] = s
     if op:
         out["poses"] = op
+    moves = rig.get("moves") or {}
+    if not isinstance(moves, dict):
+        return "moves: object expected"
+    om = {}
+    for pk, set_ in moves.items():
+        if pk not in POSES:
+            return "moves: unknown pose %s" % str(pk)[:20]
+        if not isinstance(set_, dict) or len(set_) > MAX_BONES:
+            return "moves.%s: object expected" % pk
+        s = {}
+        for k, v in set_.items():
+            if not BONE_RE.match(str(k)) or not isinstance(v, list) or len(v) != 3 or not all(_num(x, MAX_OFFSET) for x in v):
+                return "moves.%s.%s: [dx, dy, dz] expected" % (pk, str(k)[:40])
+            s[k] = [round(x, 6) for x in v]
+        if s:
+            om[pk] = s
+    if om:
+        out["moves"] = om
     if rig.get("ears") is not None:
         if not _num(rig["ears"], 1) or rig["ears"] < 0:
             return "ears: 0 to 1 expected"

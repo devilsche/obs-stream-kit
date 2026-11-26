@@ -69,7 +69,8 @@
     var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1, lookup: 1 };
     // Zusatzhaltungen am Skelett (über dem Steh- bzw. Sitz-Clip), weich ein- und ausgeblendet
     var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1, lookup: 1, test: 1, pee: 1, down: 1 };
-    var SIT_POSES = { beg: 1, hide: 1, lookup: 1, down: 1 };   // bauen auf der gemerkten Sitzhaltung auf
+    var SIT_POSES = { beg: 1, hide: 1, lookup: 1, down: 1 };
+    var DOWN_PITCH = -0.08;   // Platz: Rücken (Hüfte → Brust) leicht nach vorn abfallend   // bauen auf der gemerkten Sitzhaltung auf
     var fxg = null;   // Gruppe für Wirbeln (Tornado) zwischen holder und Körper
     // Pinkelstrahl (Feuer löschen): Tropfen auf einer Wurfparabel vom Becken zum Feuer
     var PEE_N = 46, peePos = new Float32Array(PEE_N * 3), peeA = new Float32Array(PEE_N), peeGeo = new THREE.BufferGeometry();
@@ -364,16 +365,16 @@
     // Haltungs-Korrekturen: lokale Drehung je Knochen, gewichtet mit dem Anteil der Haltung; vor dem nächsten Bild
     // wird die Drehung davor wiederhergestellt (der Sitz-Clip schreibt die Knochen nicht jedes Bild neu)
     var cq = new THREE.Quaternion(), IDQ = new THREE.Quaternion();
-    function unCorrect() { for (var i = 0; i < CORR.length; i++) CORR[i][0].quaternion.copy(CORR[i][1]); CORR.length = 0; }
+    function unCorrect() { for (var i = CORR.length - 1; i >= 0; i--) { CORR[i][0].quaternion.copy(CORR[i][1]); if (CORR[i][2]) CORR[i][0].position.sub(CORR[i][2]); } CORR.length = 0; }
     function clipW(n) { var a = actions[n]; return a && a.isRunning() ? a.getEffectiveWeight() : 0; }
     function poseWeights(moving) {
       var beg = S.pose === 'beg' ? S.poseW : 0, down = S.pose === 'down' ? S.poseW : 0;
       return { all: 1, stand: clipW('standing') * (1 - Math.min(1, moving * 3)) * (1 - S.poseW), sit: clipW('sitting') * (1 - beg - down), down: down, lie: clipW('play_dead'), beg: beg, paw: clipW('shake') };
     }
     function applyCorrect(moving) {
-      if (!RIG || !RIG.poses) return;
+      if (!RIG || (!RIG.poses && !RIG.moves)) return;
       var w = poseWeights(moving), acc = {};
-      Object.keys(RIG.poses).forEach(function (pk) {
+      Object.keys(RIG.poses || {}).forEach(function (pk) {
         var wk = w[pk] || 0, set = RIG.poses[pk]; if (wk < 0.005 || !set) return;
         Object.keys(set).forEach(function (nm) {
           var b = BYNAME[nm], q = set[nm]; if (!b || !q) return;
@@ -381,7 +382,14 @@
           if (!acc[nm]) acc[nm] = [b, part]; else acc[nm][1].multiply(part);
         });
       });
-      Object.keys(acc).forEach(function (nm) { var b = acc[nm][0]; CORR.push([b, b.quaternion.clone()]); b.quaternion.multiply(acc[nm][1]); });
+      // Verschiebungen je Haltung (Becken, Rücken, Körpermitte: lokaler Versatz, gewichtet)
+      var mv = {};
+      if (RIG.moves) Object.keys(RIG.moves).forEach(function (pk) {
+        var wk = w[pk] || 0, set = RIG.moves[pk]; if (wk < 0.005 || !set) return;
+        Object.keys(set).forEach(function (nm) { var b = BYNAME[nm], o = set[nm]; if (!b || !o) return; var v = mv[nm] || (mv[nm] = [b, new THREE.Vector3()]); v[1].x += o[0] * Math.min(1, wk); v[1].y += o[1] * Math.min(1, wk); v[1].z += o[2] * Math.min(1, wk); });
+      });
+      Object.keys(acc).forEach(function (nm) { var b = acc[nm][0]; CORR.push([b, b.quaternion.clone(), null]); b.quaternion.multiply(acc[nm][1]); });
+      Object.keys(mv).forEach(function (nm) { var b = mv[nm][0]; CORR.push([b, b.quaternion.clone(), mv[nm][1]]); b.position.add(mv[nm][1]); });
     }
 
     function play(name, opts) {
@@ -392,6 +400,36 @@
       cur = a;
     }
     var tq = new THREE.Quaternion(), pq = new THREE.Quaternion(), ax = new THREE.Vector3();
+    // Knochen so drehen, dass sein Kind zum Weltpunkt target zeigt (Anteil w)
+    var aq = new THREE.Quaternion(), aIdq = new THREE.Quaternion(), aA = new THREE.Vector3(), aB = new THREE.Vector3(), aP = new THREE.Vector3();
+    function aimBone(bone, child, target, w) {
+      if (!bone || !child) return;
+      bone.getWorldPosition(aP); child.getWorldPosition(aA).sub(aP); aB.copy(target).sub(aP);
+      if (aA.lengthSq() < 1e-12 || aB.lengthSq() < 1e-12) return;
+      aq.setFromUnitVectors(aA.normalize(), aB.normalize()); if (w < 1) aq.slerp(aIdq, 1 - w);
+      bone.parent.getWorldQuaternion(pq); var loc = pq.clone().invert().multiply(aq).multiply(pq);
+      bone.quaternion.premultiply(loc); bone.updateMatrixWorld(true);
+    }
+    // Sitzen/Platz: ein Hinterbein, das durch den Boden geht (längere Beine beim eigenen Modell), im Knie stärker
+    // beugen, bis die Pfote auf dem Boden steht – statt den ganzen Hund anzuheben (dann schweben die Vorderpfoten)
+    function groundHind() {
+      var gY = 0.012, V3 = THREE.Vector3;
+      [[B.L_hip, B.L_knee, B.L_ankle, B.L_foot, B.LB_toes], [B.R_hip, B.R_knee, B.R_ankle, B.R_foot, B.RB_toes]].forEach(function (l) {
+        if (!l[4]) return;
+        holder.updateMatrixWorld(true);
+        var H = l[0].getWorldPosition(new V3()), K = l[1].getWorldPosition(new V3()), A = l[2].getWorldPosition(new V3());
+        var lo = Math.min(A.y, l[3].getWorldPosition(new V3()).y, l[4].getWorldPosition(new V3()).y), def = gY - lo;
+        if (def < 0.003) return;
+        var a = H.distanceTo(K), c = K.distanceTo(A), T = A.clone(); T.y += def;
+        var u = T.clone().sub(H), d = Math.min(u.length(), (a + c) * 0.999); if (d < 1e-6 || a < 1e-6) return;
+        u.normalize();
+        var cosA = Math.max(-1, Math.min(1, (a * a + d * d - c * c) / (2 * a * d))), sinA = Math.sqrt(1 - cosA * cosA);
+        var pv = K.clone().sub(H); pv.addScaledVector(u, -pv.dot(u)); if (pv.lengthSq() < 1e-12) pv.copy(FWD); pv.normalize();
+        var Kn = H.clone().addScaledVector(u, a * cosA).addScaledVector(pv, a * sinA), Tn = H.clone().addScaledVector(u, d);
+        CORR.push([l[0], l[0].quaternion.clone(), null]); CORR.push([l[1], l[1].quaternion.clone(), null]);
+        aimBone(l[0], l[1], Kn, 1); aimBone(l[1], l[2], Tn, 1);
+      });
+    }
     function turn(bone, worldAxis, ang) {
       if (!bone || !ang) return;
       bone.parent.getWorldQuaternion(pq); pq.invert();
@@ -788,6 +826,7 @@
           peeGeo.attributes.position.needsUpdate = peeGeo.attributes.a.needsUpdate = true;
         }
         applyCorrect(moving);
+        if (cur === actions.sitting && moving < 0.05 && !S.fly) groundHind();
         // gebeugte Steh-Haltungen: Rumpf so kippen, dass Vorder- und Hinterpfoten gleich hoch stehen (Beine beugen allein
         // hebt nur Pfoten an – gemessen: Hinterpfoten 15 cm in der Luft, Vorderpfoten am Boden)
         if (S.poseW > 0.05 && S.pose && POSES[S.pose] && !SIT_POSES[S.pose] && S.pose !== 'flail' && S.pose !== 'shakeoff' && S.pose !== 'pee' && !S.fly) levelFeet();
@@ -836,10 +875,29 @@
         LEGS.forEach(function (l) { turn(l[0], LAT, 0.8 * w); turn(l[1], LAT, -2.2 * w); turn(l[2], LAT, 2.0 * w); });   // Oberarm dicht am Körper, Ellbogen vorn, Unterarm zur Brust, Pfoten stark abgeknickt
         LEGS.forEach(function (l, i) { turn(l[0], FWD, (i ? -1 : 1) * 0.28 * w); });   // etwas auseinander (kein Händchenhalten)
         turn(B.neck_base, LAT, 0.8 * w); turn(B.head, LAT, 0.05 * w);
-      } else if (name === 'down') {   // Platz: aus dem Sitzen Brust ab, Vorderbeine flach nach vorn, Kopf oben
-        turn(B.spine_1, LAT, 0.42 * w); turn(B.spine_2, LAT, 0.28 * w); turn(B.chest, LAT, 0.2 * w);
-        LEGS.forEach(function (l) { turn(l[0], LAT, -2.0 * w); turn(l[1], LAT, 0.25 * w); turn(l[2], LAT, -0.2 * w); });   // Brust tiefer schwenkt die Beine nach hinten: Schulter weit vor
-        turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.25 * w);
+      } else if (name === 'down') {   // Platz: aus dem Sitzen den ganzen Rumpf um die Hüfte nach vorn ablegen (Rücken gerade,
+        // kein Buckel), Hinterbeine bleiben gefaltet am Boden, Vorderbeine liegen flach nach vorn (Ellbogen und Unterarm am
+        // Boden), Kopf oben. Alles über Weltpunkte gerechnet, damit es auch mit eigenem Modell und versetzten Gelenken passt.
+        var V3 = THREE.Vector3, wpos = function (b) { return b.getWorldPosition(new V3()); };
+        var hipA = wpos(B.L_hip).add(wpos(B.R_hip)).multiplyScalar(0.5), sh = wpos(B.L_shoulder).add(wpos(B.R_shoulder)).multiplyScalar(0.5);
+        var bk = wpos(B.chest).sub(hipA), pitch = Math.atan2(bk.y, Math.hypot(bk.x, bk.z));
+        var upper = wpos(B.L_elbow).distanceTo(wpos(B.L_shoulder)), gY = 0.015;
+        var sv = sh.clone().sub(hipA), sr = Math.hypot(Math.hypot(sv.x, sv.z), sv.y), sphi = Math.atan2(sv.y, Math.hypot(sv.x, sv.z));
+        var shMin = gY + upper * 0.55, tMax = sr > 0 ? sphi - Math.asin(Math.max(-1, Math.min(1, (shMin - hipA.y) / sr))) : 0;
+        var tilt = Math.max(0, Math.min(pitch - DOWN_PITCH, tMax)) * w;
+        turn(B.COG, LAT, tilt); turn(B.L_hip, LAT, -tilt); turn(B.R_hip, LAT, -tilt); turn(B.tail_1, LAT, -tilt * 0.6);
+        var hipB = wpos(B.L_hip).add(wpos(B.R_hip)).multiplyScalar(0.5);
+        B.COG.position.add(hipA.sub(hipB).applyMatrix3(new THREE.Matrix3().setFromMatrix4(B.COG.parent.matrixWorld).invert()));
+        turn(B.chest, LAT, 0.08 * w);
+        [[B.L_shoulder, B.L_elbow, B.L_wrist, B.L_hand, B.LF_toes], [B.R_shoulder, B.R_elbow, B.R_wrist, B.R_hand, B.RF_toes]].forEach(function (l) {
+          if (!l[4]) return;
+          var S0 = wpos(l[0]), L1 = S0.distanceTo(wpos(l[1])), L2 = wpos(l[1]).distanceTo(wpos(l[2])), L3 = wpos(l[2]).distanceTo(wpos(l[3])), L4 = wpos(l[3]).distanceTo(wpos(l[4]));
+          var ey = gY + 0.02, dy = Math.min(L1 * 0.98, Math.max(0, S0.y - ey)), hb = Math.sqrt(Math.max(0, L1 * L1 - dy * dy));
+          var El = new V3(S0.x, S0.y - dy, S0.z).addScaledVector(FWD, -hb), Wr = El.clone().addScaledVector(FWD, L2), Ha = Wr.clone().addScaledVector(FWD, L3), To = Ha.clone().addScaledVector(FWD, L4);
+          Wr.y = Ha.y = To.y = gY;
+          aimBone(l[0], l[1], El, w); aimBone(l[1], l[2], Wr, w); aimBone(l[2], l[3], Ha, w); aimBone(l[3], l[4], To, w);
+        });
+        turn(B.neck_base, LAT, -0.35 * w); turn(B.head, LAT, -0.2 * w);
       } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen
         turn(B.spine_1, LAT, 0.4 * w); turn(B.spine_2, LAT, 0.25 * w); turn(B.chest, LAT, 0.15 * w);
         LEGS.forEach(function (l) { turn(l[0], LAT, -1.7 * w); turn(l[1], LAT, 2.3 * w); turn(l[2], LAT, 1.1 * w); });
@@ -970,6 +1028,9 @@
         if (r) { if (r.ears != null) EAR_FOLD = r.ears; if (r.tailUp != null) TAIL_UP = r.tailUp; TAIL_CURL = r.tailCurl || 0; } },
       hold: function (m, face, clipAt) {
         plan = []; step = null; roam = false; S.face = face == null ? 3 : face; S.rise = 0; S.x = 0; S.z = 0; S.wag = 0;
+        // Korrekturen des letzten Bilds erst zurücknehmen: der Mixer merkt sich beim Starten eines Clips den Ist-Zustand
+        // der Knochen und schreibt ihn beim Wechsel zurück – sonst bliebe z. B. ein gebeugtes Knie im Stehen hängen
+        unCorrect(); unRigOff(); unSnout();
         setMode(m);
         // festhalten: Überblenden sofort fertig (bei angehaltenem Mixer liefe es nie zu Ende)
         Object.keys(actions).forEach(function (k) { if (actions[k] !== cur) actions[k].stop(); });

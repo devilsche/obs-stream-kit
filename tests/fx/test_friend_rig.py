@@ -39,6 +39,15 @@ def test_rig_without_skin_is_fine(tmp_path):
     assert friend_rig.save(str(tmp_path), {"poses": {"beg": {"head_jnt40_038": [0, 0, 0, 1]}}}) is None
 
 
+def test_moves_per_pose(tmp_path):
+    root = str(tmp_path)
+    assert friend_rig.save(root, {"moves": {"down": {"pelvis_jnt6_04": [0, -3.5, 0]}}}) is None
+    assert friend_rig.load(root)["moves"] == {"down": {"pelvis_jnt6_04": [0, -3.5, 0]}}
+    assert friend_rig.save(root, {"moves": {"dance": {}}})
+    assert friend_rig.save(root, {"moves": {"down": {"pelvis_jnt6_04": [0, 5000, 0]}}})
+    assert friend_rig.save(root, {"moves": {"down": {"pelvis_jnt6_04": [0, 1]}}})
+
+
 def test_rejects_bad_input(tmp_path):
     root = str(tmp_path)
     sk = _rig()["skin"]

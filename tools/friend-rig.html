@@ -184,7 +184,7 @@
 
       <section data-pane="poses" role="tabpanel" aria-label="Poses" hidden>
         <h2>Fix the poses</h2>
-        <p class="small muted">Pick a pose, then click a joint. Move (W): the arrows swing the bone leading to it. Turn (E, or hold Ctrl): the rings turn the bone at that joint, with everything after it. Each fix belongs to this pose only. Faded dots are on the far side.</p>
+        <p class="small muted">Pick a pose, then click a joint. Move (W): the arrows swing the bone leading to it. Hip, back and body centre move instead (e.g. lower the hip in Down). Turn (E, or hold Ctrl): the rings turn the bone at that joint, with everything after it. Each fix belongs to this pose only. Faded dots are on the far side.</p>
         <div class="row" role="group" aria-label="Pose">
           <button type="button" data-pose="all">All poses</button>
           <button type="button" data-pose="stand">Stand</button>
@@ -260,7 +260,7 @@
       var dog = FriendDog.create({ canvas: $('cv'), model: BASE + 'assets/friend/dog.glb', sizePx: 300, fur: 'pinscher', body: 'custom',
         area: 'center', roam: false, sound: false, edit: true });
       var E = dog.edit, cam = E.cam, scene = E.scene;
-      var rig = { joints: {}, poses: {}, ears: 0, tailUp: 0.45, tailCurl: 0 };
+      var rig = { joints: {}, poses: {}, moves: {}, ears: 0, tailUp: 0.45, tailCurl: 0 };
       var skinData = null;            // gebundenes Modell: {pos Float32, idx Uint32, col Uint8, j Uint8, w Uint8, bones [], inv Float32}
       var src = null;                 // eingepasstes Modell (THREE.Mesh) vor dem Binden
       var align = new THREE.Group(); scene.add(align);
@@ -439,10 +439,15 @@
         if (kind === 'move') {
           g.O0 = (rig.joints[b.name] || [0, 0, 0]).slice(); g.M = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
           if (bm && $('mirrorJ').checked) { g.bm = bm; g.O0m = (rig.joints[bm.name] || [0, 0, 0]).slice(); g.Mm = new THREE.Matrix3().setFromMatrix4(bm.parent.matrixWorld).invert(); }
+        } else if (kind === 'aim' && SHIFT[n]) {   // Becken, Rücken, Körpermitte: Knochen davor wäre die Körpermitte (dreht
+          g.kind = 'shift';                         // den ganzen Hund) – stattdessen nur für diese Haltung verschieben
+          var ms = (rig.moves[poseKey] || {})[b.name];
+          g.O0 = ms ? ms.slice() : [0, 0, 0]; g.M = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
         } else if (kind === 'aim') { if (!b.parent || !b.parent.isBone) return null; corrState(g, b.parent); }
         else corrState(g, b);
         return g;
       }
+      var SHIFT = { COG: 1, pelvis: 1, spine_1: 1 };
       function setCorr(key, P, C0, W0, q) {
         var set = rig.poses[key] = rig.poses[key] || {};
         var C = C0.clone().multiply(W0.clone().invert().multiply(q).multiply(W0)).normalize();
@@ -456,6 +461,9 @@
           rig.joints[b.name] = [g.O0[0] + l.x, g.O0[1] + l.y, g.O0[2] + l.z];
           if (g.bm) { var lm = new THREE.Vector3(d.x, d.y, -d.z).applyMatrix3(g.Mm); rig.joints[g.bm.name] = [g.O0m[0] + lm.x, g.O0m[1] + lm.y, g.O0m[2] + lm.z]; }
           if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
+        } else if (g.kind === 'shift') {
+          var ls = hit.clone().sub(g.J0).applyMatrix3(g.M), mset = rig.moves[g.key] = rig.moves[g.key] || {};
+          mset[b.name] = [g.O0[0] + ls.x, g.O0[1] + ls.y, g.O0[2] + ls.z];
         } else {
           var q = qd;
           if (g.kind === 'aim') {
@@ -672,27 +680,37 @@
             for (var s = 0; s + 1 < hs.length; s += 2) out.push([hs[s], hs[s + 1]]);
             return out;
           }
-          function pick(list, v) {   // Intervall, das v enthält, sonst das nächste
-            var best = null, bd = 1e9;
-            list.forEach(function (iv) { var d = v < iv[0] ? iv[0] - v : v > iv[1] ? v - iv[1] : 0; if (d < bd) { bd = d; best = iv; } });
+          function pick(list, v, maxd) {   // Intervall, das v enthält, sonst das nächste (höchstens maxd entfernt)
+            var best = null, bd = maxd == null ? 1e9 : maxd;
+            list.forEach(function (iv) { var d = v < iv[0] ? iv[0] - v : v > iv[1] ? v - iv[1] : 0; if (d <= bd) { bd = d; best = iv; } });
             return best;
           }
           var subtree = function (b, top) { var q = b; while (q) { if (q === top) return true; q = q.parent; } return false; };
           var mains = JOINTS.map(function (n) { return E.B[n]; }).filter(function (b) { return b && D.has(b); }).sort(function (a2, c2) { return depth(a2) - depth(c2); });
           src.updateMatrixWorld(true);
+          // Pfoten bleiben auf dem Boden: ihre Höhe merken und nach dem Hineinschieben wiederherstellen (sonst ziehen
+          // Hüfte und Knie sie mit nach oben – gemessen: Hinterpfoten 17 bzw. 41 cm in der Luft)
+          var isLeg = function (b) { return /hip|knee|ankle|foot|toes|shoulder|elbow|wrist|hand|^[LR][FB]_/.test(shortName(b)); };
+          var isFoot = function (b) { return /toes|_foot|_hand|^[LR][FB]_/.test(shortName(b)); }, footY = new Map();
+          D.forEach(function (pos, b) { if (isFoot(b)) footY.set(b, pos.y); });
           mains.forEach(function (J) {
             var p0 = D.get(J), p1 = p0.clone(), FAR = 3;
             var zs = spans(new THREE.Vector3(p0.x, p0.y, FAR), new THREE.Vector3(0, 0, -1)).map(function (iv) { return [FAR - iv[1], FAR - iv[0]]; });
-            var zi = pick(zs, p0.z); if (zi) p1.z = (zi[0] + zi[1]) / 2;
+            // Beine: nur mittig ins Bein, wenn der Strahl wirklich nur das Bein trifft (schmal) – geht er durch den Bauch,
+            // landete das Knie sonst in der Körpermitte bzw. oben im Rumpf
+            var leg = isLeg(J), zi = pick(zs, p0.z, leg ? 0.04 : null); if (zi && (!leg || zi[1] - zi[0] < 0.09)) p1.z = (zi[0] + zi[1]) / 2;
             var ys = spans(new THREE.Vector3(p1.x, FAR, p1.z), new THREE.Vector3(0, -1, 0)).map(function (iv) { return [FAR - iv[1], FAR - iv[0]]; });
-            var yi = pick(ys, p0.y);
+            var yi = isFoot(J) || leg ? null : pick(ys, p0.y);
             if (yi) { var m = Math.min(0.02, (yi[1] - yi[0]) * 0.3); if (p1.y > yi[1] - m) p1.y = yi[1] - m; else if (p1.y < yi[0] + m) p1.y = yi[0] + m; }
             var xs = spans(new THREE.Vector3(-FAR, p1.y, p1.z), new THREE.Vector3(1, 0, 0)).map(function (iv) { return [iv[0] - FAR, iv[1] - FAR]; });
-            var xi = pick(xs, p1.x);   // vorn/hinten herausragend (Nasenspitze, Zehen): knapp hinein
-            if (xi) { var mx2 = Math.min(0.015, (xi[1] - xi[0]) * 0.3); if (p1.x > xi[1] - mx2) p1.x = xi[1] - mx2; else if (p1.x < xi[0] + mx2) p1.x = xi[0] + mx2; }
+            var xi = pick(xs, p1.x, leg ? 0.04 : null);   // vorn/hinten herausragend (Nasenspitze, Zehen): knapp hinein
+            if (xi && (!leg || xi[1] - xi[0] < 0.09)) { var mx2 = Math.min(0.015, (xi[1] - xi[0]) * 0.3); if (p1.x > xi[1] - mx2) p1.x = xi[1] - mx2; else if (p1.x < xi[0] + mx2) p1.x = xi[0] + mx2; }
             var dlt = p1.sub(p0); if (dlt.lengthSq() < 1e-10) return;
-            D.forEach(function (pos, b) { if (subtree(b, J)) pos.add(dlt); });
+            // Beingelenke unterhalb nur waagrecht mitnehmen: hebt das Hineinschieben die Hüfte, würden Knie und Sprunggelenk
+            // sonst mit hochgezogen und das Bein unten künstlich verlängert (fliegt beim Sitzen nach vorn)
+            D.forEach(function (pos, b) { if (!subtree(b, J)) return; if (b !== J && isLeg(b)) { pos.x += dlt.x; pos.z += dlt.z; } else pos.add(dlt); });
           });
+          footY.forEach(function (y, b) { D.get(b).y = y; });
           bones.forEach(function (b) {
             if (!D.has(b)) return;
             var pd = D.get(b.parent) || b.parent.getWorldPosition(new THREE.Vector3());
@@ -795,7 +813,7 @@
       $('resetJ').addEventListener('click', function () { rig.joints = {}; E.liveRig(rig); mark(); status('Joints reset.'); });
 
       // ── Binden: Gewichte und Farben vom eingebauten Hund (nächste Punkte), Bind-Matrizen aus der aktuellen Haltung ──
-      function stripSkin() { var r = JSON.parse(JSON.stringify({ joints: rig.joints, poses: rig.poses, ears: rig.ears, tailUp: rig.tailUp, tailCurl: rig.tailCurl || 0 })); return r; }
+      function stripSkin() { var r = JSON.parse(JSON.stringify({ joints: rig.joints, poses: rig.poses, moves: rig.moves, ears: rig.ears, tailUp: rig.tailUp, tailCurl: rig.tailCurl || 0 })); return r; }
       function grid(points, cell) {
         var G = new Map();
         for (var i = 0; i < points.length / 3; i++) {
@@ -935,15 +953,17 @@
       $('copyP').addEventListener('click', function () {
         var from = $('copyFrom').value;
         if (from === poseKey) { status('Pick a different pose to copy from.', 'err'); return; }
-        var set = rig.poses[from]; if (!set || !Object.keys(set).length) { status('That pose has no fixes yet.', 'err'); return; }
-        rig.poses[poseKey] = JSON.parse(JSON.stringify(set)); E.liveRig(rig); mark();
+        var set = rig.poses[from] || {}, mv = rig.moves[from] || {};
+        if (!Object.keys(set).length && !Object.keys(mv).length) { status('That pose has no fixes yet.', 'err'); return; }
+        rig.poses[poseKey] = JSON.parse(JSON.stringify(set)); rig.moves[poseKey] = JSON.parse(JSON.stringify(mv)); E.liveRig(rig); mark();
         status('Fixes copied from ' + $('copyFrom').selectedOptions[0].textContent + '.', 'ok');
       });
-      $('resetP').addEventListener('click', function () { delete rig.poses[poseKey]; E.liveRig(rig); mark(); status('Pose reset.'); });
+      $('resetP').addEventListener('click', function () { delete rig.poses[poseKey]; delete rig.moves[poseKey]; E.liveRig(rig); mark(); status('Pose reset.'); });
       $('resetJt').addEventListener('click', function () {
         if (!sel) return; var b = E.B[sel];
         if (tab === 'joints') { delete rig.joints[b.name]; }
         else if (rig.poses[poseKey]) { if (b.parent) delete rig.poses[poseKey][b.parent.name]; delete rig.poses[poseKey][b.name]; }
+        if (tab === 'poses' && rig.moves[poseKey]) delete rig.moves[poseKey][b.name];
         E.liveRig(rig); mark();
       });
 
@@ -1100,7 +1120,7 @@
       $('drop').addEventListener('click', function () {
         if ($('drop').dataset.sure !== '1') { $('drop').dataset.sure = '1'; $('drop').textContent = 'Really? Click again'; setTimeout(function () { $('drop').dataset.sure = ''; $('drop').textContent = 'Back to built-in dog'; }, 4000); return; }
         api('DELETE').then(function () {
-          rig = { joints: {}, poses: {}, ears: 0, tailUp: 0.45 }; skinData = null; E.setRig(null); E.liveRig(rig); showOrig();
+          rig = { joints: {}, poses: {}, moves: {}, ears: 0, tailUp: 0.45 }; skinData = null; E.setRig(null); E.liveRig(rig); showOrig();
           $('drop').dataset.sure = ''; $('drop').textContent = 'Back to built-in dog'; status('Removed. The dog uses the built-in model again.', 'ok');
         }).catch(function (e) { status('Failed: ' + e.message, 'err'); });
       });
@@ -1115,7 +1135,7 @@
         setTab('model'); requestAnimationFrame(loop);
         return api('GET').then(function (d) {
           var r = d.rig; if (!r) { status('No own model saved yet. Load your GLB in step 1.'); return; }
-          rig = { joints: r.joints || {}, poses: r.poses || {}, ears: r.ears || 0, tailUp: r.tailUp != null ? r.tailUp : 0.45, tailCurl: r.tailCurl || 0 };
+          rig = { joints: r.joints || {}, poses: r.poses || {}, moves: r.moves || {}, ears: r.ears || 0, tailUp: r.tailUp != null ? r.tailUp : 0.45, tailCurl: r.tailCurl || 0 };
           $('curl').value = rig.tailCurl; $('curlO').value = (+rig.tailCurl).toFixed(2);
           $('ears').value = rig.ears; $('earsO').value = (+rig.ears).toFixed(2); $('tail').value = rig.tailUp; $('tailO').value = (+rig.tailUp).toFixed(2);
           if (r.skin) {
