@@ -97,9 +97,10 @@
         <button type="button" role="tab" data-tab="model">1 Model</button>
         <button type="button" role="tab" data-tab="joints">2 Joints</button>
         <button type="button" role="tab" data-tab="bind">3 Bind</button>
-        <button type="button" role="tab" data-tab="poses">4 Poses</button>
-        <button type="button" role="tab" data-tab="paint">5 Paint</button>
-        <button type="button" role="tab" data-tab="test">6 Test</button>
+        <button type="button" role="tab" data-tab="shape">4 Shape</button>
+        <button type="button" role="tab" data-tab="poses">5 Poses</button>
+        <button type="button" role="tab" data-tab="paint">6 Paint</button>
+        <button type="button" role="tab" data-tab="test">7 Test</button>
       </nav>
 
       <section data-pane="model" role="tabpanel" aria-label="Model">
@@ -127,6 +128,8 @@
         <div class="row"><label class="chk"><input type="checkbox" id="mirrorJ" checked> Move left and right together</label></div>
         <div class="row"><label for="ears">Ear fold</label><input id="ears" type="range" min="0" max="1" step="0.01" value="0"><output id="earsO" for="ears">0</output></div>
         <div class="row"><label for="tail">Tail angle</label><input id="tail" type="range" min="-0.6" max="1.5" step="0.01" value="0.45"><output id="tailO" for="tail">0.45</output></div>
+        <div class="row"><label for="curl">Tail curl</label><input id="curl" type="range" min="-1.5" max="1.5" step="0.01" value="0"><output id="curlO" for="curl">0</output></div>
+        <p class="small muted">Tail dots bend the tail when dragged (in every pose). Curl rolls it up (+) or down (−).</p>
         <div class="row"><button type="button" id="autoJ">Auto-place joints</button><button type="button" class="ghost" id="resetJ">Reset joints</button></div>
         <p class="small muted">Auto-place stretches the skeleton to the size of your model. Then fine-tune by hand.</p>
         <p class="small muted" id="rebindHint" hidden>Joints changed after binding: bind again in step 3.</p>
@@ -139,10 +142,26 @@
         <p class="small" id="bindInfo"></p>
       </section>
 
+      <section data-pane="shape" role="tabpanel" aria-label="Shape" hidden>
+        <h2>Shape the body</h2>
+        <p class="small muted">Sculpt your bound model like clay. Left mouse uses the tool, right mouse orbits. Undo with Ctrl+Z.</p>
+        <div class="row" role="group" aria-label="Tool">
+          <button type="button" data-tool="grab" aria-pressed="true">Grab</button>
+          <button type="button" data-tool="inflate">Inflate</button>
+          <button type="button" data-tool="deflate">Deflate</button>
+          <button type="button" data-tool="smooth">Smooth</button>
+        </div>
+        <div class="row"><label for="srad">Size</label><input id="srad" type="range" min="0.01" max="0.25" step="0.002" value="0.06"><output id="sradO" for="srad">0.06</output></div>
+        <div class="row"><label for="sstr">Strength</label><input id="sstr" type="range" min="0.05" max="1" step="0.05" value="0.5"><output id="sstrO" for="sstr">0.5</output></div>
+        <div class="row"><label class="chk"><input type="checkbox" id="smir" checked> Both sides (mirror)</label></div>
+        <div class="row"><button type="button" class="ghost" id="sundo">Undo</button></div>
+      </section>
+
       <section data-pane="poses" role="tabpanel" aria-label="Poses" hidden>
         <h2>Fix the poses</h2>
         <p class="small muted">Pick a pose, then drag a joint: the bone leading to it turns. Fixes are blended in whenever the dog takes that pose.</p>
         <div class="row" role="group" aria-label="Pose">
+          <button type="button" data-pose="all">All poses</button>
           <button type="button" data-pose="stand">Stand</button>
           <button type="button" data-pose="sit">Sit</button>
           <button type="button" data-pose="down">Down</button>
@@ -213,7 +232,7 @@
       var dog = FriendDog.create({ canvas: $('cv'), model: BASE + 'assets/friend/dog.glb', sizePx: 300, fur: 'pinscher', body: 'custom',
         area: 'center', roam: false, sound: false, edit: true });
       var E = dog.edit, cam = E.cam, scene = E.scene;
-      var rig = { joints: {}, poses: {}, ears: 0, tailUp: 0.45 };
+      var rig = { joints: {}, poses: {}, ears: 0, tailUp: 0.45, tailCurl: 0 };
       var skinData = null;            // gebundenes Modell: {pos Float32, idx Uint32, col Uint8, j Uint8, w Uint8, bones [], inv Float32}
       var src = null;                 // eingepasstes Modell (THREE.Mesh) vor dem Binden
       var align = new THREE.Group(); scene.add(align);
@@ -303,16 +322,17 @@
         E.liveRig(rig); mark(); if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
       }
       // Weltdrehung q am Knochen P als lokale Korrektur der aktuellen Haltung: C' = C · (Wp⁻¹ q Wp)
-      function rotBone(P, q) {
+      function rotBone(P, q, key) {
         var Wp = new THREE.Quaternion(); P.getWorldQuaternion(Wp);
-        var set = rig.poses[poseKey] = rig.poses[poseKey] || {}, c = set[P.name];
+        key = key || poseKey;
+        var set = rig.poses[key] = rig.poses[key] || {}, c = set[P.name];
         var C = c ? new THREE.Quaternion(c[0], c[1], c[2], c[3]) : new THREE.Quaternion();
         var loc = Wp.clone().invert().multiply(q).multiply(Wp);
         C.multiply(loc).normalize(); set[P.name] = [C.x, C.y, C.z, C.w];
       }
-      function turnJoint(n, qWorld) {
+      function turnJoint(n, qWorld, key) {
         var b = E.B[n]; if (!b || !b.parent || !b.parent.isBone) return;
-        rotBone(b.parent, qWorld);
+        rotBone(b.parent, qWorld, key);
         var mn = mirrorName(shortName(b.parent));
         if ($('mirrorP').checked && mn && E.B[mn]) rotBone(E.B[mn], new THREE.Quaternion(-qWorld.x, -qWorld.y, qWorld.z, qWorld.w));
         E.liveRig(rig); mark();
@@ -330,11 +350,12 @@
         if (!drag) return;
         var b = E.B[drag.n]; b.getWorldPosition(wp);
         var hit = planeHit(ev, wp); if (!hit) return;
-        if (tab === 'joints') { moveJoint(drag.n, hit.clone().sub(wp)); }
-        else if (tab === 'poses' && b.parent && b.parent.isBone) {
+        var bendTail = tab === 'joints' && /^tail_[2-7]$/.test(drag.n);   // Rute wird jedes Bild gerade gerichtet: hier biegen statt schieben
+        if (tab === 'joints' && !bendTail) { moveJoint(drag.n, hit.clone().sub(wp)); }
+        else if ((tab === 'poses' || bendTail) && b.parent && b.parent.isBone) {
           var pv = new THREE.Vector3(); b.parent.getWorldPosition(pv);
           var a = wp.clone().sub(pv), c = hit.clone().sub(pv);
-          if (a.lengthSq() > 1e-8 && c.lengthSq() > 1e-8) turnJoint(drag.n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()));
+          if (a.lengthSq() > 1e-8 && c.lengthSq() > 1e-8) turnJoint(drag.n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()), bendTail ? 'all' : null);
         }
       });
       OV.addEventListener('pointerup', function (ev) { if (drag) { try { OV.releasePointerCapture(drag.pid); } catch (e) { /* schon frei */ } drag = null; } paintDown = false; });
@@ -345,12 +366,13 @@
         ev.preventDefault(); var n = ev.currentTarget.dataset.n, step = ev.shiftKey ? 0.02 : 0.004;
         var right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
         var d = right.multiplyScalar(dx * step).add(up.multiplyScalar(dy * step));
-        if (tab === 'joints') moveJoint(n, d);
-        else if (tab === 'poses') {
+        var bend = tab === 'joints' && /^tail_[2-7]$/.test(n);
+        if (tab === 'joints' && !bend) moveJoint(n, d);
+        else if (tab === 'poses' || bend) {
           var b = E.B[n]; if (!b.parent || !b.parent.isBone) return;
           b.getWorldPosition(wp); var pv = new THREE.Vector3(); b.parent.getWorldPosition(pv);
           var a = wp.clone().sub(pv), c = wp.clone().add(d.multiplyScalar(2)).sub(pv);
-          turnJoint(n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()));
+          turnJoint(n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()), bend ? 'all' : null);
         }
       }
 
@@ -494,13 +516,37 @@
             if (loc.lengthSq() > 1e-12) rig.joints[b.name] = [loc.x, loc.y, loc.z];
           });
           E.liveRig(rig); mark(); if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
-          status('Joints placed. Check legs, head, ears and tail, then bind.', 'ok');
+          // Rute: Winkel und Länge am Modell messen (Spitze = Punkt hinter/über der Wurzel mit größtem Abstand);
+          // die Rute wird jedes Bild auf diesen Winkel gerade gerichtet, Gelenk-Versatz allein dreht sie nicht
+          setTimeout(function () {
+            E.holder.updateMatrixWorld(true);
+            var T = E.B.tail_1.getWorldPosition(new THREE.Vector3()), tip = null, best = 0, vv = new THREE.Vector3();
+            for (var i2 = 0; i2 < pa.count; i2++) {
+              vv.fromBufferAttribute(pa, i2).applyMatrix4(src.matrixWorld);
+              if (vv.x > T.x + 0.03 || vv.y < T.y - 0.02) continue;
+              var dd = vv.distanceTo(T); if (dd > best) { best = dd; tip = vv.clone(); }
+            }
+            if (tip && best > 0.04) {
+              var ang = Math.atan2(tip.y - T.y, T.x - tip.x);
+              rig.tailUp = Math.max(-0.6, Math.min(1.5, ang)); $('tail').value = rig.tailUp; $('tailO').value = rig.tailUp.toFixed(2);
+              var chain = []; for (var k = 2; k <= 7; k++) if (E.B['tail_' + k]) chain.push(E.B['tail_' + k]);
+              var cur = 0, prev = T.clone(); chain.forEach(function (bn) { var q = bn.getWorldPosition(new THREE.Vector3()); cur += q.distanceTo(prev); prev = q; });
+              var f = cur > 0 ? best * 0.92 / cur : 1;   // Spitze sitzt etwas vor dem letzten Punkt
+              chain.forEach(function (bn) {
+                var base = bn.position.clone(), o = rig.joints[bn.name]; if (o) base.sub(new THREE.Vector3(o[0], o[1], o[2]));
+                var want = bn.position.clone().multiplyScalar(f), off = want.sub(base); rig.joints[bn.name] = [off.x, off.y, off.z];
+              });
+              E.liveRig(rig);
+            }
+            status('Joints placed. Check legs, head, ears and tail, then bind.', 'ok');
+          }, 200);
         }, 250);
       });
+      $('curl').addEventListener('input', function () { rig.tailCurl = +$('curl').value; $('curlO').value = rig.tailCurl.toFixed(2); E.liveRig(rig); mark(); });
       $('resetJ').addEventListener('click', function () { rig.joints = {}; E.liveRig(rig); mark(); status('Joints reset.'); });
 
       // ── Binden: Gewichte und Farben vom eingebauten Hund (nächste Punkte), Bind-Matrizen aus der aktuellen Haltung ──
-      function stripSkin() { var r = JSON.parse(JSON.stringify({ joints: rig.joints, poses: rig.poses, ears: rig.ears, tailUp: rig.tailUp })); return r; }
+      function stripSkin() { var r = JSON.parse(JSON.stringify({ joints: rig.joints, poses: rig.poses, ears: rig.ears, tailUp: rig.tailUp, tailCurl: rig.tailCurl || 0 })); return r; }
       function grid(points, cell) {
         var G = new Map();
         for (var i = 0; i < points.length / 3; i++) {
@@ -536,7 +582,7 @@
         if (src) { align.updateMatrixWorld(true); var g = src.geometry.clone(); g.applyMatrix4(src.matrixWorld); srcPos = g; }
         else { status('Load a model first (step 1).', 'err'); return; }
         status('Binding...');
-        var noPose = stripSkin(); noPose.poses = {}; E.liveRig(noPose);   // Bind-Haltung ohne Haltungs-Korrekturen
+        var noPose = stripSkin(); noPose.poses = {}; noPose.tailCurl = 0; E.liveRig(noPose);   // Bind-Haltung ohne Haltungs-Korrekturen und ohne eingerollte Rute
         E.EDIT.still = true; E.hold('idle', 3);
         setTimeout(function () {
           E.holder.updateMatrixWorld(true);
@@ -588,7 +634,10 @@
           var bones = o.skeleton.bones, inv = new Float32Array(bones.length * 16);
           bones.forEach(function (b, k) { b.updateMatrixWorld(true); new THREE.Matrix4().copy(b.matrixWorld).invert().toArray(inv, k * 16); });
           var idx = srcPos.index ? new Uint32Array(srcPos.index.array) : (function () { var a = new Uint32Array(n); for (var z = 0; z < n; z++) a[z] = z; return a; })();
-          skinData = { pos: P, idx: idx, col: C, j: J, w: W, bones: bones.map(function (b) { return b.name; }), inv: inv };
+          skinData = { pos: P, idx: idx, col: C, j: J, w: W, bones: bones.map(function (b) { return b.name; }), inv: inv }; adj = null; undo = [];
+          // Quelle = gebundene Ruhelage (ohne Einpass-Transform): erneutes Binden und Formen arbeiten darauf weiter
+          src.geometry.attributes.position.array.set(P); src.geometry.attributes.position.needsUpdate = true; src.geometry.computeVertexNormals();
+          src.position.set(0, 0, 0); src.quaternion.identity(); A.mir = false; ['sc', 'ox', 'oy', 'oz'].forEach(function (id) { $(id).value = 0; }); applyAlign();
           E.liveRig(rig); applySkin(); jointsSinceBind = false; $('rebindHint').hidden = true;
           src.userData.fromFile = false; src.visible = false; $('showSrc').checked = false;
           $('bindInfo').textContent = n.toLocaleString('en') + ' points bound to ' + bones.length + ' bones.';
@@ -606,7 +655,7 @@
       function dec(s, T) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return T === Uint8Array ? u : new T(u.buffer); }
 
       // ── Haltungen ──
-      var HOLD = { stand: ['idle'], sit: ['sit'], down: ['down'], lie: ['lie', 0.5], beg: ['beg'], paw: ['shake', 0.45] };
+      var HOLD = { all: ['idle'], stand: ['idle'], sit: ['sit'], down: ['down'], lie: ['lie', 0.5], beg: ['beg'], paw: ['shake', 0.45] };
       function setPose(k) {
         poseKey = k; document.querySelectorAll('[data-pose]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.pose === k)); });
         E.EDIT.still = true; E.hold(HOLD[k][0], 3, HOLD[k][1]);
@@ -650,6 +699,81 @@
       OV.addEventListener('pointerleave', function () { $('brush').setAttribute('hidden', ''); });
       $('recol').addEventListener('click', function () { if (!src) { status('No model.', 'err'); return; } src.userData.fromFile = true; bind(); });
 
+      // ── Formen (Ruhelage des gebundenen Modells verschieben, Gewichte bleiben) ──
+      var tool = 'grab', sculpt = null, undo = [], midZ = 0, adj = null;
+      document.querySelectorAll('[data-tool]').forEach(function (b) { b.addEventListener('click', function () { tool = b.dataset.tool;
+        document.querySelectorAll('[data-tool]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }); });
+      ['srad', 'sstr'].forEach(function (id) { $(id).addEventListener('input', function () { $(id + 'O').value = $(id).value; }); });
+      function fall(x) { var u = 1 - x * x; return u * u; }
+      function shapeTargets(hit) {
+        var P = skinData.pos, rad = +$('srad').value, out = [], centers = [hit];
+        if ($('smir').checked) centers.push(new THREE.Vector3(hit.x, hit.y, 2 * midZ - hit.z));
+        centers.forEach(function (c, ci) {
+          for (var i = 0; i < P.length / 3; i++) {
+            var dx = P[i * 3] - c.x, dy = P[i * 3 + 1] - c.y, dz = P[i * 3 + 2] - c.z, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (d < rad) out.push([i, fall(d / rad), ci ? -1 : 1]);
+          }
+        });
+        return out;
+      }
+      function syncPos(normals) {
+        var m = E.custom(); if (!m) return;
+        var pa = m.geometry.attributes.position; pa.array.set(skinData.pos); pa.needsUpdate = true;
+        if (normals) m.geometry.computeVertexNormals();
+        if (src && src.geometry.attributes.position.count * 3 === skinData.pos.length) { src.geometry.attributes.position.array.set(skinData.pos); src.geometry.attributes.position.needsUpdate = true; }
+      }
+      function buildAdj() {
+        var I = skinData.idx, n = skinData.pos.length / 3, sets = []; for (var i = 0; i < n; i++) sets.push([]);
+        for (var f = 0; f < I.length; f += 3) { var a = I[f], b = I[f + 1], c = I[f + 2]; sets[a].push(b, c); sets[b].push(a, c); sets[c].push(a, b); }
+        return sets;
+      }
+      function shapeDown(ev) {
+        var m = E.custom(); if (!m || !skinData) { status('Bind the model first (step 3).', 'err'); return; }
+        var hit = screenRay(ev).intersectObject(m, false)[0]; if (!hit) return;
+        undo.push(skinData.pos.slice()); if (undo.length > 30) undo.shift();
+        var P = skinData.pos, s = 0; for (var i = 2; i < P.length; i += 3) s += P[i]; midZ = s / (P.length / 3);
+        if (tool === 'smooth' && !adj) adj = buildAdj();
+        sculpt = { hit: hit.point.clone(), last: hit.point.clone(), tg: shapeTargets(hit.point), orig: skinData.pos.slice(), n: 0 };
+        OV.setPointerCapture(ev.pointerId);
+      }
+      function shapeMove(ev) {
+        if (!sculpt) return;
+        var P = skinData.pos, str = +$('sstr').value;
+        if (tool === 'grab') {
+          var h = planeHit(ev, sculpt.hit); if (!h) return;
+          var d = h.sub(sculpt.hit);
+          sculpt.tg.forEach(function (e) { var i = e[0], f = e[1] * str * 2 > 1 ? 1 * e[1] : e[1] * str * 2;
+            P[i * 3] = sculpt.orig[i * 3] + d.x * f; P[i * 3 + 1] = sculpt.orig[i * 3 + 1] + d.y * f; P[i * 3 + 2] = sculpt.orig[i * 3 + 2] + d.z * e[2] * f; });
+        } else {
+          var m = E.custom(), hit = screenRay(ev).intersectObject(m, false)[0]; if (!hit) return;
+          var tg = shapeTargets(hit.point), N = m.geometry.attributes.normal;
+          if (tool === 'smooth') {
+            var cp = P.slice();
+            tg.forEach(function (e) { var i = e[0], nb = adj[i]; if (!nb.length) return; var ax = 0, ay = 0, az = 0;
+              for (var k = 0; k < nb.length; k++) { ax += cp[nb[k] * 3]; ay += cp[nb[k] * 3 + 1]; az += cp[nb[k] * 3 + 2]; }
+              var f = e[1] * str * 0.6; P[i * 3] += (ax / nb.length - P[i * 3]) * f; P[i * 3 + 1] += (ay / nb.length - P[i * 3 + 1]) * f; P[i * 3 + 2] += (az / nb.length - P[i * 3 + 2]) * f; });
+          } else {
+            var sg = tool === 'inflate' ? 1 : -1, amt = 0.0025 * str * sg;
+            tg.forEach(function (e) { var i = e[0]; P[i * 3] += N.getX(i) * amt * e[1]; P[i * 3 + 1] += N.getY(i) * amt * e[1]; P[i * 3 + 2] += N.getZ(i) * amt * e[1]; });
+          }
+        }
+        sculpt.n++; syncPos(sculpt.n % 4 === 0); mark();
+      }
+      function shapeUp() { if (!sculpt) return; sculpt = null; syncPos(true); }
+      function shapeUndo() { if (!undo.length || !skinData) return; skinData.pos.set(undo.pop()); syncPos(true); mark(); }
+      $('sundo').addEventListener('click', shapeUndo);
+      document.addEventListener('keydown', function (ev) { if (tab === 'shape' && (ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); shapeUndo(); } });
+      OV.addEventListener('pointerdown', function (ev) { if (tab === 'shape' && ev.button === 0) shapeDown(ev); });
+      OV.addEventListener('pointermove', function (ev) {
+        if (tab !== 'shape') return;
+        if (sculpt) { shapeMove(ev); return; }
+        var m = E.custom(), br = $('brush'); if (!m) return;
+        var hit = screenRay(ev).intersectObject(m, false)[0]; if (!hit) { br.setAttribute('hidden', ''); return; }
+        var rad = +$('srad').value, s = toScreen(hit.point), e2 = toScreen(hit.point.clone().add(new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0).multiplyScalar(rad)));
+        br.removeAttribute('hidden'); br.setAttribute('cx', s[0]); br.setAttribute('cy', s[1]); br.setAttribute('r', Math.max(3, Math.abs(e2[0] - s[0])));
+      });
+      OV.addEventListener('pointerup', shapeUp);
+
       // ── Test ──
       document.querySelectorAll('[data-act]').forEach(function (b) {
         b.addEventListener('click', function () {
@@ -665,13 +789,13 @@
         tab = k;
         document.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === k)); b.setAttribute('aria-pressed', String(b.dataset.tab === k)); });
         document.querySelectorAll('[data-pane]').forEach(function (s) { s.hidden = s.dataset.pane !== k; });
-        controls.mouseButtons = k === 'paint' ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        controls.mouseButtons = k === 'paint' || k === 'shape' ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
         $('brush').setAttribute('hidden', '');
         if (k === 'poses') setPose(poseKey);
         else if (k !== 'test') { E.EDIT.still = true; E.hold('idle', 3); }
         if (src) src.visible = $('showSrc').checked && (k === 'model' || k === 'joints' || k === 'bind');
         $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Drag the dots into your model. Shift + arrow keys move faster.',
-          bind: 'Binding uses the standing pose.', poses: 'Drag a dot: the bone leading to it turns.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
+          bind: 'Binding uses the standing pose.', shape: 'Left mouse sculpts, right mouse orbits, Ctrl+Z undoes.', poses: 'Drag a dot: the bone leading to it turns.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
       }
       document.querySelectorAll('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
 
@@ -701,10 +825,12 @@
         setTab('model'); requestAnimationFrame(loop);
         return api('GET').then(function (d) {
           var r = d.rig; if (!r) { status('No own model saved yet. Load your GLB in step 1.'); return; }
-          rig = { joints: r.joints || {}, poses: r.poses || {}, ears: r.ears || 0, tailUp: r.tailUp != null ? r.tailUp : 0.45 };
+          rig = { joints: r.joints || {}, poses: r.poses || {}, ears: r.ears || 0, tailUp: r.tailUp != null ? r.tailUp : 0.45, tailCurl: r.tailCurl || 0 };
+          $('curl').value = rig.tailCurl; $('curlO').value = (+rig.tailCurl).toFixed(2);
           $('ears').value = rig.ears; $('earsO').value = (+rig.ears).toFixed(2); $('tail').value = rig.tailUp; $('tailO').value = (+rig.tailUp).toFixed(2);
           if (r.skin) {
             var sk = r.skin;
+            adj = null; undo = [];
             skinData = { pos: dec(sk.pos, Float32Array), idx: dec(sk.idx, Uint32Array), col: dec(sk.col, Uint8Array), j: dec(sk.j, Uint8Array), w: dec(sk.w, Uint8Array), bones: sk.bones, inv: dec(sk.inv, Float32Array) };
             var geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(skinData.pos.slice(), 3)); geo.setIndex(new THREE.BufferAttribute(skinData.idx.slice(), 1));
             if (src) { align.remove(src); } src = new THREE.Mesh(geo, mats.src); src.visible = false; align.add(src);   // Ruhelage für erneutes Binden

@@ -41,7 +41,7 @@
     var SNOUT = [];
     function unSnout() { for (var i = 0; i < SNOUT.length; i++) if (SNOUT[i][2]) { SNOUT[i][0].position.sub(SNOUT[i][1]); SNOUT[i][2] = false; } }
     var EAR_FOLD = 0, EAR_BASE = 0.45, EAR_TIP = 1.9;   // Kippwinkel (rad) bei ears=100: Basis nach vorne, Spitze dazu
-    var TAIL_SCALE = null, SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5;
+    var TAIL_SCALE = null, SIZE = 0.6, TAIL_STRAIGHT = true, TAIL_UP = 0.45, TAIL_THIN = 0.5, TAIL_CURL = 0;
     // Körperbau-Vorlagen (Shiba-Modell umgeformt). Jack Russell: kompakt, etwas länger als hoch, kürzeres Bein,
     // Rute aufrecht. Pinscher: schlank, hochbeinig, hochgezogener Bauch, Rute schräg.
     var BODIES = {
@@ -172,7 +172,8 @@
     // die Beine hängen an eigenen Knochen und bleiben lang), Gesamtproportionen, Rute (Winkel + Dicke)
     function applyBody(key) {
       var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1; EAR_FOLD = opt.ears != null ? opt.ears : (bd.earFold || 0);
-      if (RIG && RIG.skin && key === 'custom') { if (RIG.ears != null) EAR_FOLD = RIG.ears; if (RIG.tailUp != null) TAIL_UP = RIG.tailUp; }
+      TAIL_CURL = 0;
+      if (RIG && RIG.skin && key === 'custom') { if (RIG.ears != null) EAR_FOLD = RIG.ears; if (RIG.tailUp != null) TAIL_UP = RIG.tailUp; TAIL_CURL = RIG.tailCurl || 0; }
       if (buildGroup) buildGroup.scale.set(BUILD.len, BUILD.height, BUILD.width);
       unSnout(); SNOUT.length = 0;
       slimMeshes.forEach(function (m) {
@@ -367,7 +368,7 @@
     function clipW(n) { var a = actions[n]; return a && a.isRunning() ? a.getEffectiveWeight() : 0; }
     function poseWeights(moving) {
       var beg = S.pose === 'beg' ? S.poseW : 0, down = S.pose === 'down' ? S.poseW : 0;
-      return { stand: clipW('standing') * (1 - Math.min(1, moving * 3)) * (1 - S.poseW), sit: clipW('sitting') * (1 - beg - down), down: down, lie: clipW('play_dead'), beg: beg, paw: clipW('shake') };
+      return { all: 1, stand: clipW('standing') * (1 - Math.min(1, moving * 3)) * (1 - S.poseW), sit: clipW('sitting') * (1 - beg - down), down: down, lie: clipW('play_dead'), beg: beg, paw: clipW('shake') };
     }
     function applyCorrect(moving) {
       if (!RIG || !RIG.poses) return;
@@ -741,6 +742,8 @@
             tb.updateMatrixWorld(true);
           }
         }
+        // eigenes Modell: Rute einrollen (jedes Glied ein Stück nach oben/vorn), nach dem Geraderichten
+        if (TAIL_CURL) for (var tc = 2; tc <= 7; tc++) turn(B['tail_' + tc], LAT, TAIL_CURL * 0.3);
         var w = EDIT.still ? 0 : S.wag * (1 - 0.4 * moving), wf = 9 + 5 * S.wag;
         if (TAIL_STRAIGHT) {
           // gerade Rute: Schwung aus der Wurzel – breit seitlich, dazu leicht kreisend auf und ab (auch von der Seite sichtbar)
@@ -961,7 +964,7 @@
       custom: function () { return customMesh; },
       setRig: function (r) { RIG = r; if (r && r.skin) { BODY_KEY = 'custom'; applyBody('custom'); } setRig(r); },
       liveRig: function (r) { RIG = r; unRigOff(); RIGOFF = []; if (r && r.joints) Object.keys(r.joints).forEach(function (nm) { var b = BYNAME[nm], o = r.joints[nm]; if (b && o) RIGOFF.push([b, new THREE.Vector3(o[0], o[1], o[2]), false]); });
-        if (r) { if (r.ears != null) EAR_FOLD = r.ears; if (r.tailUp != null) TAIL_UP = r.tailUp; } },
+        if (r) { if (r.ears != null) EAR_FOLD = r.ears; if (r.tailUp != null) TAIL_UP = r.tailUp; TAIL_CURL = r.tailCurl || 0; } },
       hold: function (m, face, clipAt) {
         plan = []; step = null; roam = false; S.face = face == null ? 3 : face; S.rise = 0; S.x = 0; S.z = 0; S.wag = 0;
         setMode(m);

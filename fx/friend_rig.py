@@ -4,8 +4,8 @@ Global, eine Datei data/friend-rig.json. Inhalt (alles optional außer version):
   skin:   Mesh am Hunde-Skelett – pos (Float32 xyz), idx (Uint32), col (Uint8 rgb, sRGB), j/w (Uint8 × 4 je Punkt:
           Knochen-Nummer in bones und Gewicht 0–255), bones (Knochennamen), inv (Float32 4×4 je Knochen) – Arrays als Base64
   joints: {Knochen: [dx, dy, dz]} lokaler Versatz der Gelenke
-  poses:  {stand|sit|down|lie|beg|paw: {Knochen: [x, y, z, w]}} lokale Drehung je Haltung
-  ears:   Kippohr 0–1, tailUp: Rutenwinkel (rad)
+  poses:  {all|stand|sit|down|lie|beg|paw: {Knochen: [x, y, z, w]}} lokale Drehung je Haltung (all = immer, z. B. Rute)
+  ears:   Kippohr 0–1, tailUp: Rutenwinkel (rad), tailCurl: Rute einrollen (rad je Glied ÷ 0,3)
 Gibt es eine Datei, nimmt der Hund dieses Modell statt des eingebauten.
 """
 import base64
@@ -18,7 +18,7 @@ import tempfile
 import threading
 
 BONE_RE = re.compile(r"^[\w.:-]{1,80}$")
-POSES = ("stand", "sit", "down", "lie", "beg", "paw")
+POSES = ("all", "stand", "sit", "down", "lie", "beg", "paw")
 MAX_VERTS = 60000
 MAX_TRIS = 120000
 MAX_BONES = 255
@@ -135,6 +135,10 @@ def clean(rig):
         if not _num(rig["ears"], 1) or rig["ears"] < 0:
             return "ears: 0 to 1 expected"
         out["ears"] = round(rig["ears"], 4)
+    if rig.get("tailCurl") is not None:
+        if not _num(rig["tailCurl"], 1.6):
+            return "tailCurl: -1.6 to 1.6 expected"
+        out["tailCurl"] = round(rig["tailCurl"], 4)
     if rig.get("tailUp") is not None:
         if not _num(rig["tailUp"], 1.6):
             return "tailUp: -1.6 to 1.6 expected"

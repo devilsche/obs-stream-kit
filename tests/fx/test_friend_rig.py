@@ -16,7 +16,7 @@ def _rig(**over):
             "col": _b("B", [10] * 9), "j": _b("B", [0, 1, 0, 0] * 3), "w": _b("B", [200, 55, 0, 0] * 3),
             "inv": _b("f", ident * 2)}
     rig = {"skin": skin, "joints": {"pelvis_jnt6_04": [0.01, 0, -0.02]},
-           "poses": {"sit": {"head_jnt40_038": [0, 0.1, 0, 0.995]}}, "ears": 0.8, "tailUp": 0.5}
+           "poses": {"sit": {"head_jnt40_038": [0, 0.1, 0, 0.995]}, "all": {"tail_2": [0, 0, 0.1, 0.995]}}, "ears": 0.8, "tailUp": 0.5, "tailCurl": -0.4}
     rig.update(over)
     return rig
 
@@ -29,6 +29,7 @@ def test_save_load_delete(tmp_path):
     assert got["skin"]["bones"] == ["pelvis_jnt6_04", "head_jnt40_038"]
     assert got["joints"]["pelvis_jnt6_04"] == [0.01, 0, -0.02]
     assert got["poses"]["sit"]["head_jnt40_038"][3] == 0.995
+    assert got["poses"]["all"]["tail_2"][2] == 0.1 and got["tailCurl"] == -0.4
     assert friend_rig.delete(root) is True
     assert friend_rig.load(root) is None
     assert friend_rig.delete(root) is False
@@ -53,6 +54,7 @@ def test_rejects_bad_input(tmp_path):
     assert friend_rig.save(root, _rig(poses={"dance": {}}))
     assert friend_rig.save(root, _rig(poses={"sit": {"head_jnt40_038": [0, 0, 2, 1]}}))
     assert friend_rig.save(root, _rig(ears=2))
+    assert friend_rig.save(root, _rig(tailCurl=3))
     assert friend_rig.load(root) is None
 
 
