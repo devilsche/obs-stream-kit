@@ -702,7 +702,7 @@
           // Leiste: vor dem Becken unter dem Bauch, zur Feuerseite hin
           var p0 = new THREE.Vector3(), gr = new THREE.Vector3(); B.pelvis.getWorldPosition(p0);
           B[(S.peeSide === 'R' ? 'L' : 'R') + '_hip'].getWorldPosition(gr);   // Hüfte des Standbeins: Höhe der Leiste
-          p0.addScaledVector(FWD, 0.14); p0.y = Math.max(0.08, gr.y - 0.13);
+          p0.addScaledVector(FWD, 0.14); p0.y = Math.max(0.06, gr.y - 0.22);   // ≈ 20 px tiefer als zuvor (bei Standardgröße 170)
           p0.addScaledVector(LAT, (S.peeSide === 'R' ? -1 : 1) * 0.07);
           var p1 = new THREE.Vector3(S.peeX, 0.04, 0), hgt = 0.16 + Math.abs(p1.x - p0.x) * 0.4;   // Feuer liegt auf der Bildebene (z = 0)
           for (var pi = 0; pi < PEE_N; pi++) {
