@@ -341,22 +341,47 @@
       function startDrag(ev) {
         ev.stopPropagation(); ev.preventDefault();
         var n = ev.currentTarget.dataset.n; select(n); ev.currentTarget.focus({ preventScroll: true });
-        E.B[n].getWorldPosition(wp);
-        drag = { n: n, last: wp.clone(), pid: ev.pointerId };
+        // Alles vom Zustand beim Anfassen aus rechnen (nicht Schritt für Schritt): zwischen zwei Mausbewegungen ist das
+        // Bild oft noch nicht neu berechnet, Schrittweise lief die Drehung sonst über und sprang hin und her
+        E.holder.updateMatrixWorld(true);
+        var b = E.B[n], J0 = b.getWorldPosition(new THREE.Vector3()), mn = mirrorName(n), bm = mn && E.B[mn];
+        var bendTail = tab === 'joints' && /^tail_[2-7]$/.test(n), turnMode = tab === 'poses' || bendTail;
+        drag = { n: n, J0: J0, pid: ev.pointerId, turn: turnMode, key: bendTail ? 'all' : poseKey };
+        if (!turnMode) {
+          drag.O0 = (rig.joints[b.name] || [0, 0, 0]).slice(); drag.M = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
+          if (bm && $('mirrorJ').checked) { drag.bm = bm; drag.O0m = (rig.joints[bm.name] || [0, 0, 0]).slice(); drag.Mm = new THREE.Matrix3().setFromMatrix4(bm.parent.matrixWorld).invert(); }
+        } else if (b.parent && b.parent.isBone) {
+          var P = b.parent, set = rig.poses[drag.key] || {};
+          drag.P = P; drag.P0 = P.getWorldPosition(new THREE.Vector3()); drag.W0 = P.getWorldQuaternion(new THREE.Quaternion());
+          drag.C0 = set[P.name] ? new THREE.Quaternion().fromArray(set[P.name]) : new THREE.Quaternion();
+          var pm = mirrorName(shortName(P)), Pm = pm && E.B[pm];
+          if (Pm && $('mirrorP').checked && !bendTail) { drag.Pm = Pm; drag.W0m = Pm.getWorldQuaternion(new THREE.Quaternion()); drag.C0m = set[Pm.name] ? new THREE.Quaternion().fromArray(set[Pm.name]) : new THREE.Quaternion(); }
+        }
         OV.setPointerCapture(ev.pointerId);
+      }
+      function setCorr(key, P, C0, W0, q) {
+        var set = rig.poses[key] = rig.poses[key] || {};
+        var C = C0.clone().multiply(W0.clone().invert().multiply(q).multiply(W0)).normalize();
+        set[P.name] = [C.x, C.y, C.z, C.w];
       }
       OV.addEventListener('pointermove', function (ev) {
         if (tab === 'paint') { brushAt(ev, ev.buttons === 1 && paintDown); return; }
         if (!drag) return;
-        var b = E.B[drag.n]; b.getWorldPosition(wp);
-        var hit = planeHit(ev, wp); if (!hit) return;
-        var bendTail = tab === 'joints' && /^tail_[2-7]$/.test(drag.n);   // Rute wird jedes Bild gerade gerichtet: hier biegen statt schieben
-        if (tab === 'joints' && !bendTail) { moveJoint(drag.n, hit.clone().sub(wp)); }
-        else if ((tab === 'poses' || bendTail) && b.parent && b.parent.isBone) {
-          var pv = new THREE.Vector3(); b.parent.getWorldPosition(pv);
-          var a = wp.clone().sub(pv), c = hit.clone().sub(pv);
-          if (a.lengthSq() > 1e-8 && c.lengthSq() > 1e-8) turnJoint(drag.n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()), bendTail ? 'all' : null);
+        var hit = planeHit(ev, drag.J0); if (!hit) return;
+        var b = E.B[drag.n];
+        if (!drag.turn) {
+          var d = hit.clone().sub(drag.J0), l = d.clone().applyMatrix3(drag.M);
+          rig.joints[b.name] = [drag.O0[0] + l.x, drag.O0[1] + l.y, drag.O0[2] + l.z];
+          if (drag.bm) { var lm = new THREE.Vector3(d.x, d.y, -d.z).applyMatrix3(drag.Mm); rig.joints[drag.bm.name] = [drag.O0m[0] + lm.x, drag.O0m[1] + lm.y, drag.O0m[2] + lm.z]; }
+          if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
+        } else if (drag.P) {   // Rute biegen (Gelenke-Schritt) bzw. Haltung: Knochen davor dreht sich, Drehung ab Anfassen
+          var a = drag.J0.clone().sub(drag.P0), c = hit.clone().sub(drag.P0);
+          if (a.lengthSq() < 1e-10 || c.lengthSq() < 1e-10) return;
+          var q = new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize());
+          setCorr(drag.key, drag.P, drag.C0, drag.W0, q);
+          if (drag.Pm) setCorr(drag.key, drag.Pm, drag.C0m, drag.W0m, new THREE.Quaternion(-q.x, -q.y, q.z, q.w));
         }
+        E.liveRig(rig); mark();
       });
       OV.addEventListener('pointerup', function (ev) { if (drag) { try { OV.releasePointerCapture(drag.pid); } catch (e) { /* schon frei */ } drag = null; } paintDown = false; });
       OV.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
