@@ -1,27 +1,19 @@
-/* Gemeinsame Bausteine der WebGL-Stinger (transitions/stinger-warp.html, transitions/stinger-shards.html).
-   Uhr ab Ladebeginn der Seite (performance.now() = 0 = Navigationsstart): OBS startet den Übergang, wenn es die
-   Seite neu lädt (restart_when_active) – die Ladezeit zählt also schon mit, sonst käme die Abdeckung zu spät und
-   OBS schaltet sichtbar vor den Würfeln um. Bleibt die Seite geladen (restart_when_active aus), startet die Uhr beim
-   Aktivwerden der Quelle neu (obsSourceActiveChanged).
+/* Gemeinsame Bausteine der WebGL-Stinger (transitions/stinger-warp.html, transitions/stinger-shards.html …).
+   Uhr: OBS lädt die Übergangsseiten einmal und hält sie geladen (gemessen am Server-Log: kein Neuladen je Übergang).
+   Beim Übergang meldet OBS „sichtbar“ oder „aktiv“ (mal das eine, mal das andere) – darauf startet die Uhr neu,
+   höchstens einmal je Übergang. Frisch geladen zählt die Uhr ab Ladebeginn (performance.now() = 0), dann ist die
+   Ladezeit schon drin und die Abdeckung kommt nicht zu spät.
    Zeiten aus der URL, Theme-Farben als RGB, Name als Textur (R = scharfer Text, G = weicher Schein). */
 (function () {
   'use strict';
-  var T0 = 0, running = false, restart = null;
-  // DIAG (temporär): Lade-/Aktivierungszeitpunkte als Anfrage ans nginx-Log (die Konsole von Übergängen landet nirgends)
-  var DIAG_ID = Math.random().toString(36).slice(2, 7);
-  function diag(what) {
-    var mm = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\/transitions\/([\w-]+)/);
-    if (mm) fetch('/s/' + mm[1] + '/theme.json?diag=' + mm[2] + '.' + DIAG_ID + '.' + what + '.' + Math.round(performance.now()), { cache: 'no-store' }).catch(function () {});
+  var T0 = 0, running = false, restart = null, lastStart = 0;
+  function onShow(e) {
+    var d = e && e.detail, now = performance.now();
+    if (!d || !(d.active || d.visible) || now < 1000 || now - lastStart < 1500) return;
+    lastStart = T0 = now; if (restart) restart();
   }
-  diag('load');
-  ['obsSourceActiveChanged', 'obsSourceVisibleChanged'].forEach(function (n) {
-    window.addEventListener(n, function (e) { diag(n.slice(9, 15) + (e.detail && (e.detail.active || e.detail.visible) ? 'On' : 'Off')); });
-  });
-  document.addEventListener('visibilitychange', function () { diag('vis-' + document.visibilityState); });
-  window.addEventListener('obsSourceActiveChanged', function (e) {
-    // nur wenn die Seite schon länger bereitliegt – frisch geladen zählt der Ladebeginn
-    if (e && e.detail && e.detail.active && performance.now() > 1500) { T0 = performance.now(); if (restart) restart(); }
-  });
+  window.addEventListener('obsSourceActiveChanged', onShow);
+  window.addEventListener('obsSourceVisibleChanged', onShow);
   var P = new URLSearchParams(location.search);
 
   function num(k, d, lo, hi) { var v = parseFloat(P.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
@@ -178,19 +170,22 @@
   }
 
   // Bildschleife bis Ende + 0,1 s, danach leer (OBS zeigt sonst das letzte Bild weiter)
-  function run(stage, U, T, each) {
+  // gemeinsame Bildschleife bis Ende + 0,1 s, danach leer (OBS zeigt sonst das letzte Bild weiter); startet beim
+  // nächsten Übergang neu (onShow)
+  function loop(draw, T, clear) {
     function frame() {
-      var t = now();
-      U.uT.value = t;
-      if (each) each(t);
-      stage.renderer.render(stage.scene, stage.cam);
-      if (!frame.seen) { frame.seen = true; diag('frame0-t' + Math.round(t * 1000)); }
+      var t = now(); draw(t);
       if (t < T.dur + 0.1) requestAnimationFrame(frame);
-      else { stage.renderer.clear(); running = false; diag('end'); frame.seen = false; }
+      else { clear(); running = false; }
     }
     restart = function () { if (!running) { running = true; frame(); } };
     running = true; frame();
   }
+  function run(stage, U, T, each) {
+    loop(function (t) { U.uT.value = t; if (each) each(t); stage.renderer.render(stage.scene, stage.cam); }, T,
+      function () { stage.renderer.clear(); });
+  }
+
 
   // GLSL-Bausteine: Rauschen, Drehmatrix, Name (tp = Bildschirm-UV → Textur, Textrechteck 1500×375 in der Mitte)
   var GLSL = [
@@ -212,5 +207,5 @@
 
   window.StingerGL = { timing: timing, now: now, colors: colors, name: name, font: font,
     artTexture: artTexture, show: show, reduced: reduced, fallback: fallback,
-    threeStage: threeStage, threeUniforms: threeUniforms, run: run, GLSL: GLSL, param: function (k) { return P.get(k); } };
+    threeStage: threeStage, threeUniforms: threeUniforms, run: run, loop: loop, GLSL: GLSL, param: function (k) { return P.get(k); } };
 })();
