@@ -7,14 +7,17 @@
 (function () {
   'use strict';
   var T0 = 0, running = false, restart = null;
-  // DIAG (temporär): Lade-/Aktivierungszeitpunkte ins OBS-Log
-  {
-    console.error('stinger-diag load', location.pathname, 'obs=' + !!window.obsstudio, 'now=' + Math.round(performance.now()));
-    setTimeout(function () { console.error('stinger-diag +1s', 'now=' + Math.round(performance.now())); }, 1000);
-    ['obsSourceActiveChanged', 'obsSourceVisibleChanged'].forEach(function (n) {
-      window.addEventListener(n, function (e) { console.error('stinger-diag', n, JSON.stringify(e.detail), 'now=' + Math.round(performance.now())); });
-    });
+  // DIAG (temporär): Lade-/Aktivierungszeitpunkte als Anfrage ans nginx-Log (die Konsole von Übergängen landet nirgends)
+  var DIAG_ID = Math.random().toString(36).slice(2, 7);
+  function diag(what) {
+    var mm = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\/transitions\/([\w-]+)/);
+    if (mm) fetch('/s/' + mm[1] + '/theme.json?diag=' + mm[2] + '.' + DIAG_ID + '.' + what + '.' + Math.round(performance.now()), { cache: 'no-store' }).catch(function () {});
   }
+  diag('load');
+  ['obsSourceActiveChanged', 'obsSourceVisibleChanged'].forEach(function (n) {
+    window.addEventListener(n, function (e) { diag(n.slice(9, 15) + (e.detail && (e.detail.active || e.detail.visible) ? 'On' : 'Off')); });
+  });
+  document.addEventListener('visibilitychange', function () { diag('vis-' + document.visibilityState); });
   window.addEventListener('obsSourceActiveChanged', function (e) {
     // nur wenn die Seite schon länger bereitliegt – frisch geladen zählt der Ladebeginn
     if (e && e.detail && e.detail.active && performance.now() > 1500) { T0 = performance.now(); if (restart) restart(); }
@@ -181,8 +184,9 @@
       U.uT.value = t;
       if (each) each(t);
       stage.renderer.render(stage.scene, stage.cam);
+      if (!frame.seen) { frame.seen = true; diag('frame0-t' + Math.round(t * 1000)); }
       if (t < T.dur + 0.1) requestAnimationFrame(frame);
-      else { stage.renderer.clear(); running = false; }
+      else { stage.renderer.clear(); running = false; diag('end'); frame.seen = false; }
     }
     restart = function () { if (!running) { running = true; frame(); } };
     running = true; frame();
