@@ -1,9 +1,16 @@
 /* Gemeinsame Bausteine der WebGL-Stinger (transitions/stinger-warp.html, transitions/stinger-shards.html).
-   Uhr ab Skriptstart (nicht ab Schriftladen, sonst käme die Abdeckung zu spät und der harte Schnitt wäre sichtbar),
+   Uhr ab Ladebeginn der Seite (performance.now() = 0 = Navigationsstart): OBS startet den Übergang, wenn es die
+   Seite neu lädt (restart_when_active) – die Ladezeit zählt also schon mit, sonst käme die Abdeckung zu spät und
+   OBS schaltet sichtbar vor den Würfeln um. Bleibt die Seite geladen (restart_when_active aus), startet die Uhr beim
+   Aktivwerden der Quelle neu (obsSourceActiveChanged).
    Zeiten aus der URL, Theme-Farben als RGB, Name als Textur (R = scharfer Text, G = weicher Schein). */
 (function () {
   'use strict';
-  var T0 = performance.now();
+  var T0 = 0, running = false, restart = null;
+  window.addEventListener('obsSourceActiveChanged', function (e) {
+    // nur wenn die Seite schon länger bereitliegt – frisch geladen zählt der Ladebeginn
+    if (e && e.detail && e.detail.active && performance.now() > 1500) { T0 = performance.now(); if (restart) restart(); }
+  });
   var P = new URLSearchParams(location.search);
 
   function num(k, d, lo, hi) { var v = parseFloat(P.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
@@ -161,14 +168,16 @@
 
   // Bildschleife bis Ende + 0,1 s, danach leer (OBS zeigt sonst das letzte Bild weiter)
   function run(stage, U, T, each) {
-    (function frame() {
+    function frame() {
       var t = now();
       U.uT.value = t;
       if (each) each(t);
       stage.renderer.render(stage.scene, stage.cam);
       if (t < T.dur + 0.1) requestAnimationFrame(frame);
-      else stage.renderer.clear();
-    })();
+      else { stage.renderer.clear(); running = false; }
+    }
+    restart = function () { if (!running) { running = true; frame(); } };
+    running = true; frame();
   }
 
   // GLSL-Bausteine: Rauschen, Drehmatrix, Name (tp = Bildschirm-UV → Textur, Textrechteck 1500×375 in der Mitte)

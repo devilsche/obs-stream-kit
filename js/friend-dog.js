@@ -689,8 +689,8 @@
           // Leiste: vor dem Becken unter dem Bauch, zur Feuerseite hin
           var p0 = new THREE.Vector3(), gr = new THREE.Vector3(); B.pelvis.getWorldPosition(p0);
           B[(S.peeSide === 'R' ? 'L' : 'R') + '_hip'].getWorldPosition(gr);   // Hüfte des Standbeins: Höhe der Leiste
-          p0.addScaledVector(FWD, 0.16); p0.y = Math.max(0.08, gr.y - 0.06);
-          p0.addScaledVector(LAT, (S.peeSide === 'R' ? -1 : 1) * 0.05);
+          p0.addScaledVector(FWD, 0.14); p0.y = Math.max(0.08, gr.y - 0.13);
+          p0.addScaledVector(LAT, (S.peeSide === 'R' ? -1 : 1) * 0.07);
           var p1 = new THREE.Vector3(S.peeX, 0.04, 0), hgt = 0.16 + Math.abs(p1.x - p0.x) * 0.4;   // Feuer liegt auf der Bildebene (z = 0)
           for (var pi = 0; pi < PEE_N; pi++) {
             var u = (pi / PEE_N + t * 1.7) % 1;
@@ -775,7 +775,12 @@
       } else if (name === 'pee') {   // Bein heben: linkes Hinterbein seitlich hoch (Längsachse), leicht weg gelehnt
         // Bein auf der Feuerseite seitlich hoch (S.peeSide), Gewicht auf die anderen drei, leicht weg gelehnt
         var sd = S.peeSide === 'R' ? -1 : 1, hp = B[(S.peeSide || 'L') + '_hip'], kn = B[(S.peeSide || 'L') + '_knee'];
-        turn(hp, FWD, sd * 1.35 * w); turn(kn, LAT, 0.55 * w);
+        // Rüde am Pfosten: Oberschenkel seitlich hoch und etwas nach vorn, Knie stark gebeugt, Pfote eingezogen –
+        // nicht gestreckt weg (sonst wirkt es wie ein Tritt und der Strahl käme aus dem Rücken)
+        var an = B[(S.peeSide || 'L') + '_ankle'];
+        // Knie/Sprunggelenk um die mitgedrehte Scharnierachse beugen (das Bein steht seitlich, die Weltquerachse wäre falsch)
+        var ab = sd * 1.6 * w, hinge = LAT.clone().applyAxisAngle(FWD, ab);
+        turn(hp, LAT, -0.35 * w); turn(hp, FWD, ab); turn(kn, hinge, 1.2 * w); if (an) turn(an, hinge, -0.8 * w);
         turn(B.COG, FWD, -sd * 0.06 * w); tailOver(0.4 * w);
       } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
         turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.45 * w);
