@@ -130,6 +130,8 @@
         <div class="row"><label for="tail">Tail angle</label><input id="tail" type="range" min="-0.6" max="1.5" step="0.01" value="0.45"><output id="tailO" for="tail">0.45</output></div>
         <div class="row"><label for="curl">Tail curl</label><input id="curl" type="range" min="-1.5" max="1.5" step="0.01" value="0"><output id="curlO" for="curl">0</output></div>
         <p class="small muted">Tail dots bend the tail when dragged (in every pose). Curl rolls it up (+) or down (−).</p>
+        <div class="row"><button type="button" id="straightBtn">Straighten stance</button></div>
+        <p class="small muted">The built-in standing pose is slightly crooked (head turned, ears uneven, paws uneven). Straighten fixes the standing pose; Auto-place does it first anyway.</p>
         <div class="row"><button type="button" id="autoJ">Auto-place joints</button><button type="button" class="ghost" id="resetJ">Reset joints</button></div>
         <p class="small muted">Auto-place stretches the skeleton to the size of your model. Then fine-tune by hand.</p>
         <p class="small muted" id="rebindHint" hidden>Joints changed after binding: bind again in step 3.</p>
@@ -509,10 +511,38 @@
       // Skelett auf die Maße des Modells strecken: jedes Gelenk aus dem Kasten des eingebauten Hunds in den Kasten des
       // Modells abbilden. Versatz nur in der Position (Drehungen bleiben), daher geht es ohne Zwischenbilder rückwärts:
       // lokal = (Eltern-Welt ohne Position)⁻¹ · (Ziel − Ziel des Eltern) − Ruhelage
+      // Geraderichten der Stehhaltung (Korrekturen unter poses.stand): Kopf geradeaus, Ohren gleich hoch, Pfoten
+      // symmetrisch. Mehrere Durchgänge, weil der Hund die Korrekturen erst im nächsten Bild anwendet.
+      function corrWorld(key, P, q) {
+        var set = rig.poses[key] || {}, C0 = set[P.name] ? new THREE.Quaternion().fromArray(set[P.name]) : new THREE.Quaternion();
+        setCorr(key, P, C0, P.getWorldQuaternion(new THREE.Quaternion()), q);
+      }
+      function straighten(done) {
+        E.EDIT.still = true; E.hold('idle', 3);
+        var pass = 0, V = function (n) { return E.B[n].getWorldPosition(new THREE.Vector3()); }, UPV = new THREE.Vector3(0, 1, 0);
+        (function step() {
+          E.holder.updateMatrixWorld(true);
+          var nb = V('neck_base'), no = V('nose'), d = no.clone().sub(nb); d.y = 0;
+          if (d.lengthSq() > 1e-8) corrWorld('stand', E.B.neck_base, new THREE.Quaternion().setFromAxisAngle(UPV, -Math.atan2(-d.z, d.x)));
+          var L = V('L_ear_base'), R = V('R_ear_base'), u = new THREE.Vector3(0, L.y - R.y, L.z - R.z);
+          if (u.lengthSq() > 1e-8) corrWorld('stand', E.B.head, new THREE.Quaternion().setFromUnitVectors(u.normalize(), new THREE.Vector3(0, 0, Math.sign(L.z - R.z) || -1)));
+          [['L_shoulder', 'LF_toes', 'R_shoulder', 'RF_toes', 'chest'], ['L_hip', 'LB_toes', 'R_hip', 'RB_toes', 'pelvis']].forEach(function (pr) {
+            // symmetrisch zur Körpermitte (Brust bzw. Becken), gleich weit vorn
+            var tl = V(pr[1]), tr = V(pr[3]), mx = (tl.x + tr.x) / 2, z0 = V(pr[4]).z, half = (Math.abs(tl.z - z0) + Math.abs(tr.z - z0)) / 2, sl = tl.z < tr.z ? -1 : 1;
+            [[pr[0], tl, z0 + sl * half], [pr[2], tr, z0 - sl * half]].forEach(function (e) {
+              var top = V(e[0]), a = e[1].clone().sub(top), c = new THREE.Vector3(mx, e[1].y, e[2]).sub(top);
+              if (a.lengthSq() > 1e-8 && c.lengthSq() > 1e-8) corrWorld('stand', E.B[e[0]], new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()));
+            });
+          });
+          E.liveRig(rig); mark();
+          if (++pass < 4) setTimeout(step, 120); else setTimeout(function () { if (done) done(); }, 150);
+        })();
+      }
+      $('straightBtn').addEventListener('click', function () { straighten(function () { status('Standing pose straightened.', 'ok'); }); });
       $('autoJ').addEventListener('click', function () {
         if (!src) { status('Load a model first (step 1).', 'err'); return; }
-        rig.joints = {}; E.liveRig(rig); E.EDIT.still = true; E.hold('idle', 3);
-        setTimeout(function () {
+        rig.joints = {}; E.liveRig(rig);
+        straighten(function () {
           E.holder.updateMatrixWorld(true); align.updateMatrixWorld(true);
           var tb = origBox(), sb = new THREE.Box3().setFromObject(src), ts = tb.getSize(new THREE.Vector3()), ss = sb.getSize(new THREE.Vector3());
           var map = function (p) { return new THREE.Vector3(sb.min.x + (p.x - tb.min.x) / ts.x * ss.x, sb.min.y + (p.y - tb.min.y) / ts.y * ss.y, sb.min.z + (p.z - tb.min.z) / ts.z * ss.z); };
@@ -565,7 +595,7 @@
             }
             status('Joints placed. Check legs, head, ears and tail, then bind.', 'ok');
           }, 200);
-        }, 250);
+        });
       });
       $('curl').addEventListener('input', function () { rig.tailCurl = +$('curl').value; $('curlO').value = rig.tailCurl.toFixed(2); E.liveRig(rig); mark(); });
       $('resetJ').addEventListener('click', function () { rig.joints = {}; E.liveRig(rig); mark(); status('Joints reset.'); });
@@ -607,7 +637,7 @@
         if (src) { align.updateMatrixWorld(true); var g = src.geometry.clone(); g.applyMatrix4(src.matrixWorld); srcPos = g; }
         else { status('Load a model first (step 1).', 'err'); return; }
         status('Binding...');
-        var noPose = stripSkin(); noPose.poses = {}; noPose.tailCurl = 0; E.liveRig(noPose);   // Bind-Haltung ohne Haltungs-Korrekturen und ohne eingerollte Rute
+        var noPose = stripSkin(); noPose.poses = rig.poses.stand ? { stand: rig.poses.stand } : {}; noPose.tailCurl = 0; E.liveRig(noPose);   // Bind-Haltung: gerade gerichtete Stehhaltung, ohne andere Korrekturen und ohne eingerollte Rute
         E.EDIT.still = true; E.hold('idle', 3);
         setTimeout(function () {
           E.holder.updateMatrixWorld(true);
