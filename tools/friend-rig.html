@@ -195,6 +195,8 @@
           <button type="button" data-pose="paw">Paw</button>
         </div>
         <div class="row"><label class="chk"><input type="checkbox" id="mirrorP"> Turn left and right together</label></div>
+        <div class="row"><label for="copyFrom">Start from</label><select id="copyFrom"><option value="beg">Beg</option><option value="sit">Sit</option><option value="down">Down</option><option value="stand">Stand</option><option value="paw">Paw</option><option value="lie">Play dead</option></select><button type="button" class="ghost" id="copyP">Copy fixes here</button></div>
+        <p class="small muted">Copies the fixes of another pose into this one, e.g. the hind legs from Beg to Sit. Then adjust what differs.</p>
         <div class="row"><button type="button" class="ghost" id="resetP">Reset this pose</button><button type="button" class="ghost" id="resetJt" disabled>Reset selected joint</button></div>
       </section>
 
@@ -930,6 +932,13 @@
         E.EDIT.still = true; E.hold(HOLD[k][0], 3, HOLD[k][1]);
       }
       document.querySelectorAll('[data-pose]').forEach(function (b) { b.addEventListener('click', function () { setPose(b.dataset.pose); }); });
+      $('copyP').addEventListener('click', function () {
+        var from = $('copyFrom').value;
+        if (from === poseKey) { status('Pick a different pose to copy from.', 'err'); return; }
+        var set = rig.poses[from]; if (!set || !Object.keys(set).length) { status('That pose has no fixes yet.', 'err'); return; }
+        rig.poses[poseKey] = JSON.parse(JSON.stringify(set)); E.liveRig(rig); mark();
+        status('Fixes copied from ' + $('copyFrom').selectedOptions[0].textContent + '.', 'ok');
+      });
       $('resetP').addEventListener('click', function () { delete rig.poses[poseKey]; E.liveRig(rig); mark(); status('Pose reset.'); });
       $('resetJt').addEventListener('click', function () {
         if (!sel) return; var b = E.B[sel];
