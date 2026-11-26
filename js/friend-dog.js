@@ -775,7 +775,7 @@
       } else if (name === 'pee') {   // Bein heben: linkes Hinterbein seitlich hoch (Längsachse), leicht weg gelehnt
         // Bein auf der Feuerseite seitlich hoch (S.peeSide), Gewicht auf die anderen drei, leicht weg gelehnt
         var sd = S.peeSide === 'R' ? -1 : 1, hp = B[(S.peeSide || 'L') + '_hip'], kn = B[(S.peeSide || 'L') + '_knee'];
-        turn(hp, FWD, sd * 0.95 * w); turn(kn, LAT, 0.45 * w);
+        turn(hp, FWD, sd * 1.35 * w); turn(kn, LAT, 0.55 * w);
         turn(B.COG, FWD, -sd * 0.06 * w); tailOver(0.4 * w);
       } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
         turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.45 * w);
