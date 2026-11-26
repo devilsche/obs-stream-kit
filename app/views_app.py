@@ -72,6 +72,11 @@ TOOLS = [
      "desc": "Ready-made explosion, fire and smoke animations (CC0) side by side, fired by click, with WebGL extras – groundwork for the new Burst effect.",
      "path": "tools/explosion-preview.html",
      "admin_only": True},
+    {"key": "logo-cut",
+     "label": "Logo cut editor",
+     "desc": "Cut the letters and stripes of the Logo 3D apart by hand: outlines over the image, drag points, add or merge parts. Saved cuts replace the automatic split.",
+     "path": "tools/logo-cut.html",
+     "admin_only": True},
     {"key": "duck-viewer",
      "label": "Rubber duck viewer",
      "desc": "The 3D rubber duck from the party rain, large and freely rotatable (drag, arrow keys, zoom).",
@@ -779,6 +784,37 @@ def duck_part_delete(key):
     """Globalen Umbau eines Teils verwerfen: wieder wie im Code."""
     from fx import duck_outfits
     return jsonify({"ok": True, "deleted": duck_outfits.delete_part(_duck_root(), key)})
+
+
+@bp_app.route("/app/api/logo-cuts", methods=["GET"])
+@require_admin
+def logo_cuts_list():
+    """Logo-Cut-Editor: Bilder in assets/ und gespeicherte Teile."""
+    from fx import logo_cuts
+    root = _duck_root()
+    return jsonify({"ok": True, "images": logo_cuts.images(root), "cuts": logo_cuts.load(root)})
+
+
+@bp_app.route("/app/api/logo-cuts", methods=["POST"])
+@require_admin
+def logo_cuts_save():
+    """Logo-Cut-Editor: Teile eines Bilds speichern (global, Logo 3D nimmt sie beim nächsten Laden). Nur JSON."""
+    from fx import logo_cuts
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "JSON body expected"}), 400
+    err = logo_cuts.save(_duck_root(), body.get("file"), body.get("parts"))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/logo-cuts/<file>", methods=["DELETE"])
+@require_admin
+def logo_cuts_delete(file):
+    """Eigene Teile verwerfen: Logo 3D zerlegt das Bild wieder automatisch."""
+    from fx import logo_cuts
+    return jsonify({"ok": True, "deleted": logo_cuts.delete(_duck_root(), file)})
 
 
 @bp_app.route("/app/api/cars/<kind>", methods=["POST"])

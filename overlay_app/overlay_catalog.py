@@ -145,8 +145,9 @@ ALERTS = [
 DECOR = [
     {"key": "logo",           "label": "Logo",            "file": "logo.html",           "size": "1920×1080",
      "desc": "Logo overlay.",                          "params": [], "switches": []},
-    {"key": "logo-3d", "summary": "3D logo: stripes fly in, letters flip.",        "label": "Logo 3D",         "file": "logo-3d.html",        "size": "800×304",
-     "desc": "Your logo in WebGL: the stripes fly in from behind one by one, the letters drop in with a flip, then a shine runs across. Every few seconds a wave, a hop or a shine; replays the intro on alerts. Splits stripes and letters automatically.",
+    {"key": "logo-3d", "summary": "3D logo: stripes stand up, letters flip.",      "label": "Logo 3D",         "file": "logo-3d.html",        "size": "800×304",
+     "desc": "Your logo in WebGL: the stripes stand up one by one from the left, the letters drop in with a flip, a shine runs across; then the stripes tip away from the right and it starts over. Replays on alerts. Splits stripes and letters automatically.",
+     "hint": "Letters or stripes cut wrong? Fix them by hand in Tools → Logo cut editor (admin).",
      "params": [], "switches": [
          {"key": "pause",  "label": "Pause (s)", "type": "number", "default": "10", "min": 3,
           "tooltip": "Seconds with only the lettering before the stripes build up again"},

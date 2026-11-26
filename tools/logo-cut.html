@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Logo cut editor</title>
+  <style>
+    /* Logo-Cut-Editor: Buchstaben und Streifen für Logo 3D (widgets/logo-3d.html) von Hand ausschneiden.
+       Umrisse liegen über dem Bild, Punkte ziehen, Punkte einfügen/löschen, Teile neu zeichnen, Löcher.
+       Gespeichert in data/logo-cuts.json (global, je Bilddatei); gibt es einen Eintrag, nimmt Logo 3D ihn statt der
+       automatischen Zerlegung (js/logo-split.js – dieselbe Automatik wie hier „Auto-detect“). */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --danger: #ff8a80; --ok: #9be59b; --checker-a: #2b3142; --checker-b: #232838; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 5; }
+    header { padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 20px; margin: 0; }
+    header p { margin: 0; color: var(--muted); }
+    header a { color: var(--text); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; height: calc(100vh - 52px); }
+    .stage { position: relative; overflow: auto; background: repeating-conic-gradient(var(--checker-a) 0 25%, var(--checker-b) 0 50%) 0 0 / 24px 24px; }
+    .stage:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+    #svg { display: block; touch-action: none; }
+    #svg.zoom-fit { width: 100%; height: auto; }
+    #svg.zoom-2 { width: 200%; height: auto; }
+    #svg.zoom-4 { width: 400%; height: auto; }
+    #svg.zoom-8 { width: 800%; height: auto; }
+    #svg.drawing { cursor: crosshair; }
+    .part { fill-rule: evenodd; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: pointer; fill-opacity: 0.22; }
+    .part.sel { fill-opacity: 0.35; stroke-width: 3; }
+    .part[data-hue="0"] { fill: #ff5d5d; stroke: #ff5d5d; } .part[data-hue="1"] { fill: #ffb347; stroke: #ffb347; }
+    .part[data-hue="2"] { fill: #f7e463; stroke: #f7e463; } .part[data-hue="3"] { fill: #6ee77a; stroke: #6ee77a; }
+    .part[data-hue="4"] { fill: #4fd8e8; stroke: #4fd8e8; } .part[data-hue="5"] { fill: #6d8cff; stroke: #6d8cff; }
+    .part[data-hue="6"] { fill: #c07bff; stroke: #c07bff; } .part[data-hue="7"] { fill: #ff7bd0; stroke: #ff7bd0; }
+    .handle { fill: #fff; stroke: #000; stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab; }
+    .handle.on { fill: var(--accent); }
+    .draft { fill: none; stroke: var(--accent); stroke-width: 2; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; }
+    section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+    h2 { font-size: 15px; margin: 0 0 8px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .row > label { min-width: 84px; color: var(--muted); }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; min-height: 30px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.primary { background: var(--accent); color: #1b1300; border-color: var(--accent); font-weight: 700; }
+    button.primary:hover { background: #ffd24a; }
+    button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+    button.ghost { background: transparent; border-color: var(--line); }
+    button:focus-visible, select:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    select { background: #0e131c; color: var(--text); border: 1px solid #4a5570; border-radius: 6px; padding: 4px 6px; font: inherit; min-height: 30px; max-width: 100%; }
+    .grow { flex: 1; min-width: 0; }
+    .tabs { display: flex; gap: 6px; }
+    .parts { display: flex; flex-wrap: wrap; gap: 6px; }
+    .parts button { min-width: 36px; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; margin: 4px 0; }
+    .origin { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+    kbd { background: #0e131c; border: 1px solid #4a5570; border-radius: 4px; padding: 0 4px; font-size: 12px; }
+    ul.keys { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+    #status { min-height: 20px; margin: 8px 0 0; }
+    #status.ok { color: var(--ok); }
+    #status.err { color: var(--danger); }
+    .sticky { position: sticky; bottom: 0; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    [hidden] { display: none !important; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; height: auto; } .stage { height: 60vh; } .panel { border-left: 0; border-top: 1px solid var(--line); } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#panel">Skip to controls</a>
+  <header>
+    <h1>Logo cut editor</h1>
+    <p>Cut letters and stripes for the Logo 3D by hand. Saved cuts replace the automatic split.</p>
+    <a href="/app/tools">Back to tools</a>
+  </header>
+  <main class="layout">
+    <div class="stage" id="stage" tabindex="0" aria-label="Logo image with part outlines. Arrow keys move the selected point, Delete removes it.">
+      <svg id="svg" class="zoom-fit" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Logo image">
+        <image id="img" x="0" y="0"></image>
+        <g id="shapes"></g>
+        <polyline id="draft" class="draft" points=""></polyline>
+        <g id="handles"></g>
+      </svg>
+    </div>
+    <div class="panel" id="panel">
+      <section aria-labelledby="h-img">
+        <h2 id="h-img">Image</h2>
+        <div class="tabs" role="group" aria-label="What to edit">
+          <button type="button" id="tabText" aria-pressed="true">Letters</button>
+          <button type="button" id="tabLines" aria-pressed="false">Stripes</button>
+        </div>
+        <div class="row">
+          <label for="fileText">Text image</label>
+          <select id="fileText" class="grow"></select>
+        </div>
+        <div class="row">
+          <label for="fileLines">Stripes image</label>
+          <select id="fileLines" class="grow"></select>
+        </div>
+        <div class="row">
+          <label for="zoom">Zoom</label>
+          <select id="zoom">
+            <option value="fit">Fit</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option>
+          </select>
+          <span class="origin" id="origin">–</span>
+        </div>
+      </section>
+
+      <section aria-labelledby="h-parts">
+        <h2 id="h-parts">Parts</h2>
+        <p class="muted small">Left to right is the order in which they appear in the Logo 3D.</p>
+        <div class="parts" id="parts" role="group" aria-label="Parts"></div>
+        <div class="row">
+          <button type="button" id="auto" class="ghost">Auto-detect</button>
+          <button type="button" id="newPart">Draw new part</button>
+          <button type="button" id="redraw" disabled>Redraw selected</button>
+        </div>
+        <div class="row">
+          <button type="button" id="addHole" disabled>Add hole</button>
+          <button type="button" id="simplify" disabled>Fewer points</button>
+          <button type="button" id="delPart" class="danger" disabled>Delete part</button>
+        </div>
+        <ul class="keys">
+          <li>Drag a point to move it, double-click an edge to add one.</li>
+          <li>Click a point, then <kbd>Del</kbd> removes it, arrow keys nudge it (<kbd>Shift</kbd> = 10 px).</li>
+          <li>Drawing: click to set points, double-click or <kbd>Enter</kbd> to finish, <kbd>Esc</kbd> to cancel.</li>
+          <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> undo, <kbd>Ctrl</kbd>+<kbd>Y</kbd> redo.</li>
+        </ul>
+      </section>
+
+      <section aria-labelledby="h-prev">
+        <h2 id="h-prev">Check</h2>
+        <p class="muted small">Opens the Logo 3D with these two images in a new tab (save first).</p>
+        <div class="row"><a id="preview" href="#" target="_blank" rel="noopener">Open Logo 3D</a></div>
+      </section>
+
+      <div class="sticky">
+        <div class="row">
+          <button type="button" id="save" class="primary">Save and go live</button>
+          <button type="button" id="undo" class="ghost">Undo</button>
+          <button type="button" id="redo" class="ghost">Redo</button>
+          <button type="button" id="drop" class="danger">Back to automatic</button>
+        </div>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </main>
+
+  <script src="/s/__WIDGET_TOKEN__/js/logo-split.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var TOKEN = window.__WIDGET_TOKEN__ || '', NS = 'http://www.w3.org/2000/svg';
+      var LS = window.LogoSplit;
+      function $(id) { return document.getElementById(id); }
+      var svg = $('svg'), shapesG = $('shapes'), handlesG = $('handles'), draftEl = $('draft'), imgEl = $('img');
+      var st = { kind: 1, files: { 0: 'logo_lines_blue_t.png', 1: 'logo_text_luckor_hd.png' }, saved: {}, parts: [], sel: -1, pt: null,
+                 dirty: false, auto: true, draw: null, hist: [], fut: [], im: null, W: 1, H: 1 };
+
+      function status(msg, cls) { var s = $('status'); s.textContent = msg || ''; s.className = cls || ''; }
+      function api(method, url, body) {
+        return fetch(url, { method: method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined, credentials: 'same-origin' })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || d.ok === false) throw new Error(d.error || ('HTTP ' + r.status)); return d; }); });
+      }
+      function clone(v) { return JSON.parse(JSON.stringify(v)); }
+      function file() { return st.files[st.kind]; }
+
+      // ── Verlauf ──
+      function snap() { st.hist.push(clone(st.parts)); if (st.hist.length > 80) st.hist.shift(); st.fut = []; }
+      function changed() { st.dirty = true; st.auto = false; render(); }
+      function undo() { if (!st.hist.length) return; st.fut.push(clone(st.parts)); st.parts = st.hist.pop(); st.pt = null; if (st.sel >= st.parts.length) st.sel = st.parts.length - 1; changed(); }
+      function redo() { if (!st.fut.length) return; st.hist.push(clone(st.parts)); st.parts = st.fut.pop(); st.pt = null; changed(); }
+
+      // ── Bild + Automatik ──
+      function loadImage(f) {
+        return new Promise(function (ok, bad) {
+          var im = new Image(); im.onload = function () { ok(im); }; im.onerror = function () { bad(new Error('Image not loaded: ' + f)); };
+          im.src = '/s/' + TOKEN + '/assets/' + encodeURIComponent(f);
+        });
+      }
+      function autoParts(im, kind) {
+        var px = LS.pixels(im, Math.min(1, 2048 / Math.max(im.naturalWidth, im.naturalHeight))), k = px.c.width / im.naturalWidth;
+        var list = kind ? LS.splitLetters(LS.separateShadow(px).face) : LS.splitBlobs(px);
+        return LS.toCuts(list, k, kind);
+      }
+      function open() {
+        var f = file(); status('Loading …');
+        return loadImage(f).then(function (im) {
+          st.im = im; st.W = im.naturalWidth; st.H = im.naturalHeight;
+          svg.setAttribute('viewBox', '0 0 ' + st.W + ' ' + st.H);
+          imgEl.setAttribute('width', st.W); imgEl.setAttribute('height', st.H); imgEl.setAttribute('href', im.src);
+          var sv = st.saved[f];
+          st.auto = !sv; st.parts = sv ? clone(sv) : autoParts(im, st.kind);
+          st.sel = -1; st.pt = null; st.dirty = false; st.hist = []; st.fut = []; st.draw = null;
+          render(); status(sv ? 'Saved cut loaded.' : (st.parts.length ? 'Automatic split shown – edit and save to keep it.' : 'Nothing detected – draw the parts yourself.'), 'ok');
+        }).catch(function (e) { status(e.message, 'err'); });
+      }
+
+      // ── Zeichnen ──
+      function el(tag, attrs) { var e = document.createElementNS(NS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+      function ringD(r) { return 'M' + r.map(function (q) { return q[0] + ' ' + q[1]; }).join('L') + 'Z'; }
+      function order() {   // Reihenfolge wie im Widget: nach Mitte von links nach rechts
+        return st.parts.map(function (p, i) {
+          var xs = p.poly.map(function (q) { return q[0]; }); return { i: i, cx: (Math.min.apply(0, xs) + Math.max.apply(0, xs)) / 2 };
+        }).sort(function (a, b) { return a.cx - b.cx; }).map(function (o) { return o.i; });
+      }
+      function handleR() { var b = svg.getBoundingClientRect(); return Math.max(2, 6 * st.W / Math.max(1, b.width)); }
+      function render() {
+        shapesG.textContent = ''; handlesG.textContent = '';
+        var ord = order();
+        st.parts.forEach(function (p, i) {
+          var path = el('path', { d: [p.poly].concat(p.holes || []).map(ringD).join(' '), class: 'part' + (i === st.sel ? ' sel' : ''), 'data-hue': String(ord.indexOf(i) % 8), 'data-i': String(i) });
+          shapesG.appendChild(path);
+        });
+        if (st.sel >= 0 && st.parts[st.sel] && !st.draw) {
+          var p = st.parts[st.sel], r = handleR();
+          [p.poly].concat(p.holes || []).forEach(function (ring, ri) {
+            ring.forEach(function (q, qi) {
+              var on = st.pt && st.pt[0] === ri && st.pt[1] === qi;
+              handlesG.appendChild(el('circle', { cx: q[0], cy: q[1], r: r, class: 'handle' + (on ? ' on' : ''), 'data-r': String(ri), 'data-q': String(qi) }));
+            });
+          });
+        }
+        draftEl.setAttribute('points', st.draw ? st.draw.pts.map(function (q) { return q.join(','); }).join(' ') : '');
+        svg.classList.toggle('drawing', !!st.draw);
+        // Teile-Liste in Widget-Reihenfolge
+        var box = $('parts'); box.textContent = '';
+        ord.forEach(function (i, n) {
+          var b = document.createElement('button'); b.type = 'button'; b.textContent = String(n + 1);
+          b.setAttribute('aria-pressed', i === st.sel ? 'true' : 'false'); b.setAttribute('aria-label', 'Part ' + (n + 1));
+          b.addEventListener('click', function () { st.sel = i; st.pt = null; render(); });
+          box.appendChild(b);
+        });
+        var has = st.sel >= 0;
+        $('redraw').disabled = !has; $('addHole').disabled = !has; $('simplify').disabled = !has; $('delPart').disabled = !has;
+        $('undo').disabled = !st.hist.length; $('redo').disabled = !st.fut.length;
+        $('save').disabled = !st.parts.length || (!st.dirty && !st.auto && !!st.saved[file()]);
+        $('drop').disabled = !st.saved[file()];
+        $('origin').textContent = (st.saved[file()] ? 'saved cut' : 'automatic') + (st.dirty ? ', edited' : '');
+        $('tabText').setAttribute('aria-pressed', st.kind === 1 ? 'true' : 'false');
+        $('tabLines').setAttribute('aria-pressed', st.kind === 0 ? 'true' : 'false');
+        $('preview').href = '/s/' + TOKEN + '/widgets/logo-3d.html?lines=' + encodeURIComponent(st.files[0]) + '&text=' + encodeURIComponent(st.files[1]);
+      }
+
+      // ── Maus ──
+      function svgPt(ev) {
+        var p = svg.createSVGPoint(); p.x = ev.clientX; p.y = ev.clientY;
+        var q = p.matrixTransform(svg.getScreenCTM().inverse());
+        return [Math.round(Math.min(st.W, Math.max(0, q.x)) * 10) / 10, Math.round(Math.min(st.H, Math.max(0, q.y)) * 10) / 10];
+      }
+      function ring(ri) { var p = st.parts[st.sel]; return ri === 0 ? p.poly : p.holes[ri - 1]; }
+      var drag = null;
+      svg.addEventListener('pointerdown', function (ev) {
+        if (ev.button !== 0) return;
+        var t = ev.target;
+        if (st.draw) { st.draw.pts.push(svgPt(ev)); render(); return; }
+        if (t.classList.contains('handle')) {
+          st.pt = [+t.dataset.r, +t.dataset.q]; snap(); drag = { moved: false };
+          svg.setPointerCapture(ev.pointerId); render(); return;
+        }
+        if (t.classList.contains('part')) { st.sel = +t.dataset.i; st.pt = null; render(); return; }
+        st.sel = -1; st.pt = null; render();
+      });
+      svg.addEventListener('pointermove', function (ev) {
+        if (!drag || !st.pt) return;
+        var q = svgPt(ev); ring(st.pt[0])[st.pt[1]] = q; drag.moved = true; st.dirty = true; st.auto = false;
+        var c = handlesG.querySelector('.handle.on'); if (c) { c.setAttribute('cx', q[0]); c.setAttribute('cy', q[1]); }
+        var path = shapesG.querySelector('[data-i="' + st.sel + '"]'); var p = st.parts[st.sel];
+        if (path) path.setAttribute('d', [p.poly].concat(p.holes || []).map(ringD).join(' '));
+      });
+      svg.addEventListener('pointerup', function () {
+        if (!drag) return;
+        if (!drag.moved) st.hist.pop();
+        drag = null; render();
+      });
+      // Doppelklick: Zeichnen beenden bzw. Punkt auf der nächsten Kante einfügen
+      svg.addEventListener('dblclick', function (ev) {
+        if (st.draw) { finishDraw(); return; }
+        if (st.sel < 0) return;
+        var q = svgPt(ev), p = st.parts[st.sel], best = null;
+        [p.poly].concat(p.holes || []).forEach(function (r, ri) {
+          for (var i = 0; i < r.length; i++) {
+            var a = r[i], b = r[(i + 1) % r.length], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1;
+            var t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)), ex = a[0] + dx * t - q[0], ey = a[1] + dy * t - q[1], d = ex * ex + ey * ey;
+            if (!best || d < best.d) best = { d: d, ri: ri, i: i + 1 };
+          }
+        });
+        if (!best) return;
+        snap(); ring(best.ri).splice(best.i, 0, q); st.pt = [best.ri, best.i]; changed();
+      });
+
+      // ── Zeichnen neuer Teile/Löcher ──
+      function startDraw(mode) { st.draw = { mode: mode, pts: [] }; st.pt = null; render(); $('stage').focus(); status(mode === 'hole' ? 'Click the hole outline, double-click or Enter to finish.' : 'Click the outline, double-click or Enter to finish.'); }
+      function finishDraw() {
+        var d = st.draw; st.draw = null;
+        // Doppelklick setzt zwei Punkte zu viel (zweimal pointerdown): doppelte Punkte am Ende raus
+        var pts = d.pts.filter(function (q, i) { var n = d.pts[i + 1]; return !n || Math.hypot(n[0] - q[0], n[1] - q[1]) > 0.5; });
+        if (pts.length < 3) { status('Need at least 3 points.', 'err'); render(); return; }
+        snap();
+        if (d.mode === 'hole') { var p = st.parts[st.sel]; p.holes = (p.holes || []).concat([pts]).slice(0, 8); }
+        else if (d.mode === 'redraw') { st.parts[st.sel].poly = pts; }
+        else { st.parts.push({ poly: pts, holes: [] }); st.sel = st.parts.length - 1; }
+        status(''); changed();
+      }
+      $('newPart').addEventListener('click', function () { startDraw('new'); });
+      $('redraw').addEventListener('click', function () { if (st.sel >= 0) startDraw('redraw'); });
+      $('addHole').addEventListener('click', function () { if (st.sel >= 0) startDraw('hole'); });
+      $('delPart').addEventListener('click', function () { if (st.sel < 0) return; snap(); st.parts.splice(st.sel, 1); st.sel = -1; st.pt = null; changed(); });
+      $('simplify').addEventListener('click', function () {
+        if (st.sel < 0) return; snap(); var p = st.parts[st.sel], eps = Math.max(1, st.W / 1500);
+        p.poly = LS.rdp(p.poly, eps); p.holes = (p.holes || []).map(function (h) { return LS.rdp(h, eps); }).filter(function (h) { return h.length >= 3; });
+        st.pt = null; changed();
+      });
+      $('auto').addEventListener('click', function () {
+        if (!st.im) return; snap(); st.parts = autoParts(st.im, st.kind); st.sel = -1; st.pt = null; changed();
+        status('Automatic split loaded – save to keep it.', 'ok');
+      });
+
+      // ── Tastatur ──
+      document.addEventListener('keydown', function (ev) {
+        var tag = (ev.target.tagName || '').toLowerCase(); if (tag === 'select') return;
+        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'z') { ev.preventDefault(); undo(); return; }
+        if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'y') { ev.preventDefault(); redo(); return; }
+        if (st.draw) {
+          if (ev.key === 'Enter') { ev.preventDefault(); finishDraw(); }
+          else if (ev.key === 'Escape') { st.draw = null; status(''); render(); }
+          return;
+        }
+        if (!st.pt || st.sel < 0) return;
+        var r = ring(st.pt[0]), step = ev.shiftKey ? 10 : 1, q = r[st.pt[1]];
+        var mv = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[ev.key];
+        if (mv) { ev.preventDefault(); snap(); r[st.pt[1]] = [q[0] + mv[0], q[1] + mv[1]]; changed(); return; }
+        if (ev.key === 'Delete' || ev.key === 'Backspace') {
+          ev.preventDefault();
+          if (r.length <= 3) { status('An outline needs at least 3 points.', 'err'); return; }
+          snap(); r.splice(st.pt[1], 1); st.pt = null; changed();
+        }
+      });
+
+      // ── Bedienfeld ──
+      function switchKind(k) {
+        if (st.kind === k) return;
+        if (st.dirty && !window.confirm('Discard unsaved changes?')) return;
+        st.kind = k; open();
+      }
+      $('tabText').addEventListener('click', function () { switchKind(1); });
+      $('tabLines').addEventListener('click', function () { switchKind(0); });
+      [['fileText', 1], ['fileLines', 0]].forEach(function (a) {
+        $(a[0]).addEventListener('change', function () {
+          st.files[a[1]] = $(a[0]).value;
+          if (st.kind === a[1]) { st.dirty = false; open(); } else render();
+        });
+      });
+      $('zoom').addEventListener('change', function () { svg.setAttribute('class', 'zoom-' + $('zoom').value); render(); });
+      $('undo').addEventListener('click', undo);
+      $('redo').addEventListener('click', redo);
+      $('save').addEventListener('click', function () {
+        var f = file(), parts = st.parts.map(function (p) { return { poly: p.poly, holes: p.holes || [] }; });
+        status('Saving …');
+        api('POST', '/app/api/logo-cuts', { file: f, parts: parts }).then(function () {
+          st.saved[f] = clone(parts); st.dirty = false; st.auto = false; render();
+          status('Saved. The Logo 3D uses these parts the next time it loads (refresh the OBS source).', 'ok');
+        }).catch(function (e) { status('Not saved: ' + e.message, 'err'); });
+      });
+      $('drop').addEventListener('click', function () {
+        var f = file();
+        api('DELETE', '/app/api/logo-cuts/' + encodeURIComponent(f)).then(function () {
+          delete st.saved[f]; status('Back to the automatic split.', 'ok'); open();
+        }).catch(function (e) { status('Not reset: ' + e.message, 'err'); });
+      });
+      window.addEventListener('beforeunload', function (ev) { if (st.dirty) { ev.preventDefault(); ev.returnValue = ''; } });
+
+      api('GET', '/app/api/logo-cuts').then(function (d) {
+        st.saved = d.cuts || {};
+        [['fileText', 1], ['fileLines', 0]].forEach(function (a) {
+          var s = $(a[0]); (d.images || []).forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; s.appendChild(o); });
+          if ((d.images || []).indexOf(st.files[a[1]]) < 0 && d.images && d.images.length) st.files[a[1]] = d.images[0];
+          s.value = st.files[a[1]];
+        });
+        open();
+      }).catch(function (e) { status('Could not load: ' + e.message, 'err'); });
+    })();
+  </script>
+</body>
+</html>

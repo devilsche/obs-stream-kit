@@ -618,6 +618,15 @@ def duck_outfits_js(token):
     return _no_store(Response(js, mimetype="application/javascript"))
 
 
+@bp_fx.route("/s/<token>/api/fx/logo/cuts.json")
+def logo_cuts_json(token):
+    """Im Logo-Cut-Editor ausgeschnittene Teile (global) für Logo 3D: {bild: [teil, …]}."""
+    if g.tenant_id is None:
+        abort(404)
+    from fx import logo_cuts
+    return _no_store(jsonify({"cuts": logo_cuts.load(current_app.config.get("_PROJECT_ROOT") or ".")}))
+
+
 @bp_fx.route("/s/<token>/api/fx/cars/catalog.json")
 def car_catalog(token):
     """Aufbereitete Auto-Modelle für den Regen (data/car-rain/catalog.json, scripts/build_car_rain.py)."""
