@@ -224,7 +224,7 @@
       function friendFire(name, args) {
         if (name !== 'fire' || args.x == null || !apiBase || !window.obsstudio || powerOn === false || Date.now() - lastFriendFire < 8000) return;
         lastFriendFire = Date.now();
-        fetch(apiBase + 'friend?cmd=react&event=fire&x=' + args.x, { cache: 'no-store' }).catch(function () {});
+        fetch(apiBase + 'friend?cmd=react&event=fire&x=' + args.x + (args.others && args.others.length ? '&others=' + args.others.join(',') : ''), { cache: 'no-store' }).catch(function () {});
       }
       function sbEvent(name, args) {
         if (!settings.sbaction || !window.obsstudio) return;

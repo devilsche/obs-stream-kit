@@ -463,11 +463,19 @@
       // Heldentat: zum Feuer rennen, Hinterteil hin, Bein heben, löschen, stolz bellen
       pee: function (p) {
         if (!p || p.x == null) return [];
-        var fx = (parseFloat(p.x) - W / 2) / pxPerUnit, right = fx > S.x;
-        var stand = Math.max(-RANGE, Math.min(RANGE, fx + (right ? -0.75 : 0.75)));
+        // Wie ein Rüde an einem Pfosten: mit der Flanke neben das Feuer, Bein auf der Feuerseite heben, Strahl aus der
+        // Leiste seitlich zum Feuer. Rücken schräg zum Zuschauer (11 bzw. 1 Uhr), damit man Bein und Strahl sieht.
+        // Mehrere Feuer: nur eine Seite nehmen, an der kein anderes brennt (sonst verbrennt er sich) – sind beide zu,
+        // bellt er nur. Gewählt wird bevorzugt die Seite, von der er kommt.
+        var fx = (parseFloat(p.x) - W / 2) / pxPerUnit, others = String(p.others || '').split(',').filter(Boolean)
+          .map(function (v) { return (parseFloat(v) - W / 2) / pxPerUnit; }).filter(function (v) { return !isNaN(v); });
+        var safe = function (x) { return x >= -RANGE && x <= RANGE && others.every(function (o) { return Math.abs(o - x) > 170 / pxPerUnit; }); };
+        var sides = (S.x < fx ? [-1, 1] : [1, -1]).filter(function (d) { return safe(fx + d * 0.42); });
+        if (!sides.length) return [{ do: 'face', hour: 6, dur: 0.3 }, { do: 'bark', n: 3, gap: 0.3 }, { do: 'wag', v: 0.4, dur: 0 }];
+        var right = sides[0] < 0, stand = fx + sides[0] * 0.42;
         return [{ do: 'wag', v: 1, dur: 0 }, { do: 'bark', n: 1, gap: 0.3 }, { do: 'goto', x: stand, gait: 'run' },
-          { do: 'face', hour: right ? 9 : 3, dur: 0.5 }, { do: 'call', fn: function () { S.peeX = fx; } },
-          { do: 'mode', m: 'pee', dur: 3.2 }, { do: 'call', fn: function () { S.peeX = null; if (opt.onExtinguish) opt.onExtinguish(); } },
+          { do: 'face', hour: right ? 11.3 : 12.7, dur: 0.6 }, { do: 'call', fn: function () { S.peeX = fx; S.peeSide = right ? 'R' : 'L'; } },
+          { do: 'mode', m: 'pee', dur: 3.2 }, { do: 'call', fn: function () { S.peeX = null; if (opt.onExtinguish) opt.onExtinguish(parseFloat(p.x)); } },
           { do: 'mode', m: 'idle', face: 6, dur: 0.5 }, { do: 'bark', n: 2, gap: 0.4 }, { do: 'wag', v: 1, dur: 2 }, { do: 'wag', v: 0.4, dur: 0 }];
       },
       shakeoff: function (f) { f = typeof f === 'number' ? f : 6; return [{ do: 'face', hour: f, dur: 0.5 }, { do: 'mode', m: 'shakeoff', dur: 1.6 }, { do: 'mode', m: 'idle', dur: 0.6 }]; },
@@ -678,7 +686,11 @@
         // Strahl: vom Becken (etwas hinter der Mitte, Höhe der Hüfte) im Bogen zum Feuer am Boden
         peeMesh.visible = S.mode === 'pee' && S.poseW > 0.6 && S.peeX != null;
         if (peeMesh.visible) {
-          var p0 = new THREE.Vector3(); B.pelvis.getWorldPosition(p0); p0.addScaledVector(FWD, -0.05); p0.y -= 0.05;
+          // Leiste: vor dem Becken unter dem Bauch, zur Feuerseite hin
+          var p0 = new THREE.Vector3(), gr = new THREE.Vector3(); B.pelvis.getWorldPosition(p0);
+          B[(S.peeSide === 'R' ? 'L' : 'R') + '_hip'].getWorldPosition(gr);   // Hüfte des Standbeins: Höhe der Leiste
+          p0.addScaledVector(FWD, 0.16); p0.y = Math.max(0.08, gr.y - 0.06);
+          p0.addScaledVector(LAT, (S.peeSide === 'R' ? -1 : 1) * 0.05);
           var p1 = new THREE.Vector3(S.peeX, 0.04, S.z), hgt = 0.22 + Math.abs(p1.x - p0.x) * 0.35;
           for (var pi = 0; pi < PEE_N; pi++) {
             var u = (pi / PEE_N + t * 1.7) % 1;
@@ -761,8 +773,10 @@
         turn(B.neck_base, LAT, 1.0 * w); turn(B.head, LAT, 0.35 * w);
         tailOver(-1.5 * w);
       } else if (name === 'pee') {   // Bein heben: linkes Hinterbein seitlich hoch (Längsachse), leicht weg gelehnt
-        turn(B.L_hip, FWD, 0.95 * w); turn(B.L_knee, LAT, 0.45 * w);
-        turn(B.COG, FWD, -0.06 * w); tailOver(0.4 * w);
+        // Bein auf der Feuerseite seitlich hoch (S.peeSide), Gewicht auf die anderen drei, leicht weg gelehnt
+        var sd = S.peeSide === 'R' ? -1 : 1, hp = B[(S.peeSide || 'L') + '_hip'], kn = B[(S.peeSide || 'L') + '_knee'];
+        turn(hp, FWD, sd * 0.95 * w); turn(kn, LAT, 0.45 * w);
+        turn(B.COG, FWD, -sd * 0.06 * w); tailOver(0.4 * w);
       } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
         turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.45 * w);
       } else if (name === 'shakeoff') {   // Wasser abschütteln: Welle von Kopf bis Becken, schnell, klingt ab

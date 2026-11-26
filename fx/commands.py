@@ -84,6 +84,21 @@ def _int_range(lo, hi):
     return conv
 
 
+def _int_list(lo, hi, maxn):
+    """Komma-Liste ganzer Zahlen (z. B. Positionen weiterer Feuer) → "x1,x2" oder None."""
+    def conv(v):
+        out = []
+        for part in str(v).split(",")[:maxn]:
+            try:
+                f = float(part)
+            except ValueError:
+                continue
+            if f == f:
+                out.append(str(int(max(lo, min(hi, round(f))))))
+        return ",".join(out) or None
+    return conv
+
+
 def _float_range(lo, hi):
     def conv(v):
         try:
@@ -292,7 +307,7 @@ EFFECTS = {
         "args": {
             "react": {"event": _choice("follow", "sub", "resub", "giftsub", "bits", "raid", "donation", "welcome",
                                        "burnout", "pet", "fire"),
-                      "name": _name, "x": _int_range(0, 4000)},
+                      "name": _name, "x": _int_range(0, 4000), "others": _int_list(0, 4000, 8)},
             "act": {"action": _choice("walk", "run", "stand", "sit", "lie", "paw", "roll", "bark", "wag", "turn", "come",
                                       "sleep", "playdead", "beg", "growl", "shakeoff"),
                     "face": _float_range(1, 12)},
@@ -392,7 +407,7 @@ EFFECTS = {
             "xmasdone": {"step": _choice("setup", "farewell")},
             "season": {"to": _choice("next", "auto", "winter", "spring", "summer", "autumn")},
             "ignite": {"wet": _flag},
-            "extinguish": {"name": _name},
+            "extinguish": {"name": _name, "x": _int_range(0, 4000)},
             "clear": {"kind": _choice("followers", "ornaments", "gifts", "minis", "snow", "snowman",
                                       "pumpkins", "leaves", "flowers", "garden", "castles", "heat")},
             "pumpkin": {"name": _name},

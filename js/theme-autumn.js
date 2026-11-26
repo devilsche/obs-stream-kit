@@ -1157,7 +1157,8 @@
         for (var j = 0; j < 5; j++) B.smoke(x + rand(-30, 30), y - 10, { o: 0.45 });
       }
       if (opts.ignite) opts.ignite(wet);
-      emit('fire', { cause: cause, wet: wet, fires: burning().length, side: x < W / 2 ? 'left' : 'right', x: Math.round(x) });
+      emit('fire', { cause: cause, wet: wet, fires: burning().length, side: x < W / 2 ? 'left' : 'right', x: Math.round(x),
+        others: burning().filter(function (o) { return o.x !== x; }).map(function (o) { return Math.round(o.x); }) });
     }
     // Funkenflug: Nachbarstelle im Haufen (mit dem Wind eher in seine Richtung)
     function spread(f) {
@@ -1260,7 +1261,9 @@
     function extinguish(p) {
       if (!B.on) return;
       var done = parseFloat(p.done) > 0;
-      var live = burning(), f = live[0] || null;
+      // mit x (der Hund): das Feuer an dieser Stelle, sonst das älteste
+      var live = burning(), f = live[0] || null, px = parseFloat(p.x);
+      if (!isNaN(px) && live.length) f = live.reduce(function (a, b) { return Math.abs(b.x - px) < Math.abs(a.x - px) ? b : a; });
       var x = f ? f.x : lastFireX !== null ? lastFireX : (Math.random() < 0.5 ? 330 : W - 330);
       if (!done) {
         var sx = f ? x : Math.random() < 0.5 ? rand(200, 520) : rand(W - 520, W - 200);
