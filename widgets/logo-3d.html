@@ -155,8 +155,8 @@
         });
       }
       /* Weicher Schlagschatten im Textbild (reines Schwarz, halbdeckend) gehört nicht zu den Buchstaben: er käme beim
-         Zerschneiden in harten Streifen mit und würde sich mitdrehen. Er wird herausgelöst und je Buchstabe als eigene
-         Fläche dahinter gehängt (shadowSlices), dreht sich also mit; die Buchstaben behalten Schrift und Kontur. */
+         Zerschneiden in harten Streifen mit und würde sich mitdrehen. Er wird herausgelöst und je Buchstabe aus dessen
+         eigener Form neu gebaut (letterShadow), hängt dahinter und dreht sich deckungsgleich mit; die Buchstaben behalten Schrift und Kontur. */
       function separateShadow(px) {
         var w = px.d.width, h = px.d.height, a = px.d.data;
         var sc = document.createElement('canvas'); sc.width = w; sc.height = h;
@@ -169,20 +169,23 @@
         var fc = document.createElement('canvas'); fc.width = w; fc.height = h; fc.getContext('2d').putImageData(fd, 0, 0);
         return { face: { c: fc, d: fd }, shadow: { c: sc, d: sd } };
       }
-      // Schatten je Buchstabe: dieselben Spalten wie die Buchstaben, um den Versatz des Schattens verschoben – so hängt
-      // jedes Stück am eigenen Buchstaben und dreht und hüpft mit ihm.
-      function shadowSlices(sh, face, list) {
-        function cx(px) { var w = px.d.width, h = px.d.height, a = px.d.data, sx = 0, n = 0; for (var i = 0; i < w * h; i++) { var v = a[i * 4 + 3]; if (v) { sx += (i % w) * v; n += v; } } return n ? sx / n : 0; }
-        var off = Math.round(cx(sh) - cx(face)), w = sh.d.width, h = sh.d.height;
-        return list.map(function (p, i) {
-          var a0 = i ? p.x0 + off : 0, a1 = i < list.length - 1 ? p.x0 + p.c.width + off : w;
-          a0 = Math.max(0, a0); a1 = Math.min(w, a1); if (a1 - a0 < 2) return null;
-          var c = document.createElement('canvas'); c.width = a1 - a0; c.height = h;
-          var g = c.getContext('2d'); g.drawImage(sh.c, a0, 0, c.width, h, 0, 0, c.width, h);
-          var r = whole({ c: c, d: g.getImageData(0, 0, c.width, h) })[0];
-          if (r) r.x0 += a0;
-          return r;
-        });
+      // Schatten je Buchstabe, aus dem Buchstaben selbst gebaut: seine Form schwarz, weichgezeichnet und um den Versatz
+      // des Original-Schattens verschoben. Hängt am Buchstaben und dreht und hüpft deckungsgleich mit.
+      function shadowLook(sh, face) {
+        function cen(px) { var w = px.d.width, h = px.d.height, a = px.d.data, sx = 0, sy = 0, n = 0;
+          for (var i = 0; i < w * h; i++) { var v = a[i * 4 + 3]; if (v) { var x = i % w; sx += x * v; sy += (i - x) / w * v; n += v; } }
+          return n ? [sx / n, sy / n] : [0, 0]; }
+        var c1 = cen(sh), c0 = cen(face), a = sh.d.data, sum = 0, n = 0;
+        for (var i = 3; i < a.length; i += 4) if (a[i]) { sum += a[i]; n++; }
+        return { dx: c1[0] - c0[0], dy: c1[1] - c0[1], alpha: n ? Math.min(1, sum / n / 255 * 1.6) : 0.6 };
+      }
+      function letterShadow(p, look) {
+        var blur = Math.max(2, p.c.height * 0.035), pad = Math.ceil(blur * 3 + Math.max(Math.abs(look.dx), Math.abs(look.dy)));
+        var c = document.createElement('canvas'); c.width = p.c.width + pad * 2; c.height = p.c.height + pad * 2;
+        var x = c.getContext('2d'); x.filter = 'blur(' + blur.toFixed(1) + 'px)';
+        x.drawImage(p.c, pad + look.dx, pad + look.dy); x.filter = 'none';
+        x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgba(0,0,0,' + look.alpha.toFixed(2) + ')'; x.fillRect(0, 0, c.width, c.height);
+        return { c: c, x0: p.x0 - pad, y0: p.y0 - pad };
       }
       function whole(px) {
         var w = px.d.width, h = px.d.height, a = px.d.data, x0 = w, y0 = h, x1 = 0, y1 = 0;
@@ -279,7 +282,8 @@
           var sep = kind ? separateShadow(px) : { face: px, shadow: null };
           var list = (kind ? splitColumns(sep.face, im.naturalWidth > px.c.width ? pixels(im, 1) : px) : splitBlobs(px)) || whole(sep.face);
           list.forEach(function (p, i) { addPart(p, ks, kind, i); });
-          if (sep.shadow && kind && list.length > 1) shadowSlices(sep.shadow, sep.face, list).forEach(function (q, i) { if (q) addShadow(parts[parts.length - list.length + i], q, ks); });
+          if (sep.shadow && kind && list.length > 1) { var look = shadowLook(sep.shadow, sep.face);
+            list.forEach(function (q, i) { addShadow(parts[parts.length - list.length + i], letterShadow(q, look), ks); }); }
           else if (sep.shadow) whole(sep.shadow).forEach(function (p) { addPart(p, ks, 2, 0); });
         });
         if (!parts.length) return;
