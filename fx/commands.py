@@ -309,7 +309,7 @@ EFFECTS = {
                                        "burnout", "pet", "fire"),
                       "name": _name, "x": _int_range(0, 4000), "others": _int_list(0, 4000, 8)},
             "act": {"action": _choice("walk", "run", "stand", "sit", "lie", "paw", "roll", "bark", "wag", "turn", "come",
-                                      "sleep", "playdead", "beg", "growl", "shakeoff"),
+                                      "sleep", "playdead", "beg", "growl", "shakeoff", "down"),
                     "face": _float_range(1, 12)},
         },
     },

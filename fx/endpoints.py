@@ -627,6 +627,15 @@ def logo_cuts_json(token):
     return _no_store(jsonify({"cuts": logo_cuts.load(current_app.config.get("_PROJECT_ROOT") or ".")}))
 
 
+@bp_fx.route("/s/<token>/api/fx/friend/rig.json")
+def friend_rig_json(token):
+    """Eigenes Hundemodell aus dem Rig-Editor (global) für effects/friend.html: {"rig": {…} | null}."""
+    if g.tenant_id is None:
+        abort(404)
+    from fx import friend_rig
+    return _no_store(jsonify({"rig": friend_rig.load(current_app.config.get("_PROJECT_ROOT") or ".")}))
+
+
 @bp_fx.route("/s/<token>/api/fx/cars/catalog.json")
 def car_catalog(token):
     """Aufbereitete Auto-Modelle für den Regen (data/car-rain/catalog.json, scripts/build_car_rain.py)."""

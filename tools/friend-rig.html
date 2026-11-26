@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Friend dog rig editor</title>
+  <style>
+    /* Rig-Editor für den Friend-Hund (effects/friend.html, js/friend-dog.js): eigenes 3D-Modell (GLB) auf das
+       Hunde-Skelett setzen. Schritte: Modell einpassen → Gelenke ziehen → binden (Gewichte + Farben vom eingebauten
+       Hund übernommen) → Haltungen korrigieren (Sitz, Platz, Männchen, Pfote, Stehen; Gelenke ziehen dreht den
+       Knochen davor) → Fell anmalen → testen → speichern (data/friend-rig.json, global). */
+    :root { --bg: #1d2433; --panel: #141a26; --line: #2a3346; --text: #f0eaf5; --muted: #c4bad6; --accent: #f2b705; --btn: #5e2a79; --btn-hi: #8a4dad; --danger: #ff8a80; --ok: #9be59b; --stage: #262d3d; }
+    html { background: var(--bg); }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 'DM Sans', system-ui, sans-serif; }
+    .skip { position: absolute; left: -9999px; }
+    .skip:focus { left: 12px; top: 12px; background: var(--accent); color: #000; padding: 6px 10px; z-index: 5; }
+    header { padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; border-bottom: 1px solid var(--line); }
+    h1 { font-size: 20px; margin: 0; }
+    header p { margin: 0; color: var(--muted); }
+    header a { color: var(--text); }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: calc(100vh - 52px); }
+    .stagewrap { display: flex; flex-direction: column; min-width: 0; background: var(--stage); }
+    .views { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+    .stage { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+    .stage canvas, .stage svg { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .stage svg { touch-action: none; }
+    .stage svg:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+    .bone { stroke: rgba(255, 255, 255, 0.55); stroke-width: 2; }
+    .jt { fill: #fff; stroke: #000; stroke-width: 1.5; cursor: grab; }
+    .jt.l { fill: #6ee7ff; } .jt.r { fill: #ff9d6e; }
+    .jt.sel { fill: var(--accent); stroke-width: 2.5; }
+    .jt:focus-visible { outline: none; stroke: var(--accent); stroke-width: 4; }
+    .jt.off { display: none; }
+    .brush { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+    .tip { position: absolute; left: 10px; bottom: 8px; margin: 0; padding: 4px 8px; background: rgba(10, 14, 22, 0.75); border-radius: 6px; color: var(--muted); font-size: 12px; pointer-events: none; }
+    .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; display: flex; flex-direction: column; }
+    .steps { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+    section { padding: 12px 0; border-bottom: 1px solid var(--line); }
+    h2 { font-size: 15px; margin: 0 0 8px; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+    .row > label:first-child { min-width: 92px; color: var(--muted); }
+    .row input[type=range] { flex: 1; min-width: 120px; accent-color: var(--accent); }
+    .row output { min-width: 44px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+    button { background: var(--btn); color: #fff; border: 1px solid var(--btn-hi); border-radius: 6px; padding: 5px 10px; font: inherit; cursor: pointer; min-height: 30px; }
+    button:hover { background: var(--btn-hi); }
+    button[aria-pressed="true"] { background: var(--btn-hi); box-shadow: inset 0 0 0 2px var(--accent); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    button.primary { background: var(--accent); color: #1b1300; border-color: var(--accent); font-weight: 700; }
+    button.primary:hover { background: #ffd24a; }
+    button.danger { background: transparent; color: var(--danger); border-color: var(--danger); }
+    button.ghost { background: transparent; border-color: var(--line); }
+    button:focus-visible, input:focus-visible, a:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    input[type=file] { max-width: 100%; color: var(--muted); }
+    input[type=color] { width: 44px; height: 30px; border: 1px solid var(--line); background: transparent; padding: 0; }
+    .sw { width: 30px; height: 30px; border-radius: 6px; padding: 0; border: 2px solid var(--line); }
+    .sw[aria-pressed="true"] { border-color: var(--accent); box-shadow: none; }
+    .sw[data-c="black"] { background: #1b1512; } .sw[data-c="tan"] { background: #b0743e; } .sw[data-c="white"] { background: #e9e1d6; }
+    .sw[data-c="brown"] { background: #5a3a22; } .sw[data-c="pink"] { background: #c98a86; } .sw[data-c="grey"] { background: #6b6460; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; margin: 4px 0; }
+    label.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--text); }
+    #status { min-height: 20px; margin: 8px 0 0; }
+    #status.ok { color: var(--ok); }
+    #status.err { color: var(--danger); }
+    .sticky { position: sticky; bottom: 0; margin-top: auto; background: var(--panel); padding: 10px 0 4px; border-top: 1px solid var(--line); }
+    [hidden] { display: none !important; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; height: auto; } .stage { height: 60vh; flex: none; } .panel { border-left: 0; border-top: 1px solid var(--line); } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#panel">Skip to controls</a>
+  <header>
+    <h1>Friend dog rig editor</h1>
+    <p>Your own dog model on the friend dog's skeleton. All tricks keep working.</p>
+    <a href="/app/tools">Back to tools</a>
+  </header>
+  <main class="layout">
+    <div class="stagewrap">
+      <div class="views" role="group" aria-label="Camera">
+        <button type="button" data-view="side">Side</button>
+        <button type="button" data-view="front">Front</button>
+        <button type="button" data-view="back">Back</button>
+        <button type="button" data-view="top">Top</button>
+        <button type="button" data-view="three">3/4</button>
+      </div>
+      <div class="stage" id="stage">
+        <canvas id="cv" width="1280" height="800" aria-hidden="true"></canvas>
+        <svg id="ov" viewBox="0 0 1280 800" preserveAspectRatio="none" tabindex="0" role="application"
+             aria-label="Dog view. Drag to orbit, mouse wheel to zoom. Joint dots can be dragged or focused with Tab and moved with the arrow keys.">
+          <g id="bones"></g><g id="joints"></g><circle id="brush" class="brush" r="20" hidden></circle>
+        </svg>
+        <p class="tip" id="tip">Drag empty space to orbit, wheel to zoom.</p>
+      </div>
+    </div>
+    <aside class="panel" id="panel" aria-label="Editor steps">
+      <nav class="steps" role="tablist" aria-label="Steps">
+        <button type="button" role="tab" data-tab="model">1 Model</button>
+        <button type="button" role="tab" data-tab="joints">2 Joints</button>
+        <button type="button" role="tab" data-tab="bind">3 Bind</button>
+        <button type="button" role="tab" data-tab="poses">4 Poses</button>
+        <button type="button" role="tab" data-tab="paint">5 Paint</button>
+        <button type="button" role="tab" data-tab="test">6 Test</button>
+      </nav>
+
+      <section data-pane="model" role="tabpanel" aria-label="Model">
+        <h2>Fit your model</h2>
+        <p class="small muted">Load a GLB file of your dog. It appears over the built-in dog (dark). Make it stand on the ground, nose to the right, about the same size.</p>
+        <div class="row"><label for="file">Model file</label><input id="file" type="file" accept=".glb,model/gltf-binary"></div>
+        <div class="row">
+          <button type="button" id="autofit">Auto-fit</button>
+          <button type="button" id="rotY">Turn 90°</button>
+          <button type="button" id="rotZ">Tip 90°</button>
+          <button type="button" id="rotX">Roll 90°</button>
+          <button type="button" id="mir">Mirror</button>
+        </div>
+        <div class="row"><label for="sc">Size</label><input id="sc" type="range" min="-1" max="1" step="0.005" value="0"><output id="scO" for="sc">1.00</output></div>
+        <div class="row"><label for="ox">Forward</label><input id="ox" type="range" min="-0.6" max="0.6" step="0.002" value="0"><output id="oxO" for="ox">0</output></div>
+        <div class="row"><label for="oy">Up</label><input id="oy" type="range" min="-0.4" max="0.4" step="0.002" value="0"><output id="oyO" for="oy">0</output></div>
+        <div class="row"><label for="oz">Sideways</label><input id="oz" type="range" min="-0.3" max="0.3" step="0.002" value="0"><output id="ozO" for="oz">0</output></div>
+        <div class="row"><label for="op">See-through</label><input id="op" type="range" min="0.15" max="1" step="0.05" value="0.55"><output id="opO" for="op">0.55</output></div>
+        <div class="row"><label class="chk"><input type="checkbox" id="showSrc" checked> Your model</label><label class="chk"><input type="checkbox" id="showOrig" checked> Built-in dog</label></div>
+      </section>
+
+      <section data-pane="joints" role="tabpanel" aria-label="Joints" hidden>
+        <h2>Place the joints</h2>
+        <p class="small muted">Drag every dot to where that joint sits inside your model: hips, knees, shoulders, elbows, head, ears, tail. Check side and front view. Blue = left, orange = right.</p>
+        <div class="row"><label class="chk"><input type="checkbox" id="mirrorJ" checked> Move left and right together</label></div>
+        <div class="row"><label for="ears">Ear fold</label><input id="ears" type="range" min="0" max="1" step="0.01" value="0"><output id="earsO" for="ears">0</output></div>
+        <div class="row"><label for="tail">Tail angle</label><input id="tail" type="range" min="-0.6" max="1.5" step="0.01" value="0.45"><output id="tailO" for="tail">0.45</output></div>
+        <div class="row"><button type="button" id="autoJ">Auto-place joints</button><button type="button" class="ghost" id="resetJ">Reset joints</button></div>
+        <p class="small muted">Auto-place stretches the skeleton to the size of your model. Then fine-tune by hand.</p>
+        <p class="small muted" id="rebindHint" hidden>Joints changed after binding: bind again in step 3.</p>
+      </section>
+
+      <section data-pane="bind" role="tabpanel" aria-label="Bind" hidden>
+        <h2>Bind to the skeleton</h2>
+        <p class="small muted">Hangs every point of your model on the nearest bones and takes the black-and-tan colours from the built-in dog. Do this again after moving joints.</p>
+        <div class="row"><button type="button" class="primary" id="bindBtn">Bind model</button></div>
+        <p class="small" id="bindInfo"></p>
+      </section>
+
+      <section data-pane="poses" role="tabpanel" aria-label="Poses" hidden>
+        <h2>Fix the poses</h2>
+        <p class="small muted">Pick a pose, then drag a joint: the bone leading to it turns. Fixes are blended in whenever the dog takes that pose.</p>
+        <div class="row" role="group" aria-label="Pose">
+          <button type="button" data-pose="stand">Stand</button>
+          <button type="button" data-pose="sit">Sit</button>
+          <button type="button" data-pose="down">Down</button>
+          <button type="button" data-pose="lie">Play dead</button>
+          <button type="button" data-pose="beg">Beg</button>
+          <button type="button" data-pose="paw">Paw</button>
+        </div>
+        <div class="row"><label class="chk"><input type="checkbox" id="mirrorP"> Turn left and right together</label></div>
+        <div class="row"><button type="button" class="ghost" id="resetP">Reset this pose</button><button type="button" class="ghost" id="resetJt" disabled>Reset selected joint</button></div>
+      </section>
+
+      <section data-pane="paint" role="tabpanel" aria-label="Paint" hidden>
+        <h2>Paint the fur</h2>
+        <p class="small muted">Left mouse paints, right mouse orbits. Needs a bound model.</p>
+        <div class="row" role="group" aria-label="Colour">
+          <button type="button" class="sw" data-c="black" aria-label="Black"></button>
+          <button type="button" class="sw" data-c="tan" aria-label="Tan"></button>
+          <button type="button" class="sw" data-c="white" aria-label="White"></button>
+          <button type="button" class="sw" data-c="brown" aria-label="Brown"></button>
+          <button type="button" class="sw" data-c="pink" aria-label="Pink"></button>
+          <button type="button" class="sw" data-c="grey" aria-label="Grey"></button>
+          <input type="color" id="pick" value="#1b1512" aria-label="Custom colour">
+        </div>
+        <div class="row"><label for="bsz">Brush</label><input id="bsz" type="range" min="0.005" max="0.09" step="0.001" value="0.025"><output id="bszO" for="bsz">0.025</output></div>
+        <div class="row"><label for="soft">Softness</label><input id="soft" type="range" min="0" max="1" step="0.05" value="0.4"><output id="softO" for="soft">0.4</output></div>
+        <div class="row"><button type="button" class="ghost" id="recol">Colours from built-in dog again</button></div>
+      </section>
+
+      <section data-pane="test" role="tabpanel" aria-label="Test" hidden>
+        <h2>Try it out</h2>
+        <div class="row">
+          <button type="button" data-act="walk">Walk</button><button type="button" data-act="run">Run</button>
+          <button type="button" data-act="sit">Sit</button><button type="button" data-act="down">Down</button>
+          <button type="button" data-act="beg">Beg</button><button type="button" data-act="paw">Paw</button>
+          <button type="button" data-act="roll">Roll</button><button type="button" data-act="playdead">Play dead</button>
+          <button type="button" data-act="growl">Growl</button><button type="button" data-act="shakeoff">Shake off</button>
+          <button type="button" data-act="pee">Put out fire</button><button type="button" data-act="stand">Stand</button>
+        </div>
+      </section>
+
+      <div class="sticky">
+        <div class="row">
+          <button type="button" class="primary" id="save">Save</button>
+          <button type="button" class="danger" id="drop">Back to built-in dog</button>
+        </div>
+        <p id="status" role="status" aria-live="polite"></p>
+      </div>
+    </aside>
+  </main>
+
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-OrbitControls.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/friend-dog.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      var TOKEN = window.__WIDGET_TOKEN__ || '', BASE = TOKEN ? '/s/' + TOKEN + '/' : '../';
+      var $ = function (id) { return document.getElementById(id); };
+      var NS = 'http://www.w3.org/2000/svg', OV = $('ov'), VW = 1280, VH = 800;
+      var COLORS = { black: '#1b1512', tan: '#b0743e', white: '#e9e1d6', brown: '#5a3a22', pink: '#c98a86', grey: '#6b6460' };
+      var JOINTS = ['COG', 'pelvis', 'spine_1', 'spine_2', 'chest', 'neck_base', 'neck_mid', 'head', 'jaw', 'nose',
+        'L_ear_base', 'L_ear_tip', 'R_ear_base', 'R_ear_tip', 'tail_1', 'tail_2', 'tail_3', 'tail_4', 'tail_5', 'tail_6', 'tail_7',
+        'L_clavicle', 'L_shoulder', 'L_elbow', 'L_wrist', 'L_hand', 'LF_toes', 'R_clavicle', 'R_shoulder', 'R_elbow', 'R_wrist', 'R_hand', 'RF_toes',
+        'L_hip', 'L_knee', 'L_ankle', 'L_foot', 'LB_toes', 'R_hip', 'R_knee', 'R_ankle', 'R_foot', 'RB_toes'];
+
+      var dog = FriendDog.create({ canvas: $('cv'), model: BASE + 'assets/friend/dog.glb', sizePx: 300, fur: 'pinscher', body: 'custom',
+        area: 'center', roam: false, sound: false, edit: true });
+      var E = dog.edit, cam = E.cam, scene = E.scene;
+      var rig = { joints: {}, poses: {}, ears: 0, tailUp: 0.45 };
+      var skinData = null;            // gebundenes Modell: {pos Float32, idx Uint32, col Uint8, j Uint8, w Uint8, bones [], inv Float32}
+      var src = null;                 // eingepasstes Modell (THREE.Mesh) vor dem Binden
+      var align = new THREE.Group(); scene.add(align);
+      var tab = 'model', poseKey = 'stand', sel = null, color = COLORS.black, dirty = false, jointsSinceBind = false;
+      var controls = new THREE.OrbitControls(cam, OV);
+      controls.target.set(0, 0.38, 0); controls.enableDamping = false;
+      var mats = { src: new THREE.MeshStandardMaterial({ color: 0xd8c8b4, roughness: 0.8, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }) };
+
+      function status(msg, kind) { var s = $('status'); s.textContent = msg || ''; s.className = kind || ''; }
+      function api(method, body) {
+        return fetch('/app/api/friend-rig', { method: method, credentials: 'same-origin', headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.ok) throw new Error(d.error || ('HTTP ' + r.status)); return d; }); });
+      }
+      function mark() { dirty = true; }
+
+      // ── Kamera ──
+      function view(v) {
+        var T = controls.target, d = 2.3; T.set(E.holder.position.x, 0.38, 0);
+        var P = { side: [0, 0.05, d], front: [d, 0.05, 0], back: [-d, 0.05, 0], top: [0.001, d, 0], three: [d * 0.7, d * 0.35, d * 0.7] }[v] || [0, 0.05, d];
+        cam.position.set(T.x + P[0], T.y + P[1], T.z + P[2]); cam.lookAt(T); controls.update();
+      }
+      document.querySelectorAll('[data-view]').forEach(function (b) { b.addEventListener('click', function () { view(b.dataset.view); }); });
+
+      // ── Gelenk-Punkte ──
+      var HANDLES = {}, LINES = [];
+      function shortName(b) { return b.name.replace(/_jnt\d+_\d+$/, ''); }
+      function mirrorName(n) { return /^L/.test(n) ? n.replace(/^L/, 'R') : /^R/.test(n) ? n.replace(/^R/, 'L') : null; }
+      function buildHandles() {
+        var gB = $('bones'), gJ = $('joints');
+        JOINTS.forEach(function (n) {
+          var b = E.B[n]; if (!b) return;
+          var c = document.createElementNS(NS, 'circle');
+          c.setAttribute('r', /toes|tip|nose|tail_[2-7]/.test(n) ? 6 : 8);
+          c.setAttribute('class', 'jt' + (/^L/.test(n) ? ' l' : /^R/.test(n) ? ' r' : ''));
+          c.setAttribute('tabindex', '0'); c.setAttribute('role', 'button');
+          c.setAttribute('aria-label', 'Joint ' + n.replace(/_/g, ' '));
+          c.dataset.n = n; gJ.appendChild(c); HANDLES[n] = c;
+          c.addEventListener('pointerdown', startDrag);
+          c.addEventListener('focus', function () { select(n); });
+          c.addEventListener('keydown', keyMove);
+          var p = b.parent; while (p && p.isBone && JOINTS.indexOf(shortName(p)) < 0) p = p.parent;
+          if (p && p.isBone) { var l = document.createElementNS(NS, 'line'); l.setAttribute('class', 'bone'); gB.appendChild(l); LINES.push([l, n, shortName(p)]); }
+        });
+      }
+      function select(n) {
+        sel = n; Object.keys(HANDLES).forEach(function (k) { HANDLES[k].classList.toggle('sel', k === n); });
+        $('resetJt').disabled = !n;
+      }
+      var wp = new THREE.Vector3();
+      function toScreen(v) { var p = v.clone().project(cam); return [(p.x + 1) / 2 * VW, (1 - p.y) / 2 * VH, p.z]; }
+      function updateHandles() {
+        var show = tab === 'joints' || tab === 'poses';
+        $('bones').toggleAttribute('hidden', !show); $('joints').toggleAttribute('hidden', !show);
+        if (!show) return;
+        E.holder.updateMatrixWorld(true);
+        var S = {};
+        Object.keys(HANDLES).forEach(function (n) {
+          E.B[n].getWorldPosition(wp); var s = toScreen(wp); S[n] = s;
+          var c = HANDLES[n]; c.setAttribute('cx', s[0].toFixed(1)); c.setAttribute('cy', s[1].toFixed(1)); c.classList.toggle('off', s[2] > 1);
+        });
+        LINES.forEach(function (L) { var a = S[L[1]], b = S[L[2]]; if (!a || !b) return; L[0].setAttribute('x1', a[0]); L[0].setAttribute('y1', a[1]); L[0].setAttribute('x2', b[0]); L[0].setAttribute('y2', b[1]); });
+      }
+
+      // Bildschirmpunkt → Punkt auf der Ebene durch den Gelenkpunkt (senkrecht zur Blickrichtung)
+      var ray = new THREE.Raycaster();
+      function screenRay(ev) {
+        var r = OV.getBoundingClientRect();
+        ray.setFromCamera(new THREE.Vector2((ev.clientX - r.left) / r.width * 2 - 1, -((ev.clientY - r.top) / r.height * 2 - 1)), cam);
+        return ray;
+      }
+      function planeHit(ev, through) {
+        var n = new THREE.Vector3(); cam.getWorldDirection(n);
+        var pl = new THREE.Plane().setFromNormalAndCoplanarPoint(n, through), out = new THREE.Vector3();
+        return screenRay(ev).ray.intersectPlane(pl, out) ? out : null;
+      }
+      // Weltverschiebung → lokaler Gelenk-Versatz (im Raum des Elternknochens)
+      function addOffset(n, dWorld) {
+        var b = E.B[n]; if (!b) return;
+        var m = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
+        var d = dWorld.clone().applyMatrix3(m), k = b.name, o = rig.joints[k] || [0, 0, 0];
+        rig.joints[k] = [o[0] + d.x, o[1] + d.y, o[2] + d.z];
+      }
+      function moveJoint(n, dWorld) {
+        addOffset(n, dWorld);
+        var mn = mirrorName(n);
+        if ($('mirrorJ').checked && mn && E.B[mn]) addOffset(mn, new THREE.Vector3(dWorld.x, dWorld.y, -dWorld.z));
+        E.liveRig(rig); mark(); if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
+      }
+      // Weltdrehung q am Knochen P als lokale Korrektur der aktuellen Haltung: C' = C · (Wp⁻¹ q Wp)
+      function rotBone(P, q) {
+        var Wp = new THREE.Quaternion(); P.getWorldQuaternion(Wp);
+        var set = rig.poses[poseKey] = rig.poses[poseKey] || {}, c = set[P.name];
+        var C = c ? new THREE.Quaternion(c[0], c[1], c[2], c[3]) : new THREE.Quaternion();
+        var loc = Wp.clone().invert().multiply(q).multiply(Wp);
+        C.multiply(loc).normalize(); set[P.name] = [C.x, C.y, C.z, C.w];
+      }
+      function turnJoint(n, qWorld) {
+        var b = E.B[n]; if (!b || !b.parent || !b.parent.isBone) return;
+        rotBone(b.parent, qWorld);
+        var mn = mirrorName(shortName(b.parent));
+        if ($('mirrorP').checked && mn && E.B[mn]) rotBone(E.B[mn], new THREE.Quaternion(-qWorld.x, -qWorld.y, qWorld.z, qWorld.w));
+        E.liveRig(rig); mark();
+      }
+      var drag = null;
+      function startDrag(ev) {
+        ev.stopPropagation(); ev.preventDefault();
+        var n = ev.currentTarget.dataset.n; select(n); ev.currentTarget.focus({ preventScroll: true });
+        E.B[n].getWorldPosition(wp);
+        drag = { n: n, last: wp.clone(), pid: ev.pointerId };
+        OV.setPointerCapture(ev.pointerId);
+      }
+      OV.addEventListener('pointermove', function (ev) {
+        if (tab === 'paint') { brushAt(ev, ev.buttons === 1 && paintDown); return; }
+        if (!drag) return;
+        var b = E.B[drag.n]; b.getWorldPosition(wp);
+        var hit = planeHit(ev, wp); if (!hit) return;
+        if (tab === 'joints') { moveJoint(drag.n, hit.clone().sub(wp)); }
+        else if (tab === 'poses' && b.parent && b.parent.isBone) {
+          var pv = new THREE.Vector3(); b.parent.getWorldPosition(pv);
+          var a = wp.clone().sub(pv), c = hit.clone().sub(pv);
+          if (a.lengthSq() > 1e-8 && c.lengthSq() > 1e-8) turnJoint(drag.n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()));
+        }
+      });
+      OV.addEventListener('pointerup', function (ev) { if (drag) { try { OV.releasePointerCapture(drag.pid); } catch (e) { /* schon frei */ } drag = null; } paintDown = false; });
+      OV.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
+      function keyMove(ev) {
+        var k = ev.key, dx = k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : 0, dy = k === 'ArrowUp' ? 1 : k === 'ArrowDown' ? -1 : 0;
+        if (!dx && !dy) return;
+        ev.preventDefault(); var n = ev.currentTarget.dataset.n, step = ev.shiftKey ? 0.02 : 0.004;
+        var right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
+        var d = right.multiplyScalar(dx * step).add(up.multiplyScalar(dy * step));
+        if (tab === 'joints') moveJoint(n, d);
+        else if (tab === 'poses') {
+          var b = E.B[n]; if (!b.parent || !b.parent.isBone) return;
+          b.getWorldPosition(wp); var pv = new THREE.Vector3(); b.parent.getWorldPosition(pv);
+          var a = wp.clone().sub(pv), c = wp.clone().add(d.multiplyScalar(2)).sub(pv);
+          turnJoint(n, new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize()));
+        }
+      }
+
+      // ── Modell laden und einpassen ──
+      var A = { rx: 0, ry: 0, rz: 0, mir: false };
+      function applyAlign() {
+        if (!src) return;
+        var s = Math.pow(3, +$('sc').value);
+        align.position.set(+$('ox').value, +$('oy').value, +$('oz').value);
+        align.scale.set(s * (A.mir ? -1 : 1), s, s);
+        $('scO').value = s.toFixed(2); $('oxO').value = (+$('ox').value).toFixed(3); $('oyO').value = (+$('oy').value).toFixed(3); $('ozO').value = (+$('oz').value).toFixed(3);
+        mark();
+      }
+      ['sc', 'ox', 'oy', 'oz'].forEach(function (id) { $(id).addEventListener('input', applyAlign); });
+      $('op').addEventListener('input', function () { mats.src.opacity = +$('op').value; $('opO').value = (+$('op').value).toFixed(2); });
+      $('showSrc').addEventListener('change', function () { if (src) src.visible = $('showSrc').checked; });
+      $('showOrig').addEventListener('change', showOrig);
+      function showOrig() { var on = $('showOrig').checked && !skinData; E.originals().forEach(function (o) { o.visible = on; }); }
+      function setSource(geo) {
+        if (src) { align.remove(src); src.geometry.dispose(); }
+        geo.computeBoundingBox(); var bb = geo.boundingBox, c = bb.getCenter(new THREE.Vector3());
+        geo.translate(-c.x, -bb.min.y, -c.z);
+        src = new THREE.Mesh(geo, mats.src); src.renderOrder = 5; align.add(src);
+        A = { rx: 0, ry: 0, rz: 0, mir: false }; src.rotation.set(0, 0, 0);
+        ['sc', 'ox', 'oy', 'oz'].forEach(function (id) { $(id).value = 0; });
+        applyAlign();
+      }
+      function cleanGeo(list) {
+        var parts = list.map(function (o) {
+          var g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld);
+          var keep = new THREE.BufferGeometry(); keep.setAttribute('position', g.attributes.position);
+          if (g.index) keep.setIndex(g.index);
+          return keep.index ? keep.toNonIndexed() : keep;
+        });
+        var merged = parts.length > 1 ? THREE.BufferGeometryUtils.mergeBufferGeometries(parts) : parts[0];
+        var g2 = THREE.BufferGeometryUtils.mergeVertices(merged, 1e-5); g2.computeVertexNormals(); return g2;
+      }
+      $('file').addEventListener('change', function () {
+        var fl = this.files && this.files[0]; if (!fl) return;
+        fl.arrayBuffer().then(function (buf) {
+          new THREE.GLTFLoader().parse(buf, '', function (g) {
+            g.scene.updateMatrixWorld(true);
+            var list = []; g.scene.traverse(function (o) { if (o.isMesh) list.push(o); });
+            if (!list.length) { status('No mesh in that file.', 'err'); return; }
+            var geo = cleanGeo(list);
+            var n = geo.attributes.position.count;
+            orient(geo); setSource(geo); src.userData.fromFile = true; bestFacing();
+            status('Loaded ' + n.toLocaleString('en') + ' points. Check the fit, then place the joints.', 'ok');
+            skinData = null; showOrig(); E.setRig(stripSkin()); $('showSrc').checked = true; src.visible = true;
+          }, function (e) { status('Could not read the file: ' + (e && e.message || e), 'err'); });
+        });
+      });
+      // Ausrichtung raten: Längsachse nach vorn (x), Kopf = Ende mit mehr Masse oben (die Rute ist dünn)
+      function orient(geo) {
+        geo.computeBoundingBox(); var e = geo.boundingBox.getSize(new THREE.Vector3());
+        if (e.z > e.x * 1.15) geo.rotateY(Math.PI / 2);
+        geo.computeBoundingBox(); var bb = geo.boundingBox, L = bb.max.x - bb.min.x, cx = (bb.max.x + bb.min.x) / 2, hi = bb.min.y + (bb.max.y - bb.min.y) * 0.6;
+        var pa = geo.attributes.position, front = 0, back = 0;
+        for (var i = 0; i < pa.count; i++) { if (pa.getY(i) < hi) continue; var x = pa.getX(i); if (x > cx + L * 0.2) front++; else if (x < cx - L * 0.2) back++; }
+        geo.computeVertexNormals();
+      }
+      // Blickrichtung: alle vier Drehungen probieren, die mit dem besten Überdecken des eingebauten Hunds gewinnt
+      function origPoints() {
+        var o = E.originals()[0], pa = o.geometry.attributes.position, v = new THREE.Vector3(), out = [];
+        E.holder.updateMatrixWorld(true);
+        for (var i = 0; i < pa.count; i += 3) { o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); out.push(v.x, v.y, v.z); }
+        return new Float32Array(out);
+      }
+      function bestFacing() {
+        var gr = grid(origPoints(), 0.03), best = null, pa = src.geometry.attributes.position, v = new THREE.Vector3(), step = Math.max(1, Math.floor(pa.count / 600));
+        for (var r = 0; r < 4; r++) {
+          autoFit(); src.updateMatrixWorld(true);
+          var sum = 0, cnt = 0;
+          for (var i = 0; i < pa.count; i += step) { v.fromBufferAttribute(pa, i).applyMatrix4(src.matrixWorld); var nb = nearest(gr, v.x, v.y, v.z, 1); if (nb.length) { sum += Math.sqrt(nb[0][0]); cnt++; } }
+          var score = cnt ? sum / cnt : 1e9;
+          if (!best || score < best.s) best = { s: score, q: src.quaternion.clone() };
+          src.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2));
+        }
+        src.quaternion.copy(best.q); autoFit();
+      }
+      function origBox() {
+        var o = E.originals()[0], box = new THREE.Box3(), v = new THREE.Vector3(), pa = o.geometry.attributes.position;
+        E.holder.updateMatrixWorld(true);
+        for (var i = 0; i < pa.count; i += 7) { o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); box.expandByPoint(v); }
+        return box;
+      }
+      function autoFit() {
+        if (!src) return;
+        $('sc').value = 0; $('ox').value = 0; $('oy').value = 0; $('oz').value = 0; applyAlign(); align.updateMatrixWorld(true);
+        var tb = origBox(), sb = new THREE.Box3().setFromObject(src);
+        var th = tb.max.y - tb.min.y, sh = sb.max.y - sb.min.y; if (sh <= 0) return;
+        var s = th / sh; $('sc').value = (Math.log(s) / Math.log(3)).toFixed(3); applyAlign(); align.updateMatrixWorld(true);
+        sb.setFromObject(src);
+        var tc = tb.getCenter(new THREE.Vector3()), sc = sb.getCenter(new THREE.Vector3());
+        $('ox').value = (tc.x - sc.x).toFixed(3); $('oy').value = (tb.min.y - sb.min.y).toFixed(3); $('oz').value = (tc.z - sc.z).toFixed(3);
+        applyAlign();
+      }
+      $('autofit').addEventListener('click', autoFit);
+      function rot(axis) { if (!src) return; var q = new THREE.Quaternion().setFromAxisAngle(axis, Math.PI / 2); src.quaternion.premultiply(q); src.updateMatrixWorld(true);
+        var bb = new THREE.Box3().setFromObject(src); src.position.y -= bb.min.y / align.scale.y; autoFit(); }
+      $('rotY').addEventListener('click', function () { rot(new THREE.Vector3(0, 1, 0)); });
+      $('rotZ').addEventListener('click', function () { rot(new THREE.Vector3(0, 0, 1)); });
+      $('rotX').addEventListener('click', function () { rot(new THREE.Vector3(1, 0, 0)); });
+      $('mir').addEventListener('click', function () { A.mir = !A.mir; applyAlign(); });
+
+      // ── Gelenke-Regler ──
+      $('ears').addEventListener('input', function () { rig.ears = +$('ears').value; $('earsO').value = rig.ears.toFixed(2); E.liveRig(rig); mark(); if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; } });
+      $('tail').addEventListener('input', function () { rig.tailUp = +$('tail').value; $('tailO').value = rig.tailUp.toFixed(2); E.liveRig(rig); mark(); if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; } });
+      // Skelett auf die Maße des Modells strecken: jedes Gelenk aus dem Kasten des eingebauten Hunds in den Kasten des
+      // Modells abbilden. Versatz nur in der Position (Drehungen bleiben), daher geht es ohne Zwischenbilder rückwärts:
+      // lokal = (Eltern-Welt ohne Position)⁻¹ · (Ziel − Ziel des Eltern) − Ruhelage
+      $('autoJ').addEventListener('click', function () {
+        if (!src) { status('Load a model first (step 1).', 'err'); return; }
+        rig.joints = {}; E.liveRig(rig); E.EDIT.still = true; E.hold('idle', 3);
+        setTimeout(function () {
+          E.holder.updateMatrixWorld(true); align.updateMatrixWorld(true);
+          var tb = origBox(), sb = new THREE.Box3().setFromObject(src), ts = tb.getSize(new THREE.Vector3()), ss = sb.getSize(new THREE.Vector3());
+          var map = function (p) { return new THREE.Vector3(sb.min.x + (p.x - tb.min.x) / ts.x * ss.x, sb.min.y + (p.y - tb.min.y) / ts.y * ss.y, sb.min.z + (p.z - tb.min.z) / ts.z * ss.z); };
+          var bones = E.originals()[0].skeleton.bones, D = new Map(), inCog = function (b) { var q = b; while (q) { if (q === E.B.COG) return true; q = q.parent; } return false; };
+          bones.forEach(function (b) { if (inCog(b)) D.set(b, map(b.getWorldPosition(new THREE.Vector3()))); });
+          // Beine: die vier Pfoten des Modells am Boden suchen (vorne/hinten × links/rechts) und jedes Bein von
+          // Schulter bzw. Hüfte abwärts waagrecht dorthin schieben, damit die Gelenke in den Beinen des Modells liegen
+          var pa = src.geometry.attributes.position, v = new THREE.Vector3(), low = [];
+          for (var i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(src.matrixWorld); if (v.y < sb.min.y + ss.y * 0.07) low.push([v.x, v.z]); }
+          if (low.length > 20) {
+            var xs = low.map(function (e) { return e[0]; }).sort(function (a, c) { return a - c; }), midX = xs[Math.floor(xs.length / 2)], midZ = (sb.min.z + sb.max.z) / 2;
+            var feet = {};
+            low.forEach(function (e) { var k = (e[0] > midX ? 'F' : 'H') + (e[1] > midZ ? 'L' : 'R'); var f = feet[k] || (feet[k] = [0, 0, 0]); f[0] += e[0]; f[1] += e[1]; f[2]++; });
+            var under = function (b, top) { var q = b; while (q) { if (q === top) return true; q = q.parent; } return false; };
+            [['FL', 'L_shoulder', 'LF_toes'], ['FR', 'R_shoulder', 'RF_toes'], ['HL', 'L_hip', 'LB_toes'], ['HR', 'R_hip', 'RB_toes']].forEach(function (L) {
+              var f = feet[L[0]], top = E.B[L[1]], toe = E.B[L[2]]; if (!f || f[2] < 5 || !top || !toe || !D.has(toe)) return;
+              var dx = f[0] / f[2] - D.get(toe).x, dz = f[1] / f[2] - D.get(toe).z;
+              D.forEach(function (pos, b) { if (under(b, top)) { pos.x += dx; pos.z += dz; } });
+            });
+          }
+          bones.forEach(function (b) {
+            if (!D.has(b)) return;
+            var pd = D.get(b.parent) || b.parent.getWorldPosition(new THREE.Vector3());
+            var m3 = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
+            var loc = D.get(b).clone().sub(pd).applyMatrix3(m3).sub(b.position);
+            if (loc.lengthSq() > 1e-12) rig.joints[b.name] = [loc.x, loc.y, loc.z];
+          });
+          E.liveRig(rig); mark(); if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
+          status('Joints placed. Check legs, head, ears and tail, then bind.', 'ok');
+        }, 250);
+      });
+      $('resetJ').addEventListener('click', function () { rig.joints = {}; E.liveRig(rig); mark(); status('Joints reset.'); });
+
+      // ── Binden: Gewichte und Farben vom eingebauten Hund (nächste Punkte), Bind-Matrizen aus der aktuellen Haltung ──
+      function stripSkin() { var r = JSON.parse(JSON.stringify({ joints: rig.joints, poses: rig.poses, ears: rig.ears, tailUp: rig.tailUp })); return r; }
+      function grid(points, cell) {
+        var G = new Map();
+        for (var i = 0; i < points.length / 3; i++) {
+          var k = Math.floor(points[i * 3] / cell) + ',' + Math.floor(points[i * 3 + 1] / cell) + ',' + Math.floor(points[i * 3 + 2] / cell);
+          var a = G.get(k); if (!a) G.set(k, a = []); a.push(i);
+        }
+        return { G: G, cell: cell, P: points };
+      }
+      function nearest(gr, x, y, z, k) {
+        var cx = Math.floor(x / gr.cell), cy = Math.floor(y / gr.cell), cz = Math.floor(z / gr.cell), best = [];
+        for (var r = 0; r < 12; r++) {
+          for (var i = -r; i <= r; i++) for (var j = -r; j <= r; j++) for (var l = -r; l <= r; l++) {
+            if (Math.max(Math.abs(i), Math.abs(j), Math.abs(l)) !== r) continue;
+            var a = gr.G.get((cx + i) + ',' + (cy + j) + ',' + (cz + l)); if (!a) continue;
+            for (var q = 0; q < a.length; q++) {
+              var p = a[q], dx = gr.P[p * 3] - x, dy = gr.P[p * 3 + 1] - y, dz = gr.P[p * 3 + 2] - z, d = dx * dx + dy * dy + dz * dz;
+              best.push([d, p]);
+            }
+          }
+          if (best.length >= k && r > 0) break;
+        }
+        best.sort(function (a, b) { return a[0] - b[0]; });
+        return best.slice(0, k);
+      }
+      function furPixels() {
+        var tx = E.FUR.cache.pinscher || E.FUR.orig; if (!tx) return null;
+        var img = tx.image, cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+        var cx = cv.getContext('2d'); cx.drawImage(img, 0, 0);
+        return { w: cv.width, h: cv.height, d: cx.getImageData(0, 0, cv.width, cv.height).data, flip: tx.flipY };
+      }
+      function bind() {
+        var srcPos;
+        if (src) { align.updateMatrixWorld(true); var g = src.geometry.clone(); g.applyMatrix4(src.matrixWorld); srcPos = g; }
+        else { status('Load a model first (step 1).', 'err'); return; }
+        status('Binding...');
+        var noPose = stripSkin(); noPose.poses = {}; E.liveRig(noPose);   // Bind-Haltung ohne Haltungs-Korrekturen
+        E.EDIT.still = true; E.hold('idle', 3);
+        setTimeout(function () {
+          E.holder.updateMatrixWorld(true);
+          var o = E.originals()[0], pa = o.geometry.attributes.position, n0 = pa.count, OP = new Float32Array(n0 * 3), v = new THREE.Vector3();
+          for (var i = 0; i < n0; i++) { o.boneTransform(i, v); v.applyMatrix4(o.matrixWorld); OP[i * 3] = v.x; OP[i * 3 + 1] = v.y; OP[i * 3 + 2] = v.z; }
+          var si = o.geometry.attributes.skinIndex, sw = o.geometry.attributes.skinWeight, uv = o.geometry.attributes.uv;
+          // Körperregionen: ein Punkt übernimmt Gewichte nur aus derselben Region des eingebauten Hunds (sonst holt sich
+          // z. B. die Brust Anteile der Pfote und spannt beim „Pfote geben“ lange Zacken)
+          var bonesO = o.skeleton.bones, GROUPS = [['LF', 'L_clavicle'], ['RF', 'R_clavicle'], ['LH', 'L_hip'], ['RH', 'R_hip'], ['TL', 'tail_1'], ['HD', 'neck_mid']];
+          function groupOf(b) { var q = b; while (q && q.isBone) { for (var gi = 0; gi < GROUPS.length; gi++) if (q === E.B[GROUPS[gi][1]]) return gi; q = q.parent; } return GROUPS.length; }
+          var bg = bonesO.map(groupOf), NG = GROUPS.length + 1, GET0 = ['getX', 'getY', 'getZ', 'getW'];
+          var opg = []; for (var g0 = 0; g0 < NG; g0++) opg.push([]);
+          for (var oi = 0; oi < n0; oi++) { var bb = -1, bwm = -1; for (var c0 = 0; c0 < 4; c0++) { var w0 = sw[GET0[c0]](oi); if (w0 > bwm) { bwm = w0; bb = si[GET0[c0]](oi); } } opg[bg[bb]].push(oi); }
+          var grs = opg.map(function (list) { var a = new Float32Array(list.length * 3); list.forEach(function (ix, k) { a[k * 3] = OP[ix * 3]; a[k * 3 + 1] = OP[ix * 3 + 1]; a[k * 3 + 2] = OP[ix * 3 + 2]; }); var gg = grid(a, 0.025); gg.ids = list; return gg; });
+          // Gruppe eines Modellpunkts: nächstes Knochenstück (Gelenk → Kind) unter den Hauptgelenken
+          var SEG = []; JOINTS.forEach(function (nm) { var c = E.B[nm]; if (!c) return; var pp = c.parent; while (pp && pp.isBone && JOINTS.indexOf(shortName(pp)) < 0) pp = pp.parent;
+            if (pp && pp.isBone) SEG.push([pp.getWorldPosition(new THREE.Vector3()), c.getWorldPosition(new THREE.Vector3()), groupOf(c)]); });
+          var sa = new THREE.Vector3(), sbv = new THREE.Vector3(), sp = new THREE.Vector3();
+          function segGroup(x, y, z) {
+            var best = 1e9, bgp = NG - 1; sp.set(x, y, z);
+            for (var s2 = 0; s2 < SEG.length; s2++) { sa.subVectors(SEG[s2][1], SEG[s2][0]); var L2 = sa.lengthSq(); var tt = L2 > 0 ? Math.max(0, Math.min(1, sbv.subVectors(sp, SEG[s2][0]).dot(sa) / L2)) : 0;
+              sbv.copy(SEG[s2][0]).addScaledVector(sa, tt); var dd = sbv.distanceToSquared(sp); if (dd < best) { best = dd; bgp = SEG[s2][2]; } }
+            return bgp;
+          }
+          var pos = srcPos.attributes.position, n = pos.count, P = new Float32Array(pos.array.length);
+          for (var p = 0; p < n; p++) { P[p * 3] = pos.getX(p); P[p * 3 + 1] = pos.getY(p); P[p * 3 + 2] = pos.getZ(p); }
+          var J = new Uint8Array(n * 4), W = new Uint8Array(n * 4), keepCol = skinData && skinData.col && skinData.col.length === n * 3 && !src.userData.fromFile;
+          var C = keepCol ? skinData.col : new Uint8Array(n * 3), fur = keepCol ? null : furPixels();
+          var GET = ['getX', 'getY', 'getZ', 'getW'];
+          for (var q = 0; q < n; q++) {
+            var gq = segGroup(P[q * 3], P[q * 3 + 1], P[q * 3 + 2]), gr = grs[gq].ids.length >= 8 ? grs[gq] : grs[NG - 1];
+            var nb = nearest(gr, P[q * 3], P[q * 3 + 1], P[q * 3 + 2], 8).map(function (e) { return [e[0], gr.ids[e[1]]]; }), acc = {};
+            for (var t = 0; t < nb.length; t++) {
+              var wi = 1 / (Math.sqrt(nb[t][0]) + 0.004); wi *= wi;
+              for (var c = 0; c < 4; c++) { var bi = si[GET[c]](nb[t][1]), bw = sw[GET[c]](nb[t][1]); if (bw > 0) acc[bi] = (acc[bi] || 0) + bw * wi; }
+            }
+            var top = Object.keys(acc).map(function (k) { return [+k, acc[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 4);
+            var sum = top.reduce(function (s2, e) { return s2 + e[1]; }, 0) || 1, used = 0;
+            for (var c2 = 0; c2 < 4; c2++) {
+              var e = top[c2]; J[q * 4 + c2] = e ? e[0] : 0;
+              var wv = e ? Math.round(e[1] / sum * 255) : 0; if (c2 === 3 || !top[c2 + 1]) wv = Math.max(0, 255 - used); used += wv; W[q * 4 + c2] = e ? wv : 0;
+            }
+            if (fur && uv && nb.length) {
+              var u = uv.getX(nb[0][1]), vv = uv.getY(nb[0][1]);
+              var px = Math.min(fur.w - 1, Math.max(0, Math.floor((u % 1 + 1) % 1 * fur.w))), py = Math.min(fur.h - 1, Math.max(0, Math.floor((fur.flip ? 1 - ((vv % 1 + 1) % 1) : (vv % 1 + 1) % 1) * fur.h)));
+              var o4 = (py * fur.w + px) * 4; C[q * 3] = fur.d[o4]; C[q * 3 + 1] = fur.d[o4 + 1]; C[q * 3 + 2] = fur.d[o4 + 2];
+            } else if (!keepCol) { C[q * 3] = 27; C[q * 3 + 1] = 21; C[q * 3 + 2] = 18; }
+          }
+          var bones = o.skeleton.bones, inv = new Float32Array(bones.length * 16);
+          bones.forEach(function (b, k) { b.updateMatrixWorld(true); new THREE.Matrix4().copy(b.matrixWorld).invert().toArray(inv, k * 16); });
+          var idx = srcPos.index ? new Uint32Array(srcPos.index.array) : (function () { var a = new Uint32Array(n); for (var z = 0; z < n; z++) a[z] = z; return a; })();
+          skinData = { pos: P, idx: idx, col: C, j: J, w: W, bones: bones.map(function (b) { return b.name; }), inv: inv };
+          E.liveRig(rig); applySkin(); jointsSinceBind = false; $('rebindHint').hidden = true;
+          src.userData.fromFile = false; src.visible = false; $('showSrc').checked = false;
+          $('bindInfo').textContent = n.toLocaleString('en') + ' points bound to ' + bones.length + ' bones.';
+          status('Bound. Check the poses and paint the fur, then save.', 'ok'); mark();
+        }, 400);
+      }
+      $('bindBtn').addEventListener('click', bind);
+      function enc(u8) { var s = '', CH = 0x8000; for (var i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
+      function bytes(ta) { return new Uint8Array(ta.buffer, ta.byteOffset, ta.byteLength); }
+      function skinJson() {
+        if (!skinData) return null;
+        return { pos: enc(bytes(skinData.pos)), idx: enc(bytes(skinData.idx)), col: enc(skinData.col), j: enc(skinData.j), w: enc(skinData.w), bones: skinData.bones, inv: enc(bytes(skinData.inv)) };
+      }
+      function applySkin() { var r = stripSkin(); r.skin = skinJson(); E.setRig(r); showOrig(); }
+      function dec(s, T) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return T === Uint8Array ? u : new T(u.buffer); }
+
+      // ── Haltungen ──
+      var HOLD = { stand: ['idle'], sit: ['sit'], down: ['down'], lie: ['lie', 0.5], beg: ['beg'], paw: ['shake', 0.45] };
+      function setPose(k) {
+        poseKey = k; document.querySelectorAll('[data-pose]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.pose === k)); });
+        E.EDIT.still = true; E.hold(HOLD[k][0], 3, HOLD[k][1]);
+      }
+      document.querySelectorAll('[data-pose]').forEach(function (b) { b.addEventListener('click', function () { setPose(b.dataset.pose); }); });
+      $('resetP').addEventListener('click', function () { delete rig.poses[poseKey]; E.liveRig(rig); mark(); status('Pose reset.'); });
+      $('resetJt').addEventListener('click', function () {
+        if (!sel) return; var b = E.B[sel];
+        if (tab === 'joints') { delete rig.joints[b.name]; }
+        else if (b.parent && rig.poses[poseKey]) delete rig.poses[poseKey][b.parent.name];
+        E.liveRig(rig); mark();
+      });
+
+      // ── Malen ──
+      var paintDown = false;
+      document.querySelectorAll('.sw').forEach(function (b) { b.addEventListener('click', function () { color = COLORS[b.dataset.c]; $('pick').value = color; swatch(b); }); });
+      function swatch(on) { document.querySelectorAll('.sw').forEach(function (b) { b.setAttribute('aria-pressed', String(b === on)); }); }
+      $('pick').addEventListener('input', function () { color = $('pick').value; swatch(null); });
+      ['bsz', 'soft'].forEach(function (id) { $(id).addEventListener('input', function () { $(id + 'O').value = $(id).value; }); });
+      function brushAt(ev, doPaint) {
+        var m = E.custom(), br = $('brush'); if (!m) { br.setAttribute('hidden', ''); return; }
+        var hit = screenRay(ev).intersectObject(m, false)[0];
+        if (!hit) { br.setAttribute('hidden', ''); return; }
+        var rad = +$('bsz').value, s = toScreen(hit.point), e2 = toScreen(hit.point.clone().add(new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0).multiplyScalar(rad)));
+        br.removeAttribute('hidden'); br.setAttribute('cx', s[0]); br.setAttribute('cy', s[1]); br.setAttribute('r', Math.max(3, Math.abs(e2[0] - s[0])));
+        if (!doPaint) return;
+        var col = new THREE.Color(color), lin = col.clone().convertSRGBToLinear(), soft = +$('soft').value;
+        var P = skinData.pos, CA = m.geometry.attributes.color, r8 = [Math.round(col.r * 255), Math.round(col.g * 255), Math.round(col.b * 255)];
+        for (var i = 0; i < P.length / 3; i++) {
+          var dx = P[i * 3] - hit.point.x, dy = P[i * 3 + 1] - hit.point.y, dz = P[i * 3 + 2] - hit.point.z, d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (d > rad) continue;
+          var a = soft > 0 ? Math.min(1, (1 - d / rad) / soft) : 1;
+          for (var c = 0; c < 3; c++) {
+            skinData.col[i * 3 + c] = Math.round(skinData.col[i * 3 + c] * (1 - a) + r8[c] * a);
+            CA.array[i * 3 + c] = Math.pow(skinData.col[i * 3 + c] / 255, 2.2);
+          }
+        }
+        CA.needsUpdate = true; mark();
+      }
+      OV.addEventListener('pointerdown', function (ev) { if (tab === 'paint' && ev.button === 0) { paintDown = true; brushAt(ev, true); } });
+      OV.addEventListener('pointerleave', function () { $('brush').setAttribute('hidden', ''); });
+      $('recol').addEventListener('click', function () { if (!src) { status('No model.', 'err'); return; } src.userData.fromFile = true; bind(); });
+
+      // ── Test ──
+      document.querySelectorAll('[data-act]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          E.EDIT.still = false; E.setRoam(false);
+          var a = b.dataset.act;
+          if (a === 'pee') dog.react('fire', { x: 1280 / 2 + (E.holder.position.x > 0 ? -260 : 260) });
+          else dog.act(a, { face: a === 'walk' || a === 'run' ? null : 5 });
+        });
+      });
+
+      // ── Schritte ──
+      function setTab(k) {
+        tab = k;
+        document.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === k)); b.setAttribute('aria-pressed', String(b.dataset.tab === k)); });
+        document.querySelectorAll('[data-pane]').forEach(function (s) { s.hidden = s.dataset.pane !== k; });
+        controls.mouseButtons = k === 'paint' ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        $('brush').setAttribute('hidden', '');
+        if (k === 'poses') setPose(poseKey);
+        else if (k !== 'test') { E.EDIT.still = true; E.hold('idle', 3); }
+        if (src) src.visible = $('showSrc').checked && (k === 'model' || k === 'joints' || k === 'bind');
+        $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Drag the dots into your model. Shift + arrow keys move faster.',
+          bind: 'Binding uses the standing pose.', poses: 'Drag a dot: the bone leading to it turns.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
+      }
+      document.querySelectorAll('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+
+      // ── Speichern / Verwerfen ──
+      $('save').addEventListener('click', function () {
+        if (jointsSinceBind && !window.__rigWarned) { window.__rigWarned = true; status('Joints changed since binding. Bind again (step 3) or press Save once more to keep it.', 'err'); return; }
+        var r = stripSkin(); r.skin = skinJson();
+        status('Saving...');
+        api('POST', { rig: r }).then(function () { dirty = false; window.__rigWarned = false; status('Saved. The dog in OBS uses it after its next reload.', 'ok'); })
+          .catch(function (e) { status('Not saved: ' + e.message, 'err'); });
+      });
+      $('drop').addEventListener('click', function () {
+        if ($('drop').dataset.sure !== '1') { $('drop').dataset.sure = '1'; $('drop').textContent = 'Really? Click again'; setTimeout(function () { $('drop').dataset.sure = ''; $('drop').textContent = 'Back to built-in dog'; }, 4000); return; }
+        api('DELETE').then(function () {
+          rig = { joints: {}, poses: {}, ears: 0, tailUp: 0.45 }; skinData = null; E.setRig(null); E.liveRig(rig); showOrig();
+          $('drop').dataset.sure = ''; $('drop').textContent = 'Back to built-in dog'; status('Removed. The dog uses the built-in model again.', 'ok');
+        }).catch(function (e) { status('Failed: ' + e.message, 'err'); });
+      });
+      window.addEventListener('beforeunload', function (ev) { if (dirty) { ev.preventDefault(); ev.returnValue = ''; } });
+
+      if (/[?&]debug=1/.test(location.search)) window.__rig = { E: E, rig: function () { return rig; }, setPose: setPose, json: function () { var r = stripSkin(); r.skin = skinJson(); return r; } };   // Prüfen im Headless-Browser
+      // ── Start ──
+      function loop() { controls.update(); updateHandles(); requestAnimationFrame(loop); }
+      dog.ready.then(function () {
+        buildHandles(); E.EDIT.still = true; E.hold('idle', 3);
+        setTimeout(function () { view('side'); }, 60);
+        setTab('model'); requestAnimationFrame(loop);
+        return api('GET').then(function (d) {
+          var r = d.rig; if (!r) { status('No own model saved yet. Load your GLB in step 1.'); return; }
+          rig = { joints: r.joints || {}, poses: r.poses || {}, ears: r.ears || 0, tailUp: r.tailUp != null ? r.tailUp : 0.45 };
+          $('ears').value = rig.ears; $('earsO').value = (+rig.ears).toFixed(2); $('tail').value = rig.tailUp; $('tailO').value = (+rig.tailUp).toFixed(2);
+          if (r.skin) {
+            var sk = r.skin;
+            skinData = { pos: dec(sk.pos, Float32Array), idx: dec(sk.idx, Uint32Array), col: dec(sk.col, Uint8Array), j: dec(sk.j, Uint8Array), w: dec(sk.w, Uint8Array), bones: sk.bones, inv: dec(sk.inv, Float32Array) };
+            var geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(skinData.pos.slice(), 3)); geo.setIndex(new THREE.BufferAttribute(skinData.idx.slice(), 1));
+            if (src) { align.remove(src); } src = new THREE.Mesh(geo, mats.src); src.visible = false; align.add(src);   // Ruhelage für erneutes Binden
+            $('showSrc').checked = false; E.setRig(r); showOrig();
+          } else E.liveRig(rig);
+          status('Loaded the saved model.', 'ok');
+        });
+      }).catch(function (e) { status('Could not start: ' + (e && e.message || e), 'err'); });
+    })();
+  </script>
+</body>
+</html>

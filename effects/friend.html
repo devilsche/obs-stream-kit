@@ -27,7 +27,15 @@
       function num(k, d, lo, hi) { var v = parseFloat(p.get(k)); return isNaN(v) ? d : Math.max(lo, Math.min(hi, v)); }
       var reactions = {};
       FriendDog.REACTIONS.forEach(function (ev) { if (p.get('on_' + ev)) reactions[ev] = p.get('on_' + ev); });
+      // eigenes Modell aus dem Rig-Editor (tools/friend-rig.html), falls gespeichert; ?rig=0 = Originalhund
+      var tm = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//);
+      var rigP = tm && p.get('rig') !== '0'
+        ? fetch('/s/' + tm[1] + '/api/fx/friend/rig.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : {}; }).then(function (d) { return d && d.rig || null; }).catch(function () { return null; })
+        : Promise.resolve(null);
+      rigP.then(start);
+      function start(rig) {
       var f = FriendDog.create({
+        rig: rig,
         // Heldentat: nach dem Pinkeln das Feuer wirklich löschen (zählt in der Feuerwehr-Rangliste als „Friend“)
         onExtinguish: function (x) { var mm = location.pathname.match(/^\/s\/([A-Za-z0-9_]+)\//); if (mm) fetch('/s/' + mm[1] + '/api/fx/weather?cmd=extinguish&name=Friend' + (x != null ? '&x=' + Math.round(x) : ''), { cache: 'no-store' }).catch(function () {}); },
         testPose: (p.get('pt') || '').split(',').filter(Boolean).map(function (e) { var q = e.split(':'); return [q[0], parseFloat(q[1]) || 0, q[2] || 'lat']; }),
@@ -92,6 +100,7 @@
             .then(function () { setTimeout(poll, delay); });
         })();
       });
+      }
     })();
   </script>
 </body>

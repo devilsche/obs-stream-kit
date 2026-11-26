@@ -77,6 +77,11 @@ TOOLS = [
      "desc": "Cut the letters and stripes of the Logo 3D apart by hand: outlines over the image, drag points, add or merge parts. Saved cuts replace the automatic split.",
      "path": "tools/logo-cut.html",
      "admin_only": True},
+    {"key": "friend-rig",
+     "label": "Friend dog rig editor",
+     "desc": "Put your own 3D dog model on the friend dog's skeleton: fit it, drag the joints into place, fix sit, down and beg poses, paint the fur, test the moves.",
+     "path": "tools/friend-rig.html",
+     "admin_only": True},
     {"key": "duck-viewer",
      "label": "Rubber duck viewer",
      "desc": "The 3D rubber duck from the party rain, large and freely rotatable (drag, arrow keys, zoom).",
@@ -815,6 +820,36 @@ def logo_cuts_delete(file):
     """Eigene Teile verwerfen: Logo 3D zerlegt das Bild wieder automatisch."""
     from fx import logo_cuts
     return jsonify({"ok": True, "deleted": logo_cuts.delete(_duck_root(), file)})
+
+
+@bp_app.route("/app/api/friend-rig", methods=["GET"])
+@require_admin
+def friend_rig_get():
+    """Friend-Rig-Editor: gespeichertes eigenes Hundemodell (oder null)."""
+    from fx import friend_rig
+    return jsonify({"ok": True, "rig": friend_rig.load(_duck_root())})
+
+
+@bp_app.route("/app/api/friend-rig", methods=["POST"])
+@require_admin
+def friend_rig_save():
+    """Friend-Rig-Editor: eigenes Hundemodell speichern (global, der Hund nimmt es beim nächsten Laden). Nur JSON."""
+    from fx import friend_rig
+    body = request.get_json(silent=True) if request.is_json else None
+    if not isinstance(body, dict):
+        return jsonify({"ok": False, "error": "JSON body expected"}), 400
+    err = friend_rig.save(_duck_root(), body.get("rig"))
+    if err:
+        return jsonify({"ok": False, "error": err}), 400
+    return jsonify({"ok": True})
+
+
+@bp_app.route("/app/api/friend-rig", methods=["DELETE"])
+@require_admin
+def friend_rig_delete():
+    """Eigenes Hundemodell verwerfen: wieder der eingebaute Hund."""
+    from fx import friend_rig
+    return jsonify({"ok": True, "deleted": friend_rig.delete(_duck_root())})
 
 
 @bp_app.route("/app/api/cars/<kind>", methods=["POST"])

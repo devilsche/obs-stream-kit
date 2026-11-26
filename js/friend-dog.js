@@ -46,7 +46,9 @@
     // Rute aufrecht. Pinscher: schlank, hochbeinig, hochgezogener Bauch, Rute schräg.
     var BODIES = {
       pinscher: { build: { len: 1.02, height: 1.04, width: 0.86 }, slim: { belly: 0.78, chest: 0.86, neck: 0.72 }, tailUp: 0.45, tailThin: 0.28, muzzle: 1.4, headW: 0.8, upperLeg: 0.72, earFold: 0.85 },
-      jack: { build: { len: 1.08, height: 0.95, width: 0.9 }, slim: { belly: 0.82, chest: 0.88, neck: 0.78 }, tailUp: 1.0, tailThin: 0.6, muzzle: 1.15, headW: 0.9, upperLeg: 0.85, earFold: 0.85 }
+      jack: { build: { len: 1.08, height: 0.95, width: 0.9 }, slim: { belly: 0.82, chest: 0.88, neck: 0.78 }, tailUp: 1.0, tailThin: 0.6, muzzle: 1.15, headW: 0.9, upperLeg: 0.85, earFold: 0.85 },
+      // eigenes Modell (Rig-Editor, tools/friend-rig.html): Form kommt aus dem Mesh, das Skelett bleibt unverformt
+      custom: { build: { len: 1, height: 1, width: 1 }, slim: { belly: 1, chest: 1, neck: 1 }, tailUp: 0.45, tailThin: 1, muzzle: 1, headW: 1, upperLeg: 1, earFold: 0 }
     };
     var BUILD = BODIES.pinscher.build, SLIM = BODIES.pinscher.slim, MUZZLE = 1, HEADW = 1, UPLEG = 1, buildGroup = null, slimMeshes = [];
 
@@ -66,8 +68,8 @@
               pose: null, poseW: 0, growlLeft: 0, growlNext: 0, growlT: 9, fly: null };
     var CLIPS = { sit: 1, shake: 1, roll: 1, lie: 1, beg: 1, hide: 1, lookup: 1 };
     // Zusatzhaltungen am Skelett (über dem Steh- bzw. Sitz-Clip), weich ein- und ausgeblendet
-    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1, lookup: 1, test: 1, pee: 1 };
-    var SIT_POSES = { beg: 1, hide: 1, lookup: 1 };   // bauen auf der gemerkten Sitzhaltung auf
+    var POSES = { beg: 1, hide: 1, stance: 1, cower: 1, shakeoff: 1, flail: 1, lookup: 1, test: 1, pee: 1, down: 1 };
+    var SIT_POSES = { beg: 1, hide: 1, lookup: 1, down: 1 };   // bauen auf der gemerkten Sitzhaltung auf
     var fxg = null;   // Gruppe für Wirbeln (Tornado) zwischen holder und Körper
     // Pinkelstrahl (Feuer löschen): Tropfen auf einer Wurfparabel vom Becken zum Feuer
     var PEE_N = 46, peePos = new Float32Array(PEE_N * 3), peeA = new Float32Array(PEE_N), peeGeo = new THREE.BufferGeometry();
@@ -78,6 +80,10 @@
       fragmentShader: 'varying float va; void main(){ float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; gl_FragColor = vec4(1.0, 0.86, 0.25, va * (1.0 - r * 1.6)); }' }));
     peeMesh.frustumCulled = false; peeMesh.visible = false; scene.add(peeMesh);
     var FUR_KEY = opt.fur || 'pinscher', BODY_KEY = opt.body || 'pinscher';
+    // Eigenes Modell aus dem Rig-Editor (opt.rig): Mesh mit eigenen Gewichten am selben Skelett, Gelenk-Versatz
+    // (joints: Knochen → lokale Verschiebung) und Haltungs-Korrekturen (poses: Haltung → Knochen → lokale Drehung).
+    var RIG = opt.rig || null, BYNAME = {}, RIGOFF = [], CORR = [], customMesh = null, EDIT = { still: false };
+    if (RIG && RIG.skin) BODY_KEY = 'custom';
 
     var ready = new Promise(function (resolve, reject) {
       new THREE.GLTFLoader().load(opt.model, function (g) {
@@ -89,13 +95,14 @@
         buildGroup = new THREE.Group(); buildGroup.add(inner);   // Körperbau: in Hund-Achsen (x vorn, y hoch, z quer)
         fxg = new THREE.Group(); fxg.add(buildGroup); holder.add(fxg);
         dog.traverse(function (o) {
-          if (o.isBone) { var k = o.name.replace(/_jnt\d+_\d+$/, ''); if (!B[k]) B[k] = o; BIND.push([o, o.quaternion.clone(), o.position.clone()]); }
+          if (o.isBone) { var k = o.name.replace(/_jnt\d+_\d+$/, ''); if (!B[k]) B[k] = o; BYNAME[o.name] = o; BIND.push([o, o.quaternion.clone(), o.position.clone()]); }
           if (o.isMesh) o.frustumCulled = false;
         });
         dog.traverse(function (o) { if (o.isMesh && o.material && o.material.map && !FUR.mat) { FUR.mat = o.material; FUR.orig = o.material.map; } });
         applyFur(FUR_KEY);
         dog.traverse(function (o) { if (o.isSkinnedMesh) slimMeshes.push({ o: o, orig: o.geometry.attributes.position.array.slice() }); });
         applyBody(BODY_KEY);
+        setRig(RIG);
         mixer = new THREE.AnimationMixer(dog);
         g.animations.forEach(function (c) { actions[c.name.replace(/^0\|/, '').replace(/_0$/, '')] = mixer.clipAction(c); });
         // Grundstellung = erstes Bild des Steh-Clips (die Ruhepose der Datei ist keine natürliche Haltung; Knochen ohne
@@ -165,6 +172,7 @@
     // die Beine hängen an eigenen Knochen und bleiben lang), Gesamtproportionen, Rute (Winkel + Dicke)
     function applyBody(key) {
       var bd = BODIES[key] || BODIES.pinscher; BUILD = bd.build; SLIM = bd.slim; TAIL_UP = bd.tailUp; TAIL_THIN = bd.tailThin; MUZZLE = bd.muzzle || 1; HEADW = bd.headW || 1; UPLEG = bd.upperLeg || 1; EAR_FOLD = opt.ears != null ? opt.ears : (bd.earFold || 0);
+      if (RIG && RIG.skin && key === 'custom') { if (RIG.ears != null) EAR_FOLD = RIG.ears; if (RIG.tailUp != null) TAIL_UP = RIG.tailUp; }
       if (buildGroup) buildGroup.scale.set(BUILD.len, BUILD.height, BUILD.width);
       unSnout(); SNOUT.length = 0;
       slimMeshes.forEach(function (m) {
@@ -316,6 +324,63 @@
         })();
       });
       TAIL_SCALE = !!B.tail_1;   // Schwanzglieder jedes Bild auf Maßstab 1 (Clips haben eigene Skalierungsspuren)
+    }
+
+    // ── Eigenes Modell (Rig) ──
+    function b64(s, T) { var bin = atob(s), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return T === Uint8Array ? u : new T(u.buffer); }
+    function buildSkin(sk) {
+      if (customMesh) { customMesh.parent.remove(customMesh); customMesh.geometry.dispose(); customMesh = null; }
+      slimMeshes.forEach(function (m) { m.o.visible = !sk; });
+      if (!sk) return;
+      var bones = sk.bones.map(function (n) { return BYNAME[n]; });
+      if (bones.some(function (b) { return !b; })) { console.error('[friend] rig: unknown bone'); slimMeshes.forEach(function (m) { m.o.visible = true; }); return; }
+      var pos = b64(sk.pos, Float32Array), n = pos.length / 3, col = b64(sk.col, Uint8Array), jj = b64(sk.j, Uint8Array), ww = b64(sk.w, Uint8Array);
+      var inv = b64(sk.inv, Float32Array), geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setIndex(new THREE.BufferAttribute(b64(sk.idx, Uint32Array), 1));
+      var c = new Float32Array(n * 3); for (var i = 0; i < n * 3; i++) c[i] = Math.pow(col[i] / 255, 2.2);   // sRGB → linear
+      geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      var si = new Uint16Array(n * 4), sw = new Float32Array(n * 4);
+      for (var v = 0; v < n; v++) { var s = 0; for (var k = 0; k < 4; k++) { si[v * 4 + k] = jj[v * 4 + k]; sw[v * 4 + k] = ww[v * 4 + k]; s += ww[v * 4 + k]; }
+        for (var k2 = 0; k2 < 4; k2++) sw[v * 4 + k2] = s > 0 ? sw[v * 4 + k2] / s : (k2 ? 0 : 1); }
+      geo.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); geo.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4));
+      geo.computeVertexNormals();
+      var invs = bones.map(function (b, i) { return new THREE.Matrix4().fromArray(inv, i * 16); });
+      var mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.72, metalness: 0, skinning: true });
+      customMesh = new THREE.SkinnedMesh(geo, mat);
+      customMesh.bindMode = 'detached'; customMesh.frustumCulled = false;
+      customMesh.bind(new THREE.Skeleton(bones, invs), new THREE.Matrix4());
+      scene.add(customMesh);
+    }
+    // Gelenk-Versatz: wie SNOUT jedes Bild nach Mixer/Zurücksetzen dazu, vor dem nächsten Bild wieder weg
+    function setRig(r) {
+      RIG = r || null; unRigOff(); RIGOFF = []; unCorrect(); CORR = [];
+      if (RIG && RIG.joints) Object.keys(RIG.joints).forEach(function (nm) { var b = BYNAME[nm], o = RIG.joints[nm]; if (b && o) RIGOFF.push([b, new THREE.Vector3(o[0], o[1], o[2]), false]); });
+      if (slimMeshes.length) buildSkin(RIG && RIG.skin || null);
+    }
+    function unRigOff() { for (var i = 0; i < RIGOFF.length; i++) if (RIGOFF[i][2]) { RIGOFF[i][0].position.sub(RIGOFF[i][1]); RIGOFF[i][2] = false; } }
+    function addRigOff() { for (var i = 0; i < RIGOFF.length; i++) { RIGOFF[i][0].position.add(RIGOFF[i][1]); RIGOFF[i][2] = true; } }
+    // Haltungs-Korrekturen: lokale Drehung je Knochen, gewichtet mit dem Anteil der Haltung; vor dem nächsten Bild
+    // wird die Drehung davor wiederhergestellt (der Sitz-Clip schreibt die Knochen nicht jedes Bild neu)
+    var cq = new THREE.Quaternion(), IDQ = new THREE.Quaternion();
+    function unCorrect() { for (var i = 0; i < CORR.length; i++) CORR[i][0].quaternion.copy(CORR[i][1]); CORR.length = 0; }
+    function clipW(n) { var a = actions[n]; return a && a.isRunning() ? a.getEffectiveWeight() : 0; }
+    function poseWeights(moving) {
+      var beg = S.pose === 'beg' ? S.poseW : 0, down = S.pose === 'down' ? S.poseW : 0;
+      return { stand: clipW('standing') * (1 - Math.min(1, moving * 3)) * (1 - S.poseW), sit: clipW('sitting') * (1 - beg - down), down: down, lie: clipW('play_dead'), beg: beg, paw: clipW('shake') };
+    }
+    function applyCorrect(moving) {
+      if (!RIG || !RIG.poses) return;
+      var w = poseWeights(moving), acc = {};
+      Object.keys(RIG.poses).forEach(function (pk) {
+        var wk = w[pk] || 0, set = RIG.poses[pk]; if (wk < 0.005 || !set) return;
+        Object.keys(set).forEach(function (nm) {
+          var b = BYNAME[nm], q = set[nm]; if (!b || !q) return;
+          cq.set(q[0], q[1], q[2], q[3]).normalize(); var part = IDQ.clone().slerp(cq, Math.min(1, wk));
+          if (!acc[nm]) acc[nm] = [b, part]; else acc[nm][1].multiply(part);
+        });
+      });
+      Object.keys(acc).forEach(function (nm) { var b = acc[nm][0]; CORR.push([b, b.quaternion.clone()]); b.quaternion.multiply(acc[nm][1]); });
     }
 
     function play(name, opts) {
@@ -516,6 +581,8 @@
         hide: [{ do: 'face', hour: face == null ? 6 : face, dur: 0.3 }, { do: 'mode', m: 'sit', face: face == null ? 6 : face, dur: 0.7 },
           { do: 'mode', m: 'hide', face: face == null ? 6 : face, dur: 6 }, { do: 'mode', m: 'idle', dur: 0.6 }],
         beg: PRESETS.beg(face), growl: PRESETS.growl(face), shakeoff: PRESETS.shakeoff(face),
+        down: [{ do: 'face', hour: face == null ? 6 : face, dur: 0.5 }, { do: 'mode', m: 'sit', face: face == null ? 6 : face, dur: 0.7 },
+          { do: 'mode', m: 'down', face: face == null ? 6 : face, dur: 12 }, { do: 'mode', m: 'sit', face: face == null ? 6 : face, dur: 1 }],
         turn: [{ do: 'goto', x: clamp(S.x - S.dir * 1.2), gait: 'walk' }],
         come: [{ do: 'goto', x: (area[0] + area[1]) / 2, gait: 'walk' }, { do: 'mode', m: 'sit', face: 6, dur: 6 }],
         test: [{ do: 'mode', m: 'test', face: face == null ? 3 : face, dur: 60 }]
@@ -599,6 +666,7 @@
         // Steh-Clips), dann nur die eigene Bewegung – sonst addieren sich Drehungen auf (gemessen: bis 2,4 rad nach einer Kehre).
         // Stehen und Clips: nur Knochen zurücksetzen, die der laufende Clip nicht selbst schreibt.
         unSnout();   // Schnauzen-Versatz vom letzten Bild zurücknehmen (Knochen ohne Positionsspur würden sonst aufaddieren)
+        unCorrect(); unRigOff();   // eigenes Modell: Korrekturen und Gelenk-Versatz vom letzten Bild zurücknehmen
         // Haltungen im Stand (Kampfstellung, Ducken, Schütteln, Strampeln) wie das Laufen: alle Knochen aus der Grundstellung,
         // sonst addieren sich die Drehungen Bild für Bild auf (gemessen: Vorderbein nach 1 s senkrecht nach oben)
         var standPose = POSES[S.mode] && !SIT_POSES[S.mode] || (S.poseW > 0.01 && !SIT_POSES[S.pose] && !CLIPS[S.mode]);
@@ -613,7 +681,7 @@
             if (!driven) { BIND[bj][0].quaternion.copy(BIND[bj][1]); BIND[bj][0].position.copy(BIND[bj][2]); }
           }
           if (cur === actions.standing) cur.timeScale = 1;
-          mixer.update(dt);
+          mixer.update(EDIT.still ? 0 : dt);
           // Männchen baut auf der Sitzhaltung auf; der Sitz-Clip ist ein Standbild (Länge 0) und wird nicht jedes Bild neu
           // geschrieben – deshalb die Sitzhaltung einmal merken und jedes Bild wiederherstellen (sonst addiert sich die Pose auf)
           if (SIT_POSES[S.mode] || (SIT_POSES[S.pose] && S.poseW > 0.01)) {
@@ -637,6 +705,7 @@
         // Kippohren (Pinscher): obere Ohrhälfte (Glied ear_tip) nach vorne-unten abknicken, leicht nach außen.
         // Jedes Bild nach dem Mixer, weil alle Clips eigene Ohrspuren haben; die Bewegung der Clips bleibt erhalten.
         for (var sni = 0; sni < SNOUT.length; sni++) { SNOUT[sni][0].position.add(SNOUT[sni][1]); SNOUT[sni][2] = true; }
+        addRigOff();
         if (EAR_FOLD > 0) {
           // Kippohr: ganzes Ohr an der Basis nach vorne kippen (um die Querachse, UP → FWD), Spitze weiter nach vorne-unten
           // knicken. Das Spitzenglied allein bewegt nur das letzte Stück und lässt einen Zacken stehen.
@@ -672,7 +741,7 @@
             tb.updateMatrixWorld(true);
           }
         }
-        var w = S.wag * (1 - 0.4 * moving), wf = 9 + 5 * S.wag;
+        var w = EDIT.still ? 0 : S.wag * (1 - 0.4 * moving), wf = 9 + 5 * S.wag;
         if (TAIL_STRAIGHT) {
           // gerade Rute: Schwung aus der Wurzel – breit seitlich, dazu leicht kreisend auf und ab (auch von der Seite sichtbar)
           turn(B.tail_1, UP, Math.sin(t * wf) * 0.75 * w);
@@ -689,7 +758,7 @@
         // Kopf zum Zuschauer (Rest der Drehung zur Kamera), im Stehen schaut er sich dabei ein wenig um
         // Kopf nur im Stehen zum Zuschauer drehen; bei Clips (Sitzen, Pfote …) führt der Clip den Kopf
         var look = 0;
-        if (S.mode === 'idle') look = (1 - moving) * (-S.dir * 0.3 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.9) * 0.03);
+        if (S.mode === 'idle' && !EDIT.still) look = (1 - moving) * (-S.dir * 0.3 + Math.sin(t * 0.7) * 0.15 + Math.sin(t * 1.9) * 0.03);
         turn(B.neck_base, UP, look * 0.4); turn(B.head, UP, look * 0.6);
         // Zusatzhaltungen (weich ein-/ausgeblendet), Knurren
         S.poseW += ((POSES[S.mode] ? 1 : 0) - S.poseW) * Math.min(1, dt * 6);
@@ -712,6 +781,7 @@
           }
           peeGeo.attributes.position.needsUpdate = peeGeo.attributes.a.needsUpdate = true;
         }
+        applyCorrect(moving);
         // gebeugte Steh-Haltungen: Rumpf so kippen, dass Vorder- und Hinterpfoten gleich hoch stehen (Beine beugen allein
         // hebt nur Pfoten an – gemessen: Hinterpfoten 15 cm in der Luft, Vorderpfoten am Boden)
         if (S.poseW > 0.05 && S.pose && POSES[S.pose] && !SIT_POSES[S.pose] && S.pose !== 'flail' && S.pose !== 'shakeoff' && S.pose !== 'pee' && !S.fly) levelFeet();
@@ -760,6 +830,10 @@
         LEGS.forEach(function (l) { turn(l[0], LAT, 0.8 * w); turn(l[1], LAT, -2.2 * w); turn(l[2], LAT, 2.0 * w); });   // Oberarm dicht am Körper, Ellbogen vorn, Unterarm zur Brust, Pfoten stark abgeknickt
         LEGS.forEach(function (l, i) { turn(l[0], FWD, (i ? -1 : 1) * 0.28 * w); });   // etwas auseinander (kein Händchenhalten)
         turn(B.neck_base, LAT, 0.8 * w); turn(B.head, LAT, 0.05 * w);
+      } else if (name === 'down') {   // Platz: aus dem Sitzen Brust ab, Vorderbeine flach nach vorn, Kopf oben
+        turn(B.spine_1, LAT, 0.42 * w); turn(B.spine_2, LAT, 0.28 * w); turn(B.chest, LAT, 0.2 * w);
+        LEGS.forEach(function (l) { turn(l[0], LAT, -2.0 * w); turn(l[1], LAT, 0.25 * w); turn(l[2], LAT, -0.2 * w); });   // Brust tiefer schwenkt die Beine nach hinten: Schulter weit vor
+        turn(B.neck_base, LAT, -0.55 * w); turn(B.head, LAT, -0.25 * w);
       } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen
         turn(B.spine_1, LAT, 0.4 * w); turn(B.spine_2, LAT, 0.25 * w); turn(B.chest, LAT, 0.15 * w);
         LEGS.forEach(function (l) { turn(l[0], LAT, -1.7 * w); turn(l[1], LAT, 2.3 * w); turn(l[2], LAT, 1.1 * w); });
@@ -879,7 +953,27 @@
 
     ready.then(function () { setMode('idle'); requestAnimationFrame(frame); });
     if (opt.testPose && opt.testPose.length) root.__friendDbg = { S: S, holder: holder, B: B, FEET: FEET };   // nur Vorschau mit ?pt=
-    return { ready: ready, react: react, act: act, weather: weather, setFur: function (k) { FUR_KEY = k; applyFur(k); }, setBody: function (k) { BODY_KEY = k; applyBody(k); } };
+    var api = { ready: ready, react: react, act: act, weather: weather, setFur: function (k) { FUR_KEY = k; applyFur(k); }, setBody: function (k) { BODY_KEY = k; applyBody(k); } };
+    // Rig-Editor (tools/friend-rig.html): Zugriff auf Szene, Knochen und Zustand, Haltung festhalten, Rig live tauschen
+    if (opt.edit) api.edit = {
+      scene: scene, cam: cam, renderer: renderer, holder: holder, B: B, BYNAME: BYNAME, S: S, EDIT: EDIT, FUR: FUR,
+      originals: function () { return slimMeshes.map(function (m) { return m.o; }); },
+      custom: function () { return customMesh; },
+      setRig: function (r) { RIG = r; if (r && r.skin) { BODY_KEY = 'custom'; applyBody('custom'); } setRig(r); },
+      liveRig: function (r) { RIG = r; unRigOff(); RIGOFF = []; if (r && r.joints) Object.keys(r.joints).forEach(function (nm) { var b = BYNAME[nm], o = r.joints[nm]; if (b && o) RIGOFF.push([b, new THREE.Vector3(o[0], o[1], o[2]), false]); });
+        if (r) { if (r.ears != null) EAR_FOLD = r.ears; if (r.tailUp != null) TAIL_UP = r.tailUp; } },
+      hold: function (m, face, clipAt) {
+        plan = []; step = null; roam = false; S.face = face == null ? 3 : face; S.rise = 0; S.x = 0; S.z = 0; S.wag = 0;
+        setMode(m);
+        // festhalten: Überblenden sofort fertig (bei angehaltenem Mixer liefe es nie zu Ende)
+        Object.keys(actions).forEach(function (k) { if (actions[k] !== cur) actions[k].stop(); });
+        if (cur) { cur.stopFading(); cur.setEffectiveWeight(1); if (clipAt != null) cur.time = cur.getClip().duration * clipAt; mixer.update(0); }
+        S.poseW = POSES[m] ? 1 : 0; S.begSnap = null;
+      },
+      setRoam: function (v) { roam = !!v; },
+      time: function () { return t; }
+    };
+    return api;
   }
 
   root.FriendDog = { create: create, REACTIONS: Object.keys(DEFAULT_REACTIONS) };
