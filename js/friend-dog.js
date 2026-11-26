@@ -779,7 +779,7 @@
         // nicht gestreckt weg (sonst wirkt es wie ein Tritt und der Strahl käme aus dem Rücken)
         var an = B[(S.peeSide || 'L') + '_ankle'];
         // Knie/Sprunggelenk um die mitgedrehte Scharnierachse beugen (das Bein steht seitlich, die Weltquerachse wäre falsch)
-        var ab = sd * 1.6 * w, hinge = LAT.clone().applyAxisAngle(FWD, ab);
+        var ab = sd * 2.25 * w, hinge = LAT.clone().applyAxisAngle(FWD, ab);
         turn(hp, LAT, -0.35 * w); turn(hp, FWD, ab); turn(kn, hinge, 1.2 * w); if (an) turn(an, hinge, -0.8 * w);
         turn(B.COG, FWD, -sd * 0.06 * w); tailOver(0.4 * w);
       } else if (name === 'lookup') {   // sitzt und schaut nach oben (Regenbogen, Aurora, Meteore)
