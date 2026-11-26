@@ -156,6 +156,7 @@
       <section data-pane="bind" role="tabpanel" aria-label="Bind" hidden>
         <h2>Bind to the skeleton</h2>
         <p class="small muted">Hangs every point of your model on the nearest bones and takes the black-and-tan colours from the built-in dog. Do this again after moving joints.</p>
+        <div class="row"><label for="wmode">Weights from</label><select id="wmode"><option value="skel" selected>Skeleton (distance to bones)</option><option value="dog">Built-in dog (copy)</option></select></div>
         <div class="row"><button type="button" class="primary" id="bindBtn">Bind model</button></div>
         <p class="small" id="bindInfo"></p>
       </section>
@@ -596,6 +597,36 @@
               D.forEach(function (pos, b) { if (under(b, top)) { pos.x += dx; pos.z += dz; } });
             });
           }
+          // Jedes Hauptgelenk ins Innere des Modells: seitlich in die Mitte des Querschnitts, liegt es darüber oder
+          // darunter, knapp hinein. Knochen darunter (Zehen, Lefzen …) wandern mit, Kindgelenke werden danach selbst geprüft.
+          var rcs = new THREE.Raycaster(), depth = function (b) { var d = 0, q = b; while (q && q.isBone) { d++; q = q.parent; } return d; };
+          function spans(o, dir) {
+            rcs.set(o, dir); rcs.far = 10;
+            var hs = rcs.intersectObject(src, false).map(function (h) { return h.distance; }), out = [];
+            for (var s = 0; s + 1 < hs.length; s += 2) out.push([hs[s], hs[s + 1]]);
+            return out;
+          }
+          function pick(list, v) {   // Intervall, das v enthält, sonst das nächste
+            var best = null, bd = 1e9;
+            list.forEach(function (iv) { var d = v < iv[0] ? iv[0] - v : v > iv[1] ? v - iv[1] : 0; if (d < bd) { bd = d; best = iv; } });
+            return best;
+          }
+          var subtree = function (b, top) { var q = b; while (q) { if (q === top) return true; q = q.parent; } return false; };
+          var mains = JOINTS.map(function (n) { return E.B[n]; }).filter(function (b) { return b && D.has(b); }).sort(function (a2, c2) { return depth(a2) - depth(c2); });
+          src.updateMatrixWorld(true);
+          mains.forEach(function (J) {
+            var p0 = D.get(J), p1 = p0.clone(), FAR = 3;
+            var zs = spans(new THREE.Vector3(p0.x, p0.y, FAR), new THREE.Vector3(0, 0, -1)).map(function (iv) { return [FAR - iv[1], FAR - iv[0]]; });
+            var zi = pick(zs, p0.z); if (zi) p1.z = (zi[0] + zi[1]) / 2;
+            var ys = spans(new THREE.Vector3(p1.x, FAR, p1.z), new THREE.Vector3(0, -1, 0)).map(function (iv) { return [FAR - iv[1], FAR - iv[0]]; });
+            var yi = pick(ys, p0.y);
+            if (yi) { var m = Math.min(0.02, (yi[1] - yi[0]) * 0.3); if (p1.y > yi[1] - m) p1.y = yi[1] - m; else if (p1.y < yi[0] + m) p1.y = yi[0] + m; }
+            var xs = spans(new THREE.Vector3(-FAR, p1.y, p1.z), new THREE.Vector3(1, 0, 0)).map(function (iv) { return [iv[0] - FAR, iv[1] - FAR]; });
+            var xi = pick(xs, p1.x);   // vorn/hinten herausragend (Nasenspitze, Zehen): knapp hinein
+            if (xi) { var mx2 = Math.min(0.015, (xi[1] - xi[0]) * 0.3); if (p1.x > xi[1] - mx2) p1.x = xi[1] - mx2; else if (p1.x < xi[0] + mx2) p1.x = xi[0] + mx2; }
+            var dlt = p1.sub(p0); if (dlt.lengthSq() < 1e-10) return;
+            D.forEach(function (pos, b) { if (subtree(b, J)) pos.add(dlt); });
+          });
           bones.forEach(function (b) {
             if (!D.has(b)) return;
             var pd = D.get(b.parent) || b.parent.getWorldPosition(new THREE.Vector3());
@@ -764,10 +795,32 @@
           var J = new Uint8Array(n * 4), W = new Uint8Array(n * 4), keepCol = skinData && skinData.col && skinData.col.length === n * 3 && !src.userData.fromFile;
           var C = keepCol ? skinData.col : new Uint8Array(n * 3), fur = keepCol ? null : furPixels();
           var GET = ['getX', 'getY', 'getZ', 'getW'];
+          // Gewichte aus dem Skelett: Abstand jedes Punkts zu den Knochenstücken (Gelenk → Kindgelenk; Endglieder
+          // verlängert), nur Stücke nahe am nächsten zählen, 1/d⁴ – wie die automatischen Gewichte in 3D-Programmen
+          var useSkel = $('wmode').value === 'skel', SG = [];
+          if (useSkel) {
+            var mainSet = {}; JOINTS.forEach(function (nm) { if (E.B[nm]) mainSet[nm] = E.B[nm]; });
+            var mainParent = function (b) { var q2 = b.parent; while (q2 && q2.isBone && !mainSet[shortName(q2)]) q2 = q2.parent; return q2 && q2.isBone ? q2 : null; };
+            var kids = {}; Object.keys(mainSet).forEach(function (nm) { var mp = mainParent(mainSet[nm]); if (mp) (kids[mp.name] = kids[mp.name] || []).push(mainSet[nm]); });
+            Object.keys(mainSet).forEach(function (nm) {
+              var Jb = mainSet[nm], oi2 = bonesO.indexOf(Jb), a3 = Jb.getWorldPosition(new THREE.Vector3()); if (oi2 < 0) return;
+              var ks = kids[Jb.name] || [];
+              if (ks.length) ks.forEach(function (kb) { SG.push([a3, kb.getWorldPosition(new THREE.Vector3()), oi2]); });
+              else { var mp2 = mainParent(Jb); if (!mp2) return; var pp2 = mp2.getWorldPosition(new THREE.Vector3()); SG.push([a3, a3.clone().add(a3.clone().sub(pp2).multiplyScalar(0.35)), oi2]); }
+            });
+          }
+          var s1 = new THREE.Vector3(), s2 = new THREE.Vector3(), s3 = new THREE.Vector3();
           for (var q = 0; q < n; q++) {
             var gq = segGroup(P[q * 3], P[q * 3 + 1], P[q * 3 + 2]), gr = grs[gq].ids.length >= 8 ? grs[gq] : grs[NG - 1];
             var nb = nearest(gr, P[q * 3], P[q * 3 + 1], P[q * 3 + 2], 8).map(function (e) { return [e[0], gr.ids[e[1]]]; }), acc = {};
-            for (var t = 0; t < nb.length; t++) {
+            if (useSkel && SG.length) {
+              s3.set(P[q * 3], P[q * 3 + 1], P[q * 3 + 2]);
+              var ds = SG.map(function (sg) { s1.subVectors(sg[1], sg[0]); var L2 = s1.lengthSq(); var tt = L2 > 0 ? Math.max(0, Math.min(1, s2.subVectors(s3, sg[0]).dot(s1) / L2)) : 0;
+                s2.copy(sg[0]).addScaledVector(s1, tt); return s2.distanceTo(s3); });
+              var dmin = Math.min.apply(null, ds);
+              for (var sgi = 0; sgi < SG.length; sgi++) { if (ds[sgi] > dmin * 1.6 + 0.006) continue; var ww2 = 1 / Math.pow(ds[sgi] + 0.004, 4); acc[SG[sgi][2]] = (acc[SG[sgi][2]] || 0) + ww2; }
+            }
+            for (var t = 0; t < nb.length && !(useSkel && SG.length); t++) {
               var wi = 1 / (Math.sqrt(nb[t][0]) + 0.004); wi *= wi;
               for (var c = 0; c < 4; c++) { var bi = si[GET[c]](nb[t][1]), bw = sw[GET[c]](nb[t][1]); if (bw > 0) acc[bi] = (acc[bi] || 0) + bw * wi; }
             }
