@@ -50,7 +50,8 @@
         var url = '/s/' + m[1] + '/api/fx/friend/poll', seq = null, epoch = null;
         // Wetter-Befehle mitlesen (dieselben wie weather.html): Regen, Blitz, Hagel, Tornado, Tsunami … wirken auf den Hund
         if (p.get('weather') !== '0') (function () {
-          var wurl = '/s/' + m[1] + '/api/fx/weather/poll', wseq = null, wep = null;
+          // Wetter aus (power off): der Hund reagiert auf nichts davon – Stand kommt mit dem ersten Poll und per Befehl
+          var wurl = '/s/' + m[1] + '/api/fx/weather/poll', wseq = null, wep = null, wOn = true;
           (function wpoll() {
             var delay = 1000;
             fetch(wurl + (wseq === null ? '' : '?since=' + wseq), { cache: 'no-store' })
@@ -58,8 +59,11 @@
               .then(function (d) {
                 if (wep !== null && d.epoch !== wep) { wep = d.epoch; wseq = 0; delay = 0; return; }
                 wep = d.epoch;
+                if (d.state && d.state.power) wOn = d.state.power !== 'off';
                 if (wseq !== null) (d.commands || []).forEach(function (c) {
                   var q = c.params || {};
+                  if (c.cmd === 'power') { wOn = q.state !== 'off'; return; }
+                  if (!wOn) return;
                   if (c.cmd === 'weather' && q.to) f.weather(q.to);
                   else if (c.cmd === 'strike') f.weather('strike');
                   else if (c.cmd === 'spectacle' && q.type) f.weather(q.type, q);

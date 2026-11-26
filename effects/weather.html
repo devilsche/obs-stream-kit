@@ -222,7 +222,7 @@
       // höchstens alle 8 s; ohne Freischaltung „friend“ lehnt der Server ab.
       var lastFriendFire = 0;
       function friendFire(name, args) {
-        if (name !== 'fire' || args.x == null || !apiBase || !window.obsstudio || Date.now() - lastFriendFire < 8000) return;
+        if (name !== 'fire' || args.x == null || !apiBase || !window.obsstudio || powerOn === false || Date.now() - lastFriendFire < 8000) return;
         lastFriendFire = Date.now();
         fetch(apiBase + 'friend?cmd=react&event=fire&x=' + args.x, { cache: 'no-store' }).catch(function () {});
       }
