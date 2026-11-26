@@ -31,6 +31,8 @@
     .jt.sel { fill: var(--accent); stroke-width: 2.5; }
     .jt:focus-visible { outline: none; stroke: var(--accent); stroke-width: 4; }
     .jt.off { display: none; }
+    .jt.back { opacity: 0.3; } .bone.back { opacity: 0.25; } .jt.back.sel { opacity: 0.85; }
+    .gm { display: inline-flex; gap: 6px; }
     .jt.x, .bone.x { display: none; }
     #ov.all .jt.x, #ov.all .bone.x { display: inline; }
     #ov.all .jt.x.off { display: none; }
@@ -93,12 +95,16 @@
         <button type="button" data-view="back">Back</button>
         <button type="button" data-view="top">Top</button>
         <button type="button" data-view="three">3/4</button>
+        <span class="gm" role="group" aria-label="Handle on the selected joint">
+          <button type="button" data-gm="translate" aria-pressed="true">Move (W)</button>
+          <button type="button" data-gm="rotate">Turn (E, or hold Ctrl)</button>
+        </span>
         <label class="chk vchk"><input type="checkbox" id="allJ"> All joints</label>
       </div>
       <div class="stage" id="stage">
         <canvas id="cv" width="1280" height="800" aria-hidden="true"></canvas>
         <svg id="ov" viewBox="0 0 1280 800" preserveAspectRatio="none" tabindex="0" role="application"
-             aria-label="Dog view. Drag to orbit, mouse wheel to zoom. Joint dots can be dragged or focused with Tab and moved with the arrow keys.">
+             aria-label="Dog view. Drag to orbit, mouse wheel to zoom. Click a joint dot for a 3D handle: arrows move it, rings turn it. Dots can also be focused with Tab and moved with the arrow keys.">
           <g id="bones"></g><g id="joints"></g><circle id="brush" class="brush" r="20" hidden></circle>
         </svg>
         <p class="tip" id="tip">Drag empty space to orbit, wheel to zoom.</p>
@@ -141,7 +147,7 @@
         <p class="small" id="placeInfo" aria-live="polite"></p>
         <div class="jlist" id="jlist" role="group" aria-label="Joints to place"></div>
         <div class="row"><label class="chk"><input type="checkbox" id="mirrorJ" checked> Left and right together</label></div>
-        <p class="small muted">Fine-tune: drag a dot (moves it in the screen plane).</p>
+        <p class="small muted">Fine-tune: drag a dot (moves it in the screen plane), or click it and drag one of the arrows (moves it in depth too). Faded dots are on the far side.</p>
         <div class="row"><label for="ears">Ear fold</label><input id="ears" type="range" min="0" max="1" step="0.01" value="0"><output id="earsO" for="ears">0</output></div>
         <div class="row"><label for="tail">Tail angle</label><input id="tail" type="range" min="-0.6" max="1.5" step="0.01" value="0.45"><output id="tailO" for="tail">0.45</output></div>
         <div class="row"><label for="curl">Tail curl</label><input id="curl" type="range" min="-1.5" max="1.5" step="0.01" value="0"><output id="curlO" for="curl">0</output></div>
@@ -178,7 +184,7 @@
 
       <section data-pane="poses" role="tabpanel" aria-label="Poses" hidden>
         <h2>Fix the poses</h2>
-        <p class="small muted">Pick a pose, then drag a joint: the bone leading to it turns. Fixes are blended in whenever the dog takes that pose.</p>
+        <p class="small muted">Pick a pose, then click a joint. Move (W): the arrows swing the bone leading to it. Turn (E, or hold Ctrl): the rings turn the bone at that joint, with everything after it. Each fix belongs to this pose only. Faded dots are on the far side.</p>
         <div class="row" role="group" aria-label="Pose">
           <button type="button" data-pose="all">All poses</button>
           <button type="button" data-pose="stand">Stand</button>
@@ -234,6 +240,7 @@
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128.min.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-GLTFLoader.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-OrbitControls.js"></script>
+  <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-TransformControls.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/vendor/three-r128-BufferGeometryUtils.js"></script>
   <script src="/s/__WIDGET_TOKEN__/js/friend-dog.js"></script>
   <script>
@@ -316,6 +323,8 @@
       function select(n) {
         sel = n; Object.keys(HANDLES).forEach(function (k) { HANDLES[k].classList.toggle('sel', k === n); });
         $('resetJt').disabled = !n;
+        if (n && (tab === 'joints' || tab === 'poses')) { syncPivot(); tc.attach(pivot); } else tc.detach();
+        gizmoMode();
       }
       var wp = new THREE.Vector3();
       function toScreen(v) { var p = v.clone().project(cam); return [(p.x + 1) / 2 * VW, (1 - p.y) / 2 * VH, p.z]; }
@@ -325,12 +334,49 @@
         if (!show) return;
         E.holder.updateMatrixWorld(true);
         var S = {};
+        // hintere Punkte (hinter der Körpermitte, von der Kamera aus) blass: links und rechts nicht mehr verwechseln
+        var cd = cam.getWorldDirection(new THREE.Vector3()), ctr = E.B.COG.getWorldPosition(new THREE.Vector3());
         Object.keys(HANDLES).forEach(function (n) {
-          E.B[n].getWorldPosition(wp); var s = toScreen(wp); S[n] = s;
-          var c = HANDLES[n]; c.setAttribute('cx', s[0].toFixed(1)); c.setAttribute('cy', s[1].toFixed(1)); c.classList.toggle('off', s[2] > 1);
+          E.B[n].getWorldPosition(wp); var back = wp.clone().sub(ctr).dot(cd) > 0.015, s = toScreen(wp); s[3] = back; S[n] = s;
+          var c = HANDLES[n]; c.setAttribute('cx', s[0].toFixed(1)); c.setAttribute('cy', s[1].toFixed(1)); c.classList.toggle('off', s[2] > 1); c.classList.toggle('back', back);
         });
-        LINES.forEach(function (L) { var a = S[L[1]], b = S[L[2]]; if (!a || !b) return; L[0].setAttribute('x1', a[0]); L[0].setAttribute('y1', a[1]); L[0].setAttribute('x2', b[0]); L[0].setAttribute('y2', b[1]); });
+        LINES.forEach(function (L) { var a = S[L[1]], b = S[L[2]]; if (!a || !b) return; L[0].setAttribute('x1', a[0]); L[0].setAttribute('y1', a[1]); L[0].setAttribute('x2', b[0]); L[0].setAttribute('y2', b[1]); L[0].classList.toggle('back', a[3] && b[3]); });
+        if (!tcDrag) syncPivot();
       }
+
+      // ── 3D-Griff am gewählten Gelenk (wie im Enten-Editor): Pfeile verschieben entlang einer Achse, Ringe drehen ──
+      // Gelenke-Schritt: nur verschieben (Lage im Modell). Haltungen: verschieben dreht den Knochen davor zum Punkt,
+      // drehen dreht den Knochen selbst (samt allem dahinter). Strg gedrückt halten = vorübergehend drehen.
+      var pivot = new THREE.Object3D(); scene.add(pivot);
+      var tc = new THREE.TransformControls(cam, OV); tc.setSize(0.75); tc.setSpace('world'); scene.add(tc);
+      var gMode = 'translate', ctrlHeld = false, tcDrag = null;
+      function syncPivot() { if (sel && E.B[sel]) { E.B[sel].getWorldPosition(pivot.position); pivot.quaternion.identity(); } }
+      function gizmoMode() {
+        var m = tab === 'poses' && (ctrlHeld || gMode === 'rotate') ? 'rotate' : 'translate';
+        if (tc.mode !== m && !tcDrag) tc.setMode(m);
+        document.querySelectorAll('[data-gm]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.gm === m)); b.disabled = b.dataset.gm === 'rotate' && tab !== 'poses'; });
+      }
+      document.querySelectorAll('[data-gm]').forEach(function (b) { b.addEventListener('click', function () { gMode = b.dataset.gm; gizmoMode(); }); });
+      tc.addEventListener('dragging-changed', function (e) { controls.enabled = !e.value; });
+      tc.addEventListener('mouseDown', function () {
+        if (!sel) return; syncPivot();
+        tcDrag = grab(sel, tab === 'poses' ? (tc.mode === 'rotate' ? 'turn' : 'aim') : 'move');
+      });
+      tc.addEventListener('objectChange', function () {
+        if (!tcDrag) return;
+        if (tcDrag.kind === 'turn') applyGrab(tcDrag, null, pivot.quaternion.clone()); else applyGrab(tcDrag, pivot.position.clone());
+      });
+      tc.addEventListener('mouseUp', function () { tcDrag = null; syncPivot(); gizmoMode(); });
+      document.addEventListener('keydown', function (ev) {
+        var typing = /INPUT|SELECT|TEXTAREA/.test((document.activeElement || {}).tagName || '') && document.activeElement.type !== 'range' && document.activeElement.type !== 'checkbox';
+        if (ev.key === 'Control') { ctrlHeld = true; gizmoMode(); return; }
+        if (typing || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+        if (ev.key === 'w' || ev.key === 'W') { gMode = 'translate'; gizmoMode(); }
+        else if (ev.key === 'e' || ev.key === 'E') { gMode = 'rotate'; gizmoMode(); }
+        else if (ev.key === 'Escape' && sel) select(null);
+      });
+      document.addEventListener('keyup', function (ev) { if (ev.key === 'Control') { ctrlHeld = false; gizmoMode(); } });
+      window.addEventListener('blur', function () { if (ctrlHeld) { ctrlHeld = false; gizmoMode(); } });
 
       // Bildschirmpunkt → Punkt auf der Ebene durch den Gelenkpunkt (senkrecht zur Blickrichtung)
       var ray = new THREE.Raycaster();
@@ -374,50 +420,68 @@
         E.liveRig(rig); mark();
       }
       var drag = null;
-      function startDrag(ev) {
-        ev.stopPropagation(); ev.preventDefault();
-        var n = ev.currentTarget.dataset.n; select(n); ev.currentTarget.focus({ preventScroll: true });
-        // Alles vom Zustand beim Anfassen aus rechnen (nicht Schritt für Schritt): zwischen zwei Mausbewegungen ist das
-        // Bild oft noch nicht neu berechnet, Schrittweise lief die Drehung sonst über und sprang hin und her
+      // Zustand beim Anfassen merken und alles davon aus rechnen (nicht Schritt für Schritt): zwischen zwei Mausbewegungen
+      // ist das Bild oft noch nicht neu berechnet, schrittweise lief die Drehung sonst über und sprang hin und her.
+      // kind: move = Gelenk verschieben (Gelenke-Schritt), aim = Knochen davor dreht sich zum Punkt, turn = Knochen selbst drehen
+      function corrState(g, P) {
+        var set = rig.poses[g.key] || {};
+        g.P = P; g.P0 = P.getWorldPosition(new THREE.Vector3()); g.W0 = P.getWorldQuaternion(new THREE.Quaternion());
+        g.C0 = set[P.name] ? new THREE.Quaternion().fromArray(set[P.name]) : new THREE.Quaternion();
+        var pm = mirrorName(shortName(P)), Pm = pm && E.B[pm];
+        if (Pm && $('mirrorP').checked) { g.Pm = Pm; g.W0m = Pm.getWorldQuaternion(new THREE.Quaternion()); g.C0m = set[Pm.name] ? new THREE.Quaternion().fromArray(set[Pm.name]) : new THREE.Quaternion(); }
+      }
+      function grab(n, kind) {
         E.holder.updateMatrixWorld(true);
-        var b = E.B[n], J0 = b.getWorldPosition(new THREE.Vector3()), mn = mirrorName(n), bm = mn && E.B[mn];
-        var bendTail = false, turnMode = tab === 'poses';   // Gelenke-Schritt: nur Position; drehen nur unter Poses
-        drag = { n: n, J0: J0, pid: ev.pointerId, turn: turnMode, key: bendTail ? 'all' : poseKey };
-        if (!turnMode) {
-          drag.O0 = (rig.joints[b.name] || [0, 0, 0]).slice(); drag.M = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
-          if (bm && $('mirrorJ').checked) { drag.bm = bm; drag.O0m = (rig.joints[bm.name] || [0, 0, 0]).slice(); drag.Mm = new THREE.Matrix3().setFromMatrix4(bm.parent.matrixWorld).invert(); }
-        } else if (b.parent && b.parent.isBone) {
-          var P = b.parent, set = rig.poses[drag.key] || {};
-          drag.P = P; drag.P0 = P.getWorldPosition(new THREE.Vector3()); drag.W0 = P.getWorldQuaternion(new THREE.Quaternion());
-          drag.C0 = set[P.name] ? new THREE.Quaternion().fromArray(set[P.name]) : new THREE.Quaternion();
-          var pm = mirrorName(shortName(P)), Pm = pm && E.B[pm];
-          if (Pm && $('mirrorP').checked && !bendTail) { drag.Pm = Pm; drag.W0m = Pm.getWorldQuaternion(new THREE.Quaternion()); drag.C0m = set[Pm.name] ? new THREE.Quaternion().fromArray(set[Pm.name]) : new THREE.Quaternion(); }
-        }
-        OV.setPointerCapture(ev.pointerId);
+        var b = E.B[n]; if (!b) return null;
+        var g = { n: n, J0: b.getWorldPosition(new THREE.Vector3()), kind: kind, key: poseKey }, mn = mirrorName(n), bm = mn && E.B[mn];
+        if (kind === 'move') {
+          g.O0 = (rig.joints[b.name] || [0, 0, 0]).slice(); g.M = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
+          if (bm && $('mirrorJ').checked) { g.bm = bm; g.O0m = (rig.joints[bm.name] || [0, 0, 0]).slice(); g.Mm = new THREE.Matrix3().setFromMatrix4(bm.parent.matrixWorld).invert(); }
+        } else if (kind === 'aim') { if (!b.parent || !b.parent.isBone) return null; corrState(g, b.parent); }
+        else corrState(g, b);
+        return g;
       }
       function setCorr(key, P, C0, W0, q) {
         var set = rig.poses[key] = rig.poses[key] || {};
         var C = C0.clone().multiply(W0.clone().invert().multiply(q).multiply(W0)).normalize();
         set[P.name] = [C.x, C.y, C.z, C.w];
       }
+      // hit: neuer Weltpunkt des Gelenks (move/aim), qd: Weltdrehung seit dem Anfassen (turn)
+      function applyGrab(g, hit, qd) {
+        var b = E.B[g.n];
+        if (g.kind === 'move') {
+          var d = hit.clone().sub(g.J0), l = d.clone().applyMatrix3(g.M);
+          rig.joints[b.name] = [g.O0[0] + l.x, g.O0[1] + l.y, g.O0[2] + l.z];
+          if (g.bm) { var lm = new THREE.Vector3(d.x, d.y, -d.z).applyMatrix3(g.Mm); rig.joints[g.bm.name] = [g.O0m[0] + lm.x, g.O0m[1] + lm.y, g.O0m[2] + lm.z]; }
+          if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
+        } else {
+          var q = qd;
+          if (g.kind === 'aim') {
+            var a = g.J0.clone().sub(g.P0), c = hit.clone().sub(g.P0);
+            if (a.lengthSq() < 1e-10 || c.lengthSq() < 1e-10) return;
+            q = new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize());
+          }
+          setCorr(g.key, g.P, g.C0, g.W0, q);
+          if (g.Pm) setCorr(g.key, g.Pm, g.C0m, g.W0m, new THREE.Quaternion(-q.x, -q.y, q.z, q.w));
+        }
+        E.liveRig(rig); mark();
+      }
+      function startDrag(ev) {
+        ev.stopPropagation(); ev.preventDefault();
+        var n = ev.currentTarget.dataset.n; select(n); ev.currentTarget.focus({ preventScroll: true });
+        drag = grab(n, tab === 'poses' ? (tc.mode === 'rotate' ? 'turn' : 'aim') : 'move'); if (!drag) return;
+        drag.pid = ev.pointerId; drag.x0 = ev.clientX;
+        OV.setPointerCapture(ev.pointerId);
+      }
       OV.addEventListener('pointermove', function (ev) {
         if (tab === 'paint') { brushAt(ev, ev.buttons === 1 && paintDown); return; }
         if (!drag) return;
-        var hit = planeHit(ev, drag.J0); if (!hit) return;
-        var b = E.B[drag.n];
-        if (!drag.turn) {
-          var d = hit.clone().sub(drag.J0), l = d.clone().applyMatrix3(drag.M);
-          rig.joints[b.name] = [drag.O0[0] + l.x, drag.O0[1] + l.y, drag.O0[2] + l.z];
-          if (drag.bm) { var lm = new THREE.Vector3(d.x, d.y, -d.z).applyMatrix3(drag.Mm); rig.joints[drag.bm.name] = [drag.O0m[0] + lm.x, drag.O0m[1] + lm.y, drag.O0m[2] + lm.z]; }
-          if (skinData) { jointsSinceBind = true; $('rebindHint').hidden = false; }
-        } else if (drag.P) {   // Rute biegen (Gelenke-Schritt) bzw. Haltung: Knochen davor dreht sich, Drehung ab Anfassen
-          var a = drag.J0.clone().sub(drag.P0), c = hit.clone().sub(drag.P0);
-          if (a.lengthSq() < 1e-10 || c.lengthSq() < 1e-10) return;
-          var q = new THREE.Quaternion().setFromUnitVectors(a.normalize(), c.normalize());
-          setCorr(drag.key, drag.P, drag.C0, drag.W0, q);
-          if (drag.Pm) setCorr(drag.key, drag.Pm, drag.C0m, drag.W0m, new THREE.Quaternion(-q.x, -q.y, q.z, q.w));
+        if (drag.kind === 'turn') {   // Punkt ziehen im Drehmodus: Knochen um die Blickachse drehen
+          var vd = cam.getWorldDirection(new THREE.Vector3());
+          applyGrab(drag, null, new THREE.Quaternion().setFromAxisAngle(vd, (ev.clientX - drag.x0) * 0.01));
+          return;
         }
-        E.liveRig(rig); mark();
+        var hit = planeHit(ev, drag.J0); if (hit) applyGrab(drag, hit);
       });
       OV.addEventListener('pointerup', function (ev) { if (drag) { try { OV.releasePointerCapture(drag.pid); } catch (e) { /* schon frei */ } drag = null; } paintDown = false; });
       OV.addEventListener('contextmenu', function (ev) { ev.preventDefault(); });
@@ -710,7 +774,7 @@
       }
       function midZ0() { var P = src.geometry.attributes.position, s = 0, v = new THREE.Vector3(); for (var i = 0; i < P.count; i += 5) { v.fromBufferAttribute(P, i).applyMatrix4(src.matrixWorld); s += v.z; } return s / Math.ceil(P.count / 5); }
       OV.addEventListener('pointerdown', function (ev) {
-        if (tab !== 'joints' || !placing || ev.button !== 0) return;
+        if (tab !== 'joints' || !placing || ev.button !== 0 || tc.dragging || tc.axis) return;
         var p = inside(ev); if (!p) { $('placeInfo').textContent = 'Missed the model. Click on it.'; return; }
         var n = placing;
         if (n === '@tailtip') tailTo(p);
@@ -870,7 +934,7 @@
       $('resetJt').addEventListener('click', function () {
         if (!sel) return; var b = E.B[sel];
         if (tab === 'joints') { delete rig.joints[b.name]; }
-        else if (b.parent && rig.poses[poseKey]) delete rig.poses[poseKey][b.parent.name];
+        else if (rig.poses[poseKey]) { if (b.parent) delete rig.poses[poseKey][b.parent.name]; delete rig.poses[poseKey][b.name]; }
         E.liveRig(rig); mark();
       });
 
@@ -1000,6 +1064,8 @@
         document.querySelectorAll('[data-pane]').forEach(function (s) { s.hidden = s.dataset.pane !== k; });
         controls.mouseButtons = k === 'paint' || k === 'shape' ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
         $('brush').setAttribute('hidden', '');
+        if (sel && (k === 'joints' || k === 'poses')) tc.attach(pivot); else tc.detach();
+        gizmoMode();
         if (k === 'poses') setPose(poseKey);
         else if (k !== 'test') { E.EDIT.still = true; E.hold('idle', 3); }
         if (src) src.visible = $('showSrc').checked && (k === 'model' || k === 'joints' || k === 'bind');
@@ -1009,8 +1075,8 @@
         // Gelenke-Schritt: nur dein Modell (fast deckend) und das Skelett, ohne den eingebauten Hund darüber
         if (k === 'joints') { E.originals().forEach(function (o) { o.visible = false; }); mats.src.opacity = 0.8; }
         else { showOrig(); mats.src.opacity = +$('op').value; }
-        $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Pick a joint in the list (or Guided), then click on your model. Right mouse turns the view.',
-          bind: 'Binding uses the standing pose.', shape: 'Left mouse sculpts, right mouse orbits, Ctrl+Z undoes.', poses: 'Drag a dot: the bone leading to it turns.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
+        $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Pick a joint in the list (or Guided), then click on your model. Or click a dot and move it with the arrows.',
+          bind: 'Binding uses the standing pose.', shape: 'Left mouse sculpts, right mouse orbits, Ctrl+Z undoes.', poses: 'Click a dot: arrows turn the bone leading to it, rings (E or Ctrl) turn the bone itself.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
       }
       document.querySelectorAll('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
 

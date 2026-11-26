@@ -690,6 +690,9 @@
             else for (var bs = 0; bs < BIND.length; bs++) { BIND[bs][0].quaternion.copy(S.begSnap[bs][0]); BIND[bs][0].position.copy(S.begSnap[bs][1]); }
           } else S.begSnap = null;
         }
+        // Editor: von Männchen/Platz direkt auf Sitz festgehalten – die gemerkte Sitzhaltung einmal zurückschreiben, der
+        // Sitz-Clip (Standbild) tut es nicht, sonst bliebe die alte Haltung stehen
+        if (S.snapBack) { if (cur === actions.sitting) for (var sb = 0; sb < BIND.length; sb++) { BIND[sb][0].quaternion.copy(S.snapBack[sb][0]); BIND[sb][0].position.copy(S.snapBack[sb][1]); } S.snapBack = null; }
         holder.updateMatrixWorld(true);
         FWD.set(1, 0, 0).applyAxisAngle(UP, holder.rotation.y);
         LAT.crossVectors(UP, FWD).normalize();
@@ -971,7 +974,7 @@
         // festhalten: Überblenden sofort fertig (bei angehaltenem Mixer liefe es nie zu Ende)
         Object.keys(actions).forEach(function (k) { if (actions[k] !== cur) actions[k].stop(); });
         if (cur) { cur.stopFading(); cur.setEffectiveWeight(1); if (clipAt != null) cur.time = cur.getClip().duration * clipAt; mixer.update(0); }
-        S.poseW = POSES[m] ? 1 : 0; S.begSnap = null;
+        S.poseW = POSES[m] ? 1 : 0; if (S.begSnap) S.snapBack = S.begSnap; S.begSnap = null;
       },
       setRoam: function (v) { roam = !!v; },
       time: function () { return t; }
