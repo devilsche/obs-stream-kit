@@ -58,7 +58,7 @@
         vertexShader: S.GLSL + '\n' + [
           'attribute vec2 aCell; attribute vec4 aRnd;',
           'uniform float uT, uCut, uOpen, uDur, uCalm, uR;',
-          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide;',
+          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide, vRest;',
           'void main(){',
           '  float d = clamp(length(aCell / vec2(960.0, 540.0)) / 1.414, 0.0, 1.0);',
           '  float win = uCut - 0.1;',
@@ -77,6 +77,7 @@
           '  world += vec3(dir*(200.0 + aRnd.z*700.0)*eo, mix(-1800.0, 1300.0, aRnd.y)*eo);',
           '  world.y -= 700.0*pOut*pOut;',
           '  world.z += -250.0*(1.0 - pIn);',
+          '  vRest = (pIn >= 1.0 && pOut <= 0.0) ? 1.0 : 0.0;',
           '  if (pIn >= 1.0 && pOut <= 0.0) world = vec3(aCell + position.xy * uR * 1.004, position.z * 34.0);',
           '  vN = Rm * normal; vObj = position.xy; vSide = normal.z > 0.5 ? 0.0 : 1.0;',
           '  vUv = (aCell + position.xy * uR) / vec2(1920.0, 1080.0) + 0.5;',
@@ -90,7 +91,7 @@
         ].join('\n'),
         fragmentShader: S.GLSL + '\n' + [
           'uniform float uT, uCut, uOpen, uHasText; uniform vec3 uP, uA, uA2, uBg; uniform sampler2D uTex;',
-          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide;',
+          'varying vec2 vUv, vObj; varying vec3 vN; varying float vA, vHot, vMove, vSide, vRest;',
           'void main(){',
           '  if (vA <= 0.001) discard;',
           // Seiten und Rückseite der Wabe: dunkles Glas mit Glanz und leuchtender Kante
@@ -108,12 +109,12 @@
           '  vec3 N = normalize(vN), L0 = normalize(vec3(-0.45, 0.55, 0.75));',
           '  c *= 0.6 + 0.3*max(dot(N, L0), 0.0) + 0.2*max(N.z, 0.0);',
           '  c += mix(uA2, vec3(1.0), 0.6) * pow(max(dot(reflect(-L0, N), vec3(0.0, 0.0, 1.0)), 0.0), 20.0) * 0.7;',
-          // Sechseck-Kante (Abstand zum Rand, 1 = Kante) + Schild-Puls kurz vor dem Schnitt
+          // Sechseck-Kante (Abstand zum Rand, 1 = Kante): nur solange die Waben fliegen; geschlossen ist die Wand eine
+          // Fläche ohne Waben (wie Cube und Shards) – erst kurz vor dem Aufbrechen reißen die Kanten auf
           '  vec2 a = abs(vObj); float e = max(a.y, a.x*0.866 + a.y*0.5) / 0.866;',
           '  float line = smoothstep(0.86, 0.97, e);',
-          '  float pulse = exp(-abs(vMove - (uT - (uCut - 0.35))*2.2)*14.0) * step(uT, uCut + 0.2);',
-          '  c += mix(uA2, vec3(1.0), 0.35) * line * (0.18 + vHot*1.2 + pulse*1.6);',
-          '  c += mix(uA2, vec3(1.0), 0.5) * pulse * 0.25;',
+          '  float crack = smoothstep(uOpen - 0.18 + vMove*0.12, uOpen + vMove*0.12, uT);',
+          '  c += mix(uA2, vec3(1.0), 0.35) * line * ((1.0 - vRest)*(0.18 + vHot*1.2) + vRest*crack*1.4);',
           '  gl_FragColor = vec4(c, vA);',
           '}'
         ].join('\n')
