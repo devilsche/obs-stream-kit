@@ -39,11 +39,11 @@
 
       var canvas = document.getElementById('gl'), r;
       try { r = new THREE.WebGLRenderer({ canvas: canvas, alpha: true, antialias: true, preserveDrawingBuffer: !isNaN(AT) }); } catch (e) { console.error('logo-3d: no WebGL'); return; }
-      r.setPixelRatio(1); r.setClearColor(0x000000, 0);
+      r.setPixelRatio(1); r.setClearColor(0x000000, 0); r.autoClear = false;
       var scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(30, 1, 10, 50000);
       if (THREE.RoomEnvironment) scene.environment = new THREE.PMREMGenerator(r).fromScene(new THREE.RoomEnvironment(), 0.04).texture;
-      scene.add(new THREE.AmbientLight(0xffffff, 0.35));
-      var keyL = new THREE.DirectionalLight(0xffffff, 1.2); keyL.position.set(-400, 600, 900); scene.add(keyL);
+      var amb = new THREE.AmbientLight(0xffffff, 0.35); amb.layers.enableAll(); scene.add(amb);
+      var keyL = new THREE.DirectionalLight(0xffffff, 1.2); keyL.position.set(-400, 600, 900); keyL.layers.enableAll(); scene.add(keyL);
       var W = 0, H = 0;
       function resize() {
         W = window.innerWidth || 400; H = window.innerHeight || 152;
@@ -187,6 +187,94 @@
         x.globalCompositeOperation = 'source-in'; x.fillStyle = 'rgba(0,0,0,' + look.alpha.toFixed(2) + ')'; x.fillRect(0, 0, c.width, c.height);
         return { c: c, x0: p.x0 - pad, y0: p.y0 - pad };
       }
+      // ── Buchstaben als echte 3D-Körper ──
+      // Zerlegen nach zusammenhängenden Flächen (nicht nach Spalten: kursive Buchstaben überlappen sich in x), Umriss
+      // samt Löchern (o, R, D) per Marching Squares nachzeichnen, vereinfachen, mit Fase extrudieren. Die Vorderseite
+      // trägt das Originalbild, Fase und Flanken sind Chrom.
+      var LT = 110;   // Deckkraft-Schwelle für den Umriss
+      function splitLetters(px) {
+        var w = px.d.width, h = px.d.height, a = px.d.data, lab = new Int32Array(w * h), st = new Int32Array(w * h), comps = [], n = 0;
+        for (var i = 0; i < w * h; i++) {
+          if (lab[i] || a[i * 4 + 3] < LT) continue;
+          n++; var sp = 0, c = { n: n, x0: w, y0: h, x1: 0, y1: 0, cnt: 0 }; st[sp++] = i; lab[i] = n;
+          while (sp) {
+            var q = st[--sp], x = q % w, y = (q - x) / w; c.cnt++;
+            if (x < c.x0) c.x0 = x; if (x > c.x1) c.x1 = x; if (y < c.y0) c.y0 = y; if (y > c.y1) c.y1 = y;
+            var nb = [x > 0 ? q - 1 : -1, x < w - 1 ? q + 1 : -1, y > 0 ? q - w : -1, y < h - 1 ? q + w : -1];
+            for (var k = 0; k < 4; k++) { var m = nb[k]; if (m >= 0 && !lab[m] && a[m * 4 + 3] >= LT) { lab[m] = n; st[sp++] = m; } }
+          }
+          comps.push(c);
+        }
+        var big = comps.reduce(function (m, c) { return Math.max(m, c.cnt); }, 0);
+        comps = comps.filter(function (c) { return c.cnt > big * 0.04; }).sort(function (p, q) { return p.x0 - q.x0; });
+        if (comps.length < 2 || comps.length > 30) return null;
+        return comps.map(function (c) {
+          var pad = 2, cw = c.x1 - c.x0 + 1 + pad * 2, ch = c.y1 - c.y0 + 1 + pad * 2;
+          var cv = document.createElement('canvas'); cv.width = cw; cv.height = ch;
+          var g = cv.getContext('2d'), id = g.createImageData(cw, ch), mask = new Uint8Array(cw * ch);
+          // nur diese Fläche (samt weichem Rand bis 2 px), Nachbarbuchstaben bleiben draußen
+          for (var y = 0; y < ch; y++) for (var x = 0; x < cw; x++) {
+            var sx = x + c.x0 - pad, sy = y + c.y0 - pad; if (sx < 0 || sy < 0 || sx >= w || sy >= h) continue;
+            var si = sy * w + sx, own = lab[si] === c.n;
+            if (!own && a[si * 4 + 3]) { for (var dy = -2; dy <= 2 && !own; dy++) for (var dx = -2; dx <= 2 && !own; dx++) { var tx = sx + dx, ty = sy + dy; if (tx >= 0 && ty >= 0 && tx < w && ty < h && lab[ty * w + tx] === c.n) own = !lab[si]; } }
+            if (!own) continue;
+            var o = (y * cw + x) * 4; id.data[o] = a[si * 4]; id.data[o + 1] = a[si * 4 + 1]; id.data[o + 2] = a[si * 4 + 2]; id.data[o + 3] = a[si * 4 + 3];
+            if (lab[si] === c.n) mask[y * cw + x] = 1;
+          }
+          g.putImageData(id, 0, 0);
+          return { c: cv, x0: c.x0 - pad, y0: c.y0 - pad, mask: mask, mw: cw, mh: ch };
+        });
+      }
+      // Marching Squares auf der Maske → geschlossene Linienzüge (Pixelkoordinaten, y nach unten)
+      function contours(mask, w, h) {
+        function v(x, y) { return x >= 0 && y >= 0 && x < w && y < h ? mask[y * w + x] : 0; }
+        var next = {}, pts = {};
+        function seg(ax, ay, bx, by) { var ka = ax + ',' + ay, kb = bx + ',' + by; next[ka] = kb; pts[ka] = [ax, ay]; pts[kb] = [bx, by]; }
+        for (var y = -1; y < h; y++) for (var x = -1; x < w; x++) {
+          var tl = v(x, y), tr = v(x + 1, y), br = v(x + 1, y + 1), bl = v(x, y + 1), k = tl * 8 + tr * 4 + br * 2 + bl;
+          var T = [x * 2 + 1, y * 2], R = [x * 2 + 2, y * 2 + 1], B = [x * 2 + 1, y * 2 + 2], L = [x * 2, y * 2 + 1];
+          // Umlauf: Füllung immer rechts der Laufrichtung (y nach unten)
+          var S = { 1: [[L, B]], 2: [[B, R]], 3: [[L, R]], 4: [[R, T]], 5: [[L, T], [R, B]], 6: [[B, T]], 7: [[L, T]],
+                    8: [[T, L]], 9: [[T, B]], 10: [[T, R], [B, L]], 11: [[T, R]], 12: [[R, L]], 13: [[R, B]], 14: [[B, L]] }[k];
+          if (S) S.forEach(function (sg) { seg(sg[0][0], sg[0][1], sg[1][0], sg[1][1]); });
+        }
+        var seen = {}, loops = [];
+        Object.keys(next).forEach(function (k0) {
+          if (seen[k0]) return; var loop = [], k = k0;
+          while (k && !seen[k]) { seen[k] = 1; loop.push([pts[k][0] / 2, pts[k][1] / 2]); k = next[k]; }
+          if (loop.length > 8) loops.push(rdp(loop, 0.6));
+        });
+        return loops;
+      }
+      function rdp(pts, eps) {   // Douglas-Peucker für geschlossene Züge
+        function simp(a, b) {
+          var A = pts[a], Bp = pts[b], dx = Bp[0] - A[0], dy = Bp[1] - A[1], L = Math.hypot(dx, dy) || 1, mx = 0, mi = -1;
+          for (var i = a + 1; i < b; i++) { var d = Math.abs((pts[i][0] - A[0]) * dy - (pts[i][1] - A[1]) * dx) / L; if (d > mx) { mx = d; mi = i; } }
+          return mx > eps ? simp(a, mi).concat(simp(mi, b).slice(1)) : [A, Bp];
+        }
+        var h = pts.length >> 1; return simp(0, h).concat(simp(h, pts.length - 1).slice(1, -1));
+      }
+      function area(l) { var s = 0; for (var i = 0; i < l.length; i++) { var p = l[i], q = l[(i + 1) % l.length]; s += p[0] * q[1] - q[0] * p[1]; } return s / 2; }
+      var CHROME = new THREE.MeshStandardMaterial({ color: 0xd8dbe2, metalness: 1, roughness: 0.22, envMapIntensity: 1.2, transparent: true });
+      function addLetterSolid(p, s, i) {
+        var loops = contours(p.mask, p.mw, p.mh); if (!loops.length) return false;
+        loops.sort(function (a, b) { return Math.abs(area(b)) - Math.abs(area(a)); });
+        var cw = p.mw, ch = p.mh, toV = function (q) { return new THREE.Vector2(q[0] - cw / 2, ch / 2 - q[1]); };
+        var outer = loops[0], shape = new THREE.Shape(outer.map(toV)), so = Math.sign(area(outer));
+        loops.slice(1).forEach(function (l) { if (Math.sign(area(l)) !== so && Math.abs(area(l)) > 4) shape.holes.push(new THREE.Path(l.map(toV))); });
+        var bev = Math.max(1.5, ch * 0.025);
+        var geo = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: true, bevelThickness: 0.35, bevelSize: bev, bevelOffset: -bev, bevelSegments: 4, curveSegments: 1 });
+        geo.translate(0, 0, -0.5); geo.scale(1 / s, 1 / s, 1);
+        var tex = new THREE.CanvasTexture(p.c); tex.encoding = THREE.sRGBEncoding; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+        tex.repeat.set(1 / cw, 1 / ch); tex.offset.set(0.5, 0.5);   // Deckel-UVs sind die Formkoordinaten (Pixel, mittig)
+        // Vorderseite leuchtet aus dem Originalbild (emissiveMap), Licht und Umgebung geben nur etwas Glanz dazu
+        var face = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color(0xffffff).multiplyScalar(0.8), metalness: 0, roughness: 0.45, envMapIntensity: 0.4, transparent: true });
+        face.userData.em = face.emissive.clone();
+        var mesh = new THREE.Mesh(geo, [face, CHROME.clone()]), g = new THREE.Group(); g.add(mesh); root.add(g);
+        mesh.layers.set(1);
+        parts.push({ g: g, front: mesh, sides: [], kind: 1, i: i, solid: true, letter: true, x0: p.x0 / s, y0: p.y0 / s, w: cw / s, h: ch / s });
+        return true;
+      }
       function whole(px) {
         var w = px.d.width, h = px.d.height, a = px.d.data, x0 = w, y0 = h, x1 = 0, y1 = 0;
         for (var i = 0; i < w * h; i++) if (a[i * 4 + 3]) { var x = i % w, y = (i - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -251,8 +339,14 @@
         if (!p || p.kind !== 1) return;
         var tex = new THREE.CanvasTexture(q.c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
         var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frontMat(tex)); m.renderOrder = 12;
-        m.material.uniforms.uBold.value = 0; p.g.add(m);
+        m.material.uniforms.uBold.value = 0; p.g.add(m); if (p.letter) m.layers.set(1);
         p.shadow = { m: m, x0: q.x0 / s, y0: q.y0 / s, w: q.c.width / s, h: q.c.height / s };
+      }
+      function placeShadow(p, th, lz) {   // relativ zum Buchstaben, dahinter
+        if (!p.shadow) return; var d = p.shadow;
+        d.m.scale.set(d.w * SC, d.h * SC, 1);
+        d.m.position.set((d.x0 + d.w / 2 - p.x0 - p.w / 2) * SC, (p.y0 + p.h / 2 - d.y0 - d.h / 2) * SC, lz ? -lz * 0.6 : -th * 1.2);
+        if (lz) d.m.scale.z = 1;
       }
       function layout() {
         if (!parts.length) return;
@@ -261,14 +355,16 @@
         var th = Math.max(2, bh * SC * 0.018);   // Dicke ≈ 2 % der Logohöhe
         parts.forEach(function (p) {
           p.home = new THREE.Vector3((p.x0 + p.w / 2 - (box.x0 + box.x1) / 2) * SC, ((box.y0 + box.y1) / 2 - (p.y0 + p.h / 2)) * SC, [0, th * 1.6, th * 0.4][p.kind]);
+          if (p.solid && p.letter) {   // Buchstabe: Tiefe ≈ 15 % seiner Höhe, Vorderseite vorn wie bisher die flachen Buchstaben
+            var lz = Math.max(4, p.h * SC * 0.15); p.front.scale.set(SC, SC, lz); p.home.z = th * 1.6 - lz * 0.4;
+            placeShadow(p, th, lz); return;
+          }
           if (p.solid) { var dz = Math.max(8, bh * SC * 0.16); p.front.scale.set(SC, SC, dz); p.home.z = -dz * 0.8; return; }   // hinter der Schrift
           p.front.scale.set(p.w * SC, p.h * SC, 1);
           p.sides.forEach(function (m, k) { m.scale.copy(p.front.scale); m.position.z = -(k + 1) * th / LAYERS; });
           var u = p.front.material.uniforms; u.uOff.value.set((p.x0 - box.x0) / bw, (p.y0 - box.y0) / bh); u.uSize.value.set(p.w / bw, p.h / bh);
           u.uBold.value = [0.45, 0.85, 0][p.kind];
-          if (p.shadow) { var d = p.shadow;   // relativ zum Buchstaben, dahinter
-            d.m.scale.set(d.w * SC, d.h * SC, 1);
-            d.m.position.set((d.x0 + d.w / 2 - p.x0 - p.w / 2) * SC, (p.y0 + p.h / 2 - d.y0 - d.h / 2) * SC, -th * 1.2); }
+          placeShadow(p, th, 0);
         });
         if (halo) halo.scale.set(bw * SC * 1.25, bh * SC * 1.6, 1);
       }
@@ -280,8 +376,12 @@
           var px = pixels(im, Math.min(1, 2048 / Math.max(im.naturalWidth, im.naturalHeight)));
           var ks = px.c.width / ref.naturalWidth;   // Teile in Koordinaten des ersten Bilds
           var sep = kind ? separateShadow(px) : { face: px, shadow: null };
-          var list = (kind ? splitColumns(sep.face, im.naturalWidth > px.c.width ? pixels(im, 1) : px) : splitBlobs(px)) || whole(sep.face);
-          list.forEach(function (p, i) { addPart(p, ks, kind, i); });
+          var letters = kind ? splitLetters(sep.face) : null, list;
+          if (letters) { list = letters; letters.forEach(function (p, i) { if (!addLetterSolid(p, ks, i)) addPart(p, ks, 1, i); }); }
+          else {
+            list = (kind ? splitColumns(sep.face, im.naturalWidth > px.c.width ? pixels(im, 1) : px) : splitBlobs(px)) || whole(sep.face);
+            list.forEach(function (p, i) { addPart(p, ks, kind, i); });
+          }
           if (sep.shadow && kind && list.length > 1) { var look = shadowLook(sep.shadow, sep.face);
             list.forEach(function (q, i) { addShadow(parts[parts.length - list.length + i], letterShadow(q, look), ks); }); }
           else if (sep.shadow) whole(sep.shadow).forEach(function (p) { addPart(p, ks, 2, 0); });
@@ -358,8 +458,12 @@
           }
         }
         if (p.solid) {
-          p.front.material.opacity = fade * p.front.material.userData.base; p.front.visible = fade > 0.002;
-          p.front.material.emissive.copy(ACC).multiplyScalar(flash * 0.6);
+          p.front.visible = fade > 0.002;
+          [].concat(p.front.material).forEach(function (mt) {
+            mt.opacity = fade * (mt.userData.base || 1);
+            if (mt.userData.em) mt.emissive.copy(mt.userData.em).lerp(ACC, flash * 0.6);
+            else if (mt.emissive) mt.emissive.copy(ACC).multiplyScalar(flash * 0.6);
+          });
           return;
         }
         p.front.material.uniforms.uFade.value = fade;
@@ -389,7 +493,9 @@
         }
         // leicht von oben und schräg: so sieht man Ober- und Seitenflächen der Streifen; sanftes Schwenken zeigt die Tiefe
         root.rotation.x = -0.22; root.rotation.y = REDUCED ? 0.1 : Math.sin(t * 0.5) * 0.16;
-        r.render(scene, cam);
+        // zwei Durchgänge: erst Streifen, dann Tiefenpuffer leeren und die Buchstaben-Körper – so liegen die Buchstaben
+        // immer vorn (auch wenn Streifen sich drehen), haben aber unter sich korrekte Tiefe (Fase, Flanken)
+        r.clear(); cam.layers.set(0); r.render(scene, cam); r.clearDepth(); cam.layers.set(1); r.render(scene, cam);
         tLast = t;
         if (isNaN(AT)) requestAnimationFrame(frame);
       }
