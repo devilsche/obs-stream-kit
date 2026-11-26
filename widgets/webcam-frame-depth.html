@@ -117,11 +117,57 @@
 
       // ── Emotes ──
       var R = 0, texCache = {}, ETEX_DEMO = [];
+      // Emote als Textur. Bewegte Emotes (GIF/WebP von Twitch, 7TV, FFZ) laufen mit: ImageDecoder (WebCodecs, in OBS ab
+      // Chromium 94 da) zerlegt sie in Einzelbilder, die im Takt ihrer Bilddauer auf eine Canvas-Textur gemalt werden.
+      // Ohne ImageDecoder oder bei Fehlern bleibt es beim Standbild.
+      var ANIM = [];
       function emoteTex(url) {
         if (texCache[url]) return texCache[url];
-        var t = new THREE.TextureLoader().setCrossOrigin('anonymous').load(url, undefined, undefined, function () { console.error('webcam-frame-depth: emote not loaded', url); t._bad = true; });
-        t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
-        texCache[url] = t; return t;
+        var c = document.createElement('canvas'); c.width = c.height = 2;
+        var t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+        t._pending = true; texCache[url] = t;
+        fetch(url, { mode: 'cors' }).then(function (res) {
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          var type = (res.headers.get('content-type') || '').split(';')[0].trim();
+          return res.arrayBuffer().then(function (buf) { return decodeFrames(buf, type); });
+        }).then(function (fr) {
+          if (!fr.length) throw new Error('no frames');
+          c.width = fr[0].b.width; c.height = fr[0].b.height;
+          t._frames = fr; t._cur = -1; t._total = fr.reduce(function (s, f) { return s + f.d; }, 0);
+          drawFrame(t, 0); t._pending = false;
+          if (fr.length > 1 && t._total > 0) ANIM.push(t);
+        }).catch(function (err) { console.error('webcam-frame-depth: emote not loaded', url, String(err)); t._bad = true; });
+        return t;
+      }
+      async function decodeFrames(buf, type) {
+        if (window.ImageDecoder && /^image\/(gif|webp|png|avif|apng)$/.test(type)) {
+          try {
+            if (await ImageDecoder.isTypeSupported(type)) {
+              var d = new ImageDecoder({ data: buf, type: type }); await d.tracks.ready;
+              var n = Math.min(120, d.tracks.selectedTrack ? d.tracks.selectedTrack.frameCount : 1), out = [];
+              for (var i = 0; i < n; i++) {
+                var r = await d.decode({ frameIndex: i }), vf = r.image;
+                out.push({ b: await createImageBitmap(vf), d: Math.max(20, (vf.duration || 100000) / 1000) });
+                vf.close();
+              }
+              d.close();
+              if (out.length) return out;
+            }
+          } catch (e) { /* Standbild */ }
+        }
+        return [{ b: await createImageBitmap(new Blob([buf], { type: type || 'image/png' })), d: 0 }];
+      }
+      function drawFrame(t, k) {
+        if (t._cur === k) return;
+        var c = t.image, x = c.getContext('2d'); x.clearRect(0, 0, c.width, c.height); x.drawImage(t._frames[k].b, 0, 0, c.width, c.height);
+        t._cur = k; t.needsUpdate = true;
+      }
+      function tickAnim(ms) {
+        for (var i = 0; i < ANIM.length; i++) {
+          var t = ANIM[i], f = t._frames, at = ms % t._total, k = 0;
+          while (k < f.length - 1 && at >= f[k].d) { at -= f[k].d; k++; }
+          drawFrame(t, k);
+        }
       }
       // Unicode-Emoji (Windows-Emoji-Leiste) als Textur: Systemschrift für Farb-Emojis
       function emojiTex(e) {
@@ -279,7 +325,7 @@
         // Emotes
         var showFront = on('front'), sp = 0;
         emoteMeshes.forEach(function (m, i) {
-          var e = E[i]; m.visible = !!e && showFront && !!e.tex && !e.tex._bad && !!e.tex.image; if (!m.visible) return;
+          var e = E[i]; m.visible = !!e && showFront && !!e.tex && !e.tex._bad && !e.tex._pending && !!e.tex.image; if (!m.visible) return;
           m.material.map = e.tex; m.material.needsUpdate = m.material.userData.t !== e.tex; m.material.userData.t = e.tex;
           m.position.set(e.p.x, e.p.y, 30); m.rotation.z = e.a;
           var age = t - e.born; m.scale.setScalar((2 * R + 4) * (0.4 + 0.6 * Math.min(1, age * 6)));
@@ -299,6 +345,7 @@
         for (; sp < SPK; sp++) spA[sp] = 0;
         sparkG.attributes.position.needsUpdate = sparkG.attributes.a.needsUpdate = true;
         sparks.visible = showFront;
+        if (ANIM.length) tickAnim(performance.now());
         r.render(scene, cam);
         if (isNaN(AT)) requestAnimationFrame(frame);
       }
