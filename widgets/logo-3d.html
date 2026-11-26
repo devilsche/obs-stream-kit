@@ -242,7 +242,7 @@
         Object.keys(next).forEach(function (k0) {
           if (seen[k0]) return; var loop = [], k = k0;
           while (k && !seen[k]) { seen[k] = 1; loop.push([pts[k][0] / 2, pts[k][1] / 2]); k = next[k]; }
-          if (loop.length > 8) loops.push(rdp(loop, 0.6));
+          if (loop.length > 8) loops.push(chaikin(rdp(loop, 1.1), 2));
         });
         return loops;
       }
@@ -254,8 +254,37 @@
         }
         var h = pts.length >> 1; return simp(0, h).concat(simp(h, pts.length - 1).slice(1, -1));
       }
+      // Ecken leicht abrunden, Pixeltreppen glätten (sonst wirken die Flanken wie zerkratzt)
+      function chaikin(l, it) {
+        for (var k = 0; k < it; k++) {
+          var o = [];
+          for (var i = 0; i < l.length; i++) { var p = l[i], q = l[(i + 1) % l.length];
+            o.push([p[0] * 0.75 + q[0] * 0.25, p[1] * 0.75 + q[1] * 0.25], [p[0] * 0.25 + q[0] * 0.75, p[1] * 0.25 + q[1] * 0.75]); }
+          l = o;
+        }
+        return l;
+      }
+      // weiche Normalen über flache Knicke (< 40°), harte Kanten bleiben – ExtrudeGeometry liefert nur Facetten
+      function creaseNormals(geo) {
+        var P = geo.attributes.position.array, N = new Float32Array(P.length), fn = [], map = {}, i, j, cosT = Math.cos(40 * Math.PI / 180);
+        var a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+        for (i = 0; i < P.length / 9; i++) {
+          a.fromArray(P, i * 9); b.fromArray(P, i * 9 + 3); c.fromArray(P, i * 9 + 6);
+          var f = new THREE.Vector3().subVectors(c, b).cross(b.clone().sub(a)).normalize(); fn.push(f);
+          for (j = 0; j < 3; j++) { var v = i * 3 + j, key = Math.round(P[v * 3] * 100) + ',' + Math.round(P[v * 3 + 1] * 100) + ',' + Math.round(P[v * 3 + 2] * 1000); (map[key] = map[key] || []).push(v); }
+        }
+        Object.keys(map).forEach(function (key) {
+          var vs = map[key];
+          vs.forEach(function (v) {
+            var own = fn[(v / 3) | 0], sum = new THREE.Vector3();
+            vs.forEach(function (u) { var o = fn[(u / 3) | 0]; if (own.dot(o) > cosT) sum.add(o); });
+            sum.normalize(); N[v * 3] = sum.x; N[v * 3 + 1] = sum.y; N[v * 3 + 2] = sum.z;
+          });
+        });
+        geo.setAttribute('normal', new THREE.BufferAttribute(N, 3));
+      }
       function area(l) { var s = 0; for (var i = 0; i < l.length; i++) { var p = l[i], q = l[(i + 1) % l.length]; s += p[0] * q[1] - q[0] * p[1]; } return s / 2; }
-      var CHROME = new THREE.MeshStandardMaterial({ color: 0xd8dbe2, metalness: 1, roughness: 0.22, envMapIntensity: 1.2, transparent: true });
+      var CHROME = new THREE.MeshStandardMaterial({ color: 0x9da3ae, metalness: 1, roughness: 0.28, envMapIntensity: 1.0, transparent: true });
       function addLetterSolid(p, s, i) {
         var loops = contours(p.mask, p.mw, p.mh); if (!loops.length) return false;
         loops.sort(function (a, b) { return Math.abs(area(b)) - Math.abs(area(a)); });
@@ -264,14 +293,14 @@
         loops.slice(1).forEach(function (l) { if (Math.sign(area(l)) !== so && Math.abs(area(l)) > 4) shape.holes.push(new THREE.Path(l.map(toV))); });
         var bev = Math.max(1.5, ch * 0.025);
         var geo = new THREE.ExtrudeGeometry(shape, { depth: 1, bevelEnabled: true, bevelThickness: 0.35, bevelSize: bev, bevelOffset: -bev, bevelSegments: 4, curveSegments: 1 });
-        geo.translate(0, 0, -0.5); geo.scale(1 / s, 1 / s, 1);
-        var tex = new THREE.CanvasTexture(p.c); tex.encoding = THREE.sRGBEncoding; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+        geo.translate(0, 0, -0.5); creaseNormals(geo); geo.scale(1 / s, 1 / s, 1);
+        var tex = new THREE.CanvasTexture(p.c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;   // ohne sRGB-Umrechnung: Ausgabe ist linear, so bleibt das Bild so hell wie im Original
         tex.repeat.set(1 / cw, 1 / ch); tex.offset.set(0.5, 0.5);   // Deckel-UVs sind die Formkoordinaten (Pixel, mittig)
         // Vorderseite leuchtet aus dem Originalbild (emissiveMap), Licht und Umgebung geben nur etwas Glanz dazu
-        var face = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color(0xffffff).multiplyScalar(0.8), metalness: 0, roughness: 0.45, envMapIntensity: 0.4, transparent: true });
+        var face = new THREE.MeshStandardMaterial({ map: tex, color: 0x555555, emissiveMap: tex, emissive: new THREE.Color(0xffffff).multiplyScalar(0.92), metalness: 0, roughness: 0.4, envMapIntensity: 0.3, transparent: true });
         face.userData.em = face.emissive.clone();
         var mesh = new THREE.Mesh(geo, [face, CHROME.clone()]), g = new THREE.Group(); g.add(mesh); root.add(g);
-        mesh.layers.set(1);
+        mesh.layers.set(1); mesh.renderOrder = 20;   // nach dem Schatten (12), sonst legt der sich grau über den Buchstaben
         parts.push({ g: g, front: mesh, sides: [], kind: 1, i: i, solid: true, letter: true, x0: p.x0 / s, y0: p.y0 / s, w: cw / s, h: ch / s });
         return true;
       }
@@ -355,8 +384,8 @@
         var th = Math.max(2, bh * SC * 0.018);   // Dicke ≈ 2 % der Logohöhe
         parts.forEach(function (p) {
           p.home = new THREE.Vector3((p.x0 + p.w / 2 - (box.x0 + box.x1) / 2) * SC, ((box.y0 + box.y1) / 2 - (p.y0 + p.h / 2)) * SC, [0, th * 1.6, th * 0.4][p.kind]);
-          if (p.solid && p.letter) {   // Buchstabe: Tiefe ≈ 15 % seiner Höhe, Vorderseite vorn wie bisher die flachen Buchstaben
-            var lz = Math.max(4, p.h * SC * 0.15); p.front.scale.set(SC, SC, lz); p.home.z = th * 1.6 - lz * 0.4;
+          if (p.solid && p.letter) {   // Buchstabe: Tiefe ≈ 12 % seiner Höhe, Vorderseite vorn wie bisher die flachen Buchstaben
+            var lz = Math.max(4, p.h * SC * 0.12); p.front.scale.set(SC, SC, lz); p.home.z = th * 1.6 - lz * 0.4;
             placeShadow(p, th, lz); return;
           }
           if (p.solid) { var dz = Math.max(8, bh * SC * 0.16); p.front.scale.set(SC, SC, dz); p.home.z = -dz * 0.8; return; }   // hinter der Schrift
@@ -492,7 +521,7 @@
           halo.material.uniforms.uMix.value = 0.5 + 0.5 * Math.sin(t * 2.5);
         }
         // leicht von oben und schräg: so sieht man Ober- und Seitenflächen der Streifen; sanftes Schwenken zeigt die Tiefe
-        root.rotation.x = -0.22; root.rotation.y = REDUCED ? 0.1 : Math.sin(t * 0.5) * 0.16;
+        root.rotation.x = -0.12; root.rotation.y = REDUCED ? 0.1 : Math.sin(t * 0.5) * 0.16;
         // zwei Durchgänge: erst Streifen, dann Tiefenpuffer leeren und die Buchstaben-Körper – so liegen die Buchstaben
         // immer vorn (auch wenn Streifen sich drehen), haben aber unter sich korrekte Tiefe (Fase, Flanken)
         r.clear(); cam.layers.set(0); r.render(scene, cam); r.clearDepth(); cam.layers.set(1); r.render(scene, cam);
