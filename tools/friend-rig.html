@@ -37,6 +37,11 @@
     .jt.x { stroke-width: 1; }
     .bone.x { stroke: rgba(255, 255, 255, 0.3); stroke-width: 1; }
     .vchk { margin-left: auto; color: var(--muted); }
+    .jlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin: 6px 0; }
+    .jlist button { font-size: 12px; padding: 3px 6px; min-height: 26px; text-align: left; background: transparent; border-color: var(--line); }
+    .jlist button.done { border-color: var(--ok); }
+    .jlist button[aria-pressed="true"] { background: var(--btn-hi); }
+    #ov.placing { cursor: crosshair; }
     .brush { fill: none; stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
     .tip { position: absolute; left: 10px; bottom: 8px; margin: 0; padding: 4px 8px; background: rgba(10, 14, 22, 0.75); border-radius: 6px; color: var(--muted); font-size: 12px; pointer-events: none; }
     .panel { background: var(--panel); border-left: 1px solid var(--line); overflow-y: auto; padding: 0 14px 24px; display: flex; flex-direction: column; }
@@ -131,12 +136,16 @@
 
       <section data-pane="joints" role="tabpanel" aria-label="Joints" hidden>
         <h2>Place the joints</h2>
-        <p class="small muted">Drag every dot to where that joint sits inside your model: hips, knees, shoulders, elbows, head, ears, tail. Check side and front view. Blue = left, orange = right.</p>
-        <div class="row"><label class="chk"><input type="checkbox" id="mirrorJ" checked> Move left and right together</label></div>
+        <p class="small muted">Pick a joint, then click on your model where it is. The joint goes into the middle of the body at that spot. Only position here; turning is in step 5.</p>
+        <div class="row"><button type="button" class="primary" id="guide">Guided: place all</button><button type="button" class="ghost" id="placeStop" hidden>Stop placing</button></div>
+        <p class="small" id="placeInfo" aria-live="polite"></p>
+        <div class="jlist" id="jlist" role="group" aria-label="Joints to place"></div>
+        <div class="row"><label class="chk"><input type="checkbox" id="mirrorJ" checked> Left and right together</label></div>
+        <p class="small muted">Fine-tune: drag a dot (moves it in the screen plane).</p>
         <div class="row"><label for="ears">Ear fold</label><input id="ears" type="range" min="0" max="1" step="0.01" value="0"><output id="earsO" for="ears">0</output></div>
         <div class="row"><label for="tail">Tail angle</label><input id="tail" type="range" min="-0.6" max="1.5" step="0.01" value="0.45"><output id="tailO" for="tail">0.45</output></div>
         <div class="row"><label for="curl">Tail curl</label><input id="curl" type="range" min="-1.5" max="1.5" step="0.01" value="0"><output id="curlO" for="curl">0</output></div>
-        <p class="small muted">Tail dots bend the tail when dragged (in every pose). Curl rolls it up (+) or down (−).</p>
+        <p class="small muted">Curl rolls the tail up (+) or down (−). Bending single tail joints: step 5, "All poses".</p>
         <div class="row"><button type="button" id="straightBtn">Straighten stance</button></div>
         <p class="small muted">The built-in standing pose is slightly crooked (head turned, ears uneven, paws uneven). Straighten fixes the standing pose; Auto-place does it first anyway.</p>
         <div class="row"><button type="button" id="autoJ">Auto-place joints</button><button type="button" class="ghost" id="resetJ">Reset joints</button></div>
@@ -371,7 +380,7 @@
         // Bild oft noch nicht neu berechnet, Schrittweise lief die Drehung sonst über und sprang hin und her
         E.holder.updateMatrixWorld(true);
         var b = E.B[n], J0 = b.getWorldPosition(new THREE.Vector3()), mn = mirrorName(n), bm = mn && E.B[mn];
-        var bendTail = tab === 'joints' && /^tail_[2-7]$/.test(n), turnMode = tab === 'poses' || bendTail;
+        var bendTail = false, turnMode = tab === 'poses';   // Gelenke-Schritt: nur Position; drehen nur unter Poses
         drag = { n: n, J0: J0, pid: ev.pointerId, turn: turnMode, key: bendTail ? 'all' : poseKey };
         if (!turnMode) {
           drag.O0 = (rig.joints[b.name] || [0, 0, 0]).slice(); drag.M = new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert();
@@ -417,7 +426,7 @@
         ev.preventDefault(); var n = ev.currentTarget.dataset.n, step = ev.shiftKey ? 0.02 : 0.004;
         var right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0), up = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
         var d = right.multiplyScalar(dx * step).add(up.multiplyScalar(dy * step));
-        var bend = tab === 'joints' && /^tail_[2-7]$/.test(n);
+        var bend = false;
         if (tab === 'joints' && !bend) moveJoint(n, d);
         else if (tab === 'poses' || bend) {
           var b = E.B[n]; if (!b.parent || !b.parent.isBone) return;
@@ -605,22 +614,86 @@
               if (vv.x > T.x + 0.03 || vv.y < T.y - 0.02) continue;
               var dd = vv.distanceTo(T); if (dd > best) { best = dd; tip = vv.clone(); }
             }
-            if (tip && best > 0.04) {
-              var ang = Math.atan2(tip.y - T.y, T.x - tip.x);
-              rig.tailUp = Math.max(-0.6, Math.min(1.5, ang)); $('tail').value = rig.tailUp; $('tailO').value = rig.tailUp.toFixed(2);
-              var chain = []; for (var k = 2; k <= 7; k++) if (E.B['tail_' + k]) chain.push(E.B['tail_' + k]);
-              var cur = 0, prev = T.clone(); chain.forEach(function (bn) { var q = bn.getWorldPosition(new THREE.Vector3()); cur += q.distanceTo(prev); prev = q; });
-              var f = cur > 0 ? best * 0.92 / cur : 1;   // Spitze sitzt etwas vor dem letzten Punkt
-              chain.forEach(function (bn) {
-                var base = bn.position.clone(), o = rig.joints[bn.name]; if (o) base.sub(new THREE.Vector3(o[0], o[1], o[2]));
-                var want = bn.position.clone().multiplyScalar(f), off = want.sub(base); rig.joints[bn.name] = [off.x, off.y, off.z];
-              });
-              E.liveRig(rig);
-            }
+            if (tip && best > 0.04) tailTo(tip);
             status('Joints placed. Check legs, head, ears and tail, then bind.', 'ok');
           }, 200);
         });
       });
+      // Rute auf eine Spitze ausrichten: Winkel (die Rute wird jedes Bild gerade gerichtet) und Länge der Glieder
+      function tailTo(tip) {
+        E.holder.updateMatrixWorld(true);
+        var T = E.B.tail_1.getWorldPosition(new THREE.Vector3()), len = tip.distanceTo(T);
+        rig.tailUp = Math.max(-0.6, Math.min(1.5, Math.atan2(tip.y - T.y, T.x - tip.x))); $('tail').value = rig.tailUp; $('tailO').value = rig.tailUp.toFixed(2);
+        var chain = []; for (var k = 2; k <= 7; k++) if (E.B['tail_' + k]) chain.push(E.B['tail_' + k]);
+        var cur = 0, prev = T.clone(), Lc = 0, Lb = 0, bases = [];
+        chain.forEach(function (bn) {
+          var q = bn.getWorldPosition(new THREE.Vector3()); cur += q.distanceTo(prev); prev = q;
+          var o = rig.joints[bn.name], base = bn.position.clone(); if (o) base.sub(new THREE.Vector3(o[0], o[1], o[2]));
+          Lc += bn.position.length(); Lb += base.length(); bases.push(base);
+        });
+        if (!Lc || !Lb || !cur) return;
+        var g = (len * 0.92 / (cur / Lc)) / Lb;   // Spitze sitzt etwas vor dem letzten Punkt
+        chain.forEach(function (bn, i) { var off = bases[i].clone().multiplyScalar(g - 1); rig.joints[bn.name] = [off.x, off.y, off.z]; });
+        E.liveRig(rig); mark();
+      }
+      // ── Gelenke auf das Modell setzen: Klick → Strahl durch das Modell, Mitte zwischen Ein- und Austritt ──
+      var PLACE = [['pelvis', 'Hips'], ['spine_1', 'Back'], ['chest', 'Chest'], ['neck_base', 'Neck base'], ['neck_mid', 'Neck'], ['head', 'Head'],
+        ['jaw', 'Jaw'], ['nose', 'Nose tip'], ['L_ear_base', 'Left ear root'], ['L_ear_tip', 'Left ear fold'], ['R_ear_base', 'Right ear root'], ['R_ear_tip', 'Right ear fold'],
+        ['L_shoulder', 'Left shoulder'], ['L_elbow', 'Left elbow'], ['L_wrist', 'Left wrist'], ['LF_toes', 'Left front paw'],
+        ['R_shoulder', 'Right shoulder'], ['R_elbow', 'Right elbow'], ['R_wrist', 'Right wrist'], ['RF_toes', 'Right front paw'],
+        ['L_hip', 'Left hip'], ['L_knee', 'Left knee'], ['L_ankle', 'Left hock'], ['LB_toes', 'Left hind paw'],
+        ['R_hip', 'Right hip'], ['R_knee', 'Right knee'], ['R_ankle', 'Right hock'], ['RB_toes', 'Right hind paw'],
+        ['tail_1', 'Tail root'], ['@tailtip', 'Tail tip']];
+      var placing = null, guided = false, placed = {};
+      PLACE.forEach(function (e) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = e[1]; b.dataset.j = e[0]; b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', function () { guided = false; arm(e[0]); }); $('jlist').appendChild(b);
+      });
+      function label(n) { var e = PLACE.filter(function (x) { return x[0] === n; })[0]; return e ? e[1] : n; }
+      function arm(n) {
+        placing = n;
+        document.querySelectorAll('#jlist button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.j === n)); b.classList.toggle('done', !!placed[b.dataset.j]); });
+        OV.classList.toggle('placing', !!n); controls.mouseButtons = n ? { LEFT: null, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE } : { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+        $('placeStop').hidden = !n;
+        $('placeInfo').textContent = n ? 'Click on your model where the ' + label(n).toLowerCase() + ' is. Right mouse turns the view.' : '';
+        if (n && n !== '@tailtip' && E.B[n]) select(n);
+      }
+      function nextGuided(n) {
+        var i = PLACE.findIndex(function (e) { return e[0] === n; }), mir = $('mirrorJ').checked;
+        for (var k = i + 1; k < PLACE.length; k++) { var m = PLACE[k][0]; if (mir && /^R/.test(m)) continue; return m; }
+        return null;
+      }
+      function inside(ev) {
+        if (!src) return null;
+        var was = src.visible; src.visible = true; src.updateMatrixWorld(true);
+        var hits = screenRay(ev).intersectObject(src, false); src.visible = was;
+        if (!hits.length) return null;
+        if (hits.length > 1) return hits[0].point.clone().add(hits[1].point).multiplyScalar(0.5);
+        return hits[0].point.clone().add(screenRay(ev).ray.direction.clone().multiplyScalar(0.03));
+      }
+      function placeJoint(n, target) {
+        E.holder.updateMatrixWorld(true);
+        var b = E.B[n], cur = b.getWorldPosition(new THREE.Vector3());
+        var l = target.clone().sub(cur).applyMatrix3(new THREE.Matrix3().setFromMatrix4(b.parent.matrixWorld).invert());
+        var o = rig.joints[b.name] || [0, 0, 0]; rig.joints[b.name] = [o[0] + l.x, o[1] + l.y, o[2] + l.z];
+      }
+      function midZ0() { var P = src.geometry.attributes.position, s = 0, v = new THREE.Vector3(); for (var i = 0; i < P.count; i += 5) { v.fromBufferAttribute(P, i).applyMatrix4(src.matrixWorld); s += v.z; } return s / Math.ceil(P.count / 5); }
+      OV.addEventListener('pointerdown', function (ev) {
+        if (tab !== 'joints' || !placing || ev.button !== 0) return;
+        var p = inside(ev); if (!p) { $('placeInfo').textContent = 'Missed the model. Click on it.'; return; }
+        var n = placing;
+        if (n === '@tailtip') tailTo(p);
+        else {
+          placeJoint(n, p);
+          var mn = mirrorName(n);
+          if ($('mirrorJ').checked && mn && E.B[mn]) { var mz = midZ0(); placeJoint(mn, new THREE.Vector3(p.x, p.y, 2 * mz - p.z)); placed[mn] = 1; }
+        }
+        placed[n] = 1; E.liveRig(rig); mark(); if (skinData) jointsSinceBind = true;
+        var nx = guided ? nextGuided(n) : null;
+        setTimeout(function () { arm(nx); if (!nx) { guided = false; $('placeInfo').textContent = 'Placed. Check from the front too, then go on.'; } }, 60);
+      });
+      $('guide').addEventListener('click', function () { guided = true; placed = {}; arm(PLACE[0][0]); });
+      $('placeStop').addEventListener('click', function () { guided = false; arm(null); });
       $('curl').addEventListener('input', function () { rig.tailCurl = +$('curl').value; $('curlO').value = rig.tailCurl.toFixed(2); E.liveRig(rig); mark(); });
       $('resetJ').addEventListener('click', function () { rig.joints = {}; E.liveRig(rig); mark(); status('Joints reset.'); });
 
@@ -867,6 +940,7 @@
       function setTab(k) {
         // Gelenke nach dem Binden verschoben: beim Verlassen des Gelenke-Schritts automatisch neu binden
         var leaving = tab === 'joints' && k !== 'joints';
+        if (leaving && placing) { guided = false; arm(null); }
         tab = k;
         if (leaving && skinData && jointsSinceBind) setTimeout(function () { status('Joints changed: binding again...'); bind(); }, 50);
         document.querySelectorAll('[data-tab]').forEach(function (b) { b.setAttribute('aria-selected', String(b.dataset.tab === k)); b.setAttribute('aria-pressed', String(b.dataset.tab === k)); });
@@ -878,8 +952,11 @@
         if (src) src.visible = $('showSrc').checked && (k === 'model' || k === 'joints' || k === 'bind');
         // Gelenke setzen am unverformten Modell: das gebundene würde beim Ziehen mitgezerrt
         var cm = E.custom(); if (cm) cm.visible = !(k === 'joints' && skinData);
-        if (k === 'joints' && skinData && src) src.visible = true;
-        $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Drag the dots into your model. Shift + arrow keys move faster.',
+        if (k === 'joints' && src) src.visible = true;
+        // Gelenke-Schritt: nur dein Modell (fast deckend) und das Skelett, ohne den eingebauten Hund darüber
+        if (k === 'joints') { E.originals().forEach(function (o) { o.visible = false; }); mats.src.opacity = 0.8; }
+        else { showOrig(); mats.src.opacity = +$('op').value; }
+        $('tip').textContent = { model: 'Drag empty space to orbit, wheel to zoom.', joints: 'Pick a joint in the list (or Guided), then click on your model. Right mouse turns the view.',
           bind: 'Binding uses the standing pose.', shape: 'Left mouse sculpts, right mouse orbits, Ctrl+Z undoes.', poses: 'Drag a dot: the bone leading to it turns.', paint: 'Left mouse paints, right mouse orbits.', test: 'The dog moves on its own now.' }[k];
       }
       document.querySelectorAll('[data-tab]').forEach(function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
