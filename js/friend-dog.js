@@ -732,7 +732,7 @@
         var bob = Math.sin(t * 3.2) * 0.05;
         // Oberkörper senkrecht über dem Becken (wie stehend), Kopf schaut nach vorn
         turn(B.spine_1, LAT, -(0.5 + bob) * w); turn(B.spine_2, LAT, -0.32 * w); turn(B.chest, LAT, -0.2 * w);
-        LEGS.forEach(function (l) { turn(l[0], LAT, -0.2 * w); turn(l[1], LAT, -1.2 * w); turn(l[2], LAT, 1.35 * w); });   // Oberarm schräg vor-unten, Ellbogen vorn, Unterarm zur Brust, Pfoten hängen
+        LEGS.forEach(function (l) { turn(l[0], LAT, 0.8 * w); turn(l[1], LAT, -2.2 * w); turn(l[2], LAT, 2.0 * w); });   // Oberarm dicht am Körper, Ellbogen vorn, Unterarm zur Brust, Pfoten stark abgeknickt
         LEGS.forEach(function (l, i) { turn(l[0], FWD, (i ? -1 : 1) * 0.28 * w); });   // etwas auseinander (kein Händchenhalten)
         turn(B.neck_base, LAT, 0.8 * w); turn(B.head, LAT, 0.05 * w);
       } else if (name === 'hide') {   // Platz und Pfoten über den Kopf: Bauch am Boden, Kopf zwischen den Vorderbeinen
