@@ -154,8 +154,6 @@ DECOR = [
           "options": [["both", "Wave and shine"], ["wave", "Wave"], ["shine", "Shine"], ["off", "Off"]]},
          {"key": "intro",  "label": "Intro on load", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
          {"key": "alerts", "label": "Replay on alerts", "type": "select", "default": "1", "options": [["1", "On"], ["0", "Off"]]},
-         {"key": "glow",   "label": "Glow", "type": "select", "default": "theme",
-          "options": [["theme", "Theme colours"], ["purple", "Purple"], ["gold", "Gold"], ["off", "Off"]]},
          {"key": "lines",  "label": "Stripes image", "type": "text", "default": "", "placeholder": "logo_lines_blue_t.png",
           "tooltip": "File in assets/ – stripes are split into separate parts"},
          {"key": "text",   "label": "Text image", "type": "text", "default": "", "placeholder": "logo_text_luckor_hd.png",

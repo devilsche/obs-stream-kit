@@ -10,7 +10,7 @@
        nacheinander mit Salto, blitzen bei der Landung, dann läuft ein Glanz durch. Leerlauf alle `pause` Sekunden:
        Welle durch die Streifen + Buchstaben hüpfen mit Drehung, und/oder Glanz. Bei Alerts spielt das Intro neu.
        URL: lines, text (Dateien in assets/, wie logo.html), pause (s, Standard 10), idle (both|wave|shine|off),
-       intro (1|0), alerts (1|0), glow (theme|purple|gold|off|Hex). Größe = Browser-Source, das Logo passt sich ein. -->
+       intro (1|0), alerts (1|0), glow (off|theme|purple|gold|Hex, Standard off). Größe = Browser-Source, das Logo passt sich ein. -->
   <link rel="stylesheet" href="_theme.css">
   <style>
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
@@ -33,7 +33,7 @@
 
       function col(n, fb, into) { var v = (getComputedStyle(document.documentElement).getPropertyValue(n) || '').trim(), c = into || new THREE.Color(); c.set(fb); try { if (v) c.set(v); } catch (e) {} return c; }
       var ACC = col('--theme-accent', '#f2b705'), PRI = col('--theme-primary', '#5e2a79');
-      var glowP = (P.get('glow') || 'theme').replace(/^#?([0-9a-f]{6})$/i, '#$1');
+      var glowP = (P.get('glow') || 'off').replace(/^#?([0-9a-f]{6})$/i, '#$1');
       var GLOW_A = glowP === 'gold' ? new THREE.Color('#f2b705') : glowP === 'purple' ? new THREE.Color('#5e2a79') : /^#/.test(glowP) ? new THREE.Color(glowP) : PRI;
       var GLOW_B = glowP === 'theme' ? ACC : GLOW_A;
 
@@ -155,8 +155,8 @@
         });
       }
       /* Weicher Schlagschatten im Textbild (reines Schwarz, halbdeckend) gehört nicht zu den Buchstaben: er käme beim
-         Zerschneiden in harten Streifen mit und würde sich mitdrehen. Er wird herausgelöst und liegt als eine Fläche
-         still auf den Streifen; die Buchstaben behalten Schrift und Kontur. */
+         Zerschneiden in harten Streifen mit und würde sich mitdrehen. Er wird herausgelöst und je Buchstabe als eigene
+         Fläche dahinter gehängt (shadowSlices), dreht sich also mit; die Buchstaben behalten Schrift und Kontur. */
       function separateShadow(px) {
         var w = px.d.width, h = px.d.height, a = px.d.data;
         var sc = document.createElement('canvas'); sc.width = w; sc.height = h;
@@ -169,6 +169,21 @@
         var fc = document.createElement('canvas'); fc.width = w; fc.height = h; fc.getContext('2d').putImageData(fd, 0, 0);
         return { face: { c: fc, d: fd }, shadow: { c: sc, d: sd } };
       }
+      // Schatten je Buchstabe: dieselben Spalten wie die Buchstaben, um den Versatz des Schattens verschoben – so hängt
+      // jedes Stück am eigenen Buchstaben und dreht und hüpft mit ihm.
+      function shadowSlices(sh, face, list) {
+        function cx(px) { var w = px.d.width, h = px.d.height, a = px.d.data, sx = 0, n = 0; for (var i = 0; i < w * h; i++) { var v = a[i * 4 + 3]; if (v) { sx += (i % w) * v; n += v; } } return n ? sx / n : 0; }
+        var off = Math.round(cx(sh) - cx(face)), w = sh.d.width, h = sh.d.height;
+        return list.map(function (p, i) {
+          var a0 = i ? p.x0 + off : 0, a1 = i < list.length - 1 ? p.x0 + p.c.width + off : w;
+          a0 = Math.max(0, a0); a1 = Math.min(w, a1); if (a1 - a0 < 2) return null;
+          var c = document.createElement('canvas'); c.width = a1 - a0; c.height = h;
+          var g = c.getContext('2d'); g.drawImage(sh.c, a0, 0, c.width, h, 0, 0, c.width, h);
+          var r = whole({ c: c, d: g.getImageData(0, 0, c.width, h) })[0];
+          if (r) r.x0 += a0;
+          return r;
+        });
+      }
       function whole(px) {
         var w = px.d.width, h = px.d.height, a = px.d.data, x0 = w, y0 = h, x1 = 0, y1 = 0;
         for (var i = 0; i < w * h; i++) if (a[i * 4 + 3]) { var x = i % w, y = (i - x) / w; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
@@ -178,11 +193,12 @@
         return [{ c: c, x0: x0, y0: y0 }];
       }
 
+      // Buchstaben und Schatten ohne Tiefentest: sie liegen immer vor den Streifen, auch wenn die sich drehen.
       // Teil mit Dicke: Vorderseite mit Glanz/Blitz, dahinter abgedunkelte Lagen (wirken beim Drehen wie eine Kante)
       var LAYERS = 7, root = new THREE.Group(); scene.add(root);
       var parts = [], halo, box = { x0: 0, y0: 0, x1: 1, y1: 1 }, SC = 1;
       function frontMat(tex) {
-        return new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false,
+        return new THREE.ShaderMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false, depthTest: false,
           uniforms: { uTex: { value: tex }, uShine: { value: -9 }, uFlash: { value: 0 }, uFade: { value: 1 }, uAcc: { value: ACC },
             uOff: { value: new THREE.Vector2() }, uSize: { value: new THREE.Vector2(1, 1) }, uBold: { value: 0.6 } },
           vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
@@ -206,7 +222,7 @@
         var inset = 6 / s * (2048 / 4200) * 2;
         pc.forEach(function (v, k) { var dx = v[0] - mx, dy = v[1] - my, L = Math.hypot(dx, dy) || 1, X = v[0] - dx / L * inset, Y = v[1] - dy / L * inset; if (k) sh.lineTo(X, Y); else sh.moveTo(X, Y); });
         var bev = 6 / s * (2048 / 4200) * 2;   // feine Fase (≈ 6 px im Bild), wächst nicht mit dem schrägen Umriss
-        var geo = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: true, bevelThickness: 0.25, bevelSize: bev, bevelSegments: 3 });
+        var geo = new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: true, bevelThickness: 0.12, bevelSize: bev, bevelSegments: 3 });
         geo.translate(0, 0, -0.5);
         var colr = p.col ? new THREE.Color(p.col[0], p.col[1], p.col[2]).convertSRGBToLinear() : new THREE.Color(0x2f6fff);
         var mat = new THREE.MeshStandardMaterial({ color: colr, metalness: 0.45, roughness: 0.3, envMapIntensity: 1.0, transparent: true, emissive: new THREE.Color(0) });
@@ -222,11 +238,18 @@
         var sides = [];
         for (var k = 1; k <= (kind === 2 ? 0 : LAYERS); k++) {
           var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.45,
-            side: THREE.DoubleSide, color: new THREE.Color().setScalar(0.78 - k * 0.03), depthWrite: false }));
+            side: THREE.DoubleSide, color: new THREE.Color().setScalar(0.78 - k * 0.03), depthWrite: false, depthTest: false }));
           m.renderOrder = [1, 21, 11][kind]; g.add(m); sides.push(m);
         }
         root.add(g);
         parts.push({ g: g, front: front, sides: sides, kind: kind, i: i, x0: p.x0 / s, y0: p.y0 / s, w: p.c.width / s, h: p.c.height / s });
+      }
+      function addShadow(p, q, s) {
+        if (!p || p.kind !== 1) return;
+        var tex = new THREE.CanvasTexture(q.c); tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+        var m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), frontMat(tex)); m.renderOrder = 12;
+        m.material.uniforms.uBold.value = 0; p.g.add(m);
+        p.shadow = { m: m, x0: q.x0 / s, y0: q.y0 / s, w: q.c.width / s, h: q.c.height / s };
       }
       function layout() {
         if (!parts.length) return;
@@ -235,11 +258,14 @@
         var th = Math.max(2, bh * SC * 0.018);   // Dicke ≈ 2 % der Logohöhe
         parts.forEach(function (p) {
           p.home = new THREE.Vector3((p.x0 + p.w / 2 - (box.x0 + box.x1) / 2) * SC, ((box.y0 + box.y1) / 2 - (p.y0 + p.h / 2)) * SC, [0, th * 1.6, th * 0.4][p.kind]);
-          if (p.solid) { var dz = Math.max(3, bh * SC * 0.05); p.front.scale.set(SC, SC, dz); p.home.z = -dz * 0.8; return; }   // hinter der Schrift
+          if (p.solid) { var dz = Math.max(8, bh * SC * 0.16); p.front.scale.set(SC, SC, dz); p.home.z = -dz * 0.8; return; }   // hinter der Schrift
           p.front.scale.set(p.w * SC, p.h * SC, 1);
           p.sides.forEach(function (m, k) { m.scale.copy(p.front.scale); m.position.z = -(k + 1) * th / LAYERS; });
           var u = p.front.material.uniforms; u.uOff.value.set((p.x0 - box.x0) / bw, (p.y0 - box.y0) / bh); u.uSize.value.set(p.w / bw, p.h / bh);
           u.uBold.value = [0.45, 0.85, 0][p.kind];
+          if (p.shadow) { var d = p.shadow;   // relativ zum Buchstaben, dahinter
+            d.m.scale.set(d.w * SC, d.h * SC, 1);
+            d.m.position.set((d.x0 + d.w / 2 - p.x0 - p.w / 2) * SC, (p.y0 + p.h / 2 - d.y0 - d.h / 2) * SC, -th * 1.2); }
         });
         if (halo) halo.scale.set(bw * SC * 1.25, bh * SC * 1.6, 1);
       }
@@ -253,7 +279,8 @@
           var sep = kind ? separateShadow(px) : { face: px, shadow: null };
           var list = (kind ? splitColumns(sep.face, im.naturalWidth > px.c.width ? pixels(im, 1) : px) : splitBlobs(px)) || whole(sep.face);
           list.forEach(function (p, i) { addPart(p, ks, kind, i); });
-          if (sep.shadow) whole(sep.shadow).forEach(function (p) { addPart(p, ks, 2, 0); });
+          if (sep.shadow && kind && list.length > 1) shadowSlices(sep.shadow, sep.face, list).forEach(function (q, i) { if (q) addShadow(parts[parts.length - list.length + i], q, ks); });
+          else if (sep.shadow) whole(sep.shadow).forEach(function (p) { addPart(p, ks, 2, 0); });
         });
         if (!parts.length) return;
         box = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
@@ -314,6 +341,7 @@
             }
           }
           flash = Math.max(0, 1 - Math.abs(q - 1) * 5) * 0.8;
+          if (p.shadow) p.shadow.m.material.uniforms.uFade.value = Math.min(1, Math.max(0, (q - 0.8) / 0.5));
         }
         // Leerlauf: alle PAUSE s nach dem Intro
         var since = a - introLen();
@@ -355,6 +383,8 @@
           halo.material.uniforms.uK.value = on * (0.35 + 0.15 * Math.sin(t * 2.5));
           halo.material.uniforms.uMix.value = 0.5 + 0.5 * Math.sin(t * 2.5);
         }
+        // leicht von oben und schräg: so sieht man Ober- und Seitenflächen der Streifen; sanftes Schwenken zeigt die Tiefe
+        root.rotation.x = -0.22; root.rotation.y = REDUCED ? 0.1 : Math.sin(t * 0.5) * 0.16;
         r.render(scene, cam);
         tLast = t;
         if (isNaN(AT)) requestAnimationFrame(frame);
